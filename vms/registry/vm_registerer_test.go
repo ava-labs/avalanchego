@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -104,7 +104,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 		AddRoute(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -133,7 +133,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 		AddRoute(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -163,7 +163,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 		AddRoute(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -172,9 +172,9 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	// Adding aliases fails
 	resources.mockServer.EXPECT().
 		AddAliases(
-			path.Join(constants.VMAliasPrefix, id.String()),
-			path.Join(constants.VMAliasPrefix, aliases[0]),
-			path.Join(constants.VMAliasPrefix, aliases[1]),
+			path.Join(constant.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, aliases[0]),
+			path.Join(constant.VMAliasPrefix, aliases[1]),
 		).
 		Return(errTest)
 
@@ -201,7 +201,7 @@ func TestRegisterHappyCase(t *testing.T) {
 		AddRoute(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -209,9 +209,9 @@ func TestRegisterHappyCase(t *testing.T) {
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
 	resources.mockServer.EXPECT().
 		AddAliases(
-			path.Join(constants.VMAliasPrefix, id.String()),
-			path.Join(constants.VMAliasPrefix, aliases[0]),
-			path.Join(constants.VMAliasPrefix, aliases[1]),
+			path.Join(constant.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, aliases[0]),
+			path.Join(constant.VMAliasPrefix, aliases[1]),
 		).
 		Times(1).
 		Return(nil)
@@ -300,7 +300,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 		AddRouteWithReadLock(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -329,7 +329,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 		AddRouteWithReadLock(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -359,7 +359,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 		AddRouteWithReadLock(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -368,9 +368,9 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	// Adding aliases fails
 	resources.mockServer.EXPECT().
 		AddAliasesWithReadLock(
-			path.Join(constants.VMAliasPrefix, id.String()),
-			path.Join(constants.VMAliasPrefix, aliases[0]),
-			path.Join(constants.VMAliasPrefix, aliases[1]),
+			path.Join(constant.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, aliases[0]),
+			path.Join(constant.VMAliasPrefix, aliases[1]),
 		).
 		Return(errTest)
 
@@ -397,7 +397,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 		AddRouteWithReadLock(
 			handlers["foo"],
 			gomock.Any(),
-			path.Join(constants.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, id.String()),
 			"foo",
 		).
 		Times(1).
@@ -405,9 +405,9 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
 	resources.mockServer.EXPECT().
 		AddAliasesWithReadLock(
-			path.Join(constants.VMAliasPrefix, id.String()),
-			path.Join(constants.VMAliasPrefix, aliases[0]),
-			path.Join(constants.VMAliasPrefix, aliases[1]),
+			path.Join(constant.VMAliasPrefix, id.String()),
+			path.Join(constant.VMAliasPrefix, aliases[0]),
+			path.Join(constant.VMAliasPrefix, aliases[1]),
 		).
 		Times(1).
 		Return(nil)

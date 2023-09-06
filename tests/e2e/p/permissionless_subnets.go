@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -47,7 +47,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			ginkgo.By("retrieving the node ID of a primary network validator", func() {
 				pChainClient := platformvm.NewClient(nodeURI)
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
-				validatorIDs, err := pChainClient.SampleValidators(ctx, constants.PrimaryNetworkID, 1)
+				validatorIDs, err := pChainClient.SampleValidators(ctx, constant.PrimaryNetworkID, 1)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
 				gomega.Expect(validatorIDs).Should(gomega.HaveLen(1))
@@ -71,7 +71,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				cancel()
 
 				subnetID = subnetTx.ID()
-				gomega.Expect(subnetID, err).Should(gomega.Not(gomega.Equal(constants.PrimaryNetworkID)))
+				gomega.Expect(subnetID, err).Should(gomega.Not(gomega.Equal(constant.PrimaryNetworkID)))
 			})
 
 			var subnetAssetID ids.ID
@@ -99,7 +99,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := xWallet.IssueExportTx(
-					constants.PlatformChainID,
+					constant.PlatformChainID,
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{

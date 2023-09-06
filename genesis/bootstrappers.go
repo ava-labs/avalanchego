@@ -4,13 +4,12 @@
 package genesis
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -38,7 +37,7 @@ type Bootstrapper struct {
 
 // SampleBootstrappers returns the some beacons this node should connect to
 func SampleBootstrappers(networkID uint32, count int) []Bootstrapper {
-	networkName := constants.NetworkIDToNetworkName[networkID]
+	networkName := constant.NetworkIDToNetworkName[networkID]
 	bootstrappers := bootstrappersPerNetwork[networkName]
 	count = math.Min(count, len(bootstrappers))
 

@@ -5,13 +5,12 @@ package platformvm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
+	stdmath "math"
 	"net/http"
 	"time"
-
-	stdjson "encoding/json"
-	stdmath "math"
 
 	"go.uber.org/zap"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -575,7 +574,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 		}
 		// Include primary network
 		response.Subnets[len(subnets)] = APISubnet{
-			ID:          constants.PrimaryNetworkID,
+			ID:          constant.PrimaryNetworkID,
 			ControlKeys: []string{},
 			Threshold:   json.Uint32(0),
 		}
@@ -589,10 +588,10 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 		}
 		subnetSet.Add(subnetID)
 
-		if subnetID == constants.PrimaryNetworkID {
+		if subnetID == constant.PrimaryNetworkID {
 			response.Subnets = append(response.Subnets,
 				APISubnet{
-					ID:          constants.PrimaryNetworkID,
+					ID:          constant.PrimaryNetworkID,
 					ControlKeys: []string{},
 					Threshold:   json.Uint32(0),
 				},
@@ -662,7 +661,7 @@ func (s *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs
 		zap.String("method", "getStakingAssetID"),
 	)
 
-	if args.SubnetID == constants.PrimaryNetworkID {
+	if args.SubnetID == constant.PrimaryNetworkID {
 		response.AssetID = s.vm.ctx.AVAXAssetID
 		return nil
 	}
@@ -1412,7 +1411,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		return errNamedSubnetCantBePrimary
 	}
 
@@ -1790,11 +1789,11 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	// TODO: Document FXs and have user specify them in API call
 	fxIDsSet := set.Set[ids.ID]{}
 	fxIDsSet.Add(fxIDs...)
-	if vmID == constants.AVMID && !fxIDsSet.Contains(secp256k1fx.ID) {
+	if vmID == constant.AVMID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID == constants.PrimaryNetworkID {
+	if args.SubnetID == constant.PrimaryNetworkID {
 		return txs.ErrCantValidatePrimaryNetwork
 	}
 
@@ -2009,7 +2008,7 @@ func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *Vali
 		zap.String("method", "validates"),
 	)
 
-	if args.SubnetID != constants.PrimaryNetworkID {
+	if args.SubnetID != constant.PrimaryNetworkID {
 		subnetTx, _, err := s.vm.state.GetTx(args.SubnetID)
 		if err != nil {
 			return fmt.Errorf(
@@ -2097,7 +2096,7 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 		}
 	}
 
-	chains, err := s.vm.state.GetChains(constants.PrimaryNetworkID)
+	chains, err := s.vm.state.GetChains(constant.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -2110,7 +2109,7 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chainID,
 			Name:     chain.ChainName,
-			SubnetID: constants.PrimaryNetworkID,
+			SubnetID: constant.PrimaryNetworkID,
 			VMID:     chain.VMID,
 		})
 	}
@@ -2363,7 +2362,7 @@ func (s *Service) GetMinStake(_ *http.Request, args *GetMinStakeArgs, reply *Get
 		zap.String("method", "getMinStake"),
 	)
 
-	if args.SubnetID == constants.PrimaryNetworkID {
+	if args.SubnetID == constant.PrimaryNetworkID {
 		reply.MinValidatorStake = json.Uint64(s.vm.MinValidatorStake)
 		reply.MinDelegatorStake = json.Uint64(s.vm.MinDelegatorStake)
 		return nil
@@ -2691,7 +2690,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 	// Only report uptimes that we have been actively tracking.
-	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
+	if constant.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
 		return nil, nil
 	}
 

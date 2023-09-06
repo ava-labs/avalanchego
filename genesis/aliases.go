@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -18,15 +18,15 @@ import (
 // Aliases returns the default aliases based on the network ID
 func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
 	apiAliases := map[string][]string{
-		path.Join(constants.ChainAliasPrefix, constants.PlatformChainID.String()): {
+		path.Join(constant.ChainAliasPrefix, constant.PlatformChainID.String()): {
 			"P",
 			"platform",
-			path.Join(constants.ChainAliasPrefix, "P"),
-			path.Join(constants.ChainAliasPrefix, "platform"),
+			path.Join(constant.ChainAliasPrefix, "P"),
+			path.Join(constant.ChainAliasPrefix, "platform"),
 		},
 	}
 	chainAliases := map[ids.ID][]string{
-		constants.PlatformChainID: {"P", "platform"},
+		constant.PlatformChainID: {"P", "platform"},
 	}
 
 	genesis, err := genesis.Parse(genesisBytes) // TODO let's not re-create genesis to do aliasing
@@ -36,22 +36,22 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	for _, chain := range genesis.Chains {
 		uChain := chain.Unsigned.(*txs.CreateChainTx)
 		chainID := chain.ID()
-		endpoint := path.Join(constants.ChainAliasPrefix, chainID.String())
+		endpoint := path.Join(constant.ChainAliasPrefix, chainID.String())
 		switch uChain.VMID {
-		case constants.AVMID:
+		case constant.AVMID:
 			apiAliases[endpoint] = []string{
 				"X",
 				"avm",
-				path.Join(constants.ChainAliasPrefix, "X"),
-				path.Join(constants.ChainAliasPrefix, "avm"),
+				path.Join(constant.ChainAliasPrefix, "X"),
+				path.Join(constant.ChainAliasPrefix, "avm"),
 			}
 			chainAliases[chainID] = GetXChainAliases()
-		case constants.EVMID:
+		case constant.EVMID:
 			apiAliases[endpoint] = []string{
 				"C",
 				"evm",
-				path.Join(constants.ChainAliasPrefix, "C"),
-				path.Join(constants.ChainAliasPrefix, "evm"),
+				path.Join(constant.ChainAliasPrefix, "C"),
+				path.Join(constant.ChainAliasPrefix, "evm"),
 			}
 			chainAliases[chainID] = GetCChainAliases()
 		}
@@ -69,11 +69,11 @@ func GetXChainAliases() []string {
 
 func GetVMAliases() map[ids.ID][]string {
 	return map[ids.ID][]string{
-		constants.PlatformVMID: {"platform"},
-		constants.AVMID:        {"avm"},
-		constants.EVMID:        {"evm"},
-		secp256k1fx.ID:         {"secp256k1fx"},
-		nftfx.ID:               {"nftfx"},
-		propertyfx.ID:          {"propertyfx"},
+		constant.PlatformVMID: {"platform"},
+		constant.AVMID:        {"avm"},
+		constant.EVMID:        {"evm"},
+		secp256k1fx.ID:        {"secp256k1fx"},
+		nftfx.ID:              {"nftfx"},
+		propertyfx.ID:         {"propertyfx"},
 	}
 }

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -454,7 +454,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Produce(e.State, txID, tx.Outs)
 
 	if e.Config.PartialSyncPrimaryNetwork &&
-		tx.Subnet == constants.PrimaryNetworkID &&
+		tx.Subnet == constant.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.Ctx.NodeID {
 		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),

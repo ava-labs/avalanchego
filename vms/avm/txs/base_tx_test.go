@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -92,7 +92,7 @@ func TestBaseTxSerialization(t *testing.T) {
 	}
 
 	tx := &Tx{Unsigned: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},

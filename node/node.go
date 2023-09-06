@@ -60,7 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -243,7 +243,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
 
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := net.Listen(constant.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
-		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
+		dialer.NewDialer(constant.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
 		consensusRouter,
 	)
 
@@ -637,10 +637,10 @@ func (n *Node) initChains(genesisBytes []byte) error {
 	n.Log.Info("initializing chains")
 
 	platformChain := chains.ChainParameters{
-		ID:            constants.PlatformChainID,
-		SubnetID:      constants.PrimaryNetworkID,
+		ID:            constant.PlatformChainID,
+		SubnetID:      constant.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMID:          constants.PlatformVMID,
+		VMID:          constant.PlatformVMID,
 		CustomBeacons: n.bootstrappers,
 	}
 
@@ -754,13 +754,13 @@ func (n *Node) addDefaultVMAliases() error {
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
-	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.AVMID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constant.AVMID)
 	if err != nil {
 		return err
 	}
 	xChainID := createAVMTx.ID()
 
-	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.EVMID)
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constant.EVMID)
 	if err != nil {
 		return err
 	}
@@ -769,7 +769,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// If any of these chains die, the node shuts down
 	criticalChains := set.Set[ids.ID]{}
 	criticalChains.Add(
-		constants.PlatformChainID,
+		constant.PlatformChainID,
 		xChainID,
 		cChainID,
 	)
@@ -869,7 +869,7 @@ func (n *Node) initVMs() error {
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 		primaryVdrs := validators.NewSet()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
@@ -882,7 +882,7 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
+		vmRegisterer.Register(context.TODO(), constant.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
 				Validators:                    vdrs,
@@ -914,13 +914,13 @@ func (n *Node) initVMs() error {
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
+		vmRegisterer.Register(context.TODO(), constant.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		vmRegisterer.Register(context.TODO(), constant.EVMID, &coreth.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
@@ -992,7 +992,7 @@ func (n *Node) initMetricsAPI() error {
 		return nil
 	}
 
-	if err := n.MetricsGatherer.Register(constants.PlatformName, n.MetricsRegisterer); err != nil {
+	if err := n.MetricsGatherer.Register(constant.PlatformName, n.MetricsRegisterer); err != nil {
 		return err
 	}
 
@@ -1082,7 +1082,7 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
+	primaryValidators, _ := n.vdrs.Get(constant.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
@@ -1289,7 +1289,7 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 func (n *Node) initVdrs() validators.Set {
 	n.vdrs = validators.NewManager()
 	vdrSet := validators.NewSet()
-	_ = n.vdrs.Add(constants.PrimaryNetworkID, vdrSet)
+	_ = n.vdrs.Add(constant.PrimaryNetworkID, vdrSet)
 	return vdrSet
 }
 

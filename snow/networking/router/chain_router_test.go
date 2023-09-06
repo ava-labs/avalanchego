@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -1430,8 +1430,8 @@ func TestConnectedSubnet(t *testing.T) {
 
 	// Create bootstrapper, engine and handler
 	platform := snow.DefaultConsensusContextTest()
-	platform.ChainID = constants.PlatformChainID
-	platform.SubnetID = constants.PrimaryNetworkID
+	platform.ChainID = constant.PlatformChainID
+	platform.SubnetID = constant.PrimaryNetworkID
 	platform.Registerer = prometheus.NewRegistry()
 	platform.Metrics = metrics.NewOptionalGatherer()
 	platform.Executing.Set(false)
@@ -1467,7 +1467,7 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
-	chainRouter.Connected(peerNodeID, version.CurrentApp, constants.PrimaryNetworkID)
+	chainRouter.Connected(peerNodeID, version.CurrentApp, constant.PrimaryNetworkID)
 
 	peerSubnetConnectedMsg0 := handler.Message{
 		InboundMessage: message.InternalConnectedSubnet(peerNodeID, subnetID0),
@@ -1481,25 +1481,25 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), myDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, myNodeID)
+	chainRouter.Benched(constant.PlatformChainID, myNodeID)
 
 	peerDisconnectedMsg := handler.Message{
 		InboundMessage: message.InternalDisconnected(peerNodeID),
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, peerNodeID)
+	chainRouter.Benched(constant.PlatformChainID, peerNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg0).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg1).Times(1)
 
-	chainRouter.Unbenched(constants.PlatformChainID, myNodeID)
+	chainRouter.Unbenched(constant.PlatformChainID, myNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
 
-	chainRouter.Unbenched(constants.PlatformChainID, peerNodeID)
+	chainRouter.Unbenched(constant.PlatformChainID, peerNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
 	chainRouter.Disconnected(peerNodeID)

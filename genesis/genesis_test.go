@@ -4,6 +4,7 @@
 package genesis
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,12 +13,10 @@ import (
 	"testing"
 	"time"
 
-	_ "embed"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -179,27 +178,27 @@ func TestGenesisFromFile(t *testing.T) {
 		expectedHash    string
 	}{
 		"mainnet": {
-			networkID:    constants.MainnetID,
+			networkID:    constant.MainnetID,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
 		"fuji": {
-			networkID:    constants.FujiID,
+			networkID:    constant.FujiID,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
 		"fuji (with custom specified)": {
-			networkID:    constants.FujiID,
+			networkID:    constant.FujiID,
 			customConfig: localGenesisConfigJSON, // won't load
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
 		"local": {
-			networkID:    constants.LocalID,
+			networkID:    constant.LocalID,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
 		"local (with custom specified)": {
-			networkID:    constants.LocalID,
+			networkID:    constant.LocalID,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
@@ -262,19 +261,19 @@ func TestGenesisFromFlag(t *testing.T) {
 		expectedHash string
 	}{
 		"mainnet": {
-			networkID:   constants.MainnetID,
+			networkID:   constant.MainnetID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"fuji": {
-			networkID:   constants.FujiID,
+			networkID:   constant.FujiID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"local": {
-			networkID:   constants.LocalID,
+			networkID:   constant.LocalID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"local (with custom specified)": {
-			networkID:    constants.LocalID,
+			networkID:    constant.LocalID,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  errOverridesStandardNetworkConfig,
 		},
@@ -310,13 +309,13 @@ func TestGenesisFromFlag(t *testing.T) {
 				// try loading a default config
 				var err error
 				switch test.networkID {
-				case constants.MainnetID:
+				case constant.MainnetID:
 					genBytes, err = json.Marshal(&MainnetConfig)
 					require.NoError(err)
-				case constants.TestnetID:
+				case constant.TestnetID:
 					genBytes, err = json.Marshal(&FujiConfig)
 					require.NoError(err)
-				case constants.LocalID:
+				case constant.LocalID:
 					genBytes, err = json.Marshal(&LocalConfig)
 					require.NoError(err)
 				default:
@@ -346,20 +345,20 @@ func TestGenesis(t *testing.T) {
 		expectedID string
 	}{
 		{
-			networkID:  constants.MainnetID,
+			networkID:  constant.MainnetID,
 			expectedID: "UUvXi6j7QhVvgpbKM89MP5HdrxKm9CaJeHc187TsDNf8nZdLk",
 		},
 		{
-			networkID:  constants.FujiID,
+			networkID:  constant.FujiID,
 			expectedID: "MSj6o9TpezwsQx4Tv7SHqpVvCbJ8of1ikjsqPZ1bKRjc9zBy3",
 		},
 		{
-			networkID:  constants.LocalID,
+			networkID:  constant.LocalID,
 			expectedID: "4vzpz26oNFyGnMCeFFPSx41Ek4dBPpPPWe6Zq2bSxdCSGbkC2",
 		},
 	}
 	for _, test := range tests {
-		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+		t.Run(constant.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
 			require := require.New(t)
 
 			config := GetConfig(test.networkID)
@@ -382,40 +381,40 @@ func TestVMGenesis(t *testing.T) {
 		vmTest    []vmTest
 	}{
 		{
-			networkID: constants.MainnetID,
+			networkID: constant.MainnetID,
 			vmTest: []vmTest{
 				{
-					vmID:       constants.AVMID,
+					vmID:       constant.AVMID,
 					expectedID: "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
 				},
 				{
-					vmID:       constants.EVMID,
+					vmID:       constant.EVMID,
 					expectedID: "2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
 				},
 			},
 		},
 		{
-			networkID: constants.FujiID,
+			networkID: constant.FujiID,
 			vmTest: []vmTest{
 				{
-					vmID:       constants.AVMID,
+					vmID:       constant.AVMID,
 					expectedID: "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm",
 				},
 				{
-					vmID:       constants.EVMID,
+					vmID:       constant.EVMID,
 					expectedID: "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp",
 				},
 			},
 		},
 		{
-			networkID: constants.LocalID,
+			networkID: constant.LocalID,
 			vmTest: []vmTest{
 				{
-					vmID:       constants.AVMID,
+					vmID:       constant.AVMID,
 					expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
 				},
 				{
-					vmID:       constants.EVMID,
+					vmID:       constant.EVMID,
 					expectedID: "2CA6j5zYzasynPsFeNoqWkmTCt3VScMvXUZHbfDJ8k3oGzAPtU",
 				},
 			},
@@ -425,7 +424,7 @@ func TestVMGenesis(t *testing.T) {
 	for _, test := range tests {
 		for _, vmTest := range test.vmTest {
 			name := fmt.Sprintf("%s-%s",
-				constants.NetworkIDToNetworkName[test.networkID],
+				constant.NetworkIDToNetworkName[test.networkID],
 				vmTest.vmID,
 			)
 			t.Run(name, func(t *testing.T) {
@@ -456,21 +455,21 @@ func TestAVAXAssetID(t *testing.T) {
 		expectedID string
 	}{
 		{
-			networkID:  constants.MainnetID,
+			networkID:  constant.MainnetID,
 			expectedID: "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
 		},
 		{
-			networkID:  constants.FujiID,
+			networkID:  constant.FujiID,
 			expectedID: "U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK",
 		},
 		{
-			networkID:  constants.LocalID,
+			networkID:  constant.LocalID,
 			expectedID: "2fombhL7aGPwj3KH4bfrmJwW6PVnMobf9Y2fn9GwxiAAJyFDbe",
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+		t.Run(constant.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
 			require := require.New(t)
 
 			config := GetConfig(test.networkID)

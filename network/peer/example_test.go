@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -27,7 +27,7 @@ func ExampleStartTestPeer() {
 	peer, err := StartTestPeer(
 		ctx,
 		peerIP,
-		constants.LocalID,
+		constant.LocalID,
 		router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 			fmt.Printf("handling %s\n", msg.Op())
 		}),

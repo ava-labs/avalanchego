@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -58,14 +58,14 @@ func (*AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 }
 
 func (tx *AddPermissionlessDelegatorTx) PendingPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
+	if tx.Subnet == constant.PrimaryNetworkID {
 		return PrimaryNetworkDelegatorBanffPendingPriority
 	}
 	return SubnetPermissionlessDelegatorPendingPriority
 }
 
 func (tx *AddPermissionlessDelegatorTx) CurrentPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
+	if tx.Subnet == constant.PrimaryNetworkID {
 		return PrimaryNetworkDelegatorCurrentPriority
 	}
 	return SubnetPermissionlessDelegatorCurrentPriority

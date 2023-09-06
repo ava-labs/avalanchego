@@ -5,14 +5,13 @@ package platformvm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"testing"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -270,7 +269,7 @@ func TestGetTx(t *testing.T) {
 				return service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
-					constants.AVMID,
+					constant.AVMID,
 					nil,
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -582,7 +581,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
-	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	args := GetCurrentValidatorsArgs{SubnetID: constant.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
@@ -632,7 +631,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(service.vm.state.Commit())
 
 	// Call getCurrentValidators
-	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	args = GetCurrentValidatorsArgs{SubnetID: constant.PrimaryNetworkID}
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
@@ -648,7 +647,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Nil(vdr.Delegators)
 
 		innerArgs := GetCurrentValidatorsArgs{
-			SubnetID: constants.PrimaryNetworkID,
+			SubnetID: constant.PrimaryNetworkID,
 			NodeIDs:  []ids.NodeID{vdr.NodeID},
 		}
 		innerResponse := GetCurrentValidatorsReply{}
@@ -738,7 +737,7 @@ func TestGetBlock(t *testing.T) {
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 				testSubnet1.ID(),
 				nil,
-				constants.AVMID,
+				constant.AVMID,
 				nil,
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},

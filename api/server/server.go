@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -189,7 +189,7 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 		zap.Stringer("chainID", ctx.ChainID),
 	)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
+	defaultEndpoint := path.Join(constant.ChainAliasPrefix, ctx.ChainID.String())
 
 	// Register each endpoint
 	for extension, handler := range handlers {

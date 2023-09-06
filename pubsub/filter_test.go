@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
@@ -19,7 +19,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	require := require.New(t)
 
 	chainAlias := "X"
-	hrp := constants.GetHRP(5)
+	hrp := constant.GetHRP(5)
 
 	addrID := ids.ShortID{1}
 	addrStr, err := address.Format(chainAlias, hrp, addrID[:])

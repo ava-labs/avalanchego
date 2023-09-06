@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gomath "math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/pires/go-proxyproto"
 
@@ -34,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -189,7 +188,7 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
 ) (Network, error) {
-	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
+	primaryNetworkValidators, ok := config.Validators.Get(constant.PrimaryNetworkID)
 	if !ok {
 		return nil, errMissingPrimaryValidators
 	}
@@ -456,7 +455,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
+	n.router.Connected(nodeID, peerVersion, constant.PrimaryNetworkID)
 	for subnetID := range peer.TrackedSubnets() {
 		n.router.Connected(nodeID, peerVersion, subnetID)
 	}
@@ -468,7 +467,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		validators.Contains(n.config.Validators, constant.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
 }
 
@@ -807,7 +806,7 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, nodeID) ||
+	return validators.Contains(n.config.Validators, constant.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
@@ -858,7 +857,7 @@ func (n *network) getPeers(
 		}
 
 		trackedSubnets := peer.TrackedSubnets()
-		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+		if subnetID != constant.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -901,7 +900,7 @@ func (n *network) samplePeers(
 		func(p peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
 			trackedSubnets := p.TrackedSubnets()
-			if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+			if subnetID != constant.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 				return false
 			}
 
@@ -1336,7 +1335,7 @@ func (n *network) StartClose() {
 }
 
 func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
-	if subnetID != constants.PrimaryNetworkID && !n.config.TrackedSubnets.Contains(subnetID) {
+	if subnetID != constant.PrimaryNetworkID && !n.config.TrackedSubnets.Contains(subnetID) {
 		return UptimeResult{}, errNotTracked
 	}
 
@@ -1405,7 +1404,7 @@ func (n *network) runTimers() {
 		case <-gossipPeerlists.C:
 			n.gossipPeerLists()
 		case <-updateUptimes.C:
-			primaryUptime, err := n.NodeUptime(constants.PrimaryNetworkID)
+			primaryUptime, err := n.NodeUptime(constant.PrimaryNetworkID)
 			if err != nil {
 				n.peerConfig.Log.Debug("failed to get primary network uptime",
 					zap.Error(err),
@@ -1433,7 +1432,7 @@ func (n *network) runTimers() {
 // gossipPeerLists gossips validators to peers in the network
 func (n *network) gossipPeerLists() {
 	peers := n.samplePeers(
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		int(n.config.PeerListValidatorGossipSize),
 		int(n.config.PeerListNonValidatorGossipSize),
 		int(n.config.PeerListPeersGossipSize),

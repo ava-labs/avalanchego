@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -71,11 +71,11 @@ var (
 			MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
 				VdrAllocSize:        1 * units.GiB,
 				AtLargeAllocSize:    1 * units.GiB,
-				NodeMaxAtLargeBytes: constants.DefaultMaxMessageSize,
+				NodeMaxAtLargeBytes: constant.DefaultMaxMessageSize,
 			},
 			BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
 				RefillRate:   units.MiB,
-				MaxBurstSize: constants.DefaultMaxMessageSize,
+				MaxBurstSize: constant.DefaultMaxMessageSize,
 			},
 			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
 				MaxRecheckDelay: 50 * time.Millisecond,
@@ -88,7 +88,7 @@ var (
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 			VdrAllocSize:        1 * units.GiB,
 			AtLargeAllocSize:    1 * units.GiB,
-			NodeMaxAtLargeBytes: constants.DefaultMaxMessageSize,
+			NodeMaxAtLargeBytes: constant.DefaultMaxMessageSize,
 		},
 		MaxInboundConnsPerSec: 100,
 	}
@@ -109,10 +109,10 @@ var (
 		Namespace:          "",
 		NetworkID:          49463,
 		MaxClockDifference: time.Minute,
-		PingFrequency:      constants.DefaultPingFrequency,
+		PingFrequency:      constant.DefaultPingFrequency,
 		AllowPrivateIPs:    true,
 
-		CompressionType: constants.DefaultNetworkCompressionType,
+		CompressionType: constant.DefaultNetworkCompressionType,
 
 		UptimeCalculator:  uptime.NewManager(uptime.NewTestState()),
 		UptimeMetricFreq:  30 * time.Second,
@@ -188,7 +188,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		"",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -232,7 +232,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		}
 
 		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 
 		config := config
 
@@ -338,7 +338,7 @@ func TestSend(t *testing.T) {
 
 	toSend := set.Set[ids.NodeID]{}
 	toSend.Add(nodeIDs[1])
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
+	sentTo := net0.Send(outboundGetMsg, toSend, constant.PrimaryNetworkID, subnets.NoOpAllower)
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
@@ -377,7 +377,7 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 
 	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
+	sentTo := net0.Send(outboundGetMsg, toSend, constant.PrimaryNetworkID, newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
 
@@ -385,7 +385,7 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	// Test Gossip now
-	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
+	sentTo = net0.Gossip(outboundGetMsg, constant.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
 
@@ -405,7 +405,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
+	require.NoError(validators.Add(network.config.Validators, constant.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
 	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: staking.CertificateFromX509(tlsCert.Leaf),
@@ -458,7 +458,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		}
 
 		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 
 		config := config
 
@@ -552,7 +552,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 
 		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 
 		config := config
 

@@ -5,11 +5,10 @@ package avm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"math/rand"
 	"testing"
-
-	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -46,7 +45,7 @@ const (
 	startBalance uint64 = 50000
 
 	username       = "bobby"
-	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
+	password       = "StrnasfqewiurPasswdn56d" // #nosec G101
 	feeAssetName   = "TEST"
 	otherAssetName = "OTHER"
 )
@@ -243,7 +242,7 @@ func newContext(tb testing.TB) *snow.Context {
 	tx := getCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
+	ctx.NetworkID = constant.UnitTestID
 	ctx.ChainID = chainID
 	ctx.AVAXAssetID = tx.ID()
 	ctx.XChainID = ids.Empty.Prefix(0)
@@ -252,14 +251,14 @@ func newContext(tb testing.TB) *snow.Context {
 
 	require.NoError(aliaser.Alias(chainID, "X"))
 	require.NoError(aliaser.Alias(chainID, chainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, "P"))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, constant.PlatformChainID.String()))
 
 	ctx.ValidatorState = &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: ctx.SubnetID,
-				chainID:                   ctx.SubnetID,
+				constant.PlatformChainID: ctx.SubnetID,
+				chainID:                  ctx.SubnetID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -330,7 +329,7 @@ func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx
 	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -382,13 +381,13 @@ func sampleAddrs(tb testing.TB, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []s
 func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	require := require.New(tb)
 
-	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
+	addr0Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[0].Bytes())
 	require.NoError(err)
 
-	addr1Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
+	addr1Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[1].Bytes())
 	require.NoError(err)
 
-	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
+	addr2Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
 	return &BuildGenesisArgs{
@@ -472,13 +471,13 @@ func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 	require := require.New(tb)
 
-	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
+	addr0Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[0].Bytes())
 	require.NoError(err)
 
-	addr1Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
+	addr1Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[1].Bytes())
 	require.NoError(err)
 
-	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
+	addr2Str, err := address.FormatBech32(constant.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
 	return &BuildGenesisArgs{

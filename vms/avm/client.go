@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -226,7 +226,7 @@ func NewClient(uri, chain string) Client {
 	path := fmt.Sprintf(
 		"%s/ext/%s/%s",
 		uri,
-		constants.ChainAliasPrefix,
+		constant.ChainAliasPrefix,
 		chain,
 	)
 	return &client{

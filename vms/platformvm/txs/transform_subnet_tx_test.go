@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -58,8 +58,8 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 	simpleTransformTx := &TransformSubnetTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -116,7 +116,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 	}
 	require.NoError(simpleTransformTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -229,8 +229,8 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 	complexTransformTx := &TransformSubnetTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -342,7 +342,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 	utils.Sort(complexTransformTx.Ins)
 	require.NoError(complexTransformTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -580,7 +580,7 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *TransformSubnetTx {
 				return &TransformSubnetTx{
 					BaseTx: validBaseTx,
-					Subnet: constants.PrimaryNetworkID,
+					Subnet: constant.PrimaryNetworkID,
 				}
 			},
 			err: errCantTransformPrimaryNetwork,

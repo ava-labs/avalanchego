@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -307,7 +307,7 @@ func NewTestGenesis(
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
 	switch networkID {
-	case constants.TestnetID, constants.MainnetID, constants.LocalID:
+	case constant.TestnetID, constant.MainnetID, constant.LocalID:
 		return nil, errInvalidNetworkIDForGenesis
 	}
 	if len(validatorIDs) == 0 {
@@ -320,7 +320,7 @@ func NewTestGenesis(
 	// Address that controls stake doesn't matter -- generate it randomly
 	stakeAddress, err := address.Format(
 		"X",
-		constants.GetHRP(networkID),
+		constant.GetHRP(networkID),
 		ids.GenerateTestShortID().Bytes(),
 	)
 	if err != nil {
@@ -362,7 +362,7 @@ func NewTestGenesis(
 
 	// Set X-Chain balances
 	for xChainAddress, balance := range xChainBalances {
-		avaxAddr, err := address.Format("X", constants.GetHRP(networkID), xChainAddress[:])
+		avaxAddr, err := address.Format("X", constant.GetHRP(networkID), xChainAddress[:])
 		if err != nil {
 			return nil, fmt.Errorf("failed to format X-Chain address: %w", err)
 		}
@@ -403,7 +403,7 @@ func NewTestGenesis(
 	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
 	// will be easier to perform with nodes other than the initial validators since the timing of
 	// staking can be more easily controlled.
-	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
+	rewardAddr, err := address.Format("X", constant.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to format reward address: %w", err)
 	}

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -130,7 +130,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: adding to Primary Network
 	addSubnetValidatorTx.SyntacticallyVerified = false
-	addSubnetValidatorTx.Subnet = constants.PrimaryNetworkID
+	addSubnetValidatorTx.Subnet = constant.PrimaryNetworkID
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)

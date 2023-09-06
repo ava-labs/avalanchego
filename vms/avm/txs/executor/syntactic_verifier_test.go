@@ -4,16 +4,15 @@
 package executor
 
 import (
+	stdmath "math"
 	"strings"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -36,7 +35,7 @@ func newContext(t testing.TB) *snow.Context {
 	require := require.New(t)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
+	ctx.NetworkID = constant.UnitTestID
 	ctx.ChainID = ids.GenerateTestID()
 	ctx.XChainID = ctx.ChainID
 	ctx.CChainID = ids.GenerateTestID()
@@ -44,8 +43,8 @@ func newContext(t testing.TB) *snow.Context {
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
 	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, "P"))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, constant.PlatformChainID.String()))
 	return ctx
 }
 
@@ -92,7 +91,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 		In:     &fxInput,
 	}
 	baseTx := avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: ctx.ChainID,
 		Outs: []*avax.TransferableOutput{
 			&output,
@@ -462,7 +461,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 		In:     &fxInput,
 	}
 	baseTx := avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: ctx.ChainID,
 		Outs: []*avax.TransferableOutput{
 			&output,
@@ -1069,7 +1068,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 		In:     &fxInput,
 	}
 	baseTx := avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
 			&input,
@@ -1556,7 +1555,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 		In:     &fxInput,
 	}
 	baseTx := avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: ctx.ChainID,
 		Outs: []*avax.TransferableOutput{
 			&output,
@@ -1954,7 +1953,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 		In:     &fxInput,
 	}
 	baseTx := avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
+		NetworkID:    constant.UnitTestID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
 			&input,

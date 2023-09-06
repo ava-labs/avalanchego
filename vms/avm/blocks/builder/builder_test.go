@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -561,7 +561,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func createTxs() []*txs.Tx {
 	return []*txs.Tx{{
 		Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: ids.GenerateTestID(),
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: ids.GenerateTestID()},
@@ -600,7 +600,7 @@ func createParentTxs(cm codec.Manager) ([]*txs.Tx, error) {
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: ids.ID{1, 2, 3}},

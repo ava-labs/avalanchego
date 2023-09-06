@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
 
@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -53,7 +53,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-			minValStake, minDelStake, err := pChainClient.GetMinStake(ctx, constants.PlatformChainID)
+			minValStake, minDelStake, err := pChainClient.GetMinStake(ctx, constant.PlatformChainID)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
@@ -180,7 +180,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			ginkgo.By("import avax from P into X chain", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := xWallet.IssueImportTx(
-					constants.PlatformChainID,
+					constant.PlatformChainID,
 					&outputOwner,
 					common.WithContext(ctx),
 				)

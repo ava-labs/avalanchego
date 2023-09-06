@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -52,7 +52,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		"",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -99,13 +99,13 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 		MessageCreator:       mc,
 		Log:                  logging.NoLog{},
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
-		VersionCompatibility: version.GetCompatibility(constants.LocalID),
+		VersionCompatibility: version.GetCompatibility(constant.LocalID),
 		MySubnets:            trackedSubnets,
 		UptimeCalculator:     uptime.NoOpCalculator,
 		Beacons:              validators.NewSet(),
-		NetworkID:            constants.LocalID,
-		PingFrequency:        constants.DefaultPingFrequency,
-		PongTimeout:          constants.DefaultPingPongTimeout,
+		NetworkID:            constant.LocalID,
+		PingFrequency:        constant.DefaultPingFrequency,
+		PongTimeout:          constant.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
 	}
@@ -284,7 +284,7 @@ func TestPingUptimes(t *testing.T) {
 				return pingMsg
 			}(),
 			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
+				uptime, ok := peer.ObservedUptime(constant.PrimaryNetworkID)
 				require.True(ok)
 				require.Equal(uint32(1), uptime)
 
@@ -309,7 +309,7 @@ func TestPingUptimes(t *testing.T) {
 				return pingMsg
 			}(),
 			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
+				uptime, ok := peer.ObservedUptime(constant.PrimaryNetworkID)
 				require.True(ok)
 				require.Equal(uint32(1), uptime)
 

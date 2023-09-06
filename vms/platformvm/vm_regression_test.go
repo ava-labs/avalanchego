@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/version"
@@ -348,7 +348,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -521,7 +521,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		onAccept, found := vm.manager.GetState(addValidatorStandardBlk.ID())
 		require.True(found)
 
-		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+		_, err := onAccept.GetPendingValidator(constant.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 	}
 
@@ -653,7 +653,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
+	vm.Config.Validators.Add(constant.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -670,10 +670,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that new validator is now in the current validator set.
 	{
-		_, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+		_, err := newState.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 
-		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+		_, err = newState.GetPendingValidator(constant.PrimaryNetworkID, nodeID)
 		require.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := newState.GetTimestamp()
@@ -692,7 +692,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
+	vm.state.SetCurrentSupply(constant.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
@@ -736,7 +736,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept, ok := vm.manager.GetState(addValidatorStandardBlk0.ID())
 		require.True(ok)
 
-		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err := onAccept.GetPendingValidator(constant.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
 	}
 
@@ -765,10 +765,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept, ok := vm.manager.GetState(advanceTimeStandardBlk0.ID())
 		require.True(ok)
 
-		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err := onAccept.GetCurrentValidator(constant.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
 
-		_, err = onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err = onAccept.GetPendingValidator(constant.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := onAccept.GetTimestamp()
@@ -907,7 +907,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept, ok := vm.manager.GetState(addValidatorStandardBlk1.ID())
 		require.True(ok)
 
-		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err := onAccept.GetPendingValidator(constant.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
 	}
 
@@ -936,10 +936,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept, ok := vm.manager.GetState(advanceTimeStandardBlk1.ID())
 		require.True(ok)
 
-		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err := onAccept.GetCurrentValidator(constant.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
 
-		_, err = onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err = onAccept.GetPendingValidator(constant.PrimaryNetworkID, nodeID1)
 		require.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := onAccept.GetTimestamp()
@@ -963,7 +963,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
+	vm.Config.Validators.Add(constant.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -981,18 +981,18 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		staker0, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+		staker0, err := newState.GetCurrentValidator(constant.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
 		require.Equal(uint64(60000000), staker0.PotentialReward)
 
-		staker1, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+		staker1, err := newState.GetCurrentValidator(constant.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
 		require.Equal(uint64(59999999), staker1.PotentialReward)
 
-		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err = newState.GetPendingValidator(constant.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err = newState.GetPendingValidator(constant.PrimaryNetworkID, nodeID1)
 		require.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := newState.GetTimestamp()
@@ -1028,7 +1028,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID3: defaultWeight,
 		nodeID4: defaultWeight,
 	}
-	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	validators, err := vm.GetValidatorSet(context.Background(), 1, constant.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators1 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1077,7 +1077,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(2), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(context.Background(), i, constant.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
 			require.Equal(weight, validators[nodeID].Weight)
@@ -1112,7 +1112,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(3), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(context.Background(), i, constant.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
 			require.Equal(weight, validators[nodeID].Weight)
@@ -1127,7 +1127,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID4: defaultWeight,
 		nodeID5: vm.MaxValidatorStake,
 	}
-	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
+	validators, err = vm.GetValidatorSet(context.Background(), 3, constant.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators2 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1512,7 +1512,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			End:    uint64(primaryEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		Subnet:    constants.PrimaryNetworkID,
+		Subnet:    constant.PrimaryNetworkID,
 		Signer:    signer.NewProofOfPossession(sk1),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -1544,7 +1544,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1610,7 +1610,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1643,7 +1643,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			End:    uint64(primaryReEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		Subnet:    constants.PrimaryNetworkID,
+		Subnet:    constant.PrimaryNetworkID,
 		Signer:    signer.NewProofOfPossession(sk2),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -1675,7 +1675,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1686,7 +1686,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		require.NoError(checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
-			constants.PrimaryNetworkID,
+			constant.PrimaryNetworkID,
 			height,
 			uPrimaryTx.Signer.Key(),
 		))
@@ -1695,7 +1695,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
-			constants.PrimaryNetworkID,
+			constant.PrimaryNetworkID,
 			primaryEndHeight,
 			uPrimaryTx.Signer.Key(),
 		)
@@ -1704,7 +1704,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(checkValidatorBlsKeyIsSet(
 		vm.State,
 		nodeID,
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		primaryRestartHeight,
 		uPrimaryRestartTx.Signer.Key(),
 	))
@@ -1783,7 +1783,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1810,7 +1810,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1843,7 +1843,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		Subnet:    constants.PrimaryNetworkID,
+		Subnet:    constant.PrimaryNetworkID,
 		Signer:    signer.NewProofOfPossession(sk2),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -1875,7 +1875,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	emptySigner := &signer.Empty{}
@@ -1883,7 +1883,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		require.NoError(checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
-			constants.PrimaryNetworkID,
+			constant.PrimaryNetworkID,
 			height,
 			emptySigner.Key(),
 		))
@@ -1946,7 +1946,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -2012,7 +2012,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -2045,7 +2045,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		Subnet:    constants.PrimaryNetworkID,
+		Subnet:    constant.PrimaryNetworkID,
 		Signer:    signer.NewProofOfPossession(sk2),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -2077,7 +2077,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 
 	require.NoError(buildAndAcceptStandardBlock(vm))
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	emptySigner := &signer.Empty{}
@@ -2085,7 +2085,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		require.NoError(checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
-			constants.PrimaryNetworkID,
+			constant.PrimaryNetworkID,
 			height,
 			emptySigner.Key(),
 		))
@@ -2155,7 +2155,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	// insert the subnet validator
@@ -2215,7 +2215,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Generating the validator set should not error when re-introducing a

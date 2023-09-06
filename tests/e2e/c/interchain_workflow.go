@@ -6,7 +6,7 @@ package c
 import (
 	"math/big"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -138,7 +138,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 
 		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain", func() {
 			_, err := cWallet.IssueExportTx(
-				constants.PlatformChainID,
+				constant.PlatformChainID,
 				exportOutputs,
 				e2e.WithDefaultContext(),
 			)

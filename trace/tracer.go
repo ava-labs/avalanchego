@@ -15,7 +15,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -69,14 +69,14 @@ func New(config Config) (Tracer, error) {
 		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
 		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL,
 			attribute.Stringer("version", version.Current),
-			semconv.ServiceNameKey.String(constants.AppName),
+			semconv.ServiceNameKey.String(constant.AppName),
 		)),
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(tracerProviderOpts...)
 	return &tracer{
-		Tracer: tracerProvider.Tracer(constants.AppName),
+		Tracer: tracerProvider.Tracer(constant.AppName),
 		tp:     tracerProvider,
 	}, nil
 }

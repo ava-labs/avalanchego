@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 var (
@@ -110,7 +110,7 @@ func GetRequestID(m any) (uint32, bool) {
 	// Here we assign the requestID already in use for gossiped containers
 	// to allow a uniform handling of all messages
 	if _, ok := m.(*p2p.AppGossip); ok {
-		return constants.GossipMsgRequestID, true
+		return constant.GossipMsgRequestID, true
 	}
 
 	return 0, false

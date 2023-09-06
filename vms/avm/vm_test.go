@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -142,7 +142,7 @@ func TestIssueNFT(t *testing.T) {
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -173,7 +173,7 @@ func TestIssueNFT(t *testing.T) {
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -198,7 +198,7 @@ func TestIssueNFT(t *testing.T) {
 	transferNFTTx := &txs.Tx{
 		Unsigned: &txs.OperationTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    constants.UnitTestID,
+				NetworkID:    constant.UnitTestID,
 				BlockchainID: chainID,
 			}},
 			Ops: []*txs.Operation{{
@@ -243,7 +243,7 @@ func TestIssueProperty(t *testing.T) {
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -266,7 +266,7 @@ func TestIssueProperty(t *testing.T) {
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -298,7 +298,7 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -350,7 +350,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				// fee asset
@@ -433,7 +433,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	key := keys[0]
 	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -466,7 +466,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 
 	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -518,7 +518,7 @@ func TestIssueImportTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constant.PlatformChainID)
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
@@ -536,7 +536,7 @@ func TestIssueImportTx(t *testing.T) {
 	txAssetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
@@ -549,7 +549,7 @@ func TestIssueImportTx(t *testing.T) {
 				},
 			}},
 		}},
-		SourceChain: constants.PlatformChainID,
+		SourceChain: constant.PlatformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  txAssetID,
@@ -598,7 +598,7 @@ func TestIssueImportTx(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constant.PlatformChainID, [][]byte{id[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -631,7 +631,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	txAssetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
@@ -644,7 +644,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 				},
 			}},
 		}},
-		SourceChain: constants.PlatformChainID,
+		SourceChain: constant.PlatformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  txAssetID,
@@ -668,7 +668,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constant.PlatformChainID, [][]byte{id[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -696,7 +696,7 @@ func TestIssueExportTx(t *testing.T) {
 	key := keys[0]
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -710,7 +710,7 @@ func TestIssueExportTx(t *testing.T) {
 				},
 			}},
 		}},
-		DestinationChain: constants.PlatformChainID,
+		DestinationChain: constant.PlatformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
@@ -724,7 +724,7 @@ func TestIssueExportTx(t *testing.T) {
 	}}
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constant.PlatformChainID)
 	utxoBytes, _, _, err := peerSharedMemory.Indexed(
 		env.vm.ctx.ChainID,
 		[][]byte{
@@ -768,7 +768,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	assetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -782,7 +782,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 				},
 			}},
 		}},
-		DestinationChain: constants.PlatformChainID,
+		DestinationChain: constant.PlatformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: assetID,
 			Out: &secp256k1fx.TransferOutput{
@@ -802,7 +802,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 
-	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constant.PlatformChainID)
 	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		env.vm.ctx.ChainID: {
 			RemoveRequests: [][]byte{utxoID[:]},

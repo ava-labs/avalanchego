@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -372,7 +372,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					StartTime: verifiedTx.StartTime().Add(time.Second),
 					EndTime:   verifiedTx.EndTime(),
 				}
-				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				mockState.EXPECT().GetCurrentValidator(constant.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
 			sTxF: func() *txs.Tx {
@@ -418,7 +418,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					StartTime: verifiedTx.StartTime(),
 					EndTime:   verifiedTx.EndTime(),
 				}
-				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				mockState.EXPECT().GetCurrentValidator(constant.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
 			sTxF: func() *txs.Tx {
@@ -464,7 +464,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					StartTime: time.Unix(0, 0),
 					EndTime:   mockable.MaxTime,
 				}
-				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				mockState.EXPECT().GetCurrentValidator(constant.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
 			sTxF: func() *txs.Tx {
@@ -514,7 +514,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					StartTime: time.Unix(0, 0),
 					EndTime:   mockable.MaxTime,
 				}
-				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				mockState.EXPECT().GetCurrentValidator(constant.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
 			sTxF: func() *txs.Tx {
@@ -570,7 +570,7 @@ func TestGetValidatorRules(t *testing.T) {
 	tests := []test{
 		{
 			name:     "primary network",
-			subnetID: constants.PrimaryNetworkID,
+			subnetID: constant.PrimaryNetworkID,
 			backend: &Backend{
 				Config: config,
 				Ctx: &snow.Context{
@@ -687,7 +687,7 @@ func TestGetDelegatorRules(t *testing.T) {
 	tests := []test{
 		{
 			name:     "primary network",
-			subnetID: constants.PrimaryNetworkID,
+			subnetID: constant.PrimaryNetworkID,
 			backend: &Backend{
 				Config: config,
 				Ctx: &snow.Context{

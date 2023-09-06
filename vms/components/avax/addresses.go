@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -74,7 +74,7 @@ func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, erro
 		return ids.ID{}, ids.ShortID{}, err
 	}
 
-	expectedHRP := constants.GetHRP(a.ctx.NetworkID)
+	expectedHRP := constant.GetHRP(a.ctx.NetworkID)
 	if hrp != expectedHRP {
 		return ids.ID{}, ids.ShortID{}, fmt.Errorf(
 			"expected hrp %q but got %q",
@@ -99,7 +99,7 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 	if err != nil {
 		return "", err
 	}
-	hrp := constants.GetHRP(a.ctx.NetworkID)
+	hrp := constant.GetHRP(a.ctx.NetworkID)
 	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }
 

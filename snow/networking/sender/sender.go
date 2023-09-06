@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -1524,7 +1524,7 @@ func (s *sender) SendGossip(_ context.Context, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(
 		s.ctx.ChainID,
-		constants.GossipMsgRequestID,
+		constant.GossipMsgRequestID,
 		container,
 		s.engineType,
 	)
@@ -1573,7 +1573,7 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) 
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(
 		s.ctx.ChainID,
-		constants.GossipMsgRequestID,
+		constant.GossipMsgRequestID,
 		container,
 		s.engineType,
 	)

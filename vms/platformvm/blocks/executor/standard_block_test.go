@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -339,17 +339,17 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	// tests
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[block.ID()].onAcceptState
-	currentValidator, err := updatedState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	currentValidator, err := updatedState.GetCurrentValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(addPendingValidatorTx.ID(), currentValidator.TxID)
 	require.Equal(uint64(1370), currentValidator.PotentialReward) // See rewards tests to explain why 1370
 
-	_, err = updatedState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = updatedState.GetPendingValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Test VM validators
 	require.NoError(block.Accept(context.Background()))
-	require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, nodeID))
+	require.True(validators.Contains(env.config.Validators, constant.PrimaryNetworkID, nodeID))
 }
 
 // Ensure semantic verification updates the current and pending staker sets correctly.
@@ -561,13 +561,13 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
-					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetPendingValidator(constant.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, constant.PrimaryNetworkID, stakerNodeID))
 				case current:
-					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetCurrentValidator(constant.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, constant.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
@@ -789,7 +789,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 	vdrWeight := primarySet.GetWeight(nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)

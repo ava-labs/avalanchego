@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -76,7 +76,7 @@ func (r *vmRegisterer) register(ctx context.Context, pathAdder server.PathAdder,
 	}
 
 	// all static endpoints go to the vm endpoint, defaulting to the vm id
-	defaultEndpoint := path.Join(constants.VMAliasPrefix, vmID.String())
+	defaultEndpoint := path.Join(constant.VMAliasPrefix, vmID.String())
 
 	if err := r.createStaticEndpoints(pathAdder, handlers, defaultEndpoint); err != nil {
 		return err
@@ -149,7 +149,7 @@ func (r vmRegisterer) getURLAliases(vmID ids.ID, defaultEndpoint string) ([]stri
 
 	var urlAliases []string
 	for _, alias := range aliases {
-		urlAlias := path.Join(constants.VMAliasPrefix, alias)
+		urlAlias := path.Join(constant.VMAliasPrefix, alias)
 		if urlAlias != defaultEndpoint {
 			urlAliases = append(urlAliases, urlAlias)
 		}

@@ -8,11 +8,11 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 var Noop Tracer = noOpTracer{
-	t: trace.NewNoopTracerProvider().Tracer(constants.AppName),
+	t: trace.NewNoopTracerProvider().Tracer(constant.AppName),
 }
 
 // noOpTracer is an implementation of trace.Tracer that does nothing.

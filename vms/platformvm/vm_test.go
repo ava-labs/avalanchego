@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -130,14 +130,14 @@ func defaultContext(t *testing.T) *snow.Context {
 	require := require.New(t)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
+	ctx.NetworkID = constant.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 	aliaser := ids.NewAliaser()
 
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, "P"))
+	require.NoError(aliaser.Alias(constant.PlatformChainID, constant.PlatformChainID.String()))
 	require.NoError(aliaser.Alias(xChainID, "X"))
 	require.NoError(aliaser.Alias(xChainID, xChainID.String()))
 	require.NoError(aliaser.Alias(cChainID, "C"))
@@ -148,9 +148,9 @@ func defaultContext(t *testing.T) *snow.Context {
 	ctx.ValidatorState = &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
+				constant.PlatformChainID: constant.PrimaryNetworkID,
+				xChainID:                 constant.PrimaryNetworkID,
+				cChainID:                 constant.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -170,7 +170,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		addr, err := address.FormatBech32(constant.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
@@ -181,7 +181,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+		addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
@@ -203,7 +203,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(constants.UnitTestID),
+		NetworkID:     json.Uint32(constant.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -237,7 +237,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		addr, err := address.FormatBech32(constant.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
 		genesisUTXOs[i] = api.UTXO{
@@ -249,7 +249,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+		addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
 		genesisValidators[i] = api.PermissionlessValidator{
@@ -271,7 +271,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
+		NetworkID:     json.Uint32(constant.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -300,7 +300,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -416,7 +416,7 @@ func TestGenesis(t *testing.T) {
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
 			id := keys[0].PublicKey().Address()
-			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+			addr, err := address.FormatBech32(constant.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
@@ -425,7 +425,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
+	vdrSet, ok := vm.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 	require.Len(genesisState.Validators, vdrSet.Len())
 
@@ -481,7 +481,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constant.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
 
@@ -579,7 +579,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constant.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -799,7 +799,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -890,7 +890,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -982,7 +982,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constant.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1318,7 +1318,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
+	_ = firstVdrs.Add(constant.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             firstVdrs,
@@ -1406,7 +1406,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
+	_ = secondVdrs.Add(constant.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             secondVdrs,
@@ -1460,7 +1460,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -1563,7 +1563,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter := &router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
+	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constant.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
@@ -1780,7 +1780,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -1923,7 +1923,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constant.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
@@ -1941,7 +1941,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
+	_ = firstVdrs.Add(constant.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
@@ -1983,7 +1983,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
+	_ = secondVdrs.Add(constant.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .21,
@@ -2101,7 +2101,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.Equal(status.Aborted, txStatus)
 
 	_, err = secondVM.state.GetCurrentValidator(
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		ids.NodeID(keys[1].PublicKey().Address()),
 	)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -2114,7 +2114,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
@@ -2206,7 +2206,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		ids.NodeID(keys[1].PublicKey().Address()),
 	)
 	require.ErrorIs(err, database.ErrNotFound)

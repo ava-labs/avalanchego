@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -89,7 +89,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(GenesisFileContentKey, "", "Specifies base64 encoded genesis content")
 
 	// Network ID
-	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
+	fs.String(NetworkNameKey, constant.MainnetName, "Network ID this node will connect to")
 
 	// AVAX fees
 	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
@@ -120,11 +120,11 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
 	// Peer List Gossip
-	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
-	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constants.DefaultNetworkPeerListValidatorGossipSize, "Number of validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constants.DefaultNetworkPeerListNonValidatorGossipSize, "Number of non-validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, constants.DefaultNetworkPeerListPeersGossipSize, "Number of total peers (including non-validators and validators) that the node will gossip peer list to")
-	fs.Duration(NetworkPeerListGossipFreqKey, constants.DefaultNetworkPeerListGossipFreq, "Frequency to gossip peers to other nodes")
+	fs.Uint(NetworkPeerListNumValidatorIPsKey, constant.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
+	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constant.DefaultNetworkPeerListValidatorGossipSize, "Number of validators that the node will gossip peer list to")
+	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constant.DefaultNetworkPeerListNonValidatorGossipSize, "Number of non-validators that the node will gossip peer list to")
+	fs.Uint(NetworkPeerListPeersGossipSizeKey, constant.DefaultNetworkPeerListPeersGossipSize, "Number of total peers (including non-validators and validators) that the node will gossip peer list to")
+	fs.Duration(NetworkPeerListGossipFreqKey, constant.DefaultNetworkPeerListGossipFreq, "Frequency to gossip peers to other nodes")
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT")
@@ -132,77 +132,77 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(PublicIPResolutionServiceKey, "", fmt.Sprintf("Only acceptable values are 'ifconfigco', 'opendns' or 'ifconfigme'. When provided, the node will use that service to periodically resolve/update its public IP. Ignored if %s is set", PublicIPKey))
 
 	// Inbound Connection Throttling
-	fs.Duration(NetworkInboundConnUpgradeThrottlerCooldownKey, constants.DefaultInboundConnUpgradeThrottlerCooldown, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
-	fs.Float64(NetworkInboundThrottlerMaxConnsPerSecKey, constants.DefaultInboundThrottlerMaxConnsPerSec, "Max number of inbound connections to accept (from all peers) per second")
+	fs.Duration(NetworkInboundConnUpgradeThrottlerCooldownKey, constant.DefaultInboundConnUpgradeThrottlerCooldown, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
+	fs.Float64(NetworkInboundThrottlerMaxConnsPerSecKey, constant.DefaultInboundThrottlerMaxConnsPerSec, "Max number of inbound connections to accept (from all peers) per second")
 	// Outbound Connection Throttling
-	fs.Uint(NetworkOutboundConnectionThrottlingRpsKey, constants.DefaultOutboundConnectionThrottlingRps, "Make at most this number of outgoing peer connection attempts per second")
-	fs.Duration(NetworkOutboundConnectionTimeoutKey, constants.DefaultOutboundConnectionTimeout, "Timeout when dialing a peer")
+	fs.Uint(NetworkOutboundConnectionThrottlingRpsKey, constant.DefaultOutboundConnectionThrottlingRps, "Make at most this number of outgoing peer connection attempts per second")
+	fs.Duration(NetworkOutboundConnectionTimeoutKey, constant.DefaultOutboundConnectionTimeout, "Timeout when dialing a peer")
 	// Timeouts
-	fs.Duration(NetworkInitialTimeoutKey, constants.DefaultNetworkInitialTimeout, "Initial timeout value of the adaptive timeout manager")
-	fs.Duration(NetworkMinimumTimeoutKey, constants.DefaultNetworkMinimumTimeout, "Minimum timeout value of the adaptive timeout manager")
-	fs.Duration(NetworkMaximumTimeoutKey, constants.DefaultNetworkMaximumTimeout, "Maximum timeout value of the adaptive timeout manager")
-	fs.Duration(NetworkMaximumInboundTimeoutKey, constants.DefaultNetworkMaximumInboundTimeout, "Maximum timeout value of an inbound message. Defines duration within which an incoming message must be fulfilled. Incoming messages containing deadline higher than this value will be overridden with this value.")
-	fs.Duration(NetworkTimeoutHalflifeKey, constants.DefaultNetworkTimeoutHalflife, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0")
-	fs.Float64(NetworkTimeoutCoefficientKey, constants.DefaultNetworkTimeoutCoefficient, "Multiplied by average network response time to get the network timeout. Must be >= 1")
-	fs.Duration(NetworkReadHandshakeTimeoutKey, constants.DefaultNetworkReadHandshakeTimeout, "Timeout value for reading handshake messages")
-	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer")
-	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
+	fs.Duration(NetworkInitialTimeoutKey, constant.DefaultNetworkInitialTimeout, "Initial timeout value of the adaptive timeout manager")
+	fs.Duration(NetworkMinimumTimeoutKey, constant.DefaultNetworkMinimumTimeout, "Minimum timeout value of the adaptive timeout manager")
+	fs.Duration(NetworkMaximumTimeoutKey, constant.DefaultNetworkMaximumTimeout, "Maximum timeout value of the adaptive timeout manager")
+	fs.Duration(NetworkMaximumInboundTimeoutKey, constant.DefaultNetworkMaximumInboundTimeout, "Maximum timeout value of an inbound message. Defines duration within which an incoming message must be fulfilled. Incoming messages containing deadline higher than this value will be overridden with this value.")
+	fs.Duration(NetworkTimeoutHalflifeKey, constant.DefaultNetworkTimeoutHalflife, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0")
+	fs.Float64(NetworkTimeoutCoefficientKey, constant.DefaultNetworkTimeoutCoefficient, "Multiplied by average network response time to get the network timeout. Must be >= 1")
+	fs.Duration(NetworkReadHandshakeTimeoutKey, constant.DefaultNetworkReadHandshakeTimeout, "Timeout value for reading handshake messages")
+	fs.Duration(NetworkPingTimeoutKey, constant.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer")
+	fs.Duration(NetworkPingFrequencyKey, constant.DefaultPingFrequency, "Frequency of pinging other peers")
 
-	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s, %s]", compression.TypeGzip, compression.TypeZstd, compression.TypeNone))
+	fs.String(NetworkCompressionTypeKey, constant.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s, %s]", compression.TypeGzip, compression.TypeZstd, compression.TypeNone))
 
-	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
+	fs.Duration(NetworkMaxClockDifferenceKey, constant.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
 	// Note: The default value is set to false here because the default
 	// networkID is mainnet. The real default value of NetworkAllowPrivateIPs is
 	// based on the networkID.
-	fs.Bool(NetworkAllowPrivateIPsKey, false, fmt.Sprintf("Allows the node to initiate outbound connection attempts to peers with private IPs. If the provided --%s is one of [%s, %s] the default is false. Oterhwise, the default is true", NetworkNameKey, constants.MainnetName, constants.FujiName))
-	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
-	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
-	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
+	fs.Bool(NetworkAllowPrivateIPsKey, false, fmt.Sprintf("Allows the node to initiate outbound connection attempts to peers with private IPs. If the provided --%s is one of [%s, %s] the default is false. Oterhwise, the default is true", NetworkNameKey, constant.MainnetName, constant.FujiName))
+	fs.Bool(NetworkRequireValidatorToConnectKey, constant.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
+	fs.Uint(NetworkPeerReadBufferSizeKey, constant.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
+	fs.Uint(NetworkPeerWriteBufferSizeKey, constant.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
 
-	fs.Bool(NetworkTCPProxyEnabledKey, constants.DefaultNetworkTCPProxyEnabled, "Require all P2P connections to be initiated with a TCP proxy header")
+	fs.Bool(NetworkTCPProxyEnabledKey, constant.DefaultNetworkTCPProxyEnabled, "Require all P2P connections to be initiated with a TCP proxy header")
 	// The PROXY protocol specification recommends setting this value to be at
 	// least 3 seconds to cover a TCP retransmit.
 	// Ref: https://www.haproxy.org/download/2.3/doc/proxy-protocol.txt
 	// Specifying a timeout of 0 will actually result in a timeout of 200ms, but
 	// a timeout of 0 should generally not be provided.
-	fs.Duration(NetworkTCPProxyReadTimeoutKey, constants.DefaultNetworkTCPProxyReadTimeout, "Maximum duration to wait for a TCP proxy header")
+	fs.Duration(NetworkTCPProxyReadTimeoutKey, constant.DefaultNetworkTCPProxyReadTimeout, "Maximum duration to wait for a TCP proxy header")
 
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
-	fs.Int(BenchlistFailThresholdKey, constants.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
-	fs.Duration(BenchlistDurationKey, constants.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
-	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
+	fs.Int(BenchlistFailThresholdKey, constant.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
+	fs.Duration(BenchlistDurationKey, constant.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
+	fs.Duration(BenchlistMinFailingDurationKey, constant.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
 
 	// Router
 	// TODO: Remove this flag in the future
-	fs.Duration(ConsensusAcceptedFrontierGossipFrequencyKey, constants.DefaultAcceptedFrontierGossipFrequency, "Frequency of gossiping accepted frontiers")
-	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
-	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
-	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constants.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipValidatorSizeKey, constants.DefaultAppGossipValidatorSize, "Number of validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipNonValidatorSizeKey, constants.DefaultAppGossipNonValidatorSize, "Number of non-validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipPeerSizeKey, constants.DefaultAppGossipPeerSize, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
+	fs.Duration(ConsensusAcceptedFrontierGossipFrequencyKey, constant.DefaultAcceptedFrontierGossipFrequency, "Frequency of gossiping accepted frontiers")
+	fs.Uint(ConsensusAppConcurrencyKey, constant.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
+	fs.Duration(ConsensusShutdownTimeoutKey, constant.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
+	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constant.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constant.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constant.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constant.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constant.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constant.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
+	fs.Uint(AppGossipValidatorSizeKey, constant.DefaultAppGossipValidatorSize, "Number of validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipNonValidatorSizeKey, constant.DefaultAppGossipNonValidatorSize, "Number of non-validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipPeerSizeKey, constant.DefaultAppGossipPeerSize, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
 
 	// Inbound Throttling
-	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constants.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")
-	fs.Uint64(InboundThrottlerVdrAllocSizeKey, constants.DefaultInboundThrottlerVdrAllocSize, "Size, in bytes, of validator byte allocation in inbound message throttler")
-	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, constants.DefaultInboundThrottlerNodeMaxAtLargeBytes, "Max number of bytes a node can take from the inbound message throttler's at-large allocation. Must be at least the max message size")
-	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode, "Max number of messages currently processing from a given node")
-	fs.Uint64(InboundThrottlerBandwidthRefillRateKey, constants.DefaultInboundThrottlerBandwidthRefillRate, "Max average inbound bandwidth usage of a peer, in bytes per second. See BandwidthThrottler")
-	fs.Uint64(InboundThrottlerBandwidthMaxBurstSizeKey, constants.DefaultInboundThrottlerBandwidthMaxBurstSize, "Max inbound bandwidth a node can use at once. Must be at least the max message size. See BandwidthThrottler")
-	fs.Duration(InboundThrottlerCPUMaxRecheckDelayKey, constants.DefaultInboundThrottlerCPUMaxRecheckDelay, "In the CPU-based network throttler, check at least this often whether the node's CPU usage has fallen to an acceptable level")
-	fs.Duration(InboundThrottlerDiskMaxRecheckDelayKey, constants.DefaultInboundThrottlerDiskMaxRecheckDelay, "In the disk-based network throttler, check at least this often whether the node's disk usage has fallen to an acceptable level")
+	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constant.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")
+	fs.Uint64(InboundThrottlerVdrAllocSizeKey, constant.DefaultInboundThrottlerVdrAllocSize, "Size, in bytes, of validator byte allocation in inbound message throttler")
+	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, constant.DefaultInboundThrottlerNodeMaxAtLargeBytes, "Max number of bytes a node can take from the inbound message throttler's at-large allocation. Must be at least the max message size")
+	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, constant.DefaultInboundThrottlerMaxProcessingMsgsPerNode, "Max number of messages currently processing from a given node")
+	fs.Uint64(InboundThrottlerBandwidthRefillRateKey, constant.DefaultInboundThrottlerBandwidthRefillRate, "Max average inbound bandwidth usage of a peer, in bytes per second. See BandwidthThrottler")
+	fs.Uint64(InboundThrottlerBandwidthMaxBurstSizeKey, constant.DefaultInboundThrottlerBandwidthMaxBurstSize, "Max inbound bandwidth a node can use at once. Must be at least the max message size. See BandwidthThrottler")
+	fs.Duration(InboundThrottlerCPUMaxRecheckDelayKey, constant.DefaultInboundThrottlerCPUMaxRecheckDelay, "In the CPU-based network throttler, check at least this often whether the node's CPU usage has fallen to an acceptable level")
+	fs.Duration(InboundThrottlerDiskMaxRecheckDelayKey, constant.DefaultInboundThrottlerDiskMaxRecheckDelay, "In the disk-based network throttler, check at least this often whether the node's disk usage has fallen to an acceptable level")
 
 	// Outbound Throttling
-	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, constants.DefaultOutboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in outbound message throttler")
-	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, constants.DefaultOutboundThrottlerVdrAllocSize, "Size, in bytes, of validator byte allocation in outbound message throttler")
-	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes, "Max number of bytes a node can take from the outbound message throttler's at-large allocation. Must be at least the max message size")
+	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, constant.DefaultOutboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in outbound message throttler")
+	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, constant.DefaultOutboundThrottlerVdrAllocSize, "Size, in bytes, of validator byte allocation in outbound message throttler")
+	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, constant.DefaultOutboundThrottlerNodeMaxAtLargeBytes, "Max number of bytes a node can take from the outbound message throttler's at-large allocation. Must be at least the max message size")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
@@ -236,13 +236,13 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
-	fs.Duration(HealthCheckAveragerHalflifeKey, constants.DefaultHealthCheckAveragerHalflife, "Halflife of averager when calculating a running average in a health check")
+	fs.Duration(HealthCheckAveragerHalflifeKey, constant.DefaultHealthCheckAveragerHalflife, "Halflife of averager when calculating a running average in a health check")
 	// Network Layer Health
-	fs.Duration(NetworkHealthMaxTimeSinceMsgSentKey, constants.DefaultNetworkHealthMaxTimeSinceMsgSent, "Network layer returns unhealthy if haven't sent a message for at least this much time")
-	fs.Duration(NetworkHealthMaxTimeSinceMsgReceivedKey, constants.DefaultNetworkHealthMaxTimeSinceMsgReceived, "Network layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Float64(NetworkHealthMaxPortionSendQueueFillKey, constants.DefaultNetworkHealthMaxPortionSendQueueFill, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
-	fs.Uint(NetworkHealthMinPeersKey, constants.DefaultNetworkHealthMinPeers, "Network layer returns unhealthy if connected to less than this many peers")
-	fs.Float64(NetworkHealthMaxSendFailRateKey, constants.DefaultNetworkHealthMaxSendFailRate, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
+	fs.Duration(NetworkHealthMaxTimeSinceMsgSentKey, constant.DefaultNetworkHealthMaxTimeSinceMsgSent, "Network layer returns unhealthy if haven't sent a message for at least this much time")
+	fs.Duration(NetworkHealthMaxTimeSinceMsgReceivedKey, constant.DefaultNetworkHealthMaxTimeSinceMsgReceived, "Network layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Float64(NetworkHealthMaxPortionSendQueueFillKey, constant.DefaultNetworkHealthMaxPortionSendQueueFill, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
+	fs.Uint(NetworkHealthMinPeersKey, constant.DefaultNetworkHealthMinPeers, "Network layer returns unhealthy if connected to less than this many peers")
+	fs.Float64(NetworkHealthMaxSendFailRateKey, constant.DefaultNetworkHealthMaxSendFailRate, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
 	// Router Health
 	fs.Float64(RouterHealthMaxDropRateKey, 1, "Node reports unhealthy if the router drops more than this portion of messages")
 	fs.Uint(RouterHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
@@ -347,8 +347,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(ChainAliasesContentKey, "", "Specifies base64 encoded map from blockchainID to custom aliases")
 
 	// Delays
-	fs.Duration(NetworkInitialReconnectDelayKey, constants.DefaultNetworkInitialReconnectDelay, "Initial delay duration must be waited before attempting to reconnect a peer")
-	fs.Duration(NetworkMaxReconnectDelayKey, constants.DefaultNetworkMaxReconnectDelay, "Maximum delay duration must be waited before attempting to reconnect a peer")
+	fs.Duration(NetworkInitialReconnectDelayKey, constant.DefaultNetworkInitialReconnectDelay, "Initial delay duration must be waited before attempting to reconnect a peer")
+	fs.Duration(NetworkMaxReconnectDelayKey, constant.DefaultNetworkMaxReconnectDelay, "Maximum delay duration must be waited before attempting to reconnect a peer")
 
 	// System resource trackers
 	fs.Duration(SystemTrackerFrequencyKey, 500*time.Millisecond, "Frequency to check the real system usage of tracked processes. More frequent checks --> usage metrics are more accurate, but more expensive to track")
@@ -381,7 +381,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 // BuildFlagSet returns a complete set of flags for avalanchego
 func BuildFlagSet() *pflag.FlagSet {
-	fs := pflag.NewFlagSet(constants.AppName, pflag.ContinueOnError)
+	fs := pflag.NewFlagSet(constant.AppName, pflag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)
 	return fs

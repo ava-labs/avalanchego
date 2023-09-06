@@ -18,7 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -38,7 +38,7 @@ const (
 	// We use this to ensure that the proof we generate is not too large to fit in a message.
 	// TODO: refine this estimate. This is almost certainly a large overestimate.
 	estimatedMessageOverhead = 4 * units.KiB
-	maxByteSizeLimit         = constants.DefaultMaxMessageSize - estimatedMessageOverhead
+	maxByteSizeLimit         = constant.DefaultMaxMessageSize - estimatedMessageOverhead
 	endProofSizeBufferAmount = 2 * units.KiB
 )
 

@@ -7,10 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdmath "math"
 	"sync"
 	"time"
-
-	stdmath "math"
 
 	"github.com/google/btree"
 
@@ -30,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -418,23 +417,23 @@ type txAndStatus struct {
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
 	if tx == nil {
-		return ids.IDLen + constants.PointerOverhead
+		return ids.IDLen + constant.PointerOverhead
 	}
-	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
+	return ids.IDLen + len(tx.Bytes()) + constant.PointerOverhead
 }
 
 func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	if t == nil {
-		return ids.IDLen + constants.PointerOverhead
+		return ids.IDLen + constant.PointerOverhead
 	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constant.PointerOverhead
 }
 
 func blockSize(_ ids.ID, blk blocks.Block) int {
 	if blk == nil {
-		return ids.IDLen + constants.PointerOverhead
+		return ids.IDLen + constant.PointerOverhead
 	}
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + constant.PointerOverhead
 }
 
 func New(
@@ -1021,7 +1020,7 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) {
 }
 
 func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		return s.currentSupply, nil
 	}
 
@@ -1052,7 +1051,7 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 }
 
 func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		s.currentSupply = cs
 	} else {
 		s.modifiedSupplies[subnetID] = cs
@@ -1211,8 +1210,8 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	endHeight uint64,
 ) error {
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
-		constants.PrimaryNetworkID[:],
+		marshalStartDiffKey(constant.PrimaryNetworkID, startHeight),
+		constant.PrimaryNetworkID[:],
 	)
 	defer diffIter.Release()
 
@@ -1257,7 +1256,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
-	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
+	s.SetCurrentSupply(constant.PrimaryNetworkID, genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk)
 
 	// Persist UTXOs that exist at genesis
@@ -1274,7 +1273,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 
 		stakeAmount := tx.Validator.Wght
 		stakeDuration := tx.Validator.Duration()
-		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+		currentSupply, err := s.GetCurrentSupply(constant.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}
@@ -1296,7 +1295,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 
 		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
-		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+		s.SetCurrentSupply(constant.PrimaryNetworkID, newCurrentSupply)
 	}
 
 	for _, chain := range genesis.Chains {
@@ -1346,7 +1345,7 @@ func (s *state) loadMetadata() error {
 		return err
 	}
 	s.persistedCurrentSupply = currentSupply
-	s.SetCurrentSupply(constants.PrimaryNetworkID, currentSupply)
+	s.SetCurrentSupply(constant.PrimaryNetworkID, currentSupply)
 
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err != nil {
@@ -1612,7 +1611,7 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
-	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
+	primaryValidators, ok := s.cfg.Validators.Get(constant.PrimaryNetworkID)
 	if !ok {
 		return errMissingValidatorSet
 	}
@@ -1620,12 +1619,12 @@ func (s *state) initValidatorSets() error {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := s.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
+	err := s.ValidatorSet(constant.PrimaryNetworkID, primaryValidators)
 	if err != nil {
 		return err
 	}
 
-	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
+	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constant.PrimaryNetworkID, s.ctx.NodeID)
 	primaryValidators.RegisterCallbackListener(vl)
 
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
@@ -1893,7 +1892,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		// Select db to write to
 		validatorDB := s.currentSubnetValidatorList
 		delegatorDB := s.currentSubnetDelegatorList
-		if subnetID == constants.PrimaryNetworkID {
+		if subnetID == constant.PrimaryNetworkID {
 			validatorDB = s.currentValidatorList
 			delegatorDB = s.currentDelegatorList
 		}
@@ -1929,7 +1928,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// added. This means the prior value for the public key was
 					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
+						marshalDiffKey(constant.PrimaryNetworkID, height, nodeID),
 						nil,
 					)
 					if err != nil {
@@ -1976,7 +1975,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// significantly more efficient to parse when applying
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
+						marshalDiffKey(constant.PrimaryNetworkID, height, nodeID),
 						staker.PublicKey.Serialize(),
 					)
 					if err != nil {
@@ -2037,7 +2036,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			// We only track the current validator set of tracked subnets.
-			if subnetID != constants.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
+			if subnetID != constant.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
 				continue
 			}
 
@@ -2070,7 +2069,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 	if !updateValidators {
 		return nil
 	}
-	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
+	primaryValidators, ok := s.cfg.Validators.Get(constant.PrimaryNetworkID)
 	if !ok {
 		return nil
 	}
@@ -2116,7 +2115,7 @@ func (s *state) writePendingStakers() error {
 
 		validatorDB := s.pendingSubnetValidatorList
 		delegatorDB := s.pendingSubnetDelegatorList
-		if subnetID == constants.PrimaryNetworkID {
+		if subnetID == constant.PrimaryNetworkID {
 			validatorDB = s.pendingValidatorList
 			delegatorDB = s.pendingDelegatorList
 		}

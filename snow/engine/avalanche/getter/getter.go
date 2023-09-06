@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -120,7 +120,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
 		newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes)
-		if newLen > constants.MaxContainersLen {
+		if newLen > constant.MaxContainersLen {
 			// reached maximum response size
 			break
 		}

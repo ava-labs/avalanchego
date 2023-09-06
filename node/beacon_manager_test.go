@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -59,7 +59,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	for _, nodeID := range validatorIDs {
 		nodeID := nodeID
 		go func() {
-			b.Connected(nodeID, version.CurrentApp, constants.PrimaryNetworkID)
+			b.Connected(nodeID, version.CurrentApp, constant.PrimaryNetworkID)
 			b.Connected(nodeID, version.CurrentApp, ids.GenerateTestID())
 		}()
 	}

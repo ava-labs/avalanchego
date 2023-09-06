@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 func TestSubnetValidatorVerifySubnetID(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSubnetValidatorVerifySubnetID(t *testing.T) {
 	// Error path
 	{
 		vdr := &SubnetValidator{
-			Subnet: constants.PrimaryNetworkID,
+			Subnet: constant.PrimaryNetworkID,
 		}
 
 		err := vdr.Verify()

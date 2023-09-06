@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -59,7 +59,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 		dirPath   string
 	)
 	for {
-		_, reserved := constants.NetworkIDToNetworkName[networkID]
+		_, reserved := constant.NetworkIDToNetworkName[networkID]
 		if reserved {
 			networkID++
 			continue

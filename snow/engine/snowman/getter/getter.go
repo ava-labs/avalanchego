@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
@@ -154,7 +154,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.vm,
 		blkID,
 		gh.cfg.AncestorsMaxContainersSent,
-		constants.MaxContainersLen,
+		constant.MaxContainersLen,
 		gh.cfg.MaxTimeGetAncestors,
 	)
 	if err != nil {

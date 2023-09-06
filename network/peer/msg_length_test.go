@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 func TestWriteMsgLen(t *testing.T) {
@@ -36,17 +36,17 @@ func TestWriteMsgLen(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			msgLen:      constants.DefaultMaxMessageSize,
-			msgLimit:    constants.DefaultMaxMessageSize,
+			msgLen:      constant.DefaultMaxMessageSize,
+			msgLimit:    constant.DefaultMaxMessageSize,
 			expectedErr: nil,
 		},
 		{
 			msgLen:      1,
-			msgLimit:    constants.DefaultMaxMessageSize,
+			msgLimit:    constant.DefaultMaxMessageSize,
 			expectedErr: nil,
 		},
 		{
-			msgLen:      constants.DefaultMaxMessageSize,
+			msgLen:      constant.DefaultMaxMessageSize,
 			msgLimit:    1,
 			expectedErr: errMaxMessageLengthExceeded,
 		},
@@ -87,7 +87,7 @@ func TestReadMsgLen(t *testing.T) {
 		},
 		{
 			msgLenBytes:    []byte{0b11111111, 0xFF, 0xFF, 0xFF},
-			msgLimit:       constants.DefaultMaxMessageSize,
+			msgLimit:       constant.DefaultMaxMessageSize,
 			expectedErr:    errMaxMessageLengthExceeded,
 			expectedMsgLen: 0,
 		},

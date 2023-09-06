@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -319,7 +319,7 @@ func getNetworkConfig(
 		return network.Config{}, err
 	}
 
-	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
+	allowPrivateIPs := !constant.ProductionNetworkIDs.Contains(networkID)
 	if v.IsSet(NetworkAllowPrivateIPsKey) {
 		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
@@ -421,10 +421,10 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
 	case config.PeerListGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
-	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
-		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
-	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
-		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
+	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constant.MinInboundThrottlerMaxRecheckDelay:
+		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constant.MinInboundThrottlerMaxRecheckDelay)
+	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constant.MinInboundThrottlerMaxRecheckDelay:
+		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerDiskMaxRecheckDelayKey, constant.MinInboundThrottlerMaxRecheckDelay)
 	case config.MaxReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxReconnectDelayKey)
 	case config.InitialReconnectDelay < 0:
@@ -786,7 +786,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		return node.StakingConfig{}, errSybilProtectionDisabledStakerWeights
 	}
 
-	if !config.SybilProtectionEnabled && (networkID == constants.MainnetID || networkID == constants.FujiID) {
+	if !config.SybilProtectionEnabled && (networkID == constant.MainnetID || networkID == constant.FujiID) {
 		return node.StakingConfig{}, errSybilProtectionDisabledOnPublicNetwork
 	}
 
@@ -799,7 +799,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
+	if networkID != constant.MainnetID && networkID != constant.FujiID {
 		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
 		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
@@ -836,7 +836,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
+	if networkID != constant.MainnetID && networkID != constant.FujiID {
 		return genesis.TxFeeConfig{
 			TxFee:                         v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:              v.GetUint64(CreateAssetTxFeeKey),
@@ -882,7 +882,7 @@ func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
-		if subnetID == constants.PrimaryNetworkID {
+		if subnetID == constant.PrimaryNetworkID {
 			return nil, errCannotTrackPrimaryNetwork
 		}
 		trackedSubnetIDs.Add(subnetID)
@@ -913,7 +913,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		Name: v.GetString(DBTypeKey),
 		Path: filepath.Join(
 			GetExpandedArg(v, DBPathKey),
-			constants.NetworkName(networkID),
+			constant.NetworkName(networkID),
 		),
 		Config: configBytes,
 	}, nil
@@ -1311,7 +1311,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network ID
-	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
+	nodeConfig.NetworkID, err = constant.NetworkID(v.GetString(NetworkNameKey))
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1394,7 +1394,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
-	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
+	subnetConfigs[constant.PrimaryNetworkID] = primaryNetworkConfig
 
 	nodeConfig.SubnetConfigs = subnetConfigs
 

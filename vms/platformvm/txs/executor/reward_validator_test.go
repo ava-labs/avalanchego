@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -287,7 +287,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	vdrSet, ok := env.config.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 
 	stake := vdrSet.GetWeight(vdrNodeID)
@@ -423,7 +423,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// test validator stake
-	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	vdrSet, ok := env.config.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 
 	stake := vdrSet.GetWeight(vdrNodeID)
@@ -735,7 +735,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}()
 	dummyHeight := uint64(1)
 
-	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	initialSupply, err := env.state.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -839,7 +839,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 	require.Zero(delReward, "expected delegator balance not to increase")
 
-	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	newSupply, err := env.state.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }

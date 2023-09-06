@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -82,8 +82,8 @@ func NewTestNetwork(
 		logging.NoLog{},
 		metrics,
 		"",
-		constants.DefaultNetworkCompressionType,
-		constants.DefaultNetworkMaximumInboundTimeout,
+		constant.DefaultNetworkCompressionType,
+		constant.DefaultNetworkMaximumInboundTimeout,
 	)
 	if err != nil {
 		return nil, err
@@ -92,87 +92,87 @@ func NewTestNetwork(
 	networkConfig := Config{
 		ThrottlerConfig: ThrottlerConfig{
 			InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
-				UpgradeCooldown:        constants.DefaultInboundConnUpgradeThrottlerCooldown,
-				MaxRecentConnsUpgraded: int(math.Ceil(constants.DefaultInboundThrottlerMaxConnsPerSec * constants.DefaultInboundConnUpgradeThrottlerCooldown.Seconds())),
+				UpgradeCooldown:        constant.DefaultInboundConnUpgradeThrottlerCooldown,
+				MaxRecentConnsUpgraded: int(math.Ceil(constant.DefaultInboundThrottlerMaxConnsPerSec * constant.DefaultInboundConnUpgradeThrottlerCooldown.Seconds())),
 			},
 
 			InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 				MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
-					VdrAllocSize:        constants.DefaultInboundThrottlerVdrAllocSize,
-					AtLargeAllocSize:    constants.DefaultInboundThrottlerAtLargeAllocSize,
-					NodeMaxAtLargeBytes: constants.DefaultInboundThrottlerNodeMaxAtLargeBytes,
+					VdrAllocSize:        constant.DefaultInboundThrottlerVdrAllocSize,
+					AtLargeAllocSize:    constant.DefaultInboundThrottlerAtLargeAllocSize,
+					NodeMaxAtLargeBytes: constant.DefaultInboundThrottlerNodeMaxAtLargeBytes,
 				},
 
 				BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
-					RefillRate:   constants.DefaultInboundThrottlerBandwidthRefillRate,
-					MaxBurstSize: constants.DefaultInboundThrottlerBandwidthMaxBurstSize,
+					RefillRate:   constant.DefaultInboundThrottlerBandwidthRefillRate,
+					MaxBurstSize: constant.DefaultInboundThrottlerBandwidthMaxBurstSize,
 				},
 
 				CPUThrottlerConfig: throttling.SystemThrottlerConfig{
-					MaxRecheckDelay: constants.DefaultInboundThrottlerCPUMaxRecheckDelay,
+					MaxRecheckDelay: constant.DefaultInboundThrottlerCPUMaxRecheckDelay,
 				},
 
 				DiskThrottlerConfig: throttling.SystemThrottlerConfig{
-					MaxRecheckDelay: constants.DefaultInboundThrottlerDiskMaxRecheckDelay,
+					MaxRecheckDelay: constant.DefaultInboundThrottlerDiskMaxRecheckDelay,
 				},
 
-				MaxProcessingMsgsPerNode: constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
+				MaxProcessingMsgsPerNode: constant.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
 			},
 			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
-				VdrAllocSize:        constants.DefaultOutboundThrottlerVdrAllocSize,
-				AtLargeAllocSize:    constants.DefaultOutboundThrottlerAtLargeAllocSize,
-				NodeMaxAtLargeBytes: constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes,
+				VdrAllocSize:        constant.DefaultOutboundThrottlerVdrAllocSize,
+				AtLargeAllocSize:    constant.DefaultOutboundThrottlerAtLargeAllocSize,
+				NodeMaxAtLargeBytes: constant.DefaultOutboundThrottlerNodeMaxAtLargeBytes,
 			},
 
-			MaxInboundConnsPerSec: constants.DefaultInboundThrottlerMaxConnsPerSec,
+			MaxInboundConnsPerSec: constant.DefaultInboundThrottlerMaxConnsPerSec,
 		},
 
 		HealthConfig: HealthConfig{
 			Enabled:                      true,
-			MinConnectedPeers:            constants.DefaultNetworkHealthMinPeers,
-			MaxTimeSinceMsgReceived:      constants.DefaultNetworkHealthMaxTimeSinceMsgReceived,
-			MaxTimeSinceMsgSent:          constants.DefaultNetworkHealthMaxTimeSinceMsgSent,
-			MaxPortionSendQueueBytesFull: constants.DefaultNetworkHealthMaxPortionSendQueueFill,
-			MaxSendFailRate:              constants.DefaultNetworkHealthMaxSendFailRate,
-			SendFailRateHalflife:         constants.DefaultHealthCheckAveragerHalflife,
+			MinConnectedPeers:            constant.DefaultNetworkHealthMinPeers,
+			MaxTimeSinceMsgReceived:      constant.DefaultNetworkHealthMaxTimeSinceMsgReceived,
+			MaxTimeSinceMsgSent:          constant.DefaultNetworkHealthMaxTimeSinceMsgSent,
+			MaxPortionSendQueueBytesFull: constant.DefaultNetworkHealthMaxPortionSendQueueFill,
+			MaxSendFailRate:              constant.DefaultNetworkHealthMaxSendFailRate,
+			SendFailRateHalflife:         constant.DefaultHealthCheckAveragerHalflife,
 		},
 
-		ProxyEnabled:           constants.DefaultNetworkTCPProxyEnabled,
-		ProxyReadHeaderTimeout: constants.DefaultNetworkTCPProxyReadTimeout,
+		ProxyEnabled:           constant.DefaultNetworkTCPProxyEnabled,
+		ProxyReadHeaderTimeout: constant.DefaultNetworkTCPProxyReadTimeout,
 
 		DialerConfig: dialer.Config{
-			ThrottleRps:       constants.DefaultOutboundConnectionThrottlingRps,
-			ConnectionTimeout: constants.DefaultOutboundConnectionTimeout,
+			ThrottleRps:       constant.DefaultOutboundConnectionThrottlingRps,
+			ConnectionTimeout: constant.DefaultOutboundConnectionTimeout,
 		},
 
 		TimeoutConfig: TimeoutConfig{
-			PingPongTimeout:      constants.DefaultPingPongTimeout,
-			ReadHandshakeTimeout: constants.DefaultNetworkReadHandshakeTimeout,
+			PingPongTimeout:      constant.DefaultPingPongTimeout,
+			ReadHandshakeTimeout: constant.DefaultNetworkReadHandshakeTimeout,
 		},
 
 		PeerListGossipConfig: PeerListGossipConfig{
-			PeerListNumValidatorIPs:        constants.DefaultNetworkPeerListNumValidatorIPs,
-			PeerListValidatorGossipSize:    constants.DefaultNetworkPeerListValidatorGossipSize,
-			PeerListNonValidatorGossipSize: constants.DefaultNetworkPeerListNonValidatorGossipSize,
-			PeerListPeersGossipSize:        constants.DefaultNetworkPeerListPeersGossipSize,
-			PeerListGossipFreq:             constants.DefaultNetworkPeerListGossipFreq,
+			PeerListNumValidatorIPs:        constant.DefaultNetworkPeerListNumValidatorIPs,
+			PeerListValidatorGossipSize:    constant.DefaultNetworkPeerListValidatorGossipSize,
+			PeerListNonValidatorGossipSize: constant.DefaultNetworkPeerListNonValidatorGossipSize,
+			PeerListPeersGossipSize:        constant.DefaultNetworkPeerListPeersGossipSize,
+			PeerListGossipFreq:             constant.DefaultNetworkPeerListGossipFreq,
 		},
 
 		DelayConfig: DelayConfig{
-			InitialReconnectDelay: constants.DefaultNetworkInitialReconnectDelay,
-			MaxReconnectDelay:     constants.DefaultNetworkMaxReconnectDelay,
+			InitialReconnectDelay: constant.DefaultNetworkInitialReconnectDelay,
+			MaxReconnectDelay:     constant.DefaultNetworkMaxReconnectDelay,
 		},
 
-		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
-		CompressionType:              constants.DefaultNetworkCompressionType,
-		PingFrequency:                constants.DefaultPingFrequency,
-		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
-		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
-		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,
+		MaxClockDifference:           constant.DefaultNetworkMaxClockDifference,
+		CompressionType:              constant.DefaultNetworkCompressionType,
+		PingFrequency:                constant.DefaultPingFrequency,
+		AllowPrivateIPs:              !constant.ProductionNetworkIDs.Contains(networkID),
+		UptimeMetricFreq:             constant.DefaultUptimeMetricFreq,
+		MaximumInboundMessageTimeout: constant.DefaultNetworkMaximumInboundTimeout,
 
-		RequireValidatorToConnect: constants.DefaultNetworkRequireValidatorToConnect,
-		PeerReadBufferSize:        constants.DefaultNetworkPeerReadBufferSize,
-		PeerWriteBufferSize:       constants.DefaultNetworkPeerWriteBufferSize,
+		RequireValidatorToConnect: constant.DefaultNetworkRequireValidatorToConnect,
+		PeerReadBufferSize:        constant.DefaultNetworkPeerReadBufferSize,
+		PeerWriteBufferSize:       constant.DefaultNetworkPeerWriteBufferSize,
 	}
 
 	networkConfig.NetworkID = networkID
@@ -189,7 +189,7 @@ func NewTestNetwork(
 	validatorManager := validators.NewManager()
 	beacons := validators.NewSet()
 	networkConfig.Validators = validatorManager
-	networkConfig.Validators.Add(constants.PrimaryNetworkID, currentValidators)
+	networkConfig.Validators.Add(constant.PrimaryNetworkID, currentValidators)
 	networkConfig.Beacons = beacons
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
@@ -201,7 +201,7 @@ func NewTestNetwork(
 		metrics,
 		resource.NoUsage,
 		&meter.ContinuousFactory{},
-		constants.DefaultHealthCheckAveragerHalflife,
+		constant.DefaultHealthCheckAveragerHalflife,
 	)
 	if err != nil {
 		return nil, err
@@ -239,10 +239,10 @@ func NewTestNetwork(
 		log,
 		newNoopListener(),
 		dialer.NewDialer(
-			constants.NetworkType,
+			constant.NetworkType,
 			dialer.Config{
-				ThrottleRps:       constants.DefaultOutboundConnectionThrottlingRps,
-				ConnectionTimeout: constants.DefaultOutboundConnectionTimeout,
+				ThrottleRps:       constant.DefaultOutboundConnectionThrottlingRps,
+				ConnectionTimeout: constant.DefaultOutboundConnectionTimeout,
 			},
 			log,
 		),

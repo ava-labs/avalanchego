@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -38,7 +38,7 @@ func New(config Config) (Engine, error) {
 }
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + constant.PointerOverhead
 }
 
 // Transitive implements the Engine interface by attempting to fetch all

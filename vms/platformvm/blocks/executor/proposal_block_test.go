@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -107,10 +107,10 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		EndTime:   chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply(constant.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().GetDelegateeReward(constant.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
-	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
+	env.mockedState.EXPECT().GetUptime(gomock.Any(), constant.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
 		time.Time{},      /*lastUpdated*/
 		nil,              /*err*/
@@ -170,7 +170,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply(constant.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,
@@ -229,7 +229,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	currentStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
 
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetDelegateeReward(constant.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	pendingStakersIt := state.NewMockStakerIterator(ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
@@ -683,13 +683,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
-					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetPendingValidator(constant.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, constant.PrimaryNetworkID, stakerNodeID))
 				case current:
-					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetCurrentValidator(constant.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, constant.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
@@ -1030,7 +1030,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 	vdrWeight := primarySet.GetWeight(nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
@@ -1214,7 +1214,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.Get(constant.PrimaryNetworkID)
 	require.True(ok)
 	vdrWeight := primarySet.GetWeight(nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)

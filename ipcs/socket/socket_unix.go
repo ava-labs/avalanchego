@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 var staleSocketTimeout = 100 * time.Millisecond
@@ -53,7 +53,7 @@ func Dial(addr string) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{Conn: c, maxMessageSize: int64(constants.DefaultMaxMessageSize)}, nil
+	return &Client{Conn: c, maxMessageSize: int64(constant.DefaultMaxMessageSize)}, nil
 }
 
 // removeIfStaleUnixSocket takes in a path and removes it iff it is a socket

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -100,7 +100,7 @@ func FetchState(
 		codec  codec.Manager
 	}{
 		{
-			id:     constants.PlatformChainID,
+			id:     constant.PlatformChainID,
 			client: pClient,
 			codec:  txs.Codec,
 		},
@@ -155,7 +155,7 @@ func FetchEthState(
 	path := fmt.Sprintf(
 		"%s/ext/%s/C/rpc",
 		uri,
-		constants.ChainAliasPrefix,
+		constant.ChainAliasPrefix,
 	)
 	client, err := ethclient.Dial(path)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -52,7 +52,7 @@ func main() {
 
 	exportStartTime := time.Now()
 	exportTx, err := cWallet.IssueExportTx(
-		constants.PlatformChainID,
+		constant.PlatformChainID,
 		[]*secp256k1fx.TransferOutput{{
 			Amt:          units.Avax,
 			OutputOwners: owner,

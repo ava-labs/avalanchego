@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -915,7 +915,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	}
 	baseTx := txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: ctx.ChainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: asset,

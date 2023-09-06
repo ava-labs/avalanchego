@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -25,7 +25,7 @@ type beaconManager struct {
 }
 
 func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	if constants.PrimaryNetworkID == subnetID &&
+	if constant.PrimaryNetworkID == subnetID &&
 		b.beacons.Contains(nodeID) &&
 		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
 		b.timer.Cancel()

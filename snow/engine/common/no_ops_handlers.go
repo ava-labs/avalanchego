@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -179,7 +179,7 @@ func NewNoOpPutHandler(log logging.Logger) PutHandler {
 }
 
 func (nop *noOpPutHandler) Put(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
-	if requestID == constants.GossipMsgRequestID {
+	if requestID == constant.GossipMsgRequestID {
 		nop.log.Verbo("dropping request",
 			zap.String("reason", "unhandled by this gear"),
 			zap.Stringer("messageOp", message.PutOp),

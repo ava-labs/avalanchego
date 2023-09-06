@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -40,7 +40,7 @@ const (
 	// wrappers.LongLen accounts for the timestamp of the container
 	// ids.IDLen accounts for the container ID
 	// wrappers.ShortLen accounts for the codec version
-	codecMaxSize = int(constants.DefaultMaxMessageSize) + wrappers.IntLen + wrappers.LongLen + ids.IDLen + wrappers.ShortLen
+	codecMaxSize = int(constant.DefaultMaxMessageSize) + wrappers.IntLen + wrappers.LongLen + ids.IDLen + wrappers.ShortLen
 )
 
 var (
@@ -159,7 +159,7 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 			zap.String("chainName", chainName),
 		)
 		return
-	} else if ctx.SubnetID != constants.PrimaryNetworkID {
+	} else if ctx.SubnetID != constant.PrimaryNetworkID {
 		i.log.Debug("not registering chain to indexer",
 			zap.String("reason", "not in the primary network"),
 			zap.String("chainName", chainName),

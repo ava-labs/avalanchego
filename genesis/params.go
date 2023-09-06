@@ -6,7 +6,7 @@ package genesis
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -61,11 +61,11 @@ type Params struct {
 
 func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 	switch networkID {
-	case constants.MainnetID:
+	case constant.MainnetID:
 		return MainnetParams.TxFeeConfig
-	case constants.FujiID:
+	case constant.FujiID:
 		return FujiParams.TxFeeConfig
-	case constants.LocalID:
+	case constant.LocalID:
 		return LocalParams.TxFeeConfig
 	default:
 		return LocalParams.TxFeeConfig
@@ -74,11 +74,11 @@ func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 
 func GetStakingConfig(networkID uint32) StakingConfig {
 	switch networkID {
-	case constants.MainnetID:
+	case constant.MainnetID:
 		return MainnetParams.StakingConfig
-	case constants.FujiID:
+	case constant.FujiID:
 		return FujiParams.StakingConfig
-	case constants.LocalID:
+	case constant.LocalID:
 		return LocalParams.StakingConfig
 	default:
 		return LocalParams.StakingConfig

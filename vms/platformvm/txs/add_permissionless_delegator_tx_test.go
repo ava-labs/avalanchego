@@ -5,9 +5,8 @@ package txs
 
 import (
 	"errors"
-	"testing"
-
 	stdmath "math"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -62,8 +61,8 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 	simpleAddPrimaryTx := &AddPermissionlessDelegatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -91,7 +90,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 			End:    12345 + 200*24*60*60,
 			Wght:   2 * units.KiloAvax,
 		},
-		Subnet: constants.PrimaryNetworkID,
+		Subnet: constant.PrimaryNetworkID,
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -122,7 +121,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 	utils.Sort(simpleAddPrimaryTx.Ins)
 	require.NoError(simpleAddPrimaryTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -222,8 +221,8 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 	complexAddPrimaryTx := &AddPermissionlessDelegatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -334,7 +333,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 			End:    12345 + 200*24*60*60,
 			Wght:   5 * units.KiloAvax,
 		},
-		Subnet: constants.PrimaryNetworkID,
+		Subnet: constant.PrimaryNetworkID,
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -376,7 +375,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 	}
 	require.NoError(complexAddPrimaryTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -643,8 +642,8 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 	simpleAddSubnetTx := &AddPermissionlessDelegatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -718,7 +717,7 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 	utils.Sort(simpleAddSubnetTx.Ins)
 	require.NoError(simpleAddSubnetTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -839,8 +838,8 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 	complexAddSubnetTx := &AddPermissionlessDelegatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -993,7 +992,7 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 	}
 	require.NoError(complexAddSubnetTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -1541,7 +1540,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 					Validator: Validator{
 						Wght: 2,
 					},
-					Subnet: constants.PrimaryNetworkID,
+					Subnet: constant.PrimaryNetworkID,
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{

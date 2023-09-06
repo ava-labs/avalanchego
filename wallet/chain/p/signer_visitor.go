@@ -4,14 +4,13 @@
 package p
 
 import (
+	stdcontext "context"
 	"errors"
 	"fmt"
 
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -52,7 +51,7 @@ func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -60,7 +59,7 @@ func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -73,7 +72,7 @@ func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error
 }
 
 func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -81,7 +80,7 @@ func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 }
 
 func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -94,7 +93,7 @@ func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -102,7 +101,7 @@ func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 }
 
 func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -115,7 +114,7 @@ func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -123,7 +122,7 @@ func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -136,7 +135,7 @@ func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx)
 }
 
 func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -149,7 +148,7 @@ func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 }
 
 func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -157,7 +156,7 @@ func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVa
 }
 
 func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	txSigners, err := s.getSigners(constant.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
