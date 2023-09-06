@@ -50,5 +50,6 @@ func serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		}
 	}(ctx)
 
+	// start RPC Chain VM server
 	return startVMServer(ctx, server)
 }
