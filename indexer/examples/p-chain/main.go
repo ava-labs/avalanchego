@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/indexer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	platformvmblock "github.com/ava-labs/avalanchego/vms/platformvm/block"
+	proposervmblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
@@ -33,12 +33,12 @@ func main() {
 		}
 
 		platformvmBlockBytes := container.Bytes
-		proposerVMBlock, err := block.Parse(container.Bytes)
+		proposerVMBlock, err := proposervmblock.Parse(container.Bytes)
 		if err == nil {
 			platformvmBlockBytes = proposerVMBlock.Block()
 		}
 
-		platformvmBlock, err := blocks.Parse(blocks.Codec, platformvmBlockBytes)
+		platformvmBlock, err := platformvmblock.Parse(platformvmblock.Codec, platformvmBlockBytes)
 		if err != nil {
 			log.Fatalf("failed to parse platformvm block: %s\n", err)
 		}
