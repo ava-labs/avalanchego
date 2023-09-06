@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -88,9 +88,9 @@ func TestAcceptedFrontier(t *testing.T) {
 	blkID := ids.GenerateTestID()
 
 	dummyBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  []byte{1, 2, 3},
@@ -128,13 +128,13 @@ func TestFilterAccepted(t *testing.T) {
 	blkID1 := ids.GenerateTestID()
 	blkID2 := ids.GenerateTestID()
 
-	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	blk0 := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     blkID0,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
-	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	blk1 := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     blkID1,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.CantLastAccepted = false

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
@@ -133,25 +133,25 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vtxBytes2 := []byte{2}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes1,
 	}
 	vtx2 := &avalanche.TestVertex{ // vtx2 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID2,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes2,
@@ -203,11 +203,11 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx2.Status() == choices.Accepted, nil
+		return vtx2.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx2.Status())
+		require.Equal(choice.Accepted, vtx2.Status())
 		return []ids.ID{vtxID2}
 	}
 
@@ -218,9 +218,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(choices.Accepted, vtx2.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, vtx2.Status())
 }
 
 // Accepted frontier has one vertex, which has one vertex as a dependency.
@@ -240,17 +240,17 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	vtxBytes2 := []byte{2}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{ // vtx1 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentsV: []avalanche.Vertex{vtx0},
 		HeightV:  1,
@@ -258,9 +258,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 	// Should not receive transitive votes from [vtx1]
 	vtx2 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes2,
@@ -307,13 +307,13 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			return vtx0, nil
 		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
+			vtx1.StatusV = choice.Processing
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
-			vtx2.StatusV = choices.Processing
+			vtx2.StatusV = choice.Processing
 			return vtx2, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
@@ -342,11 +342,11 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx1.Status() == choices.Accepted, nil
+		return vtx1.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx1.Status())
+		require.Equal(choice.Accepted, vtx1.Status())
 		return []ids.ID{vtxID1}
 	}
 
@@ -358,9 +358,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
 	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(choices.Processing, vtx2.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
+	require.Equal(choice.Processing, vtx2.Status())
 }
 
 // Vertex has a dependency and tx has a dependency
@@ -376,18 +376,18 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	txBytes1 := []byte{1}
 
 	innerTx0 := &snowstorm.TestTx{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     txID0,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV: txBytes0,
 	}
 
 	// Depends on tx0
 	tx1 := &snowstorm.TestTx{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     txID1,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		DependenciesV: set.Of(innerTx0.IDV),
 		BytesV:        txBytes1,
@@ -415,18 +415,18 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		TxsV:    []snowstorm.Tx{tx1},
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{ // vtx1 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentsV: []avalanche.Vertex{vtx0}, // Depends on vtx0
 		HeightV:  1,
@@ -489,7 +489,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			return vtx0, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
@@ -498,11 +498,11 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx1.Status() == choices.Accepted, nil
+		return vtx1.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx1.Status())
+		require.Equal(choice.Accepted, vtx1.Status())
 		return []ids.ID{vtxID1}
 	}
 
@@ -513,10 +513,10 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, tx0.Status())
-	require.Equal(choices.Accepted, tx1.Status())
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, tx0.Status())
+	require.Equal(choice.Accepted, tx1.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
 }
 
 // Ancestors only contains 1 of the two needed vertices; have to issue another GetAncestors
@@ -534,26 +534,26 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	vtxBytes2 := []byte{2}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx0},
 		HeightV:  1,
 		BytesV:   vtxBytes1,
 	}
 	vtx2 := &avalanche.TestVertex{ // vtx2 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID2,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentsV: []avalanche.Vertex{vtx1},
 		HeightV:  2,
@@ -592,10 +592,10 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			return vtx0, nil
 		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
+			vtx1.StatusV = choice.Processing
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
 			return vtx2, nil
@@ -622,11 +622,11 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.Equal(vtxID0, requested)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx2.Status() == choices.Accepted, nil
+		return vtx2.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx2.Status())
+		require.Equal(choice.Accepted, vtx2.Status())
 		return []ids.ID{vtxID2}
 	}
 
@@ -637,9 +637,9 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
 	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(choices.Accepted, vtx2.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, vtx2.Status())
 }
 
 func TestBootstrapperFinalized(t *testing.T) {
@@ -654,17 +654,17 @@ func TestBootstrapperFinalized(t *testing.T) {
 	vtxBytes1 := []byte{1}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{ // vtx1 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx0},
 		HeightV:  1,
@@ -709,11 +709,11 @@ func TestBootstrapperFinalized(t *testing.T) {
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			parsedVtx0 = true
 			return vtx0, nil
 		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
+			vtx1.StatusV = choice.Processing
 			parsedVtx1 = true
 			return vtx1, nil
 		default:
@@ -737,11 +737,11 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx1.Status() == choices.Accepted, nil
+		return vtx1.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx1.Status())
+		require.Equal(choice.Accepted, vtx1.Status())
 		return []ids.ID{vtxID1}
 	}
 
@@ -753,8 +753,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 	reqID = requestIDs[vtxID0]
 	require.NoError(bs.GetAncestorsFailed(context.Background(), peerID, reqID))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
 }
 
 // Test that Ancestors accepts the parents of the first vertex returned
@@ -772,26 +772,26 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	vtxBytes2 := []byte{2}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx0},
 		HeightV:  1,
 		BytesV:   vtxBytes1,
 	}
 	vtx2 := &avalanche.TestVertex{ // vtx2 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx1},
 		HeightV:  2,
@@ -840,15 +840,15 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			parsedVtx0 = true
 			return vtx0, nil
 		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
+			vtx1.StatusV = choice.Processing
 			parsedVtx1 = true
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
-			vtx2.StatusV = choices.Processing
+			vtx2.StatusV = choice.Processing
 			parsedVtx2 = true
 			return vtx2, nil
 		default:
@@ -868,11 +868,11 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	require.Contains(requestIDs, vtxID2)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx2.Status() == choices.Accepted, nil
+		return vtx2.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx2.Status())
+		require.Equal(choice.Accepted, vtx2.Status())
 		return []ids.ID{vtxID2}
 	}
 
@@ -884,9 +884,9 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	reqID := requestIDs[vtxID2]
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(choices.Accepted, vtx2.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, vtx2.Status())
 }
 
 func TestRestartBootstrapping(t *testing.T) {
@@ -909,53 +909,53 @@ func TestRestartBootstrapping(t *testing.T) {
 	vtxBytes5 := []byte{5}
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID0,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx0},
 		HeightV:  1,
 		BytesV:   vtxBytes1,
 	}
 	vtx2 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx1},
 		HeightV:  2,
 		BytesV:   vtxBytes2,
 	}
 	vtx3 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID3,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx2},
 		HeightV:  3,
 		BytesV:   vtxBytes3,
 	}
 	vtx4 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID4,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx2},
 		HeightV:  3,
 		BytesV:   vtxBytes4,
 	}
 	vtx5 := &avalanche.TestVertex{ // vtx5 is the stop vertex
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     vtxID5,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentsV: []avalanche.Vertex{vtx3, vtx4},
 		HeightV:  4,
@@ -1020,27 +1020,27 @@ func TestRestartBootstrapping(t *testing.T) {
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
+			vtx0.StatusV = choice.Processing
 			parsedVtx0 = true
 			return vtx0, nil
 		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
+			vtx1.StatusV = choice.Processing
 			parsedVtx1 = true
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
-			vtx2.StatusV = choices.Processing
+			vtx2.StatusV = choice.Processing
 			parsedVtx2 = true
 			return vtx2, nil
 		case bytes.Equal(vtxBytes, vtxBytes3):
-			vtx3.StatusV = choices.Processing
+			vtx3.StatusV = choice.Processing
 			parsedVtx3 = true
 			return vtx3, nil
 		case bytes.Equal(vtxBytes, vtxBytes4):
-			vtx4.StatusV = choices.Processing
+			vtx4.StatusV = choice.Processing
 			parsedVtx4 = true
 			return vtx4, nil
 		case bytes.Equal(vtxBytes, vtxBytes5):
-			vtx5.StatusV = choices.Processing
+			vtx5.StatusV = choice.Processing
 			parsedVtx5 = true
 			return vtx5, nil
 		default:
@@ -1080,11 +1080,11 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
-		return vtx5.Status() == choices.Accepted, nil
+		return vtx5.Status() == choice.Accepted, nil
 	}
 
 	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx5.Status())
+		require.Equal(choice.Accepted, vtx5.Status())
 		return []ids.ID{vtxID5}
 	}
 
@@ -1096,10 +1096,10 @@ func TestRestartBootstrapping(t *testing.T) {
 	vtx1ReqID := requestIDs[vtxID1]
 	require.NoError(bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(choices.Accepted, vtx2.Status())
-	require.Equal(choices.Accepted, vtx3.Status())
-	require.Equal(choices.Accepted, vtx4.Status())
-	require.Equal(choices.Accepted, vtx5.Status())
+	require.Equal(choice.Accepted, vtx0.Status())
+	require.Equal(choice.Accepted, vtx1.Status())
+	require.Equal(choice.Accepted, vtx2.Status())
+	require.Equal(choice.Accepted, vtx3.Status())
+	require.Equal(choice.Accepted, vtx4.Status())
+	require.Equal(choice.Accepted, vtx5.Status())
 }

@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -32,7 +32,7 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 
 func (b *postForkBlock) acceptOuterBlk() error {
 	// Update in-memory references
-	b.status = choices.Accepted
+	b.status = choice.Accepted
 	b.vm.lastAcceptedTime = b.Timestamp()
 
 	return b.vm.acceptPostForkBlock(b)
@@ -47,13 +47,13 @@ func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {
 func (b *postForkBlock) Reject(context.Context) error {
 	// We do not reject the inner block here because it may be accepted later
 	delete(b.vm.verifiedBlocks, b.ID())
-	b.status = choices.Rejected
+	b.status = choice.Rejected
 	return nil
 }
 
-func (b *postForkBlock) Status() choices.Status {
-	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
-		return choices.Processing
+func (b *postForkBlock) Status() choice.Status {
+	if b.status == choice.Accepted && b.Height() > b.vm.lastAcceptedHeight {
+		return choice.Processing
 	}
 	return b.status
 }
@@ -157,7 +157,7 @@ func (b *postForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return b.PChainHeight(), nil
 }
 
-func (b *postForkBlock) setStatus(status choices.Status) {
+func (b *postForkBlock) setStatus(status choice.Status) {
 	b.status = status
 }
 

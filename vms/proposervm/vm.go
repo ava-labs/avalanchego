@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -533,13 +533,13 @@ func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 
 		// If the inner block is accepted, then we don't need to revert any more
 		// blocks.
-		if shouldBeAccepted.Status() == choices.Accepted {
+		if shouldBeAccepted.Status() == choice.Accepted {
 			return vm.db.Commit()
 		}
 
 		// Mark the last accepted block as processing - rather than accepted.
-		lastAccepted.setStatus(choices.Processing)
-		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+		lastAccepted.setStatus(choice.Processing)
+		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choice.Processing); err != nil {
 			return err
 		}
 
@@ -699,7 +699,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   choices.Processing,
+				status:   choice.Processing,
 			},
 		}
 	} else {
@@ -708,7 +708,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   choices.Processing,
+				status:   choice.Processing,
 			},
 		}
 	}
@@ -806,7 +806,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk(), choice.Accepted); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {

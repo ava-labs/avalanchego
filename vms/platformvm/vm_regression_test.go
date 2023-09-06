@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -585,7 +585,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Because we no longer ever reject a block in verification, the status
 	// should remain as processing.
 	importBlkStatus := importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
+	require.Equal(choice.Processing, importBlkStatus)
 
 	// Populate the shared memory UTXO.
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
@@ -616,7 +616,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
+	require.Equal(choice.Processing, importBlkStatus)
 
 	// Move chain time ahead to bring the new validator from the pending
 	// validator set into the current validator set.
@@ -648,7 +648,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		require.NoError(blk.Accept(context.Background()))
 
 		status := blk.Status()
-		require.Equal(choices.Accepted, status)
+		require.Equal(choice.Accepted, status)
 	}
 
 	// Force a reload of the state from the database.
@@ -834,7 +834,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Because we no longer ever reject a block in verification, the status
 	// should remain as processing.
 	importBlkStatus := importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
+	require.Equal(choice.Processing, importBlkStatus)
 
 	// Populate the shared memory UTXO.
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
@@ -865,7 +865,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
+	require.Equal(choice.Processing, importBlkStatus)
 
 	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
@@ -958,7 +958,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		require.NoError(blk.Accept(context.Background()))
 
 		status := blk.Status()
-		require.Equal(choices.Accepted, status)
+		require.Equal(choice.Accepted, status)
 	}
 
 	// Force a reload of the state from the database.

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -58,9 +58,9 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     Genesis,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -113,14 +113,14 @@ func TestEngineAdd(t *testing.T) {
 
 	require.Equal(ids.Empty, te.Ctx.ChainID)
 
-	parent := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	parent := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Unknown,
+		StatusV: choice.Unknown,
 	}}
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: parent.IDV,
 		HeightV: 1,
@@ -177,9 +177,9 @@ func TestEngineQuery(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -246,9 +246,9 @@ func TestEngineQuery(t *testing.T) {
 	require.True(*queried)
 
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk.IDV,
 		HeightV: 2,
@@ -305,7 +305,7 @@ func TestEngineQuery(t *testing.T) {
 	require.NoError(te.Put(context.Background(), vdr, *getRequestID, blk1.Bytes()))
 	vm.ParseBlockF = nil
 
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk1.Status())
 	require.Empty(te.blocked)
 
 	_ = te.polls.String() // Shouldn't panic
@@ -352,9 +352,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -374,9 +374,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -407,9 +407,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	require.NoError(te.issue(context.Background(), blk0, false))
 
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 2,
@@ -472,7 +472,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	// Should be dropped because the query was already filled
 	require.NoError(te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID()))
 
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk1.Status())
 	require.Empty(te.blocked)
 }
 
@@ -484,18 +484,18 @@ func TestEngineBlockedIssue(t *testing.T) {
 	sender.Default(false)
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 2,
@@ -516,7 +516,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 
 	require.NoError(te.issue(context.Background(), blk1, false))
 
-	blk0.StatusV = choices.Processing
+	blk0.StatusV = choice.Processing
 	require.NoError(te.issue(context.Background(), blk0, false))
 
 	require.Equal(blk1.ID(), te.Consensus.Preference())
@@ -530,9 +530,9 @@ func TestEngineAbandonResponse(t *testing.T) {
 	sender.Default(false)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -589,9 +589,9 @@ func TestEnginePushQuery(t *testing.T) {
 	sender.Default(true)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -650,9 +650,9 @@ func TestEngineBuildBlock(t *testing.T) {
 	sender.Default(true)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -747,9 +747,9 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -768,9 +768,9 @@ func TestVoteCanceling(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -815,9 +815,9 @@ func TestEngineNoQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm := &block.TestVM{}
@@ -841,9 +841,9 @@ func TestEngineNoQuery(t *testing.T) {
 	require.NoError(te.Start(context.Background(), 0))
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -862,9 +862,9 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm := &block.TestVM{}
@@ -928,9 +928,9 @@ func TestEngineAbandonChit(t *testing.T) {
 	sender.Default(true)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -983,9 +983,9 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	sender.Default(true)
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -1046,27 +1046,27 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.Default(true)
 
 	missingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	parentBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: missingBlk.IDV,
 		HeightV: 2,
 		BytesV:  []byte{2},
 	}
 	blockingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: parentBlk.IDV,
 		HeightV: 3,
@@ -1101,7 +1101,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	sender.CantSendPullQuery = false
 
-	missingBlk.StatusV = choices.Processing
+	missingBlk.StatusV = choice.Processing
 	require.NoError(te.issue(context.Background(), missingBlk, false))
 
 	require.Empty(te.blocked)
@@ -1115,27 +1115,27 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.Default(true)
 
 	issuedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	missingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{2},
 	}
 	blockingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: missingBlk.IDV,
 		HeightV: 2,
@@ -1174,7 +1174,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	require.Len(te.blocked, 2)
 	sender.CantSendPullQuery = false
 
-	missingBlk.StatusV = choices.Processing
+	missingBlk.StatusV = choice.Processing
 	require.NoError(te.issue(context.Background(), missingBlk, false))
 }
 
@@ -1186,9 +1186,9 @@ func TestEngineRetryFetch(t *testing.T) {
 	sender.Default(true)
 
 	missingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -1233,18 +1233,18 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	sender.Default(true)
 
 	validBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	invalidBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: validBlk.IDV,
 		HeightV: 2,
@@ -1276,7 +1276,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	require.NoError(te.issue(context.Background(), invalidBlk, false))
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID))
 
-	require.Equal(choices.Accepted, validBlk.Status())
+	require.Equal(choice.Accepted, validBlk.Status())
 }
 
 func TestEngineGossip(t *testing.T) {
@@ -1314,18 +1314,18 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	sender.Default(true)
 
 	missingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: missingBlk.IDV,
 		HeightV: 2,
@@ -1390,7 +1390,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 	sender.CantSendPullQuery = false
 
-	missingBlk.StatusV = choices.Processing
+	missingBlk.StatusV = choice.Processing
 
 	require.NoError(te.Put(context.Background(), vdr, *reqID, missingBlk.Bytes()))
 
@@ -1405,18 +1405,18 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.Default(true)
 
 	missingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: missingBlk.IDV,
 		HeightV: 2,
@@ -1513,9 +1513,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -1535,9 +1535,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -1614,9 +1614,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -1635,9 +1635,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -1668,16 +1668,16 @@ func TestEngineDoubleChit(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(choice.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID()))
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(choice.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID()))
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(choice.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk.ID(), blk.ID()))
-	require.Equal(choices.Accepted, blk.Status())
+	require.Equal(choice.Accepted, blk.Status())
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
@@ -1706,9 +1706,9 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     Genesis,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -1728,18 +1728,18 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 2,
@@ -1807,27 +1807,27 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{2},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
 		HeightV: 2,
@@ -1886,7 +1886,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	require.True(asked)
 
-	rejectedBlk.StatusV = choices.Rejected
+	rejectedBlk.StatusV = choice.Rejected
 
 	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
 
@@ -1899,27 +1899,27 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{2},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
 		HeightV: 2,
@@ -1996,7 +1996,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	require.False(queried)
 	require.True(asked)
 
-	rejectedBlk.StatusV = choices.Processing
+	rejectedBlk.StatusV = choice.Processing
 	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
 
 	require.False(queried)
@@ -2010,28 +2010,28 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Rejected,
+			StatusV: choice.Rejected,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{2},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			RejectV: errUnexpectedCall,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
 		HeightV: 2,
@@ -2097,18 +2097,18 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -2116,10 +2116,10 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		BytesV:  []byte{2},
 	}
 	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			RejectV: errUnexpectedCall,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
 		HeightV: 2,
@@ -2188,18 +2188,18 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	preferredBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
 	nonPreferredBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -2259,9 +2259,9 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -2270,9 +2270,9 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// [blk2] is a child of [blk1] and cannot pass verification until [blk1]
 	// has been marked as accepted.
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk1.ID(),
 		HeightV: 2,
@@ -2374,8 +2374,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require.NoError(te.Put(context.Background(), *reqVdr, *sendReqID, blk2.Bytes()))
 
 	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Processing, blk2.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Processing, blk2.Status())
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
@@ -2406,7 +2406,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// After a single vote for [blk2], it should be marked as accepted.
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk2.ID()))
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 }
 
 // Test that in the following scenario, if block B fails verification, votes
@@ -2431,9 +2431,9 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -2442,9 +2442,9 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// [blk2] is a child of [blk1] and cannot pass verification until [blk1]
 	// has been marked as accepted.
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk1.ID(),
 		HeightV: 2,
@@ -2454,9 +2454,9 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// [blk3] is a child of [blk2] and will not attempt to be issued until
 	// [blk2] has successfully been verified.
 	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk2.ID(),
 		HeightV: 3,
@@ -2555,7 +2555,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk1.Status())
 }
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
@@ -2565,9 +2565,9 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	sender.Default(true)
 
 	grandParentBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -2575,9 +2575,9 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	parentBlkA := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: grandParentBlk.ID(),
 		HeightV: 2,
@@ -2588,9 +2588,9 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	// Note that [parentBlkB] has the same [ID()] as [parentBlkA];
 	// it's a different instantiation of the same block.
 	parentBlkB := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     parentBlkA.IDV,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: parentBlkA.ParentV,
 		HeightV: parentBlkA.HeightV,
@@ -2599,9 +2599,9 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	// Child of [parentBlkA]/[parentBlkB]
 	childBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: parentBlkA.ID(),
 		HeightV: 3,
@@ -2681,8 +2681,8 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
-	require.Equal(choices.Processing, parentBlkA.Status())
-	require.Equal(choices.Accepted, parentBlkB.Status())
+	require.Equal(choice.Processing, parentBlkA.Status())
+	require.Equal(choice.Accepted, parentBlkB.Status())
 
 	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childBlk, nil
@@ -2732,9 +2732,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	gBlk := &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -2752,9 +2752,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.LastAcceptedF = nil
 
 	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: gBlk.IDV,
 		HeightV: 1,
@@ -2781,7 +2781,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(choice.Processing, blk.Status())
 
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.Contains(inVdrs, vdr)
@@ -2791,9 +2791,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk.ID(), blk.ID()))
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(choice.Processing, blk.Status())
 
 	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
 
-	require.Equal(choices.Accepted, blk.Status())
+	require.Equal(choice.Accepted, blk.Status())
 }

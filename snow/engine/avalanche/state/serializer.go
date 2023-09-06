@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -135,7 +135,7 @@ func (s *Serializer) getUniqueVertex(vtxID ids.ID) (*uniqueVertex, error) {
 		serializer: s,
 		id:         vtxID,
 	}
-	if vtx.Status() == choices.Unknown {
+	if vtx.Status() == choice.Unknown {
 		return nil, errUnknownVertex
 	}
 	return vtx, nil

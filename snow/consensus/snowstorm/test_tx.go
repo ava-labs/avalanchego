@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -15,7 +15,7 @@ var _ Tx = (*TestTx)(nil)
 
 // TestTx is a useful test tx
 type TestTx struct {
-	choices.TestDecidable
+	choice.TestDecidable
 
 	DependenciesV    set.Set[ids.ID]
 	DependenciesErrV error

@@ -12,10 +12,10 @@ import (
 
 	"github.com/onsi/gomega"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -235,7 +235,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					gomega.Expect(status).Should(gomega.Equal(choice.Accepted))
 				}
 
 				for _, u := range rpcEps {
@@ -244,7 +244,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					gomega.Expect(status).Should(gomega.Equal(choice.Accepted))
 
 					mm, err := tests.GetNodeMetrics(u, allMetrics...)
 					gomega.Expect(err).Should(gomega.BeNil())

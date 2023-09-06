@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -146,9 +146,9 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	blkID0 := ids.Empty.Prefix(0)
 	blkBytes0 := []byte{0}
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
@@ -217,17 +217,17 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	blkBytes1 := []byte{1}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
@@ -284,7 +284,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk1.Status())
 }
 
 // Requests the unknown block and gets back a Ancestors with unexpected request ID.
@@ -305,26 +305,26 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	blkBytes2 := []byte{2}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
@@ -379,7 +379,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
@@ -411,9 +411,9 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 }
 
 // There are multiple needed blocks and Ancestors returns one at a time
@@ -433,35 +433,35 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	blkBytes3 := []byte{3}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
 	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID3,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk2.IDV,
 		HeightV: 3,
@@ -522,11 +522,11 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.StatusV = choices.Processing
+			blk2.StatusV = choice.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
@@ -554,9 +554,9 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	require.Equal(blkID1, requested)
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 }
 
 // There are multiple needed blocks and some validators do not have all the blocks
@@ -577,35 +577,35 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	blkBytes3 := []byte{3}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
 	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID3,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk2.IDV,
 		HeightV: 3,
@@ -666,11 +666,11 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.StatusV = choices.Processing
+			blk2.StatusV = choice.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
@@ -714,9 +714,9 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), requestedVdr, requestID, [][]byte{blkBytes1})) // respond with blk1
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 
 	// check peerToBlacklist was removed from the fetch set
 	require.NotContains(bs.(*bootstrapper).fetchFrom, peerToBlacklist)
@@ -739,35 +739,35 @@ func TestBootstrapperAncestors(t *testing.T) {
 	blkBytes3 := []byte{3}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
 	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID3,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk2.IDV,
 		HeightV: 3,
@@ -828,11 +828,11 @@ func TestBootstrapperAncestors(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.StatusV = choices.Processing
+			blk2.StatusV = choice.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
@@ -856,9 +856,9 @@ func TestBootstrapperAncestors(t *testing.T) {
 	require.Equal(blkID2, requested)
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 }
 
 func TestBootstrapperFinalized(t *testing.T) {
@@ -875,26 +875,26 @@ func TestBootstrapperFinalized(t *testing.T) {
 	blkBytes2 := []byte{2}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
@@ -950,11 +950,11 @@ func TestBootstrapperFinalized(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.StatusV = choices.Processing
+			blk2.StatusV = choice.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		}
@@ -976,9 +976,9 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
 }
 
 func TestRestartBootstrapping(t *testing.T) {
@@ -999,44 +999,44 @@ func TestRestartBootstrapping(t *testing.T) {
 	blkBytes4 := []byte{4}
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID0,
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID1,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID2,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
 	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID3,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk2.IDV,
 		HeightV: 3,
 		BytesV:  blkBytes3,
 	}
 	blk4 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     blkID4,
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		ParentV: blk3.IDV,
 		HeightV: 4,
@@ -1085,19 +1085,19 @@ func TestRestartBootstrapping(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.StatusV = choices.Processing
+			blk1.StatusV = choice.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.StatusV = choices.Processing
+			blk2.StatusV = choice.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
-			blk3.StatusV = choices.Processing
+			blk3.StatusV = choice.Processing
 			parsedBlk3 = true
 			return blk3, nil
 		case bytes.Equal(blkBytes, blkBytes4):
-			blk4.StatusV = choices.Processing
+			blk4.StatusV = choice.Processing
 			parsedBlk4 = true
 			return blk4, nil
 		}
@@ -1156,11 +1156,11 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
-	require.Equal(choices.Accepted, blk3.Status())
-	require.Equal(choices.Accepted, blk4.Status())
+	require.Equal(choice.Accepted, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
+	require.Equal(choice.Accepted, blk2.Status())
+	require.Equal(choice.Accepted, blk3.Status())
+	require.Equal(choice.Accepted, blk4.Status())
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
@@ -1169,17 +1169,17 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	config, peerID, sender, vm := newConfig(t)
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 		BytesV:  utils.RandomBytes(32),
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
@@ -1242,8 +1242,8 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blk0.Bytes()}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Processing, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choice.Processing, blk0.Status())
+	require.Equal(choice.Accepted, blk1.Status())
 }
 
 func TestBootstrapContinueAfterHalt(t *testing.T) {
@@ -1252,26 +1252,26 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	config, _, _, vm := newConfig(t)
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  utils.RandomBytes(32),
 	}
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  utils.RandomBytes(32),
 	}
 	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk1.IDV,
 		HeightV: 2,
@@ -1377,18 +1377,18 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	require.NoError(err)
 
 	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  utils.RandomBytes(32),
 	}
 
 	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blk0.ID(),
 		HeightV: 1,

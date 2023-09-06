@@ -7,13 +7,13 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Tx consumes state.
 type Tx interface {
-	choices.Decidable
+	choice.Decidable
 
 	// MissingDependencies returns the set of transactions that must be accepted
 	// before this transaction is accepted.

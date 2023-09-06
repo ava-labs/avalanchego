@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -31,9 +31,9 @@ var (
 	GenesisID        = ids.Empty.Prefix(0)
 	GenesisHeight    = uint64(0)
 	GenesisTimestamp = time.Unix(1, 0)
-	Genesis          = &TestBlock{TestDecidable: choices.TestDecidable{
+	Genesis          = &TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     GenesisID,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	testFuncs = []testFunc{
@@ -129,9 +129,9 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -171,9 +171,9 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -205,17 +205,17 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -251,15 +251,15 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 	}
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	parent := &TestBlock{TestDecidable: choices.TestDecidable{
+	parent := &TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Unknown,
+		StatusV: choice.Unknown,
 	}}
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: parent.IDV,
 		HeightV: parent.HeightV + 1,
@@ -269,7 +269,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 	// been rejected. Therefore the block should be immediately rejected
 	require.NoError(sm.Add(context.Background(), block))
 	require.Equal(GenesisID, sm.Preference())
-	require.Equal(choices.Rejected, block.Status())
+	require.Equal(choice.Rejected, block.Status())
 }
 
 func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
@@ -290,7 +290,7 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	}
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	require.Equal(choices.Accepted, Genesis.Status())
+	require.Equal(choice.Accepted, Genesis.Status())
 	require.False(sm.Processing(Genesis.ID()))
 	require.True(sm.Decided(Genesis))
 	require.True(sm.IsPreferred(Genesis))
@@ -315,15 +315,15 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Rejected,
+			StatusV: choice.Rejected,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.Equal(choices.Rejected, block.Status())
+	require.Equal(choice.Rejected, block.Status())
 	require.False(sm.Processing(block.ID()))
 	require.True(sm.Decided(block))
 	require.False(sm.IsPreferred(block))
@@ -348,15 +348,15 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(choice.Processing, block.Status())
 	require.False(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
 	require.False(sm.IsPreferred(block))
@@ -381,16 +381,16 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 
 	require.NoError(sm.Add(context.Background(), block))
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(choice.Processing, block.Status())
 	require.True(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
 	require.True(sm.IsPreferred(block))
@@ -415,9 +415,9 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -430,12 +430,12 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.False(sm.Finalized())
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(choice.Processing, block.Status())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.True(sm.Finalized())
-	require.Equal(choices.Accepted, block.Status())
+	require.Equal(choice.Accepted, block.Status())
 }
 
 func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
@@ -457,17 +457,17 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -482,14 +482,14 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.False(sm.Finalized())
-	require.Equal(choices.Processing, firstBlock.Status())
-	require.Equal(choices.Processing, secondBlock.Status())
+	require.Equal(choice.Processing, firstBlock.Status())
+	require.Equal(choice.Processing, secondBlock.Status())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.True(sm.Finalized())
-	require.Equal(choices.Accepted, firstBlock.Status())
-	require.Equal(choices.Rejected, secondBlock.Status())
+	require.Equal(choice.Accepted, firstBlock.Status())
+	require.Equal(choice.Rejected, secondBlock.Status())
 }
 
 func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
@@ -513,17 +513,17 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -599,25 +599,25 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block1.IDV,
 		HeightV: block1.HeightV + 1,
@@ -645,9 +645,9 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	require.True(sm.Finalized())
 	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Rejected, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
+	require.Equal(choice.Accepted, block0.Status())
+	require.Equal(choice.Rejected, block1.Status())
+	require.Equal(choice.Rejected, block2.Status())
 }
 
 func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
@@ -669,33 +669,33 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block1.IDV,
 		HeightV: block1.HeightV + 1,
 	}
 	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(4),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block1.IDV,
 		HeightV: block1.HeightV + 1,
@@ -737,10 +737,10 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.True(sm.Finalized())
 	require.Equal(block3.ID(), sm.Preference())
-	require.Equal(choices.Rejected, block0.Status())
-	require.Equal(choices.Accepted, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
-	require.Equal(choices.Accepted, block3.Status())
+	require.Equal(choice.Rejected, block0.Status())
+	require.Equal(choice.Accepted, block1.Status())
+	require.Equal(choice.Rejected, block2.Status())
+	require.Equal(choice.Accepted, block3.Status())
 }
 
 func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
@@ -762,9 +762,9 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -804,41 +804,41 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block0.IDV,
 		HeightV: block0.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block1.IDV,
 		HeightV: block1.HeightV + 1,
 	}
 	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(4),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block0.IDV,
 		HeightV: block0.HeightV + 1,
 	}
 	block4 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(5),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block3.IDV,
 		HeightV: block3.HeightV + 1,
@@ -878,11 +878,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	require.False(sm.Finalized())
 	require.Equal(block2.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Processing, block1.Status())
-	require.Equal(choices.Processing, block2.Status())
-	require.Equal(choices.Processing, block3.Status())
-	require.Equal(choices.Processing, block4.Status())
+	require.Equal(choice.Accepted, block0.Status())
+	require.Equal(choice.Processing, block1.Status())
+	require.Equal(choice.Processing, block2.Status())
+	require.Equal(choice.Processing, block3.Status())
+	require.Equal(choice.Processing, block4.Status())
 
 	dep2_2_2 := bag.Bag[ids.ID]{}
 	dep2_2_2.AddCount(block2.ID(), 3)
@@ -894,11 +894,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	require.True(sm.Finalized())
 	require.Equal(block2.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Accepted, block1.Status())
-	require.Equal(choices.Accepted, block2.Status())
-	require.Equal(choices.Rejected, block3.Status())
-	require.Equal(choices.Rejected, block4.Status())
+	require.Equal(choice.Accepted, block0.Status())
+	require.Equal(choice.Accepted, block1.Status())
+	require.Equal(choice.Accepted, block2.Status())
+	require.Equal(choice.Rejected, block3.Status())
+	require.Equal(choice.Rejected, block4.Status())
 }
 
 func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
@@ -919,33 +919,33 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x0f}, // 1111
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x08}, // 0001
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x01}, // 1000
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block2.IDV,
 		HeightV: block2.HeightV + 1,
@@ -973,10 +973,10 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), block3))
 
 	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
-	require.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
+	require.Equal(choice.Processing, block0.Status(), "should not be accepted yet")
+	require.Equal(choice.Processing, block1.Status(), "should not be rejected yet")
+	require.Equal(choice.Processing, block2.Status(), "should not be rejected yet")
+	require.Equal(choice.Processing, block3.Status(), "should not be rejected yet")
 
 	// Current graph structure:
 	//       G
@@ -999,10 +999,10 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.True(sm.Finalized(), "finalized too late")
-	require.Equal(choices.Accepted, block0.Status(), "should be accepted")
-	require.Equal(choices.Rejected, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
-	require.Equal(choices.Rejected, block3.Status())
+	require.Equal(choice.Accepted, block0.Status(), "should be accepted")
+	require.Equal(choice.Rejected, block1.Status())
+	require.Equal(choice.Rejected, block2.Status())
+	require.Equal(choice.Rejected, block3.Status())
 }
 
 func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
@@ -1023,33 +1023,33 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x06}, // 0110
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x08}, // 0001
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x01}, // 1000
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block2.IDV,
 		HeightV: block2.HeightV + 1,
@@ -1077,10 +1077,10 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	require.NoError(sm.Add(context.Background(), block3))
 
 	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block1.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block2.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block3.Status(), "should not be decided yet")
+	require.Equal(choice.Processing, block0.Status(), "should not be decided yet")
+	require.Equal(choice.Processing, block1.Status(), "should not be decided yet")
+	require.Equal(choice.Processing, block2.Status(), "should not be decided yet")
+	require.Equal(choice.Processing, block3.Status(), "should not be decided yet")
 
 	// Current graph structure:
 	//       G
@@ -1103,10 +1103,10 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.False(sm.Finalized(), "finalized too early")
-	require.Equal(choices.Processing, block0.Status())
-	require.Equal(choices.Processing, block1.Status())
-	require.Equal(choices.Processing, block2.Status())
-	require.Equal(choices.Processing, block3.Status())
+	require.Equal(choice.Processing, block0.Status())
+	require.Equal(choice.Processing, block1.Status())
+	require.Equal(choice.Processing, block2.Status())
+	require.Equal(choice.Processing, block3.Status())
 }
 
 func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
@@ -1128,33 +1128,33 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	a1Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	b1Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	a2Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: a1Block.IDV,
 		HeightV: a1Block.HeightV + 1,
 	}
 	b2Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: b1Block.IDV,
 		HeightV: b1Block.HeightV + 1,
@@ -1299,16 +1299,16 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	rejectedBlock := &TestBlock{TestDecidable: choices.TestDecidable{
+	rejectedBlock := &TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Rejected,
+		StatusV: choice.Rejected,
 	}}
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			RejectV: errTest,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: rejectedBlock.IDV,
 		HeightV: rejectedBlock.HeightV + 1,
@@ -1338,10 +1338,10 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
 			AcceptV: errTest,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -1375,18 +1375,18 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			RejectV: errTest,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -1421,26 +1421,26 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
 			RejectV: errTest,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block1.IDV,
 		HeightV: block1.HeightV + 1,
@@ -1507,9 +1507,9 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x03}, // 0b0011
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
@@ -1536,17 +1536,17 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x03}, // 0b0011
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
 	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{0x03}, // 0b0011, same as block0
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: block0.IDV,
 		HeightV: block0.HeightV + 1,

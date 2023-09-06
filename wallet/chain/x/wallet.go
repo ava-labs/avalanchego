@@ -7,7 +7,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -318,7 +318,7 @@ func (w *wallet) IssueTx(
 		return err
 	}
 
-	if txStatus != choices.Accepted {
+	if txStatus != choice.Accepted {
 		return errNotAccepted
 	}
 	return nil

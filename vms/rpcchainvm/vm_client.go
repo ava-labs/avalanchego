@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
@@ -236,7 +236,7 @@ func (vm *VMClient) Initialize(
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
-		status:   choices.Accepted,
+		status:   choice.Accepted,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
@@ -344,7 +344,7 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
-		status:   choices.Accepted,
+		status:   choice.Accepted,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
@@ -464,7 +464,7 @@ func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block
 		return nil, err
 	}
 
-	status := choices.Status(resp.Status)
+	status := choice.Status(resp.Status)
 	if err := status.Valid(); err != nil {
 		return nil, err
 	}
@@ -501,7 +501,7 @@ func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, 
 		return nil, err
 	}
 
-	status := choices.Status(resp.Status)
+	status := choice.Status(resp.Status)
 	if err := status.Valid(); err != nil {
 		return nil, err
 	}
@@ -676,7 +676,7 @@ func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 			return nil, err
 		}
 
-		status := choices.Status(blkResp.Status)
+		status := choice.Status(blkResp.Status)
 		if err := status.Valid(); err != nil {
 			return nil, err
 		}
@@ -833,7 +833,7 @@ func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*bloc
 		vm:                  vm,
 		id:                  id,
 		parentID:            parentID,
-		status:              choices.Processing,
+		status:              choice.Processing,
 		bytes:               resp.Bytes,
 		height:              resp.Height,
 		time:                time,
@@ -846,7 +846,7 @@ type blockClient struct {
 
 	id                  ids.ID
 	parentID            ids.ID
-	status              choices.Status
+	status              choice.Status
 	bytes               []byte
 	height              uint64
 	time                time.Time
@@ -858,7 +858,7 @@ func (b *blockClient) ID() ids.ID {
 }
 
 func (b *blockClient) Accept(ctx context.Context) error {
-	b.status = choices.Accepted
+	b.status = choice.Accepted
 	_, err := b.vm.client.BlockAccept(ctx, &vmpb.BlockAcceptRequest{
 		Id: b.id[:],
 	})
@@ -866,14 +866,14 @@ func (b *blockClient) Accept(ctx context.Context) error {
 }
 
 func (b *blockClient) Reject(ctx context.Context) error {
-	b.status = choices.Rejected
+	b.status = choice.Rejected
 	_, err := b.vm.client.BlockReject(ctx, &vmpb.BlockRejectRequest{
 		Id: b.id[:],
 	})
 	return err
 }
 
-func (b *blockClient) Status() choices.Status {
+func (b *blockClient) Status() choice.Status {
 	return b.status
 }
 

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -85,7 +85,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choice.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
@@ -101,7 +101,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		zap.Stringer("vtxID", vtxID),
 	)
 	vertex, err := gh.storage.GetVtx(ctx, vtxID)
-	if err != nil || vertex.Status() == choices.Unknown {
+	if err != nil || vertex.Status() == choice.Unknown {
 		gh.log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
 	}
@@ -131,7 +131,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 			return err
 		}
 		for _, parent := range parents {
-			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
+			if parent.Status() == choice.Unknown { // Don't have this vertex;ignore
 				continue
 			}
 			if parentID := parent.ID(); !visited.Contains(parentID) { // If already visited, ignore

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -37,7 +37,7 @@ func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 	return b.Block.Accept(ctx)
 }
 
-func (b *preForkBlock) Status() choices.Status {
+func (b *preForkBlock) Status() choice.Status {
 	forkHeight, err := b.vm.getForkHeight()
 	if err == database.ErrNotFound {
 		return b.Block.Status()
@@ -54,7 +54,7 @@ func (b *preForkBlock) Status() choices.Status {
 	// The fork has occurred earlier than this block, so preForkBlocks are all
 	// invalid.
 	if b.Height() >= forkHeight {
-		return choices.Rejected
+		return choice.Rejected
 	}
 	return b.Block.Status()
 }
@@ -235,7 +235,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 

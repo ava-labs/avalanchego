@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -57,7 +57,7 @@ func (b *blockJob) ID() ids.ID {
 func (b *blockJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], error) {
 	missing := set.Set[ids.ID]{}
 	parentID := b.blk.Parent()
-	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choices.Accepted {
+	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choice.Accepted {
 		missing.Add(parentID)
 	}
 	return missing, nil
@@ -65,7 +65,7 @@ func (b *blockJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], er
 
 func (b *blockJob) HasMissingDependencies(ctx context.Context) (bool, error) {
 	parentID := b.blk.Parent()
-	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choices.Accepted {
+	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choice.Accepted {
 		return true, nil
 	}
 	return false, nil
@@ -82,10 +82,10 @@ func (b *blockJob) Execute(ctx context.Context) error {
 	}
 	status := b.blk.Status()
 	switch status {
-	case choices.Unknown, choices.Rejected:
+	case choice.Unknown, choice.Rejected:
 		b.numDropped.Inc()
 		return fmt.Errorf("attempting to execute block with status %s", status)
-	case choices.Processing:
+	case choice.Processing:
 		blkID := b.blk.ID()
 		if err := b.blk.Verify(ctx); err != nil {
 			b.log.Error("block failed verification during bootstrapping",

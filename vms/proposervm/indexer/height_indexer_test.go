@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -49,13 +49,13 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choice.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     postForkStatelessBlk.ID(),
-				StatusV: choices.Accepted,
+				StatusV: choice.Accepted,
 			},
 			HeightV: blkHeight,
 		}
@@ -129,13 +129,13 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choice.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     postForkStatelessBlk.ID(),
-				StatusV: choices.Accepted,
+				StatusV: choice.Accepted,
 			},
 			HeightV: blkHeight,
 		}
@@ -213,13 +213,13 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choice.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     postForkStatelessBlk.ID(),
-				StatusV: choices.Accepted,
+				StatusV: choice.Accepted,
 			},
 			HeightV: blkHeight,
 		}

@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -139,7 +139,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
-		if err == nil && blk.Status() == choices.Accepted {
+		if err == nil && blk.Status() == choice.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}

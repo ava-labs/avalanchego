@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -96,13 +96,13 @@ func TestFilterAccepted(t *testing.T) {
 	vtxID1 := ids.GenerateTestID()
 	vtxID2 := ids.GenerateTestID()
 
-	vtx0 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+	vtx0 := &avalanche.TestVertex{TestDecidable: choice.TestDecidable{
 		IDV:     vtxID0,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
-	vtx1 := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+	vtx1 := &avalanche.TestVertex{TestDecidable: choice.TestDecidable{
 		IDV:     vtxID1,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 
 	bsIntf, err := New(manager, config)

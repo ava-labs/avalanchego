@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -485,9 +485,9 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running
-		if status := blk.Status(); status != choices.Processing {
+		if status := blk.Status(); status != choice.Processing {
 			t.Ctx.Log.Warn("attempting to issue block with unexpected status",
-				zap.Stringer("expectedStatus", choices.Processing),
+				zap.Stringer("expectedStatus", choice.Processing),
 				zap.Stringer("status", status),
 			)
 		}
@@ -595,14 +595,14 @@ func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) 
 		blkID = blk.Parent()
 		blk, err = t.GetBlock(ctx, blkID)
 		if err != nil {
-			status = choices.Unknown
+			status = choice.Unknown
 			break
 		}
 		status = blk.Status()
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if status != choices.Unknown && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
+	if status != choice.Unknown && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
 		return true, nil
 	}
 
@@ -764,7 +764,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 	// Because the dependency must have been fulfilled by the time this function
 	// is called - we don't expect [err] to be non-nil. But it is handled for
 	// completness and future proofing.
-	if err != nil || !(parent.Status() == choices.Accepted || t.Consensus.Processing(parentID)) {
+	if err != nil || !(parent.Status() == choice.Accepted || t.Consensus.Processing(parentID)) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(ctx, blkID)

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -59,7 +59,7 @@ func (v *vertexJob) MissingDependencies(context.Context) (set.Set[ids.ID], error
 		return missing, err
 	}
 	for _, parent := range parents {
-		if parent.Status() != choices.Accepted {
+		if parent.Status() != choice.Accepted {
 			missing.Add(parent.ID())
 		}
 	}
@@ -73,7 +73,7 @@ func (v *vertexJob) HasMissingDependencies(context.Context) (bool, error) {
 		return false, err
 	}
 	for _, parent := range parents {
-		if parent.Status() != choices.Accepted {
+		if parent.Status() != choice.Accepted {
 			return true, nil
 		}
 	}
@@ -94,7 +94,7 @@ func (v *vertexJob) Execute(ctx context.Context) error {
 		return err
 	}
 	for _, tx := range txs {
-		if tx.Status() != choices.Accepted {
+		if tx.Status() != choice.Accepted {
 			v.numDropped.Inc()
 			v.log.Warn("attempting to execute vertex with non-accepted transactions")
 			return nil
@@ -102,10 +102,10 @@ func (v *vertexJob) Execute(ctx context.Context) error {
 	}
 	status := v.vtx.Status()
 	switch status {
-	case choices.Unknown, choices.Rejected:
+	case choice.Unknown, choice.Rejected:
 		v.numDropped.Inc()
 		return fmt.Errorf("attempting to execute vertex with status %s", status)
-	case choices.Processing:
+	case choice.Processing:
 		v.numAccepted.Inc()
 		v.log.Trace("accepting vertex in bootstrapping",
 			zap.Stringer("vtxID", v.vtx.ID()),

@@ -6,7 +6,7 @@ package avalanche
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
@@ -15,7 +15,7 @@ import (
 // Note: Verify is not part of this interface because bootstrapping uses IDs to
 // verify the vertex is valid.
 type Vertex interface {
-	choices.Decidable
+	choice.Decidable
 
 	// Returns the vertices this vertex depends on
 	Parents() ([]Vertex, error)

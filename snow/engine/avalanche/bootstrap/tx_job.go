@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -74,10 +74,10 @@ func (t *txJob) Execute(ctx context.Context) error {
 
 	status := t.tx.Status()
 	switch status {
-	case choices.Unknown, choices.Rejected:
+	case choice.Unknown, choice.Rejected:
 		t.numDropped.Inc()
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
-	case choices.Processing:
+	case choice.Processing:
 		txID := t.tx.ID()
 		if err := t.tx.Verify(ctx); err != nil {
 			t.log.Error("transaction failed verification during bootstrapping",

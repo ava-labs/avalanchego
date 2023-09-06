@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -60,9 +60,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -87,9 +87,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	}
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -114,9 +114,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	}
 
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -206,9 +206,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -227,9 +227,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -248,9 +248,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -365,9 +365,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -393,9 +393,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	}
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -423,9 +423,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// .. and some post-fork
 	proRemoteVM.Set(postForkTime)
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -445,9 +445,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk4 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{4},
 		ParentV:    coreBlk3.ID(),
@@ -564,9 +564,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -591,9 +591,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	}
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -618,9 +618,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	}
 
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -685,9 +685,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -706,9 +706,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -727,9 +727,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -801,9 +801,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
 	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -829,9 +829,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	}
 
 	coreBlk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
@@ -859,9 +859,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	// .. and some post-fork
 	proRemoteVM.Set(postForkTime)
 	coreBlk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    coreBlk2.ID(),
@@ -881,9 +881,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxDelay))
 
 	coreBlk4 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{4},
 		ParentV:    coreBlk3.ID(),
@@ -964,9 +964,9 @@ func initTestRemoteProposerVM(
 	require := require.New(t)
 
 	coreGenBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		HeightV:    0,
 		TimestampV: genesisTimestamp,

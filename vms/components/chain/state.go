@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -47,7 +47,7 @@ type State struct {
 	buildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
 
 	// getStatus returns the status of the block
-	getStatus func(context.Context, snowman.Block) (choices.Status, error)
+	getStatus func(context.Context, snowman.Block) (choice.Status, error)
 
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
@@ -83,43 +83,43 @@ type Config struct {
 type Block interface {
 	snowman.Block
 
-	SetStatus(choices.Status)
+	SetStatus(choice.Status)
 }
 
 // produceGetStatus creates a getStatus function that infers the status of a block by using a function
 // passed in from the VM that gets the block ID at a specific height. It is assumed that for any height
 // less than or equal to the last accepted block, getBlockIDAtHeight returns the accepted blockID at
 // the requested height.
-func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64) (ids.ID, error)) func(context.Context, snowman.Block) (choices.Status, error) {
-	return func(ctx context.Context, blk snowman.Block) (choices.Status, error) {
+func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64) (ids.ID, error)) func(context.Context, snowman.Block) (choice.Status, error) {
+	return func(ctx context.Context, blk snowman.Block) (choice.Status, error) {
 		internalBlk, ok := blk.(Block)
 		if !ok {
-			return choices.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
+			return choice.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
 		}
 		lastAcceptedHeight := s.lastAcceptedBlock.Height()
 		blkHeight := internalBlk.Height()
 		if blkHeight > lastAcceptedHeight {
-			internalBlk.SetStatus(choices.Processing)
-			return choices.Processing, nil
+			internalBlk.SetStatus(choice.Processing)
+			return choice.Processing, nil
 		}
 
 		acceptedID, err := getBlockIDAtHeight(ctx, blkHeight)
 		switch err {
 		case nil:
 			if acceptedID == blk.ID() {
-				internalBlk.SetStatus(choices.Accepted)
-				return choices.Accepted, nil
+				internalBlk.SetStatus(choice.Accepted)
+				return choice.Accepted, nil
 			}
-			internalBlk.SetStatus(choices.Rejected)
-			return choices.Rejected, nil
+			internalBlk.SetStatus(choice.Rejected)
+			return choice.Rejected, nil
 		case database.ErrNotFound:
 			// Not found can happen if chain history is missing. In this case,
 			// the block may have been accepted or rejected, it isn't possible
 			// to know here.
-			internalBlk.SetStatus(choices.Processing)
-			return choices.Processing, nil
+			internalBlk.SetStatus(choice.Processing)
+			return choice.Processing, nil
 		default:
-			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
+			return choice.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
 		}
 	}
 }
@@ -132,7 +132,7 @@ func (s *State) initialize(config *Config) {
 	s.unmarshalBlock = config.UnmarshalBlock
 	s.batchedUnmarshalBlock = config.BatchedUnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
-		s.getStatus = func(_ context.Context, blk snowman.Block) (choices.Status, error) {
+		s.getStatus = func(_ context.Context, blk snowman.Block) (choice.Status, error) {
 			return blk.Status(), nil
 		}
 	} else {
@@ -491,9 +491,9 @@ func (s *State) addBlockOutsideConsensus(ctx context.Context, blk snowman.Block)
 		return nil, fmt.Errorf("could not get block status for %s due to %w", blkID, err)
 	}
 	switch status {
-	case choices.Accepted, choices.Rejected:
+	case choice.Accepted, choice.Rejected:
 		s.decidedBlocks.Put(blkID, wrappedBlk)
-	case choices.Processing:
+	case choice.Processing:
 		s.unverifiedBlocks.Put(blkID, wrappedBlk)
 	default:
 		return nil, fmt.Errorf("found unexpected status for blk %s: %s", blkID, status)

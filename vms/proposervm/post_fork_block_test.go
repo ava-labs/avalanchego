@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -45,20 +45,20 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 	innerOracleBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV: ids.Empty.Prefix(1111),
 			},
 			BytesV: []byte{1},
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
+				TestDecidable: choice.TestDecidable{
 					IDV: ids.Empty.Prefix(2222),
 				},
 				BytesV: []byte{2},
 			},
 			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
+				TestDecidable: choice.TestDecidable{
 					IDV: ids.Empty.Prefix(3333),
 				},
 				BytesV: []byte{3},
@@ -81,7 +81,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerOracleBlk,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 
@@ -106,9 +106,9 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -166,7 +166,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 
@@ -204,9 +204,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -245,9 +245,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	prntTimestamp := prntProBlk.Timestamp()
 
 	childCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: prntCoreBlk.ID(),
 		BytesV:  []byte{2},
@@ -271,7 +271,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 
@@ -376,9 +376,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -417,9 +417,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	prntBlkPChainHeight := pChainHeight
 
 	childCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV:    prntCoreBlk.ID(),
 		BytesV:     []byte{2},
@@ -442,7 +442,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 
@@ -516,9 +516,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
-				StatusV: choices.Processing,
+				StatusV: choice.Processing,
 			},
 			BytesV:     []byte{1},
 			ParentV:    coreGenBlk.ID(),
@@ -527,18 +527,18 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
 		&snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
-				StatusV: choices.Processing,
+				StatusV: choice.Processing,
 			},
 			BytesV:     []byte{2},
 			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
-				StatusV: choices.Processing,
+				StatusV: choice.Processing,
 			},
 			BytesV:     []byte{3},
 			ParentV:    oracleCoreBlk.ID(),
@@ -597,9 +597,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	prntBlkPChainHeight := pChainHeight
 
 	childCoreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV:    oracleCoreBlk.opts[0].ID(),
 		BytesV:     []byte{2},
@@ -622,7 +622,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
+			status:   choice.Processing,
 		},
 	}
 
@@ -695,9 +695,9 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	}
 
 	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -758,9 +758,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	}
 
 	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -797,7 +797,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	require.NoError(builtBlk.Accept(context.Background()))
 
 	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		if coreBlk.Status() == choices.Accepted {
+		if coreBlk.Status() == choice.Accepted {
 			return coreBlk.ID(), nil
 		}
 		return coreGenBlk.ID(), nil
@@ -822,9 +822,9 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 	// generate two blocks with the same core block and store them
 	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -847,7 +847,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 	// set proBlk1 as preferred
 	require.NoError(proBlk1.Accept(context.Background()))
-	require.Equal(choices.Accepted, coreBlk.Status())
+	require.Equal(choice.Accepted, coreBlk.Status())
 
 	acceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -864,9 +864,9 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	}()
 
 	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
@@ -884,8 +884,8 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 
 	require.NoError(proBlk.Reject(context.Background()))
 
-	require.Equal(choices.Rejected, proBlk.Status())
-	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
+	require.Equal(choice.Rejected, proBlk.Status())
+	require.NotEqual(choice.Rejected, proBlk.innerBlk.Status())
 }
 
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
@@ -900,9 +900,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
-				StatusV: choices.Processing,
+				StatusV: choice.Processing,
 			},
 			BytesV:     []byte{1},
 			ParentV:    coreGenBlk.ID(),
@@ -910,18 +910,18 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		},
 	}
 	coreOpt0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{2},
 		ParentV:    oracleCoreBlk.ID(),
 		TimestampV: oracleCoreBlk.Timestamp(),
 	}
 	coreOpt1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{3},
 		ParentV:    oracleCoreBlk.ID(),
@@ -1013,9 +1013,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 	}()
 
 	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),

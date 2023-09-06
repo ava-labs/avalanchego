@@ -6,7 +6,7 @@ package state
 import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
@@ -65,7 +65,7 @@ func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
 	return s.state.SetVertex(vID, vtx)
 }
 
-func (s *prefixedState) Status(id ids.ID) choices.Status {
+func (s *prefixedState) Status(id ids.ID) choice.Status {
 	var (
 		sID ids.ID
 		ok  bool
@@ -78,7 +78,7 @@ func (s *prefixedState) Status(id ids.ID) choices.Status {
 	return s.state.Status(sID)
 }
 
-func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
+func (s *prefixedState) SetStatus(id ids.ID, status choice.Status) error {
 	var (
 		sID ids.ID
 		ok  bool

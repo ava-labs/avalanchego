@@ -16,7 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -201,7 +201,7 @@ func (ts *Topological) Decided(blk Block) bool {
 	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	return blk.Status() == choices.Processing && blk.Height() <= ts.height
+	return blk.Status() == choice.Processing && blk.Height() <= ts.height
 }
 
 func (ts *Topological) Processing(blkID ids.ID) bool {
@@ -218,7 +218,7 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 
 func (ts *Topological) IsPreferred(blk Block) bool {
 	// If the block is accepted, then it must be transitively preferred.
-	if blk.Status() == choices.Accepted {
+	if blk.Status() == choice.Accepted {
 		return true
 	}
 	return ts.preferredIDs.Contains(blk.ID())

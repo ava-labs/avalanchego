@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -45,7 +45,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	// load innerVM expectations
 	innerGenesisBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'G', 'e', 'n', 'e', 's', 'i', 's', 'I', 'D'},
 		},
 		HeightV: 0,
@@ -200,7 +200,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   choices.Accepted,
+			status:   choice.Accepted,
 		},
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
@@ -285,7 +285,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   choices.Accepted,
+			status:   choice.Accepted,
 		},
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
@@ -373,7 +373,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   choices.Accepted,
+			status:   choice.Accepted,
 		},
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
@@ -446,7 +446,7 @@ func TestParseStateSummary(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   choices.Accepted,
+			status:   choice.Accepted,
 		},
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
@@ -581,7 +581,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   choices.Accepted,
+			status:   choice.Accepted,
 		},
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))

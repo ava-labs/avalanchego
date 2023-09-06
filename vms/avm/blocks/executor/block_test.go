@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -963,7 +963,7 @@ func TestBlockStatus(t *testing.T) {
 	type test struct {
 		name      string
 		blockFunc func(ctrl *gomock.Controller) *Block
-		expected  choices.Status
+		expected  choice.Status
 	}
 	tests := []test{
 		{
@@ -973,7 +973,7 @@ func TestBlockStatus(t *testing.T) {
 					rejected: true,
 				}
 			},
-			expected: choices.Rejected,
+			expected: choice.Rejected,
 		},
 		{
 			name: "block is last accepted",
@@ -988,7 +988,7 @@ func TestBlockStatus(t *testing.T) {
 					},
 				}
 			},
-			expected: choices.Accepted,
+			expected: choice.Accepted,
 		},
 		{
 			name: "block is processing",
@@ -1005,7 +1005,7 @@ func TestBlockStatus(t *testing.T) {
 					},
 				}
 			},
-			expected: choices.Processing,
+			expected: choice.Processing,
 		},
 		{
 			name: "block is accepted but not last accepted",
@@ -1025,7 +1025,7 @@ func TestBlockStatus(t *testing.T) {
 					},
 				}
 			},
-			expected: choices.Accepted,
+			expected: choice.Accepted,
 		},
 		{
 			name: "block is unknown",
@@ -1045,7 +1045,7 @@ func TestBlockStatus(t *testing.T) {
 					},
 				}
 			},
-			expected: choices.Processing,
+			expected: choice.Processing,
 		},
 	}
 	for _, tt := range tests {

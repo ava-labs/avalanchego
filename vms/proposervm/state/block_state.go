@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -29,8 +29,8 @@ var (
 )
 
 type BlockState interface {
-	GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
-	PutBlock(blk block.Block, status choices.Status) error
+	GetBlock(blkID ids.ID) (block.Block, choice.Status, error)
+	PutBlock(blk block.Block, status choice.Status) error
 	DeleteBlock(blkID ids.ID) error
 }
 
@@ -43,8 +43,8 @@ type blockState struct {
 }
 
 type blockWrapper struct {
-	Block  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
+	Block  []byte        `serialize:"true"`
+	Status choice.Status `serialize:"true"`
 
 	block block.Block
 }
@@ -82,10 +82,10 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	}, err
 }
 
-func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error) {
+func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choice.Status, error) {
 	if blk, found := s.blkCache.Get(blkID); found {
 		if blk == nil {
-			return nil, choices.Unknown, database.ErrNotFound
+			return nil, choice.Unknown, database.ErrNotFound
 		}
 		return blk.block, blk.Status, nil
 	}
@@ -93,25 +93,25 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	blkWrapperBytes, err := s.db.Get(blkID[:])
 	if err == database.ErrNotFound {
 		s.blkCache.Put(blkID, nil)
-		return nil, choices.Unknown, database.ErrNotFound
+		return nil, choice.Unknown, database.ErrNotFound
 	}
 	if err != nil {
-		return nil, choices.Unknown, err
+		return nil, choice.Unknown, err
 	}
 
 	blkWrapper := blockWrapper{}
 	parsedVersion, err := c.Unmarshal(blkWrapperBytes, &blkWrapper)
 	if err != nil {
-		return nil, choices.Unknown, err
+		return nil, choice.Unknown, err
 	}
 	if parsedVersion != version {
-		return nil, choices.Unknown, errBlockWrongVersion
+		return nil, choice.Unknown, errBlockWrongVersion
 	}
 
 	// The key was in the database
 	blk, err := block.Parse(blkWrapper.Block)
 	if err != nil {
-		return nil, choices.Unknown, err
+		return nil, choice.Unknown, err
 	}
 	blkWrapper.block = blk
 
@@ -119,7 +119,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	return blk, blkWrapper.Status, nil
 }
 
-func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
+func (s *blockState) PutBlock(blk block.Block, status choice.Status) error {
 	blkWrapper := blockWrapper{
 		Block:  blk.Bytes(),
 		Status: status,

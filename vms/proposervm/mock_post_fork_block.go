@@ -13,7 +13,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
+	choice "github.com/ava-labs/avalanchego/snow/choice"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "go.uber.org/mock/gomock"
@@ -127,10 +127,10 @@ func (mr *MockPostForkBlockMockRecorder) Reject(arg0 interface{}) *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockPostForkBlock) Status() choices.Status {
+func (m *MockPostForkBlock) Status() choice.Status {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(choices.Status)
+	ret0, _ := ret[0].(choice.Status)
 	return ret0
 }
 
@@ -267,7 +267,7 @@ func (mr *MockPostForkBlockMockRecorder) setInnerBlk(arg0 interface{}) *gomock.C
 }
 
 // setStatus mocks base method.
-func (m *MockPostForkBlock) setStatus(arg0 choices.Status) {
+func (m *MockPostForkBlock) setStatus(arg0 choice.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "setStatus", arg0)
 }

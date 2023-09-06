@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -640,7 +640,7 @@ func TestParsedStateBlock(t *testing.T) {
 		stBlk := stateBlk{
 			Blk:    blk,
 			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
+			Status: choice.Accepted,
 		}
 
 		stBlkBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
