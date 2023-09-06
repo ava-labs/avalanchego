@@ -175,7 +175,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Set(key, value, pebble.NoSync))
+	return updateError(db.pebbleDB.Set(key, value, pebble.NoSync)) // TODO is NoSync OK?
 }
 
 func (db *Database) Delete(key []byte) error {
@@ -186,7 +186,7 @@ func (db *Database) Delete(key []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Delete(key, pebble.NoSync))
+	return updateError(db.pebbleDB.Delete(key, pebble.NoSync)) // TODO is NoSync OK?
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {

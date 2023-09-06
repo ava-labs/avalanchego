@@ -14,7 +14,6 @@ import (
 
 var _ database.Batch = (*batch)(nil)
 
-// batch is a wrapper around a pebbleDB batch to contain sizes.
 type batch struct {
 	batch *pebble.Batch
 	db    *Database
@@ -33,12 +32,12 @@ func (db *Database) NewBatch() database.Batch {
 
 func (b *batch) Put(key, value []byte) error {
 	b.size += len(key) + len(value) + pebbleByteOverHead
-	return b.batch.Set(key, value, pebble.NoSync)
+	return b.batch.Set(key, value, pebble.NoSync) // TODO is NoSync OK?
 }
 
 func (b *batch) Delete(key []byte) error {
 	b.size += len(key) + pebbleByteOverHead
-	return b.batch.Delete(key, pebble.NoSync)
+	return b.batch.Delete(key, pebble.NoSync) // TODO is NoSync OK?
 }
 
 func (b *batch) Size() int { return b.size }
@@ -68,7 +67,7 @@ func (b *batch) Write() error {
 		if err := newbatch.batch.Apply(b.batch, nil); err != nil {
 			return err
 		}
-		return updateError(newbatch.batch.Commit(pebble.NoSync))
+		return updateError(newbatch.batch.Commit(pebble.NoSync)) // TODO is NoSync OK?
 	}
 	// mark it for alerady committed
 	b.applied.Store(true)
