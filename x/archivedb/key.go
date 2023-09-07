@@ -46,9 +46,6 @@ func newDBKey(key []byte, height uint64) []byte {
 
 // Takes a slice of bytes and returns a databaseKey instance.
 func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
-	if bytes.Equal(rawKey, keyHeight) {
-		return nil, 0, database.ErrNotFound
-	}
 	rawKeyLen := len(rawKey)
 	reader := bytes.NewReader(rawKey)
 	keyLen, err := binary.ReadUvarint(reader)
@@ -67,7 +64,7 @@ func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	}
 
 	if uint64(readBytes) != keyLen {
-		return nil, 0, ErrInsufficientLength
+		return nil, 0, database.ErrNotFound
 	}
 
 	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-longLen:])
