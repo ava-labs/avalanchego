@@ -38,6 +38,7 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 // module
 func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
+	defer iterator.Release()
 
 	reader.heightLastFoundKey = 0
 
@@ -45,6 +46,12 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 		// There is no available key with the requested prefix
 		return nil, database.ErrNotFound
 	}
+
+	err := iterator.Error()
+	if err != nil {
+		return nil, err
+	}
+
 	foundKey, height, err := parseDBKey(iterator.Key())
 	if err != nil {
 		return nil, err
@@ -53,11 +60,15 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 		return nil, database.ErrNotFound
 	}
 	rawValue := iterator.Value()
-	rawValueLen := len(rawValue) - 1
-	if rawValue[rawValueLen] == 1 {
+	rawValueLen := len(rawValue)
+	if rawValueLen == 0 {
+		// malformed, value should never ever be empty
 		return nil, database.ErrNotFound
 	}
-	value := rawValue[:rawValueLen]
+	if rawValue[rawValueLen-1] == 1 {
+		return nil, database.ErrNotFound
+	}
+	value := rawValue[:rawValueLen-1]
 	reader.heightLastFoundKey = height
 	return value, nil
 }

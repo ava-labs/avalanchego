@@ -3,9 +3,7 @@
 
 package archivedb
 
-import (
-	"github.com/ava-labs/avalanchego/database"
-)
+import "github.com/ava-labs/avalanchego/database"
 
 // A thin wrapper on top of the database.Batch that also keeps track of the height.
 //
