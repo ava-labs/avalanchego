@@ -24,7 +24,7 @@ var (
 // It should expose the inner key, the raw bytes representation as it will be
 // stored in the database, and a height at which this key should be associated.
 //
-// There are two specific implementations, a dbKey and a dbMetaKey. The dbKeye
+// There are two specific implementations, a dbKey and a dbMetaKey. The dbKey
 // is used to store any record in the database and dbMetaKey to store any
 // metadata that the database needs to function (and it is a global entry, not
 // associated to any particual height).
