@@ -10,6 +10,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_Path_Token(t *testing.T) {
+	require := require.New(t)
+
+	path2 := NewTokenPath([]byte{0b0101_0101}, BranchFactor2)
+	require.Equal(byte(0), path2.Token(0))
+	require.Equal(byte(1), path2.Token(1))
+	require.Equal(byte(0), path2.Token(2))
+	require.Equal(byte(1), path2.Token(3))
+	require.Equal(byte(0), path2.Token(4))
+	require.Equal(byte(1), path2.Token(5))
+	require.Equal(byte(0), path2.Token(6))
+	require.Equal(byte(1), path2.Token(7))
+
+	path4 := NewTokenPath([]byte{0b0110_0110}, BranchFactor4)
+	require.Equal(byte(1), path4.Token(0))
+	require.Equal(byte(2), path4.Token(1))
+	require.Equal(byte(1), path4.Token(2))
+	require.Equal(byte(2), path4.Token(3))
+
+	path16 := NewTokenPath([]byte{0x12}, BranchFactor16)
+	require.Equal(byte(1), path16.Token(0))
+	require.Equal(byte(2), path16.Token(1))
+
+	path256 := NewTokenPath([]byte{0x12}, BranchFactor256)
+	require.Equal(byte(0x12), path256.Token(0))
+}
+
+func Test_Path_Append(t *testing.T) {
+	require := require.New(t)
+
+	path2 := NewTokenPath([]byte{}, BranchFactor2)
+	for i := 0; i < 2; i++ {
+		require.Equal(byte(i), path2.Append(byte(i)).Token(0))
+	}
+
+	path4 := NewTokenPath([]byte{}, BranchFactor4)
+	for i := 0; i < 4; i++ {
+		require.Equal(byte(i), path4.Append(byte(i)).Token(0))
+	}
+
+	path16 := NewTokenPath([]byte{}, BranchFactor16)
+	for i := 0; i < 16; i++ {
+		require.Equal(byte(i), path16.Append(byte(i)).Token(0))
+	}
+
+	path256 := NewTokenPath([]byte{}, BranchFactor256)
+	for i := 0; i < 256; i++ {
+		require.Equal(byte(i), path256.Append(byte(i)).Token(0))
+	}
+}
+
 func Test_SerializedPath_NibbleVal(t *testing.T) {
 	require := require.New(t)
 

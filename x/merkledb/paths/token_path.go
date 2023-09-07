@@ -102,7 +102,7 @@ func (p TokenPath) HasPrefix(prefix TokenPath) bool {
 
 func (p TokenPath) Append(token byte) TokenPath {
 	return TokenPath{
-		value:        p.value + string(token),
+		value:        p.value + string([]byte{token}),
 		tokenBitSize: p.tokenBitSize,
 	}
 }
