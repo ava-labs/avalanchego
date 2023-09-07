@@ -4,8 +4,6 @@
 package archivedb
 
 import (
-	"encoding/binary"
-
 	"github.com/ava-labs/avalanchego/database"
 )
 
@@ -35,9 +33,7 @@ func (c *dbBatchWithHeight) Write() error {
 		return ErrInvalidBatchHeight
 	}
 
-	var newHeightBytes [8]byte
-	binary.BigEndian.PutUint64(newHeightBytes[:], c.height)
-	err := c.batch.Put(newMetaKey(dbHeight).Bytes(), newHeightBytes[:])
+	err := database.PutUInt64(c.batch, keyHeight, c.height)
 	if err != nil {
 		return err
 	}

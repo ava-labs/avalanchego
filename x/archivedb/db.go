@@ -5,7 +5,6 @@ package archivedb
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"sync"
 
@@ -60,7 +59,7 @@ type archiveDB struct {
 }
 
 var (
-	dbHeight              = []byte("archivedb.height")
+	keyHeight             = newMetaKey([]byte("archivedb.height")).Bytes()
 	ErrUnknownHeight      = errors.New("unknown height")
 	ErrInvalidBatchHeight = errors.New("invalid batch height")
 )
@@ -69,27 +68,19 @@ func NewArchiveDB(
 	ctx context.Context,
 	db database.Database,
 ) (*archiveDB, error) {
-	var currentHeight uint64
-	height, err := db.Get(newMetaKey(dbHeight).Bytes())
+	height, err := database.GetUInt64(db, keyHeight)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return nil, err
 		}
-		currentHeight = 0
-	} else {
-		currentHeight = binary.BigEndian.Uint64(height)
+		height = 0
 	}
 
 	return &archiveDB{
 		ctx:           ctx,
-		currentHeight: currentHeight,
+		currentHeight: height,
 		rawDB:         db,
 	}, nil
-}
-
-// Returns the value of a metadata
-func (db *archiveDB) getMetadata(key []byte) ([]byte, error) {
-	return db.rawDB.Get(newMetaKey(key).Bytes())
 }
 
 // Tiny wrapper on top Get() passing the last stored height

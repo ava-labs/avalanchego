@@ -163,9 +163,9 @@ func TestDBKeySpace(t *testing.T) {
 	require.Equal(uint64(3), writer.Height())
 	require.NoError(writer.Write())
 
-	storedHeight, err := db.getMetadata(dbHeight)
+	storedHeight, err := database.GetUInt64(db.rawDB, keyHeight)
 	require.NoError(err)
-	require.Equal([]byte{0, 0, 0, 0, 0, 0, 0, 3}, storedHeight)
+	require.Equal(uint64(3), storedHeight)
 
 	val, height, err := db.Get(key1, 3)
 	require.NoError(err)
