@@ -15,8 +15,9 @@ import (
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chain"
+	"github.com/ava-labs/avalanchego/chain/atomic"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -713,7 +714,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             vdrs,

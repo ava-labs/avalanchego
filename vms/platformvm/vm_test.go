@@ -14,8 +14,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chain"
+	"github.com/ava-labs/avalanchego/chain/atomic"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -302,7 +303,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             vdrs,
@@ -1320,7 +1321,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		Validators:             firstVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
@@ -1408,7 +1409,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
@@ -1462,7 +1463,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
@@ -1782,7 +1783,7 @@ func TestUnverifiedParent(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
@@ -1943,7 +1944,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
 		Validators:             firstVdrs,
@@ -1985,7 +1986,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		UptimePercentage:       .21,
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -2116,7 +2117,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
 		Validators:             vdrs,

@@ -26,7 +26,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
+	"github.com/ava-labs/avalanchego/chain/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"

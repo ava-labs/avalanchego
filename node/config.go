@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -194,8 +194,8 @@ type Config struct {
 
 	SubnetConfigs map[ids.ID]subnets.Config `json:"subnetConfigs"`
 
-	ChainConfigs map[string]chains.ChainConfig `json:"-"`
-	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
+	ChainConfigs map[string]chain.ChainConfig `json:"-"`
+	ChainAliases map[ids.ID][]string          `json:"chainAliases"`
 
 	VMAliaser ids.Aliaser `json:"-"`
 

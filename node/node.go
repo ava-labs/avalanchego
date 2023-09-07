@@ -33,8 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chain"
+	"github.com/ava-labs/avalanchego/chain/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -130,7 +130,7 @@ type Node struct {
 	msgCreator message.Creator
 
 	// Manages creation of blockchains and routing messages to them
-	chainManager chains.Manager
+	chainManager chain.Manager
 
 	// Manages validator benching
 	benchlistManager benchlist.Manager
@@ -636,7 +636,7 @@ func (n *Node) initIndexer() error {
 func (n *Node) initChains(genesisBytes []byte) error {
 	n.Log.Info("initializing chains")
 
-	platformChain := chains.ChainParameters{
+	platformChain := chain.ChainParameters{
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
@@ -804,7 +804,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	n.chainManager = chains.New(&chains.ManagerConfig{
+	n.chainManager = chain.New(&chain.ManagerConfig{
 		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 		StakingTLSCert:                          n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,

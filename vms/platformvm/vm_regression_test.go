@@ -14,8 +14,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chain"
+	"github.com/ava-labs/avalanchego/chain/atomic"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -350,7 +351,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
+		Chains:                 chain.TestManager,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,

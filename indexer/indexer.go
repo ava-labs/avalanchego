@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -72,7 +72,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	chains.Registrant
+	chain.Registrant
 	// Close will do nothing and return nil after the first call
 	io.Closer
 }

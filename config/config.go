@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -998,35 +998,35 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	return "", nil
 }
 
-func getChainConfigsFromFlag(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigsFromFlag(v *viper.Viper) (map[string]chain.ChainConfig, error) {
 	chainConfigContentB64 := v.GetString(ChainConfigContentKey)
 	chainConfigContent, err := base64.StdEncoding.DecodeString(chainConfigContentB64)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 	}
 
-	chainConfigs := make(map[string]chains.ChainConfig)
+	chainConfigs := make(map[string]chain.ChainConfig)
 	if err := json.Unmarshal(chainConfigContent, &chainConfigs); err != nil {
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 	return chainConfigs, nil
 }
 
-func getChainConfigsFromDir(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigsFromDir(v *viper.Viper) (map[string]chain.ChainConfig, error) {
 	chainConfigPath, err := getPathFromDirKey(v, ChainConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(chainConfigPath) == 0 {
-		return make(map[string]chains.ChainConfig), nil
+		return make(map[string]chain.ChainConfig), nil
 	}
 
 	return readChainConfigPath(chainConfigPath)
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
-func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigs(v *viper.Viper) (map[string]chain.ChainConfig, error) {
 	if v.IsSet(ChainConfigContentKey) {
 		return getChainConfigsFromFlag(v)
 	}
@@ -1035,12 +1035,12 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
+func readChainConfigPath(chainConfigPath string) (map[string]chain.ChainConfig, error) {
 	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
 	if err != nil {
 		return nil, err
 	}
-	chainConfigMap := make(map[string]chains.ChainConfig)
+	chainConfigMap := make(map[string]chain.ChainConfig)
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)
 		if err != nil {
@@ -1063,7 +1063,7 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 			return chainConfigMap, err
 		}
 
-		chainConfigMap[dirInfo.Name()] = chains.ChainConfig{
+		chainConfigMap[dirInfo.Name()] = chain.ChainConfig{
 			Config:  configData,
 			Upgrade: upgradeData,
 		}

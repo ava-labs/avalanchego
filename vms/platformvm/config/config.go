@@ -6,7 +6,7 @@ package config
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -19,7 +19,7 @@ import (
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
 	// The node's chain manager
-	Chains chains.Manager
+	Chains chain.Manager
 
 	// Node's validator set maps subnetID -> validators of the subnet
 	//
@@ -149,7 +149,7 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 		return
 	}
 
-	chainParams := chains.ChainParameters{
+	chainParams := chain.ChainParameters{
 		ID:          chainID,
 		SubnetID:    tx.SubnetID,
 		GenesisData: tx.GenesisData,

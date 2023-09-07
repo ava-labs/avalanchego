@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
@@ -44,7 +44,7 @@ type Config struct {
 	ProfileDir   string
 	LogFactory   logging.Factory
 	NodeConfig   interface{}
-	ChainManager chains.Manager
+	ChainManager chain.Manager
 	HTTPServer   server.PathAdderWithReadLock
 	VMRegistry   registry.VMRegistry
 	VMManager    vms.Manager

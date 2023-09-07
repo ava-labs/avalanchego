@@ -12,7 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -36,7 +36,7 @@ type Info struct {
 	log          logging.Logger
 	myIP         ips.DynamicIPPort
 	networking   network.Network
-	chainManager chains.Manager
+	chainManager chain.Manager
 	vmManager    vms.Manager
 	validators   validators.Set
 	benchlist    benchlist.Manager
@@ -63,7 +63,7 @@ type Parameters struct {
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
-	chainManager chains.Manager,
+	chainManager chain.Manager,
 	vmManager vms.Manager,
 	myIP ips.DynamicIPPort,
 	network network.Network,
