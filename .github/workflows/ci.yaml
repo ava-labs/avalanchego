@@ -20,6 +20,7 @@ jobs:
           toolchain: stable
           override: true
       - uses: arduino/setup-protoc@v2
+      # caution: this is the same restore as in gh-pages.yaml
       - name: Restore Cargo Cache
         id: cargo-cache
         uses: actions/cache/restore@v3
@@ -174,4 +175,4 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ needs.build.outputs.cache-key }}
-      - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --document-private-items --no-deps
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps
