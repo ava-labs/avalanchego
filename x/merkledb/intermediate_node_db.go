@@ -4,8 +4,6 @@
 package merkledb
 
 import (
-	"bytes"
-	"encoding/binary"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -122,12 +120,12 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 }
 
 func (db *intermediateNodeDB) constructDBKey(key path) []byte {
-	// We need differentiate between two paths of equal byte length but different nibble length
-	// so add the nibble length to the []byte key
-	lengthPrefix := bytes.NewBuffer(intermediateNodePrefix)
-	serializedKey := key.Serialize()
-	_ = binary.Write(lengthPrefix, binary.BigEndian, serializedKey.NibbleLength)
-	return addPrefixToKey(db.bufferPool, lengthPrefix.Bytes(), key.Serialize().Value)
+	// We need differentiate between two paths of equal byte length but different token length
+	// so add the parity to the key prefix
+	lengthPrefix := make([]byte, len(intermediateNodePrefix)+1)
+	copy(lengthPrefix, intermediateNodePrefix)
+	lengthPrefix[len(intermediateNodePrefix)] = byte(len(key) % 2)
+	return addPrefixToKey(db.bufferPool, lengthPrefix, key.Serialize().Value)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {
