@@ -150,3 +150,7 @@ func Bootstrap(
 	}
 	return status, stopper, nil
 }
+
+func NewCmd(path string, args ...string) *exec.Cmd {
+	return exec.Command(path, args...)
+}

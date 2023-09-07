@@ -91,6 +91,7 @@ var (
 type VMClient struct {
 	*chain.State
 	client         vmpb.VMClient
+	healthCli      healthpb.HealthClient
 	runtime        runtime.Stopper
 	pid            int
 	processTracker resource.ProcessTracker
@@ -352,8 +353,14 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 }
 
 func (vm *VMClient) Shutdown(ctx context.Context) error {
+	// ensure the vm is alive before sending blocking shutdown RPC.
+	_, err := vm.healthCli.Check(ctx, &healthpb.HealthCheckRequest{Service: ""})
+	if err != nil {
+		return fmt.Errorf("shutdown failed vm has already been terminated: %w", err)
+	}
+
 	errs := wrappers.Errs{}
-	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{})
+	_, err = vm.client.Shutdown(ctx, &emptypb.Empty{})
 	errs.Add(err)
 
 	vm.serverCloser.Stop()

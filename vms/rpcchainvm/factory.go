@@ -7,6 +7,11 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
@@ -56,12 +61,30 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 		return nil, err
 	}
 
-	clientConn, err := grpcutils.Dial(status.Addr)
+	vmConn, err := grpcutils.Dial(status.Addr)
 	if err != nil {
 		return nil, err
 	}
 
-	vm := NewClient(vmpb.NewVMClient(clientConn))
+	vm := NewClient(vmpb.NewVMClient(vmConn))
+
+	healthDialOpts := []grpc.DialOption{
+		grpc.WithDefaultCallOptions(
+			grpc.WaitForReady(false), // fail fast
+		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+
+	// gRPC health check connection will fail fast if the server is not ready.
+	// this is useful for detecting if the VM process has crashed.
+	healthConn, err := grpc.Dial(status.Addr, healthDialOpts...)
+	if err != nil {
+		return nil, err
+	}
+	// gRPC health check client
+	// ref. https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+	vm.healthCli = healthpb.NewHealthClient(healthConn)
+
 	vm.SetProcess(stopper, status.Pid, f.processTracker)
 
 	f.runtimeTracker.TrackRuntime(stopper)

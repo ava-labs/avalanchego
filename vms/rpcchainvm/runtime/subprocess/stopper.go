@@ -10,23 +10,31 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
+	"go.uber.org/zap"
 )
 
-func NewStopper(logger logging.Logger, cmd *exec.Cmd) runtime.Stopper {
+func NewStopper(log logging.Logger, cmd *exec.Cmd) runtime.Stopper {
 	return &stopper{
-		cmd:    cmd,
-		logger: logger,
+		cmd: cmd,
+		log: log,
 	}
 }
 
 type stopper struct {
-	once   sync.Once
-	cmd    *exec.Cmd
-	logger logging.Logger
+	once sync.Once
+	cmd  *exec.Cmd
+	log  logging.Logger
 }
 
 func (s *stopper) Stop(ctx context.Context) {
 	s.once.Do(func() {
-		stop(ctx, s.logger, s.cmd)
+		err := s.cmd.Process.Kill()
+		if err == nil {
+			s.log.Debug("subprocess was killed")
+		} else {
+			s.log.Error("subprocess was killed",
+				zap.Error(err),
+			)
+		}
 	})
 }

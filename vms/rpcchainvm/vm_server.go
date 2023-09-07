@@ -64,6 +64,7 @@ var (
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vmpb.UnsafeVMServer
+	shutdownCtxCancel context.CancelFunc
 
 	vm block.ChainVM
 	// If nil, the underlying VM doesn't implement the interface.
@@ -83,7 +84,7 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm block.ChainVM) *VMServer {
+func NewServer(vm block.ChainVM, shutdownCtxCancel context.CancelFunc) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
@@ -319,6 +320,9 @@ func (vm *VMServer) Shutdown(ctx context.Context, _ *emptypb.Empty) (*emptypb.Em
 	if vm.closed == nil {
 		return &emptypb.Empty{}, nil
 	}
+	// Begin graceful termination of this server.
+	defer vm.shutdownCtxCancel()
+
 	errs := wrappers.Errs{}
 	errs.Add(vm.vm.Shutdown(ctx))
 	close(vm.closed)
