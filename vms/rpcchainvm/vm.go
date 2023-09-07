@@ -39,6 +39,7 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 	server := newVMServer(vm, opts...)
 	go func(ctx context.Context) {
 		defer func() {
+			signal.Stop(signals)
 			server.GracefulStop()
 			fmt.Println("vm server: graceful termination success")
 		}()
@@ -46,13 +47,7 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		for {
 			select {
 			case s := <-signals:
-				switch s {
-				case syscall.SIGINT:
-					fmt.Println("runtime engine: ignoring signal: SIGINT")
-				case syscall.SIGTERM:
-					fmt.Println("runtime engine: received shutdown signal: SIGTERM")
-					return
-				}
+				fmt.Printf("runtime engine: ignoring signal: %s\n", s)
 			case <-ctx.Done():
 				fmt.Println("runtime engine: context has been cancelled")
 				return

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
+	"go.uber.org/zap"
 )
 
 func NewStopper(logger logging.Logger, cmd *exec.Cmd) runtime.Stopper {
@@ -25,8 +26,15 @@ type stopper struct {
 	logger logging.Logger
 }
 
-func (s *stopper) Stop(ctx context.Context) {
+// TODO: Do we still want to provide the context to Stop?
+func (s *stopper) Stop(context.Context) {
 	s.once.Do(func() {
-		stop(ctx, s.logger, s.cmd)
+		if err := s.cmd.Process.Kill(); err != nil {
+			s.logger.Error("subprocess was killed",
+				zap.Error(err),
+			)
+			return
+		}
+		s.logger.Debug("subprocess was killed")
 	})
 }
