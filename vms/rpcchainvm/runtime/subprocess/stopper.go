@@ -8,9 +8,10 @@ import (
 	"os/exec"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"go.uber.org/zap"
 )
 
 func NewStopper(logger logging.Logger, cmd *exec.Cmd) runtime.Stopper {
@@ -31,10 +32,21 @@ func (s *stopper) Stop(context.Context) {
 	s.once.Do(func() {
 		if err := s.cmd.Process.Kill(); err != nil {
 			s.logger.Error("subprocess was killed",
+				zap.Int("pid", s.cmd.Process.Pid),
 				zap.Error(err),
 			)
 			return
 		}
-		s.logger.Debug("subprocess was killed")
+		s.logger.Debug("subprocess was killed",
+			zap.Int("pid", s.cmd.Process.Pid),
+		)
+
+		// Because we killed the process, wait is expected to return a non-nil
+		// error.
+		err := s.cmd.Wait()
+		s.logger.Debug("subprocess exited",
+			zap.Int("pid", s.cmd.Process.Pid),
+			zap.Error(err),
+		)
 	})
 }
