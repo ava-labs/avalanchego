@@ -53,7 +53,7 @@ type archiveDB struct {
 	rawDB database.Database
 
 	// Must be held when reading/writing metadata such as the current database
-	// height, because we allow our to construct a batch for any height, but we
+	// height, because we allow constructing a batch for any height, but we
 	// only allow to commit the next height
 	lock sync.RWMutex
 }
