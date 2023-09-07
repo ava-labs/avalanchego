@@ -90,9 +90,10 @@ func NewServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool]) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
-		vm:   vm,
-		bVM:  bVM,
-		ssVM: ssVM,
+		vm:            vm,
+		bVM:           bVM,
+		ssVM:          ssVM,
+		allowShutdown: allowShutdown,
 	}
 }
 
