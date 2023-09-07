@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -85,7 +85,7 @@ func newUniqueVertex(ctx context.Context, s *Serializer, b []byte) (*uniqueVerte
 
 	// The vertex is newly parsed, so set the status
 	// and persist it.
-	vtx.v.status = choices.Processing
+	vtx.v.status = choice.Processing
 	return vtx, vtx.persist()
 }
 
@@ -144,7 +144,7 @@ func (vtx *uniqueVertex) setVertex(ctx context.Context, innerVtx vertex.Stateles
 		return err
 	}
 
-	vtx.v.status = choices.Processing
+	vtx.v.status = choice.Processing
 	return vtx.persist()
 }
 
@@ -158,7 +158,7 @@ func (vtx *uniqueVertex) persist() error {
 	return vtx.serializer.versionDB.Commit()
 }
 
-func (vtx *uniqueVertex) setStatus(status choices.Status) error {
+func (vtx *uniqueVertex) setStatus(status choice.Status) error {
 	vtx.shallowRefresh()
 	if vtx.v.status == status {
 		return nil
@@ -176,7 +176,7 @@ func (vtx *uniqueVertex) Key() ids.ID {
 }
 
 func (vtx *uniqueVertex) Accept(ctx context.Context) error {
-	if err := vtx.setStatus(choices.Accepted); err != nil {
+	if err := vtx.setStatus(choice.Accepted); err != nil {
 		return err
 	}
 
@@ -202,7 +202,7 @@ func (vtx *uniqueVertex) Accept(ctx context.Context) error {
 }
 
 func (vtx *uniqueVertex) Reject(context.Context) error {
-	if err := vtx.setStatus(choices.Rejected); err != nil {
+	if err := vtx.setStatus(choice.Rejected); err != nil {
 		return err
 	}
 
@@ -216,7 +216,7 @@ func (vtx *uniqueVertex) Reject(context.Context) error {
 // TODO: run performance test to see if shallow refreshing
 // (which will mean that refresh must be called in Bytes and Verify)
 // improves performance
-func (vtx *uniqueVertex) Status() choices.Status {
+func (vtx *uniqueVertex) Status() choice.Status {
 	vtx.refresh()
 	return vtx.v.status
 }
@@ -319,7 +319,7 @@ type vertexState struct {
 	latest bool
 
 	vtx    vertex.StatelessVertex
-	status choices.Status
+	status choice.Status
 
 	parents []avalanche.Vertex
 	txs     []snowstorm.Tx

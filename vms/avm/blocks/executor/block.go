@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -294,7 +294,7 @@ func (b *Block) Reject(context.Context) error {
 	return nil
 }
 
-func (b *Block) Status() choices.Status {
+func (b *Block) Status() choice.Status {
 	// If this block's reference was rejected, we should report it as rejected.
 	//
 	// We don't persist the rejection, but that's fine. The consensus engine
@@ -304,29 +304,29 @@ func (b *Block) Status() choices.Status {
 	// The consensus engine may then try to issue the block, but will discover
 	// that it was rejected due to a conflicting block having been accepted.
 	if b.rejected {
-		return choices.Rejected
+		return choice.Rejected
 	}
 
 	blkID := b.ID()
 	// If this block is the last accepted block, we don't need to go to disk to
 	// check the status.
 	if b.manager.lastAccepted == blkID {
-		return choices.Accepted
+		return choice.Accepted
 	}
 	// Check if the block is in memory. If so, it's processing.
 	if _, ok := b.manager.blkIDToState[blkID]; ok {
-		return choices.Processing
+		return choice.Processing
 	}
 	// Block isn't in memory. Check in the database.
 	_, err := b.manager.state.GetBlock(blkID)
 	switch err {
 	case nil:
-		return choices.Accepted
+		return choice.Accepted
 
 	case database.ErrNotFound:
 		// choices.Unknown means we don't have the bytes of the block.
 		// In this case, we do, so we return choices.Processing.
-		return choices.Processing
+		return choice.Processing
 
 	default:
 		// TODO: correctly report this error to the consensus engine.
@@ -334,6 +334,6 @@ func (b *Block) Status() choices.Status {
 			"dropping unhandled database error",
 			zap.Error(err),
 		)
-		return choices.Processing
+		return choice.Processing
 	}
 }

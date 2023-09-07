@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -154,7 +154,7 @@ type state struct {
 	utxoState     avax.UTXOState
 
 	statusesPruned bool
-	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
+	statusCache    cache.Cacher[ids.ID, *choice.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB       database.Database
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
@@ -191,10 +191,10 @@ func New(
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
 
-	statusCache, err := metercacher.New[ids.ID, *choices.Status](
+	statusCache, err := metercacher.New[ids.ID, *choice.Status](
 		"status_cache",
 		metrics,
-		&cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},
+		&cache.LRU[ids.ID, *choice.Status]{Size: statusCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -308,23 +308,23 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 	// If the status was persisted, then the transaction was written before the
 	// linearization. If it wasn't marked as accepted, then we treat it as if it
 	// doesn't exist.
-	if status != choices.Accepted {
+	if status != choice.Accepted {
 		return nil, database.ErrNotFound
 	}
 	return tx, nil
 }
 
-func (s *state) getStatus(id ids.ID) (choices.Status, error) {
+func (s *state) getStatus(id ids.ID) (choice.Status, error) {
 	if s.statusesPruned {
-		return choices.Unknown, database.ErrNotFound
+		return choice.Unknown, database.ErrNotFound
 	}
 
 	if _, ok := s.addedTxs[id]; ok {
-		return choices.Unknown, database.ErrNotFound
+		return choice.Unknown, database.ErrNotFound
 	}
 	if status, found := s.statusCache.Get(id); found {
 		if status == nil {
-			return choices.Unknown, database.ErrNotFound
+			return choice.Unknown, database.ErrNotFound
 		}
 		return *status, nil
 	}
@@ -332,15 +332,15 @@ func (s *state) getStatus(id ids.ID) (choices.Status, error) {
 	val, err := database.GetUInt32(s.statusDB, id[:])
 	if err == database.ErrNotFound {
 		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
+		return choice.Unknown, database.ErrNotFound
 	}
 	if err != nil {
-		return choices.Unknown, err
+		return choice.Unknown, err
 	}
 
-	status := choices.Status(val)
+	status := choice.Status(val)
 	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
+		return choice.Unknown, err
 	}
 	s.statusCache.Put(id, &status)
 	return status, nil
@@ -662,7 +662,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	// Note: If an unexpected error occurs the caches are never re-enabled.
 	// That's fine as the node is going to be in an unhealthy state regardless.
 	oldTxCache := s.txCache
-	s.statusCache = &cache.Empty[ids.ID, *choices.Status]{}
+	s.statusCache = &cache.Empty[ids.ID, *choice.Status]{}
 	s.txCache = &cache.Empty[ids.ID, *txs.Tx]{}
 	lock.Unlock()
 
@@ -789,9 +789,9 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 	if err != nil {
 		return err
 	}
-	status := choices.Status(statusInt)
+	status := choice.Status(statusInt)
 
-	if status == choices.Accepted {
+	if status == choice.Accepted {
 		txBytes := txIter.Value()
 		tx, err := s.parser.ParseGenesisTx(txBytes)
 		if err != nil {
@@ -873,7 +873,7 @@ func (s *state) initTxChecksum() error {
 
 				statusHasNext = statusIt.Next() // we processed the txID, so move on to the next status
 
-				if choices.Status(statusInt) != choices.Accepted { // the status isn't accepted, so we skip the txID
+				if choice.Status(statusInt) != choice.Accepted { // the status isn't accepted, so we skip the txID
 					continue
 				}
 			}

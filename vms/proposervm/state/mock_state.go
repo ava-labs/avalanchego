@@ -11,7 +11,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
+	choice "github.com/ava-labs/avalanchego/snow/choice"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "go.uber.org/mock/gomock"
 )

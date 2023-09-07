@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
@@ -31,8 +31,8 @@ var (
 	blkID1 = ids.ID{1}
 	blkID2 = ids.ID{2}
 
-	status1 = choices.Accepted
-	status2 = choices.Processing
+	status1 = choice.Accepted
+	status2 = choice.Processing
 
 	time1 = time.Unix(1, 0)
 	time2 = time.Unix(2, 0)

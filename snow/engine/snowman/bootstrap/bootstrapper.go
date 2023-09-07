@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -438,12 +438,12 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		status := blk.Status()
 		// The status should never be rejected here - but we check to fail as
 		// quickly as possible
-		if status == choices.Rejected {
+		if status == choice.Rejected {
 			return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 		}
 
 		blkHeight := blk.Height()
-		if status == choices.Accepted || blkHeight <= b.startingHeight {
+		if status == choice.Accepted || blkHeight <= b.startingHeight {
 			// We can stop traversing, as we have reached the accepted frontier
 			if err := b.Blocked.Commit(); err != nil {
 				return err

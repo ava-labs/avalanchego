@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -34,13 +34,13 @@ type Client interface {
 	//
 	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
 	// used instead to determine if the tx was accepted.
-	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
+	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choice.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client
 	//       returns a decided status.
 	// TODO: Move this function off of the Client interface into a utility
 	// function.
-	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
+	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choice.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
@@ -277,7 +277,7 @@ func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Opt
 	return res.TxID, err
 }
 
-func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error) {
+func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choice.Status, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest(ctx, "avm.getTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -285,7 +285,7 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 	return res.Status, err
 }
 
-func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error) {
+func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choice.Status, error) {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 

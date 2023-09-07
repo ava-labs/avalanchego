@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -396,7 +396,7 @@ func TestGenesis(t *testing.T) {
 
 	genesisBlock, err := vm.manager.GetBlock(genesisBlockID)
 	require.NoError(err)
-	require.Equal(choices.Accepted, genesisBlock.Status())
+	require.Equal(choice.Accepted, genesisBlock.Status())
 
 	genesisState, _ := defaultGenesis(t)
 	// Ensure all the genesis UTXOs are there

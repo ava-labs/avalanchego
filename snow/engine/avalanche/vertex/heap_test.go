@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
 
@@ -21,37 +21,37 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 	h := NewHeap()
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 1,
 	}
 	vtx2 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 1,
 	}
 	vtx3 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 3,
 	}
 	vtx4 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choice.Unknown,
 		},
 		HeightV: 0,
 	}
@@ -100,32 +100,32 @@ func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
 	h := NewHeap()
 
 	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 0,
 	}
 	vtx1 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 1,
 	}
 
 	sharedID := ids.GenerateTestID()
 	vtx2 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     sharedID,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 1,
 	}
 	vtx3 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     sharedID,
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		HeightV: 2,
 	}

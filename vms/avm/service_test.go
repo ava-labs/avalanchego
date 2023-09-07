@@ -5,11 +5,10 @@ package avm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"fmt"
 	"testing"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 
@@ -25,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -91,13 +90,13 @@ func TestServiceGetTxStatus(t *testing.T) {
 	}
 	statusReply = &GetTxStatusReply{}
 	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
-	require.Equal(choices.Unknown, statusReply.Status)
+	require.Equal(choice.Unknown, statusReply.Status)
 
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
 	statusReply = &GetTxStatusReply{}
 	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
-	require.Equal(choices.Accepted, statusReply.Status)
+	require.Equal(choice.Accepted, statusReply.Status)
 }
 
 // Test the GetBalance method when argument Strict is true

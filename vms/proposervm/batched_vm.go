@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -133,7 +133,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 
 		_, status, err := vm.State.GetBlock(blkID)
 		if err == database.ErrNotFound {
-			status = choices.Processing
+			status = choice.Processing
 		} else if err != nil {
 			return nil, err
 		}

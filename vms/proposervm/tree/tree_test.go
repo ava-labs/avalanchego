@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 var (
 	GenesisID = ids.GenerateTestID()
-	Genesis   = &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	Genesis   = &snowman.TestBlock{TestDecidable: choice.TestDecidable{
 		IDV:     GenesisID,
-		StatusV: choices.Accepted,
+		StatusV: choice.Accepted,
 	}}
 )
 
@@ -26,9 +26,9 @@ func TestAcceptSingleBlock(t *testing.T) {
 	require := require.New(t)
 
 	block := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.ID(),
 	}
@@ -44,7 +44,7 @@ func TestAcceptSingleBlock(t *testing.T) {
 	require.True(contains)
 
 	require.NoError(tr.Accept(context.Background(), block))
-	require.Equal(choices.Accepted, block.Status())
+	require.Equal(choice.Accepted, block.Status())
 
 	_, contains = tr.Get(block)
 	require.False(contains)
@@ -54,17 +54,17 @@ func TestAcceptBlockConflict(t *testing.T) {
 	require := require.New(t)
 
 	blockToAccept := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.ID(),
 	}
 
 	blockToReject := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.ID(),
 	}
@@ -84,11 +84,11 @@ func TestAcceptBlockConflict(t *testing.T) {
 	require.NoError(tr.Accept(context.Background(), blockToAccept))
 
 	// check their statuses and that they are removed from the tree
-	require.Equal(choices.Accepted, blockToAccept.Status())
+	require.Equal(choice.Accepted, blockToAccept.Status())
 	_, contains = tr.Get(blockToAccept)
 	require.False(contains)
 
-	require.Equal(choices.Rejected, blockToReject.Status())
+	require.Equal(choice.Rejected, blockToReject.Status())
 	_, contains = tr.Get(blockToReject)
 	require.False(contains)
 }
@@ -97,25 +97,25 @@ func TestAcceptChainConflict(t *testing.T) {
 	require := require.New(t)
 
 	blockToAccept := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.ID(),
 	}
 
 	blockToReject := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.ID(),
 	}
 
 	blockToRejectChild := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: blockToReject.ID(),
 	}
@@ -139,15 +139,15 @@ func TestAcceptChainConflict(t *testing.T) {
 	require.NoError(tr.Accept(context.Background(), blockToAccept))
 
 	// check their statuses and whether they are removed from tree
-	require.Equal(choices.Accepted, blockToAccept.Status())
+	require.Equal(choice.Accepted, blockToAccept.Status())
 	_, contains = tr.Get(blockToAccept)
 	require.False(contains)
 
-	require.Equal(choices.Rejected, blockToReject.Status())
+	require.Equal(choice.Rejected, blockToReject.Status())
 	_, contains = tr.Get(blockToReject)
 	require.False(contains)
 
-	require.Equal(choices.Rejected, blockToRejectChild.Status())
+	require.Equal(choice.Rejected, blockToRejectChild.Status())
 	_, contains = tr.Get(blockToRejectChild)
 	require.False(contains)
 }

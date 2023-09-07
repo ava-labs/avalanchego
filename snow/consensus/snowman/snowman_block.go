@@ -5,7 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
@@ -54,5 +54,5 @@ func (n *snowmanBlock) Accepted() bool {
 	if n.blk == nil {
 		return true
 	}
-	return n.blk.Status() == choices.Accepted
+	return n.blk.Status() == choice.Accepted
 }

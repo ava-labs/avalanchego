@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -19,7 +19,7 @@ var (
 
 // TestBlock is a useful test block
 type TestBlock struct {
-	choices.TestDecidable
+	choice.TestDecidable
 
 	ParentV    ids.ID
 	HeightV    uint64

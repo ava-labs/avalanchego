@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -23,7 +23,7 @@ func TestStatus(t *testing.T) {
 	type test struct {
 		name           string
 		blockF         func(*gomock.Controller) *Block
-		expectedStatus choices.Status
+		expectedStatus choice.Status
 	}
 
 	tests := []test{
@@ -45,7 +45,7 @@ func TestStatus(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedStatus: choices.Accepted,
+			expectedStatus: choice.Accepted,
 		},
 		{
 			name: "processing",
@@ -66,7 +66,7 @@ func TestStatus(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedStatus: choices.Processing,
+			expectedStatus: choice.Processing,
 		},
 		{
 			name: "in database",
@@ -88,7 +88,7 @@ func TestStatus(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedStatus: choices.Accepted,
+			expectedStatus: choice.Accepted,
 		},
 		{
 			name: "not in map or database",
@@ -110,7 +110,7 @@ func TestStatus(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedStatus: choices.Processing,
+			expectedStatus: choice.Processing,
 		},
 	}
 

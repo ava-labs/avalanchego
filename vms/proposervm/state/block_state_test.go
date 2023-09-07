@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -50,17 +50,17 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	_, _, err = bs.GetBlock(b.ID())
 	a.Equal(database.ErrNotFound, err)
 
-	err = bs.PutBlock(b, choices.Accepted)
+	err = bs.PutBlock(b, choice.Accepted)
 	a.NoError(err)
 
 	fetchedBlock, fetchedStatus, err := bs.GetBlock(b.ID())
 	a.NoError(err)
-	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(choice.Accepted, fetchedStatus)
 	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 
 	fetchedBlock, fetchedStatus, err = bs.GetBlock(b.ID())
 	a.NoError(err)
-	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(choice.Accepted, fetchedStatus)
 	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 }
 

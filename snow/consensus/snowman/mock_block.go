@@ -13,7 +13,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
+	choice "github.com/ava-labs/avalanchego/snow/choice"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -125,10 +125,10 @@ func (mr *MockBlockMockRecorder) Reject(arg0 interface{}) *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockBlock) Status() choices.Status {
+func (m *MockBlock) Status() choice.Status {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(choices.Status)
+	ret0, _ := ret[0].(choice.Status)
 	return ret0
 }
 

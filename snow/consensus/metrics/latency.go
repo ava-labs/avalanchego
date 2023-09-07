@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -166,7 +166,7 @@ func (l *latency) Accepted(id ids.ID, pollNumber uint64, containerSize int) {
 	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
-			zap.Stringer("status", choices.Accepted),
+			zap.Stringer("status", choice.Accepted),
 			zap.Stringer("txID", id),
 		)
 		return
@@ -186,7 +186,7 @@ func (l *latency) Rejected(id ids.ID, pollNumber uint64, containerSize int) {
 	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
-			zap.Stringer("status", choices.Rejected),
+			zap.Stringer("status", choice.Rejected),
 			zap.Stringer("txID", id),
 		)
 		return

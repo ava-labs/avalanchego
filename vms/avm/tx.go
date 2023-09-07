@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -36,7 +36,7 @@ func (tx *Tx) ID() ids.ID {
 }
 
 func (tx *Tx) Accept(context.Context) error {
-	if s := tx.Status(); s != choices.Processing {
+	if s := tx.Status(); s != choice.Processing {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 
@@ -79,20 +79,20 @@ func (*Tx) Reject(context.Context) error {
 	return errUnexpectedReject
 }
 
-func (tx *Tx) Status() choices.Status {
+func (tx *Tx) Status() choice.Status {
 	txID := tx.tx.ID()
 	_, err := tx.vm.state.GetTx(txID)
 	switch err {
 	case nil:
-		return choices.Accepted
+		return choice.Accepted
 	case database.ErrNotFound:
-		return choices.Processing
+		return choice.Processing
 	default:
 		tx.vm.ctx.Log.Error("failed looking up tx status",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
-		return choices.Processing
+		return choice.Processing
 	}
 }
 
@@ -122,7 +122,7 @@ func (tx *Tx) Bytes() []byte {
 }
 
 func (tx *Tx) Verify(context.Context) error {
-	if s := tx.Status(); s != choices.Processing {
+	if s := tx.Status(); s != choice.Processing {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{

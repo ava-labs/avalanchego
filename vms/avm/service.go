@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -203,7 +203,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
-	Status choices.Status `json:"status"`
+	Status choice.Status `json:"status"`
 }
 
 type GetAddressTxsArgs struct {
@@ -295,9 +295,9 @@ func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxS
 	_, err := s.vm.state.GetTx(args.TxID)
 	switch err {
 	case nil:
-		reply.Status = choices.Accepted
+		reply.Status = choice.Accepted
 	case database.ErrNotFound:
-		reply.Status = choices.Unknown
+		reply.Status = choice.Unknown
 	default:
 		return err
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -435,12 +435,12 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 		vtxID := vtx.ID()
 
 		switch vtx.Status() {
-		case choices.Unknown:
+		case choice.Unknown:
 			b.VtxBlocked.AddMissingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex locally. Mark that we need to fetch it.
-		case choices.Rejected:
+		case choice.Rejected:
 			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtxID)
-		case choices.Processing:
+		case choice.Processing:
 			b.needToFetch.Remove(vtxID)
 			b.VtxBlocked.RemoveMissingID(vtxID)
 
@@ -549,7 +549,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 	toProcess := make([]avalanche.Vertex, 0, len(pendingContainerIDs))
 	for _, vtxID := range pendingContainerIDs {
 		if vtx, err := b.Manager.GetVtx(ctx, vtxID); err == nil {
-			if vtx.Status() == choices.Accepted {
+			if vtx.Status() == choice.Accepted {
 				b.VtxBlocked.RemoveMissingID(vtxID)
 			} else {
 				toProcess = append(toProcess, vtx) // Process this vertex.

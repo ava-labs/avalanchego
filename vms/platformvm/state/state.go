@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -210,8 +210,8 @@ type State interface {
 // TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
+	Bytes  []byte        `serialize:"true"`
+	Status choice.Status `serialize:"true"`
 }
 
 /*
@@ -1846,7 +1846,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	if status != choices.Accepted {
+	if status != choice.Accepted {
 		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -2329,22 +2329,22 @@ func (s *state) writeMetadata() error {
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
 // TODO: Remove after v1.11.x is activated
-func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choice.Status, bool, error) {
 	// Attempt to parse as blocks.Block
 	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
 	if err == nil {
-		return blk, choices.Accepted, false, nil
+		return blk, choice.Accepted, false, nil
 	}
 
 	// Fallback to [stateBlk]
 	blkState := stateBlk{}
 	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, false, err
+		return nil, choice.Processing, false, err
 	}
 
 	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, false, err
+		return nil, choice.Processing, false, err
 	}
 
 	return blkState.Blk, blkState.Status, true, nil
@@ -2390,7 +2390,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			return err
 		}
 
-		if status != choices.Accepted {
+		if status != choice.Accepted {
 			// Remove non-accepted blocks from disk.
 			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
 				return fmt.Errorf("failed to delete block: %w", err)

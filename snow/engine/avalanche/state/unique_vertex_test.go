@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -52,7 +52,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 	}
 
 	status := uVtx.Status()
-	require.Equal(choices.Unknown, status)
+	require.Equal(choice.Unknown, status)
 
 	_, err := uVtx.Parents()
 	require.ErrorIs(err, errGetParents)
@@ -67,7 +67,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 func TestUniqueVertexCacheHit(t *testing.T) {
 	require := require.New(t)
 
-	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	testTx := &snowstorm.TestTx{TestDecidable: choice.TestDecidable{
 		IDV: ids.ID{1},
 	}}
 
@@ -122,16 +122,16 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 	txBytesParent := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTxParent := &snowstorm.TestTx{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.ID{1},
-			StatusV: choices.Accepted,
+			StatusV: choice.Accepted,
 		},
 		BytesV: txBytesParent,
 	}
 
 	txBytes := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTx := &snowstorm.TestTx{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV: ids.ID{1},
 		},
 		BytesV: txBytes,
@@ -173,15 +173,15 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	}
 
 	// Register a cache miss
-	require.Equal(choices.Unknown, uVtx.Status())
+	require.Equal(choice.Unknown, uVtx.Status())
 
 	// Register cache hit
 	vtx, err := newUniqueVertex(context.Background(), s, vtxBytes)
 	require.NoError(err)
 
-	require.Equal(choices.Processing, vtx.Status())
+	require.Equal(choice.Processing, vtx.Status())
 
-	validateVertex := func(vtx *uniqueVertex, expectedStatus choices.Status) {
+	validateVertex := func(vtx *uniqueVertex, expectedStatus choice.Status) {
 		require.Equal(expectedStatus, vtx.Status())
 
 		// Call bytes first to check for regression bug
@@ -211,12 +211,12 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	}
 
 	// Check that the vertex refreshed from the cache is valid
-	validateVertex(vtx, choices.Processing)
+	validateVertex(vtx, choice.Processing)
 
 	// Check that a newly parsed vertex refreshed from the cache is valid
 	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
 	require.NoError(err)
-	validateVertex(vtx, choices.Processing)
+	validateVertex(vtx, choice.Processing)
 
 	// Check that refreshing a vertex when it has been removed from
 	// the cache works correctly
@@ -226,12 +226,12 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		id:         id,
 		serializer: s,
 	}
-	validateVertex(vtx, choices.Processing)
+	validateVertex(vtx, choice.Processing)
 
 	s.state.uniqueVtx.Flush()
 	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
 	require.NoError(err)
-	validateVertex(vtx, choices.Processing)
+	validateVertex(vtx, choice.Processing)
 }
 
 func TestParseVertexWithIncorrectChainID(t *testing.T) {

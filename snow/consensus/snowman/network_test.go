@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choice"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -38,9 +38,9 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
 	// #nosec G404
 	n.colors = append(n.colors, &TestBlock{
-		TestDecidable: choices.TestDecidable{
+		TestDecidable: choice.TestDecidable{
 			IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
-			StatusV: choices.Processing,
+			StatusV: choice.Processing,
 		},
 		ParentV: Genesis.IDV,
 		HeightV: 1,
@@ -50,9 +50,9 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 		dependency := n.colors[rand.Intn(len(n.colors))] // #nosec G404
 		// #nosec G404
 		n.colors = append(n.colors, &TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
-				StatusV: choices.Processing,
+				StatusV: choice.Processing,
 			},
 			ParentV: dependency.IDV,
 			HeightV: dependency.HeightV + 1,
@@ -73,7 +73,7 @@ func (n *Network) AddNode(sm Consensus) error {
 			myDep = blk.Parent()
 		}
 		myVtx := &TestBlock{
-			TestDecidable: choices.TestDecidable{
+			TestDecidable: choice.TestDecidable{
 				IDV:     blk.ID(),
 				StatusV: blk.Status(),
 			},
