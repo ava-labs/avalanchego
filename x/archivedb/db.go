@@ -7,17 +7,16 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 )
 
 var (
-	_ database.Batch          = (*batchWithHeight)(nil)
+	_ database.Batch          = (*dbBatchWithHeight)(nil)
 	_ database.KeyValueReader = (*dbHeightReader)(nil)
-	_ dbKey                   = (*keyInternal)(nil)
-	_ dbKey                   = (*dbMetaKey)(nil)
+	_ databaseKey             = (*dbKey)(nil)
+	_ databaseKey             = (*dbMetaKey)(nil)
 )
 
 // ArchiveDb
@@ -66,12 +65,6 @@ var (
 	ErrInvalidBatchHeight = errors.New("invalid batch height")
 )
 
-type batchWithHeight struct {
-	db     *archiveDB
-	height uint64
-	batch  database.Batch
-}
-
 func NewArchiveDB(
 	ctx context.Context,
 	db database.Database,
@@ -94,8 +87,8 @@ func NewArchiveDB(
 	}, nil
 }
 
-func (db *archiveDB) GetMetadata(key []byte) ([]byte, error) {
-	fmt.Printf("%v %v\n", key, newMetaKey(key).Bytes())
+// Returns the value of a metadata
+func (db *archiveDB) getMetadata(key []byte) ([]byte, error) {
 	return db.rawDB.Get(newMetaKey(key).Bytes())
 }
 
@@ -136,68 +129,11 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 }
 
 // Creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch(height uint64) (batchWithHeight, error) {
+func (db *archiveDB) NewBatch(height uint64) (dbBatchWithHeight, error) {
 	batch := db.rawDB.NewBatch()
-	return batchWithHeight{
+	return dbBatchWithHeight{
 		db:     db,
 		height: height,
 		batch:  batch,
 	}, nil
-}
-
-func (c *batchWithHeight) Height() uint64 {
-	return c.height
-}
-
-// Writes the changes to the database
-func (c *batchWithHeight) Write() error {
-	c.db.lock.Lock()
-	defer c.db.lock.Unlock()
-
-	if c.db.currentHeight+1 != c.height {
-		return ErrInvalidBatchHeight
-	}
-
-	var newHeightBytes [8]byte
-	binary.BigEndian.PutUint64(newHeightBytes[:], c.height)
-	err := c.batch.Put(newMetaKey(dbHeight).Bytes(), newHeightBytes[:])
-	if err != nil {
-		return err
-	}
-
-	err = c.batch.Write()
-	if err != nil {
-		return err
-	}
-	c.db.currentHeight = c.height
-	return nil
-}
-
-// Delete any previous state that may be stored in the database
-func (c *batchWithHeight) Delete(key []byte) error {
-	return c.batch.Put(newKey(key, c.height).Bytes(), []byte{1})
-}
-
-// Queues an insert for a key with a given
-func (c *batchWithHeight) Put(key []byte, value []byte) error {
-	value = append(value, 0) // not deleted element
-	return c.batch.Put(newKey(key, c.height).Bytes(), value)
-}
-
-// Returns the sizes to be committed in the database
-func (c *batchWithHeight) Size() int {
-	return c.batch.Size()
-}
-
-// Removed all pending writes and deletes to the database
-func (c *batchWithHeight) Reset() {
-	c.batch.Reset()
-}
-
-func (c *batchWithHeight) Inner() database.Batch {
-	return c.batch
-}
-
-func (c *batchWithHeight) Replay(w database.KeyValueWriterDeleter) error {
-	return c.batch.Replay(w)
 }
