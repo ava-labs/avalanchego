@@ -14,7 +14,6 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	maybe "github.com/ava-labs/avalanchego/utils/maybe"
-	path "github.com/ava-labs/avalanchego/x/merkledb/path"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -375,7 +374,7 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 }
 
 // getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 path.TokenPath, arg1 bool) (*node, error) {
+func (m *MockMerkleDB) getEditableNode(arg0 Path, arg1 bool) (*node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
 	ret0, _ := ret[0].(*node)
@@ -390,7 +389,7 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 }
 
 // getValue mocks base method.
-func (m *MockMerkleDB) getValue(arg0 path.TokenPath) ([]byte, error) {
+func (m *MockMerkleDB) getValue(arg0 Path) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getValue", arg0)
 	ret0, _ := ret[0].([]byte)

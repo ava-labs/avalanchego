@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package path
+package merkledb
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 func Test_Path_Token(t *testing.T) {
 	require := require.New(t)
 
-	path2 := NewTokenPath([]byte{0b0101_0101}, BranchFactor2)
+	path2 := NewPath([]byte{0b0101_0101}, BranchFactor2)
 	require.Equal(byte(0), path2.Token(0))
 	require.Equal(byte(1), path2.Token(1))
 	require.Equal(byte(0), path2.Token(2))
@@ -23,39 +23,39 @@ func Test_Path_Token(t *testing.T) {
 	require.Equal(byte(0), path2.Token(6))
 	require.Equal(byte(1), path2.Token(7))
 
-	path4 := NewTokenPath([]byte{0b0110_0110}, BranchFactor4)
+	path4 := NewPath([]byte{0b0110_0110}, BranchFactor4)
 	require.Equal(byte(1), path4.Token(0))
 	require.Equal(byte(2), path4.Token(1))
 	require.Equal(byte(1), path4.Token(2))
 	require.Equal(byte(2), path4.Token(3))
 
-	path16 := NewTokenPath([]byte{0x12}, BranchFactor16)
+	path16 := NewPath([]byte{0x12}, BranchFactor16)
 	require.Equal(byte(1), path16.Token(0))
 	require.Equal(byte(2), path16.Token(1))
 
-	path256 := NewTokenPath([]byte{0x12}, BranchFactor256)
+	path256 := NewPath([]byte{0x12}, BranchFactor256)
 	require.Equal(byte(0x12), path256.Token(0))
 }
 
 func Test_Path_Append(t *testing.T) {
 	require := require.New(t)
 
-	path2 := NewTokenPath([]byte{}, BranchFactor2)
+	path2 := NewPath([]byte{}, BranchFactor2)
 	for i := 0; i < 2; i++ {
 		require.Equal(byte(i), path2.Append(byte(i)).Token(0))
 	}
 
-	path4 := NewTokenPath([]byte{}, BranchFactor4)
+	path4 := NewPath([]byte{}, BranchFactor4)
 	for i := 0; i < 4; i++ {
 		require.Equal(byte(i), path4.Append(byte(i)).Token(0))
 	}
 
-	path16 := NewTokenPath([]byte{}, BranchFactor16)
+	path16 := NewPath([]byte{}, BranchFactor16)
 	for i := 0; i < 16; i++ {
 		require.Equal(byte(i), path16.Append(byte(i)).Token(0))
 	}
 
-	path256 := NewTokenPath([]byte{}, BranchFactor256)
+	path256 := NewPath([]byte{}, BranchFactor256)
 	for i := 0; i < 256; i++ {
 		require.Equal(byte(i), path256.Append(byte(i)).Token(0))
 	}
@@ -186,7 +186,7 @@ func FuzzPath(f *testing.F) {
 
 			require := require.New(t)
 
-			p := NewTokenPath(pathBytes, branching)
+			p := NewPath(pathBytes, branching)
 
 			serializedPath := p.Serialize()
 			require.True(bytes.Equal(pathBytes, serializedPath.Value))

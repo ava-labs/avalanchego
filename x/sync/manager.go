@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"github.com/ava-labs/avalanchego/x/merkledb/path"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -396,7 +395,7 @@ func (m *Manager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	proofKeyPath := path.SerializedPath{
+	proofKeyPath := merkledb.SerializedPath{
 		Value:        lastReceivedKey,
 		NibbleLength: 2 * len(lastReceivedKey),
 	}
@@ -792,7 +791,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byt
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < byte(path.BranchFactor16); childIndex++ {
+	for childIndex := startIndex; childIndex < byte(merkledb.BranchFactor16); childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}

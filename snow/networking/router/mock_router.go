@@ -20,8 +20,8 @@ import (
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	version "github.com/ava-labs/avalanchego/version"
-	gomock "go.uber.org/mock/gomock"
 	prometheus "github.com/prometheus/client_golang/prometheus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockRouter is a mock of Router interface.
