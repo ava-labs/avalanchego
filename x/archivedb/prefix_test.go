@@ -54,7 +54,7 @@ func TestDBEfficientLookups(t *testing.T) {
 	var (
 		key          = []byte("key")
 		value        = []byte("value")
-		maliciousKey = newInternalKey(key, 2).Bytes()
+		maliciousKey = newKey(key, 2).Bytes()
 	)
 
 	db, err := NewArchiveDB(
@@ -65,14 +65,14 @@ func TestDBEfficientLookups(t *testing.T) {
 	)
 	require.NoError(err)
 
-	writer, err := db.NewBatch()
+	writer, err := db.NewBatch(1)
 	require.NoError(err)
 	require.NoError(writer.Put(key, value))
 	require.Equal(uint64(1), writer.Height())
 	require.NoError(writer.Write())
 
 	for i := 0; i < 10000; i++ {
-		writer, err = db.NewBatch()
+		writer, err = db.NewBatch(uint64(i) + 2)
 		require.NoError(err)
 
 		require.NoError(writer.Put(maliciousKey, []byte{byte(i)}))

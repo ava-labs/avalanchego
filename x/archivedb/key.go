@@ -4,6 +4,7 @@
 package archivedb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"math"
@@ -12,21 +13,8 @@ import (
 var (
 	ErrInsufficientLength = errors.New("packer has insufficient length for input")
 	longLen               = 8
-	boolLen               = 1
-	// This default prefix is used as the internal default prefix for all keys.
-	// By doing so the database can safely accept keys from untrusted sources,
-	// by using a common prefix no matter how the keys are crafted externally
-	// they won't interfere with the database
-	//
-	// Having this common prefix also also allows archivedb to store metadata
-	// that may be needed, without polluting the key space.
-	//
-	// Another side effect is that migrations are possible, by changing the
-	// prefix namespace, pulling the old prefix and migrating to the new one.
-	internalKeyPrefix    = []byte("v1")
-	internalKeyPrefixLen = len(internalKeyPrefix)
-	// The length of the suffix data of the key
-	internalKeySuffixLen = longLen + boolLen
+	internalKeySuffixLen  = longLen
+	minInternalKeyLen     = internalKeySuffixLen + 2
 )
 
 // keyInternal
@@ -42,47 +30,97 @@ var (
 // Any other property are to not serialized but they are useful when parsing a
 // keyInternal struct from the database
 type keyInternal struct {
-	key       []byte
-	height    uint64
-	isDeleted bool
+	key    []byte
+	height uint64
+}
+
+type dbKey interface {
+	InnerKey() []byte
+	Bytes() []byte
+	Height() uint64
 }
 
 // Creates a new Key struct with a given key and its height
-func newInternalKey(key []byte, height uint64) *keyInternal {
+func newKey(key []byte, height uint64) *keyInternal {
 	return &keyInternal{
-		key:       key,
-		isDeleted: false,
-		height:    height,
+		key:    key,
+		height: height,
 	}
 }
 
 func (k *keyInternal) Bytes() []byte {
 	keyLen := len(k.key)
-	bytes := make([]byte, keyLen+internalKeySuffixLen+internalKeyPrefixLen)
-	copy(bytes[0:], internalKeyPrefix)
-	copy(bytes[internalKeyPrefixLen:], k.key)
-	binary.BigEndian.PutUint64(bytes[internalKeyPrefixLen+keyLen:], math.MaxUint64-k.height)
-	if k.isDeleted {
-		bytes[internalKeyPrefixLen+keyLen+longLen] = 1
-	} else {
-		bytes[internalKeyPrefixLen+keyLen+longLen] = 0
-	}
+	keyLenBytes := binary.AppendUvarint([]byte{}, uint64(keyLen))
+
+	bytes := make([]byte, len(keyLenBytes)+keyLen+internalKeySuffixLen)
+	offset := copy(bytes[0:], keyLenBytes)
+	offset += copy(bytes[offset:], k.key)
+	binary.BigEndian.PutUint64(bytes[offset:], math.MaxUint64-k.height)
 	return bytes
 }
 
+func (k *keyInternal) Height() uint64 {
+	return k.height
+}
+
+func (k *keyInternal) InnerKey() []byte {
+	return k.key
+}
+
+type dbMetaKey struct {
+	key []byte
+}
+
+func newMetaKey(key []byte) *dbMetaKey {
+	return &dbMetaKey{key}
+}
+
+func (k *dbMetaKey) Bytes() []byte {
+	bytes := make([]byte, len(k.key)+binary.MaxVarintLen64)
+	binary.PutUvarint(bytes, math.MaxUint64)
+	copy(bytes[binary.MaxVarintLen64:], k.key)
+	return bytes
+}
+
+func (dbMetaKey) Height() uint64 {
+	return 0
+}
+
+func (k *dbMetaKey) InnerKey() []byte {
+	return k.key
+}
+
 // Takes a slice of bytes and returns a Key struct
-func parseKey(rawKey []byte) (*keyInternal, error) {
-	var key keyInternal
-	if internalKeySuffixLen+internalKeyPrefixLen >= len(rawKey) {
+func parseRawDBKey(rawKey []byte) (dbKey, error) {
+	rawKeyLen := len(rawKey)
+	reader := bytes.NewReader(rawKey)
+	keyLen, err := binary.ReadUvarint(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	if keyLen == math.MaxUint64 {
+		return &dbMetaKey{
+			key: rawKey[binary.MaxVarintLen64:],
+		}, nil
+	}
+
+	if minInternalKeyLen >= rawKeyLen {
 		return nil, ErrInsufficientLength
 	}
 
-	keyWithPrefixLen := len(rawKey) - internalKeySuffixLen
+	key := make([]byte, keyLen)
+	readBytes, err := reader.Read(key)
+	if err != nil {
+		return nil, err
+	}
 
-	key.key = make([]byte, keyWithPrefixLen-internalKeyPrefixLen)
-	key.height = math.MaxUint64 - binary.BigEndian.Uint64(rawKey[keyWithPrefixLen:])
-	key.isDeleted = rawKey[keyWithPrefixLen+longLen] == 1
-	copy(key.key, rawKey[internalKeyPrefixLen:internalKeyPrefixLen+keyWithPrefixLen])
+	if uint64(readBytes) != keyLen {
+		return nil, ErrInsufficientLength
+	}
 
-	return &key, nil
+	return &keyInternal{
+		height: math.MaxUint64 - binary.BigEndian.Uint64(rawKey[rawKeyLen-internalKeySuffixLen:]),
+		key:    key,
+	}, nil
 }
