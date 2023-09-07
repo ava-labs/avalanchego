@@ -6,9 +6,7 @@
 
 package subprocess
 
-import (
-	"os/exec"
-)
+import "os/exec"
 
 func NewCmd(path string, args ...string) *exec.Cmd {
 	return exec.Command(path, args...)
