@@ -7,7 +7,6 @@ import "errors"
 
 // common errors
 var (
-	ErrClosed          = errors.New("closed")
-	ErrNotFound        = errors.New("not found")
-	ErrNotFoundLastKey = errors.New("not found last key")
+	ErrClosed   = errors.New("closed")
+	ErrNotFound = errors.New("not found")
 )

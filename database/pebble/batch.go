@@ -57,9 +57,8 @@ func (b *batch) Write() error {
 		return database.ErrClosed
 	}
 
-	if !b.written.Load() {
+	if b.written.CompareAndSwap(false, true) {
 		// This batch has not been written to the database yet.
-		b.written.Store(true)
 		return updateError(b.batch.Commit(pebble.Sync))
 	}
 
