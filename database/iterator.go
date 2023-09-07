@@ -33,9 +33,11 @@ type Iterator interface {
 	Error() error
 
 	// Key returns the key of the current key/value pair, or nil if done.
+	// If the database is closed, must still report the current contents.
 	Key() []byte
 
 	// Value returns the value of the current key/value pair, or nil if done.
+	// If the database is closed, must still report the current contents.
 	Value() []byte
 
 	// Release releases associated resources. Release should always succeed and

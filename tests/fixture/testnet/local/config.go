@@ -46,6 +46,6 @@ func LocalCChainConfig() testnet.FlagsMap {
 	// values will be used. Available C-Chain configuration options are
 	// defined in the `github.com/ava-labs/coreth/evm` package.
 	return testnet.FlagsMap{
-		"log-level": "debug",
+		"log-level": "trace",
 	}
 }

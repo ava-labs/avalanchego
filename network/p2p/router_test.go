@@ -339,7 +339,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	requestSent.Wait()
 
 	// force the router to use the same requestID
-	router.requestID = 0
+	router.requestID = 1
 	timeout.Add(1)
 	err = client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil)
 	requestSent.Wait()

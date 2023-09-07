@@ -263,7 +263,7 @@ func (c *networkClient) request(
 			zap.Int("requestLen", len(request)),
 			zap.Error(err),
 		)
-		return nil, fmt.Errorf("%w: %s", errAppSendFailed, err)
+		return nil, fmt.Errorf("%w: %w", errAppSendFailed, err)
 	}
 
 	handler := newResponseHandler()
