@@ -726,36 +726,18 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 }
 
-func Test_MerkleDB_RandomCases(t *testing.T) {
-	require := require.New(t)
+func Fuzz_MerkleDB_RandomCases(f *testing.F) {
+	f.Add(int64(0), uint16(1000))
+	f.Fuzz(
+		func(
+			t *testing.T,
+			randSeed int64,
+			size uint16) {
+			require := require.New(t)
 
-	const (
-		minSize              = 150
-		maxSize              = 500
-		checkHashProbability = 0.01
-	)
-
-	for size := minSize; size < maxSize; size += 10 {
-		now := time.Now().UnixNano()
-		t.Logf("seed for iter %d: %d", size, now)
-		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generateRandTest(require, r, size, checkHashProbability))
-	}
-}
-
-func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
-	require := require.New(t)
-
-	const (
-		initialValues        = 1_000
-		updates              = 2_500
-		checkHashProbability = 0
-	)
-
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, checkHashProbability))
+			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+			runRandDBTest(require, r, generateRandTest(require, r, int(size), 0.01))
+		})
 }
 
 // randTest performs random trie operations.
@@ -1035,59 +1017,6 @@ func generateRandTestWithKeys(
 	}
 	// always end with a full hash of the trie
 	steps = append(steps, randTestStep{op: opCheckhash})
-	return steps
-}
-
-func generateInitialValues(
-	require *require.Assertions,
-	r *rand.Rand,
-	numInitialKeyValues int,
-	size int,
-	percentChanceToFullHash float64,
-) randTest {
-	const (
-		prefixProbability   = 0.1
-		nilValueProbability = 0.05
-	)
-
-	var allKeys [][]byte
-	genKey := func() []byte {
-		// new prefixed key
-		if len(allKeys) > 2 && r.Float64() < prefixProbability {
-			prefix := allKeys[r.Intn(len(allKeys))]
-			key := make([]byte, r.Intn(50)+len(prefix))
-			copy(key, prefix)
-			_, _ = r.Read(key[len(prefix):])
-			allKeys = append(allKeys, key)
-			return key
-		}
-
-		// new key
-		key := make([]byte, r.Intn(50))
-		_, _ = r.Read(key)
-		allKeys = append(allKeys, key)
-		return key
-	}
-
-	var steps randTest
-	for i := 0; i < numInitialKeyValues; i++ {
-		step := randTestStep{
-			op:    opUpdate,
-			key:   genKey(),
-			value: make([]byte, r.Intn(50)),
-		}
-		// got is defined because if a rand method is used
-		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
-		if got < nilValueProbability {
-			step.value = nil
-		} else {
-			_, _ = r.Read(step.value)
-		}
-		steps = append(steps, step)
-	}
-	steps = append(steps, randTestStep{op: opWriteBatch})
-	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
 	return steps
 }
 
