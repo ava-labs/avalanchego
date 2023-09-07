@@ -69,6 +69,8 @@ type Config struct {
 	MaxOpenFiles                int
 }
 
+// TODO: Add support for adding a custom logger
+// TODO: Add metrics
 func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
 	// Original default settings are based on
 	// https://github.com/ethereum/go-ethereum/blob/release/1.12/ethdb/pebble/pebble.go
@@ -82,7 +84,6 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		MaxOpenFiles:                cfg.MaxOpenFiles,
 		MaxConcurrentCompactions:    runtime.NumCPU, // TODO what should default be?
 		Levels:                      make([]pebble.LevelOptions, numLevels),
-		// TODO: add support for adding a custom logger
 	}
 	for i := 0; i < len(opts.Levels); i++ {
 		l := &opts.Levels[i]
