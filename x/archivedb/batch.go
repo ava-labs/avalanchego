@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-// A thin wrapper on top of the database.Batch which keeps track of the height.
+// A thin wrapper on top of the database.Batch that also keeps track of the height.
 //
 // It takes any key and wraps it with dbKey. It is possible to construct many
 // batches but at Write() time, the height of the batch to be written to the
@@ -51,7 +51,7 @@ func (c *dbBatchWithHeight) Delete(key []byte) error {
 	return c.batch.Put(newDBKey(key, c.height), []byte{1})
 }
 
-// Queues an insert for a key with a given
+// Queues an insert for a key-value pair
 func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
 	value = append(value, 0) // not deleted element
 	return c.batch.Put(newDBKey(key, c.height), value)

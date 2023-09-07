@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -68,7 +67,6 @@ func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	}
 
 	if uint64(readBytes) != keyLen {
-		panic(fmt.Sprintf("foo %d %d", keyLen, readBytes))
 		return nil, 0, ErrInsufficientLength
 	}
 
