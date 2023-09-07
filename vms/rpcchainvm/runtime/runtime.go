@@ -17,7 +17,7 @@ const (
 	DefaultHandshakeTimeout = 5 * time.Second
 
 	// Duration of time to wait for graceful termination to complete.
-	DefaultGracefulTimeout = 5 * time.Second
+	DefaultGracefulTimeout = 2 * time.Second
 )
 
 var (

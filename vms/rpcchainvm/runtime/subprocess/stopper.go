@@ -7,10 +7,12 @@ import (
 	"context"
 	"os/exec"
 	"sync"
+	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"go.uber.org/zap"
 )
 
 func NewStopper(log logging.Logger, cmd *exec.Cmd) runtime.Stopper {
@@ -28,6 +30,7 @@ type stopper struct {
 
 func (s *stopper) Stop(ctx context.Context) {
 	s.once.Do(func() {
+		<-time.After(runtime.DefaultGracefulTimeout)
 		err := s.cmd.Process.Kill()
 		if err == nil {
 			s.log.Debug("subprocess was killed")

@@ -26,10 +26,7 @@ import (
 	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
-const (
-	defaultRuntimeDialTimeout = 5 * time.Second
-	defaultShutdownTimeout    = 5 * time.Second // TODO: make this configurable via ENV
-)
+const defaultRuntimeDialTimeout = 5 * time.Second
 
 // The address of the Runtime server is expected to be passed via ENV `runtime.EngineAddressKey`.
 // This address is used by the Runtime client to send Initialize RPC to server.
@@ -47,6 +44,7 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
 	for {
 		select {
 		case s := <-signals:
@@ -60,10 +58,10 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		case <-ctx.Done():
 			fmt.Println("runtime engine: attempting graceful shutdown")
 			// attempt graceful shutdown of VM server
-			ctx, cancel := context.WithTimeout(context.Background(), defaultShutdownTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), runtime.DefaultGracefulTimeout)
 			defer cancel()
 			if err := stopVMServer(ctx, server); err != nil {
-				fmt.Printf("runtime engine: failed to gracefully shutdown VM server: %s\n", err)
+				fmt.Printf("runtime engine: %v\n", err)
 			} else {
 				fmt.Println("runtime engine: VM server shutdown successfully")
 			}
