@@ -12,13 +12,13 @@ import (
 )
 
 func TestNaturalDescSortingForSameKey(t *testing.T) {
-	key0 := newKey(make([]byte, 0), 0)
-	key1 := newKey(make([]byte, 0), 1)
-	key2 := newKey(make([]byte, 0), 2)
-	key3 := newKey(make([]byte, 0), 3)
+	key0 := newDBKey(make([]byte, 0), 0)
+	key1 := newDBKey(make([]byte, 0), 1)
+	key2 := newDBKey(make([]byte, 0), 2)
+	key3 := newDBKey(make([]byte, 0), 3)
 
-	entry := [][]byte{key0.Bytes(), key1.Bytes(), key2.Bytes(), key3.Bytes()}
-	expected := [][]byte{key3.Bytes(), key2.Bytes(), key1.Bytes(), key0.Bytes()}
+	entry := [][]byte{key0, key1, key2, key3}
+	expected := [][]byte{key3, key2, key1, key0}
 
 	slices.SortFunc(entry, func(i, j []byte) bool {
 		return bytes.Compare(i, j) < 0
@@ -28,13 +28,13 @@ func TestNaturalDescSortingForSameKey(t *testing.T) {
 }
 
 func TestSortingDifferentPrefix(t *testing.T) {
-	key0 := newKey([]byte{0}, 0)
-	key1 := newKey([]byte{0}, 1)
-	key2 := newKey([]byte{1}, 0)
-	key3 := newKey([]byte{1}, 1)
+	key0 := newDBKey([]byte{0}, 0)
+	key1 := newDBKey([]byte{0}, 1)
+	key2 := newDBKey([]byte{1}, 0)
+	key3 := newDBKey([]byte{1}, 1)
 
-	entry := [][]byte{key0.Bytes(), key1.Bytes(), key2.Bytes(), key3.Bytes()}
-	expected := [][]byte{key1.Bytes(), key0.Bytes(), key3.Bytes(), key2.Bytes()}
+	entry := [][]byte{key0, key1, key2, key3}
+	expected := [][]byte{key1, key0, key3, key2}
 
 	slices.SortFunc(entry, func(i, j []byte) bool {
 		return bytes.Compare(i, j) < 0
@@ -44,20 +44,11 @@ func TestSortingDifferentPrefix(t *testing.T) {
 }
 
 func TestParseBack(t *testing.T) {
-	key0 := newKey([]byte{0, 1, 2, 3, 4, 5}, 102310)
-	key1, err := parseRawDBKey(key0.Bytes())
+	keyBytes := []byte{0, 1, 2, 3, 4, 5}
+	keyHeight := uint64(102310)
+	key0 := newDBKey(keyBytes, keyHeight)
+	key, height, err := parseDBKey(key0)
 	require.NoError(t, err)
-	require.Equal(t, key0, key1)
-}
-
-func TestMetadataVsRegularKey(t *testing.T) {
-	regular := newKey([]byte("test"), 0)
-	meta := newMetaKey([]byte("test"))
-	require.NotEqual(t, regular.Bytes(), meta.Bytes())
-	newMeta, err := parseRawDBKey(meta.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, meta, newMeta)
-	newRegular, err := parseRawDBKey(regular.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, regular, newRegular)
+	require.Equal(t, key, keyBytes)
+	require.Equal(t, height, keyHeight)
 }

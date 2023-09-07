@@ -54,7 +54,7 @@ func TestDBEfficientLookups(t *testing.T) {
 	var (
 		key          = []byte("key")
 		value        = []byte("value")
-		maliciousKey = newKey(key, 2).Bytes()
+		maliciousKey = newDBKey(key, 2)
 	)
 
 	db, err := NewArchiveDB(

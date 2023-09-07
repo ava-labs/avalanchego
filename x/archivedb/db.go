@@ -14,8 +14,6 @@ import (
 var (
 	_ database.Batch          = (*dbBatchWithHeight)(nil)
 	_ database.KeyValueReader = (*dbHeightReader)(nil)
-	_ databaseKey             = (*dbKey)(nil)
-	_ databaseKey             = (*dbMetaKey)(nil)
 )
 
 // ArchiveDb
@@ -59,7 +57,7 @@ type archiveDB struct {
 }
 
 var (
-	keyHeight             = newMetaKey([]byte("archivedb.height")).Bytes()
+	keyHeight             = []byte("archivedb.height")
 	ErrUnknownHeight      = errors.New("unknown height")
 	ErrInvalidBatchHeight = errors.New("invalid batch height")
 )

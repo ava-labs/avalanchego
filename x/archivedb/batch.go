@@ -48,13 +48,13 @@ func (c *dbBatchWithHeight) Write() error {
 
 // Delete any previous state that may be stored in the database
 func (c *dbBatchWithHeight) Delete(key []byte) error {
-	return c.batch.Put(newKey(key, c.height).Bytes(), []byte{1})
+	return c.batch.Put(newDBKey(key, c.height), []byte{1})
 }
 
 // Queues an insert for a key with a given
 func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
 	value = append(value, 0) // not deleted element
-	return c.batch.Put(newKey(key, c.height).Bytes(), value)
+	return c.batch.Put(newDBKey(key, c.height), value)
 }
 
 // Returns the sizes to be committed in the database

@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"math"
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 var (
@@ -16,31 +18,6 @@ var (
 	internalKeySuffixLen  = longLen
 	minInternalKeyLen     = internalKeySuffixLen + 2
 )
-
-// Database Key
-//
-// A key must implement this interface in order to be stored in the database.
-//
-// It should expose the inner key, the raw bytes representation as it will be
-// stored in the database, and a height at which this key should be associated.
-//
-// There are two specific implementations, a dbKey and a dbMetaKey. The dbKeye
-// is used to store any record in the database and dbMetaKey to store any
-// metadata that the database needs to function (and it is a global entry, not
-// associated to any particual height).
-//
-// By definition the values associated with a dbKey are append only, there is no
-// support to delete or update it. A new new record with the inner key can be
-// stored, but that will have a different dbKey because the heights will be
-// different. The entries defined under dbMetaKey can be updated onsight.
-//
-// There is no external API to use the dbMetaKey, for now it is reserved for
-// internal usage only.
-type databaseKey interface {
-	InnerKey() []byte
-	Bytes() []byte
-	Height() uint64
-}
 
 // dbKey
 //
@@ -56,92 +33,46 @@ type databaseKey interface {
 // the same prefix as the requested. By appending the length of the inner key as
 // the first bytes, it is not longer possible to query by a prefix (the full key
 // is needed to do a lookup) but all reads are a O(1).
-type dbKey struct {
-	key    []byte
-	height uint64
-}
+func newDBKey(key []byte, height uint64) []byte {
+	keyLen := len(key)
+	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + longLen
+	rawKey := make([]byte, rawKeyMaxSize)
+	offset := binary.PutUvarint(rawKey, uint64(keyLen))
+	offset += copy(rawKey[offset:], key)
+	binary.BigEndian.PutUint64(rawKey[offset:], ^height)
+	offset += longLen
 
-// Creates a new Key struct with a given key and its height
-func newKey(key []byte, height uint64) *dbKey {
-	return &dbKey{
-		key:    key,
-		height: height,
-	}
-}
-
-func (k *dbKey) Bytes() []byte {
-	keyLen := len(k.key)
-	keyLenBytes := binary.AppendUvarint([]byte{}, uint64(keyLen))
-
-	bytes := make([]byte, len(keyLenBytes)+keyLen+internalKeySuffixLen)
-	offset := copy(bytes[0:], keyLenBytes)
-	offset += copy(bytes[offset:], k.key)
-	binary.BigEndian.PutUint64(bytes[offset:], math.MaxUint64-k.height)
-	return bytes
-}
-
-func (k *dbKey) Height() uint64 {
-	return k.height
-}
-
-func (k *dbKey) InnerKey() []byte {
-	return k.key
-}
-
-type dbMetaKey struct {
-	key []byte
-}
-
-func newMetaKey(key []byte) *dbMetaKey {
-	return &dbMetaKey{key}
-}
-
-func (k *dbMetaKey) Bytes() []byte {
-	bytes := make([]byte, len(k.key)+binary.MaxVarintLen64)
-	binary.PutUvarint(bytes, math.MaxUint64)
-	copy(bytes[binary.MaxVarintLen64:], k.key)
-	return bytes
-}
-
-func (dbMetaKey) Height() uint64 {
-	return 0
-}
-
-func (k *dbMetaKey) InnerKey() []byte {
-	return k.key
+	return rawKey[0:offset]
 }
 
 // Takes a slice of bytes and returns a databaseKey instance.
-func parseRawDBKey(rawKey []byte) (databaseKey, error) {
+func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
+	if bytes.Equal(rawKey, keyHeight) {
+		return nil, 0, database.ErrNotFound
+	}
 	rawKeyLen := len(rawKey)
 	reader := bytes.NewReader(rawKey)
 	keyLen, err := binary.ReadUvarint(reader)
 	if err != nil {
-		return nil, err
-	}
-
-	if keyLen == math.MaxUint64 {
-		return &dbMetaKey{
-			key: rawKey[binary.MaxVarintLen64:],
-		}, nil
+		return nil, 0, err
 	}
 
 	if minInternalKeyLen >= rawKeyLen {
-		return nil, ErrInsufficientLength
+		return nil, 0, ErrInsufficientLength
 	}
 
 	key := make([]byte, keyLen)
 	readBytes, err := reader.Read(key)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if uint64(readBytes) != keyLen {
-		return nil, ErrInsufficientLength
+		panic(fmt.Sprintf("foo %d %d", keyLen, readBytes))
+		return nil, 0, ErrInsufficientLength
 	}
 
-	return &dbKey{
-		height: math.MaxUint64 - binary.BigEndian.Uint64(rawKey[rawKeyLen-internalKeySuffixLen:]),
-		key:    key,
-	}, nil
+	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-longLen:])
+
+	return key, ^inversedHeight, nil
 }

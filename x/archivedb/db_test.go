@@ -132,7 +132,7 @@ func TestDBKeySpace(t *testing.T) {
 
 	var (
 		key1   = []byte("key1")
-		key2   = newKey([]byte("key1"), 2).Bytes()
+		key2   = newDBKey([]byte("key1"), 2)
 		key3   = []byte("key3")
 		value1 = []byte("value1@1")
 		value2 = []byte("value2@2")

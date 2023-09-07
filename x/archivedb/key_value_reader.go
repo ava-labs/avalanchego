@@ -37,7 +37,7 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 // because dbMetaKey is for internal usage and should be leaked outside of the
 // module
 func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
-	iterator := reader.db.rawDB.NewIteratorWithStart(newKey(key, reader.height).Bytes())
+	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
 
 	reader.heightLastFoundKey = 0
 
@@ -45,26 +45,20 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 		// There is no available key with the requested prefix
 		return nil, database.ErrNotFound
 	}
-	resultKey, err := parseRawDBKey(iterator.Key())
+	foundKey, height, err := parseDBKey(iterator.Key())
 	if err != nil {
 		return nil, err
 	}
-
-	_, isMetadata := resultKey.(*dbMetaKey)
-
-	if isMetadata || !bytes.Equal(resultKey.InnerKey(), key) {
+	if !bytes.Equal(foundKey, key) {
 		return nil, database.ErrNotFound
 	}
-
 	rawValue := iterator.Value()
 	rawValueLen := len(rawValue) - 1
 	if rawValue[rawValueLen] == 1 {
 		return nil, database.ErrNotFound
 	}
-
 	value := rawValue[:rawValueLen]
-	reader.heightLastFoundKey = resultKey.Height()
-
+	reader.heightLastFoundKey = height
 	return value, nil
 }
 
