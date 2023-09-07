@@ -29,7 +29,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 		),
 		func() {
 			keychain := e2e.Env.NewKeychain(1)
-			wallet := e2e.Env.NewWallet(keychain)
+			wallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()

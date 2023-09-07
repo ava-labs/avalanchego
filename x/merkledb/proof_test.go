@@ -32,6 +32,7 @@ func getBasicDB() (*merkleDB, error) {
 	)
 }
 
+// Writes []byte{i} -> []byte{i} for i in [0, 4]
 func writeBasicBatch(t *testing.T, db *merkleDB) {
 	require := require.New(t)
 
