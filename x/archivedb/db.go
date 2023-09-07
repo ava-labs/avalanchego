@@ -118,11 +118,6 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 }
 
 // Creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch(height uint64) (dbBatchWithHeight, error) {
-	batch := db.rawDB.NewBatch()
-	return dbBatchWithHeight{
-		db:     db,
-		height: height,
-		batch:  batch,
-	}, nil
+func (db *archiveDB) NewBatch(height uint64) (*dbBatchWithHeight, error) {
+	return newBatchWithHeight(db, height)
 }

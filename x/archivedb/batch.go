@@ -17,6 +17,19 @@ type dbBatchWithHeight struct {
 	batch  database.Batch
 }
 
+func newBatchWithHeight(db *archiveDB, height uint64) (*dbBatchWithHeight, error) {
+	batch := db.rawDB.NewBatch()
+	err := database.PutUInt64(batch, keyHeight, height)
+	if err != nil {
+		return nil, err
+	}
+	return &dbBatchWithHeight{
+		db,
+		height,
+		batch,
+	}, nil
+}
+
 // Returns the height for this Batch
 func (c *dbBatchWithHeight) Height() uint64 {
 	return c.height
@@ -31,12 +44,7 @@ func (c *dbBatchWithHeight) Write() error {
 		return ErrInvalidBatchHeight
 	}
 
-	err := database.PutUInt64(c.batch, keyHeight, c.height)
-	if err != nil {
-		return err
-	}
-
-	err = c.batch.Write()
+	err := c.batch.Write()
 	if err != nil {
 		return err
 	}
@@ -63,6 +71,7 @@ func (c *dbBatchWithHeight) Size() int {
 // Removed all pending writes and deletes to the database
 func (c *dbBatchWithHeight) Reset() {
 	c.batch.Reset()
+	database.PutUInt64(c.batch, keyHeight, c.height)
 }
 
 // Returns the inner batch
