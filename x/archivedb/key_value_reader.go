@@ -18,8 +18,8 @@ type dbHeightReader struct {
 // Builds a database.Iterator where the next value is the requested *value*. If
 // the value is not found a database.ErrNotFound is returned.
 //
-// This is a private function which helps Get() and Has() to be share the key
-// look up logic
+// This is a private function which helps Get() and Has() to share the key
+// lookup logic
 func (reader *dbHeightReader) getIteratorToValue(key []byte) (database.Iterator, error) {
 	internalKey := newInternalKey(key, reader.height)
 	iterator := reader.db.rawDB.NewIteratorWithStart(internalKey.Bytes())
