@@ -17,6 +17,8 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -27,6 +29,7 @@ const (
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	pebbleByteOverHead = 8
+	numLevels          = 7
 
 	targetFileSize = 2 * units.MiB
 	filterPolicy   = bloom.FilterPolicy(10)
@@ -37,12 +40,13 @@ var (
 
 	ErrInvalidOperation = errors.New("invalid operation")
 
-	DefaultConfig = Config{
-		CacheSize:                   units.GiB,
-		BytesPerSync:                units.MiB,
-		WALBytesPerSync:             units.MiB,
+	defaultCacheSize = 512 * units.MiB
+	DefaultConfig    = Config{
+		CacheSize:                   defaultCacheSize,
+		BytesPerSync:                512 * units.KiB,
+		WALBytesPerSync:             0, // Default to no background syncing.
 		MemTableStopWritesThreshold: 8,
-		MemTableSize:                16 * units.MiB,
+		MemTableSize:                defaultCacheSize / 4,
 		MaxOpenFiles:                4 * units.KiB,
 	}
 
@@ -59,7 +63,7 @@ type Database struct {
 type Config struct {
 	CacheSize                   int // Byte
 	BytesPerSync                int // Byte
-	WALBytesPerSync             int // Byte (0 disables)
+	WALBytesPerSync             int // Byte (0 for no background syncing)
 	MemTableStopWritesThreshold int // num tables
 	MemTableSize                int // Byte
 	MaxOpenFiles                int
@@ -67,7 +71,7 @@ type Config struct {
 
 func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
 	// Original default settings are based on
-	// https://github.com/ethereum/go-ethereum/blob/release/1.11/ethdb/pebble/pebble.go
+	// https://github.com/ethereum/go-ethereum/blob/release/1.12/ethdb/pebble/pebble.go
 	opts := &pebble.Options{
 		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync:                cfg.BytesPerSync,
@@ -77,7 +81,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		MemTableSize:                cfg.MemTableSize,
 		MaxOpenFiles:                cfg.MaxOpenFiles,
 		MaxConcurrentCompactions:    runtime.NumCPU, // TODO what should default be?
-		Levels:                      make([]pebble.LevelOptions, 7),
+		Levels:                      make([]pebble.LevelOptions, numLevels),
 		// TODO: add support for adding a custom logger
 	}
 	for i := 0; i < len(opts.Levels); i++ {
@@ -88,6 +92,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	opts.Experimental.ReadSamplingMultiplier = -1 // explicitly disable seek compaction
 
 	log.Info("opening pebble")
+	log.Debug("config", zap.Any("config", opts))
 
 	db, err := pebble.Open(file, opts)
 	if err != nil {
