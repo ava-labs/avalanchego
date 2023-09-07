@@ -9,16 +9,16 @@ import (
 	"unsafe"
 )
 
-type (
-	BranchFactor int
-)
-
 const (
 	Bit    int = 1
 	Crumb  int = 2
 	Nibble int = 4
 	Byte   int = 8
+)
 
+type BranchFactor int
+
+const (
 	BranchFactor2   BranchFactor = 2
 	BranchFactor4   BranchFactor = 4
 	BranchFactor16  BranchFactor = 16
