@@ -88,9 +88,10 @@ func NewServer(vm block.ChainVM, shutdownCtxCancel context.CancelFunc) *VMServer
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
-		vm:   vm,
-		bVM:  bVM,
-		ssVM: ssVM,
+		vm:                vm,
+		bVM:               bVM,
+		ssVM:              ssVM,
+		shutdownCtxCancel: shutdownCtxCancel,
 	}
 }
 

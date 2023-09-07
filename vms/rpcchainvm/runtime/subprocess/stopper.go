@@ -28,7 +28,7 @@ type stopper struct {
 	log  logging.Logger
 }
 
-func (s *stopper) Stop(ctx context.Context) {
+func (s *stopper) Stop(_ context.Context) {
 	s.once.Do(func() {
 		<-time.After(runtime.DefaultGracefulTimeout)
 		err := s.cmd.Process.Kill()
