@@ -906,6 +906,7 @@ mod tests {
         let another_store = StoreRevMut::new(state_cache);
         let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), another_hash);
+        disk_requester.shutdown();
     }
 
     fn get_file_path(path: &Path, file: &str, line: u32) -> PathBuf {
