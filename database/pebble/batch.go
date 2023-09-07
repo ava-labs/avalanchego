@@ -51,6 +51,8 @@ func (b *batch) Write() error {
 	b.db.lock.RLock()
 	defer b.db.lock.RUnlock()
 
+	// Committing to a closed database makes pebble panic
+	// so make sure [b.db] isn't closed.
 	if b.db.closed {
 		return database.ErrClosed
 	}
@@ -61,20 +63,20 @@ func (b *batch) Write() error {
 		return updateError(b.batch.Commit(pebble.Sync))
 	}
 
-	// pebble doesn't support writing a batch twice so we have to create a
-	// batch which is a kind of duplicate of [db] and commit the new batch.
-	newbatch := &batch{
+	// pebble doesn't support writing a batch twice so we have to clone
+	// [b] and commit the clone.
+	clone := &batch{
 		db:    b.db,
 		batch: b.db.pebbleDB.NewBatch(),
 	}
 
 	// Copy the batch.
-	if err := newbatch.batch.Apply(b.batch, nil); err != nil {
+	if err := clone.batch.Apply(b.batch, nil); err != nil {
 		return err
 	}
 
 	// Commit the new batch.
-	return updateError(newbatch.batch.Commit(pebble.Sync))
+	return updateError(clone.batch.Commit(pebble.Sync))
 }
 
 func (b *batch) Reset() {
