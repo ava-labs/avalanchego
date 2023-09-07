@@ -407,16 +407,19 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// Retrieve API URIs for all nodes in the network. Assumes nodes have
-// been loaded.
-func (ln *LocalNetwork) GetURIs() []string {
-	uris := make([]string, 0, len(ln.Nodes))
+// Retrieve API URIs for all running primary validator nodes. URIs for
+// ephemeral nodes are not returned.
+func (ln *LocalNetwork) GetURIs() []testnet.NodeURI {
+	uris := make([]testnet.NodeURI, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
-			uris = append(uris, node.URI)
+			uris = append(uris, testnet.NodeURI{
+				NodeID: node.NodeID,
+				URI:    node.URI,
+			})
 		}
 	}
 	return uris
