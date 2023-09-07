@@ -618,7 +618,6 @@ impl DiskBufferRequester {
 mod tests {
     use sha3::Digest;
     use std::path::{Path, PathBuf};
-    use tempdir::TempDir;
 
     use super::*;
     use crate::{
@@ -632,21 +631,26 @@ mod tests {
 
     const STATE_SPACE: SpaceId = 0x0;
     const HASH_SIZE: usize = 32;
+
+    fn get_tmp_dir() -> PathBuf {
+        option_env!("CARGO_TARGET_TMPDIR")
+            .map(Into::into)
+            .unwrap_or(std::env::temp_dir())
+            .join("firewood")
+    }
+
     #[test]
     #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
     fn test_buffer_with_undo() {
-        let temp_dir = option_env!("CARGO_TARGET_DIR")
-            .map(PathBuf::from)
-            .unwrap_or(std::env::temp_dir());
-        let tmpdb = [temp_dir.to_str().unwrap(), "sender_api_test_db"];
+        let temp_dir = get_tmp_dir();
 
         let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
         // TODO: Run the test in a separate standalone directory for concurrency reasons
-        let path = temp_dir.join("firewood");
-        let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
+        let (root_db_path, reset) =
+            file::open_dir(temp_dir.as_path(), file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
@@ -711,14 +715,14 @@ mod tests {
         write_thread_handle.join().unwrap();
         // This is not ACID compliant, write should not return before Wal log
         // is written to disk.
-        assert!([
-            &tmpdb.into_iter().collect::<String>(),
-            "wal",
-            "00000000.log"
-        ]
-        .iter()
-        .collect::<PathBuf>()
-        .exists());
+
+        let log_file = temp_dir
+            .parent()
+            .unwrap()
+            .join("sender_api_test_db")
+            .join("wal")
+            .join("00000000.log");
+        assert!(log_file.exists());
 
         // verify
         assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
@@ -732,8 +736,8 @@ mod tests {
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
         // TODO: Run the test in a separate standalone directory for concurrency reasons
-        let tmp_dir = TempDir::new("firewood").unwrap();
-        let path = get_file_path(tmp_dir.path(), file!(), line!());
+        let tmp_dir = get_tmp_dir();
+        let path = get_file_path(tmp_dir.as_path(), file!(), line!());
         let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
@@ -816,8 +820,9 @@ mod tests {
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
-        let tmp_dir = TempDir::new("firewood").unwrap();
-        let path = get_file_path(tmp_dir.path(), file!(), line!());
+        let tmp_dir = get_tmp_dir();
+        let path = get_file_path(tmp_dir.as_path(), file!(), line!());
+        std::fs::create_dir_all(&path).unwrap();
         let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
