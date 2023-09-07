@@ -35,12 +35,19 @@ const defaultRuntimeDialTimeout = 5 * time.Second
 func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
 	ctx, shutdownCtxCancel := context.WithCancel(ctx)
 	server := newVMServer(vm, shutdownCtxCancel, opts...)
-	go func(ctx context.Context) {
-		err := startVMServer(ctx, server)
-		if err != nil {
-			fmt.Printf("runtime engine: failed to start VM server: %s\n", err)
-		}
-	}(ctx)
+
+	listener, err := grpcutils.NewListener()
+	if err != nil {
+		return fmt.Errorf("failed to create new listener: %w", err)
+	}
+
+	vmAddr := listener.Addr().String()
+	if err := initialize(ctx, vmAddr); err != nil {
+		_ = listener.Close()
+		return err
+	}
+
+	go grpcutils.Serve(listener, server)
 
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
@@ -80,23 +87,6 @@ func newVMServer(vm block.ChainVM, shutdownCtxCancel context.CancelFunc, opts ..
 	healthpb.RegisterHealthServer(server, health)
 
 	return server
-}
-
-// startVMServer starts the RPC Chain VM server and performs a handshake with the VM runtime service.
-func startVMServer(ctx context.Context, server *grpc.Server) error {
-	listener, err := grpcutils.NewListener()
-	if err != nil {
-		return fmt.Errorf("failed to create new listener: %w", err)
-	}
-
-	vmAddr := listener.Addr().String()
-	if err := initialize(ctx, vmAddr); err != nil {
-		_ = listener.Close()
-		return err
-	}
-
-	grpcutils.Serve(listener, server)
-	return nil
 }
 
 func stopVMServer(ctx context.Context, server *grpc.Server) error {
