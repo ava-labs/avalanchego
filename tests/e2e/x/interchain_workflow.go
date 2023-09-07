@@ -29,13 +29,15 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 	const transferAmount = 10 * units.Avax
 
 	ginkgo.It("should ensure that funds can be transferred from the X-Chain to the C-Chain and the P-Chain", func() {
+		nodeURI := e2e.Env.GetRandomNodeURI()
+
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
 		factory := secp256k1.Factory{}
 		recipientKey, err := factory.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
-		baseWallet := e2e.Env.NewWallet(keychain)
+		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -101,17 +103,20 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			require.NoError(err)
 		})
 
+		ginkgo.By("initializing a new eth client")
+		ethClient := e2e.Env.NewEthClient(nodeURI)
+
 		ginkgo.By("importing AVAX from the X-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(
 				xWallet.BlockchainID(),
 				recipientEthAddress,
 				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
 			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		ethClient := e2e.Env.NewEthClient()
 		e2e.Eventually(func() bool {
 			balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
 			require.NoError(err)
