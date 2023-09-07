@@ -51,7 +51,7 @@ func (c *dbBatchWithHeight) Delete(key []byte) error {
 	return c.batch.Put(newKey(key, c.height).Bytes(), []byte{1})
 }
 
-// Queues an insert for a key with a given
+// Queues an insert for a key-value pair
 func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
 	value = append(value, 0) // not deleted element
 	return c.batch.Put(newKey(key, c.height).Bytes(), value)
