@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -24,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -660,7 +659,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		type keyAndID struct {
-			key paths.SerializedPath
+			key path.SerializedPath
 			id  ids.ID
 		}
 
@@ -725,7 +724,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// Find smallest difference between the set of key/ID pairs proven by
 		// the remote/local proofs for key/ID pairs after the last received key.
 		var (
-			smallestDiffKey paths.SerializedPath
+			smallestDiffKey path.SerializedPath
 			foundDiff       bool
 		)
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {

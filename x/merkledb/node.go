@@ -10,18 +10,16 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
-const (
-	HashLength = 32
-)
+const HashLength = 32
 
 // the values that go into the node's id
 type hashValues struct {
 	Children map[byte]child
 	Value    maybe.Maybe[[]byte]
-	Key      paths.SerializedPath
+	Key      path.SerializedPath
 }
 
 // Representation of a node stored in the database.
@@ -31,7 +29,7 @@ type dbNode struct {
 }
 
 type child struct {
-	compressedPath paths.TokenPath
+	compressedPath path.TokenPath
 	id             ids.ID
 	hasValue       bool
 }
@@ -40,14 +38,14 @@ type child struct {
 type node struct {
 	dbNode
 	id          ids.ID
-	key         paths.TokenPath
+	key         path.TokenPath
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key paths.TokenPath) *node {
+func newNode(parent *node, key path.TokenPath) *node {
 	newNode := &node{
 		dbNode: dbNode{
 			children: make(map[byte]child, key.BranchFactor()),
@@ -61,7 +59,7 @@ func newNode(parent *node, key paths.TokenPath) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key paths.TokenPath, nodeBytes []byte) (*node, error) {
+func parseNode(key path.TokenPath, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
@@ -140,7 +138,7 @@ func (n *node) addChild(child *node) {
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath paths.TokenPath, childID ids.ID, hasValue bool) {
+func (n *node) addChildWithoutNode(index byte, compressedPath path.TokenPath, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,

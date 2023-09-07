@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -23,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 const defaultHistoryLength = 300
@@ -56,7 +55,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 
 	val, err := db.Get([]byte{0})
 	require.NoError(err)
-	n, err := db.getNode(paths.NewTokenPath16([]byte{0}), true)
+	n, err := db.getNode(path.NewTokenPath16([]byte{0}), true)
 	require.NoError(err)
 	val[0] = 1
 
@@ -763,10 +762,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	values := make(map[paths.TokenPath][]byte) // tracks content of the trie
+	values := make(map[path.TokenPath][]byte) // tracks content of the trie
 	currentBatch := db.NewBatch()
-	currentValues := make(map[paths.TokenPath][]byte)
-	deleteValues := make(map[paths.TokenPath]struct{})
+	currentValues := make(map[path.TokenPath][]byte)
+	deleteValues := make(map[path.TokenPath]struct{})
 	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
@@ -774,12 +773,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		switch step.op {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
-			currentValues[paths.NewTokenPath16(step.key)] = step.value
-			delete(deleteValues, paths.NewTokenPath16(step.key))
+			currentValues[path.NewTokenPath16(step.key)] = step.value
+			delete(deleteValues, path.NewTokenPath16(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
-			deleteValues[paths.NewTokenPath16(step.key)] = struct{}{}
-			delete(currentValues, paths.NewTokenPath16(step.key))
+			deleteValues[path.NewTokenPath16(step.key)] = struct{}{}
+			delete(currentValues, path.NewTokenPath16(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -858,15 +857,15 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 					pastRoots = pastRoots[len(pastRoots)-300:]
 				}
 			}
-			currentValues = map[paths.TokenPath][]byte{}
-			deleteValues = map[paths.TokenPath]struct{}{}
+			currentValues = map[path.TokenPath][]byte{}
+			deleteValues = map[path.TokenPath]struct{}{}
 			currentBatch = db.NewBatch()
 		case opGet:
 			v, err := db.Get(step.key)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
-			want := values[paths.NewTokenPath16(step.key)]
+			want := values[path.NewTokenPath16(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {

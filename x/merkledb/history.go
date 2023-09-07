@@ -8,13 +8,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 var ErrInsufficientHistory = errors.New("insufficient history to generate proof")
@@ -54,14 +53,14 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	rootID ids.ID
-	nodes  map[paths.TokenPath]*change[*node]
-	values map[paths.TokenPath]*change[maybe.Maybe[[]byte]]
+	nodes  map[path.TokenPath]*change[*node]
+	values map[path.TokenPath]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[paths.TokenPath]*change[*node], estimatedSize),
-		values: make(map[paths.TokenPath]*change[maybe.Maybe[[]byte]], estimatedSize),
+		nodes:  make(map[path.TokenPath]*change[*node], estimatedSize),
+		values: make(map[path.TokenPath]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 
@@ -155,10 +154,10 @@ func (th *trieHistory) getValueChanges(
 	var (
 		// Keep track of changed keys so the largest can be removed
 		// in order to stay within the [maxLength] limit if necessary.
-		changedKeys = set.Set[paths.TokenPath]{}
+		changedKeys = set.Set[path.TokenPath]{}
 
-		startPath = maybe.Bind(start, paths.NewTokenPath16)
-		endPath   = maybe.Bind(end, paths.NewTokenPath16)
+		startPath = maybe.Bind(start, path.NewTokenPath16)
+		endPath   = maybe.Bind(end, path.NewTokenPath16)
 
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -236,8 +235,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	}
 
 	var (
-		startPath                    = maybe.Bind(start, paths.NewTokenPath16)
-		endPath                      = maybe.Bind(end, paths.NewTokenPath16)
+		startPath                    = maybe.Bind(start, path.NewTokenPath16)
+		endPath                      = maybe.Bind(end, path.NewTokenPath16)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1

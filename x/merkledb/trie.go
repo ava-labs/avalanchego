@@ -6,7 +6,7 @@ package merkledb
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,11 +38,11 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key paths.TokenPath) ([]byte, error)
+	getValue(key path.TokenPath) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
-	getEditableNode(key paths.TokenPath, hasValue bool) (*node, error)
+	getEditableNode(key path.TokenPath, hasValue bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].

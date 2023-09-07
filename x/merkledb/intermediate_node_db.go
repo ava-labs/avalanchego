@@ -6,9 +6,8 @@ package merkledb
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 const defaultBufferLength = 256
@@ -29,7 +28,7 @@ type intermediateNodeDB struct {
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
-	nodeCache onEvictCache[paths.TokenPath, *node]
+	nodeCache onEvictCache[path.TokenPath, *node]
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
@@ -57,7 +56,7 @@ func newIntermediateNodeDB(
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
-func (db *intermediateNodeDB) onEviction(key paths.TokenPath, n *node) error {
+func (db *intermediateNodeDB) onEviction(key path.TokenPath, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
 	totalSize := cacheEntrySize(key, n)
@@ -90,7 +89,7 @@ func (db *intermediateNodeDB) onEviction(key paths.TokenPath, n *node) error {
 	return nil
 }
 
-func (db *intermediateNodeDB) addToBatch(b database.Batch, key paths.TokenPath, n *node) error {
+func (db *intermediateNodeDB) addToBatch(b database.Batch, key path.TokenPath, n *node) error {
 	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
 	db.metrics.DatabaseNodeWrite()
@@ -100,7 +99,7 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key paths.TokenPath, 
 	return b.Put(prefixedKey, n.bytes())
 }
 
-func (db *intermediateNodeDB) Get(key paths.TokenPath) (*node, error) {
+func (db *intermediateNodeDB) Get(key path.TokenPath) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
@@ -121,7 +120,7 @@ func (db *intermediateNodeDB) Get(key paths.TokenPath) (*node, error) {
 	return parseNode(key, nodeBytes)
 }
 
-func (db *intermediateNodeDB) Put(key paths.TokenPath, n *node) error {
+func (db *intermediateNodeDB) Put(key path.TokenPath, n *node) error {
 	return db.nodeCache.Put(key, n)
 }
 
@@ -129,6 +128,6 @@ func (db *intermediateNodeDB) Flush() error {
 	return db.nodeCache.Flush()
 }
 
-func (db *intermediateNodeDB) Delete(key paths.TokenPath) error {
+func (db *intermediateNodeDB) Delete(key path.TokenPath) error {
 	return db.nodeCache.Put(key, nil)
 }

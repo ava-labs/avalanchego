@@ -11,10 +11,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 const (
@@ -74,7 +73,7 @@ type decoder interface {
 	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
-func newCodec(branchFactor paths.BranchFactor) encoderDecoder {
+func newCodec(branchFactor path.BranchFactor) encoderDecoder {
 	return &codecImpl{
 		branchFactor: branchFactor,
 		varIntPool: sync.Pool{
@@ -88,7 +87,7 @@ func newCodec(branchFactor paths.BranchFactor) encoderDecoder {
 // Note that bytes.Buffer.Write always returns nil so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
-	branchFactor paths.BranchFactor
+	branchFactor path.BranchFactor
 	varIntPool   sync.Pool
 }
 
@@ -342,25 +341,25 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s paths.SerializedPath) {
+func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s path.SerializedPath) {
 	c.encodeInt(dst, s.NibbleLength)
 	_, _ = dst.Write(s.Value)
 }
 
-func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (paths.SerializedPath, error) {
+func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (path.SerializedPath, error) {
 	if minSerializedPathLen > src.Len() {
-		return paths.SerializedPath{}, io.ErrUnexpectedEOF
+		return path.SerializedPath{}, io.ErrUnexpectedEOF
 	}
 
 	var (
-		result paths.SerializedPath
+		result path.SerializedPath
 		err    error
 	)
 	if result.NibbleLength, err = c.decodeInt(src); err != nil {
-		return paths.SerializedPath{}, err
+		return path.SerializedPath{}, err
 	}
 	if result.NibbleLength < 0 {
-		return paths.SerializedPath{}, errNegativeNibbleLength
+		return path.SerializedPath{}, errNegativeNibbleLength
 	}
 	pathBytesLen := result.NibbleLength >> 1
 	hasOddLen := result.NibbleLength%2 == 1
@@ -368,19 +367,19 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (paths.SerializedPat
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
-		return paths.SerializedPath{}, io.ErrUnexpectedEOF
+		return path.SerializedPath{}, io.ErrUnexpectedEOF
 	}
 	result.Value = make([]byte, pathBytesLen)
 	if _, err := io.ReadFull(src, result.Value); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return paths.SerializedPath{}, err
+		return path.SerializedPath{}, err
 	}
 	if hasOddLen {
 		paddedNibble := result.Value[pathBytesLen-1] & 0x0F
 		if paddedNibble != 0 {
-			return paths.SerializedPath{}, errNonZeroNibblePadding
+			return path.SerializedPath{}, errNonZeroNibblePadding
 		}
 	}
 	return result, nil

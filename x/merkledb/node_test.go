@@ -7,18 +7,17 @@ import (
 	"io"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 func Test_Node_Marshal(t *testing.T) {
-	root := newNode(nil, paths.EmptyPath(paths.BranchFactor16))
+	root := newNode(nil, path.EmptyPath(path.BranchFactor16))
 	require.NotNil(t, root)
 
-	fullpath := paths.NewTokenPath16([]byte("key"))
+	fullpath := path.NewTokenPath16([]byte("key"))
 	childNode := newNode(root, fullpath)
 	childNode.setValue(maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
@@ -27,7 +26,7 @@ func Test_Node_Marshal(t *testing.T) {
 	root.addChild(childNode)
 
 	data := root.bytes()
-	rootParsed, err := parseNode(paths.NewTokenPath16([]byte("")), data)
+	rootParsed, err := parseNode(path.NewTokenPath16([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
@@ -39,10 +38,10 @@ func Test_Node_Marshal(t *testing.T) {
 }
 
 func Test_Node_Marshal_Errors(t *testing.T) {
-	root := newNode(nil, paths.EmptyPath(paths.BranchFactor16))
+	root := newNode(nil, path.EmptyPath(path.BranchFactor16))
 	require.NotNil(t, root)
 
-	fullpath := paths.NewTokenPath16([]byte{255})
+	fullpath := path.NewTokenPath16([]byte{255})
 	childNode1 := newNode(root, fullpath)
 	childNode1.setValue(maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
@@ -50,7 +49,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	childNode1.calculateID(&mockMetrics{})
 	root.addChild(childNode1)
 
-	fullpath = paths.NewTokenPath16([]byte{237})
+	fullpath = path.NewTokenPath16([]byte{237})
 	childNode2 := newNode(root, fullpath)
 	childNode2.setValue(maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
@@ -62,7 +61,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err := parseNode(paths.NewTokenPath16([]byte("")), broken)
+		_, err := parseNode(path.NewTokenPath16([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

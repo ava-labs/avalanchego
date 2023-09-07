@@ -9,12 +9,11 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/merkledb/path"
 )
 
 func FuzzCodecBool(f *testing.F) {
@@ -98,7 +97,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
 
-			clonedGot := got.Deserialize(paths.BranchFactor16).Serialize()
+			clonedGot := got.Deserialize(path.BranchFactor16).Serialize()
 			require.Equal(got, clonedGot)
 		},
 	)
@@ -149,7 +148,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				value = maybe.Some(valueBytes)
 			}
 
-			numChildren := r.Intn(int(paths.BranchFactor16)) // #nosec G404
+			numChildren := r.Intn(int(path.BranchFactor16)) // #nosec G404
 
 			children := map[byte]child{}
 			for i := 0; i < numChildren; i++ {
@@ -160,7 +159,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: paths.NewTokenPath16(childPathBytes),
+					compressedPath: path.NewTokenPath16(childPathBytes),
 					id:             childID,
 				}
 			}
@@ -211,8 +210,8 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	nodeBytes = proofBytesBuf.Bytes()
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf = bytes.NewBuffer(nodeBytes)
-	// Put num children paths.BranchFactor16+1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, int(paths.BranchFactor16)+1)
+	// Put num children path.BranchFactor16+1 at end
+	codec.(*codecImpl).encodeInt(proofBytesBuf, int(path.BranchFactor16)+1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
@@ -220,8 +219,8 @@ func TestCodecDecodeDBNode(t *testing.T) {
 
 // Ensure that encodeHashValues is deterministic
 func FuzzEncodeHashValues(f *testing.F) {
-	codec1 := newCodec(paths.BranchFactor16)
-	codec2 := newCodec(paths.BranchFactor16)
+	codec1 := newCodec(path.BranchFactor16)
+	codec2 := newCodec(path.BranchFactor16)
 
 	f.Fuzz(
 		func(
@@ -234,14 +233,14 @@ func FuzzEncodeHashValues(f *testing.F) {
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 			children := map[byte]child{}
-			numChildren := r.Intn(int(paths.BranchFactor16)) // #nosec G404
+			numChildren := r.Intn(int(path.BranchFactor16)) // #nosec G404
 			for i := 0; i < numChildren; i++ {
 				compressedPathLen := r.Intn(32) // #nosec G404
 				compressedPathBytes := make([]byte, compressedPathLen)
 				_, _ = r.Read(compressedPathBytes) // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: paths.NewTokenPath16(compressedPathBytes),
+					compressedPath: path.NewTokenPath16(compressedPathBytes),
 					id:             ids.GenerateTestID(),
 					hasValue:       r.Intn(2) == 1, // #nosec G404
 				}
@@ -261,7 +260,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      paths.NewTokenPath16(key).Serialize(),
+				Key:      path.NewTokenPath16(key).Serialize(),
 			}
 
 			// Serialize the *hashValues with both codecs
