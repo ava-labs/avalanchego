@@ -163,8 +163,8 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	initialSize := 10_000
 
 	config := newDefaultConfig()
-	config.ValueNodeCacheSize = initialSize
-	config.IntermediateNodeCacheSize = initialSize
+	config.ValueNodeCacheSize = uint(initialSize)
+	config.IntermediateNodeCacheSize = uint(initialSize)
 
 	db, err := newDB(
 		context.Background(),
