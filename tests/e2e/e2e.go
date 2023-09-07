@@ -226,7 +226,6 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	// Retrieve the contract address
 	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
 	return receipt
 }
