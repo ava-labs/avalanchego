@@ -14,12 +14,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -50,16 +54,20 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
-	require.NoError(db.Put([]byte{0}, []byte{0, 1, 2}))
 
-	val, err := db.Get([]byte{0})
+	keyBytes := []byte{0}
+	require.NoError(db.Put(keyBytes, []byte{0, 1, 2}))
+
+	val, err := db.Get(keyBytes)
 	require.NoError(err)
-	n, err := db.getNode(newPath([]byte{0}), true)
+
+	n, err := db.getNode(newPath(keyBytes), true)
 	require.NoError(err)
-	val[0] = 1
 
 	// node's value shouldn't be affected by the edit
-	require.NotEqual(val, n.value.Value())
+	originalVal := slices.Clone(val)
+	val[0]++
+	require.Equal(originalVal, n.value.Value())
 }
 
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
@@ -67,19 +75,22 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
-	require.NoError(db.Put([]byte{0}, []byte{0, 1, 2}))
 
-	vals, errs := db.GetValues(context.Background(), [][]byte{{0}})
+	keyBytes := []byte{0}
+	value := []byte{0, 1, 2}
+	require.NoError(db.Put(keyBytes, value))
+
+	gotValues, errs := db.GetValues(context.Background(), [][]byte{keyBytes})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
-	require.Equal([]byte{0, 1, 2}, vals[0])
-	vals[0][0] = 1
+	require.Equal(value, gotValues[0])
+	gotValues[0][0]++
 
 	// editing the value array shouldn't affect the db
-	vals, errs = db.GetValues(context.Background(), [][]byte{{0}})
+	gotValues, errs = db.GetValues(context.Background(), [][]byte{keyBytes})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
-	require.Equal([]byte{0, 1, 2}, vals[0])
+	require.Equal(value, gotValues[0])
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
@@ -103,23 +114,26 @@ func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 
 func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	require := require.New(t)
-	rdb := memdb.New()
-	defer rdb.Close()
+	baseDB := memdb.New()
+	defer baseDB.Close()
 
 	db, err := New(
 		context.Background(),
-		rdb,
+		baseDB,
 		newDefaultConfig(),
 	)
 	require.NoError(err)
 
-	// Populate initial set of keys
+	// Populate initial set of key-value pairs
 	keyCount := 100
 	ops := make([]database.BatchOp, 0, keyCount)
 	require.NoError(err)
 	for i := 0; i < keyCount; i++ {
 		k := []byte(strconv.Itoa(i))
-		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
+		ops = append(ops, database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		})
 	}
 	view, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
@@ -130,13 +144,14 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 
 	require.NoError(db.Close())
 
-	// reloading the db, should set the root back to the one that was saved to the memdb
+	// reloading the db, should set the root back to the one that was saved to [baseDB]
 	db, err = New(
 		context.Background(),
-		rdb,
+		baseDB,
 		newDefaultConfig(),
 	)
 	require.NoError(err)
+
 	reloadedRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, reloadedRoot)
@@ -163,24 +178,35 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require.NoError(err)
 	for i := 0; i < initialSize; i++ {
 		k := []byte(strconv.Itoa(i))
-		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
+		ops = append(ops, database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		})
 	}
 	view, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
+	// Get root
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
+
+	// Rebuild
 	require.NoError(db.rebuild(context.Background(), initialSize))
+
+	// Assert root is the same after rebuild
 	rebuiltRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, rebuiltRoot)
 
 	// add variation where root has a value
 	require.NoError(db.Put(nil, []byte{}))
+
 	root, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
+
 	require.NoError(db.rebuild(context.Background(), initialSize))
+
 	rebuiltRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, rebuiltRoot)
@@ -219,24 +245,25 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	require.NoError(err)
 
 	batch := db.NewBatch()
-	require.NoError(batch.Put([]byte("key1"), []byte("1")))
+	key1, key2 := []byte("key1"), []byte("key2")
+	require.NoError(batch.Put(key1, []byte("1")))
 	require.NoError(batch.Put([]byte("key2"), []byte("2")))
 	require.NoError(batch.Write())
 
 	batch = db.NewBatch()
 	// force key2 to be inserted into the cache as not found
-	require.NoError(batch.Delete([]byte("key2")))
+	require.NoError(batch.Delete(key2))
 	require.NoError(batch.Write())
 
 	require.NoError(memDB.Close())
 
 	// still works because key1 is read from cache
-	value, err := db.Get([]byte("key1"))
+	value, err := db.Get(key1)
 	require.NoError(err)
 	require.Equal([]byte("1"), value)
 
 	// still returns missing instead of closed because key2 is read from cache
-	_, err = db.Get([]byte("key2"))
+	_, err = db.Get(key2)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -257,6 +284,7 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	)
 	require.NoError(err)
 
+	// Create siblings of viewToCommit
 	sibling1, err := dbTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	sibling2, err := dbTrie.NewView(context.Background(), ViewChanges{})
@@ -265,6 +293,7 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(sibling1.(*trieView).isInvalid())
 	require.False(sibling2.(*trieView).isInvalid())
 
+	// Committing viewToCommit should invalidate siblings
 	require.NoError(viewToCommit.CommitToDB(context.Background()))
 
 	require.True(sibling1.(*trieView).isInvalid())
@@ -275,67 +304,89 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	require := require.New(t)
 
-	db, err := getBasicDB()
+	// Populate [db1] with 3 key-value pairs.
+	db1, err := getBasicDB()
 	require.NoError(err)
-	batch := db.NewBatch()
+	batch := db1.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("1")))
 	require.NoError(batch.Put([]byte("key2"), []byte("2")))
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), 10)
+	// Get a proof for the range [key1, key3].
+	proof, err := db1.GetRangeProof(
+		context.Background(),
+		maybe.Some([]byte("key1")),
+		maybe.Some([]byte("key3")),
+		10,
+	)
 	require.NoError(err)
 
-	freshDB, err := getBasicDB()
+	// Commit the proof to a fresh database.
+	db2, err := getBasicDB()
 	require.NoError(err)
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
+	require.NoError(db2.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
 
-	value, err := freshDB.Get([]byte("key2"))
+	// [db2] should have the same key-value pairs as [db1].
+	db2Root, err := db2.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.Equal([]byte("2"), value)
 
-	freshRoot, err := freshDB.GetMerkleRoot(context.Background())
+	db1Root, err := db1.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	oldRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(oldRoot, freshRoot)
+
+	require.Equal(db1Root, db2Root)
 }
 
 func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require := require.New(t)
 
-	db, err := getBasicDB()
+	// Populate [db1] with 3 key-value pairs.
+	db1, err := getBasicDB()
 	require.NoError(err)
-	batch := db.NewBatch()
+	batch := db1.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("1")))
 	require.NoError(batch.Put([]byte("key2"), []byte("2")))
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), 10)
+	// Get a proof for the range [key1, key3].
+	proof, err := db1.GetRangeProof(
+		context.Background(),
+		maybe.Some([]byte("key1")),
+		maybe.Some([]byte("key3")),
+		10,
+	)
 	require.NoError(err)
 
-	freshDB, err := getBasicDB()
+	// Populate [db2] with key-value pairs where some of the keys
+	// have different values than in [db1].
+	db2, err := getBasicDB()
 	require.NoError(err)
-	batch = freshDB.NewBatch()
+	batch = db2.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("3")))
 	require.NoError(batch.Put([]byte("key2"), []byte("4")))
 	require.NoError(batch.Put([]byte("key3"), []byte("5")))
 	require.NoError(batch.Put([]byte("key25"), []byte("5")))
 	require.NoError(batch.Write())
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
+	// Commit the proof from [db1] to [db2]
+	require.NoError(db2.CommitRangeProof(
+		context.Background(),
+		maybe.Some([]byte("key1")),
+		proof,
+	))
 
-	value, err := freshDB.Get([]byte("key2"))
+	// [db2] should have the same key-value pairs as [db1].
+	// Note that "key25" was in the range covered by the proof,
+	// so it's deleted from [db2].
+	db2Root, err := db2.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.Equal([]byte("2"), value)
 
-	freshRoot, err := freshDB.GetMerkleRoot(context.Background())
+	db1Root, err := db1.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	oldRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(oldRoot, freshRoot)
+
+	require.Equal(db1Root, db2Root)
 }
 
 func Test_MerkleDB_GetValues(t *testing.T) {
@@ -368,35 +419,19 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
+
 	batch := db.NewBatch()
-	require.NoError(batch.Put([]byte("key0"), nil))
+	key := []byte("key0")
+	require.NoError(batch.Put(key, nil))
 	require.NoError(batch.Write())
 
-	value, err := db.Get([]byte("key0"))
+	value, err := db.Get(key)
 	require.NoError(err)
-	require.Nil(value)
+	require.Empty(value)
 
-	value, err = getNodeValue(db, "key0")
+	value, err = getNodeValue(db, string(key))
 	require.NoError(err)
-	require.Nil(value)
-}
-
-func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	// value hasn't been inserted so shouldn't exist
-	value, err := db.Get([]byte("key"))
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(value)
-
-	require.NoError(db.Put([]byte("key"), []byte("value")))
-
-	value, err = db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value"), value)
+	require.Empty(value)
 }
 
 func Test_MerkleDB_HealthCheck(t *testing.T) {
@@ -404,59 +439,13 @@ func Test_MerkleDB_HealthCheck(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
+
 	val, err := db.HealthCheck(context.Background())
 	require.NoError(err)
 	require.Nil(val)
 }
 
-func Test_MerkleDB_Overwrite(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Put([]byte("key"), []byte("value0")))
-
-	value, err := db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value0"), value)
-
-	require.NoError(db.Put([]byte("key"), []byte("value1")))
-
-	value, err = db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value1"), value)
-}
-
-func Test_MerkleDB_Delete(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Put([]byte("key"), []byte("value0")))
-
-	value, err := db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value0"), value)
-
-	require.NoError(db.Delete([]byte("key")))
-
-	value, err = db.Get([]byte("key"))
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(value)
-}
-
-func Test_MerkleDB_DeleteMissingKey(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Delete([]byte("key")))
-}
-
-// Test that untracked views aren't persisted to [db.childViews].
+// Test that untracked views aren't tracked in [db.childViews].
 func TestDatabaseNewUntrackedView(t *testing.T) {
 	require := require.New(t)
 
@@ -505,7 +494,7 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 	// Commit the view
 	require.NoError(view.CommitToDB(context.Background()))
 
-	// The untracked view should be tracked by the parent database.
+	// The view should be tracked by the parent database.
 	require.Contains(db.childViews, view)
 	require.Len(db.childViews, 1)
 }
@@ -529,16 +518,18 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
-	require.NoError(db.Put([]byte{1}, []byte{1}))
-	require.NoError(db.Put([]byte{2}, []byte{2}))
+	key1, key2, key3 := []byte{1}, []byte{2}, []byte{3}
+	value1, value2, value3 := []byte{1}, []byte{2}, []byte{3}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	// Make a view and insert/delete a key-value pair.
 	view1Intf, err := db.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
-				{Key: []byte{3}, Value: []byte{3}},
-				{Key: []byte{1}, Delete: true},
+				{Key: key3, Value: value3}, // New k-v pair
+				{Key: key1, Delete: true},  // Delete k-v pair
 			},
 		},
 	)
@@ -570,14 +561,14 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(view1.commitToDB(context.Background()))
 
 	// Make sure the key-value pairs are correct.
-	_, err = db.Get([]byte{1})
+	_, err = db.Get(key1)
 	require.ErrorIs(err, database.ErrNotFound)
-	value, err := db.Get([]byte{2})
+	gotValue, err := db.Get(key2)
 	require.NoError(err)
-	require.Equal([]byte{2}, value)
-	value, err = db.Get([]byte{3})
+	require.Equal(value2, gotValue)
+	gotValue, err = db.Get(key3)
 	require.NoError(err)
-	require.Equal([]byte{3}, value)
+	require.Equal(value3, gotValue)
 
 	// Make sure the root is right
 	require.Equal(view1Root, db.getMerkleRoot())
@@ -645,70 +636,92 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	require := require.New(t)
 
-	totalState := 1000
 	var (
-		allKeys [][]byte
-		keyMap  map[string]struct{}
+		numRuns             = 3
+		numShuffles         = 3
+		numKeyValues        = 1_000
+		prefixProbability   = .1
+		nilValueProbability = 0.05
+		keys                [][]byte
+		keysSet             set.Set[string]
 	)
+
+	// Returns a random key.
+	// With probability approximately [prefixProbability], the returned key
+	// will be a prefix of a previously returned key.
 	genKey := func(r *rand.Rand) []byte {
-		count := 0
 		for {
 			var key []byte
-			if len(allKeys) > 2 && r.Intn(100) < 10 {
-				// new prefixed key
-				prefix := allKeys[r.Intn(len(allKeys))]
+			shouldPrefix := r.Float64() < prefixProbability
+			if len(keys) > 2 && shouldPrefix {
+				// Return a key that is a prefix of a previously returned key.
+				prefix := keys[r.Intn(len(keys))]
 				key = make([]byte, r.Intn(50)+len(prefix))
 				copy(key, prefix)
-				_, err := r.Read(key[len(prefix):])
-				require.NoError(err)
+				_, _ = r.Read(key[len(prefix):])
 			} else {
 				key = make([]byte, r.Intn(50))
-				_, err := r.Read(key)
-				require.NoError(err)
+				_, _ = r.Read(key)
 			}
-			if _, ok := keyMap[string(key)]; !ok {
-				allKeys = append(allKeys, key)
-				keyMap[string(key)] = struct{}{}
+
+			// If the key has already been returned, try again.
+			// This test would flake if we allowed duplicate keys
+			// because then the order of insertion matters.
+			if !keysSet.Contains(string(key)) {
+				keysSet.Add(string(key))
+				keys = append(keys, key)
 				return key
 			}
-			count++
 		}
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < numRuns; i++ {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
 
-		ops := make([]database.BatchOp, 0, totalState)
-		allKeys = [][]byte{}
-		keyMap = map[string]struct{}{}
-		for x := 0; x < totalState; x++ {
+		// Insert key-value pairs into a database.
+		ops := make([]database.BatchOp, 0, numKeyValues)
+		keys = [][]byte{}
+		for x := 0; x < numKeyValues; x++ {
 			key := genKey(r)
 			value := make([]byte, r.Intn(51))
-			if len(value) == 51 {
+			if r.Float64() < nilValueProbability {
 				value = nil
 			} else {
-				_, err := r.Read(value)
-				require.NoError(err)
+				_, _ = r.Read(value)
 			}
-			ops = append(ops, database.BatchOp{Key: key, Value: value})
+			ops = append(ops, database.BatchOp{
+				Key:   key,
+				Value: value,
+			})
 		}
+
 		db, err := getBasicDB()
 		require.NoError(err)
-		result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
+
+		view1, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 		require.NoError(err)
-		primaryRoot, err := result.GetMerkleRoot(context.Background())
+
+		// Get the root of the trie after applying [ops].
+		view1Root, err := view1.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		for shuffleIndex := 0; shuffleIndex < 3; shuffleIndex++ {
-			r.Shuffle(totalState, func(i, j int) {
+
+		// Assert that the same operations applied in a different order
+		// result in the same root. Note this is only true because
+		// all keys inserted are unique.
+		for shuffleIndex := 0; shuffleIndex < numShuffles; shuffleIndex++ {
+			r.Shuffle(numKeyValues, func(i, j int) {
 				ops[i], ops[j] = ops[j], ops[i]
 			})
-			result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
+
+			view2, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
-			newRoot, err := result.GetMerkleRoot(context.Background())
+
+			view2Root, err := view2.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			require.Equal(primaryRoot, newRoot)
+
+			require.Equal(view1Root, view2Root)
 		}
 	}
 }
@@ -716,21 +729,33 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 func Test_MerkleDB_RandomCases(t *testing.T) {
 	require := require.New(t)
 
-	for i := 150; i < 500; i += 10 {
+	const (
+		minSize              = 150
+		maxSize              = 500
+		checkHashProbability = 0.01
+	)
+
+	for size := minSize; size < maxSize; size += 10 {
 		now := time.Now().UnixNano()
-		t.Logf("seed for iter %d: %d", i, now)
+		t.Logf("seed for iter %d: %d", size, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generate(require, r, i, .01))
+		runRandDBTest(require, r, generateRandTest(require, r, size, checkHashProbability))
 	}
 }
 
 func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
+	const (
+		initialValues        = 1_000
+		updates              = 2_500
+		checkHashProbability = 0
+	)
+
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, 1000, 2500, 0.0))
+	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, checkHashProbability))
 }
 
 // randTest performs random trie operations.
@@ -758,32 +783,43 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
+	const (
+		maxProofLen  = 100
+		maxPastRoots = defaultHistoryLength
+	)
+
+	var (
+		values               = make(map[path][]byte) // tracks content of the trie
+		currentBatch         = db.NewBatch()
+		uncommittedKeyValues = make(map[path][]byte)
+		uncommittedDeletes   = set.Set[path]{}
+		pastRoots            = []ids.ID{}
+	)
+
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-
-	values := make(map[path][]byte) // tracks content of the trie
-	currentBatch := db.NewBatch()
-	currentValues := make(map[path][]byte)
-	deleteValues := make(map[path]struct{})
-	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
 		require.LessOrEqual(i, len(rt))
 		switch step.op {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
-			currentValues[newPath(step.key)] = step.value
-			delete(deleteValues, newPath(step.key))
+
+			uncommittedKeyValues[newPath(step.key)] = step.value
+			uncommittedDeletes.Remove(newPath(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
-			deleteValues[newPath(step.key)] = struct{}{}
-			delete(currentValues, newPath(step.key))
+
+			uncommittedDeletes.Add(newPath(step.key))
+			delete(uncommittedKeyValues, newPath(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
+
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -793,36 +829,42 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				end = maybe.Some(step.value)
 			}
 
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, 100)
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
 			require.NoError(err)
+			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
+
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				start,
 				end,
 				root,
 			))
-			require.LessOrEqual(len(rangeProof.KeyValues), 100)
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if len(pastRoots) > 1 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			end := maybe.Nothing[[]byte]()
-			if len(step.value) > 0 {
-				end = maybe.Some(step.value)
-			}
+
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
 			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, 100)
+			end := maybe.Nothing[[]byte]()
+			if len(step.value) > 0 {
+				end = maybe.Some(step.value)
+			}
+
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
 			}
 			require.NoError(err)
+			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
+
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
 
@@ -833,69 +875,95 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				end,
 				root,
 			))
-			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			require.NoError(currentBatch.Write())
-			for key, value := range currentValues {
-				values[key] = value
-			}
-			for key := range deleteValues {
-				delete(values, key)
-			}
 
-			if len(currentValues) == 0 && len(deleteValues) == 0 {
+			require.NoError(currentBatch.Write())
+			currentBatch.Reset()
+
+			if len(uncommittedKeyValues) == 0 && len(uncommittedDeletes) == 0 {
 				continue
 			}
+
+			for key, value := range uncommittedKeyValues {
+				values[key] = value
+			}
+			maps.Clear(uncommittedKeyValues)
+
+			for key := range uncommittedDeletes {
+				delete(values, key)
+			}
+			uncommittedDeletes.Clear()
+
 			newRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if oldRoot != newRoot {
 				pastRoots = append(pastRoots, newRoot)
-				if len(pastRoots) > 300 {
-					pastRoots = pastRoots[len(pastRoots)-300:]
+				if len(pastRoots) > maxPastRoots {
+					pastRoots = pastRoots[len(pastRoots)-maxPastRoots:]
 				}
 			}
-			currentValues = map[path][]byte{}
-			deleteValues = map[path]struct{}{}
-			currentBatch = db.NewBatch()
+
 		case opGet:
 			v, err := db.Get(step.key)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
+
 			want := values[newPath(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
+
 			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
+
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
-			dbTrie, err := newDatabase(
+			// Create a view with the same key-values as [db]
+			newDB, err := newDatabase(
 				context.Background(),
 				memdb.New(),
 				newDefaultConfig(),
 				&mockMetrics{},
 			)
 			require.NoError(err)
+
 			ops := make([]database.BatchOp, 0, len(values))
 			for key, value := range values {
-				ops = append(ops, database.BatchOp{Key: key.Serialize().Value, Value: value})
+				ops = append(ops, database.BatchOp{
+					Key:   key.Serialize().Value,
+					Value: value,
+				})
 			}
-			newView, err := dbTrie.NewView(context.Background(), ViewChanges{BatchOps: ops})
+
+			newView, err := newDB.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
-			calculatedRoot, err := newView.GetMerkleRoot(context.Background())
+			// Check that the root of the view is the same as the root of [db]
+			newRoot, err := newView.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			dbRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			require.Equal(dbRoot, calculatedRoot)
+			require.Equal(dbRoot, newRoot)
+		default:
+			require.FailNow("unknown op")
 		}
 	}
 }
 
-func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+func generateRandTestWithKeys(
+	require *require.Assertions,
+	r *rand.Rand,
+	allKeys [][]byte,
+	size int,
+	checkHashProbability float64,
+) randTest {
+	const nilEndProbability = 0.1
+
 	genKey := func() []byte {
 		if len(allKeys) < 2 || r.Intn(100) < 10 {
 			// new key
@@ -920,8 +988,10 @@ func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Ran
 	}
 
 	genEnd := func(key []byte) []byte {
-		shouldBeNil := r.Intn(10)
-		if shouldBeNil == 0 {
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilEndProbability {
 			return nil
 		}
 
@@ -956,7 +1026,7 @@ func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Ran
 			step.value = genEnd(step.key)
 		case opCheckhash:
 			// this gets really expensive so control how often it happens
-			if r.Float64() >= percentChanceToFullHash {
+			if r.Float64() < checkHashProbability {
 				continue
 			}
 		}
@@ -968,49 +1038,61 @@ func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Ran
 	return steps
 }
 
-func generateInitialValues(require *require.Assertions, r *rand.Rand, initialValues int, size int, percentChanceToFullHash float64) randTest {
+func generateInitialValues(
+	require *require.Assertions,
+	r *rand.Rand,
+	numInitialKeyValues int,
+	size int,
+	percentChanceToFullHash float64,
+) randTest {
+	const (
+		prefixProbability   = 0.1
+		nilValueProbability = 0.05
+	)
+
 	var allKeys [][]byte
 	genKey := func() []byte {
 		// new prefixed key
-		if len(allKeys) > 2 && r.Intn(100) < 10 {
+		if len(allKeys) > 2 && r.Float64() < prefixProbability {
 			prefix := allKeys[r.Intn(len(allKeys))]
 			key := make([]byte, r.Intn(50)+len(prefix))
 			copy(key, prefix)
-			_, err := r.Read(key[len(prefix):])
-			require.NoError(err)
+			_, _ = r.Read(key[len(prefix):])
 			allKeys = append(allKeys, key)
 			return key
 		}
 
 		// new key
 		key := make([]byte, r.Intn(50))
-		_, err := r.Read(key)
-		require.NoError(err)
+		_, _ = r.Read(key)
 		allKeys = append(allKeys, key)
 		return key
 	}
 
 	var steps randTest
-	for i := 0; i < initialValues; i++ {
-		step := randTestStep{op: opUpdate}
-		step.key = genKey()
-		step.value = make([]byte, r.Intn(51))
-		if len(step.value) == 51 {
+	for i := 0; i < numInitialKeyValues; i++ {
+		step := randTestStep{
+			op:    opUpdate,
+			key:   genKey(),
+			value: make([]byte, r.Intn(50)),
+		}
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilValueProbability {
 			step.value = nil
 		} else {
-			_, err := r.Read(step.value)
-			require.NoError(err)
+			_, _ = r.Read(step.value)
 		}
 		steps = append(steps, step)
 	}
 	steps = append(steps, randTestStep{op: opWriteBatch})
-	steps = append(steps, generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)...)
+	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
 	return steps
 }
 
-func generate(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
-	var allKeys [][]byte
-	return generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)
+func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+	return generateRandTestWithKeys(require, r, [][]byte{}, size, percentChanceToFullHash)
 }
 
 // Inserts [n] random key/value pairs into each database.
