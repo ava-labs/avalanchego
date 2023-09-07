@@ -74,7 +74,7 @@ func (k *dbKey) Bytes() []byte {
 	keyLenBytes := binary.AppendUvarint([]byte{}, uint64(keyLen))
 
 	bytes := make([]byte, len(keyLenBytes)+keyLen+internalKeySuffixLen)
-	offset := copy(bytes[0:], keyLenBytes)
+	offset := copy(bytes, keyLenBytes)
 	offset += copy(bytes[offset:], k.key)
 	binary.BigEndian.PutUint64(bytes[offset:], math.MaxUint64-k.height)
 	return bytes
