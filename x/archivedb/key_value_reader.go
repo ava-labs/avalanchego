@@ -15,7 +15,7 @@ type dbHeightReader struct {
 	heightLastFoundKey uint64
 }
 
-// Has() retrieves if a key is present in the key-value data store.
+// Has retrieves if a key is present in the key-value data store.
 func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 	_, err := reader.Get(key)
 	if err == database.ErrNotFound {
@@ -43,13 +43,13 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	reader.heightLastFoundKey = 0
 
 	if !iterator.Next() {
+		err := iterator.Error()
+		if err != nil {
+			return nil, err
+		}
+
 		// There is no available key with the requested prefix
 		return nil, database.ErrNotFound
-	}
-
-	err := iterator.Error()
-	if err != nil {
-		return nil, err
 	}
 
 	foundKey, height, err := parseDBKey(iterator.Key())

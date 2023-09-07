@@ -44,7 +44,7 @@ func newDBKey(key []byte, height uint64) []byte {
 	return rawKey[0:offset]
 }
 
-// Takes a slice of bytes and returns a databaseKey instance.
+// Takes a slice of bytes and returns a the inner key and the height
 func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	rawKeyLen := len(rawKey)
 	reader := bytes.NewReader(rawKey)

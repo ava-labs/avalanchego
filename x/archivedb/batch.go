@@ -59,8 +59,10 @@ func (c *dbBatchWithHeight) Delete(key []byte) error {
 
 // Queues an insert for a key-value pair
 func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
-	value = append(value, 0) // not deleted element
-	return c.batch.Put(newDBKey(key, c.height), value)
+	newValue := make([]byte, len(value)+1)
+	offset := copy(newValue, value)
+	newValue[offset] = 0 // not deleted element
+	return c.batch.Put(newDBKey(key, c.height), newValue)
 }
 
 // Returns the sizes to be committed in the database
@@ -71,7 +73,7 @@ func (c *dbBatchWithHeight) Size() int {
 // Removed all pending writes and deletes to the database
 func (c *dbBatchWithHeight) Reset() {
 	c.batch.Reset()
-	database.PutUInt64(c.batch, keyHeight, c.height)
+	_ = database.PutUInt64(c.batch, keyHeight, c.height)
 }
 
 // Returns the inner batch
