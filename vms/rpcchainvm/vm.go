@@ -49,6 +49,9 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		for {
 			select {
 			case s := <-signals:
+				// We drop all signals until our parent process has notified us
+				// that we are shutting down. Once we are in the shutdown
+				// workflow, we will gracefully exit upon receiving a SIGTERM.
 				if !allowShutdown.Get() {
 					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
 					continue
