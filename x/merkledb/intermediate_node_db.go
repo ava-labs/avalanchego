@@ -121,11 +121,23 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 
 func (db *intermediateNodeDB) constructDBKey(key path) []byte {
 	// We need differentiate between two paths of equal byte length but different token length
-	// so add the parity to the key prefix
-	lengthPrefix := make([]byte, len(intermediateNodePrefix)+1)
-	copy(lengthPrefix, intermediateNodePrefix)
-	lengthPrefix[len(intermediateNodePrefix)] = byte(len(key) % 2)
-	return addPrefixToKey(db.bufferPool, lengthPrefix, key.Serialize().Value)
+	// so add the modulo remainder as a key suffix
+	dbKey := db.bufferPool.Get().([]byte)
+	defer db.bufferPool.Put(dbKey)
+	compressedKey := key.Serialize().Value
+	keyLen := len(compressedKey) + 1
+	if cap(dbKey) >= keyLen {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		dbKey = dbKey[:keyLen]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		db.bufferPool.Put(dbKey)
+		dbKey = make([]byte, keyLen)
+	}
+	copy(dbKey, compressedKey)
+	dbKey[len(compressedKey)] = byte(len(key) % 2)
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {
