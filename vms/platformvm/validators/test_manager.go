@@ -26,7 +26,7 @@ func (testManager) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
 
-func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 	return nil, nil
 }
 

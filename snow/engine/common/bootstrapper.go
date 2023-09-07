@@ -58,10 +58,10 @@ type bootstrapper struct {
 	acceptedFrontierSet set.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted set.Set[ids.NodeID]
+	pendingSendAccepted set.Set[ids.GenericNodeID]
 	// IDs of validators we requested filtering the accepted frontier from but
 	// haven't received a reply yet
-	pendingReceiveAccepted set.Set[ids.NodeID]
+	pendingReceiveAccepted set.Set[ids.GenericNodeID]
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
 	failedAccepted set.Set[ids.NodeID]
@@ -187,15 +187,15 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		)
 		return nil
 	}
-
-	if !b.pendingReceiveAccepted.Contains(nodeID) {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if !b.pendingReceiveAccepted.Contains(genericNodeID) {
 		b.Ctx.Log.Debug("received unexpected Accepted message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
 	}
 	// Mark that we received a response from [nodeID]
-	b.pendingReceiveAccepted.Remove(nodeID)
+	b.pendingReceiveAccepted.Remove(genericNodeID)
 
 	weight := b.Beacons.GetWeight(nodeID)
 	for _, containerID := range containerIDs {
@@ -371,7 +371,11 @@ func (b *bootstrapper) sendGetAccepted(ctx context.Context) {
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
-		vdrs.Add(vdr)
+		nodeID, err := ids.NodeIDFromGenericNodeID(vdr)
+		if err != nil {
+			panic(err)
+		}
+		vdrs.Add(nodeID)
 		// Add the validator to send pending receipt set
 		b.pendingReceiveAccepted.Add(vdr)
 	}

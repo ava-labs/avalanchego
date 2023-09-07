@@ -75,8 +75,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	validators := make([]validatorData, 0, len(validatorsMap))
 	weight := uint64(0)
 	for k, v := range validatorsMap {
+		nodeID, err := ids.NodeIDFromGenericNodeID(k)
+		if err != nil {
+			return nil, err
+		}
 		validators = append(validators, validatorData{
-			id:     k,
+			id:     nodeID,
 			weight: v.Weight,
 		})
 		newWeight, err := math.Add64(weight, v.Weight)

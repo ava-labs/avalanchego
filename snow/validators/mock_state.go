@@ -84,10 +84,10 @@ func (mr *MockStateMockRecorder) GetSubnetID(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // GetValidatorSet mocks base method.
-func (m *MockState) GetValidatorSet(arg0 context.Context, arg1 uint64, arg2 ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
+func (m *MockState) GetValidatorSet(arg0 context.Context, arg1 uint64, arg2 ids.ID) (map[ids.GenericNodeID]*GetValidatorOutput, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetValidatorSet", arg0, arg1, arg2)
-	ret0, _ := ret[0].(map[ids.NodeID]*GetValidatorOutput)
+	ret0, _ := ret[0].(map[ids.GenericNodeID]*GetValidatorOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

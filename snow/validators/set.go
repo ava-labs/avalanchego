@@ -71,7 +71,7 @@ type Set interface {
 	Len() int
 
 	// Map of the validators in this set
-	Map() map[ids.NodeID]*GetValidatorOutput
+	Map() map[ids.GenericNodeID]*GetValidatorOutput
 
 	// Weight returns the cumulative weight of all validators in the set.
 	Weight() uint64
@@ -318,14 +318,15 @@ func (s *vdrSet) len() int {
 	return len(s.vdrSlice)
 }
 
-func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
+func (s *vdrSet) Map() map[ids.GenericNodeID]*GetValidatorOutput {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	set := make(map[ids.NodeID]*GetValidatorOutput, len(s.vdrSlice))
+	set := make(map[ids.GenericNodeID]*GetValidatorOutput, len(s.vdrSlice))
 	for _, vdr := range s.vdrSlice {
-		set[vdr.NodeID] = &GetValidatorOutput{
-			NodeID:    vdr.NodeID,
+		genericNodeID := ids.GenericNodeIDFromNodeID(vdr.NodeID)
+		set[genericNodeID] = &GetValidatorOutput{
+			NodeID:    genericNodeID,
 			PublicKey: vdr.PublicKey,
 			Weight:    vdr.Weight,
 		}

@@ -70,7 +70,7 @@ type stateSyncer struct {
 	failedSeeders set.Set[ids.NodeID]
 
 	// IDs of validators we should request filtering the accepted state summaries from
-	targetVoters set.Set[ids.NodeID]
+	targetVoters set.Set[ids.GenericNodeID]
 	// IDs of validators we requested filtering the accepted state summaries from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
 	pendingVoters set.Set[ids.NodeID]
@@ -534,8 +534,12 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
-		vdrs.Add(vdr)
-		ss.pendingVoters.Add(vdr)
+		nodeID, err := ids.NodeIDFromGenericNodeID(vdr)
+		if err != nil {
+			panic(err)
+		}
+		vdrs.Add(nodeID)
+		ss.pendingVoters.Add(nodeID)
 	}
 
 	if len(vdrs) > 0 {

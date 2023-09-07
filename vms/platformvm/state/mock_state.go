@@ -144,7 +144,7 @@ func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // ApplyValidatorPublicKeyDiffs mocks base method.
-func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64) error {
+func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 context.Context, arg1 map[ids.GenericNodeID]*validators.GetValidatorOutput, arg2, arg3 uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -158,7 +158,7 @@ func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(arg0, arg1, arg2, 
 }
 
 // ApplyValidatorWeightDiffs mocks base method.
-func (m *MockState) ApplyValidatorWeightDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64, arg4 ids.ID) error {
+func (m *MockState) ApplyValidatorWeightDiffs(arg0 context.Context, arg1 map[ids.GenericNodeID]*validators.GetValidatorOutput, arg2, arg3 uint64, arg4 ids.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffs", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
@@ -468,7 +468,7 @@ func (mr *MockStateMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
 }
 
 // GetStartTime mocks base method.
-func (m *MockState) GetStartTime(arg0 ids.NodeID, arg1 ids.ID) (time.Time, error) {
+func (m *MockState) GetStartTime(arg0 ids.GenericNodeID, arg1 ids.ID) (time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStartTime", arg0, arg1)
 	ret0, _ := ret[0].(time.Time)
@@ -573,7 +573,7 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetUptime mocks base method.
-func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
+func (m *MockState) GetUptime(arg0 ids.GenericNodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUptime", arg0, arg1)
 	ret0, _ := ret[0].(time.Duration)
@@ -713,7 +713,7 @@ func (mr *MockStateMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 }
 
 // SetUptime mocks base method.
-func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, arg3 time.Time) error {
+func (m *MockState) SetUptime(arg0 ids.GenericNodeID, arg1 ids.ID, arg2 time.Duration, arg3 time.Time) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetUptime", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)

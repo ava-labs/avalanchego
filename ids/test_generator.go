@@ -23,3 +23,8 @@ func GenerateTestShortID() ShortID {
 func GenerateTestNodeID() NodeID {
 	return NodeID(GenerateTestShortID())
 }
+
+// GenerateTestNodeID returns a new ID that should only be used for testing
+func GenerateTestGenericNodeID() GenericNodeID {
+	return GenericNodeIDFromNodeID(GenerateTestNodeID())
+}

@@ -24,10 +24,13 @@ type GenericNodeID struct {
 	id string // TODO ABENGIA: consider exporting for serialization
 }
 
-// GenericNodeIDFromBytes attempt to convert a byte slice into a node id
-func GenericNodeIDFromBytes(b []byte) GenericNodeID {
+// GenericNodeIDFromNodeID attempt to convert a byte slice into a node id
+func GenericNodeIDFromNodeID(nodeID NodeID) GenericNodeID {
+	if nodeID == EmptyNodeID {
+		return EmptyGenericNodeID
+	}
 	return GenericNodeID{
-		id: strings.Clone(string(b)),
+		id: strings.Clone(string(nodeID.Bytes())),
 	}
 }
 

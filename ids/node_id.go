@@ -56,6 +56,18 @@ func NodeIDFromString(nodeIDStr string) (NodeID, error) {
 	return NodeID(asShort), nil
 }
 
+// NodeIDFromGenericNodeID is the inverse of NodeID.String()
+func NodeIDFromGenericNodeID(genericNodeID GenericNodeID) (NodeID, error) {
+	if genericNodeID == EmptyGenericNodeID {
+		return EmptyNodeID, nil
+	}
+	res, err := ToNodeID(genericNodeID.Bytes())
+	if err != nil {
+		return EmptyNodeID, fmt.Errorf("failed converting GenericNodeID to NodeID, %w", err)
+	}
+	return res, nil
+}
+
 func (id NodeID) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + id.String() + "\""), nil
 }

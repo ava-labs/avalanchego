@@ -15,7 +15,7 @@ type State interface {
 	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator of
 	// the subnet.
 	GetUptime(
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		subnetID ids.ID,
 	) (upDuration time.Duration, lastUpdated time.Time, err error)
 
@@ -26,7 +26,7 @@ type State interface {
 	// Invariant: expects [lastUpdated] to be truncated (floored) to the nearest
 	//            second.
 	SetUptime(
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		subnetID ids.ID,
 		upDuration time.Duration,
 		lastUpdated time.Time,
@@ -37,7 +37,7 @@ type State interface {
 	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator of
 	// the subnet.
 	GetStartTime(
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		subnetID ids.ID,
 	) (startTime time.Time, err error)
 }

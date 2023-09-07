@@ -462,15 +462,15 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	return vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID)
+	return vm.uptimeManager.Connect(ids.GenericNodeIDFromNodeID(nodeID), constants.PrimaryNetworkID)
 }
 
 func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
-	return vm.uptimeManager.Connect(nodeID, subnetID)
+	return vm.uptimeManager.Connect(ids.GenericNodeIDFromNodeID(nodeID), subnetID)
 }
 
 func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	if err := vm.uptimeManager.Disconnect(nodeID); err != nil {
+	if err := vm.uptimeManager.Disconnect(ids.GenericNodeIDFromNodeID(nodeID)); err != nil {
 		return err
 	}
 	return vm.state.Commit()

@@ -1011,17 +1011,17 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID0 := ids.NodeID(keys[0].PublicKey().Address())
-	nodeID1 := ids.NodeID(keys[1].PublicKey().Address())
-	nodeID2 := ids.NodeID(keys[2].PublicKey().Address())
-	nodeID3 := ids.NodeID(keys[3].PublicKey().Address())
-	nodeID4 := ids.NodeID(keys[4].PublicKey().Address())
+	nodeID0 := ids.GenericNodeIDFromNodeID(ids.NodeID(keys[0].PublicKey().Address()))
+	nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address()))
+	nodeID2 := ids.GenericNodeIDFromNodeID(ids.NodeID(keys[2].PublicKey().Address()))
+	nodeID3 := ids.GenericNodeIDFromNodeID(ids.NodeID(keys[3].PublicKey().Address()))
+	nodeID4 := ids.GenericNodeIDFromNodeID(ids.NodeID(keys[4].PublicKey().Address()))
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
-	expectedValidators1 := map[ids.NodeID]uint64{
+	expectedValidators1 := map[ids.GenericNodeID]uint64{
 		nodeID0: defaultWeight,
 		nodeID1: defaultWeight,
 		nodeID2: defaultWeight,
@@ -1119,13 +1119,13 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		}
 	}
 
-	expectedValidators2 := map[ids.NodeID]uint64{
-		nodeID0: defaultWeight,
-		nodeID1: defaultWeight,
-		nodeID2: defaultWeight,
-		nodeID3: defaultWeight,
-		nodeID4: defaultWeight,
-		nodeID5: vm.MaxValidatorStake,
+	expectedValidators2 := map[ids.GenericNodeID]uint64{
+		nodeID0:                              defaultWeight,
+		nodeID1:                              defaultWeight,
+		nodeID2:                              defaultWeight,
+		nodeID3:                              defaultWeight,
+		nodeID4:                              defaultWeight,
+		ids.GenericNodeIDFromNodeID(nodeID5): vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -2253,7 +2253,7 @@ func checkValidatorBlsKeyIsSet(
 		return err
 	}
 
-	val, found := vals[nodeID]
+	val, found := vals[ids.GenericNodeIDFromNodeID(nodeID)]
 	switch {
 	case !found:
 		return database.ErrNotFound

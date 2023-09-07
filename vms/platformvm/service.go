@@ -815,6 +815,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 	for _, currentStaker := range targetStakers {
 		nodeID := currentStaker.NodeID
+		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 		weight := json.Uint64(currentStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        currentStaker.TxID,
@@ -847,7 +848,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				return err
 			}
 
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
 			var (
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
@@ -911,7 +912,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			if err != nil {
 				return err
 			}
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker:    apiStaker,
 				Connected: connected,
@@ -1028,6 +1029,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 
 	for _, pendingStaker := range targetStakers {
 		nodeID := pendingStaker.NodeID
+		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 		weight := json.Uint64(pendingStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        pendingStaker.TxID,
@@ -1048,7 +1050,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			shares := attr.shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
 			vdr := platformapi.PermissionlessValidator{
 				Staker:        apiStaker,
 				DelegationFee: delegationFee,
@@ -1061,7 +1063,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			reply.Delegators = append(reply.Delegators, apiStaker)
 
 		case txs.SubnetPermissionedValidatorPendingPriority:
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker:    apiStaker,
 				Connected: connected,
@@ -2558,8 +2560,11 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 			}
 			vdrJSON.PublicKey = &pk
 		}
-
-		m[vdr.NodeID] = vdrJSON
+		nodeID, err := ids.NodeIDFromGenericNodeID(vdr.NodeID)
+		if err != nil {
+			return nil, err
+		}
+		m[nodeID] = vdrJSON
 	}
 	return stdjson.Marshal(m)
 }
@@ -2578,7 +2583,7 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 	v.Validators = make(map[ids.NodeID]*validators.GetValidatorOutput, len(m))
 	for nodeID, vdrJSON := range m {
 		vdr := &validators.GetValidatorOutput{
-			NodeID: nodeID,
+			NodeID: ids.GenericNodeIDFromNodeID(nodeID),
 			Weight: uint64(vdrJSON.Weight),
 		}
 
@@ -2615,11 +2620,19 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	)
 
 	ctx := r.Context()
-	var err error
-	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
+	dataWithGenericNodeID, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
 	}
+	res := make(map[ids.NodeID]*validators.GetValidatorOutput)
+	for genNodeID, data := range dataWithGenericNodeID {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genNodeID)
+		if err != nil {
+			return err
+		}
+		res[nodeID] = data
+	}
+	reply.Validators = res
 	return nil
 }
 
@@ -2695,7 +2708,7 @@ func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 		return nil, nil
 	}
 
-	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(staker.NodeID, staker.SubnetID, staker.StartTime)
+	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(ids.GenericNodeIDFromNodeID(staker.NodeID), staker.SubnetID, staker.StartTime)
 	if err != nil {
 		return nil, err
 	}

@@ -165,9 +165,10 @@ func TestValidatorsSample(t *testing.T) {
 					continue
 				}
 
-				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
+				validatorSet := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, 0)
 				for _, validator := range call.validators {
-					validatorSet[validator] = nil
+					nodeID := ids.GenericNodeIDFromNodeID(validator)
+					validatorSet[nodeID] = nil
 				}
 
 				calls = append(calls,

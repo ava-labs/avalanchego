@@ -43,7 +43,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
+					map[ids.GenericNodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: testVdrs[0].vdr.PublicKey,
@@ -68,7 +68,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
+					map[ids.GenericNodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: testVdrs[0].vdr.PublicKey,
@@ -94,7 +94,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					PublicKey:      testVdrs[0].vdr.PublicKey,
 					PublicKeyBytes: testVdrs[0].vdr.PublicKeyBytes,
 					Weight:         testVdrs[0].vdr.Weight * 2,
-					NodeIDs: []ids.NodeID{
+					NodeIDs: []ids.GenericNodeID{
 						testVdrs[0].nodeID,
 						testVdrs[2].nodeID,
 					},
@@ -109,7 +109,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
+					map[ids.GenericNodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: nil,
@@ -313,7 +313,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	numNodes := 10_000
 	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
-		nodeID := ids.GenerateTestNodeID()
+		nodeID := ids.GenerateTestGenericNodeID()
 		blsPrivateKey, err := bls.NewSecretKey()
 		require.NoError(b, err)
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
@@ -325,13 +325,13 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	}
 
 	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
-		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		getValidatorsOutput := make(map[ids.GenericNodeID]*validators.GetValidatorOutput)
 		for i := 0; i < size; i++ {
 			validator := getValidatorOutputs[i]
 			getValidatorsOutput[validator.NodeID] = validator
 		}
 		validatorState := &validators.TestState{
-			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 				return getValidatorsOutput, nil
 			},
 		}

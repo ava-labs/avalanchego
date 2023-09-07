@@ -19,7 +19,7 @@ var errTest = errors.New("non-nil error")
 func TestStartTracking(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -31,7 +31,7 @@ func TestStartTracking(t *testing.T) {
 	currentTime := startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -42,7 +42,7 @@ func TestStartTracking(t *testing.T) {
 func TestStartTrackingDBError(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -55,7 +55,7 @@ func TestStartTrackingDBError(t *testing.T) {
 	currentTime := startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	err := up.StartTracking([]ids.NodeID{nodeID0}, subnetID)
+	err := up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, errTest)
 }
 
@@ -65,17 +65,17 @@ func TestStartTrackingNonValidator(t *testing.T) {
 	s := NewTestState()
 	up := NewManager(s).(*manager)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 
-	err := up.StartTracking([]ids.NodeID{nodeID0}, subnetID)
+	err := up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestStartTrackingInThePast(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -87,7 +87,7 @@ func TestStartTrackingInThePast(t *testing.T) {
 	currentTime := startTime.Add(-time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -98,7 +98,7 @@ func TestStartTrackingInThePast(t *testing.T) {
 func TestStopTrackingDecreasesUptime(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -109,17 +109,17 @@ func TestStopTrackingDecreasesUptime(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	up = NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -130,7 +130,7 @@ func TestStopTrackingDecreasesUptime(t *testing.T) {
 func TestStopTrackingIncreasesUptime(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -141,19 +141,19 @@ func TestStopTrackingIncreasesUptime(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	up = NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -164,7 +164,7 @@ func TestStopTrackingIncreasesUptime(t *testing.T) {
 func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 
 	s := NewTestState()
@@ -172,14 +172,14 @@ func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
 
 	require.NoError(up.StartTracking(nil, subnetID))
 
-	err := up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
+	err := up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestStopTrackingConnectedDBError(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -192,14 +192,14 @@ func TestStopTrackingConnectedDBError(t *testing.T) {
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	s.dbReadError = errTest
-	err := up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
+	err := up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, errTest)
 }
 
 func TestStopTrackingNonConnectedPast(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -209,12 +209,12 @@ func TestStopTrackingNonConnectedPast(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(-time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := s.GetUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -225,7 +225,7 @@ func TestStopTrackingNonConnectedPast(t *testing.T) {
 func TestStopTrackingNonConnectedDBError(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -235,13 +235,13 @@ func TestStopTrackingNonConnectedDBError(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
 	s.dbWriteError = errTest
-	err := up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
+	err := up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, errTest)
 }
 
@@ -263,7 +263,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			nodeID0 := ids.GenerateTestNodeID()
+			nodeID0 := ids.GenerateTestGenericNodeID()
 			currentTime := time.Now()
 			startTime := currentTime
 
@@ -277,7 +277,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 				connected := up.IsConnected(nodeID0, subnetID)
 				require.False(connected)
 
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+				require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 				connected = up.IsConnected(nodeID0, subnetID)
 				require.False(connected)
@@ -326,7 +326,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -345,7 +345,7 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 
 	require.NoError(up.Disconnect(nodeID0))
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -356,9 +356,9 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 func TestUnrelatedNodeDisconnect(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
-	nodeID1 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestGenericNodeID()
 	currentTime := time.Now()
 	startTime := currentTime
 
@@ -368,7 +368,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
@@ -401,7 +401,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 func TestCalculateUptimeWhenNeverTracked(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -426,7 +426,7 @@ func TestCalculateUptimeWhenNeverTracked(t *testing.T) {
 func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -434,7 +434,7 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 
 	up := NewManager(s).(*manager)
 
-	require.NoError(up.StartTracking([]ids.NodeID{}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{}, subnetID))
 
 	s.AddNode(nodeID0, subnetID, startTime)
 
@@ -454,7 +454,7 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -470,7 +470,7 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
@@ -484,7 +484,7 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -495,7 +495,7 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(2 * time.Second)
 	up.clock.Set(currentTime)
@@ -514,7 +514,7 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 func TestCalculateUptimeNonValidator(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	startTime := time.Now()
 
@@ -529,7 +529,7 @@ func TestCalculateUptimeNonValidator(t *testing.T) {
 func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 	currentTime := time.Now()
 	startTime := currentTime
@@ -548,7 +548,7 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 func TestCalculateUptimePercentage(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	currentTime := time.Now()
 	subnetID := ids.GenerateTestID()
 	startTime := currentTime
@@ -558,7 +558,7 @@ func TestCalculateUptimePercentage(t *testing.T) {
 
 	up := NewManager(s).(*manager)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
@@ -571,7 +571,7 @@ func TestCalculateUptimePercentage(t *testing.T) {
 func TestStopTrackingUnixTimeRegression(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	currentTime := time.Now()
 	subnetID := ids.GenerateTestID()
 	startTime := currentTime
@@ -582,14 +582,14 @@ func TestStopTrackingUnixTimeRegression(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StopTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	currentTime = startTime.Add(time.Second)
 	up.clock.Set(currentTime)
@@ -599,7 +599,7 @@ func TestStopTrackingUnixTimeRegression(t *testing.T) {
 	currentTime = startTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
+	require.NoError(up.StartTracking([]ids.GenericNodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 

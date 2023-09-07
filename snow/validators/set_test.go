@@ -247,52 +247,54 @@ func TestSetMap(t *testing.T) {
 
 	pk := bls.PublicFromSecretKey(sk)
 	nodeID0 := ids.GenerateTestNodeID()
+	genericNodeID0 := ids.GenericNodeIDFromNodeID(nodeID0)
 	require.NoError(s.Add(nodeID0, pk, ids.Empty, 2))
 
 	m = s.Map()
 	require.Len(m, 1)
-	require.Contains(m, nodeID0)
+	require.Contains(m, genericNodeID0)
 
-	node0 := m[nodeID0]
-	require.Equal(nodeID0, node0.NodeID)
+	node0 := m[genericNodeID0]
+	require.Equal(genericNodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
 	nodeID1 := ids.GenerateTestNodeID()
+	genericNodeID1 := ids.GenericNodeIDFromNodeID(nodeID1)
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
 	m = s.Map()
 	require.Len(m, 2)
-	require.Contains(m, nodeID0)
-	require.Contains(m, nodeID1)
+	require.Contains(m, genericNodeID0)
+	require.Contains(m, genericNodeID1)
 
-	node0 = m[nodeID0]
-	require.Equal(nodeID0, node0.NodeID)
+	node0 = m[genericNodeID0]
+	require.Equal(genericNodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	node1 := m[nodeID1]
-	require.Equal(nodeID1, node1.NodeID)
+	node1 := m[genericNodeID1]
+	require.Equal(genericNodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
 	require.NoError(s.RemoveWeight(nodeID0, 1))
-	require.Equal(nodeID0, node0.NodeID)
+	require.Equal(genericNodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
 	m = s.Map()
 	require.Len(m, 2)
-	require.Contains(m, nodeID0)
-	require.Contains(m, nodeID1)
+	require.Contains(m, genericNodeID0)
+	require.Contains(m, genericNodeID1)
 
-	node0 = m[nodeID0]
-	require.Equal(nodeID0, node0.NodeID)
+	node0 = m[genericNodeID0]
+	require.Equal(genericNodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(1), node0.Weight)
 
-	node1 = m[nodeID1]
-	require.Equal(nodeID1, node1.NodeID)
+	node1 = m[genericNodeID1]
+	require.Equal(genericNodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
@@ -300,10 +302,10 @@ func TestSetMap(t *testing.T) {
 
 	m = s.Map()
 	require.Len(m, 1)
-	require.Contains(m, nodeID1)
+	require.Contains(m, genericNodeID1)
 
-	node1 = m[nodeID1]
-	require.Equal(nodeID1, node1.NodeID)
+	node1 = m[genericNodeID1]
+	require.Equal(genericNodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 

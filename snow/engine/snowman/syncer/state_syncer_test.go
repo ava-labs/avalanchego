@@ -174,7 +174,9 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -211,7 +213,9 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -246,7 +250,9 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -290,7 +296,9 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -383,7 +391,9 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -455,7 +465,9 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
@@ -568,7 +580,9 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -654,7 +668,9 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -727,7 +743,9 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -847,7 +865,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -969,7 +989,9 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -1104,7 +1126,9 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
@@ -1226,7 +1250,9 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	// Connect enough stake to start syncer
-	for nodeID := range vdrs.Map() {
+	for genericNodeID := range vdrs.Map() {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		require.NoError(err)
 		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 	require.NotEmpty(syncer.pendingSeeders)

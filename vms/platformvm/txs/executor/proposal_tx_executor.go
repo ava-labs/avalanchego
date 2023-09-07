@@ -638,8 +638,9 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// TODO: calculate subnet uptimes
+	genericNode := ids.GenericNodeIDFromNodeID(primaryNetworkValidator.NodeID)
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
-		primaryNetworkValidator.NodeID,
+		genericNode,
 		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)

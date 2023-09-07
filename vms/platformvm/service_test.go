@@ -796,7 +796,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 
 	{
 		reply.Validators[ids.EmptyNodeID] = &validators.GetValidatorOutput{
-			NodeID:    ids.EmptyNodeID,
+			NodeID:    ids.EmptyGenericNodeID,
 			PublicKey: nil,
 			Weight:    0,
 		}
@@ -806,7 +806,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 		sk, err := bls.NewSecretKey()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
-			NodeID:    nodeID,
+			NodeID:    ids.GenericNodeIDFromNodeID(nodeID),
 			PublicKey: bls.PublicFromSecretKey(sk),
 			Weight:    math.MaxUint64,
 		}

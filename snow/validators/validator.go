@@ -25,7 +25,7 @@ type Validator struct {
 // GetValidatorOutput is a struct that contains the publicly relevant values of
 // a validator of the Avalanche Network for the output of GetValidator.
 type GetValidatorOutput struct {
-	NodeID    ids.NodeID
+	NodeID    ids.GenericNodeID
 	PublicKey *bls.PublicKey
 	Weight    uint64
 }

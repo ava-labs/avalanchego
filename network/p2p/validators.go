@@ -41,7 +41,7 @@ type Validators struct {
 	validators validators.State
 
 	lock                     sync.Mutex
-	validatorIDs             set.SampleableSet[ids.NodeID]
+	validatorIDs             set.SampleableSet[ids.GenericNodeID]
 	lastUpdated              time.Time
 	maxValidatorSetStaleness time.Duration
 }
@@ -77,7 +77,16 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 	v.refresh(ctx)
 
-	return v.validatorIDs.Sample(limit)
+	genericNodeIDs := v.validatorIDs.Sample(limit)
+	res := make([]ids.NodeID, 0, len(genericNodeIDs))
+	for _, genNodeID := range genericNodeIDs {
+		nodeID, err := ids.NodeIDFromGenericNodeID(genNodeID)
+		if err != nil {
+			panic(err)
+		}
+		res = append(res, nodeID)
+	}
+	return res
 }
 
 func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
@@ -86,5 +95,5 @@ func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 
 	v.refresh(ctx)
 
-	return v.validatorIDs.Contains(nodeID)
+	return v.validatorIDs.Contains(ids.GenericNodeIDFromNodeID(nodeID))
 }

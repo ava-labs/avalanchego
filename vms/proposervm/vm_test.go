@@ -151,22 +151,28 @@ func initTestProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		var (
+			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
+			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+		)
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			thisNode: {
+				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
-				NodeID: ids.NodeID{1},
+			nodeID1: {
+				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
-				NodeID: ids.NodeID{2},
+			nodeID2: {
+				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
-				NodeID: ids.NodeID{3},
+			nodeID3: {
+				NodeID: nodeID3,
 				Weight: 7,
 			},
 		}, nil
@@ -890,10 +896,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			{1}: {
-				NodeID: ids.NodeID{1},
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			nodeID1: {
+				NodeID: nodeID1,
 				Weight: 100,
 			},
 		}, nil
@@ -1159,10 +1166,11 @@ func TestInnerVMRollback(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			{1}: {
-				NodeID: ids.NodeID{1},
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		genericNodeID := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			genericNodeID: {
+				NodeID: genericNodeID,
 				Weight: 100,
 			},
 		}, nil
@@ -1345,10 +1353,11 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		thisNodeID := ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			thisNodeID: {
+				NodeID: thisNodeID,
 				Weight: 10,
 			},
 		}, nil
@@ -1812,22 +1821,28 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		var (
+			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
+			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+		)
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			thisNode: {
+				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
-				NodeID: ids.NodeID{1},
+			nodeID1: {
+				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
-				NodeID: ids.NodeID{2},
+			nodeID2: {
+				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
-				NodeID: ids.NodeID{3},
+			nodeID3: {
+				NodeID: nodeID3,
 				Weight: 7,
 			},
 		}, nil
@@ -2016,22 +2031,28 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		var (
+			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
+			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+		)
+		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			thisNode: {
+				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
-				NodeID: ids.NodeID{1},
+			nodeID1: {
+				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
-				NodeID: ids.NodeID{2},
+			nodeID2: {
+				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
-				NodeID: ids.NodeID{3},
+			nodeID3: {
+				NodeID: nodeID3,
 				Weight: 7,
 			},
 		}, nil
@@ -2594,7 +2615,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 			return nil, nil
 		},
 	}

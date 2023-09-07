@@ -31,7 +31,7 @@ type State interface {
 		ctx context.Context,
 		height uint64,
 		subnetID ids.ID,
-	) (map[ids.NodeID]*GetValidatorOutput, error)
+	) (map[ids.GenericNodeID]*GetValidatorOutput, error)
 }
 
 type lockedState struct {
@@ -71,7 +71,7 @@ func (s *lockedState) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
+) (map[ids.GenericNodeID]*GetValidatorOutput, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -88,6 +88,6 @@ func NewNoValidatorsState(state State) State {
 	}
 }
 
-func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
+func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*GetValidatorOutput, error) {
 	return nil, nil
 }

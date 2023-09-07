@@ -91,7 +91,7 @@ type validatorState interface {
 	// GetUptime returns the current uptime measurements of [vdrID] on
 	// [subnetID].
 	GetUptime(
-		vdrID ids.NodeID,
+		vdrID ids.GenericNodeID,
 		subnetID ids.ID,
 	) (upDuration time.Duration, lastUpdated time.Time, err error)
 
@@ -99,7 +99,7 @@ type validatorState interface {
 	// Unless these measurements are deleted first, the next call to
 	// WriteUptimes will write this update to disk.
 	SetUptime(
-		vdrID ids.NodeID,
+		vdrID ids.GenericNodeID,
 		subnetID ids.ID,
 		upDuration time.Duration,
 		lastUpdated time.Time,
@@ -162,10 +162,16 @@ func (m *metadata) LoadValidatorMetadata(
 }
 
 func (m *metadata) GetUptime(
-	vdrID ids.NodeID,
+	vdrID ids.GenericNodeID,
 	subnetID ids.ID,
 ) (time.Duration, time.Time, error) {
-	metadata, exists := m.metadata[vdrID][subnetID]
+	// TODO ABENEGIA: at the end of refactoring, we should have genericNodeID here
+	shortNode, err := ids.NodeIDFromGenericNodeID(vdrID)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+
+	metadata, exists := m.metadata[shortNode][subnetID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound
 	}
@@ -173,19 +179,25 @@ func (m *metadata) GetUptime(
 }
 
 func (m *metadata) SetUptime(
-	vdrID ids.NodeID,
+	vdrID ids.GenericNodeID,
 	subnetID ids.ID,
 	upDuration time.Duration,
 	lastUpdated time.Time,
 ) error {
-	metadata, exists := m.metadata[vdrID][subnetID]
+	// TODO ABENEGIA: at the end of refactoring, we should have genericNodeID here
+	shortNode, err := ids.NodeIDFromGenericNodeID(vdrID)
+	if err != nil {
+		return err
+	}
+
+	metadata, exists := m.metadata[shortNode][subnetID]
 	if !exists {
 		return database.ErrNotFound
 	}
 	metadata.UpDuration = upDuration
 	metadata.lastUpdated = lastUpdated
 
-	m.addUpdatedMetadata(vdrID, subnetID)
+	m.addUpdatedMetadata(shortNode, subnetID)
 	return nil
 }
 

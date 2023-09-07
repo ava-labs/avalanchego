@@ -33,7 +33,7 @@ type TestState struct {
 	GetMinimumHeightF func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF func(ctx context.Context) (uint64, error)
 	GetSubnetIDF      func(ctx context.Context, chainID ids.ID) (ids.ID, error)
-	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error)
+	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.GenericNodeID]*GetValidatorOutput, error)
 }
 
 func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -70,7 +70,7 @@ func (vm *TestState) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
+) (map[ids.GenericNodeID]*GetValidatorOutput, error) {
 	if vm.GetValidatorSetF != nil {
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}

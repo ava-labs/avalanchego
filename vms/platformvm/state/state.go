@@ -154,7 +154,7 @@ type State interface {
 	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 		subnetID ids.ID,
@@ -173,7 +173,7 @@ type State interface {
 	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 	) error
@@ -996,8 +996,13 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
-func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
-	staker, err := s.currentStakers.GetValidator(subnetID, nodeID)
+func (s *state) GetStartTime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Time, error) {
+	// TODO ABENEGIA: at the end of refactoring, we should have genericNodeID here
+	shortNode, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	staker, err := s.currentStakers.GetValidator(subnetID, shortNode)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -1081,7 +1086,7 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 
 func (s *state) ApplyValidatorWeightDiffs(
 	ctx context.Context,
-	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
 	subnetID ids.ID,
@@ -1100,7 +1105,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, shortNodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1111,6 +1116,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 
 		prevHeight = parsedHeight
+		nodeID := ids.GenericNodeIDFromNodeID(shortNodeID)
 
 		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
 		if err != nil {
@@ -1151,6 +1157,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			if err != nil {
 				return err
 			}
+			genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 
 			weightDiff := ValidatorWeightDiff{}
 			_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
@@ -1158,7 +1165,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 				return err
 			}
 
-			if err := applyWeightDiff(validators, nodeID, &weightDiff); err != nil {
+			if err := applyWeightDiff(validators, genericNodeID, &weightDiff); err != nil {
 				return err
 			}
 		}
@@ -1168,8 +1175,8 @@ func (s *state) ApplyValidatorWeightDiffs(
 }
 
 func applyWeightDiff(
-	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
-	nodeID ids.NodeID,
+	vdrs map[ids.GenericNodeID]*validators.GetValidatorOutput,
+	nodeID ids.GenericNodeID,
 	weightDiff *ValidatorWeightDiff,
 ) error {
 	vdr, ok := vdrs[nodeID]
@@ -1206,7 +1213,7 @@ func applyWeightDiff(
 
 func (s *state) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
-	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
 ) error {
@@ -1221,7 +1228,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, shortNodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1231,6 +1238,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			break
 		}
 
+		nodeID := ids.GenericNodeIDFromNodeID(shortNodeID)
 		vdr, ok := validators[nodeID]
 		if !ok {
 			continue

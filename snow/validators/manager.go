@@ -146,7 +146,7 @@ func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
 	return vdrs.Contains(nodeID)
 }
 
-func NodeIDs(m Manager, subnetID ids.ID) ([]ids.NodeID, error) {
+func NodeIDs(m Manager, subnetID ids.ID) ([]ids.GenericNodeID, error) {
 	vdrs, exist := m.Get(subnetID)
 	if !exist {
 		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
