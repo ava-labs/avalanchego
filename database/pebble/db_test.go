@@ -78,7 +78,7 @@ func Test_bytesPrefix(t *testing.T) {
 
 	itopts := make([]*pebble.IterOptions, 0)
 	for _, pref := range prefs {
-		itopts = append(itopts, bytesPrefix(pref))
+		itopts = append(itopts, prefixBounds(pref))
 	}
 
 	for idx, itopt := range itopts {

@@ -271,7 +271,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 	iter := &iter{
 		db:   db,
-		iter: db.pebbleDB.NewIter(bytesPrefix(prefix)),
+		iter: db.pebbleDB.NewIter(prefixBounds(prefix)),
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -295,7 +295,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
-	iterRange := bytesPrefix(prefix)
+	iterRange := prefixBounds(prefix)
 	if bytes.Compare(start, prefix) == 1 {
 		iterRange.LowerBound = start
 	}
@@ -320,21 +320,23 @@ func updateError(err error) error {
 	}
 }
 
-// bytesPrefix returns key range that satisfy the given prefix.
-// This only applicable for the standard 'bytes comparer'.
-func bytesPrefix(prefix []byte) *pebble.IterOptions {
-	var limit []byte
+// prefixBounds returns a key range that covers all keys with the
+// given [prefix].
+// Assumes the Database uses bytes.Compare for key comparison
+// and not a custom comparer.
+func prefixBounds(prefix []byte) *pebble.IterOptions {
+	var upperBound []byte
 	for i := len(prefix) - 1; i >= 0; i-- {
 		c := prefix[i]
-		if c < 0xff {
-			limit = make([]byte, i+1)
-			copy(limit, prefix)
-			limit[i] = c + 1
+		if c < 0xFF {
+			upperBound = make([]byte, i+1)
+			copy(upperBound, prefix)
+			upperBound[i] = c + 1
 			break
 		}
 	}
 	return &pebble.IterOptions{
 		LowerBound: prefix,
-		UpperBound: limit,
+		UpperBound: upperBound,
 	}
 }

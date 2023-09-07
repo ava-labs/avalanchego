@@ -84,7 +84,7 @@ func (it *iter) Next() bool {
 
 	if err := it.iter.Error(); err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err.Error())
+		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err)
 		return false
 	}
 
@@ -92,7 +92,7 @@ func (it *iter) Next() bool {
 	it.nextVal, err = it.iter.ValueAndErr()
 	if err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err.Error())
+		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err)
 		return false
 	}
 
