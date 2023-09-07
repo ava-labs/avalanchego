@@ -17,6 +17,7 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
@@ -35,8 +36,10 @@ const defaultRuntimeDialTimeout = 5 * time.Second
 func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
 
-	server := newVMServer(vm, opts...)
+	var allowShutdown utils.Atomic[bool]
+	server := newVMServer(vm, &allowShutdown, opts...)
 	go func(ctx context.Context) {
 		defer func() {
 			server.GracefulStop()
@@ -46,6 +49,11 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		for {
 			select {
 			case s := <-signals:
+				if !allowShutdown.Get() {
+					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
+					continue
+				}
+
 				switch s {
 				case syscall.SIGINT:
 					fmt.Println("runtime engine: ignoring signal: SIGINT")
@@ -93,9 +101,9 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 }
 
 // Returns an RPC Chain VM server serving health and VM services.
-func newVMServer(vm block.ChainVM, opts ...grpcutils.ServerOption) *grpc.Server {
+func newVMServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool], opts ...grpcutils.ServerOption) *grpc.Server {
 	server := grpcutils.NewServer(opts...)
-	vmpb.RegisterVMServer(server, NewServer(vm))
+	vmpb.RegisterVMServer(server, NewServer(vm, allowShutdown))
 
 	health := health.NewServer()
 	health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
