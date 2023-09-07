@@ -43,21 +43,25 @@ func Test_Path_Append(t *testing.T) {
 	path2 := NewPath([]byte{}, BranchFactor2)
 	for i := 0; i < 2; i++ {
 		require.Equal(byte(i), path2.Append(byte(i)).Token(0))
+		require.Equal(byte(i/2), path2.Append(byte(i)).Append(byte(i/2)).Token(1))
 	}
 
 	path4 := NewPath([]byte{}, BranchFactor4)
 	for i := 0; i < 4; i++ {
 		require.Equal(byte(i), path4.Append(byte(i)).Token(0))
+		require.Equal(byte(i/2), path4.Append(byte(i)).Append(byte(i/2)).Token(1))
 	}
 
 	path16 := NewPath([]byte{}, BranchFactor16)
 	for i := 0; i < 16; i++ {
 		require.Equal(byte(i), path16.Append(byte(i)).Token(0))
+		require.Equal(byte(i/2), path16.Append(byte(i)).Append(byte(i/2)).Token(1))
 	}
 
 	path256 := NewPath([]byte{}, BranchFactor256)
 	for i := 0; i < 256; i++ {
 		require.Equal(byte(i), path256.Append(byte(i)).Token(0))
+		require.Equal(byte(i/2), path256.Append(byte(i)).Append(byte(i/2)).Token(1))
 	}
 }
 
