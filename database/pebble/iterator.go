@@ -78,13 +78,13 @@ func (it *iter) Next() bool {
 	hasPoint, _ := it.iter.HasPointAndRange()
 	if !hasPoint {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, errNoPointKey)
+		it.err = fmt.Errorf("%w: %w", errCouldntGetValue, errNoPointKey)
 		return false
 	}
 
 	if err := it.iter.Error(); err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err)
+		it.err = fmt.Errorf("%w: %w", errCouldntGetValue, err)
 		return false
 	}
 
@@ -92,7 +92,7 @@ func (it *iter) Next() bool {
 	it.nextVal, err = it.iter.ValueAndErr()
 	if err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err)
+		it.err = fmt.Errorf("%w: %w", errCouldntGetValue, err)
 		return false
 	}
 
