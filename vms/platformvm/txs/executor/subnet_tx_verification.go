@@ -70,7 +70,7 @@ func verifySubnetAuthorization(
 	subnetIntf, _, err := chainState.GetTx(subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"%w %q: %v",
+			"%w %q: %w",
 			errCantFindSubnet,
 			subnetID,
 			err,
@@ -83,7 +83,7 @@ func verifySubnetAuthorization(
 	}
 
 	if err := backend.Fx.VerifyPermission(sTx.Unsigned, subnetAuth, subnetCred, subnet.Owner); err != nil {
-		return nil, fmt.Errorf("%w: %v", errUnauthorizedSubnetModification, err)
+		return nil, fmt.Errorf("%w: %w", errUnauthorizedSubnetModification, err)
 	}
 
 	return sTx.Creds[:baseTxCredsLen], nil
