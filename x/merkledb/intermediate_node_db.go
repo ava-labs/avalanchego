@@ -4,6 +4,8 @@
 package merkledb
 
 import (
+	"bytes"
+	"encoding/binary"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -89,13 +91,13 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 }
 
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
-	defer db.bufferPool.Put(prefixedKey)
+	dbKey := db.constructDBKey(key)
+	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
 	if n == nil {
-		return b.Delete(prefixedKey)
+		return b.Delete(dbKey)
 	}
-	return b.Put(prefixedKey, n.bytes())
+	return b.Put(dbKey, n.bytes())
 }
 
 func (db *intermediateNodeDB) Get(key path) (*node, error) {
@@ -108,15 +110,24 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
+	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(dbKey)
 	if err != nil {
 		return nil, err
 	}
-	db.bufferPool.Put(prefixedKey)
+	db.bufferPool.Put(dbKey)
 
 	return parseNode(key, nodeBytes)
+}
+
+func (db *intermediateNodeDB) constructDBKey(key path) []byte {
+	// We need differentiate between two paths of equal byte length but different nibble length
+	// so add the nibble length to the []byte key
+	lengthPrefix := bytes.NewBuffer(intermediateNodePrefix)
+	serializedKey := key.Serialize()
+	_ = binary.Write(lengthPrefix, binary.BigEndian, serializedKey.NibbleLength)
+	return addPrefixToKey(db.bufferPool, lengthPrefix.Bytes(), key.Serialize().Value)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {
