@@ -29,11 +29,11 @@ func TestBenchlistAdd(t *testing.T) {
 	vdrID3 := ids.GenerateTestNodeID()
 	vdrID4 := ids.GenerateTestNodeID()
 
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID0), nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID1), nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID2), nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID3), nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID4), nil, ids.Empty, 50))
 
 	benchable := &TestBenchable{T: t}
 	benchable.Default(true)
@@ -162,12 +162,18 @@ func TestBenchlistMaxStake(t *testing.T) {
 	vdrID3 := ids.GenerateTestNodeID()
 	vdrID4 := ids.GenerateTestNodeID()
 
+	genericVdrID0 := ids.GenericNodeIDFromNodeID(vdrID0)
+	genericVdrID1 := ids.GenericNodeIDFromNodeID(vdrID1)
+	genericVdrID2 := ids.GenericNodeIDFromNodeID(vdrID2)
+	genericVdrID3 := ids.GenericNodeIDFromNodeID(vdrID3)
+	genericVdrID4 := ids.GenericNodeIDFromNodeID(vdrID4)
+
 	// Total weight is 5100
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 2000))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 100))
+	require.NoError(vdrs.Add(genericVdrID0, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(genericVdrID1, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(genericVdrID2, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(genericVdrID3, nil, ids.Empty, 2000))
+	require.NoError(vdrs.Add(genericVdrID4, nil, ids.Empty, 100))
 
 	threshold := 3
 	duration := 1 * time.Hour
@@ -244,9 +250,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 	require.True(b.isBenched(vdrID4))
 	require.Equal(3, b.benchedQueue.Len())
 	require.Equal(3, b.benchlistSet.Len())
-	require.Contains(b.benchlistSet, vdrID0)
-	require.Contains(b.benchlistSet, vdrID1)
-	require.Contains(b.benchlistSet, vdrID4)
+	require.Contains(b.benchlistSet, genericVdrID0)
+	require.Contains(b.benchlistSet, genericVdrID1)
+	require.Contains(b.benchlistSet, genericVdrID4)
 	require.Len(b.failureStreaks, 1) // for vdr2
 	b.lock.Unlock()
 
@@ -289,11 +295,11 @@ func TestBenchlistRemove(t *testing.T) {
 	vdrID4 := ids.GenerateTestNodeID()
 
 	// Total weight is 5000
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID0), nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID1), nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID2), nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID3), nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID4), nil, ids.Empty, 1000))
 
 	count := 0
 	benchable := &TestBenchable{

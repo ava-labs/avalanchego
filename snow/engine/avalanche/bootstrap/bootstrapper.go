@@ -402,8 +402,12 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		validatorID := validatorIDs[0]
 		b.Config.SharedCfg.RequestID++
 
-		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		vdr, err := ids.NodeIDFromGenericNodeID(validatorID)
+		if err != nil {
+			return err
+		}
+		b.OutstandingRequests.Add(vdr, b.Config.SharedCfg.RequestID, vtxID)
+		b.Config.Sender.SendGetAncestors(ctx, vdr, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
 }

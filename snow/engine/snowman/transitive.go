@@ -701,7 +701,13 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	}
 
 	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
+	for _, genericVdrID := range vdrIDs {
+		vdrID, err := ids.NodeIDFromGenericNodeID(genericVdrID)
+		if err != nil {
+			panic(err)
+		}
+		vdrBag.Add(vdrID)
+	}
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
@@ -731,7 +737,13 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 	}
 
 	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
+	for _, genericVdrID := range vdrIDs {
+		vdrID, err := ids.NodeIDFromGenericNodeID(genericVdrID)
+		if err != nil {
+			panic(err)
+		}
+		vdrBag.Add(vdrID)
+	}
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {

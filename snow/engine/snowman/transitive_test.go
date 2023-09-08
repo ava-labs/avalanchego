@@ -39,7 +39,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -336,9 +336,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr0), nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr1), nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr2), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -731,9 +731,9 @@ func TestVoteCanceling(t *testing.T) {
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr0), nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr1), nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr2), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1309,7 +1309,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(secondVdr, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(secondVdr), nil, ids.Empty, 1))
 
 	sender.Default(true)
 
@@ -1499,7 +1499,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1598,8 +1598,8 @@ func TestEngineDoubleChit(t *testing.T) {
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr0), nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr1), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1692,7 +1692,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -2717,7 +2717,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender

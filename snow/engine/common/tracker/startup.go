@@ -36,7 +36,7 @@ func NewStartup(peers Peers, startupWeight uint64) Startup {
 	}
 }
 
-func (s *startup) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+func (s *startup) OnValidatorAdded(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -44,7 +44,7 @@ func (s *startup) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID id
 	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
-func (s *startup) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+func (s *startup) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

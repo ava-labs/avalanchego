@@ -50,7 +50,8 @@ func NewConfig(
 		stateSyncBeacons = validators.NewSet()
 		for _, peerID := range stateSyncerIDs {
 			// Invariant: We never use the TxID or BLS keys populated here.
-			if err := stateSyncBeacons.Add(peerID, nil, ids.Empty, 1); err != nil {
+			genericPeerID := ids.GenericNodeIDFromNodeID(peerID)
+			if err := stateSyncBeacons.Add(genericPeerID, nil, ids.Empty, 1); err != nil {
 				return Config{}, err
 			}
 		}

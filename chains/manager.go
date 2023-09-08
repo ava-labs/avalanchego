@@ -1355,7 +1355,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		if !m.IsBootstrapped(constants.PlatformChainID) {
 			return "node is currently bootstrapping", nil
 		}
-		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, m.NodeID) {
+		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(m.NodeID)) {
 			return "node is not a primary network validator", nil
 		}
 

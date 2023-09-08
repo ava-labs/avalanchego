@@ -21,7 +21,7 @@ func TestSetAddZeroWeight(t *testing.T) {
 	require := require.New(t)
 
 	s := NewSet()
-	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 0)
+	err := s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 0)
 	require.ErrorIs(err, errZeroWeight)
 }
 
@@ -30,7 +30,7 @@ func TestSetAddDuplicate(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.Add(nodeID, nil, ids.Empty, 1)
@@ -41,9 +41,9 @@ func TestSetAddOverflow(t *testing.T) {
 	require := require.New(t)
 
 	s := NewSet()
-	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 
-	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
+	err := s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, stdmath.MaxUint64)
 	require.ErrorIs(err, math.ErrOverflow)
 
 	require.Equal(uint64(1), s.Weight())
@@ -54,7 +54,7 @@ func TestSetAddWeightZeroWeight(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.AddWeight(nodeID, 0)
@@ -66,9 +66,9 @@ func TestSetAddWeightOverflow(t *testing.T) {
 
 	s := NewSet()
 
-	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.AddWeight(nodeID, stdmath.MaxUint64-1)
@@ -82,7 +82,7 @@ func TestSetGetWeight(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.Zero(s.GetWeight(nodeID))
 
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
@@ -93,15 +93,15 @@ func TestSetGetWeight(t *testing.T) {
 func TestSetSubsetWeight(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.GenerateTestNodeID()
-	nodeID1 := ids.GenerateTestNodeID()
-	nodeID2 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
+	nodeID1 := ids.GenerateTestGenericNodeID()
+	nodeID2 := ids.GenerateTestGenericNodeID()
 
 	weight0 := uint64(93)
 	weight1 := uint64(123)
 	weight2 := uint64(810)
 
-	subset := set.Set[ids.NodeID]{}
+	subset := set.Set[ids.GenericNodeID]{}
 	subset.Add(nodeID0)
 	subset.Add(nodeID1)
 
@@ -121,7 +121,7 @@ func TestSetRemoveWeightZeroWeight(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.RemoveWeight(nodeID, 0)
@@ -133,9 +133,9 @@ func TestSetRemoveWeightMissingValidator(t *testing.T) {
 
 	s := NewSet()
 
-	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 
-	err := s.RemoveWeight(ids.GenerateTestNodeID(), 1)
+	err := s.RemoveWeight(ids.GenerateTestGenericNodeID(), 1)
 	require.ErrorIs(err, errMissingValidator)
 }
 
@@ -144,9 +144,9 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 
 	s := NewSet()
 
-	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(s.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.RemoveWeight(nodeID, 2)
@@ -160,7 +160,7 @@ func TestSetGet(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	_, ok := s.Get(nodeID)
 	require.False(ok)
 
@@ -193,7 +193,7 @@ func TestSetContains(t *testing.T) {
 
 	s := NewSet()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	require.False(s.Contains(nodeID))
 
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
@@ -211,13 +211,13 @@ func TestSetLen(t *testing.T) {
 	len := s.Len()
 	require.Zero(len)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
 
 	len = s.Len()
 	require.Equal(1, len)
 
-	nodeID1 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
 	len = s.Len()
@@ -246,55 +246,53 @@ func TestSetMap(t *testing.T) {
 	require.NoError(err)
 
 	pk := bls.PublicFromSecretKey(sk)
-	nodeID0 := ids.GenerateTestNodeID()
-	genericNodeID0 := ids.GenericNodeIDFromNodeID(nodeID0)
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID0, pk, ids.Empty, 2))
 
 	m = s.Map()
 	require.Len(m, 1)
-	require.Contains(m, genericNodeID0)
+	require.Contains(m, nodeID0)
 
-	node0 := m[genericNodeID0]
-	require.Equal(genericNodeID0, node0.NodeID)
+	node0 := m[nodeID0]
+	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	nodeID1 := ids.GenerateTestNodeID()
-	genericNodeID1 := ids.GenericNodeIDFromNodeID(nodeID1)
+	nodeID1 := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
 	m = s.Map()
 	require.Len(m, 2)
-	require.Contains(m, genericNodeID0)
-	require.Contains(m, genericNodeID1)
+	require.Contains(m, nodeID0)
+	require.Contains(m, nodeID1)
 
-	node0 = m[genericNodeID0]
-	require.Equal(genericNodeID0, node0.NodeID)
+	node0 = m[nodeID0]
+	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	node1 := m[genericNodeID1]
-	require.Equal(genericNodeID1, node1.NodeID)
+	node1 := m[nodeID1]
+	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
 	require.NoError(s.RemoveWeight(nodeID0, 1))
-	require.Equal(genericNodeID0, node0.NodeID)
+	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
 	m = s.Map()
 	require.Len(m, 2)
-	require.Contains(m, genericNodeID0)
-	require.Contains(m, genericNodeID1)
+	require.Contains(m, nodeID0)
+	require.Contains(m, nodeID1)
 
-	node0 = m[genericNodeID0]
-	require.Equal(genericNodeID0, node0.NodeID)
+	node0 = m[nodeID0]
+	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(1), node0.Weight)
 
-	node1 = m[genericNodeID1]
-	require.Equal(genericNodeID1, node1.NodeID)
+	node1 = m[nodeID1]
+	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
@@ -302,10 +300,10 @@ func TestSetMap(t *testing.T) {
 
 	m = s.Map()
 	require.Len(m, 1)
-	require.Contains(m, genericNodeID1)
+	require.Contains(m, nodeID1)
 
-	node1 = m[genericNodeID1]
-	require.Equal(genericNodeID1, node1.NodeID)
+	node1 = m[nodeID1]
+	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
@@ -317,9 +315,9 @@ func TestSetMap(t *testing.T) {
 func TestSetWeight(t *testing.T) {
 	require := require.New(t)
 
-	vdr0 := ids.NodeID{1}
+	vdr0 := ids.GenerateTestGenericNodeID()
 	weight0 := uint64(93)
-	vdr1 := ids.NodeID{2}
+	vdr1 := ids.GenerateTestGenericNodeID()
 	weight1 := uint64(123)
 
 	s := NewSet()
@@ -344,41 +342,41 @@ func TestSetSample(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	pk := bls.PublicFromSecretKey(sk)
 	require.NoError(s.Add(nodeID0, pk, ids.Empty, 1))
 
 	sampled, err = s.Sample(1)
 	require.NoError(err)
-	require.Equal([]ids.NodeID{nodeID0}, sampled)
+	require.Equal([]ids.GenericNodeID{nodeID0}, sampled)
 
 	_, err = s.Sample(2)
 	require.ErrorIs(err, sampler.ErrOutOfRange)
 
-	nodeID1 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestGenericNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
 
 	sampled, err = s.Sample(1)
 	require.NoError(err)
-	require.Equal([]ids.NodeID{nodeID1}, sampled)
+	require.Equal([]ids.GenericNodeID{nodeID1}, sampled)
 
 	sampled, err = s.Sample(2)
 	require.NoError(err)
-	require.Equal([]ids.NodeID{nodeID1, nodeID1}, sampled)
+	require.Equal([]ids.GenericNodeID{nodeID1, nodeID1}, sampled)
 
 	sampled, err = s.Sample(3)
 	require.NoError(err)
-	require.Equal([]ids.NodeID{nodeID1, nodeID1, nodeID1}, sampled)
+	require.Equal([]ids.GenericNodeID{nodeID1, nodeID1, nodeID1}, sampled)
 }
 
 func TestSetString(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.EmptyNodeID
-	nodeID1 := ids.NodeID{
+	nodeID0 := ids.EmptyGenericNodeID
+	nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	}
+	})
 
 	s := NewSet()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
@@ -396,12 +394,12 @@ var _ SetCallbackListener = (*callbackListener)(nil)
 
 type callbackListener struct {
 	t         *testing.T
-	onAdd     func(ids.NodeID, *bls.PublicKey, ids.ID, uint64)
-	onWeight  func(ids.NodeID, uint64, uint64)
-	onRemoved func(ids.NodeID, uint64)
+	onAdd     func(ids.GenericNodeID, *bls.PublicKey, ids.ID, uint64)
+	onWeight  func(ids.GenericNodeID, uint64, uint64)
+	onRemoved func(ids.GenericNodeID, uint64)
 }
 
-func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+func (c *callbackListener) OnValidatorAdded(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	if c.onAdd != nil {
 		c.onAdd(nodeID, pk, txID, weight)
 	} else {
@@ -409,7 +407,7 @@ func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey
 	}
 }
 
-func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (c *callbackListener) OnValidatorRemoved(nodeID ids.GenericNodeID, weight uint64) {
 	if c.onRemoved != nil {
 		c.onRemoved(nodeID, weight)
 	} else {
@@ -417,7 +415,7 @@ func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) 
 	}
 }
 
-func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 	if c.onWeight != nil {
 		c.onWeight(nodeID, oldWeight, newWeight)
 	} else {
@@ -428,7 +426,7 @@ func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight
 func TestSetAddCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.NodeID{1}
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	sk0, err := bls.NewSecretKey()
 	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
@@ -439,7 +437,7 @@ func TestSetAddCallback(t *testing.T) {
 	callCount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
-		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+		onAdd: func(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Equal(pk0, pk)
 			require.Equal(txID0, txID)
@@ -454,7 +452,7 @@ func TestSetAddCallback(t *testing.T) {
 func TestSetAddWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.NodeID{1}
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(1)
 	weight1 := uint64(93)
@@ -465,14 +463,14 @@ func TestSetAddWeightCallback(t *testing.T) {
 	callCount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
-		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+		onAdd: func(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Nil(pk)
 			require.Equal(txID0, txID)
 			require.Equal(weight0, weight)
 			callCount++
 		},
-		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+		onWeight: func(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Equal(weight0, oldWeight)
 			require.Equal(weight0+weight1, newWeight)
@@ -486,7 +484,7 @@ func TestSetAddWeightCallback(t *testing.T) {
 func TestSetRemoveWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.NodeID{1}
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 	weight1 := uint64(92)
@@ -497,14 +495,14 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	callCount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
-		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+		onAdd: func(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Nil(pk)
 			require.Equal(txID0, txID)
 			require.Equal(weight0, weight)
 			callCount++
 		},
-		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+		onWeight: func(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Equal(weight0, oldWeight)
 			require.Equal(weight0-weight1, newWeight)
@@ -518,7 +516,7 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 func TestSetValidatorRemovedCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.NodeID{1}
+	nodeID0 := ids.GenerateTestGenericNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 
@@ -528,14 +526,14 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	callCount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
-		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+		onAdd: func(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Nil(pk)
 			require.Equal(txID0, txID)
 			require.Equal(weight0, weight)
 			callCount++
 		},
-		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+		onRemoved: func(nodeID ids.GenericNodeID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
 			require.Equal(weight0, weight)
 			callCount++

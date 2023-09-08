@@ -43,13 +43,13 @@ func TestNewTargeter(t *testing.T) {
 func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	vdr := ids.NodeID{1}
+	vdr := ids.GenerateTestGenericNodeID()
 	vdrWeight := uint64(1)
 	totalVdrWeight := uint64(10)
-	nonVdr := ids.NodeID{2}
+	nonVdr := ids.GenerateTestGenericNodeID()
 	vdrs := validators.NewSet()
 	require.NoError(t, vdrs.Add(vdr, nil, ids.Empty, 1))
-	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
+	require.NoError(t, vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{
@@ -67,7 +67,7 @@ func TestTarget(t *testing.T) {
 	type test struct {
 		name           string
 		setup          func()
-		nodeID         ids.NodeID
+		nodeID         ids.GenericNodeID
 		expectedTarget float64
 	}
 	tests := []test{

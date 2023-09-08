@@ -35,7 +35,7 @@ type Set interface {
 	// - [nodeID] is already in the validator set
 	// - the total weight of the validator set would overflow uint64
 	// If an error is returned, the set will be unmodified.
-	Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error
+	Add(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error
 
 	// AddWeight to an existing staker.
 	// Returns an error if:
@@ -43,16 +43,16 @@ type Set interface {
 	// - [nodeID] is not already in the validator set
 	// - the total weight of the validator set would overflow uint64
 	// If an error is returned, the set will be unmodified.
-	AddWeight(nodeID ids.NodeID, weight uint64) error
+	AddWeight(nodeID ids.GenericNodeID, weight uint64) error
 
 	// GetWeight retrieves the validator weight from the set.
-	GetWeight(ids.NodeID) uint64
+	GetWeight(ids.GenericNodeID) uint64
 
 	// Get returns the validator tied to the specified ID.
-	Get(ids.NodeID) (*Validator, bool)
+	Get(ids.GenericNodeID) (*Validator, bool)
 
 	// SubsetWeight returns the sum of the weights of the validators.
-	SubsetWeight(set.Set[ids.NodeID]) uint64
+	SubsetWeight(set.Set[ids.GenericNodeID]) uint64
 
 	// RemoveWeight from a staker. If the staker's weight becomes 0, the staker
 	// will be removed from the validator set.
@@ -61,11 +61,11 @@ type Set interface {
 	// - [nodeID] is not already in the validator set
 	// - the weight of the validator would become negative
 	// If an error is returned, the set will be unmodified.
-	RemoveWeight(nodeID ids.NodeID, weight uint64) error
+	RemoveWeight(nodeID ids.GenericNodeID, weight uint64) error
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the set.
-	Contains(ids.NodeID) bool
+	Contains(ids.GenericNodeID) bool
 
 	// Len returns the number of validators currently in the set.
 	Len() int
@@ -78,7 +78,7 @@ type Set interface {
 
 	// Sample returns a collection of validatorIDs, potentially with duplicates.
 	// If sampling the requested size isn't possible, an error will be returned.
-	Sample(size int) ([]ids.NodeID, error)
+	Sample(size int) ([]ids.GenericNodeID, error)
 
 	// When a validator's weight changes, or a validator is added/removed,
 	// this listener is called.
@@ -86,15 +86,15 @@ type Set interface {
 }
 
 type SetCallbackListener interface {
-	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
-	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
-	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
+	OnValidatorAdded(validatorID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
+	OnValidatorRemoved(validatorID ids.GenericNodeID, weight uint64)
+	OnValidatorWeightChanged(validatorID ids.GenericNodeID, oldWeight, newWeight uint64)
 }
 
 // NewSet returns a new, empty set of validators.
 func NewSet() Set {
 	return &vdrSet{
-		vdrs:    make(map[ids.NodeID]*Validator),
+		vdrs:    make(map[ids.GenericNodeID]*Validator),
 		sampler: sampler.NewWeightedWithoutReplacement(),
 	}
 }
@@ -102,14 +102,14 @@ func NewSet() Set {
 // NewBestSet returns a new, empty set of validators.
 func NewBestSet(expectedSampleSize int) Set {
 	return &vdrSet{
-		vdrs:    make(map[ids.NodeID]*Validator),
+		vdrs:    make(map[ids.GenericNodeID]*Validator),
 		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
 	}
 }
 
 type vdrSet struct {
 	lock        sync.RWMutex
-	vdrs        map[ids.NodeID]*Validator
+	vdrs        map[ids.GenericNodeID]*Validator
 	vdrSlice    []*Validator
 	weights     []uint64
 	totalWeight uint64
@@ -120,7 +120,7 @@ type vdrSet struct {
 	callbackListeners []SetCallbackListener
 }
 
-func (s *vdrSet) Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
+func (s *vdrSet) Add(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	if weight == 0 {
 		return errZeroWeight
 	}
@@ -131,7 +131,7 @@ func (s *vdrSet) Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight u
 	return s.add(nodeID, pk, txID, weight)
 }
 
-func (s *vdrSet) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
+func (s *vdrSet) add(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	_, nodeExists := s.vdrs[nodeID]
 	if nodeExists {
 		return errDuplicateValidator
@@ -161,7 +161,7 @@ func (s *vdrSet) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight u
 	return nil
 }
 
-func (s *vdrSet) AddWeight(nodeID ids.NodeID, weight uint64) error {
+func (s *vdrSet) AddWeight(nodeID ids.GenericNodeID, weight uint64) error {
 	if weight == 0 {
 		return errZeroWeight
 	}
@@ -172,7 +172,7 @@ func (s *vdrSet) AddWeight(nodeID ids.NodeID, weight uint64) error {
 	return s.addWeight(nodeID, weight)
 }
 
-func (s *vdrSet) addWeight(nodeID ids.NodeID, weight uint64) error {
+func (s *vdrSet) addWeight(nodeID ids.GenericNodeID, weight uint64) error {
 	vdr, nodeExists := s.vdrs[nodeID]
 	if !nodeExists {
 		return errMissingValidator
@@ -195,28 +195,28 @@ func (s *vdrSet) addWeight(nodeID ids.NodeID, weight uint64) error {
 	return nil
 }
 
-func (s *vdrSet) GetWeight(nodeID ids.NodeID) uint64 {
+func (s *vdrSet) GetWeight(nodeID ids.GenericNodeID) uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.getWeight(nodeID)
 }
 
-func (s *vdrSet) getWeight(nodeID ids.NodeID) uint64 {
+func (s *vdrSet) getWeight(nodeID ids.GenericNodeID) uint64 {
 	if vdr, ok := s.vdrs[nodeID]; ok {
 		return vdr.Weight
 	}
 	return 0
 }
 
-func (s *vdrSet) SubsetWeight(subset set.Set[ids.NodeID]) uint64 {
+func (s *vdrSet) SubsetWeight(subset set.Set[ids.GenericNodeID]) uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.subsetWeight(subset)
 }
 
-func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) uint64 {
+func (s *vdrSet) subsetWeight(subset set.Set[ids.GenericNodeID]) uint64 {
 	var totalWeight uint64
 	for nodeID := range subset {
 		// Because [totalWeight] will be <= [s.totalWeight], we are guaranteed
@@ -226,7 +226,7 @@ func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) uint64 {
 	return totalWeight
 }
 
-func (s *vdrSet) RemoveWeight(nodeID ids.NodeID, weight uint64) error {
+func (s *vdrSet) RemoveWeight(nodeID ids.GenericNodeID, weight uint64) error {
 	if weight == 0 {
 		return errZeroWeight
 	}
@@ -237,7 +237,7 @@ func (s *vdrSet) RemoveWeight(nodeID ids.NodeID, weight uint64) error {
 	return s.removeWeight(nodeID, weight)
 }
 
-func (s *vdrSet) removeWeight(nodeID ids.NodeID, weight uint64) error {
+func (s *vdrSet) removeWeight(nodeID ids.GenericNodeID, weight uint64) error {
 	vdr, ok := s.vdrs[nodeID]
 	if !ok {
 		return errMissingValidator
@@ -279,14 +279,14 @@ func (s *vdrSet) removeWeight(nodeID ids.NodeID, weight uint64) error {
 	return nil
 }
 
-func (s *vdrSet) Get(nodeID ids.NodeID) (*Validator, bool) {
+func (s *vdrSet) Get(nodeID ids.GenericNodeID) (*Validator, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.get(nodeID)
 }
 
-func (s *vdrSet) get(nodeID ids.NodeID) (*Validator, bool) {
+func (s *vdrSet) get(nodeID ids.GenericNodeID) (*Validator, bool) {
 	vdr, ok := s.vdrs[nodeID]
 	if !ok {
 		return nil, false
@@ -295,14 +295,14 @@ func (s *vdrSet) get(nodeID ids.NodeID) (*Validator, bool) {
 	return &copiedVdr, true
 }
 
-func (s *vdrSet) Contains(nodeID ids.NodeID) bool {
+func (s *vdrSet) Contains(nodeID ids.GenericNodeID) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.contains(nodeID)
 }
 
-func (s *vdrSet) contains(nodeID ids.NodeID) bool {
+func (s *vdrSet) contains(nodeID ids.GenericNodeID) bool {
 	_, contains := s.vdrs[nodeID]
 	return contains
 }
@@ -324,9 +324,8 @@ func (s *vdrSet) Map() map[ids.GenericNodeID]*GetValidatorOutput {
 
 	set := make(map[ids.GenericNodeID]*GetValidatorOutput, len(s.vdrSlice))
 	for _, vdr := range s.vdrSlice {
-		genericNodeID := ids.GenericNodeIDFromNodeID(vdr.NodeID)
-		set[genericNodeID] = &GetValidatorOutput{
-			NodeID:    genericNodeID,
+		set[vdr.NodeID] = &GetValidatorOutput{
+			NodeID:    vdr.NodeID,
 			PublicKey: vdr.PublicKey,
 			Weight:    vdr.Weight,
 		}
@@ -334,7 +333,7 @@ func (s *vdrSet) Map() map[ids.GenericNodeID]*GetValidatorOutput {
 	return set
 }
 
-func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
+func (s *vdrSet) Sample(size int) ([]ids.GenericNodeID, error) {
 	if size == 0 {
 		return nil, nil
 	}
@@ -345,7 +344,7 @@ func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
 	return s.sample(size)
 }
 
-func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
+func (s *vdrSet) sample(size int) ([]ids.GenericNodeID, error) {
 	if !s.samplerInitialized {
 		if err := s.sampler.Initialize(s.weights); err != nil {
 			return nil, err
@@ -358,7 +357,7 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 		return nil, err
 	}
 
-	list := make([]ids.NodeID, size)
+	list := make([]ids.GenericNodeID, size)
 	for i, index := range indices {
 		list[i] = s.vdrSlice[index].NodeID
 	}
@@ -395,7 +394,7 @@ func (s *vdrSet) prefixedString(prefix string) string {
 		sb.WriteString(fmt.Sprintf(
 			format,
 			i,
-			vdr.NodeID,
+			vdr.NodeID.String(),
 			vdr.Weight,
 		))
 	}
@@ -414,21 +413,21 @@ func (s *vdrSet) RegisterCallbackListener(callbackListener SetCallbackListener) 
 }
 
 // Assumes [s.lock] is held
-func (s *vdrSet) callWeightChangeCallbacks(node ids.NodeID, oldWeight, newWeight uint64) {
+func (s *vdrSet) callWeightChangeCallbacks(node ids.GenericNodeID, oldWeight, newWeight uint64) {
 	for _, callbackListener := range s.callbackListeners {
 		callbackListener.OnValidatorWeightChanged(node, oldWeight, newWeight)
 	}
 }
 
 // Assumes [s.lock] is held
-func (s *vdrSet) callValidatorAddedCallbacks(node ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+func (s *vdrSet) callValidatorAddedCallbacks(node ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	for _, callbackListener := range s.callbackListeners {
 		callbackListener.OnValidatorAdded(node, pk, txID, weight)
 	}
 }
 
 // Assumes [s.lock] is held
-func (s *vdrSet) callValidatorRemovedCallbacks(node ids.NodeID, weight uint64) {
+func (s *vdrSet) callValidatorRemovedCallbacks(node ids.GenericNodeID, weight uint64) {
 	for _, callbackListener := range s.callbackListeners {
 		callbackListener.OnValidatorRemoved(node, weight)
 	}

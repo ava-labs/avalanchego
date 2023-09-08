@@ -62,7 +62,7 @@ type testAggressiveValidatorSet struct {
 	validators.Set
 }
 
-func (*testAggressiveValidatorSet) Contains(ids.NodeID) bool {
+func (*testAggressiveValidatorSet) Contains(ids.GenericNodeID) bool {
 	return true
 }
 

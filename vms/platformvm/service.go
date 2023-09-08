@@ -1133,12 +1133,20 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 	if err != nil {
 		return fmt.Errorf("sampling errored with %w", err)
 	}
+	nodeIDs := make([]ids.NodeID, 0, len(sample))
+	for _, item := range sample {
+		nodeID, err := ids.NodeIDFromGenericNodeID(item)
+		if err != nil {
+			return err
+		}
+		nodeIDs = append(nodeIDs, nodeID)
+	}
 
 	if sample == nil {
 		reply.Validators = []ids.NodeID{}
 	} else {
-		utils.Sort(sample)
-		reply.Validators = sample
+		utils.Sort(nodeIDs)
+		reply.Validators = nodeIDs
 	}
 	return nil
 }
@@ -1942,7 +1950,7 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	return validators.Contains(s.vm.ctx.NodeID)
+	return validators.Contains(ids.GenericNodeIDFromNodeID(s.vm.ctx.NodeID))
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {

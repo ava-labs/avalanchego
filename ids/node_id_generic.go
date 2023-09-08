@@ -14,7 +14,9 @@ import (
 )
 
 var (
-	EmptyGenericNodeID = GenericNodeID{}
+	EmptyGenericNodeID = GenericNodeID{
+		id: string(EmptyNodeID[:]),
+	}
 
 	_ utils.Sortable[GenericNodeID] = (*GenericNodeID)(nil)
 )

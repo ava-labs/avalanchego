@@ -118,7 +118,7 @@ type benchlist struct {
 	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet set.Set[ids.NodeID]
+	benchlistSet set.Set[ids.GenericNodeID]
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -157,7 +157,7 @@ func NewBenchlist(
 		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.NodeID]failureStreak),
-		benchlistSet:           set.Set[ids.NodeID]{},
+		benchlistSet:           set.Set[ids.GenericNodeID]{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
@@ -198,7 +198,7 @@ func (b *benchlist) remove(node *benchData) {
 		zap.Stringer("nodeID", id),
 	)
 	heap.Remove(&b.benchedQueue, node.index)
-	b.benchlistSet.Remove(id)
+	b.benchlistSet.Remove(ids.GenericNodeIDFromNodeID(id))
 	b.benchable.Unbenched(b.chainID, id)
 
 	// Update metrics
@@ -246,7 +246,7 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 // and calls cleanup if its benching period has elapsed
 // Assumes [b.lock] is held.
 func (b *benchlist) isBenched(nodeID ids.NodeID) bool {
-	if _, ok := b.benchlistSet[nodeID]; ok {
+	if _, ok := b.benchlistSet[ids.GenericNodeIDFromNodeID(nodeID)]; ok {
 		return true
 	}
 	return false
@@ -264,7 +264,7 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if b.benchlistSet.Contains(nodeID) {
+	if b.benchlistSet.Contains(ids.GenericNodeIDFromNodeID(nodeID)) {
 		// This validator is benched. Ignore failures until they're not.
 		return
 	}
@@ -290,7 +290,7 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
 func (b *benchlist) bench(nodeID ids.NodeID) {
-	validatorStake := b.vdrs.GetWeight(nodeID)
+	validatorStake := b.vdrs.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
@@ -329,7 +329,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	benchedUntil := minBenchedUntil.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
 
 	// Add to benchlist times with randomized delay
-	b.benchlistSet.Add(nodeID)
+	b.benchlistSet.Add(ids.GenericNodeIDFromNodeID(nodeID))
 	b.benchable.Benched(b.chainID, nodeID)
 
 	b.streaklock.Lock()

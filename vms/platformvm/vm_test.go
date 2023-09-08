@@ -430,8 +430,9 @@ func TestGenesis(t *testing.T) {
 	require.Len(genesisState.Validators, vdrSet.Len())
 
 	for _, key := range keys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
-		require.True(vdrSet.Contains(nodeID))
+		shortNodeID := ids.NodeID(key.PublicKey().Address())
+		genericNodeID := ids.GenericNodeIDFromNodeID(shortNodeID)
+		require.True(vdrSet.Contains(genericNodeID))
 	}
 
 	// Ensure the new subnet we created exists
@@ -1540,8 +1541,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
+	genericPeerID := ids.GenericNodeIDFromNodeID(peerID)
 	beacons := validators.NewSet()
-	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
+	require.NoError(beacons.Add(genericPeerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(

@@ -26,7 +26,7 @@ type beaconManager struct {
 
 func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID &&
-		b.beacons.Contains(nodeID) &&
+		b.beacons.Contains(ids.GenericNodeIDFromNodeID(nodeID)) &&
 		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
 		b.timer.Cancel()
 	}
@@ -34,7 +34,7 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 }
 
 func (b *beaconManager) Disconnected(nodeID ids.NodeID) {
-	if b.beacons.Contains(nodeID) {
+	if b.beacons.Contains(ids.GenericNodeIDFromNodeID(nodeID)) {
 		atomic.AddInt64(&b.numConns, -1)
 	}
 	b.Router.Disconnected(nodeID)

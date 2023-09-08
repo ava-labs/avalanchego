@@ -468,7 +468,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(n.config.MyNodeID)) ||
 		n.WantsConnection(nodeID)
 }
 
@@ -807,7 +807,7 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, nodeID) ||
+	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID)) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
@@ -862,7 +862,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		isValidator := validators.Contains(n.config.Validators, subnetID, nodeID)
+		isValidator := validators.Contains(n.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(nodeID))
 		// check if the peer is allowed to connect to the subnet
 		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
@@ -906,7 +906,7 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			isValidator := subnetValidators.Contains(peerID)
+			isValidator := subnetValidators.Contains(ids.GenericNodeIDFromNodeID(peerID))
 			// check if the peer is allowed to connect to the subnet
 			if !allower.IsAllowed(peerID, isValidator) {
 				return false
@@ -1345,7 +1345,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		return UptimeResult{}, errSubnetNotExist
 	}
 
-	myStake := validators.GetWeight(n.config.MyNodeID)
+	myStake := validators.GetWeight(ids.GenericNodeIDFromNodeID(n.config.MyNodeID))
 	if myStake == 0 {
 		return UptimeResult{}, errNotValidator
 	}
@@ -1363,7 +1363,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		peer, _ := n.connectedPeers.GetByIndex(i)
 
 		nodeID := peer.ID()
-		weight := validators.GetWeight(nodeID)
+		weight := validators.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 		if weight == 0 {
 			// this is not a validator skip it.
 			continue

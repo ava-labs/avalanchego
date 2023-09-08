@@ -27,7 +27,7 @@ func TestAccepted(t *testing.T) {
 	_, ok = a.LastAccepted(nodeID)
 	require.False(ok)
 
-	a.OnValidatorAdded(nodeID, nil, ids.GenerateTestID(), 1)
+	a.OnValidatorAdded(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.GenerateTestID(), 1)
 
 	_, ok = a.LastAccepted(nodeID)
 	require.False(ok)
@@ -42,7 +42,7 @@ func TestAccepted(t *testing.T) {
 	require.True(ok)
 	require.Equal(blkID1, blkID)
 
-	a.OnValidatorRemoved(nodeID, 1)
+	a.OnValidatorRemoved(ids.GenericNodeIDFromNodeID(nodeID), 1)
 
 	_, ok = a.LastAccepted(nodeID)
 	require.False(ok)

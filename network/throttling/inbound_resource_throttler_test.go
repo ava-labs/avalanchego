@@ -57,18 +57,19 @@ func TestSystemThrottler(t *testing.T) {
 		MaxRecheckDelay: maxRecheckDelay,
 	}
 	vdrID, nonVdrID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+	genericVdrID, genericNonVdrID := ids.GenericNodeIDFromNodeID(vdrID), ids.GenericNodeIDFromNodeID(nonVdrID)
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)
 
 	// Case: Actual usage <= target usage; should return immediately
 	// for both validator and non-validator
-	targeter.EXPECT().TargetUsage(vdrID).Return(1.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericVdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(vdrID, gomock.Any()).Return(0.9).Times(1)
 
 	throttler.Acquire(context.Background(), vdrID)
 
-	targeter.EXPECT().TargetUsage(nonVdrID).Return(1.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericNonVdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(nonVdrID, gomock.Any()).Return(0.9).Times(1)
 
 	throttler.Acquire(context.Background(), nonVdrID)
@@ -76,7 +77,7 @@ func TestSystemThrottler(t *testing.T) {
 	// Case: Actual usage > target usage; we should wait.
 	// In the first loop iteration inside acquire,
 	// say the actual usage exceeds the target.
-	targeter.EXPECT().TargetUsage(vdrID).Return(0.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericVdrID).Return(0.0).Times(1)
 	mockTracker.EXPECT().Usage(vdrID, gomock.Any()).Return(1.0).Times(1)
 	// Note we'll only actually wait [maxRecheckDelay]. We set [timeUntilAtDiskTarget]
 	// much larger to assert that the min recheck frequency is honored below.
@@ -84,7 +85,7 @@ func TestSystemThrottler(t *testing.T) {
 	mockTracker.EXPECT().TimeUntilUsage(vdrID, gomock.Any(), gomock.Any()).Return(timeUntilAtDiskTarget).Times(1)
 
 	// The second iteration, say the usage is OK.
-	targeter.EXPECT().TargetUsage(vdrID).Return(1.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericVdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(vdrID, gomock.Any()).Return(0.0).Times(1)
 
 	onAcquire := make(chan struct{})
@@ -104,12 +105,12 @@ func TestSystemThrottler(t *testing.T) {
 	case <-onAcquire:
 	}
 
-	targeter.EXPECT().TargetUsage(nonVdrID).Return(0.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericNonVdrID).Return(0.0).Times(1)
 	mockTracker.EXPECT().Usage(nonVdrID, gomock.Any()).Return(1.0).Times(1)
 
 	mockTracker.EXPECT().TimeUntilUsage(nonVdrID, gomock.Any(), gomock.Any()).Return(timeUntilAtDiskTarget).Times(1)
 
-	targeter.EXPECT().TargetUsage(nonVdrID).Return(1.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericNonVdrID).Return(1.0).Times(1)
 	mockTracker.EXPECT().Usage(nonVdrID, gomock.Any()).Return(0.0).Times(1)
 
 	// Check for non-validator
@@ -139,6 +140,7 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 		MaxRecheckDelay: maxRecheckDelay,
 	}
 	vdrID := ids.GenerateTestNodeID()
+	genericVdrID := ids.GenericNodeIDFromNodeID(vdrID)
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)
@@ -147,7 +149,7 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	// Mock the tracker so that the first loop iteration inside acquire,
 	// it says the actual usage exceeds the target.
 	// There should be no second iteration because we've already returned.
-	targeter.EXPECT().TargetUsage(vdrID).Return(0.0).Times(1)
+	targeter.EXPECT().TargetUsage(genericVdrID).Return(0.0).Times(1)
 	mockTracker.EXPECT().Usage(vdrID, gomock.Any()).Return(1.0).Times(1)
 	mockTracker.EXPECT().TimeUntilUsage(vdrID, gomock.Any(), gomock.Any()).Return(maxRecheckDelay).Times(1)
 	onAcquire := make(chan struct{})

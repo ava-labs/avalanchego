@@ -302,7 +302,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		copy(ids.Writable(&dummyTxID), n.ID.Bytes())
 
 		err := primaryNetVdrs.Add(
-			n.ID,
+			ids.GenericNodeIDFromNodeID(n.ID),
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
@@ -563,7 +563,8 @@ func (n *Node) initBootstrappers() error {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
+		genericNodeID := ids.GenericNodeIDFromNodeID(bootstrapper.ID)
+		if err := n.bootstrappers.Add(genericNodeID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}

@@ -11,7 +11,7 @@ import (
 // Validator is a struct that contains the base values representing a validator
 // of the Avalanche Network.
 type Validator struct {
-	NodeID    ids.NodeID
+	NodeID    ids.GenericNodeID
 	PublicKey *bls.PublicKey
 	TxID      ids.ID
 	Weight    uint64

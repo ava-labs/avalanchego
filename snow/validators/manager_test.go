@@ -17,7 +17,7 @@ func TestAdd(t *testing.T) {
 	m := NewManager()
 
 	subnetID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	err := Add(m, subnetID, nodeID, nil, ids.Empty, 1)
 	require.ErrorIs(err, ErrMissingValidators)
@@ -36,7 +36,7 @@ func TestAddWeight(t *testing.T) {
 	m := NewManager()
 
 	subnetID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	err := AddWeight(m, subnetID, nodeID, 1)
 	require.ErrorIs(err, ErrMissingValidators)
@@ -60,7 +60,7 @@ func TestRemoveWeight(t *testing.T) {
 	m := NewManager()
 
 	subnetID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	err := RemoveWeight(m, subnetID, nodeID, 1)
 	require.ErrorIs(err, ErrMissingValidators)
@@ -85,7 +85,7 @@ func TestContains(t *testing.T) {
 	m := NewManager()
 
 	subnetID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	require.False(Contains(m, subnetID, nodeID))
 

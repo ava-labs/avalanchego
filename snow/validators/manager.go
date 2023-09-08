@@ -101,7 +101,7 @@ func (m *manager) String() string {
 // Returns an error if:
 // - [subnetID] does not have a registered validator set in [m]
 // - adding [nodeID] to the validator set returns an error
-func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
+func Add(m Manager, subnetID ids.ID, nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
@@ -114,7 +114,7 @@ func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID 
 // Returns an error if:
 // - [subnetID] does not have a registered validator set in [m]
 // - adding [weight] to [nodeID] in the validator set returns an error
-func AddWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+func AddWeight(m Manager, subnetID ids.ID, nodeID ids.GenericNodeID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
@@ -127,7 +127,7 @@ func AddWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) err
 // Returns an error if:
 // - [subnetID] does not have a registered validator set in [m]
 // - removing [weight] from [nodeID] in the validator set returns an error
-func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.GenericNodeID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
@@ -138,7 +138,7 @@ func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) 
 // Contains is a helper that fetches the validator set of [subnetID] from [m]
 // and returns if the validator set contains [nodeID]. If [m] does not contain a
 // validator set for [subnetID], false is returned.
-func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
+func Contains(m Manager, subnetID ids.ID, nodeID ids.GenericNodeID) bool {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
 		return false

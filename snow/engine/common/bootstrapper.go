@@ -48,12 +48,12 @@ type bootstrapper struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier set.Set[ids.NodeID]
+	pendingSendAcceptedFrontier set.Set[ids.GenericNodeID]
 	// IDs of validators we requested an accepted frontier from but haven't
 	// received a reply yet
-	pendingReceiveAcceptedFrontier set.Set[ids.NodeID]
+	pendingReceiveAcceptedFrontier set.Set[ids.GenericNodeID]
 	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier set.Set[ids.NodeID]
+	failedAcceptedFrontier set.Set[ids.GenericNodeID]
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet set.Set[ids.ID]
 
@@ -64,7 +64,7 @@ type bootstrapper struct {
 	pendingReceiveAccepted set.Set[ids.GenericNodeID]
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
-	failedAccepted set.Set[ids.NodeID]
+	failedAccepted set.Set[ids.GenericNodeID]
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
@@ -91,7 +91,8 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 
-	if !b.pendingReceiveAcceptedFrontier.Contains(nodeID) {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if !b.pendingReceiveAcceptedFrontier.Contains(genericNodeID) {
 		b.Ctx.Log.Debug("received unexpected AcceptedFrontier message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -115,7 +116,8 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 		return nil
 	}
 
-	if !b.pendingReceiveAcceptedFrontier.Contains(nodeID) {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if !b.pendingReceiveAcceptedFrontier.Contains(genericNodeID) {
 		b.Ctx.Log.Debug("received unexpected GetAcceptedFrontierFailed message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -124,13 +126,14 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 
 	// If we can't get a response from [nodeID], act as though they said their
 	// accepted frontier is empty and we add the validator to the failed list
-	b.failedAcceptedFrontier.Add(nodeID)
+	b.failedAcceptedFrontier.Add(genericNodeID)
 	return b.markAcceptedFrontierReceived(ctx, nodeID)
 }
 
 func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID ids.NodeID) error {
 	// Mark that we received a response from [nodeID]
-	b.pendingReceiveAcceptedFrontier.Remove(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	b.pendingReceiveAcceptedFrontier.Remove(genericNodeID)
 
 	b.sendGetAcceptedFrontiers(ctx)
 
@@ -197,7 +200,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	// Mark that we received a response from [nodeID]
 	b.pendingReceiveAccepted.Remove(genericNodeID)
 
-	weight := b.Beacons.GetWeight(nodeID)
+	weight := b.Beacons.GetWeight(genericNodeID)
 	for _, containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
@@ -277,7 +280,8 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	// If we can't get a response from [nodeID], act as though they said that
 	// they think none of the containers we sent them in GetAccepted are
 	// accepted
-	b.failedAccepted.Add(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	b.failedAccepted.Add(genericNodeID)
 	return b.Accepted(ctx, nodeID, requestID, nil)
 }
 
@@ -352,11 +356,15 @@ func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
-		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
+		genericVdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
+		vdr, err := ids.NodeIDFromGenericNodeID(genericVdr)
+		if err != nil {
+			panic(err)
+		}
 		vdrs.Add(vdr)
 		// Add the validator to send pending receipt set
-		b.pendingReceiveAcceptedFrontier.Add(vdr)
+		b.pendingReceiveAcceptedFrontier.Add(genericVdr)
 	}
 
 	if vdrs.Len() > 0 {

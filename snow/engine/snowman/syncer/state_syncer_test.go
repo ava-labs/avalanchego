@@ -126,7 +126,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vdr0, nil, ids.Empty, startupAlpha/2))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr0), nil, ids.Empty, startupAlpha/2))
 	require.NoError(syncer.Connected(context.Background(), vdr0, version.CurrentApp))
 
 	require.False(commonCfg.StartupTracker.ShouldStart())
@@ -135,7 +135,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vdr, nil, ids.Empty, startupAlpha))
+	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, startupAlpha))
 	require.NoError(syncer.Connected(context.Background(), vdr, version.CurrentApp))
 
 	require.True(commonCfg.StartupTracker.ShouldStart())
@@ -260,7 +260,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
-		require.Contains(syncer.pendingSeeders, beaconID)
+		require.Contains(syncer.pendingSeeders, ids.GenericNodeIDFromNodeID(beaconID))
 	}
 
 	// check that, obviously, no summary is yet registered
@@ -327,7 +327,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		math.MaxInt32,
 		summaryBytes,
 	))
-	require.Contains(syncer.pendingSeeders, responsiveBeaconID) // responsiveBeacon still pending
+	require.Contains(syncer.pendingSeeders, ids.GenericNodeIDFromNodeID(responsiveBeaconID)) // responsiveBeacon still pending
 	require.Empty(syncer.weightedSummaries)
 
 	// check a response from unsolicited node is dropped
@@ -493,8 +493,9 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	))
 
 	// unresponsiveBeacon not pending anymore
-	require.NotContains(syncer.pendingSeeders, unresponsiveBeaconID)
-	require.Contains(syncer.failedSeeders, unresponsiveBeaconID)
+	genericUnresponsiveBeaconID := ids.GenericNodeIDFromNodeID(unresponsiveBeaconID)
+	require.NotContains(syncer.pendingSeeders, genericUnresponsiveBeaconID)
+	require.Contains(syncer.failedSeeders, genericUnresponsiveBeaconID)
 
 	// even in case of timeouts, other listed vdrs
 	// are reached for data
@@ -546,11 +547,11 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -591,9 +592,11 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	maxResponses := 1
 	reachedSeedersCount := syncer.Config.SampleK
 	for reachedSeedersCount >= 0 {
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		if maxResponses > 0 {
 			require.NoError(syncer.StateSummaryFrontier(
@@ -640,11 +643,11 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -677,9 +680,11 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		require.NoError(syncer.StateSummaryFrontier(
 			context.Background(),
@@ -716,11 +721,11 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -752,9 +757,11 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		require.NoError(syncer.StateSummaryFrontier(
 			context.Background(),
@@ -786,7 +793,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveVoter still pending
-	require.Contains(syncer.pendingVoters, responsiveVoterID)
+	require.Contains(syncer.pendingVoters, ids.GenericNodeIDFromNodeID(responsiveVoterID))
 	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// check a response from unsolicited node is dropped
@@ -809,7 +816,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// responsiveBeacon not pending anymore
 	require.NotContains(syncer.pendingSeeders, responsiveVoterID)
-	voterWeight := vdrs.GetWeight(responsiveVoterID)
+	voterWeight := vdrs.GetWeight(ids.GenericNodeIDFromNodeID(responsiveVoterID))
 	require.Equal(voterWeight, syncer.weightedSummaries[summaryID].weight)
 
 	// other listed voters are reached out
@@ -838,11 +845,11 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -874,9 +881,11 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		require.NoError(syncer.StateSummaryFrontier(
 			context.Background(),
@@ -946,11 +955,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -980,11 +989,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		}
 	}
 
-	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedVoters := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
 	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
-			contactedVoters[nodeID] = reqID
+			contactedVoters[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -1002,9 +1011,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		if reachedSeeders == 0 {
 			break
 		}
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		if reachedSeeders%2 == 0 {
 			require.NoError(syncer.StateSummaryFrontier(
@@ -1038,9 +1049,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
 	cumulatedWeight := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
-		voterID, found := syncer.pendingVoters.Peek()
+		genericVoterID, found := syncer.pendingVoters.Peek()
 		require.True(found)
-		reqID := contactedVoters[voterID]
+		reqID := contactedVoters[genericVoterID]
+		voterID, err := ids.NodeIDFromGenericNodeID(genericVoterID)
+		require.NoError(err)
 
 		switch {
 		case cumulatedWeight < commonCfg.Alpha/2:
@@ -1050,7 +1063,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID, minoritySummaryID},
 			))
-			cumulatedWeight += vdrs.GetWeight(voterID)
+			cumulatedWeight += vdrs.GetWeight(genericVoterID)
 
 		case cumulatedWeight < commonCfg.Alpha:
 			require.NoError(syncer.AcceptedStateSummary(
@@ -1059,7 +1072,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID},
 			))
-			cumulatedWeight += vdrs.GetWeight(voterID)
+			cumulatedWeight += vdrs.GetWeight(genericVoterID)
 
 		default:
 			require.NoError(syncer.GetAcceptedStateSummaryFailed(
@@ -1097,11 +1110,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -1117,11 +1130,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		return minoritySummary, nil
 	}
 
-	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedVoters := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
 	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
-			contactedVoters[nodeID] = reqID
+			contactedVoters[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -1135,9 +1148,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		require.NoError(syncer.StateSummaryFrontier(
 			context.Background(),
@@ -1157,9 +1172,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	// Let a majority of voters timeout.
 	timedOutWeight := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
-		voterID, found := syncer.pendingVoters.Peek()
+		genericVoterID, found := syncer.pendingVoters.Peek()
 		require.True(found)
-		reqID := contactedVoters[voterID]
+		reqID := contactedVoters[genericVoterID]
+		voterID, err := ids.NodeIDFromGenericNodeID(genericVoterID)
+		require.NoError(err)
 
 		// vdr carries the largest weight by far. Make sure it fails
 		if timedOutWeight <= commonCfg.Alpha {
@@ -1168,7 +1185,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 				voterID,
 				reqID,
 			))
-			timedOutWeight += vdrs.GetWeight(voterID)
+			timedOutWeight += vdrs.GetWeight(genericVoterID)
 		} else {
 			require.NoError(syncer.AcceptedStateSummary(
 				context.Background(),
@@ -1207,11 +1224,11 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedFrontiersProviders := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
-			contactedFrontiersProviders[nodeID] = reqID
+			contactedFrontiersProviders[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -1241,11 +1258,11 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 		}
 	}
 
-	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	contactedVoters := make(map[ids.GenericNodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
 	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
-			contactedVoters[nodeID] = reqID
+			contactedVoters[ids.GenericNodeIDFromNodeID(nodeID)] = reqID
 		}
 	}
 
@@ -1263,9 +1280,11 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 		if reachedSeeders == 0 {
 			break
 		}
-		beaconID, found := syncer.pendingSeeders.Peek()
+		genericBeaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
-		reqID := contactedFrontiersProviders[beaconID]
+		reqID := contactedFrontiersProviders[genericBeaconID]
+		beaconID, err := ids.NodeIDFromGenericNodeID(genericBeaconID)
+		require.NoError(err)
 
 		if reachedSeeders%2 == 0 {
 			require.NoError(syncer.StateSummaryFrontier(
@@ -1306,9 +1325,11 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	// We achieve it by making most nodes voting for an invalid summaryID.
 	votingWeightStake := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
-		voterID, found := syncer.pendingVoters.Peek()
+		genericVoterID, found := syncer.pendingVoters.Peek()
 		require.True(found)
-		reqID := contactedVoters[voterID]
+		reqID := contactedVoters[genericVoterID]
+		voterID, err := ids.NodeIDFromGenericNodeID(genericVoterID)
+		require.NoError(err)
 
 		switch {
 		case votingWeightStake < commonCfg.Alpha/2:
@@ -1318,7 +1339,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				reqID,
 				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
 			))
-			votingWeightStake += vdrs.GetWeight(voterID)
+			votingWeightStake += vdrs.GetWeight(genericVoterID)
 
 		default:
 			require.NoError(syncer.AcceptedStateSummary(
@@ -1327,7 +1348,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				reqID,
 				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
 			))
-			votingWeightStake += vdrs.GetWeight(voterID)
+			votingWeightStake += vdrs.GetWeight(genericVoterID)
 		}
 	}
 

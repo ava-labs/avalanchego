@@ -54,7 +54,7 @@ func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -311,7 +311,7 @@ func TestReliableMessages(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -462,7 +462,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,

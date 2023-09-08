@@ -27,24 +27,24 @@ type Accepted interface {
 
 type accepted struct {
 	lock       sync.RWMutex
-	validators set.Set[ids.NodeID]
-	frontier   map[ids.NodeID]ids.ID
+	validators set.Set[ids.GenericNodeID]
+	frontier   map[ids.GenericNodeID]ids.ID
 }
 
 func NewAccepted() Accepted {
 	return &accepted{
-		frontier: make(map[ids.NodeID]ids.ID),
+		frontier: make(map[ids.GenericNodeID]ids.ID),
 	}
 }
 
-func (a *accepted) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
+func (a *accepted) OnValidatorAdded(nodeID ids.GenericNodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	a.validators.Add(nodeID)
 }
 
-func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
+func (a *accepted) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -52,14 +52,15 @@ func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	delete(a.frontier, nodeID)
 }
 
-func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
+func (*accepted) OnValidatorWeightChanged(_ ids.GenericNodeID, _, _ uint64) {}
 
 func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.validators.Contains(nodeID) {
-		a.frontier[nodeID] = frontier
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if a.validators.Contains(genericNodeID) {
+		a.frontier[genericNodeID] = frontier
 	}
 }
 
@@ -67,6 +68,7 @@ func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	acceptedID, ok := a.frontier[nodeID]
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	acceptedID, ok := a.frontier[genericNodeID]
 	return acceptedID, ok
 }

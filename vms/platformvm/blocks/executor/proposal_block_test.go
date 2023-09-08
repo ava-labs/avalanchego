@@ -685,20 +685,20 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
 				case current:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					require.False(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
 				case current:
-					require.True(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
 				}
 			}
 		})
@@ -837,8 +837,8 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Check VM Validators are removed successfully
 	require.NoError(propBlk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
-	require.False(validators.Contains(env.config.Validators, subnetID, subnetVdr2NodeID))
-	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
+	require.False(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(subnetVdr2NodeID)))
+	require.False(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(subnetValidatorNodeID)))
 }
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
@@ -942,7 +942,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
+			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(subnetValidatorNodeID)))
 		})
 	}
 }
@@ -1032,7 +1032,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
-	vdrWeight := primarySet.GetWeight(nodeID)
+	vdrWeight := primarySet.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
@@ -1124,7 +1124,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight after delegation
-	vdrWeight = primarySet.GetWeight(nodeID)
+	vdrWeight = primarySet.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
@@ -1216,7 +1216,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
-	vdrWeight := primarySet.GetWeight(nodeID)
+	vdrWeight := primarySet.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
@@ -1306,6 +1306,6 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight after delegation
-	vdrWeight = primarySet.GetWeight(nodeID)
+	vdrWeight = primarySet.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }

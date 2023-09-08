@@ -44,26 +44,26 @@ type lockedPeers struct {
 func NewPeers() Peers {
 	return &lockedPeers{
 		peers: &peerData{
-			validators: make(map[ids.NodeID]uint64),
+			validators: make(map[ids.GenericNodeID]uint64),
 		},
 	}
 }
 
-func (p *lockedPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+func (p *lockedPeers) OnValidatorAdded(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.peers.OnValidatorAdded(nodeID, pk, txID, weight)
 }
 
-func (p *lockedPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (p *lockedPeers) OnValidatorRemoved(nodeID ids.GenericNodeID, weight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.peers.OnValidatorRemoved(nodeID, weight)
 }
 
-func (p *lockedPeers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+func (p *lockedPeers) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -120,24 +120,24 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 	return &lockedPeers{
 		peers: &meteredPeers{
 			Peers: &peerData{
-				validators: make(map[ids.NodeID]uint64),
+				validators: make(map[ids.GenericNodeID]uint64),
 			},
 			percentConnected: percentConnected,
 		},
 	}, reg.Register(percentConnected)
 }
 
-func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+func (p *meteredPeers) OnValidatorAdded(nodeID ids.GenericNodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	p.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
-func (p *meteredPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (p *meteredPeers) OnValidatorRemoved(nodeID ids.GenericNodeID, weight uint64) {
 	p.Peers.OnValidatorRemoved(nodeID, weight)
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
-func (p *meteredPeers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+func (p *meteredPeers) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 	p.Peers.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
@@ -156,19 +156,19 @@ func (p *meteredPeers) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 
 type peerData struct {
 	// validators maps nodeIDs to their current stake weight
-	validators map[ids.NodeID]uint64
+	validators map[ids.GenericNodeID]uint64
 	// totalWeight is the total weight of all validators
 	totalWeight uint64
 	// connectedWeight contains the sum of all connected validator weights
 	connectedWeight uint64
 	// connectedValidators is the set of currently connected peers with a
 	// non-zero stake weight
-	connectedValidators set.Set[ids.NodeID]
+	connectedValidators set.Set[ids.GenericNodeID]
 	// connectedPeers is the set of all connected peers
-	connectedPeers set.Set[ids.NodeID]
+	connectedPeers set.Set[ids.GenericNodeID]
 }
 
-func (p *peerData) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, weight uint64) {
+func (p *peerData) OnValidatorAdded(nodeID ids.GenericNodeID, _ *bls.PublicKey, _ ids.ID, weight uint64) {
 	p.validators[nodeID] = weight
 	p.totalWeight += weight
 	if p.connectedPeers.Contains(nodeID) {
@@ -177,7 +177,7 @@ func (p *peerData) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.I
 	}
 }
 
-func (p *peerData) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (p *peerData) OnValidatorRemoved(nodeID ids.GenericNodeID, weight uint64) {
 	delete(p.validators, nodeID)
 	p.totalWeight -= weight
 	if p.connectedPeers.Contains(nodeID) {
@@ -186,7 +186,7 @@ func (p *peerData) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	}
 }
 
-func (p *peerData) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+func (p *peerData) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight, newWeight uint64) {
 	p.validators[nodeID] = newWeight
 	p.totalWeight -= oldWeight
 	p.totalWeight += newWeight
@@ -197,20 +197,22 @@ func (p *peerData) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWei
 }
 
 func (p *peerData) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	if weight, ok := p.validators[nodeID]; ok {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if weight, ok := p.validators[genericNodeID]; ok {
 		p.connectedWeight += weight
-		p.connectedValidators.Add(nodeID)
+		p.connectedValidators.Add(genericNodeID)
 	}
-	p.connectedPeers.Add(nodeID)
+	p.connectedPeers.Add(genericNodeID)
 	return nil
 }
 
 func (p *peerData) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	if weight, ok := p.validators[nodeID]; ok {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if weight, ok := p.validators[genericNodeID]; ok {
 		p.connectedWeight -= weight
-		p.connectedValidators.Remove(nodeID)
+		p.connectedValidators.Remove(genericNodeID)
 	}
-	p.connectedPeers.Remove(nodeID)
+	p.connectedPeers.Remove(genericNodeID)
 	return nil
 }
 
@@ -228,11 +230,23 @@ func (p *peerData) ConnectedPercent() float64 {
 func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {
 	if p.connectedValidators.Len() == 0 {
 		connectedPeers := set.NewSet[ids.NodeID](p.connectedPeers.Len())
-		connectedPeers.Union(p.connectedPeers)
+		for genericPeer := range p.connectedPeers {
+			peer, err := ids.NodeIDFromGenericNodeID(genericPeer)
+			if err != nil {
+				panic(err)
+			}
+			connectedPeers.Add(peer)
+		}
 		return connectedPeers
 	}
 
 	connectedValidators := set.NewSet[ids.NodeID](p.connectedValidators.Len())
-	connectedValidators.Union(p.connectedValidators)
+	for genericPeer := range p.connectedValidators {
+		peer, err := ids.NodeIDFromGenericNodeID(genericPeer)
+		if err != nil {
+			panic(err)
+		}
+		connectedValidators.Add(peer)
+	}
 	return connectedValidators
 }

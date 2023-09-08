@@ -62,20 +62,20 @@ type stateSyncer struct {
 	frontierSeeders validators.Set
 	// IDs of validators we should request state summary frontier from.
 	// Will be consumed seeders are reached out for frontier.
-	targetSeeders set.Set[ids.NodeID]
+	targetSeeders set.Set[ids.GenericNodeID]
 	// IDs of validators we requested a state summary frontier from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingSeeders set.Set[ids.NodeID]
+	pendingSeeders set.Set[ids.GenericNodeID]
 	// IDs of validators that failed to respond with their state summary frontier
-	failedSeeders set.Set[ids.NodeID]
+	failedSeeders set.Set[ids.GenericNodeID]
 
 	// IDs of validators we should request filtering the accepted state summaries from
 	targetVoters set.Set[ids.GenericNodeID]
 	// IDs of validators we requested filtering the accepted state summaries from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingVoters set.Set[ids.NodeID]
+	pendingVoters set.Set[ids.GenericNodeID]
 	// IDs of validators that failed to respond with their filtered accepted state summaries
-	failedVoters set.Set[ids.NodeID]
+	failedVoters set.Set[ids.GenericNodeID]
 
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]*weightedSummary
@@ -119,7 +119,8 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 		return nil
 	}
 
-	if !ss.pendingSeeders.Contains(nodeID) {
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	if !ss.pendingSeeders.Contains(genericNodeID) {
 		ss.Ctx.Log.Debug("received unexpected StateSummaryFrontier message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -127,7 +128,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 	}
 
 	// Mark that we received a response from [nodeID]
-	ss.pendingSeeders.Remove(nodeID)
+	ss.pendingSeeders.Remove(genericNodeID)
 
 	// retrieve summary ID and register frontier;
 	// make sure next beacons are reached out
@@ -170,8 +171,9 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID
 	}
 
 	// Mark that we didn't get a response from [nodeID]
-	ss.failedSeeders.Add(nodeID)
-	ss.pendingSeeders.Remove(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	ss.failedSeeders.Add(genericNodeID)
+	ss.pendingSeeders.Remove(genericNodeID)
 
 	return ss.receivedStateSummaryFrontier(ctx)
 }
@@ -222,8 +224,9 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		)
 		return nil
 	}
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 
-	if !ss.pendingVoters.Contains(nodeID) {
+	if !ss.pendingVoters.Contains(genericNodeID) {
 		ss.Ctx.Log.Debug("received unexpected AcceptedStateSummary message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -231,9 +234,9 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	// Mark that we received a response from [nodeID]
-	ss.pendingVoters.Remove(nodeID)
+	ss.pendingVoters.Remove(genericNodeID)
 
-	nodeWeight := ss.StateSyncBeacons.GetWeight(nodeID)
+	nodeWeight := ss.StateSyncBeacons.GetWeight(genericNodeID)
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringers("summaryIDs", summaryIDs),
@@ -398,7 +401,8 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	// If we can't get a response from [nodeID], act as though they said that
 	// they think none of the containers we sent them in GetAccepted are
 	// accepted
-	ss.failedVoters.Add(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	ss.failedVoters.Add(genericNodeID)
 
 	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
@@ -517,9 +521,13 @@ func (ss *stateSyncer) restart(ctx context.Context) error {
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
-		vdr, _ := ss.targetSeeders.Pop()
+		genericVdr, _ := ss.targetSeeders.Pop()
+		vdr, err := ids.NodeIDFromGenericNodeID(genericVdr)
+		if err != nil {
+			panic(err)
+		}
 		vdrs.Add(vdr)
-		ss.pendingSeeders.Add(vdr)
+		ss.pendingSeeders.Add(genericVdr)
 	}
 
 	if vdrs.Len() > 0 {
@@ -539,7 +547,7 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 			panic(err)
 		}
 		vdrs.Add(nodeID)
-		ss.pendingVoters.Add(nodeID)
+		ss.pendingVoters.Add(vdr)
 	}
 
 	if len(vdrs) > 0 {

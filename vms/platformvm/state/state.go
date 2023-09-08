@@ -1066,15 +1066,16 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 
 func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
+		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+		if err := vdrs.Add(genericNodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
 			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+			if err := vdrs.AddWeight(genericNodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
 				return err
 			}
@@ -1632,11 +1633,12 @@ func (s *state) initValidatorSets() error {
 	if err != nil {
 		return err
 	}
+	genericNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
 
-	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
+	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, genericNodeID)
 	primaryValidators.RegisterCallbackListener(vl)
 
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
+	s.metrics.SetLocalStake(primaryValidators.GetWeight(genericNodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
 	for subnetID := range s.cfg.TrackedSubnets {
@@ -1650,7 +1652,7 @@ func (s *state) initValidatorSets() error {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
 
-		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
+		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, genericNodeID)
 		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil
@@ -2049,21 +2051,22 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				continue
 			}
 
+			genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 			if weightDiff.Decrease {
-				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+				err = validators.RemoveWeight(s.cfg.Validators, subnetID, genericNodeID, weightDiff.Amount)
 			} else {
 				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
 					err = validators.Add(
 						s.cfg.Validators,
 						subnetID,
-						nodeID,
+						genericNodeID,
 						staker.PublicKey,
 						staker.TxID,
 						weightDiff.Amount,
 					)
 				} else {
-					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+					err = validators.AddWeight(s.cfg.Validators, subnetID, genericNodeID, weightDiff.Amount)
 				}
 			}
 			if err != nil {
@@ -2082,7 +2085,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 	if !ok {
 		return nil
 	}
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
+
+	genericThisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
+	s.metrics.SetLocalStake(primaryValidators.GetWeight(genericThisNodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }

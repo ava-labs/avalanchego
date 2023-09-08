@@ -137,7 +137,8 @@ func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 	for {
 		now := t.Clock.Time()
 		// Get target usage for this node.
-		target := t.targeter.TargetUsage(nodeID)
+		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+		target := t.targeter.TargetUsage(genericNodeID)
 		// Get actual usage for this node.
 		usage := t.tracker.Usage(nodeID, now)
 		if usage <= target {
