@@ -13,7 +13,7 @@ import "github.com/ava-labs/avalanchego/database"
 // otherwise an error will be thrown
 type dbBatchWithHeight struct {
 	db     *archiveDB
-	ops    []database.BatchOp
+	ops    map[string]database.BatchOp
 	size   int
 	height uint64
 	batch  database.Batch
@@ -21,7 +21,7 @@ type dbBatchWithHeight struct {
 
 func newBatchWithHeight(db *archiveDB, height uint64) *dbBatchWithHeight {
 	batch := db.rawDB.NewBatch()
-	ops := []database.BatchOp{}
+	ops := make(map[string]database.BatchOp)
 	size := 0
 	return &dbBatchWithHeight{
 		db,
@@ -60,11 +60,16 @@ func (c *dbBatchWithHeight) Write() error {
 // Delete any previous state that may be stored in the database
 func (c *dbBatchWithHeight) Delete(key []byte) error {
 	rawKey := newDBKey(key, c.height)
-	c.ops = append(c.ops, database.BatchOp{
+	if value, exists := c.ops[string(rawKey)]; exists {
+		// decrese the size if there was any previous key/value
+		c.size -= len(value.Value)
+		c.size -= len(value.Key)
+	}
+	c.ops[string(rawKey)] = database.BatchOp{
 		Key:    rawKey,
 		Delete: true,
-	})
-	c.size += len(rawKey)
+	}
+	c.size += len(rawKey) + 1
 	return nil
 }
 
@@ -75,11 +80,16 @@ func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
 	valueWithDeleteFlag[offset] = 0 // not deleted element
 
 	rawKey := newDBKey(key, c.height)
+	if value, exists := c.ops[string(rawKey)]; exists {
+		// decrese the size if there was any previous key/value
+		c.size -= len(value.Value)
+		c.size -= len(value.Key)
+	}
 
-	c.ops = append(c.ops, database.BatchOp{
+	c.ops[string(key)] = database.BatchOp{
 		Key:   rawKey,
 		Value: valueWithDeleteFlag,
-	})
+	}
 	c.size += len(rawKey) + len(valueWithDeleteFlag)
 	return nil
 }
@@ -91,7 +101,7 @@ func (c *dbBatchWithHeight) Size() int {
 
 // Removed all pending writes and deletes to the database
 func (c *dbBatchWithHeight) Reset() {
-	c.ops = c.ops[:0]
+	c.ops = make(map[string]database.BatchOp)
 	c.size = 0
 }
 
