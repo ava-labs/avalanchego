@@ -368,10 +368,19 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
+
+		// Handle staker lifecycle.
+		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
+		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
+
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
+
+		// Handle staker lifecycle.
+		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
+		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's
@@ -390,15 +399,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
-
-	// here both commit and abort state supplies are correct. Handle staker lifecycle.
-	if _, ok := stakerTx.Unsigned.(txs.ValidatorTx); ok {
-		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
-		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
-	} else { // must be txs.DelegatorTx due to switch check above
-		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
-		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
-	}
 
 	// handle option preference
 	shouldCommit, err := e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
