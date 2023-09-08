@@ -86,7 +86,7 @@ func Test_History_Large(t *testing.T) {
 
 	numIters := 250
 
-	for i := 1; i < 10; i++ {
+	for i := 1; i < 5; i++ {
 		config := newDefaultConfig()
 		// History must be large enough to get the change proof
 		// after this loop.

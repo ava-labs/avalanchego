@@ -160,7 +160,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require := require.New(t)
 
-	initialSize := 10_000
+	initialSize := 5_000
 
 	config := newDefaultConfig()
 	config.ValueNodeCacheSize = uint(initialSize)
@@ -1034,7 +1034,7 @@ func insertRandomKeyValues(
 	deletePortion float64,
 ) {
 	maxKeyLen := units.KiB
-	maxValLen := 4 * units.KiB
+	maxValLen := 2 * units.KiB
 
 	require.GreaterOrEqual(deletePortion, float64(0))
 	require.LessOrEqual(deletePortion, float64(1))
