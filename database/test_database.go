@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,10 +61,6 @@ var Tests = []func(t *testing.T, db Database){
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
 	TestPutGetEmpty,
-}
-
-var FuzzTests = []func(*testing.F, Database){
-	FuzzKeyValue,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -1201,5 +1198,42 @@ func FuzzKeyValue(f *testing.F, db Database) {
 
 		_, err = db.Get(key)
 		require.Equal(ErrNotFound, err)
+	})
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
+	const (
+		maxKeyLen   = 32
+		maxValueLen = 32
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+		prefix []byte,
+		numKeyValues []byte,
+	) {
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		// Put a bunch of key-values
+		for i := 0; i < len(numKeyValues); i++ {
+			key := make([]byte, r.Intn(maxKeyLen))
+			_, _ = r.Read(key) // #nosec G404
+
+			value := make([]byte, r.Intn(maxValueLen))
+			_, _ = r.Read(value) // #nosec G404
+
+			require.NoError(db.Put(key, value))
+		}
+
+		iter := db.NewIteratorWithPrefix(prefix)
+		defer iter.Release()
+
+		// Iterate over the key-values and assert
+		// all keys have the prefix
+		for iter.Next() {
+			require.True(bytes.HasPrefix(iter.Key(), prefix))
+		}
 	})
 }
