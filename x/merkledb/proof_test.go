@@ -1732,10 +1732,10 @@ func FuzzProof(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
-		randSee int64,
+		randSeed int64,
 		numKeyValues uint,
 	) {
-		rand := rand.New(rand.NewSource(randSee)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		require := require.New(t)
 		db, err := getBasicDB()
 		require.NoError(err)
