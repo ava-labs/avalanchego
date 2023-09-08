@@ -1310,11 +1310,11 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
 		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
-		require.Equal(node, unmarshaledNode)
+		require.True(proofNodeEqual(node, unmarshaledNode))
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
-		require.Equal(protoNode, protoUnmarshaledNode)
+		require.True(protoProofNodeEqual(protoNode, protoUnmarshaledNode))
 	}
 }
 
@@ -1366,11 +1366,11 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.Equal(proof, unmarshaledProof)
+		require.True(rangeProofsEqual(proof, unmarshaledProof))
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
+		require.True(protoRangeProofsEqual(protoProof, protoUnmarshaledProof))
 	}
 }
 
@@ -1427,11 +1427,11 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.Equal(proof, unmarshaledProof)
+		require.True(changeProofsEqual(proof, unmarshaledProof))
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
+		require.True(protoChangeProofsEqual(protoProof, protoUnmarshaledProof))
 	}
 }
 
@@ -1551,11 +1551,11 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof Proof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.Equal(proof, unmarshaledProof)
+		require.True(proofsEqual(proof, unmarshaledProof))
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
+		require.True(protoProofsEqual(protoProof, protoUnmarshaledProof))
 	}
 }
 
