@@ -1662,7 +1662,7 @@ func TestProofProtoUnmarshal(t *testing.T) {
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {
-	var deletePortion = 0.25
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
 		randSeed int64,
@@ -1791,9 +1791,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 }
 
 func FuzzProof(f *testing.F) {
-	var (
-		deletePortion = 0.25
-	)
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
@@ -1843,7 +1841,6 @@ func FuzzProof(f *testing.F) {
 
 // Generate change proofs and verify that they are valid.
 func FuzzChangeProof(f *testing.F) {
-
 	const (
 		numKeyValues  = defaultHistoryLength / 2
 		deletePortion = 0.25

@@ -732,7 +732,8 @@ func Fuzz_MerkleDB_RandomCases(f *testing.F) {
 		func(
 			t *testing.T,
 			randSeed int64,
-			size uint16) {
+			size uint16,
+		) {
 			require := require.New(t)
 
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404

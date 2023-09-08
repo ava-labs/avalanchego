@@ -2,6 +2,7 @@ package merkledb
 
 import (
 	"bytes"
+
 	"github.com/ava-labs/avalanchego/ids"
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/utils/maybe"
