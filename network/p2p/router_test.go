@@ -27,6 +27,11 @@ func TestAppRequestResponse(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
 
+	ctxKey := new(string)
+	ctxVal := new(string)
+	*ctxKey = "foo"
+	*ctxVal = "bar"
+
 	tests := []struct {
 		name        string
 		requestFunc func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup)
@@ -45,6 +50,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -54,10 +60,11 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -77,7 +84,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -101,6 +108,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendCrossChainAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.CrossChainAppResponse(ctx, chainID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -110,9 +118,10 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 					require.NoError(t, err)
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -130,7 +139,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}()
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
