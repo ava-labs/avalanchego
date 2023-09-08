@@ -1035,7 +1035,7 @@ func insertRandomKeyValues(
 	deletePortion float64,
 ) {
 	maxKeyLen := units.KiB
-	maxValLen := 2 * units.KiB
+	maxValLen := 4 * units.KiB
 
 	require.GreaterOrEqual(deletePortion, float64(0))
 	require.LessOrEqual(deletePortion, float64(1))
