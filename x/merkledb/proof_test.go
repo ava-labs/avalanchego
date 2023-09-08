@@ -1848,27 +1848,5 @@ func FuzzChangeProof(f *testing.F) {
 			end,
 			endRootID,
 		))
-
-		// Insert another key-value pair
-		newKey := make([]byte, 32)
-		_, _ = rand.Read(newKey) // #nosec G404
-		newValue := make([]byte, 32)
-		_, _ = rand.Read(newValue) // #nosec G404
-		require.NoError(db.Put(newKey, newValue))
-
-		// Delete a key-value pair so database doesn't grow too large
-		iter := db.NewIterator()
-		require.NoError(db.Delete(iter.Key()))
-		iter.Release()
-
-		oldEndRootID := endRootID
-		endRootID, err = db.GetMerkleRoot(context.Background())
-		require.NoError(err)
-		if oldEndRootID != endRootID {
-			// Need this check because if we insert and then immediately
-			// delete a key-value pair, the root ID won't change and we'll
-			// error because start root ID == end root ID.
-			startRootID = oldEndRootID
-		}
 	})
 }
