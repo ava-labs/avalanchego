@@ -4,8 +4,9 @@ import (
 	"bytes"
 
 	"github.com/ava-labs/avalanchego/ids"
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func protoProofsEqual(proof1, proof2 *pb.Proof) bool {
