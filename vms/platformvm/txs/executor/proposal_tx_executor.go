@@ -556,7 +556,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Calculate split of reward between delegator/delegatee
-	delegatorReward, delegateeReward := SplitAmountByShares(delegator.PotentialReward, vdrTx.Shares())
+	delegatorReward, delegateeReward := reward.Split(delegator.PotentialReward, vdrTx.Shares())
 
 	utxosOffset := 0
 
@@ -668,17 +668,4 @@ func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkVali
 		return false, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 	return uptime >= expectedUptimePercentage, nil
-}
-
-func SplitAmountByShares(totalAmount uint64, shares uint32) (uint64, uint64) {
-	remainderShares := reward.PercentDenominator - uint64(shares)
-	remainderAmount := remainderShares * (totalAmount / reward.PercentDenominator)
-
-	// Delay rounding as long as possible for small numbers
-	if optimisticReward, err := safemath.Mul64(remainderShares, totalAmount); err == nil {
-		remainderAmount = optimisticReward / reward.PercentDenominator
-	}
-
-	amountFromShares := totalAmount - remainderAmount
-	return remainderAmount, amountFromShares
 }
