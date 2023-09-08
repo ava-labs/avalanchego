@@ -48,6 +48,8 @@ func NewRouter(log logging.Logger, sender common.AppSender) *Router {
 		handlers:                     make(map[uint64]*responder),
 		pendingAppRequests:           make(map[uint32]AppResponseCallback),
 		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
+		// invariant: sdk uses odd-numbered requestIDs
+		requestID: 1,
 	}
 }
 

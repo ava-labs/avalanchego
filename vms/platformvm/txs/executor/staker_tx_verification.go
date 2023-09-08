@@ -127,7 +127,7 @@ func verifyAddValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkValidatorFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -240,7 +240,7 @@ func verifyAddSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddSubnetValidatorFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -281,7 +281,7 @@ func removeSubnetValidatorValidation(
 	if err != nil {
 		// It isn't a current or pending validator.
 		return nil, false, fmt.Errorf(
-			"%s %w of %s: %v",
+			"%s %w of %s: %w",
 			tx.NodeID,
 			ErrNotValidator,
 			tx.Subnet,
@@ -314,7 +314,7 @@ func removeSubnetValidatorValidation(
 			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
 		},
 	); err != nil {
-		return nil, false, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return vdr, isCurrentValidator, nil
@@ -423,7 +423,7 @@ func verifyAddDelegatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkDelegatorFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -563,7 +563,7 @@ func verifyAddPermissionlessValidatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -707,7 +707,7 @@ func verifyAddPermissionlessDelegatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
