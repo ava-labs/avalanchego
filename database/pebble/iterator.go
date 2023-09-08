@@ -153,5 +153,7 @@ func (it *iter) release() {
 	it.db.openIterators.Remove(it)
 
 	it.closed = true
-	_ = it.iter.Close()
+	if err := it.iter.Close(); err != nil {
+		it.err = updateError(err)
+	}
 }
