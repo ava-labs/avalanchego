@@ -91,7 +91,7 @@ func Test_History_Large(t *testing.T) {
 		// History must be large enough to get the change proof
 		// after this loop. Multiply by four because every loop
 		// iteration we do two puts and up to two deletes.
-		config.HistoryLength = 4 * numIters
+		config.HistoryLength = uint(4 * numIters)
 		db, err := New(
 			context.Background(),
 			memdb.New(),
