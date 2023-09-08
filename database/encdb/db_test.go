@@ -38,6 +38,13 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	unencryptedDB := memdb.New()
+	db, err := New([]byte(testPassword), unencryptedDB)
+	require.NoError(f, err)
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
+}
+
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])

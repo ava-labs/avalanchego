@@ -58,6 +58,20 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	_ = db.Close()
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	folder := f.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(f, err)
+
+	defer db.Close()
+
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
+
+	// The database may have been closed by the test, so we don't care if it
+	// errors here.
+	_ = db.Close()
+}
+
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])

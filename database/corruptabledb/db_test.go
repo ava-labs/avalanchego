@@ -38,6 +38,12 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
+}
+
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.
 func TestCorruption(t *testing.T) {
 	key := []byte("hello")

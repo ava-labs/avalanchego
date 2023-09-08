@@ -1237,3 +1237,42 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 		}
 	})
 }
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
+	const (
+		maxKeyLen   = 32
+		maxValueLen = 32
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+		start []byte,
+		prefix []byte,
+		numKeyValues []byte,
+	) {
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		// Put a bunch of key-values
+		for i := 0; i < len(numKeyValues); i++ {
+			key := make([]byte, r.Intn(maxKeyLen))
+			_, _ = r.Read(key) // #nosec G404
+
+			value := make([]byte, r.Intn(maxValueLen))
+			_, _ = r.Read(value) // #nosec G404
+
+			require.NoError(db.Put(key, value))
+		}
+
+		iter := db.NewIteratorWithStartAndPrefix(start, prefix)
+		defer iter.Release()
+
+		// Iterate over the key-values and assert
+		// all keys have the [prefix] and are >= [start]
+		for iter.Next() {
+			require.True(bytes.HasPrefix(iter.Key(), prefix))
+			require.GreaterOrEqual(iter.Key(), start)
+		}
+	})
+}
