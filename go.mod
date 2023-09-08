@@ -30,7 +30,7 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/leanovate/gopter v0.2.9
 	github.com/mr-tron/base58 v1.2.0
-	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
+	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.24.0
 	github.com/pires/go-proxyproto v0.6.2
