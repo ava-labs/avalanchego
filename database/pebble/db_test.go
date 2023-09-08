@@ -6,7 +6,6 @@ package pebble
 import (
 	"testing"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -64,28 +63,58 @@ func BenchmarkInterface(b *testing.B) {
 	}
 }
 
-func Test_bytesPrefix(t *testing.T) {
+func TestPrefixBounds(t *testing.T) {
 	require := require.New(t)
 
-	prefs := [][]byte{
-		{},
-		{1},
-		{1},
-		{1, 2, 3},
-		{1, 2, 3, 4, 5},
-		{1, 2, 3, 4, 5, 8, 19, 29},
+	type test struct {
+		prefix        []byte
+		expectedLower []byte
+		expectedUpper []byte
 	}
 
-	itopts := make([]*pebble.IterOptions, 0)
-	for _, pref := range prefs {
-		itopts = append(itopts, prefixBounds(pref))
+	tests := []test{
+		{
+			prefix:        nil,
+			expectedLower: nil,
+			expectedUpper: nil,
+		},
+		{
+			prefix:        []byte{},
+			expectedLower: []byte{},
+			expectedUpper: nil,
+		},
+		{
+			prefix:        []byte{0x00},
+			expectedLower: []byte{0x00},
+			expectedUpper: []byte{0x01},
+		},
+		{
+			prefix:        []byte{0x01},
+			expectedLower: []byte{0x01},
+			expectedUpper: []byte{0x02},
+		},
+		{
+			prefix:        []byte{0xFF},
+			expectedLower: []byte{0xFF},
+			expectedUpper: nil,
+		},
+		{
+			prefix:        []byte{0x01, 0x02},
+			expectedLower: []byte{0x01, 0x02},
+			expectedUpper: []byte{0x01, 0x03},
+		},
+		{
+			prefix:        []byte{0x01, 0x02, 0xFF},
+			expectedLower: []byte{0x01, 0x02, 0xFF},
+			expectedUpper: []byte{0x01, 0x03},
+		},
 	}
 
-	for idx, itopt := range itopts {
-		if lbLen := len(itopt.LowerBound); lbLen > 0 {
-			require.Equal(prefs[idx], itopt.LowerBound)
-			itopt.LowerBound[lbLen-1] += 1
-			require.Equal(itopt.LowerBound, itopt.UpperBound)
-		}
+	for _, tt := range tests {
+		t.Run(string(tt.prefix), func(t *testing.T) {
+			itopts := prefixBounds(tt.prefix)
+			require.Equal(tt.expectedLower, itopts.LowerBound)
+			require.Equal(tt.expectedUpper, itopts.UpperBound)
+		})
 	}
 }

@@ -195,22 +195,19 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.closed {
+	switch {
+	case db.closed:
 		return database.ErrClosed
-	}
-
-	if comparer.Compare(start, limit) >= 0 {
+	case comparer.Compare(start, limit) >= 0:
 		// pebble's Compact will no-op & error if start >= limit
 		// according to pebble's comparer.
 		return nil
-	}
-
-	if limit != nil {
+	case limit != nil:
 		return updateError(db.pebbleDB.Compact(start, limit, true /* parallelize */))
 	}
 
-	// The database.Database spec says that a nil [limit] is treated as a key after all keys.
-	// But pebble treats a nil [limit] as being the key before all keys.
+	// The database.Database spec treats a nil [limit] as a key after all keys
+	// but pebble treats a nil [limit] as a key before all keys.
 	// Use the greatest key in the database as the [limit] to get the desired behavior.
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
@@ -283,12 +280,6 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return iter
 }
 
-// NewIteratorWithStartAndPrefix creates a lexicographically ordered iterator
-// over the database starting at start and ignoring keys that do not start with
-// the provided prefix.
-//
-// Prefix should be some key contained within [start] or else the lower bound
-// of the iteration will be overwritten with [start].
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -313,7 +304,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	return iter
 }
 
-// updateError converts a pebble-specific error to to its
+// Converts a pebble-specific error to to its
 // Avalanche equivalent, if applicable.
 func updateError(err error) error {
 	switch err {
@@ -326,10 +317,10 @@ func updateError(err error) error {
 	}
 }
 
-// prefixBounds returns a key range that covers all keys with the
+// Returns a key range that covers all keys with the
 // given [prefix].
-// Assumes the Database uses bytes.Compare for key comparison
-// and not a custom comparer.
+// Assumes the Database uses bytes.Compare for key
+// comparison and not a custom comparer.
 func prefixBounds(prefix []byte) *pebble.IterOptions {
 	var upperBound []byte
 	for i := len(prefix) - 1; i >= 0; i-- {
