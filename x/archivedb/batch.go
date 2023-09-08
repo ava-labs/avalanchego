@@ -13,21 +13,23 @@ import "github.com/ava-labs/avalanchego/database"
 // otherwise an error will be thrown
 type dbBatchWithHeight struct {
 	db     *archiveDB
+	ops    []database.BatchOp
+	size   int
 	height uint64
 	batch  database.Batch
 }
 
-func newBatchWithHeight(db *archiveDB, height uint64) (*dbBatchWithHeight, error) {
+func newBatchWithHeight(db *archiveDB, height uint64) *dbBatchWithHeight {
 	batch := db.rawDB.NewBatch()
-	err := database.PutUInt64(batch, keyHeight, height)
-	if err != nil {
-		return nil, err
-	}
+	ops := []database.BatchOp{}
+	size := 0
 	return &dbBatchWithHeight{
 		db,
+		ops,
+		size,
 		height,
 		batch,
-	}, nil
+	}
 }
 
 // Returns the height for this Batch
@@ -44,43 +46,69 @@ func (c *dbBatchWithHeight) Write() error {
 		return ErrInvalidBatchHeight
 	}
 
-	err := c.batch.Write()
-	if err != nil {
+	if err := c.Replay(c.batch); err != nil {
+		return err
+	}
+	if err := c.batch.Write(); err != nil {
 		return err
 	}
 	c.db.currentHeight = c.height
+
 	return nil
 }
 
 // Delete any previous state that may be stored in the database
 func (c *dbBatchWithHeight) Delete(key []byte) error {
-	return c.batch.Put(newDBKey(key, c.height), []byte{1})
+	rawKey := newDBKey(key, c.height)
+	c.ops = append(c.ops, database.BatchOp{
+		Key:    rawKey,
+		Delete: true,
+	})
+	c.size += len(rawKey)
+	return nil
 }
 
 // Queues an insert for a key-value pair
 func (c *dbBatchWithHeight) Put(key []byte, value []byte) error {
-	newValue := make([]byte, len(value)+1)
-	offset := copy(newValue, value)
-	newValue[offset] = 0 // not deleted element
-	return c.batch.Put(newDBKey(key, c.height), newValue)
+	valueWithDeleteFlag := make([]byte, len(value)+1)
+	offset := copy(valueWithDeleteFlag, value)
+	valueWithDeleteFlag[offset] = 0 // not deleted element
+
+	rawKey := newDBKey(key, c.height)
+
+	c.ops = append(c.ops, database.BatchOp{
+		Key:   rawKey,
+		Value: valueWithDeleteFlag,
+	})
+	c.size += len(rawKey) + len(valueWithDeleteFlag)
+	return nil
 }
 
 // Returns the sizes to be committed in the database
 func (c *dbBatchWithHeight) Size() int {
-	return c.batch.Size()
+	return c.size
 }
 
 // Removed all pending writes and deletes to the database
 func (c *dbBatchWithHeight) Reset() {
-	c.batch.Reset()
-	_ = database.PutUInt64(c.batch, keyHeight, c.height)
+	c.ops = c.ops[:0]
+	c.size = 0
 }
 
 // Returns the inner batch
 func (c *dbBatchWithHeight) Inner() database.Batch {
-	return c.batch
+	return c
 }
 
 func (c *dbBatchWithHeight) Replay(w database.KeyValueWriterDeleter) error {
-	return c.batch.Replay(w)
+	for _, op := range c.ops {
+		if err := w.Put(op.Key, op.Value); err != nil {
+			return err
+		}
+	}
+	err := database.PutUInt64(w, keyHeight, c.height)
+	if err != nil {
+		return err
+	}
+	return nil
 }
