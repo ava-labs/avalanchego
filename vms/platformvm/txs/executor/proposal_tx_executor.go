@@ -6,7 +6,6 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -557,7 +556,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Calculate split of reward between delegator/delegatee
-	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares(), math.MaxUint64)
+	delegatorReward, delegateeReward := SplitAmountByShares(delegator.PotentialReward, vdrTx.Shares())
 
 	utxosOffset := 0
 
@@ -671,7 +670,7 @@ func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkVali
 	return uptime >= expectedUptimePercentage, nil
 }
 
-func splitAmountByShares(totalAmount uint64, shares uint32, sharesAmountCap uint64) (uint64, uint64) {
+func SplitAmountByShares(totalAmount uint64, shares uint32) (uint64, uint64) {
 	remainderShares := reward.PercentDenominator - uint64(shares)
 	remainderAmount := remainderShares * (totalAmount / reward.PercentDenominator)
 
@@ -681,9 +680,5 @@ func splitAmountByShares(totalAmount uint64, shares uint32, sharesAmountCap uint
 	}
 
 	amountFromShares := totalAmount - remainderAmount
-	if amountFromShares > sharesAmountCap {
-		remainderAmount += amountFromShares - sharesAmountCap
-		amountFromShares = sharesAmountCap
-	}
 	return remainderAmount, amountFromShares
 }
