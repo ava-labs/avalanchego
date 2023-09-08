@@ -33,9 +33,7 @@ func TestInterface(t *testing.T) {
 func FuzzKeyValue(f *testing.F) {
 	folder := f.TempDir()
 	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	if err != nil {
-		require.NoError(f, err)
-	}
+	require.NoError(f, err)
 
 	defer db.Close()
 
@@ -49,9 +47,7 @@ func FuzzKeyValue(f *testing.F) {
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	folder := f.TempDir()
 	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	if err != nil {
-		require.NoError(f, err)
-	}
+	require.NoError(f, err)
 
 	defer db.Close()
 

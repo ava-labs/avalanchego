@@ -27,18 +27,14 @@ func TestInterface(t *testing.T) {
 func FuzzKeyValue(f *testing.F) {
 	unencryptedDB := memdb.New()
 	db, err := New([]byte(testPassword), unencryptedDB)
-	if err != nil {
-		require.NoError(f, err)
-	}
+	require.NoError(f, err)
 	database.FuzzKeyValue(f, db)
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	unencryptedDB := memdb.New()
 	db, err := New([]byte(testPassword), unencryptedDB)
-	if err != nil {
-		require.NoError(f, err)
-	}
+	require.NoError(f, err)
 	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
