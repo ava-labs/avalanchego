@@ -2,6 +2,12 @@ package merkledb
 
 import (
 	"bytes"
+	"context"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/stretchr/testify/require"
+	"math/rand"
+	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -9,11 +15,73 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
+func getBasicDB() (*merkleDB, error) {
+	return newDatabase(
+		context.Background(),
+		memdb.New(),
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+}
+
+// Writes []byte{i} -> []byte{i} for i in [0, 4]
+func writeBasicBatch(t *testing.T, db *merkleDB) {
+	require := require.New(t)
+
+	batch := db.NewBatch()
+	require.NoError(batch.Put([]byte{0}, []byte{0}))
+	require.NoError(batch.Put([]byte{1}, []byte{1}))
+	require.NoError(batch.Put([]byte{2}, []byte{2}))
+	require.NoError(batch.Put([]byte{3}, []byte{3}))
+	require.NoError(batch.Put([]byte{4}, []byte{4}))
+	require.NoError(batch.Write())
+}
+
+func newRandomProofNode(r *rand.Rand) ProofNode {
+	key := make([]byte, r.Intn(32)) // #nosec G404
+	_, _ = r.Read(key)              // #nosec G404
+	serializedKey := newPath(key).Serialize()
+
+	val := make([]byte, r.Intn(64)) // #nosec G404
+	_, _ = r.Read(val)              // #nosec G404
+
+	children := map[byte]ids.ID{}
+	for j := 0; j < NodeBranchFactor; j++ {
+		if r.Float64() < 0.5 {
+			var childID ids.ID
+			_, _ = r.Read(childID[:]) // #nosec G404
+			children[byte(j)] = childID
+		}
+	}
+
+	hasValue := rand.Intn(2) == 1 // #nosec G404
+	var valueOrHash maybe.Maybe[[]byte]
+	if hasValue {
+		// use the hash instead when length is greater than the hash length
+		if len(val) >= HashLength {
+			val = hashing.ComputeHash256(val)
+		} else if len(val) == 0 {
+			// We do this because when we encode a value of []byte{} we will later
+			// decode it as nil.
+			// Doing this prevents inconsistency when comparing the encoded and
+			// decoded values.
+			val = nil
+		}
+		valueOrHash = maybe.Some(val)
+	}
+
+	return ProofNode{
+		KeyPath:     serializedKey,
+		ValueOrHash: valueOrHash,
+		Children:    children,
+	}
+}
+
 func protoProofsEqual(proof1, proof2 *pb.Proof) bool {
 	return (proof1 == nil && proof2 == nil) ||
 		(proof1 != nil &&
 			proof2 != nil &&
-			len(proof1.Proof) == len(proof2.Proof) &&
+			protoProofNodesEqual(proof1.Proof, proof2.Proof) &&
 			bytes.Equal(proof1.Key, proof2.Key) &&
 			protoMaybeBytesEqual(proof1.Value, proof2.Value))
 }
@@ -31,47 +99,45 @@ func protoProofNodesEqual(proof1, proof2 []*pb.ProofNode) bool {
 }
 
 func protoRangeProofsEqual(proof1, proof2 *pb.RangeProof) bool {
-	if proof1 == nil && proof2 == nil {
-		return true
-	}
-	if (proof1 == nil ||
-		proof2 == nil) ||
-		len(proof1.Start) != len(proof2.Start) ||
-		len(proof1.End) != len(proof2.End) ||
-		len(proof1.KeyValues) != len(proof2.KeyValues) {
+	return (proof1 == nil && proof2 == nil) ||
+		(proof1 != nil &&
+			proof2 != nil &&
+			protoKeyValuesEqual(proof1.KeyValues, proof2.KeyValues) &&
+			protoProofNodesEqual(proof1.Start, proof2.Start) &&
+			protoProofNodesEqual(proof1.End, proof2.End))
+}
+
+func protoKeyValuesEqual(kv1, kv2 []*pb.KeyValue) bool {
+	if len(kv1) != len(kv2) {
 		return false
 	}
-
-	for i := 0; i < len(proof1.KeyValues); i++ {
-		if !protoKeyValueEqual(proof1.KeyValues[i], proof2.KeyValues[i]) {
+	for i, kv := range kv1 {
+		if !protoKeyValueEqual(kv, kv2[i]) {
 			return false
 		}
 	}
-
-	return protoProofNodesEqual(proof1.Start, proof2.Start) &&
-		protoProofNodesEqual(proof1.End, proof2.End)
+	return true
 }
 
 func protoChangeProofsEqual(proof1, proof2 *pb.ChangeProof) bool {
-	if proof1 == nil && proof2 == nil {
-		return true
-	}
+	return (proof1 == nil && proof2 == nil) ||
+		(proof1 != nil &&
+			proof2 != nil &&
+			protoKeyChangesEqual(proof1.KeyChanges, proof2.KeyChanges) &&
+			protoProofNodesEqual(proof1.StartProof, proof2.StartProof) &&
+			protoProofNodesEqual(proof1.EndProof, proof2.EndProof))
+}
 
-	if proof1 == nil ||
-		proof2 == nil ||
-		len(proof1.StartProof) != len(proof2.StartProof) ||
-		len(proof1.EndProof) != len(proof2.EndProof) ||
-		len(proof1.KeyChanges) != len(proof2.KeyChanges) {
+func protoKeyChangesEqual(kv1, kv2 []*pb.KeyChange) bool {
+	if len(kv1) != len(kv2) {
 		return false
 	}
-
-	for i := 0; i < len(proof1.KeyChanges); i++ {
-		if !protoKeyChangeEqual(proof1.KeyChanges[i], proof2.KeyChanges[i]) {
+	for i, kv := range kv1 {
+		if !protoKeyChangeEqual(kv, kv2[i]) {
 			return false
 		}
 	}
-	return protoProofNodesEqual(proof1.StartProof, proof2.StartProof) &&
-		protoProofNodesEqual(proof1.EndProof, proof2.EndProof)
+	return true
 }
 
 func protoProofNodeEqual(node1, node2 *pb.ProofNode) bool {
@@ -128,19 +194,21 @@ func protoChildrenEqual(children1, children2 map[uint32][]byte) bool {
 }
 
 func rangeProofsEqual(proof1, proof2 RangeProof) bool {
-	if len(proof1.StartProof) != len(proof2.StartProof) ||
-		len(proof1.EndProof) != len(proof2.EndProof) ||
-		len(proof1.KeyValues) != len(proof2.KeyValues) {
+	return keyValuesEqual(proof1.KeyValues, proof2.KeyValues) &&
+		proofNodesEqual(proof1.StartProof, proof2.StartProof) &&
+		proofNodesEqual(proof1.EndProof, proof2.EndProof)
+}
+
+func keyValuesEqual(kv1, kv2 []KeyValue) bool {
+	if len(kv1) != len(kv2) {
 		return false
 	}
-
-	for i := 0; i < len(proof1.KeyValues); i++ {
-		if !keyValueEqual(proof1.KeyValues[i], proof2.KeyValues[i]) {
+	for i, kv := range kv1 {
+		if !keyValueEqual(kv, kv2[i]) {
 			return false
 		}
 	}
-	return proofNodesEqual(proof1.StartProof, proof2.StartProof) &&
-		proofNodesEqual(proof1.EndProof, proof2.EndProof)
+	return true
 }
 
 func proofsEqual(proof1, proof2 Proof) bool {
@@ -158,20 +226,21 @@ func proofsEqual(proof1, proof2 Proof) bool {
 }
 
 func changeProofsEqual(proof1, proof2 ChangeProof) bool {
-	if len(proof1.StartProof) != len(proof2.StartProof) ||
-		len(proof1.EndProof) != len(proof2.EndProof) ||
-		len(proof1.KeyChanges) != len(proof2.KeyChanges) {
+	return keyChangesEqual(proof1.KeyChanges, proof2.KeyChanges) &&
+		proofNodesEqual(proof1.StartProof, proof2.StartProof) &&
+		proofNodesEqual(proof1.EndProof, proof2.EndProof)
+}
+
+func keyChangesEqual(kv1, kv2 []KeyChange) bool {
+	if len(kv1) != len(kv2) {
 		return false
 	}
-
-	for i := 0; i < len(proof1.KeyChanges); i++ {
-		if !keyChangeEqual(proof1.KeyChanges[i], proof2.KeyChanges[i]) {
+	for i, kv := range kv1 {
+		if !keyChangeEqual(kv, kv2[i]) {
 			return false
 		}
 	}
-
-	return proofNodesEqual(proof1.StartProof, proof2.StartProof) &&
-		proofNodesEqual(proof1.EndProof, proof2.EndProof)
+	return true
 }
 
 func proofNodesEqual(proof1, proof2 []ProofNode) bool {

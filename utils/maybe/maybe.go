@@ -65,5 +65,8 @@ func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 
 // Equal returns true if both m1 and m2 are nothing or have the same value according to [equalFunc].
 func Equal[T any](m1 Maybe[T], m2 Maybe[T], equalFunc func(T, T) bool) bool {
-	return (m1.IsNothing() && m2.IsNothing()) || (m1.HasValue() && m2.HasValue() && equalFunc(m1.Value(), m2.Value()))
+	return (m1.IsNothing() && m2.IsNothing()) ||
+		(m1.HasValue() &&
+			m2.HasValue() &&
+			equalFunc(m1.Value(), m2.Value()))
 }
