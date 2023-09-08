@@ -15,10 +15,7 @@ jobs:
       cache-key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
       # caution: this is the same restore as in gh-pages.yaml
       - name: Restore Cargo Cache
@@ -80,11 +77,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
+      - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
@@ -108,10 +101,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
@@ -132,10 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
@@ -159,10 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
