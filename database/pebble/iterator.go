@@ -73,6 +73,7 @@ func (it *iter) Next() bool {
 	it.nextKey = it.iter.Key()
 
 	// Set the next value.
+	// TODO is the below necessary?
 	// Need to make sure the following invariant for [i.iter.ValueAndErr] holds:
 	// "REQUIRES: iter.Error() == nil and HasPointAndRange() returns true for hasPoint."
 	hasPoint, _ := it.iter.HasPointAndRange()
