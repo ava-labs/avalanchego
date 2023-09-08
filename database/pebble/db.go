@@ -253,8 +253,10 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	}
 
 	iter := &iter{
-		db:   db,
-		iter: db.pebbleDB.NewIter(&pebble.IterOptions{LowerBound: start}),
+		db: db,
+		iter: db.pebbleDB.NewIter(&pebble.IterOptions{
+			LowerBound: start,
+		}),
 	}
 	db.openIterators.Add(iter)
 	return iter

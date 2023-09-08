@@ -31,17 +31,12 @@ func TestInterface(t *testing.T) {
 
 func FuzzInterface(f *testing.F) {
 	for _, test := range database.FuzzTests {
-		folder := f.TempDir()
-		cfg := DefaultConfig
-		db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
+		tmpDir := f.TempDir()
+		db, err := New(tmpDir, DefaultConfig, logging.NoLog{}, "", prometheus.NewRegistry())
 		require.NoError(f, err)
 		defer db.Close()
 
 		test(f, db)
-
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
-		_ = db.Close()
 	}
 }
 
