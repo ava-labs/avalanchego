@@ -954,59 +954,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	}
 }
 
-func generateInitialValues(
-	require *require.Assertions,
-	r *rand.Rand,
-	numInitialKeyValues uint,
-	size uint,
-	percentChanceToFullHash float64,
-) randTest {
-	const (
-		prefixProbability   = 0.1
-		nilValueProbability = 0.05
-	)
-
-	var allKeys [][]byte
-	genKey := func() []byte {
-		// new prefixed key
-		if len(allKeys) > 2 && r.Float64() < prefixProbability {
-			prefix := allKeys[r.Intn(len(allKeys))]
-			key := make([]byte, r.Intn(50)+len(prefix))
-			copy(key, prefix)
-			_, _ = r.Read(key[len(prefix):])
-			allKeys = append(allKeys, key)
-			return key
-		}
-
-		// new key
-		key := make([]byte, r.Intn(50))
-		_, _ = r.Read(key)
-		allKeys = append(allKeys, key)
-		return key
-	}
-
-	var steps randTest
-	for i := uint(0); i < numInitialKeyValues; i++ {
-		step := randTestStep{
-			op:    opUpdate,
-			key:   genKey(),
-			value: make([]byte, r.Intn(50)),
-		}
-		// got is defined because if a rand method is used
-		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
-		if got < nilValueProbability {
-			step.value = nil
-		} else {
-			_, _ = r.Read(step.value)
-		}
-		steps = append(steps, step)
-	}
-	steps = append(steps, randTestStep{op: opWriteBatch})
-	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
-	return steps
-}
-
 func generateRandTestWithKeys(
 	require *require.Assertions,
 	r *rand.Rand,
@@ -1087,6 +1034,59 @@ func generateRandTestWithKeys(
 	}
 	// always end with a full hash of the trie
 	steps = append(steps, randTestStep{op: opCheckhash})
+	return steps
+}
+
+func generateInitialValues(
+	require *require.Assertions,
+	r *rand.Rand,
+	numInitialKeyValues uint,
+	size uint,
+	percentChanceToFullHash float64,
+) randTest {
+	const (
+		prefixProbability   = 0.1
+		nilValueProbability = 0.05
+	)
+
+	var allKeys [][]byte
+	genKey := func() []byte {
+		// new prefixed key
+		if len(allKeys) > 2 && r.Float64() < prefixProbability {
+			prefix := allKeys[r.Intn(len(allKeys))]
+			key := make([]byte, r.Intn(50)+len(prefix))
+			copy(key, prefix)
+			_, _ = r.Read(key[len(prefix):])
+			allKeys = append(allKeys, key)
+			return key
+		}
+
+		// new key
+		key := make([]byte, r.Intn(50))
+		_, _ = r.Read(key)
+		allKeys = append(allKeys, key)
+		return key
+	}
+
+	var steps randTest
+	for i := uint(0); i < numInitialKeyValues; i++ {
+		step := randTestStep{
+			op:    opUpdate,
+			key:   genKey(),
+			value: make([]byte, r.Intn(50)),
+		}
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilValueProbability {
+			step.value = nil
+		} else {
+			_, _ = r.Read(step.value)
+		}
+		steps = append(steps, step)
+	}
+	steps = append(steps, randTestStep{op: opWriteBatch})
+	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
 	return steps
 }
 
