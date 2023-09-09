@@ -731,12 +731,12 @@ func FuzzMerkleDBRandomCases(f *testing.F) {
 		func(
 			t *testing.T,
 			randSeed int64,
-			size uint16,
+			size uint,
 		) {
 			require := require.New(t)
 
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			runRandDBTest(require, r, generateRandTest(require, r, int(size), 0.01))
+			runRandDBTest(require, r, generateRandTest(require, r, size, 0.01))
 		})
 }
 
@@ -937,11 +937,64 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	}
 }
 
+func generateInitialValues(
+	require *require.Assertions,
+	r *rand.Rand,
+	numInitialKeyValues int,
+	size uint,
+	percentChanceToFullHash float64,
+) randTest {
+	const (
+		prefixProbability   = 0.1
+		nilValueProbability = 0.05
+	)
+
+	var allKeys [][]byte
+	genKey := func() []byte {
+		// new prefixed key
+		if len(allKeys) > 2 && r.Float64() < prefixProbability {
+			prefix := allKeys[r.Intn(len(allKeys))]
+			key := make([]byte, r.Intn(50)+len(prefix))
+			copy(key, prefix)
+			_, _ = r.Read(key[len(prefix):])
+			allKeys = append(allKeys, key)
+			return key
+		}
+
+		// new key
+		key := make([]byte, r.Intn(50))
+		_, _ = r.Read(key)
+		allKeys = append(allKeys, key)
+		return key
+	}
+
+	var steps randTest
+	for i := 0; i < numInitialKeyValues; i++ {
+		step := randTestStep{
+			op:    opUpdate,
+			key:   genKey(),
+			value: make([]byte, r.Intn(50)),
+		}
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilValueProbability {
+			step.value = nil
+		} else {
+			_, _ = r.Read(step.value)
+		}
+		steps = append(steps, step)
+	}
+	steps = append(steps, randTestStep{op: opWriteBatch})
+	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
+	return steps
+}
+
 func generateRandTestWithKeys(
 	require *require.Assertions,
 	r *rand.Rand,
 	allKeys [][]byte,
-	size int,
+	size uint,
 	checkHashProbability float64,
 ) randTest {
 	const nilEndProbability = 0.1
@@ -989,7 +1042,7 @@ func generateRandTestWithKeys(
 	}
 
 	var steps randTest
-	for i := 0; i < size-1; {
+	for i := uint(0); i < size-1; {
 		step := randTestStep{op: r.Intn(opMax)}
 		switch step.op {
 		case opUpdate:
@@ -1020,7 +1073,7 @@ func generateRandTestWithKeys(
 	return steps
 }
 
-func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+func generateRandTest(require *require.Assertions, r *rand.Rand, size uint, percentChanceToFullHash float64) randTest {
 	return generateRandTestWithKeys(require, r, [][]byte{}, size, percentChanceToFullHash)
 }
 
@@ -1030,7 +1083,7 @@ func insertRandomKeyValues(
 	require *require.Assertions,
 	rand *rand.Rand,
 	dbs []database.Database,
-	numKeyValues int,
+	numKeyValues uint,
 	deletePortion float64,
 ) {
 	maxKeyLen := units.KiB
@@ -1038,7 +1091,7 @@ func insertRandomKeyValues(
 
 	require.GreaterOrEqual(deletePortion, float64(0))
 	require.LessOrEqual(deletePortion, float64(1))
-	for i := 0; i < numKeyValues; i++ {
+	for i := uint(0); i < numKeyValues; i++ {
 		keyLen := rand.Intn(maxKeyLen)
 		key := make([]byte, keyLen)
 		_, _ = rand.Read(key)
