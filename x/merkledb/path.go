@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"unsafe"
-
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -54,31 +52,52 @@ type Path struct {
 }
 
 func NewPath(p []byte, branchFactor BranchFactor) Path {
-	result := EmptyPath(branchFactor)
-
-	// create new buffer with a multiple of the input length since each byte gets split into multiple tokens
-	tokensPerByte := result.TokensPerByte()
-	buffer := make([]byte, len(p)*tokensPerByte)
-
-	var deserializeFunc func(val byte, pathIndex int, buffer []byte)
 	switch branchFactor {
 	case BranchFactor2:
-		deserializeFunc = deserializeByte2
+		return NewPath2(p)
 	case BranchFactor4:
-		deserializeFunc = deserializeByte4
+		return NewPath4(p)
 	case BranchFactor16:
-		deserializeFunc = deserializeByte16
+		return NewPath16(p)
 	case BranchFactor256:
-		return Path{
-			value:        string(p),
-			tokenBitSize: Byte,
-		}
+		return NewPath256(p)
 	}
+	return EmptyPath(branchFactor)
+}
+
+func NewPath2(p []byte) Path {
+	result := EmptyPath(BranchFactor2)
+	buffer := make([]byte, len(p)*8)
 
 	pathIndex := 0
 	for _, currentByte := range p {
-		deserializeFunc(currentByte, pathIndex, buffer)
-		pathIndex += tokensPerByte
+		buffer[pathIndex] = currentByte >> 7
+		buffer[pathIndex+1] = (currentByte & 0b0100_0000) >> 6
+		buffer[pathIndex+2] = (currentByte & 0b0010_0000) >> 5
+		buffer[pathIndex+3] = (currentByte & 0b0001_0000) >> 4
+		buffer[pathIndex+4] = (currentByte & 0b0000_1000) >> 3
+		buffer[pathIndex+5] = (currentByte & 0b0000_0100) >> 2
+		buffer[pathIndex+6] = (currentByte & 0b0000_0010) >> 1
+		buffer[pathIndex+7] = currentByte & 0b0000_0001
+		pathIndex += 8
+	}
+
+	// avoid copying during the conversion
+	result.value = *(*string)(unsafe.Pointer(&buffer))
+	return result
+}
+
+func NewPath4(p []byte) Path {
+	result := EmptyPath(BranchFactor4)
+	buffer := make([]byte, len(p)*4)
+
+	pathIndex := 0
+	for _, currentByte := range p {
+		buffer[pathIndex] = currentByte >> 6
+		buffer[pathIndex+1] = (currentByte & 0b0011_0000) >> 4
+		buffer[pathIndex+2] = (currentByte & 0b0000_1100) >> 2
+		buffer[pathIndex+3] = currentByte & 0b0000_0011
+		pathIndex += 4
 	}
 
 	// avoid copying during the conversion
@@ -87,7 +106,26 @@ func NewPath(p []byte, branchFactor BranchFactor) Path {
 }
 
 func NewPath16(p []byte) Path {
-	return NewPath(p, BranchFactor16)
+	result := EmptyPath(BranchFactor16)
+	buffer := make([]byte, len(p)*2)
+
+	pathIndex := 0
+	for _, currentByte := range p {
+		buffer[pathIndex] = currentByte >> 4
+		buffer[pathIndex+1] = currentByte & 0b0000_1111
+		pathIndex += 2
+	}
+
+	// avoid copying during the conversion
+	result.value = *(*string)(unsafe.Pointer(&buffer))
+	return result
+}
+
+func NewPath256(p []byte) Path {
+	return Path{
+		value:        string(p),
+		tokenBitSize: Byte,
+	}
 }
 
 func (p Path) Equal(other Path) bool {
@@ -153,17 +191,8 @@ func (p Path) BranchFactor() int {
 	return int(tokenSizeToBranchFactor[p.tokenBitSize])
 }
 
-func (p Path) TokenBitSize() int {
-	return p.tokenBitSize
-}
-
 func (p Path) TokensPerByte() int {
 	return Byte / p.tokenBitSize
-}
-
-// gets the amount of shift(>> or <<) that a token needs to be shifted based on the offset into the current byte
-func (p Path) shift(offset int) int {
-	return Byte - (p.tokenBitSize * (offset + 1))
 }
 
 // Invariant: The returned value must not be modified.
@@ -184,7 +213,7 @@ func (p Path) Serialize() SerializedPath {
 		}
 	}
 	var serializeFunc func(s *SerializedPath, byteIndex int, pathIndex int, p Path)
-	switch p.TokenBitSize() {
+	switch p.tokenBitSize {
 	case Bit:
 		serializeFunc = serializeByte2
 	case Crumb:
@@ -194,7 +223,7 @@ func (p Path) Serialize() SerializedPath {
 	case Byte:
 		return SerializedPath{
 			NibbleLength: len(p.value),
-			Value:        slices.Clone(p.Bytes()),
+			Value:        []byte(p.value),
 		}
 	}
 
@@ -220,36 +249,14 @@ func (p Path) Serialize() SerializedPath {
 	}
 
 	// deal with any partial byte due to remainder
+	shift := Byte - p.tokenBitSize
 	for offset := 0; offset < remainder; offset++ {
-		result.Value[byteLength] += p.value[pathIndex+offset] << p.shift(offset)
+		result.Value[byteLength] += p.value[pathIndex+offset] << shift
+		shift -= p.tokenBitSize
 	}
 
 	return result
 }
-
-func deserializeByte2(val byte, pathIndex int, buffer []byte) {
-	buffer[pathIndex] = val >> 7
-	buffer[pathIndex+1] = (val & 0b0100_0000) >> 6
-	buffer[pathIndex+2] = (val & 0b0010_0000) >> 5
-	buffer[pathIndex+3] = (val & 0b0001_0000) >> 4
-	buffer[pathIndex+4] = (val & 0b0000_1000) >> 3
-	buffer[pathIndex+5] = (val & 0b0000_0100) >> 2
-	buffer[pathIndex+6] = (val & 0b0000_0010) >> 1
-	buffer[pathIndex+7] = val & 0b0000_0001
-}
-
-func deserializeByte4(val byte, pathIndex int, buffer []byte) {
-	buffer[pathIndex] = val >> 6
-	buffer[pathIndex+1] = (val & 0b0011_0000) >> 4
-	buffer[pathIndex+2] = (val & 0b0000_1100) >> 2
-	buffer[pathIndex+3] = val & 0b0000_0011
-}
-
-func deserializeByte16(val byte, pathIndex int, buffer []byte) {
-	buffer[pathIndex] = val >> 4
-	buffer[pathIndex+1] = val & 0b0000_1111
-}
-
 func serializeByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<7 +
 		p.value[pathIndex+1]<<6 +
