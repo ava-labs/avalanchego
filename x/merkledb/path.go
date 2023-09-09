@@ -226,6 +226,7 @@ func (p Path) Serialize() SerializedPath {
 
 	return result
 }
+
 func deserializeByte2(val byte, pathIndex int, buffer []byte) {
 	buffer[pathIndex] = val >> 7
 	buffer[pathIndex+1] = (val & 0b0100_0000) >> 6
