@@ -205,10 +205,12 @@ func (p Path) Serialize() SerializedPath {
 		Value:        make([]byte, byteLength+remainderAddition),
 	}
 
+	// handle full bytes
 	for byteIndex := 0; byteIndex < byteLength; byteIndex++ {
 		setFunc(&result, byteIndex, p)
 	}
-
+	
+	// deal with any partial byte due to remainder
 	pathIndex := byteLength * tokensPerByte
 	for offset := 0; offset < remainder; offset++ {
 		result.Value[byteLength] += p.value[pathIndex+offset] << p.shift(offset)
