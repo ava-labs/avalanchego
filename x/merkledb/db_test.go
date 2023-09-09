@@ -740,6 +740,21 @@ func FuzzMerkleDBRandomCases(f *testing.F) {
 		})
 }
 
+func FuzzMerkleDBRandomCasesInitialValues(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		initialValues uint,
+		numSteps uint,
+		randSeed int64) {
+		if numSteps == 0 {
+			t.SkipNow()
+		}
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		runRandDBTest(require, r, generateInitialValues(require, r, initialValues, numSteps, 0.001))
+	})
+}
+
 // randTest performs random trie operations.
 // Instances of this test are created by Generate.
 type randTest []randTestStep
