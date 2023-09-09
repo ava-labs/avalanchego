@@ -154,7 +154,7 @@ func (p Path) shift(offset int) int {
 }
 
 func (p Path) mask(offset int) byte {
-	return byte(tokenSizeToBranchFactor[p.tokenBitSize]-1) << p.shift(offset)
+	return byte((p.BranchFactor() - 1) << p.shift(offset))
 }
 
 // Invariant: The returned value must not be modified.
