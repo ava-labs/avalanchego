@@ -1630,7 +1630,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			require,
 			rand,
 			[]database.Database{db},
-			int(numKeyValues),
+			numKeyValues,
 			deletePortion,
 		)
 
@@ -1745,7 +1745,7 @@ func FuzzProof(f *testing.F) {
 			require,
 			rand,
 			[]database.Database{db},
-			int(numKeyValues),
+			numKeyValues,
 			deletePortion,
 		)
 

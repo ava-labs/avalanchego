@@ -733,10 +733,12 @@ func FuzzMerkleDBRandomCases(f *testing.F) {
 			randSeed int64,
 			size uint,
 		) {
-			require := require.New(t)
+			if size == 0 {
+				t.SkipNow()
+			}
 
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			runRandDBTest(require, r, generateRandTest(require, r, size, 0.01))
+			runRandDBTest(require.New(t), r, generateRandTest(require, r, size, 0.01))
 		})
 }
 
@@ -955,7 +957,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 func generateInitialValues(
 	require *require.Assertions,
 	r *rand.Rand,
-	numInitialKeyValues int,
+	numInitialKeyValues uint,
 	size uint,
 	percentChanceToFullHash float64,
 ) randTest {
@@ -984,7 +986,7 @@ func generateInitialValues(
 	}
 
 	var steps randTest
-	for i := 0; i < numInitialKeyValues; i++ {
+	for i := uint(0); i < numInitialKeyValues; i++ {
 		step := randTestStep{
 			op:    opUpdate,
 			key:   genKey(),
