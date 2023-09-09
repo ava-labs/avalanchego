@@ -60,14 +60,25 @@ func NewPath(p []byte, branchFactor BranchFactor) Path {
 	tokensPerByte := result.TokensPerByte()
 	buffer := make([]byte, len(p)*tokensPerByte)
 
-	// Each token gets bitwise anded with a bit mask to isolate the bits of current token
-	// and then shifted right to make it a value between [0, BranchFactor)
-	bufferIndex := 0
-	for _, currentByte := range p {
-		for currentOffset := 0; currentOffset < tokensPerByte; currentOffset++ {
-			buffer[bufferIndex+currentOffset] = currentByte & result.mask(currentOffset) >> result.shift(currentOffset)
+	var deserializeFunc func(val byte, pathIndex int, buffer []byte)
+	switch branchFactor {
+	case BranchFactor2:
+		deserializeFunc = deserializeByte2
+	case BranchFactor4:
+		deserializeFunc = deserializeByte4
+	case BranchFactor16:
+		deserializeFunc = deserializeByte16
+	case BranchFactor256:
+		return Path{
+			value:        string(p),
+			tokenBitSize: Byte,
 		}
-		bufferIndex += tokensPerByte
+	}
+
+	pathIndex := 0
+	for _, currentByte := range p {
+		deserializeFunc(currentByte, pathIndex, buffer)
+		pathIndex += tokensPerByte
 	}
 
 	// avoid copying during the conversion
@@ -155,10 +166,6 @@ func (p Path) shift(offset int) int {
 	return Byte - (p.tokenBitSize * (offset + 1))
 }
 
-func (p Path) mask(offset int) byte {
-	return byte((p.BranchFactor() - 1) << p.shift(offset))
-}
-
 // Invariant: The returned value must not be modified.
 func (p Path) Bytes() []byte {
 	// avoid copying during the conversion
@@ -176,14 +183,14 @@ func (p Path) Serialize() SerializedPath {
 			Value:        []byte{},
 		}
 	}
-	var setFunc func(s *SerializedPath, byteIndex int, pathIndex int, p Path)
+	var serializeFunc func(s *SerializedPath, byteIndex int, pathIndex int, p Path)
 	switch p.TokenBitSize() {
 	case Bit:
-		setFunc = setByte2
+		serializeFunc = serializeByte2
 	case Crumb:
-		setFunc = setByte4
+		serializeFunc = serializeByte4
 	case Nibble:
-		setFunc = setByte16
+		serializeFunc = serializeByte16
 	case Byte:
 		return SerializedPath{
 			NibbleLength: len(p.value),
@@ -208,7 +215,7 @@ func (p Path) Serialize() SerializedPath {
 	// handle full bytes
 	pathIndex := 0
 	for byteIndex := 0; byteIndex < byteLength; byteIndex++ {
-		setFunc(&result, byteIndex, pathIndex, p)
+		serializeFunc(&result, byteIndex, pathIndex, p)
 		pathIndex += tokensPerByte
 	}
 
@@ -219,8 +226,30 @@ func (p Path) Serialize() SerializedPath {
 
 	return result
 }
+func deserializeByte2(val byte, pathIndex int, buffer []byte) {
+	buffer[pathIndex] = val >> 7
+	buffer[pathIndex+1] = (val & 0b0100_0000) >> 6
+	buffer[pathIndex+2] = (val & 0b0010_0000) >> 5
+	buffer[pathIndex+3] = (val & 0b0001_0000) >> 4
+	buffer[pathIndex+4] = (val & 0b0000_1000) >> 3
+	buffer[pathIndex+5] = (val & 0b0000_0100) >> 2
+	buffer[pathIndex+6] = (val & 0b0000_0010) >> 1
+	buffer[pathIndex+7] = val & 0b0000_0001
+}
 
-func setByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
+func deserializeByte4(val byte, pathIndex int, buffer []byte) {
+	buffer[pathIndex] = val >> 6
+	buffer[pathIndex+1] = (val & 0b0011_0000) >> 4
+	buffer[pathIndex+2] = (val & 0b0000_1100) >> 2
+	buffer[pathIndex+3] = val & 0b0000_0011
+}
+
+func deserializeByte16(val byte, pathIndex int, buffer []byte) {
+	buffer[pathIndex] = val >> 4
+	buffer[pathIndex+1] = val & 0b0000_1111
+}
+
+func serializeByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<7 +
 		p.value[pathIndex+1]<<6 +
 		p.value[pathIndex+2]<<5 +
@@ -231,14 +260,14 @@ func setByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 		p.value[pathIndex+7]
 }
 
-func setByte4(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
+func serializeByte4(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<6 +
 		p.value[pathIndex+1]<<4 +
 		p.value[pathIndex+2]<<2 +
 		p.value[pathIndex+3]<<0
 }
 
-func setByte16(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
+func serializeByte16(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<4 +
 		p.value[pathIndex+1]
 }
