@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"unsafe"
+
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -174,28 +176,71 @@ func (p Path) Serialize() SerializedPath {
 			Value:        []byte{},
 		}
 	}
+	var setFunc func(s *SerializedPath, byteIndex int, p Path)
+	switch p.TokenBitSize() {
+	case Bit:
+		setFunc = setByte2
+	case Crumb:
+		setFunc = setByte4
+	case Nibble:
+		setFunc = setByte16
+	case Byte:
+		return SerializedPath{
+			NibbleLength: len(p.value),
+			Value:        slices.Clone(p.Bytes()),
+		}
+	}
 
 	tokensPerByte := p.TokensPerByte()
 	byteLength := len(p.value) / tokensPerByte
 	remainder := len(p.value) % tokensPerByte
-
+	remainderAddition := 0
 	// add one so there is a byte for the remainder tokens if any exist
 	if remainder > 0 {
-		byteLength++
+		remainderAddition = 1
 	}
 
 	result := SerializedPath{
 		NibbleLength: len(p.value),
-		Value:        make([]byte, byteLength),
+		Value:        make([]byte, byteLength+remainderAddition),
 	}
 
-	for pathIndex := 0; pathIndex < len(p.value); pathIndex++ {
-		keyIndex := pathIndex / tokensPerByte
-		offset := pathIndex % tokensPerByte
-		result.Value[keyIndex] += p.value[pathIndex] << p.shift(offset)
+	for byteIndex := 0; byteIndex < byteLength; byteIndex++ {
+		setFunc(&result, byteIndex, p)
+	}
+
+	pathIndex := byteLength * tokensPerByte
+	for offset := 0; offset < remainder; offset++ {
+		result.Value[byteLength] += p.value[pathIndex+offset] << p.shift(offset)
 	}
 
 	return result
+}
+
+func setByte2(s *SerializedPath, byteIndex int, p Path) {
+	pathIndex := byteIndex * 8
+	s.Value[byteIndex] += p.value[pathIndex]<<7 +
+		p.value[pathIndex+1]<<6 +
+		p.value[pathIndex+2]<<5 +
+		p.value[pathIndex+3]<<4 +
+		p.value[pathIndex+4]<<3 +
+		p.value[pathIndex+5]<<2 +
+		p.value[pathIndex+6]<<1 +
+		p.value[pathIndex+7]
+}
+
+func setByte4(s *SerializedPath, byteIndex int, p Path) {
+	pathIndex := byteIndex * 4
+	s.Value[byteIndex] += p.value[pathIndex]<<6 +
+		p.value[pathIndex+1]<<4 +
+		p.value[pathIndex+2]<<2 +
+		p.value[pathIndex+3]<<0
+}
+
+func setByte16(s *SerializedPath, byteIndex int, p Path) {
+	pathIndex := byteIndex * 2
+	s.Value[byteIndex] += p.value[pathIndex]<<4 +
+		p.value[pathIndex+1]
 }
 
 // SerializedPath contains a path from the trie.
