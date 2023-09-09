@@ -176,7 +176,7 @@ func (p Path) Serialize() SerializedPath {
 			Value:        []byte{},
 		}
 	}
-	var setFunc func(s *SerializedPath, byteIndex int, p Path)
+	var setFunc func(s *SerializedPath, byteIndex int, pathIndex int, p Path)
 	switch p.TokenBitSize() {
 	case Bit:
 		setFunc = setByte2
@@ -206,12 +206,13 @@ func (p Path) Serialize() SerializedPath {
 	}
 
 	// handle full bytes
+	pathIndex := 0
 	for byteIndex := 0; byteIndex < byteLength; byteIndex++ {
-		setFunc(&result, byteIndex, p)
+		setFunc(&result, byteIndex, pathIndex, p)
+		pathIndex += tokensPerByte
 	}
-	
+
 	// deal with any partial byte due to remainder
-	pathIndex := byteLength * tokensPerByte
 	for offset := 0; offset < remainder; offset++ {
 		result.Value[byteLength] += p.value[pathIndex+offset] << p.shift(offset)
 	}
@@ -219,8 +220,7 @@ func (p Path) Serialize() SerializedPath {
 	return result
 }
 
-func setByte2(s *SerializedPath, byteIndex int, p Path) {
-	pathIndex := byteIndex * 8
+func setByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<7 +
 		p.value[pathIndex+1]<<6 +
 		p.value[pathIndex+2]<<5 +
@@ -231,16 +231,14 @@ func setByte2(s *SerializedPath, byteIndex int, p Path) {
 		p.value[pathIndex+7]
 }
 
-func setByte4(s *SerializedPath, byteIndex int, p Path) {
-	pathIndex := byteIndex * 4
+func setByte4(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<6 +
 		p.value[pathIndex+1]<<4 +
 		p.value[pathIndex+2]<<2 +
 		p.value[pathIndex+3]<<0
 }
 
-func setByte16(s *SerializedPath, byteIndex int, p Path) {
-	pathIndex := byteIndex * 2
+func setByte16(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 	s.Value[byteIndex] += p.value[pathIndex]<<4 +
 		p.value[pathIndex+1]
 }
