@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -204,61 +205,53 @@ func (p Path) Bytes() []byte {
 	return buf
 }
 
-// Returns the serialized representation of [p].
 func (p Path) Serialize() SerializedPath {
-	if len(p.value) == 0 {
-		return SerializedPath{
-			NibbleLength: 0,
-			Value:        []byte{},
-		}
+	tokensPerByte := 0
+	var setFunc func(pathIndex int) byte
+	switch p.BranchFactor() {
+	case 2:
+		setFunc = p.serialize2
+		tokensPerByte = 8
+	case 4:
+		setFunc = p.serialize4
+		tokensPerByte = 4
+	case 16:
+		setFunc = p.serialize16
+		tokensPerByte = 2
+	case 256:
+		setFunc = p.serialize256
+		tokensPerByte = 1
+	default:
+		return SerializedPath{}
 	}
-	var serializeFunc func(s *SerializedPath, byteIndex int, pathIndex int, p Path)
-	switch p.tokenBitSize {
-	case Bit:
-		serializeFunc = serializeByte2
-	case Crumb:
-		serializeFunc = serializeByte4
-	case Nibble:
-		serializeFunc = serializeByte16
-	case Byte:
-		return SerializedPath{
-			NibbleLength: len(p.value),
-			Value:        []byte(p.value),
-		}
-	}
-
-	tokensPerByte := p.TokensPerByte()
-	byteLength := len(p.value) / tokensPerByte
 	remainder := len(p.value) % tokensPerByte
-	remainderAddition := 0
-	// add one so there is a byte for the remainder tokens if any exist
-	if remainder > 0 {
-		remainderAddition = 1
-	}
 
 	result := SerializedPath{
 		NibbleLength: len(p.value),
-		Value:        make([]byte, byteLength+remainderAddition),
+		Value:        make([]byte, int(math.Ceil(float64(len(p.value))/float64(tokensPerByte)))),
 	}
 
-	// handle full bytes
+	keyIndex := 0
 	pathIndex := 0
-	for byteIndex := 0; byteIndex < byteLength; byteIndex++ {
-		serializeFunc(&result, byteIndex, pathIndex, p)
-		pathIndex += tokensPerByte
+	// loop over the path's bytes
+	// if the length has a remainder, subtract it so we don't overflow on the p[pathIndex+1]
+	lastIndex := len(p.value) - remainder
+	for ; pathIndex < lastIndex; pathIndex += tokensPerByte {
+		result.Value[keyIndex] = setFunc(pathIndex)
+		keyIndex++
 	}
 
-	// deal with any partial byte due to remainder
 	shift := Byte - p.tokenBitSize
 	for offset := 0; offset < remainder; offset++ {
-		result.Value[byteLength] += p.value[pathIndex+offset] << shift
+		result.Value[keyIndex] += p.value[pathIndex+offset] << shift
 		shift -= p.tokenBitSize
 	}
 
 	return result
 }
-func serializeByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
-	s.Value[byteIndex] += p.value[pathIndex]<<7 +
+
+func (p Path) serialize2(pathIndex int) byte {
+	return p.value[pathIndex]<<7 +
 		p.value[pathIndex+1]<<6 +
 		p.value[pathIndex+2]<<5 +
 		p.value[pathIndex+3]<<4 +
@@ -268,16 +261,20 @@ func serializeByte2(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
 		p.value[pathIndex+7]
 }
 
-func serializeByte4(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
-	s.Value[byteIndex] += p.value[pathIndex]<<6 +
+func (p Path) serialize4(pathIndex int) byte {
+	return p.value[pathIndex]<<6 +
 		p.value[pathIndex+1]<<4 +
 		p.value[pathIndex+2]<<2 +
 		p.value[pathIndex+3]<<0
 }
 
-func serializeByte16(s *SerializedPath, byteIndex int, pathIndex int, p Path) {
-	s.Value[byteIndex] += p.value[pathIndex]<<4 +
+func (p Path) serialize16(pathIndex int) byte {
+	return p.value[pathIndex]<<4 +
 		p.value[pathIndex+1]
+}
+
+func (p Path) serialize256(pathIndex int) byte {
+	return p.value[pathIndex]
 }
 
 // SerializedPath contains a path from the trie.
