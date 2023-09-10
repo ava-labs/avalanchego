@@ -1296,13 +1296,13 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 	}
 }
 
-func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	for i := 0; i < 1_000; i++ {
+func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		node := newRandomProofNode(rand)
 
 		// Marshal and unmarshal it.
@@ -1310,21 +1310,22 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
 		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
-		require.True(proofNodeEqual(node, unmarshaledNode))
+		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
-		require.True(protoProofNodeEqual(protoNode, protoUnmarshaledNode))
-	}
+		require.Equal(protoNode, protoUnmarshaledNode)
+	})
 }
 
-func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random range proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1366,21 +1367,22 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.True(rangeProofsEqual(proof, unmarshaledProof))
+		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.True(protoRangeProofsEqual(protoProof, protoUnmarshaledProof))
-	}
+		require.Equal(protoProof, protoUnmarshaledProof)
+	})
 }
 
-func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random change proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1427,12 +1429,12 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.True(changeProofsEqual(proof, unmarshaledProof))
+		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.True(protoChangeProofsEqual(protoProof, protoUnmarshaledProof))
-	}
+		require.Equal(protoProof, protoUnmarshaledProof)
+	})
 }
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
@@ -1513,13 +1515,14 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
-func TestProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random proof.
 		proofLen := rand.Intn(32)
 		proofPath := make([]ProofNode, proofLen)
@@ -1551,12 +1554,12 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		var unmarshaledProof Proof
 		protoProof := proof.ToProto()
 		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.True(proofsEqual(proof, unmarshaledProof))
+		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.True(protoProofsEqual(protoProof, protoUnmarshaledProof))
-	}
+		require.Equal(protoProof, protoUnmarshaledProof)
+	})
 }
 
 func TestProofProtoUnmarshal(t *testing.T) {

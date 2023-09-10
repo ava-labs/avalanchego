@@ -747,7 +747,8 @@ func FuzzMerkleDBRandomCasesInitialValues(f *testing.F) {
 		t *testing.T,
 		initialValues uint,
 		numSteps uint,
-		randSeed int64) {
+		randSeed int64,
+	) {
 		if numSteps == 0 {
 			t.SkipNow()
 		}
