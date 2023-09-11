@@ -103,7 +103,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	appRequestTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_app_request", handlerID),
+		fmt.Sprintf("%d_app_request", handlerID),
 		"app request time (ns)",
 		r.metrics,
 	)
@@ -113,7 +113,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	appRequestFailedTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_app_request_failed", handlerID),
+		fmt.Sprintf("%d_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -123,7 +123,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	appResponseTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_app_response", handlerID),
+		fmt.Sprintf("%d_app_response", handlerID),
 		"app response time (ns)",
 		r.metrics,
 	)
@@ -133,7 +133,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	appGossipTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_app_gossip", handlerID),
+		fmt.Sprintf("%d_app_gossip", handlerID),
 		"app gossip time (ns)",
 		r.metrics,
 	)
@@ -143,7 +143,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	crossChainAppRequestTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_cross_chain_app_request", handlerID),
+		fmt.Sprintf("%d_cross_chain_app_request", handlerID),
 		"cross chain app request time (ns)",
 		r.metrics,
 	)
@@ -153,7 +153,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	crossChainAppRequestFailedTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_cross_chain_app_request_failed", handlerID),
+		fmt.Sprintf("%d_cross_chain_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -163,7 +163,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	crossChainAppResponseTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("router_%d_cross_chain_app_response", handlerID),
+		fmt.Sprintf("%d_cross_chain_app_response", handlerID),
 		"cross chain app response time (ns)",
 		r.metrics,
 	)
