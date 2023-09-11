@@ -260,7 +260,6 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 
 	if err := handler.AppGossip(ctx, nodeID, parsedMsg); err != nil {
 		return err
-
 	}
 
 	handler.metrics.appGossipTime.Observe(float64(time.Since(start)))
