@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-	"math"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -228,7 +227,9 @@ func (p Path) Serialize() SerializedPath {
 
 	result := SerializedPath{
 		NibbleLength: len(p.value),
-		Value:        make([]byte, int(math.Ceil(float64(len(p.value))/float64(tokensPerByte)))),
+		// Ensure that this rounds up when len(p.value) is not evenly divisible by tokensPerByte
+		// so that the extra byte stores any remainder tokens
+		Value: make([]byte, (len(p.value)+tokensPerByte-1)/tokensPerByte),
 	}
 
 	keyIndex := 0
