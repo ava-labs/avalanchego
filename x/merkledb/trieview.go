@@ -299,7 +299,7 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	close(updatedChildren)
 
 	for child := range updatedChildren {
-		n.addChild(child)
+		n.updateChild(child)
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
