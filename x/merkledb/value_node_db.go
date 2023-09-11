@@ -72,7 +72,7 @@ func (db *valueNodeDB) Get(key Path) (*node, error) {
 	}
 	db.metrics.ValueNodeCacheMiss()
 
-	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Serialize().Value)
+	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
 
 	db.metrics.DatabaseNodeRead()
@@ -104,7 +104,7 @@ func (b *valueNodeBatch) Write() error {
 	for key, n := range b.ops {
 		b.db.metrics.DatabaseNodeWrite()
 		b.db.nodeCache.Put(key, n)
-		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Serialize().Value)
+		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
 		if n == nil {
 			if err := dbBatch.Delete(prefixedKey); err != nil {
 				return err
@@ -140,7 +140,7 @@ func (i *iterator) Key() []byte {
 	if i.current == nil {
 		return nil
 	}
-	return i.current.key.Serialize().Value
+	return i.current.key.Bytes()
 }
 
 func (i *iterator) Value() []byte {

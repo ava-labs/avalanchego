@@ -82,7 +82,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeSerializedPath(reader)
+			got, err := codec.decodePath(reader)
 			if err != nil {
 				return
 			}
@@ -91,13 +91,10 @@ func FuzzCodecSerializedPath(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeSerializedPath(&buf, got)
+			codec.encodePath(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
-
-			clonedGot := got.Deserialize(BranchFactor16).Serialize()
-			require.Equal(got, clonedGot)
 		},
 	)
 }
@@ -259,7 +256,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      NewPath16(key).Serialize(),
+				Key:      NewPath16(key),
 			}
 
 			// Serialize the *hashValues with both codecs

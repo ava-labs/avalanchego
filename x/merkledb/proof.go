@@ -55,7 +55,7 @@ var (
 )
 
 type ProofNode struct {
-	KeyPath SerializedPath
+	KeyPath Path
 	// Nothing if this is an intermediate node.
 	// The value in this node if its length < [HashLen].
 	// The hash of the value in this node otherwise.
@@ -63,12 +63,12 @@ type ProofNode struct {
 	Children    map[byte]ids.ID
 }
 
-// Assumes [node.Key.KeyPath.NibbleLength] <= math.MaxUint64.
+// Assumes [node.Key.KeyPath.Length()] <= math.MaxUint64.
 func (node *ProofNode) ToProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
 		Key: &pb.SerializedPath{
-			NibbleLength: uint64(node.KeyPath.NibbleLength),
-			Value:        node.KeyPath.Value,
+			NibbleLength: uint64(node.KeyPath.length),
+			Value:        node.KeyPath.Bytes(),
 		},
 		Children: make(map[uint32][]byte, len(node.Children)),
 	}
@@ -103,8 +103,8 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 		return ErrNilSerializedPath
 	}
 
-	node.KeyPath.NibbleLength = int(pbNode.Key.NibbleLength)
-	node.KeyPath.Value = pbNode.Key.Value
+	node.KeyPath.length = int(pbNode.Key.NibbleLength)
+	node.KeyPath.value = string(pbNode.Key.Value)
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
@@ -158,8 +158,8 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then the value of the last proof node must match [proof.Value].
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if lastNode.KeyPath.NibbleLength%2 == 0 &&
-		bytes.Equal(proof.Key, lastNode.KeyPath.Value) &&
+	if lastNode.KeyPath.length%2 == 0 &&
+		bytes.Equal(proof.Key, lastNode.KeyPath.Bytes()) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
@@ -168,7 +168,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if (lastNode.KeyPath.NibbleLength%2 == 1 || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
+	if (lastNode.KeyPath.Length()%2 == 1 || !bytes.Equal(proof.Key, lastNode.KeyPath.Bytes())) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
@@ -182,7 +182,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.Deserialize(BranchFactor16))
+	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath)
 
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
@@ -467,12 +467,11 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start Path, end mayb
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
-			nodeKey  = node.KeyPath
-			nodePath = nodeKey.Deserialize(BranchFactor16)
+			nodePath = node.KeyPath
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodeKey.NibbleLength%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodePath.Length()%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
 			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -649,17 +648,16 @@ func verifyAllChangeProofKeyValuesPresent(
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
-			nodeKey  = node.KeyPath
-			nodePath = nodeKey.Deserialize(BranchFactor16)
+			nodePath = node.KeyPath
 		)
 
 		// Check the value of any node with a key that is within the range.
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodeKey.NibbleLength%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodePath.Length()%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
-				dbValue, err := db.GetValue(ctx, nodeKey.Value)
+				dbValue, err := db.GetValue(ctx, nodePath.Bytes())
 				if err != nil {
 					if err != database.ErrNotFound {
 						return err
@@ -750,18 +748,17 @@ func verifyProofPath(proof []ProofNode, keyPath Path) error {
 		return nil
 	}
 
-	provenKey := keyPath.Serialize()
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].KeyPath
 
 		// intermediate nodes (nodes with odd nibble length) should never have a value associated with them
-		if nodeKey.NibbleLength%2 == 1 && !proof[i].ValueOrHash.IsNothing() {
+		if nodeKey.Length()%2 == 1 && !proof[i].ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 
 		// each node should have a key that has the proven key as a prefix
-		if !provenKey.HasStrictPrefix(nodeKey) {
+		if !keyPath.HasStrictPrefix(nodeKey) {
 			return ErrProofNodeNotForKey
 		}
 
@@ -775,7 +772,7 @@ func verifyProofPath(proof []ProofNode, keyPath Path) error {
 	// check the last node for a value since the above loop doesn't check the last node
 	if len(proof) > 0 {
 		lastNode := proof[len(proof)-1]
-		if lastNode.KeyPath.NibbleLength%2 == 1 && !lastNode.ValueOrHash.IsNothing() {
+		if lastNode.KeyPath.Length()%2 == 1 && !lastNode.ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 	}
@@ -825,9 +822,9 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.Deserialize(BranchFactor16)
+		keyPath := proofNode.KeyPath
 
-		if keyPath.Length()%keyPath.TokensPerByte() != 0 && !proofNode.ValueOrHash.IsNothing() {
+		if keyPath.Length()%keyPath.tokensPerByte != 0 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key
 			return ErrOddLengthWithValue
 		}

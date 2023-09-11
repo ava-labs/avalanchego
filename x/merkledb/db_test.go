@@ -934,7 +934,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			ops := make([]database.BatchOp, 0, len(values))
 			for key, value := range values {
 				ops = append(ops, database.BatchOp{
-					Key:   key.Serialize().Value,
+					Key:   key.Bytes(),
 					Value: value,
 				})
 			}

@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-
 	"github.com/ava-labs/avalanchego/database"
 
 	"golang.org/x/exp/slices"
@@ -25,13 +24,14 @@ func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	changes := make([]KeyChange, 0, len(t.changes.values))
+
 	for path, change := range t.changes.values {
-		key := path.Serialize().Value
-		if (len(start) > 0 && bytes.Compare(start, key) > 0) || !bytes.HasPrefix(key, prefix) {
+		pathBytes := path.Bytes()
+		if (len(start) > 0 && bytes.Compare(start, pathBytes) > 0) || !bytes.HasPrefix(pathBytes, prefix) {
 			continue
 		}
 		changes = append(changes, KeyChange{
-			Key:   key,
+			Key:   pathBytes,
 			Value: change.after,
 		})
 	}

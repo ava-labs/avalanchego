@@ -609,10 +609,9 @@ func (db *merkleDB) GetChangeProof(
 
 	for _, key := range changedKeys {
 		change := changes.values[key]
-		serializedKey := key.Serialize().Value
 
 		result.KeyChanges = append(result.KeyChanges, KeyChange{
-			Key: serializedKey,
+			Key: key.Bytes(),
 			// create a copy so edits of the []byte don't affect the db
 			Value: maybe.Bind(change.after, slices.Clone[[]byte]),
 		})

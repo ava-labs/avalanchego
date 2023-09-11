@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -65,141 +64,54 @@ func Test_Path_Append(t *testing.T) {
 	}
 }
 
-func Test_SerializedPath_NibbleVal(t *testing.T) {
+func Test_Path_Extend(t *testing.T) {
 	require := require.New(t)
 
-	path := SerializedPath{Value: []byte{240, 237}}
-	require.Equal(byte(15), path.NibbleVal(0))
-	require.Equal(byte(0), path.NibbleVal(1))
-	require.Equal(byte(14), path.NibbleVal(2))
-	require.Equal(byte(13), path.NibbleVal(3))
-}
+	path2 := NewPath([]byte{0b1000_0000}, BranchFactor2).Take(1)
+	p := NewPath([]byte{0b01010101}, BranchFactor2)
+	extendedP := path2.Extend(p)
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(0), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(0), extendedP.Token(3))
+	require.Equal(byte(1), extendedP.Token(4))
+	require.Equal(byte(0), extendedP.Token(5))
+	require.Equal(byte(1), extendedP.Token(6))
+	require.Equal(byte(0), extendedP.Token(7))
+	require.Equal(byte(1), extendedP.Token(8))
 
-func Test_SerializedPath_AppendNibble(t *testing.T) {
-	require := require.New(t)
+	p = NewPath([]byte{0b01010101, 0b1000_0000}, BranchFactor2).Take(9)
+	extendedP = path2.Extend(p)
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(0), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(0), extendedP.Token(3))
+	require.Equal(byte(1), extendedP.Token(4))
+	require.Equal(byte(0), extendedP.Token(5))
+	require.Equal(byte(1), extendedP.Token(6))
+	require.Equal(byte(0), extendedP.Token(7))
+	require.Equal(byte(1), extendedP.Token(8))
+	require.Equal(byte(1), extendedP.Token(9))
 
-	path := SerializedPath{Value: []byte{}}
-	require.Zero(path.NibbleLength)
+	path4 := NewPath([]byte{0b0100_0000}, BranchFactor4).Take(1)
+	p = NewPath([]byte{0b01010101}, BranchFactor4)
+	extendedP = path4.Extend(p)
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(3))
+	require.Equal(byte(1), extendedP.Token(4))
 
-	path = path.AppendNibble(1)
-	require.Equal(1, path.NibbleLength)
-	require.Equal(byte(1), path.NibbleVal(0))
+	path16 := NewPath([]byte{0b0001_0000}, BranchFactor16).Take(1)
+	p = NewPath([]byte{0b0001_0001}, BranchFactor16)
+	extendedP = path16.Extend(p)
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
 
-	path = path.AppendNibble(2)
-	require.Equal(2, path.NibbleLength)
-	require.Equal(byte(2), path.NibbleVal(1))
-}
-
-func Test_SerializedPath_Has_Prefix(t *testing.T) {
-	require := require.New(t)
-
-	first := SerializedPath{Value: []byte("FirstKey")}
-	prefix := SerializedPath{Value: []byte("FirstKe")}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
-
-	first = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 16}
-	prefix = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
-
-	first = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	prefix = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	require.True(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	first = SerializedPath{Value: []byte{247}, NibbleLength: 2}
-	prefix = SerializedPath{Value: []byte{240}, NibbleLength: 2}
-	require.False(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	first = SerializedPath{Value: []byte{247}, NibbleLength: 2}
-	prefix = SerializedPath{Value: []byte{240}, NibbleLength: 1}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
-
-	first = SerializedPath{Value: []byte{}, NibbleLength: 0}
-	prefix = SerializedPath{Value: []byte{}, NibbleLength: 0}
-	require.True(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	a := SerializedPath{Value: []byte{0x10}, NibbleLength: 1}
-	b := SerializedPath{Value: []byte{0x10}, NibbleLength: 2}
-	require.False(a.HasPrefix(b))
-}
-
-func Test_SerializedPath_HasPrefix_BadInput(t *testing.T) {
-	require := require.New(t)
-
-	a := SerializedPath{Value: []byte{}}
-	b := SerializedPath{Value: []byte{}, NibbleLength: 1}
-	require.False(a.HasPrefix(b))
-
-	a = SerializedPath{Value: []byte{}, NibbleLength: 10}
-	b = SerializedPath{Value: []byte{0x10}, NibbleLength: 1}
-	require.False(a.HasPrefix(b))
-}
-
-func Test_SerializedPath_Equal(t *testing.T) {
-	require := require.New(t)
-
-	first := SerializedPath{Value: []byte("FirstKey"), NibbleLength: 16}
-	prefix := SerializedPath{Value: []byte("FirstKey"), NibbleLength: 16}
-	require.True(first.Equal(prefix))
-
-	first = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 16}
-	prefix = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	require.False(first.Equal(prefix))
-
-	first = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	prefix = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
-	require.True(first.Equal(prefix))
-}
-
-func FuzzPath(f *testing.F) {
-	for bit0 := 0; bit0 < 2; bit0++ {
-		for bit1 := 0; bit1 < 2; bit1++ {
-			f.Add([]byte{0x01, 0xF0, 0x0F, 0x00}, bit0 == 0, bit1 == 0)
-			f.Add([]byte{}, bit0 == 0, bit1 == 0)
-			f.Add([]byte(nil), bit0 == 0, bit1 == 0)
-		}
-	}
-	f.Fuzz(
-		func(
-			t *testing.T,
-			pathBytes []byte,
-			branchingBit0 bool,
-			branchingBit1 bool,
-		) {
-			var branching BranchFactor
-			var tokensPerByte int
-			switch {
-			case branchingBit0 && branchingBit1:
-				branching = BranchFactor256
-				tokensPerByte = 1
-			case branchingBit0 && !branchingBit1:
-				branching = BranchFactor16
-				tokensPerByte = 2
-			case !branchingBit0 && branchingBit1:
-				branching = BranchFactor4
-				tokensPerByte = 4
-			case !branchingBit0 && !branchingBit1:
-				branching = BranchFactor2
-				tokensPerByte = 8
-			}
-
-			require := require.New(t)
-
-			p := NewPath(pathBytes, branching)
-
-			serializedPath := p.Serialize()
-			require.True(bytes.Equal(pathBytes, serializedPath.Value))
-			require.Equal(tokensPerByte*len(pathBytes), serializedPath.NibbleLength)
-
-			deserializedPath := serializedPath.Deserialize(branching)
-			require.Equal(p, deserializedPath)
-
-			reserializedPath := deserializedPath.Serialize()
-			require.Equal(serializedPath, reserializedPath)
-		})
+	path256 := NewPath([]byte{0b0000_0001}, BranchFactor256)
+	p = NewPath([]byte{0b0000_0001}, BranchFactor16)
+	extendedP = path256.Extend(p)
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(1), extendedP.Token(1))
 }

@@ -18,7 +18,7 @@ const HashLength = 32
 type hashValues struct {
 	Children map[byte]child
 	Value    maybe.Maybe[[]byte]
-	Key      SerializedPath
+	Key      Path
 }
 
 // Representation of a node stored in the database.
@@ -47,7 +47,7 @@ type node struct {
 func newNode(parent *node, key Path) *node {
 	newNode := &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, key.BranchFactor()),
+			children: make(map[byte]child, key.branchFactor),
 		},
 		key: key,
 	}
@@ -104,7 +104,7 @@ func (n *node) calculateID(metrics merkleMetrics) {
 	bytes := codec.encodeHashValues(&hashValues{
 		Children: n.children,
 		Value:    n.valueDigest,
-		Key:      n.key.Serialize(),
+		Key:      n.key,
 	})
 	n.id = hashing.ComputeHash256Array(bytes)
 }
@@ -172,7 +172,7 @@ func (n *node) clone() *node {
 // Returns the ProofNode representation of this node.
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
-		KeyPath:     n.key.Serialize(),
+		KeyPath:     n.key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
 		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
