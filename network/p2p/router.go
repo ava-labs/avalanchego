@@ -22,10 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
-const (
-	metricsNamespace = "router"
-)
-
 var (
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
@@ -106,8 +102,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appRequestTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_app_request", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_app_request", handlerID),
 		"app request time (ns)",
 		r.metrics,
 	)
@@ -116,8 +112,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appRequestFailedTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_app_request_failed", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -126,8 +122,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appResponseTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_app_response", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_app_response", handlerID),
 		"app response time (ns)",
 		r.metrics,
 	)
@@ -136,8 +132,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appGossipTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_app_gossip", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_app_gossip", handlerID),
 		"app gossip time (ns)",
 		r.metrics,
 	)
@@ -146,8 +142,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppRequestTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_cross_chain_app_request", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_cross_chain_app_request", handlerID),
 		"cross chain app request time (ns)",
 		r.metrics,
 	)
@@ -156,8 +152,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppRequestFailedTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_cross_chain_app_request_failed", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_cross_chain_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -166,8 +162,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppResponseTime, err := metric.NewAverager(
-		metricsNamespace,
-		fmt.Sprintf("%s_%d_cross_chain_app_response", r.namespace, handlerID),
+		r.namespace,
+		fmt.Sprintf("router_%d_cross_chain_app_response", handlerID),
 		"cross chain app response time (ns)",
 		r.metrics,
 	)
