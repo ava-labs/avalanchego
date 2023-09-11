@@ -37,8 +37,7 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	if networkingErr == nil {
 		return intf, engineErr
 	}
-	// TODO: Update this to return both errors with %w once we upgrade to Go 1.20
-	return intf, fmt.Errorf("engine: %v; networking: %v", engineErr, networkingErr)
+	return intf, fmt.Errorf("engine: %w; networking: %w", engineErr, networkingErr)
 }
 
 func (h *handler) networkHealthCheck() (interface{}, error) {
