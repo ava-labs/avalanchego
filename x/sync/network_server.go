@@ -234,7 +234,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 					zap.Int("responseLen", len(proofBytes)),
 					zap.Error(err),
 				)
-				return fmt.Errorf("%w: %s", errAppSendFailed, err)
+				return fmt.Errorf("%w: %w", errAppSendFailed, err)
 			}
 			return nil
 		}
@@ -258,7 +258,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 					zap.Int("responseLen", len(proofBytes)),
 					zap.Error(err),
 				)
-				return fmt.Errorf("%w: %s", errAppSendFailed, err)
+				return fmt.Errorf("%w: %w", errAppSendFailed, err)
 			}
 			return nil
 		}
@@ -311,7 +311,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			zap.Int("responseLen", len(proofBytes)),
 			zap.Error(err),
 		)
-		return fmt.Errorf("%w: %s", errAppSendFailed, err)
+		return fmt.Errorf("%w: %w", errAppSendFailed, err)
 	}
 	return nil
 }

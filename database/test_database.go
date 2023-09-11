@@ -24,6 +24,7 @@ import (
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestOverwriteKeyValue,
 	TestEmptyKey,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
@@ -101,6 +102,22 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.Equal(ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
+}
+
+func TestOverwriteKeyValue(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte("hello")
+	value1 := []byte("world1")
+	value2 := []byte("world2")
+
+	require.NoError(db.Put(key, value1))
+
+	require.NoError(db.Put(key, value2))
+
+	gotValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value2, gotValue)
 }
 
 func TestKeyEmptyValue(t *testing.T, db Database) {
