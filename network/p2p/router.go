@@ -95,23 +95,23 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	return handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg)
 }
 
-func (r *Router) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	callback, ok := r.clearAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	callback(nodeID, nil, ErrAppRequestFailed)
+	callback(ctx, nodeID, nil, ErrAppRequestFailed)
 	return nil
 }
 
-func (r *Router) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	callback, ok := r.clearAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	callback(nodeID, response, nil)
+	callback(ctx, nodeID, response, nil)
 	return nil
 }
 
@@ -151,23 +151,23 @@ func (r *Router) CrossChainAppRequest(
 	return handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg)
 }
 
-func (r *Router) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
+func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
 	callback, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	callback(chainID, nil, ErrAppRequestFailed)
+	callback(ctx, chainID, nil, ErrAppRequestFailed)
 	return nil
 }
 
-func (r *Router) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+func (r *Router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	callback, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	callback(chainID, response, nil)
+	callback(ctx, chainID, response, nil)
 	return nil
 }
 
