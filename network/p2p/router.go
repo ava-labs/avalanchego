@@ -103,72 +103,72 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	appRequestTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_app_request", handlerID),
+		fmt.Sprintf("handler_%d_app_request", handlerID),
 		"app request time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
 	}
 
 	appRequestFailedTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_app_request_failed", handlerID),
+		fmt.Sprintf("handler_%d_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request failed metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
 	}
 
 	appResponseTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_app_response", handlerID),
+		fmt.Sprintf("handler_%d_app_response", handlerID),
 		"app response time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app response metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register app response metric for handler_%d: %w", handlerID, err)
 	}
 
 	appGossipTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_app_gossip", handlerID),
+		fmt.Sprintf("handler_%d_app_gossip", handlerID),
 		"app gossip time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app gossip metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register app gossip metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppRequestTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_cross_chain_app_request", handlerID),
+		fmt.Sprintf("handler_%d_cross_chain_app_request", handlerID),
 		"cross chain app request time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app request metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppRequestFailedTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_cross_chain_app_request_failed", handlerID),
+		fmt.Sprintf("handler_%d_cross_chain_app_request_failed", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request failed metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppResponseTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("%d_cross_chain_app_response", handlerID),
+		fmt.Sprintf("handler_%d_cross_chain_app_response", handlerID),
 		"cross chain app response time (ns)",
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app response metric for %d: %w", handlerID, err)
+		return nil, fmt.Errorf("failed to register cross-chain app response metric for handler_%d: %w", handlerID, err)
 	}
 
 	r.handlers[handlerID] = &meteredHandler{
