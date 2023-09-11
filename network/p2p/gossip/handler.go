@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -31,6 +32,16 @@ func NewHandler[T Gossipable](
 	metrics prometheus.Registerer,
 	namespace string,
 ) (*Handler[T], error) {
+	sentTime, err := metric.NewAverager(
+		namespace,
+		"gossip_sent_time",
+		"gossip request handling latency (ns)",
+		metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	h := &Handler[T]{
 		Handler:            p2p.NoOpHandler{},
 		set:                set,
@@ -45,6 +56,7 @@ func NewHandler[T Gossipable](
 			Name:      "gossip_sent_bytes",
 			Help:      "amount of gossip sent (bytes)",
 		}),
+		sentTime: sentTime,
 	}
 
 	errs := wrappers.Errs{}
@@ -64,9 +76,11 @@ type Handler[T Gossipable] struct {
 	// metrics
 	sentN     prometheus.Counter
 	sentBytes prometheus.Counter
+	sentTime  metric.Averager
 }
 
 func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+	start := time.Now()
 	request := &sdk.PullGossipRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, err
@@ -117,6 +131,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 	h.sentN.Add(float64(len(response.Gossip)))
 	h.sentBytes.Add(float64(responseSize))
+	h.sentTime.Observe(float64(time.Since(start)))
 
 	return proto.Marshal(response)
 }

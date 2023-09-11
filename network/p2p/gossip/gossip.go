@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -39,6 +40,16 @@ func NewGossiper[T any, U GossipableAny[T]](
 	metrics prometheus.Registerer,
 	namespace string,
 ) (*Gossiper[T, U], error) {
+	receivedTime, err := metric.NewAverager(
+		namespace,
+		"gossip_received_time",
+		"gossip response handling latency (ns)",
+		metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	g := &Gossiper[T, U]{
 		config: config,
 		log:    log,
@@ -54,6 +65,7 @@ func NewGossiper[T any, U GossipableAny[T]](
 			Name:      "gossip_received_bytes",
 			Help:      "amount of gossip received (bytes)",
 		}),
+		receivedTime: receivedTime,
 	}
 
 	errs := wrappers.Errs{}
@@ -72,6 +84,7 @@ type Gossiper[T any, U GossipableAny[T]] struct {
 	client        *p2p.Client
 	receivedN     prometheus.Counter
 	receivedBytes prometheus.Counter
+	receivedTime  metric.Averager
 }
 
 func (g *Gossiper[_, _]) Gossip(ctx context.Context) {
@@ -130,6 +143,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		return
 	}
 
+	start := time.Now()
 	response := &sdk.PullGossipResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
 		g.log.Debug("failed to unmarshal gossip response", zap.Error(err))
@@ -167,6 +181,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		}
 	}
 
+	g.receivedTime.Observe(float64(time.Since(start)))
 	g.receivedN.Add(float64(len(response.Gossip)))
 	g.receivedBytes.Add(float64(receivedBytes))
 }
