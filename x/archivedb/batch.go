@@ -5,6 +5,8 @@ package archivedb
 
 import "github.com/ava-labs/avalanchego/database"
 
+var _ database.Batch = (*dbBatchWithHeight)(nil)
+
 // A thin wrapper on top of the database.Batch that also keeps track of the height.
 //
 // It takes any key and wraps it with dbKey. It is possible to construct many
