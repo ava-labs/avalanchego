@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,6 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
+)
+
+const (
+	metricsNamespace = "router"
 )
 
 var (
@@ -77,13 +82,11 @@ func NewRouter(
 	namespace string,
 ) *Router {
 	return &Router{
-		log:       log,
-		sender:    sender,
-		metrics:   metrics,
-		namespace: namespace,
-
-		handlers: make(map[uint64]*meteredHandler),
-
+		log:                          log,
+		sender:                       sender,
+		metrics:                      metrics,
+		namespace:                    namespace,
+		handlers:                     make(map[uint64]*meteredHandler),
 		pendingAppRequests:           make(map[uint32]pendingAppRequest),
 		pendingCrossChainAppRequests: make(map[uint32]pendingCrossChainAppRequest),
 		// invariant: sdk uses odd-numbered requestIDs
@@ -103,7 +106,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appRequestTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_app_request", r.namespace, handlerID),
 		"app request time (ns)",
 		r.metrics,
@@ -113,7 +116,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appRequestFailedTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_app_request_failed", r.namespace, handlerID),
 		"app request failed time (ns)",
 		r.metrics,
@@ -123,7 +126,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appResponseTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_app_response", r.namespace, handlerID),
 		"app response time (ns)",
 		r.metrics,
@@ -133,7 +136,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	appGossipTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_app_gossip", r.namespace, handlerID),
 		"app gossip time (ns)",
 		r.metrics,
@@ -143,7 +146,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppRequestTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_cross_chain_app_request", r.namespace, handlerID),
 		"cross chain app request time (ns)",
 		r.metrics,
@@ -153,7 +156,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppRequestFailedTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_cross_chain_app_request_failed", r.namespace, handlerID),
 		"app request failed time (ns)",
 		r.metrics,
@@ -163,7 +166,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}
 
 	crossChainAppResponseTime, err := metric.NewAverager(
-		"router",
+		metricsNamespace,
 		fmt.Sprintf("%s_%d_cross_chain_app_response", r.namespace, handlerID),
 		"cross chain app response time (ns)",
 		r.metrics,
@@ -200,6 +203,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 }
 
 func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	start := time.Now()
 	parsedMsg, handler, ok := r.parse(request)
 	if !ok {
 		r.log.Debug("failed to process message",
@@ -212,11 +216,12 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return nil
 	}
 
-	start := time.Now()
-	err := handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg)
-	handler.metrics.appRequestTime.Observe(float64(time.Since(start)))
+	if err := handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg); err != nil {
+		return err
+	}
 
-	return err
+	handler.metrics.appRequestTime.Observe(float64(time.Since(start)))
+	return nil
 }
 
 func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -257,10 +262,13 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 		return nil
 	}
 
-	err := handler.AppGossip(ctx, nodeID, parsedMsg)
-	handler.metrics.appGossipTime.Observe(float64(time.Since(start)))
+	if err := handler.AppGossip(ctx, nodeID, parsedMsg); err != nil {
+		return err
 
-	return err
+	}
+
+	handler.metrics.appGossipTime.Observe(float64(time.Since(start)))
+	return nil
 }
 
 func (r *Router) CrossChainAppRequest(
@@ -283,10 +291,12 @@ func (r *Router) CrossChainAppRequest(
 		return nil
 	}
 
-	err := handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg)
-	handler.metrics.crossChainAppRequestTime.Observe(float64(time.Since(start)))
+	if err := handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg); err != nil {
+		return err
+	}
 
-	return err
+	handler.metrics.crossChainAppRequestTime.Observe(float64(time.Since(start)))
+	return nil
 }
 
 func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
