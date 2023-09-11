@@ -53,7 +53,7 @@ func (mr *MockManagerMockRecorder) Dispatch() *gomock.Call {
 }
 
 // IsBenched mocks base method.
-func (m *MockManager) IsBenched(arg0 ids.NodeID, arg1 ids.ID) bool {
+func (m *MockManager) IsBenched(arg0 ids.GenericNodeID, arg1 ids.ID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsBenched", arg0, arg1)
 	ret0, _ := ret[0].(bool)
@@ -81,7 +81,7 @@ func (mr *MockManagerMockRecorder) RegisterChain(arg0 interface{}) *gomock.Call 
 }
 
 // RegisterRequest mocks base method.
-func (m *MockManager) RegisterRequest(arg0 ids.NodeID, arg1 ids.ID, arg2 bool, arg3 ids.RequestID, arg4 func()) {
+func (m *MockManager) RegisterRequest(arg0 ids.GenericNodeID, arg1 ids.ID, arg2 bool, arg3 ids.RequestID, arg4 func()) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterRequest", arg0, arg1, arg2, arg3, arg4)
 }
@@ -105,7 +105,7 @@ func (mr *MockManagerMockRecorder) RegisterRequestToUnreachableValidator() *gomo
 }
 
 // RegisterResponse mocks base method.
-func (m *MockManager) RegisterResponse(arg0 ids.NodeID, arg1 ids.ID, arg2 ids.RequestID, arg3 message.Op, arg4 time.Duration) {
+func (m *MockManager) RegisterResponse(arg0 ids.GenericNodeID, arg1 ids.ID, arg2 ids.RequestID, arg3 message.Op, arg4 time.Duration) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterResponse", arg0, arg1, arg2, arg3, arg4)
 }

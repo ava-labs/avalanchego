@@ -666,7 +666,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+	if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 		s.failedDueToBench[message.GetAncestorsOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
@@ -789,7 +789,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+	if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 		s.failedDueToBench[message.GetOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
@@ -944,7 +944,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	// we don't even bother sending messages to them. We just have them
 	// immediately fail.
 	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+		if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 			s.failedDueToBench[message.PushQueryOp].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -1076,7 +1076,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	// unresponsive so we don't even bother sending messages to them. We just
 	// have them immediately fail.
 	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+		if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 			s.failedDueToBench[message.PullQueryOp].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
@@ -1294,7 +1294,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// unresponsive so we don't even bother sending messages to them. We just
 	// have them immediately fail.
 	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+		if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 			s.failedDueToBench[message.AppRequestOp].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()

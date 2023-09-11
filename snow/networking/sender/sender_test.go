@@ -1260,7 +1260,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is benched
 			{
-				timeoutManager.EXPECT().IsBenched(destinationNodeID, chainID).Return(true)
+				timeoutManager.EXPECT().IsBenched(ids.GenericNodeIDFromNodeID(destinationNodeID), chainID).Return(true)
 
 				timeoutManager.EXPECT().RegisterRequestToUnreachableValidator()
 
@@ -1296,7 +1296,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is not myself, not benched and send fails
 			{
-				timeoutManager.EXPECT().IsBenched(destinationNodeID, chainID).Return(false)
+				timeoutManager.EXPECT().IsBenched(ids.GenericNodeIDFromNodeID(destinationNodeID), chainID).Return(false)
 
 				timeoutManager.EXPECT().RegisterRequestToUnreachableValidator()
 

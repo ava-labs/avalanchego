@@ -139,11 +139,11 @@ func (r *tracedRouter) Disconnected(nodeID ids.NodeID) {
 	r.router.Disconnected(nodeID)
 }
 
-func (r *tracedRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
+func (r *tracedRouter) Benched(chainID ids.ID, nodeID ids.GenericNodeID) {
 	r.router.Benched(chainID, nodeID)
 }
 
-func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
+func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.GenericNodeID) {
 	r.router.Unbenched(chainID, nodeID)
 }
 

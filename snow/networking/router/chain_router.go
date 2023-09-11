@@ -76,7 +76,7 @@ type ChainRouter struct {
 	peers        map[ids.NodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
-	benched                map[ids.NodeID]set.Set[ids.ID]
+	benched                map[ids.GenericNodeID]set.Set[ids.ID]
 	criticalChains         set.Set[ids.ID]
 	sybilProtectionEnabled bool
 	onFatal                func(exitCode int)
@@ -109,7 +109,7 @@ func (cr *ChainRouter) Initialize(
 	cr.chainHandlers = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout
-	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
+	cr.benched = make(map[ids.GenericNodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
 	cr.sybilProtectionEnabled = sybilProtectionEnabled
 	cr.onFatal = onFatal
@@ -190,7 +190,7 @@ func (cr *ChainRouter) RegisterRequest(
 
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(
-		nodeID,
+		ids.GenericNodeIDFromNodeID(nodeID),
 		respondingChainID,
 		shouldMeasureLatency,
 		uniqueRequestID,
@@ -344,7 +344,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	latency := cr.clock.Time().Sub(req.time)
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
+	cr.timeoutManager.RegisterResponse(ids.GenericNodeIDFromNodeID(nodeID), destinationChainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
 	chain.Push(
@@ -407,7 +407,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	for validatorID, peer := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected
 		// on all chains
-		_, benched := cr.benched[validatorID]
+		_, benched := cr.benched[ids.GenericNodeIDFromNodeID(validatorID)]
 		if benched {
 			continue
 		}
@@ -437,7 +437,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	// connected when we unbench. So skip connecting now.
 	// This is not "theoretically" possible, but keeping this here prevents us
 	// from keeping an invariant that we never bench ourselves.
-	if _, benched := cr.benched[cr.myNodeID]; benched {
+	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(cr.myNodeID)]; benched {
 		return
 	}
 
@@ -462,7 +462,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	connectedPeer.trackedSubnets.Add(subnetID)
 
 	// If this validator is benched on any chain, treat them as disconnected on all chains
-	if _, benched := cr.benched[nodeID]; benched {
+	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(nodeID)]; benched {
 		return
 	}
 
@@ -501,7 +501,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 
 	peer := cr.peers[nodeID]
 	delete(cr.peers, nodeID)
-	if _, benched := cr.benched[nodeID]; benched {
+	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(nodeID)]; benched {
 		return
 	}
 
@@ -524,13 +524,18 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 }
 
 // Benched routes an incoming notification that a validator was benched
-func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
+func (cr *ChainRouter) Benched(chainID ids.ID, genericNodeID ids.GenericNodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	benchedChains, exists := cr.benched[nodeID]
+	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+	if err != nil {
+		panic(err)
+	}
+
+	benchedChains, exists := cr.benched[genericNodeID]
 	benchedChains.Add(chainID)
-	cr.benched[nodeID] = benchedChains
+	cr.benched[genericNodeID] = benchedChains
 	peer, hasPeer := cr.peers[nodeID]
 	if exists || !hasPeer {
 		// If the set already existed, then the node was previously benched.
@@ -556,19 +561,23 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
-func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
+func (cr *ChainRouter) Unbenched(chainID ids.ID, genericNodeID ids.GenericNodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	benchedChains := cr.benched[nodeID]
+	benchedChains := cr.benched[genericNodeID]
 	benchedChains.Remove(chainID)
 	if benchedChains.Len() != 0 {
-		cr.benched[nodeID] = benchedChains
+		cr.benched[genericNodeID] = benchedChains
 		return // This node is still benched
 	}
 
-	delete(cr.benched, nodeID)
+	delete(cr.benched, genericNodeID)
 
+	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+	if err != nil {
+		panic(err)
+	}
 	peer, found := cr.peers[nodeID]
 	if !found {
 		return

@@ -37,18 +37,18 @@ var _ heap.Interface = (*benchedQueue)(nil)
 // the full network timeout for a response.
 type Benchlist interface {
 	// RegisterResponse registers the response to a query message
-	RegisterResponse(nodeID ids.NodeID)
+	RegisterResponse(nodeID ids.GenericNodeID)
 	// RegisterFailure registers that we didn't receive a response within the timeout
-	RegisterFailure(nodeID ids.NodeID)
+	RegisterFailure(nodeID ids.GenericNodeID)
 	// IsBenched returns true if messages to [validatorID]
 	// should not be sent over the network and should immediately fail.
-	IsBenched(nodeID ids.NodeID) bool
+	IsBenched(nodeID ids.GenericNodeID) bool
 }
 
 // Data about a validator who is benched
 type benchData struct {
 	benchedUntil time.Time
-	nodeID       ids.NodeID
+	nodeID       ids.GenericNodeID
 	index        int
 }
 
@@ -115,7 +115,7 @@ type benchlist struct {
 	// Validator ID --> Consecutive failure information
 	// [streaklock] must be held when touching [failureStreaks]
 	streaklock     sync.Mutex
-	failureStreaks map[ids.NodeID]failureStreak
+	failureStreaks map[ids.GenericNodeID]failureStreak
 
 	// IDs of validators that are currently benched
 	benchlistSet set.Set[ids.GenericNodeID]
@@ -156,7 +156,7 @@ func NewBenchlist(
 	benchlist := &benchlist{
 		chainID:                chainID,
 		log:                    log,
-		failureStreaks:         make(map[ids.NodeID]failureStreak),
+		failureStreaks:         make(map[ids.GenericNodeID]failureStreak),
 		benchlistSet:           set.Set[ids.GenericNodeID]{},
 		benchable:              benchable,
 		vdrs:                   validators,
@@ -195,10 +195,10 @@ func (b *benchlist) remove(node *benchData) {
 	// Update state
 	id := node.nodeID
 	b.log.Debug("removing node from benchlist",
-		zap.Stringer("nodeID", id),
+		zap.Stringer("nodeID", &id),
 	)
 	heap.Remove(&b.benchedQueue, node.index)
-	b.benchlistSet.Remove(ids.GenericNodeIDFromNodeID(id))
+	b.benchlistSet.Remove(id)
 	b.benchable.Unbenched(b.chainID, id)
 
 	// Update metrics
@@ -236,7 +236,7 @@ func (b *benchlist) setNextLeaveTime() {
 
 // IsBenched returns true if messages to [nodeID]
 // should not be sent over the network and should immediately fail.
-func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
+func (b *benchlist) IsBenched(nodeID ids.GenericNodeID) bool {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 	return b.isBenched(nodeID)
@@ -245,26 +245,26 @@ func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 // isBenched checks if [nodeID] is currently benched
 // and calls cleanup if its benching period has elapsed
 // Assumes [b.lock] is held.
-func (b *benchlist) isBenched(nodeID ids.NodeID) bool {
-	if _, ok := b.benchlistSet[ids.GenericNodeIDFromNodeID(nodeID)]; ok {
+func (b *benchlist) isBenched(nodeID ids.GenericNodeID) bool {
+	if _, ok := b.benchlistSet[nodeID]; ok {
 		return true
 	}
 	return false
 }
 
 // RegisterResponse notes that we received a response from validator [validatorID]
-func (b *benchlist) RegisterResponse(nodeID ids.NodeID) {
+func (b *benchlist) RegisterResponse(nodeID ids.GenericNodeID) {
 	b.streaklock.Lock()
 	defer b.streaklock.Unlock()
 	delete(b.failureStreaks, nodeID)
 }
 
 // RegisterResponse notes that a request to validator [validatorID] timed out
-func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
+func (b *benchlist) RegisterFailure(nodeID ids.GenericNodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if b.benchlistSet.Contains(ids.GenericNodeIDFromNodeID(nodeID)) {
+	if b.benchlistSet.Contains(nodeID) {
 		// This validator is benched. Ignore failures until they're not.
 		return
 	}
@@ -289,8 +289,8 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
-func (b *benchlist) bench(nodeID ids.NodeID) {
-	validatorStake := b.vdrs.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
+func (b *benchlist) bench(nodeID ids.GenericNodeID) {
+	validatorStake := b.vdrs.GetWeight(nodeID)
 	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
@@ -302,7 +302,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	if err != nil {
 		// This should never happen
 		b.log.Error("overflow calculating new benched stake",
-			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("nodeID", &nodeID),
 		)
 		return
 	}
@@ -313,7 +313,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	if float64(newBenchedStake) > maxBenchedStake {
 		b.log.Debug("not benching node",
 			zap.String("reason", "benched stake would exceed max"),
-			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("nodeID", &nodeID),
 			zap.Float64("benchedStake", float64(newBenchedStake)),
 			zap.Float64("maxBenchedStake", maxBenchedStake),
 		)
@@ -329,7 +329,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	benchedUntil := minBenchedUntil.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
 
 	// Add to benchlist times with randomized delay
-	b.benchlistSet.Add(ids.GenericNodeIDFromNodeID(nodeID))
+	b.benchlistSet.Add(nodeID)
 	b.benchable.Benched(b.chainID, nodeID)
 
 	b.streaklock.Lock()
@@ -341,7 +341,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 		&benchData{nodeID: nodeID, benchedUntil: benchedUntil},
 	)
 	b.log.Debug("benching validator after consecutive failed queries",
-		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("nodeID", &nodeID),
 		zap.Duration("benchDuration", benchedUntil.Sub(now)),
 		zap.Int("numFailedQueries", b.threshold),
 	)

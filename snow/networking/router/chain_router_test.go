@@ -1408,7 +1408,10 @@ func TestConnectedSubnet(t *testing.T) {
 
 	// Create chain router
 	myNodeID := ids.GenerateTestNodeID()
+	genericMyNodeID := ids.GenericNodeIDFromNodeID(myNodeID)
 	peerNodeID := ids.GenerateTestNodeID()
+	genericPeerNodeID := ids.GenericNodeIDFromNodeID(peerNodeID)
+
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 	trackedSubnets := set.Set[ids.ID]{}
@@ -1481,25 +1484,25 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), myDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, myNodeID)
+	chainRouter.Benched(constants.PlatformChainID, genericMyNodeID)
 
 	peerDisconnectedMsg := handler.Message{
 		InboundMessage: message.InternalDisconnected(peerNodeID),
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, peerNodeID)
+	chainRouter.Benched(constants.PlatformChainID, genericPeerNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg0).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg1).Times(1)
 
-	chainRouter.Unbenched(constants.PlatformChainID, myNodeID)
+	chainRouter.Unbenched(constants.PlatformChainID, genericMyNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
 	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
 
-	chainRouter.Unbenched(constants.PlatformChainID, peerNodeID)
+	chainRouter.Unbenched(constants.PlatformChainID, genericPeerNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
 	chainRouter.Disconnected(peerNodeID)

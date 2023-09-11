@@ -27,20 +27,20 @@ var (
 type Manager interface {
 	// RegisterResponse registers that we receive a request response from [nodeID]
 	// regarding [chainID] within the timeout
-	RegisterResponse(chainID ids.ID, nodeID ids.NodeID)
+	RegisterResponse(chainID ids.ID, nodeID ids.GenericNodeID)
 	// RegisterFailure registers that a request to [nodeID] regarding
 	// [chainID] timed out
-	RegisterFailure(chainID ids.ID, nodeID ids.NodeID)
+	RegisterFailure(chainID ids.ID, nodeID ids.GenericNodeID)
 	// RegisterChain registers a new chain with metrics under [namespace]
 	RegisterChain(ctx *snow.ConsensusContext) error
 	// IsBenched returns true if messages to [nodeID] regarding chain [chainID]
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
-	IsBenched(nodeID ids.NodeID, chainID ids.ID) bool
+	IsBenched(nodeID ids.GenericNodeID, chainID ids.ID) bool
 	// GetBenched returns an array of chainIDs where the specified
 	// [nodeID] is benched. If called on an id.ShortID that does
 	// not map to a validator, it will return an empty array.
-	GetBenched(nodeID ids.NodeID) []ids.ID
+	GetBenched(nodeID ids.GenericNodeID) []ids.ID
 }
 
 // Config defines the configuration for a benchlist
@@ -78,7 +78,7 @@ func NewManager(config *Config) Manager {
 
 // IsBenched returns true if messages to [nodeID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
-func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
+func (m *manager) IsBenched(nodeID ids.GenericNodeID, chainID ids.ID) bool {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -93,7 +93,7 @@ func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
 // GetBenched returns an array of chainIDs where the specified
 // [nodeID] is benched. If called on an id.ShortID that does
 // not map to a validator, it will return an empty array.
-func (m *manager) GetBenched(nodeID ids.NodeID) []ids.ID {
+func (m *manager) GetBenched(nodeID ids.GenericNodeID) []ids.ID {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -148,7 +148,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	return nil
 }
 
-func (m *manager) RegisterResponse(chainID ids.ID, nodeID ids.NodeID) {
+func (m *manager) RegisterResponse(chainID ids.ID, nodeID ids.GenericNodeID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -159,7 +159,7 @@ func (m *manager) RegisterResponse(chainID ids.ID, nodeID ids.NodeID) {
 	benchlist.RegisterResponse(nodeID)
 }
 
-func (m *manager) RegisterFailure(chainID ids.ID, nodeID ids.NodeID) {
+func (m *manager) RegisterFailure(chainID ids.ID, nodeID ids.GenericNodeID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -181,14 +181,14 @@ func (noBenchlist) RegisterChain(*snow.ConsensusContext) error {
 	return nil
 }
 
-func (noBenchlist) RegisterResponse(ids.ID, ids.NodeID) {}
+func (noBenchlist) RegisterResponse(ids.ID, ids.GenericNodeID) {}
 
-func (noBenchlist) RegisterFailure(ids.ID, ids.NodeID) {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.GenericNodeID) {}
 
-func (noBenchlist) IsBenched(ids.NodeID, ids.ID) bool {
+func (noBenchlist) IsBenched(ids.GenericNodeID, ids.ID) bool {
 	return false
 }
 
-func (noBenchlist) GetBenched(ids.NodeID) []ids.ID {
+func (noBenchlist) GetBenched(ids.GenericNodeID) []ids.ID {
 	return []ids.ID{}
 }

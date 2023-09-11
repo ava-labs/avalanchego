@@ -60,7 +60,7 @@ func (mr *MockRouterMockRecorder) AddChain(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // Benched mocks base method.
-func (m *MockRouter) Benched(arg0 ids.ID, arg1 ids.NodeID) {
+func (m *MockRouter) Benched(arg0 ids.ID, arg1 ids.GenericNodeID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Benched", arg0, arg1)
 }
@@ -161,7 +161,7 @@ func (mr *MockRouterMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 }
 
 // Unbenched mocks base method.
-func (m *MockRouter) Unbenched(arg0 ids.ID, arg1 ids.NodeID) {
+func (m *MockRouter) Unbenched(arg0 ids.ID, arg1 ids.GenericNodeID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Unbenched", arg0, arg1)
 }
