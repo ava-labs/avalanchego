@@ -754,7 +754,7 @@ func FuzzMerkleDBRandomCasesInitialValues(f *testing.F) {
 		}
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-		runRandDBTest(require, r, generateInitialValues(require, r, initialValues, numSteps, 0.001))
+		runRandDBTest(require, r, generateInitialValues(require, r, initialValues, numSteps, 0.001 /*checkHashProbability*/))
 	})
 }
 
