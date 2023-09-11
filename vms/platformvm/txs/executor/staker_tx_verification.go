@@ -101,7 +101,7 @@ func verifyAddValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err == nil {
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
@@ -181,7 +181,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
@@ -198,7 +198,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
 			"%s %w of the primary network",
@@ -274,9 +274,9 @@ func removeSubnetValidatorValidation(
 	}
 
 	isCurrentValidator := true
-	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
+	vdr, err := chainState.GetCurrentValidator(tx.Subnet, ids.GenericNodeIDFromNodeID(tx.NodeID))
 	if err == database.ErrNotFound {
-		vdr, err = chainState.GetPendingValidator(tx.Subnet, tx.NodeID)
+		vdr, err = chainState.GetPendingValidator(tx.Subnet, ids.GenericNodeIDFromNodeID(tx.NodeID))
 		isCurrentValidator = false
 	}
 	if err != nil {
@@ -373,7 +373,7 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -504,7 +504,7 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 
-	_, err = GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
+	_, err = GetValidator(chainState, tx.Subnet, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err == nil {
 		return fmt.Errorf(
 			"%w: %s on %s",
@@ -524,7 +524,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 		if err != nil {
 			return fmt.Errorf(
 				"failed to fetch the primary network validator for %s: %w",
@@ -679,7 +679,7 @@ func verifyAddPermissionlessDelegatorTx(
 		)
 	}
 
-	validator, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
+	validator, err := GetValidator(chainState, tx.Subnet, ids.GenericNodeIDFromNodeID(tx.Validator.NodeID))
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",

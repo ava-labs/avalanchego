@@ -137,7 +137,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	txID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 	publicKey := bls.PublicFromSecretKey(sk)
@@ -182,7 +182,7 @@ func TestNewPendingStaker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	txID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 	publicKey := bls.PublicFromSecretKey(sk)

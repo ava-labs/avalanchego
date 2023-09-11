@@ -482,7 +482,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID))
 	require.NoError(err)
 }
 
@@ -580,7 +580,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -660,7 +660,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.NoError(err)
 }
 
@@ -705,7 +705,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -800,7 +800,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address())))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -891,7 +891,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address())))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -983,7 +983,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address())))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1129,7 +1129,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.NoError(err)
 
 	// Advance time to when new validator should start validating
@@ -1142,10 +1142,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Accept(context.Background())) // move validator addValidatorTx from pending to current
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1155,10 +1155,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(nodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1925,7 +1925,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID))
 			require.NoError(err)
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
@@ -2104,7 +2104,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	_, err = secondVM.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
-		ids.NodeID(keys[1].PublicKey().Address()),
+		ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address())),
 	)
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -2209,7 +2209,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	_, err = vm.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
-		ids.NodeID(keys[1].PublicKey().Address()),
+		ids.GenericNodeIDFromNodeID(ids.NodeID(keys[1].PublicKey().Address())),
 	)
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -2309,6 +2309,6 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeID(id))
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.GenericNodeIDFromNodeID(ids.NodeID(id)))
 	require.ErrorIs(err, database.ErrNotFound)
 }

@@ -237,9 +237,8 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 			blsKey = s.PublicKey
 		}
 
-		genericNodeID := ids.GenericNodeIDFromNodeID(v.NodeID)
-		validatorsSet[genericNodeID] = &validators.GetValidatorOutput{
-			NodeID:    genericNodeID,
+		validatorsSet[v.NodeID] = &validators.GetValidatorOutput{
+			NodeID:    v.NodeID,
 			PublicKey: blsKey,
 			Weight:    v.Weight,
 		}

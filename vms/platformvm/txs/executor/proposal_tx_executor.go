@@ -638,9 +638,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// TODO: calculate subnet uptimes
-	genericNode := ids.GenericNodeIDFromNodeID(primaryNetworkValidator.NodeID)
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
-		genericNode,
+		primaryNetworkValidator.NodeID,
 		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
@@ -688,7 +687,7 @@ func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 
 // GetValidator returns information about the given validator, which may be a
 // current validator or pending validator.
-func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
+func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.GenericNodeID) (*state.Staker, error) {
 	validator, err := state.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
 		// This node is currently validating the subnet.

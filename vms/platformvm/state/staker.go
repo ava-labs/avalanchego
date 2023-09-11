@@ -36,7 +36,7 @@ type StakerIterator interface {
 // Invariant: Staker's size is bounded to prevent OOM DoS attacks.
 type Staker struct {
 	TxID            ids.ID
-	NodeID          ids.NodeID
+	NodeID          ids.GenericNodeID
 	PublicKey       *bls.PublicKey
 	SubnetID        ids.ID
 	Weight          uint64

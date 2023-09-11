@@ -768,8 +768,10 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Set[ids.GenericNodeID]{}
+	for _, nodeID := range args.NodeIDs {
+		nodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+	}
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -815,7 +817,10 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 	for _, currentStaker := range targetStakers {
 		nodeID := currentStaker.NodeID
-		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(currentStaker.NodeID)
+		if err != nil {
+			return err
+		}
 		weight := json.Uint64(currentStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        currentStaker.TxID,
@@ -823,7 +828,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			EndTime:     json.Uint64(currentStaker.EndTime.Unix()),
 			Weight:      weight,
 			StakeAmount: &weight,
-			NodeID:      nodeID,
+			NodeID:      shortNodeID,
 		}
 		potentialReward := json.Uint64(currentStaker.PotentialReward)
 
@@ -848,7 +853,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				return err
 			}
 
-			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			var (
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
@@ -912,7 +917,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			if err != nil {
 				return err
 			}
-			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker:    apiStaker,
 				Connected: connected,
@@ -984,8 +989,10 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Set[ids.GenericNodeID]{}
+	for _, nodeID := range args.NodeIDs {
+		nodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+	}
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -1029,11 +1036,14 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 
 	for _, pendingStaker := range targetStakers {
 		nodeID := pendingStaker.NodeID
-		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(pendingStaker.NodeID)
+		if err != nil {
+			return err
+		}
 		weight := json.Uint64(pendingStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        pendingStaker.TxID,
-			NodeID:      nodeID,
+			NodeID:      shortNodeID,
 			StartTime:   json.Uint64(pendingStaker.StartTime.Unix()),
 			EndTime:     json.Uint64(pendingStaker.EndTime.Unix()),
 			Weight:      weight,
@@ -1050,7 +1060,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			shares := attr.shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
-			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			vdr := platformapi.PermissionlessValidator{
 				Staker:        apiStaker,
 				DelegationFee: delegationFee,
@@ -1063,7 +1073,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			reply.Delegators = append(reply.Delegators, apiStaker)
 
 		case txs.SubnetPermissionedValidatorPendingPriority:
-			connected := s.vm.uptimeManager.IsConnected(genericNodeID, args.SubnetID)
+			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker:    apiStaker,
 				Connected: connected,
@@ -2465,7 +2475,7 @@ func (s *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs
 		return errStartTimeInThePast
 	}
 
-	staker, err := executor.GetValidator(s.vm.state, args.SubnetID, args.NodeID)
+	staker, err := executor.GetValidator(s.vm.state, args.SubnetID, ids.GenericNodeIDFromNodeID(args.NodeID))
 	if err == database.ErrNotFound {
 		return nil
 	}
@@ -2716,7 +2726,7 @@ func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 		return nil, nil
 	}
 
-	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(ids.GenericNodeIDFromNodeID(staker.NodeID), staker.SubnetID, staker.StartTime)
+	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(staker.NodeID, staker.SubnetID, staker.StartTime)
 	if err != nil {
 		return nil, err
 	}

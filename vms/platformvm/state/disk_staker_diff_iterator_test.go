@@ -21,7 +21,7 @@ func FuzzMarshalDiffKey(f *testing.F) {
 		var (
 			subnetID ids.ID
 			height   uint64
-			nodeID   ids.NodeID
+			nodeID   ids.GenericNodeID
 		)
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&subnetID, &height, &nodeID)
@@ -45,7 +45,7 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 			return
 		}
 
-		formattedKey := marshalDiffKey(subnetID, height, nodeID)
+		formattedKey := marshalDiffKey(subnetID, height, ids.GenericNodeIDFromNodeID(nodeID))
 		require.Equal(key, formattedKey)
 	})
 }
@@ -58,8 +58,8 @@ func TestDiffIteration(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 
-	nodeID0 := ids.NodeID{0x00}
-	nodeID1 := ids.NodeID{0x01}
+	nodeID0 := ids.GenericNodeIDFromNodeID(ids.NodeID{0x00})
+	nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID{0x01})
 
 	subnetID0Height0NodeID0 := marshalDiffKey(subnetID0, 0, nodeID0)
 	subnetID0Height1NodeID0 := marshalDiffKey(subnetID0, 1, nodeID0)

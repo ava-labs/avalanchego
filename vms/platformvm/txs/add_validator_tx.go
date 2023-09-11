@@ -56,8 +56,8 @@ func (*AddValidatorTx) SubnetID() ids.ID {
 	return constants.PrimaryNetworkID
 }
 
-func (tx *AddValidatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+func (tx *AddValidatorTx) NodeID() ids.GenericNodeID {
+	return ids.GenericNodeIDFromNodeID(tx.Validator.NodeID)
 }
 
 func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {

@@ -74,8 +74,8 @@ func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID {
 	return tx.Subnet
 }
 
-func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+func (tx *AddPermissionlessValidatorTx) NodeID() ids.GenericNodeID {
+	return ids.GenericNodeIDFromNodeID(tx.Validator.NodeID)
 }
 
 func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {

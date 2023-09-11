@@ -38,7 +38,7 @@ type diff struct {
 
 	currentStakerDiffs diffStakers
 	// map of subnetID -> nodeID -> total accrued delegatee rewards
-	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
+	modifiedDelegateeRewards map[ids.ID]map[ids.GenericNodeID]uint64
 	pendingStakerDiffs       diffStakers
 
 	addedSubnets []*txs.Tx
@@ -104,7 +104,7 @@ func (d *diff) SetCurrentSupply(subnetID ids.ID, currentSupply uint64) {
 	}
 }
 
-func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
@@ -123,20 +123,20 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	}
 }
 
-func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
+func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.GenericNodeID, amount uint64) error {
 	if d.modifiedDelegateeRewards == nil {
-		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
+		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.GenericNodeID]uint64)
 	}
 	nodes, ok := d.modifiedDelegateeRewards[subnetID]
 	if !ok {
-		nodes = make(map[ids.NodeID]uint64)
+		nodes = make(map[ids.GenericNodeID]uint64)
 		d.modifiedDelegateeRewards[subnetID] = nodes
 	}
 	nodes[nodeID] = amount
 	return nil
 }
 
-func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
+func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.GenericNodeID) (uint64, error) {
 	amount, modified := d.modifiedDelegateeRewards[subnetID][nodeID]
 	if modified {
 		return amount, nil
@@ -156,7 +156,7 @@ func (d *diff) DeleteCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.DeleteValidator(staker)
 }
 
-func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -192,7 +192,7 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
-func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
 	newValidator, status := d.pendingStakerDiffs.GetValidator(subnetID, nodeID)
@@ -219,7 +219,7 @@ func (d *diff) DeletePendingValidator(staker *Staker) {
 	d.pendingStakerDiffs.DeleteValidator(staker)
 }
 
-func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)

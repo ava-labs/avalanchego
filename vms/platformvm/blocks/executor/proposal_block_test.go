@@ -90,25 +90,26 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
+	nodeID := utx.NodeID()
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
+		NodeID:    nodeID,
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), utx.NodeID()).Return(&state.Staker{
+	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), nodeID).Return(&state.Staker{
 		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
+		NodeID:    nodeID,
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, nodeID).Return(uint64(0), nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
@@ -224,6 +225,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		TxID:     nextStakerTxID,
 		EndTime:  nextStakerTime,
 		NextTime: nextStakerTime,
+		NodeID:   ids.EmptyGenericNodeID,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 	}).AnyTimes()
 	currentStakersIt.EXPECT().Release().AnyTimes()
@@ -393,7 +395,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// Staker0 it's here just to allow to issue a proposal block with the chosen endTime.
 	staker0RewardAddress := ids.ShortID{2}
 	staker0 := staker{
-		nodeID:        ids.NodeID(staker0RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker0RewardAddress)),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
 		endTime:       time.Time{}, // actual endTime depends on specific test
@@ -401,7 +403,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker1RewardAddress := ids.GenerateTestShortID()
 	staker1 := staker{
-		nodeID:        ids.NodeID(staker1RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker1RewardAddress)),
 		rewardAddress: staker1RewardAddress,
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
 		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
@@ -409,7 +411,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker2RewardAddress := ids.ShortID{1}
 	staker2 := staker{
-		nodeID:        ids.NodeID(staker2RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker2RewardAddress)),
 		rewardAddress: staker2RewardAddress,
 		startTime:     staker1.startTime.Add(1 * time.Minute),
 		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
@@ -417,7 +419,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker3RewardAddress := ids.GenerateTestShortID()
 	staker3 := staker{
-		nodeID:        ids.NodeID(staker3RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker3RewardAddress)),
 		rewardAddress: staker3RewardAddress,
 		startTime:     staker2.startTime.Add(1 * time.Minute),
 		endTime:       staker2.endTime.Add(1 * time.Minute),
@@ -432,7 +434,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker4RewardAddress := ids.GenerateTestShortID()
 	staker4 := staker{
-		nodeID:        ids.NodeID(staker4RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker4RewardAddress)),
 		rewardAddress: staker4RewardAddress,
 		startTime:     staker3.startTime,
 		endTime:       staker3.endTime,
@@ -440,7 +442,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker5RewardAddress := ids.GenerateTestShortID()
 	staker5 := staker{
-		nodeID:        ids.NodeID(staker5RewardAddress),
+		nodeID:        ids.GenericNodeIDFromNodeID(ids.NodeID(staker5RewardAddress)),
 		rewardAddress: staker5RewardAddress,
 		startTime:     staker2.endTime,
 		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
@@ -452,14 +454,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			subnetStakers: []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime.Add(-1 * time.Second)},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: pending,
 				staker2.nodeID: pending,
 				staker3.nodeID: pending,
 				staker4.nodeID: pending,
 				staker5.nodeID: pending,
 			},
-			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
+			expectedSubnetStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: pending,
 				staker2.nodeID: pending,
 				staker3.nodeID: pending,
@@ -472,14 +474,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			subnetStakers: []staker{staker1},
 			advanceTimeTo: []time.Time{staker1.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: pending,
 				staker3.nodeID: pending,
 				staker4.nodeID: pending,
 				staker5.nodeID: pending,
 			},
-			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
+			expectedSubnetStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: pending,
 				staker3.nodeID: pending,
@@ -491,7 +493,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			description:   "advance time to the staker2 start",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: pending,
@@ -504,14 +506,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			subnetStakers: []staker{staker1, staker2, staker3Sub, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
 				staker5.nodeID: pending,
 			},
-			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
+			expectedSubnetStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID:    current,
 				staker2.nodeID:    current,
 				staker3Sub.nodeID: pending,
@@ -524,14 +526,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			subnetStakers: []staker{staker1, staker2, staker3Sub, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker3Sub.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
 				staker5.nodeID: pending,
 			},
-			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
+			expectedSubnetStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: current,
@@ -543,7 +545,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			description:   "advance time to staker5 end",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
+			expectedStakers: map[ids.GenericNodeID]stakerStatus{
 				staker1.nodeID: current,
 
 				// given its txID, staker2 will be
@@ -571,11 +573,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
+				shortNodeID, err := ids.NodeIDFromGenericNodeID(staker.nodeID)
+				require.NoError(err)
 				tx, err := env.txBuilder.NewAddValidatorTx(
 					env.config.MinValidatorStake,
 					uint64(staker.startTime.Unix()),
 					uint64(staker.endTime.Unix()),
-					staker.nodeID,
+					shortNodeID,
 					staker.rewardAddress,
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -595,12 +599,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
+				shortNodeID, err := ids.NodeIDFromGenericNodeID(subStaker.nodeID)
+				require.NoError(err)
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
 					uint64(subStaker.startTime.Unix()),
 					uint64(subStaker.endTime.Unix()),
-					subStaker.nodeID, // validator ID
-					subnetID,         // Subnet ID
+					shortNodeID, // validator ID
+					subnetID,    // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
 				)
@@ -623,11 +629,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
 				staker0.endTime = newTime
+				shortNodeID, err := ids.NodeIDFromGenericNodeID(staker0.nodeID)
+				require.NoError(err)
 				addStaker0, err := env.txBuilder.NewAddValidatorTx(
 					10,
 					uint64(staker0.startTime.Unix()),
 					uint64(staker0.endTime.Unix()),
-					staker0.nodeID,
+					shortNodeID,
 					staker0.rewardAddress,
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -685,20 +693,20 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
+					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
 				case current:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
+					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					require.False(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
+					require.False(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
 				case current:
-					require.True(validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(stakerNodeID)))
+					require.True(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
 				}
 			}
 		})
@@ -831,7 +839,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[commitBlk.ID()].onAcceptState
-	_, err = updatedState.GetCurrentValidator(subnetID, subnetValidatorNodeID)
+	_, err = updatedState.GetCurrentValidator(subnetID, ids.GenericNodeIDFromNodeID(subnetValidatorNodeID))
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully

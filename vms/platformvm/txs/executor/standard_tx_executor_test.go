@@ -1064,7 +1064,7 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 		state:       mockState,
 		staker: &state.Staker{
 			TxID:     ids.GenerateTestID(),
-			NodeID:   ids.GenerateTestNodeID(),
+			NodeID:   ids.GenerateTestGenericNodeID(),
 			Priority: txs.SubnetPermissionedValidatorCurrentPriority,
 		},
 	}
@@ -1084,7 +1084,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
 					Unsigned: &txs.CreateSubnetTx{
@@ -1147,8 +1147,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
-				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(nil, database.ErrNotFound)
+				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1176,7 +1176,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(&staker, nil).Times(1)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1202,7 +1202,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(env.staker, nil)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1226,7 +1226,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(env.staker, nil)
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(nil, status.Unknown, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1251,7 +1251,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
 					Unsigned: &txs.CreateSubnetTx{
@@ -1283,7 +1283,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, ids.GenericNodeIDFromNodeID(env.unsignedTx.NodeID)).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
 					Unsigned: &txs.CreateSubnetTx{
@@ -1430,7 +1430,7 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 		state:       mockState,
 		staker: &state.Staker{
 			TxID:   ids.GenerateTestID(),
-			NodeID: ids.GenerateTestNodeID(),
+			NodeID: ids.GenerateTestGenericNodeID(),
 		},
 	}
 }

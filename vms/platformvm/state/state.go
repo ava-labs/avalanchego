@@ -682,7 +682,7 @@ func newState(
 	}, nil
 }
 
-func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
@@ -694,7 +694,7 @@ func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
@@ -710,7 +710,7 @@ func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 	return s.currentStakers.GetStakerIterator(), nil
 }
 
-func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
 	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
@@ -722,7 +722,7 @@ func (s *state) DeletePendingValidator(staker *Staker) {
 	s.pendingStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
 	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
@@ -997,12 +997,7 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 }
 
 func (s *state) GetStartTime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Time, error) {
-	// TODO ABENEGIA: at the end of refactoring, we should have genericNodeID here
-	shortNode, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		return time.Time{}, err
-	}
-	staker, err := s.currentStakers.GetValidator(subnetID, shortNode)
+	staker, err := s.currentStakers.GetValidator(subnetID, nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -1066,16 +1061,15 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 
 func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
-		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 		staker := validator.validator
-		if err := vdrs.Add(genericNodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
 			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(genericNodeID, staker.Weight); err != nil {
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
 				return err
 			}
@@ -2051,22 +2045,21 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				continue
 			}
 
-			genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 			if weightDiff.Decrease {
-				err = validators.RemoveWeight(s.cfg.Validators, subnetID, genericNodeID, weightDiff.Amount)
+				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
 				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
 					err = validators.Add(
 						s.cfg.Validators,
 						subnetID,
-						genericNodeID,
+						nodeID,
 						staker.PublicKey,
 						staker.TxID,
 						weightDiff.Amount,
 					)
 				} else {
-					err = validators.AddWeight(s.cfg.Validators, subnetID, genericNodeID, weightDiff.Amount)
+					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				}
 			}
 			if err != nil {

@@ -145,7 +145,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	)
 
 	var (
-		nodeIDs       []ids.NodeID
+		nodeIDs       []ids.GenericNodeID
 		currentHeight uint64
 	)
 	for i := 0; i < 50; i++ {
@@ -184,13 +184,13 @@ func addPrimaryValidator(
 	startTime time.Time,
 	endTime time.Time,
 	height uint64,
-) (ids.NodeID, error) {
+) (ids.GenericNodeID, error) {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
-		return ids.EmptyNodeID, err
+		return ids.EmptyGenericNodeID, err
 	}
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
@@ -206,7 +206,7 @@ func addPrimaryValidator(
 
 	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
-		return ids.EmptyNodeID, err
+		return ids.EmptyGenericNodeID, err
 	}
 
 	s.AddStatelessBlock(blk)
@@ -219,7 +219,7 @@ func addSubnetValidator(
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	height uint64,
 ) error {
 	s.PutCurrentValidator(&state.Staker{
@@ -249,7 +249,7 @@ func addSubnetDelegator(
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,
-	nodeIDs []ids.NodeID,
+	nodeIDs []ids.GenericNodeID,
 	height uint64,
 ) error {
 	i := rand.Intn(len(nodeIDs)) //#nosec G404

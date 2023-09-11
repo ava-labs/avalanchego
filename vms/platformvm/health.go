@@ -9,13 +9,15 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
+	nodeID := ids.GenericNodeIDFromNodeID(vm.ctx.NodeID)
 	localPrimaryValidator, err := vm.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
-		vm.ctx.NodeID,
+		nodeID,
 	)
 	switch err {
 	case nil:
@@ -29,7 +31,7 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	for subnetID := range vm.TrackedSubnets {
 		localSubnetValidator, err := vm.state.GetCurrentValidator(
 			subnetID,
-			vm.ctx.NodeID,
+			nodeID,
 		)
 		switch err {
 		case nil:
