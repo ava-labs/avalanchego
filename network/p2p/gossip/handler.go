@@ -23,18 +23,18 @@ var (
 	ErrInvalidID = errors.New("invalid id")
 )
 
-func NewHandler[T Gossipable](set Set[T], maxResponseSize int) *Handler[T] {
+func NewHandler[T Gossipable](set Set[T], targetResponseSize int) *Handler[T] {
 	return &Handler[T]{
-		Handler:         p2p.NoOpHandler{},
-		set:             set,
-		maxResponseSize: maxResponseSize,
+		Handler:            p2p.NoOpHandler{},
+		set:                set,
+		targetResponseSize: targetResponseSize,
 	}
 }
 
 type Handler[T Gossipable] struct {
 	p2p.Handler
-	set             Set[T]
-	maxResponseSize int
+	set                Set[T]
+	targetResponseSize int
 }
 
 func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
@@ -70,13 +70,14 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 			return false
 		}
 
-		// check that this doesn't exceed our maximum configured response size
+		// check that this doesn't exceed our maximum configured target response
+		// size
+		gossipBytes = append(gossipBytes, bytes)
+
 		responseSize += len(bytes)
-		if responseSize > h.maxResponseSize {
+		if responseSize > h.targetResponseSize {
 			return false
 		}
-
-		gossipBytes = append(gossipBytes, bytes)
 
 		return true
 	})
