@@ -6,7 +6,7 @@ package ids
 // RequestID is a unique identifier for an in-flight request pending a response.
 type RequestID struct {
 	// The node this request came from
-	NodeID NodeID
+	NodeID GenericNodeID
 	// The chain this request came from
 	SourceChainID ID
 	// The chain the expected response should come from

@@ -84,7 +84,7 @@ func TestTimeout(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -342,7 +342,7 @@ func TestReliableMessages(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -492,7 +492,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -841,13 +841,13 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			for nodeID := range nodeIDs {
 				expectedFailedMsg := tt.failedMsgF(nodeID)
 				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					nodeID,                // Node ID
-					chainID,               // Source Chain
-					chainID,               // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
+					gomock.Any(),                        // Context
+					ids.GenericNodeIDFromNodeID(nodeID), // Node ID
+					chainID,                             // Source Chain
+					chainID,                             // Destination Chain
+					requestID,                           // Request ID
+					tt.expectedResponseOp,               // Operation
+					expectedFailedMsg,                   // Failure Message
 					tt.engineType,
 				)
 			}
@@ -1231,14 +1231,14 @@ func TestSender_Single_Request(t *testing.T) {
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(myNodeID)
 				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					myNodeID,              // Node ID
-					chainID,               // Source Chain
-					chainID,               // Destination Chain
-					requestID,             // Request ID
-					tt.expectedResponseOp, // Operation
-					expectedFailedMsg,     // Failure Message
-					engineType,            // Engine Type
+					gomock.Any(),                          // Context
+					ids.GenericNodeIDFromNodeID(myNodeID), // Node ID
+					chainID,                               // Source Chain
+					chainID,                               // Destination Chain
+					requestID,                             // Request ID
+					tt.expectedResponseOp,                 // Operation
+					expectedFailedMsg,                     // Failure Message
+					engineType,                            // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
@@ -1267,8 +1267,8 @@ func TestSender_Single_Request(t *testing.T) {
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
 				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					destinationNodeID,     // Node ID
+					gomock.Any(), // Context
+					ids.GenericNodeIDFromNodeID(destinationNodeID), // Node ID
 					chainID,               // Source Chain
 					chainID,               // Destination Chain
 					requestID,             // Request ID
@@ -1303,8 +1303,8 @@ func TestSender_Single_Request(t *testing.T) {
 				// Make sure we register requests with the router
 				expectedFailedMsg := tt.failedMsgF(destinationNodeID)
 				router.EXPECT().RegisterRequest(
-					gomock.Any(),          // Context
-					destinationNodeID,     // Node ID
+					gomock.Any(), // Context
+					ids.GenericNodeIDFromNodeID(destinationNodeID), // Node ID
 					chainID,               // Source Chain
 					chainID,               // Destination Chain
 					requestID,             // Request ID

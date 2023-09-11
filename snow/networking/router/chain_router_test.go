@@ -66,7 +66,7 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -206,7 +206,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	chainRouter := ChainRouter{}
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -345,7 +345,7 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -483,12 +483,13 @@ func TestRouterTimeout(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	nodeID := ids.GenerateTestNodeID()
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 	requestID := uint32(0)
 	{
 		wg.Add(1)
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -507,7 +508,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -526,7 +527,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -546,7 +547,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -566,7 +567,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -586,7 +587,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -606,7 +607,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -626,7 +627,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -645,7 +646,7 @@ func TestRouterTimeout(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -699,7 +700,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -724,11 +725,12 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).AnyTimes()
 
 	nodeID := ids.GenerateTestNodeID()
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -757,7 +759,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -826,7 +828,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -907,11 +909,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	nodeID := ids.GenerateTestNodeID()
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -936,7 +939,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -961,7 +964,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -987,7 +990,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -1013,7 +1016,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -1040,7 +1043,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -1065,7 +1068,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		requestID++
 		chainRouter.RegisterRequest(
 			context.Background(),
-			nodeID,
+			genericNodeID,
 			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
@@ -1114,7 +1117,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -1261,9 +1264,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// Create chain router
 	nodeID := ids.GenerateTestNodeID()
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		nodeID,
+		genericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -1362,7 +1366,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	// drop it.
 	chainRouter.RegisterRequest(
 		context.Background(),
-		nodeID,
+		genericNodeID,
 		requester.ChainID,
 		responder.ChainID,
 		uint32(1),
@@ -1418,7 +1422,7 @@ func TestConnectedSubnet(t *testing.T) {
 	trackedSubnets.Add(subnetID0, subnetID1)
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		myNodeID,
+		genericMyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -1531,7 +1535,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,

@@ -1569,7 +1569,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyNodeID,
+		ids.EmptyGenericNodeID,
 		logging.NoLog{},
 		timeoutManager,
 		time.Second,

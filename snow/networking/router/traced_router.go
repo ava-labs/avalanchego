@@ -39,7 +39,7 @@ func Trace(router Router, tracer trace.Tracer) Router {
 }
 
 func (r *tracedRouter) Initialize(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
@@ -68,7 +68,7 @@ func (r *tracedRouter) Initialize(
 
 func (r *tracedRouter) RegisterRequest(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	requestingChainID ids.ID,
 	respondingChainID ids.ID,
 	requestID uint32,

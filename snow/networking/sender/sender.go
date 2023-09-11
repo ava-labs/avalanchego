@@ -113,7 +113,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -254,7 +254,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -389,7 +389,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -524,7 +524,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -649,7 +649,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	)
 	s.router.RegisterRequest(
 		ctx,
-		nodeID,
+		ids.GenericNodeIDFromNodeID(nodeID),
 		s.ctx.ChainID,
 		s.ctx.ChainID,
 		requestID,
@@ -772,7 +772,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	)
 	s.router.RegisterRequest(
 		ctx,
-		nodeID,
+		ids.GenericNodeIDFromNodeID(nodeID),
 		s.ctx.ChainID,
 		s.ctx.ChainID,
 		requestID,
@@ -911,7 +911,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -1043,7 +1043,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -1208,7 +1208,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	)
 	s.router.RegisterRequest(
 		ctx,
-		s.ctx.NodeID,
+		ids.GenericNodeIDFromNodeID(s.ctx.NodeID),
 		s.ctx.ChainID,
 		chainID,
 		requestID,
@@ -1262,7 +1262,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		)
 		s.router.RegisterRequest(
 			ctx,
-			nodeID,
+			ids.GenericNodeIDFromNodeID(nodeID),
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,

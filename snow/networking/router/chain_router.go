@@ -72,8 +72,8 @@ type ChainRouter struct {
 	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
-	myNodeID     ids.NodeID
-	peers        map[ids.NodeID]*peer
+	myNodeID     ids.GenericNodeID
+	peers        map[ids.GenericNodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched                map[ids.GenericNodeID]set.Set[ids.ID]
@@ -93,7 +93,7 @@ type ChainRouter struct {
 // [timeouts] associated with the request that caused the incoming message, if
 // applicable.
 func (cr *ChainRouter) Initialize(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
@@ -114,7 +114,7 @@ func (cr *ChainRouter) Initialize(
 	cr.sybilProtectionEnabled = sybilProtectionEnabled
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
-	cr.peers = make(map[ids.NodeID]*peer)
+	cr.peers = make(map[ids.GenericNodeID]*peer)
 	cr.healthConfig = healthConfig
 
 	// Mark myself as connected
@@ -147,7 +147,7 @@ func (cr *ChainRouter) Initialize(
 // reply in time.
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	requestingChainID ids.ID,
 	respondingChainID ids.ID,
 	requestID uint32,
@@ -190,7 +190,7 @@ func (cr *ChainRouter) RegisterRequest(
 
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(
-		ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID,
 		respondingChainID,
 		shouldMeasureLatency,
 		uniqueRequestID,
@@ -302,7 +302,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, ids.GenericNodeIDFromNodeID(nodeID), sourceChainID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -333,7 +333,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, ids.GenericNodeIDFromNodeID(nodeID), sourceChainID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -407,7 +407,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	for validatorID, peer := range cr.peers {
 		// If this validator is benched on any chain, treat them as disconnected
 		// on all chains
-		_, benched := cr.benched[ids.GenericNodeIDFromNodeID(validatorID)]
+		_, benched := cr.benched[validatorID]
 		if benched {
 			continue
 		}
@@ -418,7 +418,12 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 			continue
 		}
 
-		msg := message.InternalConnected(validatorID, peer.version)
+		vdrID, err := ids.NodeIDFromGenericNodeID(validatorID)
+		if err != nil {
+			panic(err)
+		}
+
+		msg := message.InternalConnected(vdrID, peer.version)
 		chain.Push(ctx,
 			handler.Message{
 				InboundMessage: msg,
@@ -437,13 +442,17 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	// connected when we unbench. So skip connecting now.
 	// This is not "theoretically" possible, but keeping this here prevents us
 	// from keeping an invariant that we never bench ourselves.
-	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(cr.myNodeID)]; benched {
+	if _, benched := cr.benched[cr.myNodeID]; benched {
 		return
 	}
 
 	myself := cr.peers[cr.myNodeID]
+	myNodeID, err := ids.NodeIDFromGenericNodeID(cr.myNodeID)
+	if err != nil {
+		panic(err)
+	}
 	for subnetID := range myself.trackedSubnets {
-		cr.connectedSubnet(myself, cr.myNodeID, subnetID)
+		cr.connectedSubnet(myself, myNodeID, subnetID)
 	}
 }
 
@@ -452,12 +461,14 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	connectedPeer, exists := cr.peers[nodeID]
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+
+	connectedPeer, exists := cr.peers[genericNodeID]
 	if !exists {
 		connectedPeer = &peer{
 			version: nodeVersion,
 		}
-		cr.peers[nodeID] = connectedPeer
+		cr.peers[genericNodeID] = connectedPeer
 	}
 	connectedPeer.trackedSubnets.Add(subnetID)
 
@@ -499,8 +510,9 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	peer := cr.peers[nodeID]
-	delete(cr.peers, nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	peer := cr.peers[genericNodeID]
+	delete(cr.peers, genericNodeID)
 	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(nodeID)]; benched {
 		return
 	}
@@ -536,7 +548,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, genericNodeID ids.GenericNodeID) 
 	benchedChains, exists := cr.benched[genericNodeID]
 	benchedChains.Add(chainID)
 	cr.benched[genericNodeID] = benchedChains
-	peer, hasPeer := cr.peers[nodeID]
+	peer, hasPeer := cr.peers[genericNodeID]
 	if exists || !hasPeer {
 		// If the set already existed, then the node was previously benched.
 		return
@@ -578,7 +590,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, genericNodeID ids.GenericNodeID
 	if err != nil {
 		panic(err)
 	}
-	peer, found := cr.peers[nodeID]
+	peer, found := cr.peers[genericNodeID]
 	if !found {
 		return
 	}
@@ -683,7 +695,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,

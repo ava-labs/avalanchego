@@ -123,7 +123,7 @@ func (mr *MockRouterMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockRouter) Initialize(arg0 ids.NodeID, arg1 logging.Logger, arg2 timeout.Manager, arg3 time.Duration, arg4 set.Set[ids.ID], arg5 bool, arg6 set.Set[ids.ID], arg7 func(int), arg8 HealthConfig, arg9 string, arg10 prometheus.Registerer) error {
+func (m *MockRouter) Initialize(arg0 ids.GenericNodeID, arg1 logging.Logger, arg2 timeout.Manager, arg3 time.Duration, arg4 set.Set[ids.ID], arg5 bool, arg6 set.Set[ids.ID], arg7 func(int), arg8 HealthConfig, arg9 string, arg10 prometheus.Registerer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
 	ret0, _ := ret[0].(error)
@@ -137,7 +137,7 @@ func (mr *MockRouterMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5,
 }
 
 // RegisterRequest mocks base method.
-func (m *MockRouter) RegisterRequest(arg0 context.Context, arg1 ids.NodeID, arg2, arg3 ids.ID, arg4 uint32, arg5 message.Op, arg6 message.InboundMessage, arg7 p2p.EngineType) {
+func (m *MockRouter) RegisterRequest(arg0 context.Context, arg1 ids.GenericNodeID, arg2, arg3 ids.ID, arg4 uint32, arg5 message.Op, arg6 message.InboundMessage, arg7 p2p.EngineType) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterRequest", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }

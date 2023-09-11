@@ -27,7 +27,7 @@ type Router interface {
 	InternalHandler
 
 	Initialize(
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		log logging.Logger,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
@@ -50,7 +50,7 @@ type InternalHandler interface {
 
 	RegisterRequest(
 		ctx context.Context,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
 		requestID uint32,

@@ -789,7 +789,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	// Routes incoming messages from peers to the appropriate chain
 	err = n.Config.ConsensusRouter.Initialize(
-		n.ID,
+		ids.GenericNodeIDFromNodeID(n.ID),
 		n.Log,
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
