@@ -102,13 +102,9 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		// check that this doesn't exceed our maximum configured target response
 		// size
 		gossipBytes = append(gossipBytes, bytes)
-
 		responseSize += len(bytes)
-		if responseSize > h.targetResponseSize {
-			return false
-		}
 
-		return true
+		return responseSize <= h.targetResponseSize
 	})
 
 	if err != nil {
