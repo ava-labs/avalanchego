@@ -157,6 +157,12 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 	return nil
 }
 
+// NodeURI associates a node ID with its API URI.
+type NodeURI struct {
+	NodeID ids.NodeID
+	URI    string
+}
+
 // NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
 	NodeID ids.NodeID
