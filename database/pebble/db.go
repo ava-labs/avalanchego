@@ -32,7 +32,7 @@ var (
 
 	ErrInvalidOperation = errors.New("invalid operation")
 
-	defaultCacheSize = uint64(512 * units.MiB)
+	defaultCacheSize = 512 * units.MiB
 	DefaultConfig    = Config{
 		CacheSize:                   int(defaultCacheSize),
 		BytesPerSync:                512 * units.KiB,
@@ -57,7 +57,7 @@ type Config struct {
 	BytesPerSync                int
 	WALBytesPerSync             int // 0 means no background syncing
 	MemTableStopWritesThreshold int
-	MemTableSize                uint64
+	MemTableSize                int
 	MaxOpenFiles                int
 	MaxConcurrentCompactions    int
 }
@@ -194,10 +194,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	// The database.Database spec treats a nil [limit] as a key after all keys
 	// but pebble treats a nil [limit] as a key before all keys.
 	// Use the greatest key in the database as the [limit] to get the desired behavior.
-	it, err := db.pebbleDB.NewIter(&pebble.IterOptions{})
-	if err != nil {
-		return updateError(err)
-	}
+	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
 			return updateError(db.pebbleDB.Compact(start, lastkey, true /* parallelize */))
@@ -220,18 +217,9 @@ func (db *Database) NewIterator() database.Iterator {
 		}
 	}
 
-	innerIter, err := db.pebbleDB.NewIter(&pebble.IterOptions{})
-	if err != nil {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    updateError(err),
-		}
-	}
-
 	iter := &iter{
 		db:   db,
-		iter: innerIter,
+		iter: db.pebbleDB.NewIter(&pebble.IterOptions{}),
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -249,20 +237,11 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 		}
 	}
 
-	innerIter, err := db.pebbleDB.NewIter(&pebble.IterOptions{
-		LowerBound: start,
-	})
-	if err != nil {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    updateError(err),
-		}
-	}
-
 	iter := &iter{
-		db:   db,
-		iter: innerIter,
+		db: db,
+		iter: db.pebbleDB.NewIter(&pebble.IterOptions{
+			LowerBound: start,
+		}),
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -280,18 +259,9 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 		}
 	}
 
-	innerIter, err := db.pebbleDB.NewIter(prefixBounds(prefix))
-	if err != nil {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    updateError(err),
-		}
-	}
-
 	iter := &iter{
 		db:   db,
-		iter: innerIter,
+		iter: db.pebbleDB.NewIter(prefixBounds(prefix)),
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -314,18 +284,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		iterRange.LowerBound = start
 	}
 
-	innerIter, err := db.pebbleDB.NewIter(iterRange)
-	if err != nil {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    updateError(err),
-		}
-	}
-
 	iter := &iter{
 		db:   db,
-		iter: innerIter,
+		iter: db.pebbleDB.NewIter(iterRange),
 	}
 	db.openIterators.Add(iter)
 	return iter

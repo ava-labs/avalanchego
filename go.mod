@@ -15,7 +15,7 @@ require (
 	github.com/ava-labs/coreth v0.12.5-rc.3
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/cockroachdb/pebble v0.0.0-20230905224231-5283f24b2a69
+	github.com/cockroachdb/pebble v0.0.0-20230906160148-46873a6a7a06
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/ethereum/go-ethereum v1.12.0
 	github.com/golang-jwt/jwt/v4 v4.3.0
@@ -79,7 +79,6 @@ require (
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
-	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
