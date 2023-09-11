@@ -652,6 +652,26 @@ func TestCrossChainRequestOnShutdown(t *testing.T) {
 	require.True(t, called)
 }
 
+func TestNetworkAppRequestAfterShutdown(t *testing.T) {
+	require := require.New(t)
+
+	net := NewNetwork(nil, nil, nil, nil, ids.EmptyNodeID, 1, 0)
+	net.Shutdown()
+
+	require.NoError(net.SendAppRequest(ids.GenerateTestNodeID(), nil, nil))
+	require.NoError(net.SendAppRequest(ids.GenerateTestNodeID(), nil, nil))
+}
+
+func TestNetworkCrossChainAppRequestAfterShutdown(t *testing.T) {
+	require := require.New(t)
+
+	net := NewNetwork(nil, nil, nil, nil, ids.EmptyNodeID, 0, 1)
+	net.Shutdown()
+
+	require.NoError(net.SendCrossChainRequest(ids.GenerateTestID(), nil, nil))
+	require.NoError(net.SendCrossChainRequest(ids.GenerateTestID(), nil, nil))
+}
+
 func TestSDKRouting(t *testing.T) {
 	require := require.New(t)
 	sender := &testAppSender{

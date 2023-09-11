@@ -175,6 +175,7 @@ func (n *network) SendAppRequest(nodeID ids.NodeID, request []byte, responseHand
 // Assumes write lock is held
 func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
+		n.activeAppRequests.Release(1)
 		return nil
 	}
 
@@ -212,6 +213,7 @@ func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler 
 	defer n.lock.Unlock()
 
 	if n.closed.Get() {
+		n.activeCrossChainRequests.Release(1)
 		return nil
 	}
 
