@@ -229,7 +229,6 @@ func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 
 	pending.AppResponseCallback(ctx, nodeID, nil, ErrAppRequestFailed)
 	pending.appRequestFailedTime.Observe(float64(time.Since(start)))
-
 	return nil
 }
 
@@ -242,7 +241,6 @@ func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 
 	pending.AppResponseCallback(ctx, nodeID, response, nil)
 	pending.appResponseTime.Observe(float64(time.Since(start)))
-
 	return nil
 }
 
@@ -260,7 +258,6 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 
 	if err := handler.AppGossip(ctx, nodeID, parsedMsg); err != nil {
 		return err
-
 	}
 
 	handler.metrics.appGossipTime.Observe(float64(time.Since(start)))
@@ -304,7 +301,6 @@ func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 
 	pending.CrossChainAppResponseCallback(ctx, chainID, nil, ErrAppRequestFailed)
 	pending.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
-
 	return nil
 }
 
@@ -317,7 +313,6 @@ func (r *Router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 
 	pending.CrossChainAppResponseCallback(ctx, chainID, response, nil)
 	pending.crossChainAppResponseTime.Observe(float64(time.Since(start)))
-
 	return nil
 }
 
