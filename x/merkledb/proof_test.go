@@ -1780,7 +1780,7 @@ func FuzzProofVerification(f *testing.F) {
 }
 
 // Generate change proofs and verify that they are valid.
-func FuzzChangeProof(f *testing.F) {
+func FuzzChangeProofVerification(f *testing.F) {
 	const (
 		numKeyValues  = defaultHistoryLength / 2
 		deletePortion = 0.25
