@@ -17,6 +17,10 @@ import (
 
 const defaultPollFrequency = 100 * time.Millisecond
 
+// Signature of the function that will be called after a transaction
+// has been issued with the ID of the issued transaction.
+type PostIssuanceFunc func(ids.ID)
+
 type Option func(*Options)
 
 type Options struct {
@@ -43,6 +47,8 @@ type Options struct {
 
 	pollFrequencySet bool
 	pollFrequency    time.Duration
+
+	postIssuanceFunc PostIssuanceFunc
 }
 
 func NewOptions(ops []Option) *Options {
@@ -126,6 +132,10 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
+func (o *Options) PostIssuanceFunc() PostIssuanceFunc {
+	return o.postIssuanceFunc
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
@@ -187,5 +197,11 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	return func(o *Options) {
 		o.pollFrequencySet = true
 		o.pollFrequency = pollFrequency
+	}
+}
+
+func WithPostIssuanceFunc(f PostIssuanceFunc) Option {
+	return func(o *Options) {
+		o.postIssuanceFunc = f
 	}
 }
