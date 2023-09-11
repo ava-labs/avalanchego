@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 
 	"github.com/cockroachdb/pebble"
@@ -54,11 +53,10 @@ var (
 )
 
 type Database struct {
-	lock                  sync.RWMutex
-	pebbleDB              *pebble.DB
-	closed                bool
-	parallelizeCompaction bool
-	openIterators         set.Set[*iter]
+	lock          sync.RWMutex
+	pebbleDB      *pebble.DB
+	closed        bool
+	openIterators set.Set[*iter]
 }
 
 type Config struct {
@@ -68,7 +66,7 @@ type Config struct {
 	MemTableStopWritesThreshold int
 	MemTableSize                int
 	MaxOpenFiles                int
-	ParallelizeCompaction       bool
+	MaxConcurrentCompactions    int
 }
 
 // TODO: Add support for adding a custom logger
@@ -84,7 +82,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		MemTableStopWritesThreshold: cfg.MemTableStopWritesThreshold,
 		MemTableSize:                cfg.MemTableSize,
 		MaxOpenFiles:                cfg.MaxOpenFiles,
-		MaxConcurrentCompactions:    runtime.NumCPU, // TODO what should default be?
+		MaxConcurrentCompactions:    func() int { return cfg.MaxConcurrentCompactions },
 		Levels:                      make([]pebble.LevelOptions, numLevels),
 	}
 	for i := 0; i < len(opts.Levels); i++ {
@@ -103,9 +101,8 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	}
 
 	return &Database{
-		pebbleDB:              db,
-		parallelizeCompaction: cfg.ParallelizeCompaction,
-		openIterators:         set.Set[*iter]{},
+		pebbleDB:      db,
+		openIterators: set.Set[*iter]{},
 	}, nil
 }
 
@@ -206,7 +203,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		// according to pebble's comparer.
 		return nil
 	case limit != nil:
-		return updateError(db.pebbleDB.Compact(start, limit, db.parallelizeCompaction))
+		return updateError(db.pebbleDB.Compact(start, limit, true /* parallelize */))
 	}
 
 	// The database.Database spec treats a nil [limit] as a key after all keys
@@ -215,7 +212,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
-			return updateError(db.pebbleDB.Compact(start, lastkey, db.parallelizeCompaction))
+			return updateError(db.pebbleDB.Compact(start, lastkey, true /* parallelize */))
 		}
 	}
 
