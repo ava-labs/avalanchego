@@ -47,7 +47,7 @@ var (
 		WALBytesPerSync:             0, // Default to no background syncing.
 		MemTableStopWritesThreshold: 8,
 		MemTableSize:                defaultCacheSize / 4,
-		MaxOpenFiles:                4 * units.KiB,
+		MaxOpenFiles:                4096,
 	}
 
 	comparer = pebble.DefaultComparer
