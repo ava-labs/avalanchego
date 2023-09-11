@@ -80,11 +80,11 @@ func TestGossiperGossip(t *testing.T) {
 			expectedLen:            2,
 		},
 		{
-			name:                   "gossip - max response size exceeded",
+			name:                   "gossip - target response size exceeded",
 			maxResponseSize:        32,
-			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
-			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
-			expectedLen:            1,
+			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
+			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
+			expectedLen:            2,
 		},
 	}
 
