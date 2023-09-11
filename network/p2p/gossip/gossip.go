@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -34,20 +35,30 @@ func NewGossiper[T any, U GossipableAny[T]](
 	log logging.Logger,
 	set Set[U],
 	client *p2p.Client,
-) *Gossiper[T, U] {
-	return &Gossiper[T, U]{
+	metrics prometheus.Registerer,
+	namespace string,
+) (*Gossiper[T, U], error) {
+	g := &Gossiper[T, U]{
 		config: config,
 		log:    log,
 		set:    set,
 		client: client,
+		received: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_received",
+			Help:      "amount of gossip received",
+		}),
 	}
+
+	return g, metrics.Register(g.received)
 }
 
 type Gossiper[T any, U GossipableAny[T]] struct {
-	config Config
-	log    logging.Logger
-	set    Set[U]
-	client *p2p.Client
+	config   Config
+	log      logging.Logger
+	set      Set[U]
+	client   *p2p.Client
+	received prometheus.Counter
 }
 
 func (g *Gossiper[_, _]) Gossip(ctx context.Context) {
@@ -111,6 +122,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		g.log.Debug("failed to unmarshal gossip response", zap.Error(err))
 		return
 	}
+	g.received.Add(float64(len(response.Gossip)))
 
 	for _, bytes := range response.Gossip {
 		gossipable := U(new(T))

@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,9 +22,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestGossiperShutdown(_ *testing.T) {
+func TestGossiperShutdown(t *testing.T) {
+	require := require.New(t)
+
 	config := Config{Frequency: time.Second}
-	gossiper := NewGossiper[testTx](config, logging.NoLog{}, nil, nil)
+	metrics := prometheus.NewRegistry()
+	gossiper, err := NewGossiper[testTx](
+		config,
+		logging.NoLog{},
+		nil,
+		nil,
+		metrics,
+		"",
+	)
+	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	wg := &sync.WaitGroup{}
@@ -107,7 +120,8 @@ func TestGossiperGossip(t *testing.T) {
 			peers := &p2p.Peers{}
 			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
 
-			handler := NewHandler[*testTx](responseSet, tt.maxResponseSize)
+			handler, err := NewHandler[*testTx](responseSet, tt.maxResponseSize, metrics.NewMultiGatherer(), "")
+			require.NoError(err)
 			_, err = responseRouter.RegisterAppProtocol(0x0, handler, peers)
 			require.NoError(err)
 
@@ -146,7 +160,8 @@ func TestGossiperGossip(t *testing.T) {
 				Frequency: 500 * time.Millisecond,
 				PollSize:  1,
 			}
-			gossiper := NewGossiper[testTx, *testTx](config, logging.NoLog{}, requestSet, requestClient)
+			gossiper, err := NewGossiper[testTx, *testTx](config, logging.NoLog{}, requestSet, requestClient, prometheus.NewRegistry(), "")
+			require.NoError(err)
 			received := set.Set[*testTx]{}
 			requestSet.onAdd = func(tx *testTx) {
 				received.Add(tx)

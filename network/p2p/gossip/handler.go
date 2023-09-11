@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/protobuf/proto"
 
@@ -23,18 +24,31 @@ var (
 	ErrInvalidID = errors.New("invalid id")
 )
 
-func NewHandler[T Gossipable](set Set[T], maxResponseSize int) *Handler[T] {
-	return &Handler[T]{
-		Handler:         p2p.NoOpHandler{},
-		set:             set,
-		maxResponseSize: maxResponseSize,
+func NewHandler[T Gossipable](
+	set Set[T],
+	targetResponseSize int,
+	metrics prometheus.Registerer,
+	namespace string,
+) (*Handler[T], error) {
+	h := &Handler[T]{
+		Handler:            p2p.NoOpHandler{},
+		set:                set,
+		targetResponseSize: targetResponseSize,
+		sent: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_sent",
+			Help:      "amount of gossip sent",
+		}),
 	}
+
+	return h, metrics.Register(h.sent)
 }
 
 type Handler[T Gossipable] struct {
 	p2p.Handler
-	set             Set[T]
-	maxResponseSize int
+	set                Set[T]
+	targetResponseSize int
+	sent               prometheus.Counter
 }
 
 func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
@@ -70,13 +84,14 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 			return false
 		}
 
-		// check that this doesn't exceed our maximum configured response size
+		// check that this doesn't exceed our maximum configured target response
+		// size
+		gossipBytes = append(gossipBytes, bytes)
+
 		responseSize += len(bytes)
-		if responseSize > h.maxResponseSize {
+		if responseSize > h.targetResponseSize {
 			return false
 		}
-
-		gossipBytes = append(gossipBytes, bytes)
 
 		return true
 	})
@@ -88,6 +103,8 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	response := &sdk.PullGossipResponse{
 		Gossip: gossipBytes,
 	}
+
+	h.sent.Add(float64(len(response.Gossip)))
 
 	return proto.Marshal(response)
 }
