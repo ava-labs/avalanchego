@@ -1022,7 +1022,7 @@ func (db *merkleDB) VerifyChangeProof(
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
 	insertChildrenLessThan := maybe.Nothing[Path]()
-	if smallestPath.Length() > 0 {
+	if smallestPath.length > 0 {
 		insertChildrenLessThan = maybe.Some(smallestPath)
 	}
 	if err := addPathInfo(
@@ -1207,8 +1207,8 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
 func cacheEntrySize(p Path, n *node) int {
 	if n == nil {
-		return p.Length()
+		return len(p.Bytes())
 	}
 	// nodes cache their bytes representation so the total memory consumed is roughly twice that
-	return p.Length() + 2*len(n.bytes())
+	return len(p.Bytes()) + 2*len(n.bytes())
 }

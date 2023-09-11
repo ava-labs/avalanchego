@@ -562,7 +562,7 @@ func Test_RangeProof(t *testing.T) {
 	require.Equal([]byte{2}, proof.KeyValues[1].Value)
 	require.Equal([]byte{3}, proof.KeyValues[2].Value)
 
-	require.Equal([]byte{}, proof.EndProof[0].KeyPath.Bytes())
+	require.Nil(proof.EndProof[0].KeyPath.Bytes())
 	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Bytes())
 	require.Equal([]byte{3}, proof.EndProof[2].KeyPath.Bytes())
 
@@ -651,7 +651,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 
 	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Bytes())
 
-	require.Equal([]byte{}, proof.EndProof[0].KeyPath.Bytes())
+	require.Nil(proof.EndProof[0].KeyPath.Bytes())
 	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Bytes())
 	require.Equal([]byte{2}, proof.EndProof[2].KeyPath.Bytes())
 
@@ -1242,7 +1242,14 @@ func TestVerifyProofPath(t *testing.T) {
 			path: []ProofNode{
 				{KeyPath: NewPath16([]byte{1})},
 				{KeyPath: NewPath16([]byte{1, 2})},
-				//{KeyPath: SerializedPath{Value: []byte{1, 2, 240}, NibbleLength: 5}, ValueOrHash: maybe.Some([]byte{1})},
+				{
+					KeyPath: Path{
+						value:      string([]byte{1, 2, 240}),
+						length:     5,
+						pathConfig: branchFactorToPathConfig[BranchFactor16],
+					},
+					ValueOrHash: maybe.Some([]byte{1}),
+				},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrOddLengthWithValue,
@@ -1272,7 +1279,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
@@ -1289,7 +1296,7 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
 }
 
@@ -1305,7 +1312,7 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	protoNode.Children[uint32(BranchFactor16)] = childID[:]
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidChildIndex)
 }
 
@@ -1353,7 +1360,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var node ProofNode
-			err := node.UnmarshalProto(tt.nodeFunc())
+			err := node.UnmarshalProto(tt.nodeFunc(), BranchFactor16)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1372,7 +1379,7 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
-		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
+		require.NoError(unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
@@ -1428,7 +1435,7 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1489,7 +1496,7 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1500,7 +1507,7 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
 	var proof ChangeProof
-	err := proof.UnmarshalProto(nil)
+	err := proof.UnmarshalProto(nil, BranchFactor16)
 	require.ErrorIs(t, err, ErrNilChangeProof)
 }
 
@@ -1554,7 +1561,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(protoProof)
+	err := unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16)
 	require.ErrorIs(t, err, ErrNilMaybeBytes)
 }
 
@@ -1572,7 +1579,7 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var proof ChangeProof
-	err := proof.UnmarshalProto(protoProof)
+	err := proof.UnmarshalProto(protoProof, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
@@ -1613,7 +1620,7 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof Proof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1655,7 +1662,7 @@ func TestProofProtoUnmarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var proof Proof
-			err := proof.UnmarshalProto(tt.proof)
+			err := proof.UnmarshalProto(tt.proof, BranchFactor16)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

@@ -24,7 +24,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
-	cacheSize := 200
+	cacheSize := 198
 	evictionBatchSize := cacheSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(

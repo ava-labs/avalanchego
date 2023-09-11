@@ -27,6 +27,30 @@ func Test_Path_Skip(t *testing.T) {
 	skip := NewPath([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Skip(1)
 	require.Len(skip.value, 1)
 	require.Equal(byte(0b1010_1010), skip.value[0])
+
+	for i := 0; i < 8; i++ {
+		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor2).Skip(i)
+		shift := i
+		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
+		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
+	}
+	for i := 0; i < 4; i++ {
+		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor4).Skip(i)
+		shift := i * 2
+		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
+		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
+	}
+	for i := 0; i < 2; i++ {
+		shift := i * 4
+		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor16).Skip(i)
+		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
+		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
+	}
+
+	skip = NewPath([]byte{0b0101_0101, 0b1010_1010, 0b0101_0101}, BranchFactor256).Skip(1)
+	require.Len(skip.value, 2)
+	require.Equal(byte(0b1010_1010), skip.value[0])
+	require.Equal(byte(0b0101_0101), skip.value[1])
 }
 
 func Test_Path_Take(t *testing.T) {

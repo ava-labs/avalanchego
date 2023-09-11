@@ -515,6 +515,10 @@ func Test_Change_List(t *testing.T) {
 		newDefaultConfig(),
 	)
 	require.NoError(err)
+
+	emptyRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
 	batch := db.NewBatch()
 	require.NoError(batch.Put([]byte("key20"), []byte("value20")))
 	require.NoError(batch.Put([]byte("key21"), []byte("value21")))
@@ -525,6 +529,10 @@ func Test_Change_List(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
+	changes, err := db.history.getValueChanges(emptyRoot, startRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	require.NoError(err)
+	require.Len(changes.values, 5)
+
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key25"), []byte("value25")))
 	require.NoError(batch.Put([]byte("key26"), []byte("value26")))
@@ -532,6 +540,13 @@ func Test_Change_List(t *testing.T) {
 	require.NoError(batch.Put([]byte("key28"), []byte("value28")))
 	require.NoError(batch.Put([]byte("key29"), []byte("value29")))
 	require.NoError(batch.Write())
+
+	endRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	require.NoError(err)
+	require.Len(changes.values, 5)
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key30"), []byte("value30")))
@@ -541,12 +556,12 @@ func Test_Change_List(t *testing.T) {
 	require.NoError(batch.Delete([]byte("key22")))
 	require.NoError(batch.Write())
 
-	endRoot, err := db.GetMerkleRoot(context.Background())
+	endRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 8)
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
-	require.Len(changes.values, 8)
+	require.Len(changes.values, 10)
 }
 
 func TestHistoryRecord(t *testing.T) {

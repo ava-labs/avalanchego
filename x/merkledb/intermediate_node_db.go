@@ -89,13 +89,13 @@ func (db *intermediateNodeDB) onEviction(key Path, n *node) error {
 }
 
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key Path, n *node) error {
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
-	defer db.bufferPool.Put(prefixedKey)
+	dbKey := db.constructDBKey(key)
+	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
 	if n == nil {
-		return b.Delete(prefixedKey)
+		return b.Delete(dbKey)
 	}
-	return b.Put(prefixedKey, n.bytes())
+	return b.Put(dbKey, n.bytes())
 }
 
 func (db *intermediateNodeDB) Get(key Path) (*node, error) {
@@ -108,15 +108,36 @@ func (db *intermediateNodeDB) Get(key Path) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
+	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(dbKey)
 	if err != nil {
 		return nil, err
 	}
-	db.bufferPool.Put(prefixedKey)
+	db.bufferPool.Put(dbKey)
 
 	return parseNode(key, nodeBytes)
+}
+
+func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
+	// We need differentiate between two paths of equal byte length but different token length
+	// so add the modulo remainder as a key suffix
+	dbKey := db.bufferPool.Get().([]byte)
+	defer db.bufferPool.Put(dbKey)
+	compressedKey := key.Bytes()
+	keyLen := len(compressedKey) + 1
+	if cap(dbKey) >= keyLen {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		dbKey = dbKey[:keyLen]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		db.bufferPool.Put(dbKey)
+		dbKey = make([]byte, keyLen)
+	}
+	copy(dbKey, compressedKey)
+	dbKey[len(compressedKey)] = byte(key.length % key.tokensPerByte)
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }
 
 func (db *intermediateNodeDB) Put(key Path, n *node) error {

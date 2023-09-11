@@ -128,7 +128,7 @@ func (cp Path) bytesNeeded(tokens int) int {
 func (cp Path) Append(token byte) Path {
 	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
-	buffer[len(buffer)-1] += token << cp.shift((cp.length+1)%cp.tokensPerByte)
+	buffer[len(buffer)-1] += token << cp.shift(cp.length%cp.tokensPerByte)
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     cp.length + 1,
@@ -141,9 +141,9 @@ func (cp Path) Compare(other Path) int {
 		return result
 	}
 	switch {
-	case cp.length < other.Length():
+	case cp.length < other.length:
 		return -1
-	case cp.length == other.Length():
+	case cp.length == other.length:
 		return 0
 	}
 	return 1
@@ -157,11 +157,14 @@ func (cp Path) Less(other Path) bool {
 	return cp.Compare(other) == -1
 }
 
-func (cp Path) Length() int {
-	return cp.length
-}
-
 func (cp Path) Extend(path Path) Path {
+	if cp.length == 0 {
+		return path
+	}
+	if path.length == 0 {
+		return cp
+	}
+
 	remainder := cp.length % cp.tokensPerByte
 	totalLength := cp.length + path.length
 	buffer := make([]byte, cp.bytesNeeded(totalLength))
@@ -178,14 +181,10 @@ func (cp Path) Extend(path Path) Path {
 	reverseShift := Byte - shift
 	buffer[len(cp.value)-1] += path.value[0] >> reverseShift
 
-	odd := len(path.value) & 1
-	stopIndex := len(path.value) - odd
-	for i := 0; i < stopIndex-1; i++ {
+	for i := 0; i < len(path.value)-1; i++ {
 		buffer[len(cp.value)+i] += path.value[i]<<shift + path.value[i+1]>>reverseShift
 	}
-	if odd == 1 {
-		buffer[len(cp.value)+stopIndex] += path.value[stopIndex] << shift
-	}
+	buffer[len(buffer)-1] += path.value[len(path.value)-1] << shift
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
@@ -199,33 +198,35 @@ func (cp Path) Slice(start, end int) Path {
 }
 
 func (cp Path) Skip(tokensToSkip int) Path {
+	newLength := cp.length - tokensToSkip
+	result := Path{
+		length:     newLength,
+		pathConfig: cp.pathConfig,
+	}
+	if newLength == 0 {
+		return result
+	}
+
 	remainder := tokensToSkip % cp.tokensPerByte
 	if remainder == 0 {
-		return Path{
-			// ensure that the index rounds up
-			value:      cp.value[tokensToSkip/cp.tokensPerByte:],
-			length:     cp.length - tokensToSkip,
-			pathConfig: cp.pathConfig,
-		}
+		result.value = cp.value[tokensToSkip/cp.tokensPerByte:]
+		return result
 	}
-	buffer := make([]byte, cp.bytesNeeded(cp.length-tokensToSkip))
+
+	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
+
+	buffer := make([]byte, cp.bytesNeeded(newLength))
 	shift := cp.shift(remainder - 1)
-	odd := (len(cp.value) - 1) & 1
-	stopIndex := len(cp.value) - odd
 	reverseShift := Byte - shift
 
-	buffer[0] = cp.value[0] << reverseShift
-	for i := 1; i < stopIndex-1; i++ {
-		buffer[i] += cp.value[i]<<shift + cp.value[i+1]>>reverseShift
+	for i := 0; i < len(remainingBytes)-1; i++ {
+		buffer[i] += remainingBytes[i]<<reverseShift + remainingBytes[i+1]>>shift
 	}
-	if odd == 1 {
-		buffer[stopIndex] += cp.value[stopIndex] << shift
-	}
+	buffer[len(buffer)-1] += remainingBytes[len(remainingBytes)-1] << reverseShift
 
 	return Path{
-		// ensure that the index rounds up
 		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     cp.length - tokensToSkip,
+		length:     newLength,
 		pathConfig: cp.pathConfig,
 	}
 }
