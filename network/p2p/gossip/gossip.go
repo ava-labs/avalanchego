@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // GossipableAny exists to help create non-nil pointers to a concrete Gossipable
@@ -34,20 +36,42 @@ func NewGossiper[T any, U GossipableAny[T]](
 	log logging.Logger,
 	set Set[U],
 	client *p2p.Client,
-) *Gossiper[T, U] {
-	return &Gossiper[T, U]{
+	metrics prometheus.Registerer,
+	namespace string,
+) (*Gossiper[T, U], error) {
+	g := &Gossiper[T, U]{
 		config: config,
 		log:    log,
 		set:    set,
 		client: client,
+		receivedN: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_received_n",
+			Help:      "amount of gossip received (n)",
+		}),
+		receivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_received_bytes",
+			Help:      "amount of gossip received (bytes)",
+		}),
 	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		metrics.Register(g.receivedN),
+		metrics.Register(g.receivedBytes),
+	)
+
+	return g, errs.Err
 }
 
 type Gossiper[T any, U GossipableAny[T]] struct {
-	config Config
-	log    logging.Logger
-	set    Set[U]
-	client *p2p.Client
+	config        Config
+	log           logging.Logger
+	set           Set[U]
+	client        *p2p.Client
+	receivedN     prometheus.Counter
+	receivedBytes prometheus.Counter
 }
 
 func (g *Gossiper[_, _]) Gossip(ctx context.Context) {
@@ -112,7 +136,10 @@ func (g *Gossiper[T, U]) handleResponse(
 		return
 	}
 
+	receivedBytes := 0
 	for _, bytes := range response.Gossip {
+		receivedBytes += len(bytes)
+
 		gossipable := U(new(T))
 		if err := gossipable.Unmarshal(bytes); err != nil {
 			g.log.Debug(
@@ -139,4 +166,7 @@ func (g *Gossiper[T, U]) handleResponse(
 			continue
 		}
 	}
+
+	g.receivedN.Add(float64(len(response.Gossip)))
+	g.receivedBytes.Add(float64(receivedBytes))
 }
