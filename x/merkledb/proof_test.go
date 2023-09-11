@@ -1730,7 +1730,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 	})
 }
 
-func FuzzProof(f *testing.F) {
+func FuzzProofVerification(f *testing.F) {
 	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
