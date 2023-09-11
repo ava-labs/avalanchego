@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/protobuf/proto"
@@ -73,7 +74,6 @@ type Handler[T Gossipable] struct {
 	set                Set[T]
 	targetResponseSize int
 
-	// metrics
 	sentN     prometheus.Counter
 	sentBytes prometheus.Counter
 	sentTime  metric.Averager

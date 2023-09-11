@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -181,7 +182,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		}
 	}
 
-	g.receivedTime.Observe(float64(time.Since(start)))
 	g.receivedN.Add(float64(len(response.Gossip)))
 	g.receivedBytes.Add(float64(receivedBytes))
+	g.receivedTime.Observe(float64(time.Since(start)))
 }
