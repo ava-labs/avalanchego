@@ -726,7 +726,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 }
 
-func FuzzMerkleDBRandomCases(f *testing.F) {
+func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 	f.Fuzz(
 		func(
 			t *testing.T,
@@ -742,7 +742,7 @@ func FuzzMerkleDBRandomCases(f *testing.F) {
 		})
 }
 
-func FuzzMerkleDBRandomCasesInitialValues(f *testing.F) {
+func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		initialValues uint,
