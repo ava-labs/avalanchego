@@ -122,11 +122,17 @@ func (cp Path) Token(index int) byte {
 	return (cp.value[index/cp.tokensPerByte] >> cp.shift(offset)) & cp.mask
 }
 
+func (cp Path) bytesNeeded(tokens int) int {
+	return (tokens + cp.tokensPerByte - 1) / cp.tokensPerByte
+}
 func (cp Path) Append(token byte) Path {
-	buffer := make([]byte, (cp.length+1)/cp.tokensPerByte)
+	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
 	buffer[len(buffer)-1] += token << cp.shift((cp.length+1)%cp.tokensPerByte)
-	return Path{value: *(*string)(unsafe.Pointer(&buffer)), length: cp.length + 1}
+	return Path{
+		value:      *(*string)(unsafe.Pointer(&buffer)),
+		length:     cp.length + 1,
+		pathConfig: cp.pathConfig}
 }
 
 func (cp Path) Compare(other Path) int {
@@ -158,7 +164,7 @@ func (cp Path) Length() int {
 func (cp Path) Extend(path Path) Path {
 	remainder := cp.length % cp.tokensPerByte
 	totalLength := cp.length + path.length
-	buffer := make([]byte, (totalLength+cp.tokensPerByte-1)/cp.tokensPerByte)
+	buffer := make([]byte, cp.bytesNeeded(totalLength))
 	copy(buffer, cp.value)
 	if remainder == 0 {
 		copy(buffer[len(cp.value):], path.value)
@@ -188,11 +194,8 @@ func (cp Path) Extend(path Path) Path {
 	}
 }
 
-func (cp Path) shiftedCopy(dst []byte, shift byte) {
-
-}
 func (cp Path) Slice(start, end int) Path {
-	panic("not implemented")
+	return cp.Skip(start).Take(end)
 }
 
 func (cp Path) Skip(tokensToSkip int) Path {
@@ -205,7 +208,7 @@ func (cp Path) Skip(tokensToSkip int) Path {
 			pathConfig: cp.pathConfig,
 		}
 	}
-	buffer := make([]byte, (cp.length-tokensToSkip+cp.tokensPerByte-1)/cp.tokensPerByte)
+	buffer := make([]byte, cp.bytesNeeded(cp.length-tokensToSkip))
 	shift := cp.shift(remainder - 1)
 	odd := (len(cp.value) - 1) & 1
 	stopIndex := len(cp.value) - odd
@@ -228,9 +231,25 @@ func (cp Path) Skip(tokensToSkip int) Path {
 }
 
 func (cp Path) Take(tokensToTake int) Path {
+	remainder := tokensToTake % cp.tokensPerByte
+	if remainder == 0 {
+		return Path{
+			value:      cp.value[:tokensToTake/cp.tokensPerByte],
+			length:     tokensToTake,
+			pathConfig: cp.pathConfig,
+		}
+	}
+
+	// ensure length rounds up
+	buffer := make([]byte, cp.bytesNeeded(tokensToTake))
+	copy(buffer, cp.value)
+	shift := cp.shift(remainder - 1)
+
+	// zero out remainder bits
+	buffer[len(buffer)-1] = (buffer[len(buffer)-1] >> shift) << shift
+
 	return Path{
-		// ensure that the index rounds up
-		value:      cp.value[:(tokensToTake+cp.tokensPerByte-1)/cp.tokensPerByte],
+		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     tokensToTake,
 		pathConfig: cp.pathConfig,
 	}

@@ -9,18 +9,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_Path_SkipTake(t *testing.T) {
+func Test_Path_Skip(t *testing.T) {
 	require := require.New(t)
 
-	for i := 0; i <= 8; i++ {
-		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor2).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor2).Take(8-i))
+	for i := 0; i < 8; i++ {
+		skip := NewPath([]byte{0b0101_0101}, BranchFactor2).Skip(i)
+		require.Equal(byte(0b0101_0101<<i), skip.value[0])
 	}
-	for i := 0; i <= 8; i += 2 {
-		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor4).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor4).Take(8-i))
+	for i := 0; i < 4; i++ {
+		skip := NewPath([]byte{0b0101_0101}, BranchFactor4).Skip(i)
+		require.Equal(byte(0b0101_0101<<(i*2)), skip.value[0])
 	}
-	for i := 0; i <= 8; i += 4 {
-		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor16).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor16).Take(8-i))
+	for i := 0; i < 2; i++ {
+		skip := NewPath([]byte{0b0101_0101}, BranchFactor16).Skip(i)
+		require.Equal(byte(0b0101_0101<<(i*4)), skip.value[0])
 	}
+	skip := NewPath([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Skip(1)
+	require.Len(skip.value, 1)
+	require.Equal(byte(0b1010_1010), skip.value[0])
+}
+
+func Test_Path_Take(t *testing.T) {
+	require := require.New(t)
+	for i := 1; i <= 8; i++ {
+		shift := 8 - i
+		take := NewPath([]byte{0b0101_0101}, BranchFactor2).Take(i)
+		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
+	}
+	for i := 1; i <= 4; i++ {
+		shift := 8 - (i * 2)
+		take := NewPath([]byte{0b0101_0101}, BranchFactor4).Take(i)
+		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
+	}
+	for i := 1; i <= 2; i++ {
+		shift := 8 - (i * 4)
+		take := NewPath([]byte{0b0101_0101}, BranchFactor16).Take(i)
+		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
+	}
+	take := NewPath([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Take(1)
+	require.Len(take.value, 1)
+	require.Equal(byte(0b0101_0101), take.value[0])
 }
 
 func Test_Path_Token(t *testing.T) {
