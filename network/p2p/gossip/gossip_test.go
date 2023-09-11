@@ -33,7 +33,6 @@ func TestGossiperShutdown(t *testing.T) {
 		nil,
 		nil,
 		metrics,
-		"",
 	)
 	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -53,7 +52,7 @@ func TestGossiperShutdown(t *testing.T) {
 func TestGossiperGossip(t *testing.T) {
 	tests := []struct {
 		name                   string
-		maxResponseSize        int
+		config                 HandlerConfig
 		requester              []*testTx // what we have
 		responder              []*testTx // what the peer we're requesting gossip from has
 		expectedPossibleValues []*testTx // possible values we can have
@@ -63,38 +62,48 @@ func TestGossiperGossip(t *testing.T) {
 			name: "no gossip - no one knows anything",
 		},
 		{
-			name:                   "no gossip - requester knows more than responder",
-			maxResponseSize:        1024,
+			name: "no gossip - requester knows more than responder",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "no gossip - requester knows everything responder knows",
-			maxResponseSize:        1024,
+			name: "no gossip - requester knows everything responder knows",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "gossip - requester knows nothing",
-			maxResponseSize:        1024,
+			name: "gossip - requester knows nothing",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "gossip - requester knows less than responder",
-			maxResponseSize:        1024,
+			name: "gossip - requester knows less than responder",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedLen:            2,
 		},
 		{
-			name:                   "gossip - target response size exceeded",
-			maxResponseSize:        32,
+			name: "gossip - target response size exceeded",
+			config: HandlerConfig{
+				TargetResponseSize: 32,
+			},
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedLen:            2,
@@ -120,7 +129,7 @@ func TestGossiperGossip(t *testing.T) {
 			peers := &p2p.Peers{}
 			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
 
-			handler, err := NewHandler[*testTx](responseSet, tt.maxResponseSize, prometheus.NewRegistry(), "")
+			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
 			require.NoError(err)
 			_, err = responseRouter.RegisterAppProtocol(0x0, handler, peers)
 			require.NoError(err)
@@ -160,7 +169,13 @@ func TestGossiperGossip(t *testing.T) {
 				Frequency: 500 * time.Millisecond,
 				PollSize:  1,
 			}
-			gossiper, err := NewGossiper[testTx, *testTx](config, logging.NoLog{}, requestSet, requestClient, prometheus.NewRegistry(), "")
+			gossiper, err := NewGossiper[testTx, *testTx](
+				config,
+				logging.NoLog{},
+				requestSet,
+				requestClient,
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
 			received := set.Set[*testTx]{}
 			requestSet.onAdd = func(tx *testTx) {

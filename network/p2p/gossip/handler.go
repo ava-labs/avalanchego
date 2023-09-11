@@ -27,14 +27,18 @@ var (
 	ErrInvalidID = errors.New("invalid id")
 )
 
+type HandlerConfig struct {
+	Namespace          string
+	TargetResponseSize int
+}
+
 func NewHandler[T Gossipable](
 	set Set[T],
-	targetResponseSize int,
+	config HandlerConfig,
 	metrics prometheus.Registerer,
-	namespace string,
 ) (*Handler[T], error) {
 	sentTime, err := metric.NewAverager(
-		namespace,
+		config.Namespace,
 		"gossip_sent_time",
 		"gossip request handling latency (ns)",
 		metrics,
@@ -46,14 +50,14 @@ func NewHandler[T Gossipable](
 	h := &Handler[T]{
 		Handler:            p2p.NoOpHandler{},
 		set:                set,
-		targetResponseSize: targetResponseSize,
+		targetResponseSize: config.TargetResponseSize,
 		sentN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: config.Namespace,
 			Name:      "gossip_sent_n",
 			Help:      "amount of gossip sent (n)",
 		}),
 		sentBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: config.Namespace,
 			Name:      "gossip_sent_bytes",
 			Help:      "amount of gossip sent (bytes)",
 		}),

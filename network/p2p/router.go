@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,12 +41,10 @@ type Router struct {
 }
 
 // NewRouter returns a new instance of Router
-func NewRouter(log logging.Logger, sender common.AppSender, namespace string, metrics prometheus.Registerer) *Router {
+func NewRouter(log logging.Logger, sender common.AppSender) *Router {
 	return &Router{
 		log:                          log,
 		sender:                       sender,
-		namespace: namespace,
-		metrics: metrics
 		handlers:                     make(map[uint64]*responder),
 		pendingAppRequests:           make(map[uint32]AppResponseCallback),
 		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),

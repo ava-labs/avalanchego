@@ -28,6 +28,7 @@ type GossipableAny[T any] interface {
 }
 
 type Config struct {
+	Namespace string
 	Frequency time.Duration
 	PollSize  int
 }
@@ -38,7 +39,6 @@ func NewGossiper[T any, U GossipableAny[T]](
 	set Set[U],
 	client *p2p.Client,
 	metrics prometheus.Registerer,
-	namespace string,
 ) (*Gossiper[T, U], error) {
 	g := &Gossiper[T, U]{
 		config: config,
@@ -46,12 +46,12 @@ func NewGossiper[T any, U GossipableAny[T]](
 		set:    set,
 		client: client,
 		receivedN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: config.Namespace,
 			Name:      "gossip_received_n",
 			Help:      "amount of gossip received (n)",
 		}),
 		receivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: config.Namespace,
 			Name:      "gossip_received_bytes",
 			Help:      "amount of gossip received (bytes)",
 		}),
