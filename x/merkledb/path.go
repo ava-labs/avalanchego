@@ -168,17 +168,17 @@ func (cp Path) Extend(path Path) Path {
 			pathConfig: cp.pathConfig,
 		}
 	}
-	odd := len(path.value) & 1
-	stopIndex := len(path.value) - odd
 	shift := cp.shift(remainder - 1)
 	reverseShift := Byte - shift
-	buffer[len(cp.value)-1] += (path.value[0] & (cp.mask ^ 0xFF)) >> reverseShift
+	buffer[len(cp.value)-1] += path.value[0] >> reverseShift
 
+	odd := len(path.value) & 1
+	stopIndex := len(path.value) - odd
 	for i := 0; i < stopIndex-1; i++ {
-		buffer[i+len(cp.value)] += path.value[i]<<shift + (path.value[i+1]&(cp.mask^0xFF))>>reverseShift
+		buffer[len(cp.value)+i] += path.value[i]<<shift + path.value[i+1]>>reverseShift
 	}
 	if odd == 1 {
-		buffer[stopIndex+len(cp.value)] += path.value[stopIndex] << shift
+		buffer[len(cp.value)+stopIndex] += path.value[stopIndex] << shift
 	}
 
 	return Path{
@@ -188,12 +188,43 @@ func (cp Path) Extend(path Path) Path {
 	}
 }
 
+func (cp Path) shiftedCopy(dst []byte, shift byte) {
+
+}
 func (cp Path) Slice(start, end int) Path {
 	panic("not implemented")
 }
 
 func (cp Path) Skip(tokensToSkip int) Path {
-	panic("not implemented")
+	remainder := tokensToSkip % cp.tokensPerByte
+	if remainder == 0 {
+		return Path{
+			// ensure that the index rounds up
+			value:      cp.value[tokensToSkip/cp.tokensPerByte:],
+			length:     cp.length - tokensToSkip,
+			pathConfig: cp.pathConfig,
+		}
+	}
+	buffer := make([]byte, (cp.length-tokensToSkip+cp.tokensPerByte-1)/cp.tokensPerByte)
+	shift := cp.shift(remainder - 1)
+	odd := (len(cp.value) - 1) & 1
+	stopIndex := len(cp.value) - odd
+	reverseShift := Byte - shift
+
+	buffer[0] = cp.value[0] << reverseShift
+	for i := 1; i < stopIndex-1; i++ {
+		buffer[i] += cp.value[i]<<shift + cp.value[i+1]>>reverseShift
+	}
+	if odd == 1 {
+		buffer[stopIndex] += cp.value[stopIndex] << shift
+	}
+
+	return Path{
+		// ensure that the index rounds up
+		value:      *(*string)(unsafe.Pointer(&buffer)),
+		length:     cp.length - tokensToSkip,
+		pathConfig: cp.pathConfig,
+	}
 }
 
 func (cp Path) Take(tokensToTake int) Path {

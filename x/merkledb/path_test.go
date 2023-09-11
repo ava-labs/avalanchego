@@ -9,6 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_Path_SkipTake(t *testing.T) {
+	require := require.New(t)
+
+	for i := 0; i <= 8; i++ {
+		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor2).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor2).Take(8-i))
+	}
+	for i := 0; i <= 8; i += 2 {
+		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor4).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor4).Take(8-i))
+	}
+	for i := 0; i <= 8; i += 4 {
+		require.Equal(NewPath([]byte{0b0101_0101}, BranchFactor16).Skip(i), NewPath([]byte{0b101_01010}, BranchFactor16).Take(8-i))
+	}
+}
+
 func Test_Path_Token(t *testing.T) {
 	require := require.New(t)
 
