@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -94,7 +95,7 @@ func TestGossiperGossip(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			responseSender := common.NewMockSender(ctrl)
-			responseRouter := p2p.NewRouter(logging.NoLog{}, responseSender)
+			responseRouter := p2p.NewRouter(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
 			responseSet := testSet{
@@ -112,7 +113,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 
 			requestSender := common.NewMockSender(ctrl)
-			requestRouter := p2p.NewRouter(logging.NoLog{}, requestSender)
+			requestRouter := p2p.NewRouter(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
 
 			gossiped := make(chan struct{})
 			requestSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
