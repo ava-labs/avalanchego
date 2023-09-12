@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -26,6 +28,11 @@ func TestAppRequestResponse(t *testing.T) {
 	response := []byte("response")
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
+
+	ctxKey := new(string)
+	ctxVal := new(string)
+	*ctxKey = "foo"
+	*ctxVal = "bar"
 
 	tests := []struct {
 		name        string
@@ -45,6 +52,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -54,10 +62,11 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -77,7 +86,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -101,6 +110,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendCrossChainAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.CrossChainAppResponse(ctx, chainID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -110,9 +120,10 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 					require.NoError(t, err)
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -130,7 +141,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}()
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -191,7 +202,7 @@ func TestAppRequestResponse(t *testing.T) {
 
 			sender := common.NewMockSender(ctrl)
 			handler := mocks.NewMockHandler(ctrl)
-			router := NewRouter(logging.NoLog{}, sender)
+			router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			peers := &Peers{}
 			require.NoError(peers.Connected(context.Background(), nodeID, nil))
 			client, err := router.RegisterAppProtocol(handlerID, handler, peers)
@@ -289,7 +300,7 @@ func TestRouterDropMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			router := NewRouter(logging.NoLog{}, nil)
+			router := NewRouter(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
 
 			err := tt.requestFunc(router)
 			require.ErrorIs(err, tt.err)
@@ -306,7 +317,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	handler := mocks.NewMockHandler(ctrl)
 	sender := common.NewMockSender(ctrl)
-	router := NewRouter(logging.NoLog{}, sender)
+	router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	nodeID := ids.GenerateTestNodeID()
 
 	requestSent := &sync.WaitGroup{}
@@ -339,7 +350,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	requestSent.Wait()
 
 	// force the router to use the same requestID
-	router.requestID = 0
+	router.requestID = 1
 	timeout.Add(1)
 	err = client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil)
 	requestSent.Wait()
