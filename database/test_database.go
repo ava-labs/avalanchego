@@ -1292,6 +1292,15 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 			value := make([]byte, r.Intn(maxValueLen))
 			_, _ = r.Read(value) // #nosec G404
 
+			if len(value) == 0 {
+				// Consistently treat zero length values as nil
+				// so that we can compare [expected] and [got] with
+				// require.Equal, which treats nil and empty byte
+				// as being unequal, whereas the database treats
+				// them as being equal.
+				value = nil
+			}
+
 			if bytes.HasPrefix(key, prefix) && bytes.Compare(key, start) >= 0 {
 				expected[string(key)] = value
 			}
@@ -1304,7 +1313,11 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 		// Assert the iterator returns the expected key-values.
 		got := map[string][]byte{}
 		for iter.Next() {
-			got[string(iter.Key())] = iter.Value()
+			val := iter.Value()
+			if len(val) == 0 {
+				val = nil
+			}
+			got[string(iter.Key())] = val
 			require.NoError(db.Delete(iter.Key()))
 		}
 		require.Equal(expected, got)
