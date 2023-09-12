@@ -413,7 +413,7 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 	if err != nil {
 		panic(err)
 	}
-	peer, ok := n.connectingPeers.GetByID(shortNodeID)
+	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
 		n.peerConfig.Log.Error(
 			"unexpectedly connected to peer when not marked as attempting to connect",
@@ -673,8 +673,8 @@ func (n *network) Disconnected(nodeID ids.GenericNodeID) {
 	}
 
 	n.peersLock.RLock()
-	_, connecting := n.connectingPeers.GetByID(shortNodeID)
-	peer, connected := n.connectedPeers.GetByID(shortNodeID)
+	_, connecting := n.connectingPeers.GetByID(nodeID)
+	peer, connected := n.connectedPeers.GetByID(nodeID)
 	n.peersLock.RUnlock()
 
 	if connecting {
@@ -715,7 +715,7 @@ func (n *network) Peers(peerID ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
 
 		validator := unknownValidators[drawn]
 		n.peersLock.RLock()
-		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
+		_, isConnected := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(validator.NodeID))
 		peerIP := n.peerIPs[validator.NodeID]
 		n.peersLock.RUnlock()
 		if !isConnected {
@@ -837,7 +837,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 
 	n.manuallyTrackedIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
 
-	_, connected := n.connectedPeers.GetByID(nodeID)
+	_, connected := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(nodeID))
 	if connected {
 		// If I'm currently connected to [nodeID] then they will have told me
 		// how to connect to them in the future, and I don't need to attempt to
@@ -872,7 +872,7 @@ func (n *network) getPeers(
 	defer n.peersLock.RUnlock()
 
 	for nodeID := range nodeIDs {
-		peer, ok := n.connectedPeers.GetByID(nodeID)
+		peer, ok := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(nodeID))
 		if !ok {
 			continue
 		}
@@ -1124,8 +1124,10 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				n.peersLock.Unlock()
 				return
 			}
-			_, connecting := n.connectingPeers.GetByID(nodeID)
-			_, connected := n.connectedPeers.GetByID(nodeID)
+
+			genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+			_, connecting := n.connectingPeers.GetByID(genericNodeID)
+			_, connected := n.connectedPeers.GetByID(genericNodeID)
 			n.peersLock.Unlock()
 
 			// While it may not be strictly needed to stop attempting to connect
@@ -1236,13 +1238,13 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// At this point we have successfully upgraded the connection and will
 	// return a nil error.
 
-	if ids.GenericNodeIDFromNodeID(nodeID).Equal(n.config.MyNodeID) {
+	if nodeID.Equal(n.config.MyNodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo("dropping connection to myself")
 		return nil
 	}
 
-	if !n.AllowConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
+	if !n.AllowConnection(nodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping undesired connection",
@@ -1292,7 +1294,11 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		zap.Stringer("nodeID", nodeID),
 	)
 
-	if !n.gossipTracker.StartTrackingPeer(nodeID) {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	if !n.gossipTracker.StartTrackingPeer(shortNodeID) {
 		n.peerConfig.Log.Error(
 			"started duplicate peer tracker",
 			zap.Stringer("nodeID", nodeID),
@@ -1306,7 +1312,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		n.peerConfig,
 		tlsConn,
 		cert,
-		ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID,
 		peer.NewThrottledMessageQueue(
 			n.peerConfig.Metrics,
 			nodeID,

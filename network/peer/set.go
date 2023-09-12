@@ -26,7 +26,7 @@ type Set interface {
 
 	// GetByID attempts to fetch a [peer] whose [peer.ID] is equal to [nodeID].
 	// If no such peer exists in the set, then [false] will be returned.
-	GetByID(nodeID ids.NodeID) (Peer, bool)
+	GetByID(nodeID ids.GenericNodeID) (Peer, bool)
 
 	// GetByIndex attempts to fetch a peer who has been allocated [index]. If
 	// [index] < 0 or [index] >= [Len], then false will be returned.
@@ -77,9 +77,8 @@ func (s *peerSet) Add(peer Peer) {
 	}
 }
 
-func (s *peerSet) GetByID(nodeID ids.NodeID) (Peer, bool) {
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	index, ok := s.peersMap[genericNodeID]
+func (s *peerSet) GetByID(nodeID ids.GenericNodeID) (Peer, bool) {
+	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return nil, false
 	}
@@ -151,7 +150,7 @@ func (s *peerSet) AllInfo() []Info {
 func (s *peerSet) Info(nodeIDs []ids.NodeID) []Info {
 	peerInfo := make([]Info, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
-		if peer, ok := s.GetByID(nodeID); ok {
+		if peer, ok := s.GetByID(ids.GenericNodeIDFromNodeID(nodeID)); ok {
 			peerInfo = append(peerInfo, peer.Info())
 		}
 	}

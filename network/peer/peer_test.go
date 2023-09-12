@@ -152,15 +152,18 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *testPeer) {
 	rawPeer0, rawPeer1 := makeRawTestPeers(t, trackedSubnets)
 
+	genericNodeID0 := ids.GenericNodeIDFromNodeID(rawPeer0.nodeID)
+	genericNodeID1 := ids.GenericNodeIDFromNodeID(rawPeer1.nodeID)
+
 	peer0 := &testPeer{
 		Peer: Start(
 			rawPeer0.config,
 			rawPeer0.conn,
 			rawPeer1.cert,
-			ids.GenericNodeIDFromNodeID(rawPeer1.nodeID),
+			genericNodeID1,
 			NewThrottledMessageQueue(
 				rawPeer0.config.Metrics,
-				rawPeer1.nodeID,
+				genericNodeID1,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -172,10 +175,10 @@ func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *te
 			rawPeer1.config,
 			rawPeer1.conn,
 			rawPeer0.cert,
-			ids.GenericNodeIDFromNodeID(rawPeer0.nodeID),
+			genericNodeID0,
 			NewThrottledMessageQueue(
 				rawPeer1.config.Metrics,
-				rawPeer0.nodeID,
+				genericNodeID0,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -204,14 +207,18 @@ func TestReady(t *testing.T) {
 	require := require.New(t)
 
 	rawPeer0, rawPeer1 := makeRawTestPeers(t, set.Set[ids.ID]{})
+
+	genericNodeID0 := ids.GenericNodeIDFromNodeID(rawPeer0.nodeID)
+	genericNodeID1 := ids.GenericNodeIDFromNodeID(rawPeer1.nodeID)
+
 	peer0 := Start(
 		rawPeer0.config,
 		rawPeer0.conn,
 		rawPeer1.cert,
-		ids.GenericNodeIDFromNodeID(rawPeer1.nodeID),
+		genericNodeID1,
 		NewThrottledMessageQueue(
 			rawPeer0.config.Metrics,
-			rawPeer1.nodeID,
+			genericNodeID1,
 			logging.NoLog{},
 			throttling.NewNoOutboundThrottler(),
 		),
@@ -223,10 +230,10 @@ func TestReady(t *testing.T) {
 		rawPeer1.config,
 		rawPeer1.conn,
 		rawPeer0.cert,
-		ids.GenericNodeIDFromNodeID(rawPeer0.nodeID),
+		genericNodeID0,
 		NewThrottledMessageQueue(
 			rawPeer1.config.Metrics,
-			rawPeer0.nodeID,
+			genericNodeID0,
 			logging.NoLog{},
 			throttling.NewNoOutboundThrottler(),
 		),

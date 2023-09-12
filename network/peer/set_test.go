@@ -30,9 +30,9 @@ func TestSet(t *testing.T) {
 	peer2 := &peer{
 		id: ids.GenericNodeIDFromNodeID(nodeID2),
 	}
-	// unknownPeer := &peer{
-	// 	id: ids.GenericNodeIDFromNodeID(unknownNodeID),
-	// }
+	unknownPeer := &peer{
+		id: ids.GenericNodeIDFromNodeID(unknownNodeID),
+	}
 	peer3 := &peer{
 		id: ids.GenericNodeIDFromNodeID(nodeID3),
 	}
@@ -42,7 +42,7 @@ func TestSet(t *testing.T) {
 
 	// add of first peer is handled
 	set.Add(peer1)
-	retrievedPeer1, peer1Found := set.GetByID(nodeID1)
+	retrievedPeer1, peer1Found := set.GetByID(peer1.id)
 	require.True(peer1Found)
 	observed1, _ := peer1.ObservedUptime(constants.PrimaryNetworkID)
 	observed2, _ := retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
@@ -51,7 +51,7 @@ func TestSet(t *testing.T) {
 
 	// re-addition of peer works as update
 	set.Add(updatedPeer1)
-	retrievedPeer1, peer1Found = set.GetByID(nodeID1)
+	retrievedPeer1, peer1Found = set.GetByID(peer1.id)
 	require.True(peer1Found)
 	observed1, _ = updatedPeer1.ObservedUptime(constants.PrimaryNetworkID)
 	observed2, _ = retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
@@ -60,7 +60,7 @@ func TestSet(t *testing.T) {
 
 	// add of another peer is handled
 	set.Add(peer2)
-	retrievedPeer2, peer2Found := set.GetByID(nodeID2)
+	retrievedPeer2, peer2Found := set.GetByID(peer2.id)
 	require.True(peer2Found)
 	observed1, _ = peer2.ObservedUptime(constants.PrimaryNetworkID)
 	observed2, _ = retrievedPeer2.ObservedUptime(constants.PrimaryNetworkID)
@@ -69,20 +69,20 @@ func TestSet(t *testing.T) {
 
 	// removal of added peer is handled
 	set.Remove(nodeID1)
-	_, peer1Found = set.GetByID(nodeID1)
+	_, peer1Found = set.GetByID(peer1.id)
 	require.False(peer1Found)
-	retrievedPeer2, peer2Found = set.GetByID(nodeID2)
+	retrievedPeer2, peer2Found = set.GetByID(peer2.id)
 	require.True(peer2Found)
 	require.Equal(peer2.id, retrievedPeer2.ID())
 	require.Equal(1, set.Len())
 
 	// query for unknown peer is handled
-	_, unknownPeerfound := set.GetByID(unknownNodeID)
+	_, unknownPeerfound := set.GetByID(unknownPeer.id)
 	require.False(unknownPeerfound)
 
 	// removal of unknown peer is handled
 	set.Remove(unknownNodeID)
-	retrievedPeer2, peer2Found = set.GetByID(nodeID2)
+	retrievedPeer2, peer2Found = set.GetByID(peer2.id)
 	require.True(peer2Found)
 	require.Equal(peer2.id, retrievedPeer2.ID())
 	require.Equal(1, set.Len())
