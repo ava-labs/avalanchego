@@ -64,7 +64,7 @@ contract ExampleWarp {
         uint32 index
     ) external view {
         (WarpBlockHash memory warpBlockHash, bool valid) = warp.getVerifiedWarpBlockHash(index);
-        require(valid);
+        require(!valid);
         require(warpBlockHash.sourceChainID == bytes32(0));
         require(warpBlockHash.blockHash == bytes32(0));
     }
