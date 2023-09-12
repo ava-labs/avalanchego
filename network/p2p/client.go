@@ -40,6 +40,7 @@ type CrossChainAppResponseCallback func(
 )
 
 type Client struct {
+	handlerID     uint64
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
@@ -95,7 +96,10 @@ func (c *Client) AppRequest(
 			return err
 		}
 
-		c.router.pendingAppRequests[requestID] = onResponse
+		c.router.pendingAppRequests[requestID] = pendingAppRequest{
+			AppResponseCallback: onResponse,
+			metrics:             c.router.handlers[c.handlerID].metrics,
+		}
 		c.router.requestID += 2
 	}
 
@@ -155,7 +159,10 @@ func (c *Client) CrossChainAppRequest(
 		return err
 	}
 
-	c.router.pendingCrossChainAppRequests[requestID] = onResponse
+	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
+		CrossChainAppResponseCallback: onResponse,
+		metrics:                       c.router.handlers[c.handlerID].metrics,
+	}
 	c.router.requestID += 2
 
 	return nil
