@@ -25,7 +25,10 @@ jobs:
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         if: matrix.os == 'windows-2022'
         run: |
-          echo "TIMEOUT=180s" >> $GITHUB_ENV
+          echo "TIMEOUT=240s" >> $GITHUB_ENV
+      - name: TODO remove this debug step
+        run: |
+          echo "TIMEOUT=$TIMEOUT"
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
