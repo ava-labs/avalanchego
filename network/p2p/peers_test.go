@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -132,7 +134,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			}
 			mockAppSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(expectedCalls)
 
-			r := NewRouter(logging.NoLog{}, mockAppSender)
+			r := NewRouter(logging.NoLog{}, mockAppSender, prometheus.NewRegistry(), "")
 			peers := &Peers{}
 			for _, peer := range tt.peers {
 				require.NoError(peers.Connected(context.Background(), peer, nil))
