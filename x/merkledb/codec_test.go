@@ -28,7 +28,7 @@ func FuzzCodecBool(f *testing.F) {
 			startLen := reader.Len()
 			got, err := codec.decodeBool(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
@@ -56,7 +56,7 @@ func FuzzCodecInt(f *testing.F) {
 			startLen := reader.Len()
 			got, err := codec.decodeInt(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
@@ -84,7 +84,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			startLen := reader.Len()
 			got, err := codec.decodeSerializedPath(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
@@ -113,7 +113,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
 			if err := codec.decodeDBNode(b, node); err != nil {
-				return
+				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
