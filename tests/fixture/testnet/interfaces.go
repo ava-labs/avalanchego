@@ -20,7 +20,7 @@ type Network interface {
 
 // Defines node capabilities supportable regardless of how a network is orchestrated.
 type Node interface {
-	GetID() ids.NodeID
+	GetID() ids.GenericNodeID
 	GetConfig() NodeConfig
 	GetProcessContext() node.NodeProcessContext
 	IsHealthy(ctx context.Context) (bool, error)

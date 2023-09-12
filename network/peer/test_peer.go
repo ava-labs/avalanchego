@@ -126,7 +126,7 @@ func StartTestPeer(
 		},
 		conn,
 		cert,
-		peerID,
+		ids.GenericNodeIDFromNodeID(peerID),
 		NewBlockingMessageQueue(
 			metrics,
 			logging.NoLog{},

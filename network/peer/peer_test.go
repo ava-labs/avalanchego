@@ -157,7 +157,7 @@ func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *te
 			rawPeer0.config,
 			rawPeer0.conn,
 			rawPeer1.cert,
-			rawPeer1.nodeID,
+			ids.GenericNodeIDFromNodeID(rawPeer1.nodeID),
 			NewThrottledMessageQueue(
 				rawPeer0.config.Metrics,
 				rawPeer1.nodeID,
@@ -172,7 +172,7 @@ func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *te
 			rawPeer1.config,
 			rawPeer1.conn,
 			rawPeer0.cert,
-			rawPeer0.nodeID,
+			ids.GenericNodeIDFromNodeID(rawPeer0.nodeID),
 			NewThrottledMessageQueue(
 				rawPeer1.config.Metrics,
 				rawPeer0.nodeID,
@@ -208,7 +208,7 @@ func TestReady(t *testing.T) {
 		rawPeer0.config,
 		rawPeer0.conn,
 		rawPeer1.cert,
-		rawPeer1.nodeID,
+		ids.GenericNodeIDFromNodeID(rawPeer1.nodeID),
 		NewThrottledMessageQueue(
 			rawPeer0.config.Metrics,
 			rawPeer1.nodeID,
@@ -223,7 +223,7 @@ func TestReady(t *testing.T) {
 		rawPeer1.config,
 		rawPeer1.conn,
 		rawPeer0.cert,
-		rawPeer0.nodeID,
+		ids.GenericNodeIDFromNodeID(rawPeer0.nodeID),
 		NewThrottledMessageQueue(
 			rawPeer1.config.Metrics,
 			rawPeer0.nodeID,

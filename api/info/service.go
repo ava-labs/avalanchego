@@ -240,7 +240,7 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 	for index, peer := range peers {
 		peerInfo[index] = Peer{
 			Info:    peer,
-			Benched: i.benchlist.GetBenched(ids.GenericNodeIDFromNodeID(peer.ID)),
+			Benched: i.benchlist.GetBenched(peer.ID),
 		}
 	}
 

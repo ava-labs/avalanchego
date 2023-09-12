@@ -52,8 +52,8 @@ type Set interface {
 }
 
 type peerSet struct {
-	peersMap   map[ids.NodeID]int // nodeID -> peer's index in peersSlice
-	peersSlice []Peer             // invariant: len(peersSlice) == len(peersMap)
+	peersMap   map[ids.GenericNodeID]int // nodeID -> peer's index in peersSlice
+	peersSlice []Peer                    // invariant: len(peersSlice) == len(peersMap)
 }
 
 // NewSet returns a set that does not internally manage synchronization.
@@ -62,7 +62,7 @@ type peerSet struct {
 // remaining methods are safe for concurrent use.
 func NewSet() Set {
 	return &peerSet{
-		peersMap: make(map[ids.NodeID]int),
+		peersMap: make(map[ids.GenericNodeID]int),
 	}
 }
 
@@ -78,7 +78,8 @@ func (s *peerSet) Add(peer Peer) {
 }
 
 func (s *peerSet) GetByID(nodeID ids.NodeID) (Peer, bool) {
-	index, ok := s.peersMap[nodeID]
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	index, ok := s.peersMap[genericNodeID]
 	if !ok {
 		return nil, false
 	}
@@ -93,7 +94,8 @@ func (s *peerSet) GetByIndex(index int) (Peer, bool) {
 }
 
 func (s *peerSet) Remove(nodeID ids.NodeID) {
-	index, ok := s.peersMap[nodeID]
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	index, ok := s.peersMap[genericNodeID]
 	if !ok {
 		return
 	}
@@ -105,7 +107,7 @@ func (s *peerSet) Remove(nodeID ids.NodeID) {
 	s.peersMap[lastPeerID] = index
 	s.peersSlice[index] = lastPeer
 
-	delete(s.peersMap, nodeID)
+	delete(s.peersMap, genericNodeID)
 	s.peersSlice[lastIndex] = nil
 	s.peersSlice = s.peersSlice[:lastIndex]
 }

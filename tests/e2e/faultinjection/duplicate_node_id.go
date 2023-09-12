@@ -68,7 +68,7 @@ func checkConnectedPeers(existingNodes []testnet.Node, newNode testnet.Node) {
 	infoClient := info.NewClient(newNode.GetProcessContext().URI)
 	peers, err := infoClient.Peers(context.Background())
 	require.NoError(err)
-	peerIDs := set.NewSet[ids.NodeID](len(existingNodes))
+	peerIDs := set.NewSet[ids.GenericNodeID](len(existingNodes))
 	for _, peer := range peers {
 		peerIDs.Add(peer.ID)
 	}

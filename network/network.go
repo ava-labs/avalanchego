@@ -407,9 +407,13 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 
 // Connected is called after the peer finishes the handshake.
 // Will not be called after [Disconnected] is called with this peer.
-func (n *network) Connected(nodeID ids.NodeID) {
+func (n *network) Connected(nodeID ids.GenericNodeID) {
 	n.peersLock.Lock()
-	peer, ok := n.connectingPeers.GetByID(nodeID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	peer, ok := n.connectingPeers.GetByID(shortNodeID)
 	if !ok {
 		n.peerConfig.Log.Error(
 			"unexpectedly connected to peer when not marked as attempting to connect",
@@ -426,39 +430,39 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		Timestamp: peerIP.Timestamp,
 		Signature: peerIP.Signature,
 	}
-	prevIP, ok := n.peerIPs[nodeID]
+	prevIP, ok := n.peerIPs[shortNodeID]
 	if !ok {
 		// If the IP wasn't previously tracked, then we never could have
 		// gossiped it. This means we don't need to reset the validator's
 		// tracked set.
-		n.peerIPs[nodeID] = newIP
+		n.peerIPs[shortNodeID] = newIP
 	} else if prevIP.Timestamp < newIP.Timestamp {
 		// The previous IP was stale, so we should gossip the newer IP.
-		n.peerIPs[nodeID] = newIP
+		n.peerIPs[shortNodeID] = newIP
 
 		if !prevIP.IPPort.Equal(newIP.IPPort) {
 			// This IP is actually different, so we should gossip it.
 			n.peerConfig.Log.Debug("resetting gossip due to ip change",
 				zap.Stringer("nodeID", nodeID),
 			)
-			_ = n.gossipTracker.ResetValidator(nodeID)
+			_ = n.gossipTracker.ResetValidator(shortNodeID)
 		}
 	}
 
-	if tracked, ok := n.trackedIPs[nodeID]; ok {
+	if tracked, ok := n.trackedIPs[shortNodeID]; ok {
 		tracked.stopTracking()
-		delete(n.trackedIPs, nodeID)
+		delete(n.trackedIPs, shortNodeID)
 	}
-	n.connectingPeers.Remove(nodeID)
+	n.connectingPeers.Remove(shortNodeID)
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
+	n.router.Connected(shortNodeID, peerVersion, constants.PrimaryNetworkID)
 	for subnetID := range peer.TrackedSubnets() {
-		n.router.Connected(nodeID, peerVersion, subnetID)
+		n.router.Connected(shortNodeID, peerVersion, subnetID)
 	}
 }
 
@@ -472,7 +476,7 @@ func (n *network) AllowConnection(nodeID ids.GenericNodeID) bool {
 		n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
+func (n *network) Track(peerID ids.GenericNodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
 	// Perform all signature verification and hashing before grabbing the peer
 	// lock.
 	// Note: Avoiding signature verification when the IP isn't needed is a
@@ -583,7 +587,11 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	}
 
 	txIDsToAck := maps.Keys(newestTimestamp)
-	txIDsToAck, ok := n.gossipTracker.AddKnown(peerID, txIDsWithUpToDateIP, txIDsToAck)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
+	if err != nil {
+		panic(err)
+	}
+	txIDsToAck, ok := n.gossipTracker.AddKnown(shortNodeID, txIDsWithUpToDateIP, txIDsToAck)
 	if !ok {
 		n.peerConfig.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", peerID),
@@ -606,7 +614,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	return peerAcks, nil
 }
 
-func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
+func (n *network) MarkTracked(peerID ids.GenericNodeID, ips []*p2p.PeerAck) error {
 	txIDs := make([]ids.ID, 0, len(ips))
 
 	n.peersLock.RLock()
@@ -635,7 +643,11 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
 		}
 	}
 
-	if _, ok := n.gossipTracker.AddKnown(peerID, txIDs, nil); !ok {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
+	if err != nil {
+		panic(err)
+	}
+	if _, ok := n.gossipTracker.AddKnown(shortNodeID, txIDs, nil); !ok {
 		n.peerConfig.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", peerID),
 		)
@@ -648,8 +660,12 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
 // It is guaranteed that [Connected] will not be called with [nodeID] after this
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
-func (n *network) Disconnected(nodeID ids.NodeID) {
-	if !n.gossipTracker.StopTrackingPeer(nodeID) {
+func (n *network) Disconnected(nodeID ids.GenericNodeID) {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	if !n.gossipTracker.StopTrackingPeer(shortNodeID) {
 		n.peerConfig.Log.Error(
 			"stopped non-existent peer tracker",
 			zap.Stringer("nodeID", nodeID),
@@ -657,21 +673,25 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	}
 
 	n.peersLock.RLock()
-	_, connecting := n.connectingPeers.GetByID(nodeID)
-	peer, connected := n.connectedPeers.GetByID(nodeID)
+	_, connecting := n.connectingPeers.GetByID(shortNodeID)
+	peer, connected := n.connectedPeers.GetByID(shortNodeID)
 	n.peersLock.RUnlock()
 
 	if connecting {
-		n.disconnectedFromConnecting(nodeID)
+		n.disconnectedFromConnecting(shortNodeID)
 	}
 	if connected {
-		n.disconnectedFromConnected(peer, nodeID)
+		n.disconnectedFromConnected(peer, shortNodeID)
 	}
 }
 
-func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
+func (n *network) Peers(peerID ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
 	// Only select validators that we haven't already sent to this peer
-	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
+	if err != nil {
+		panic(err)
+	}
+	unknownValidators, ok := n.gossipTracker.GetUnknown(shortNodeID)
 	if !ok {
 		n.peerConfig.Log.Debug(
 			"unable to find peer to gossip to",
@@ -906,9 +926,13 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			isValidator := subnetValidators.Contains(ids.GenericNodeIDFromNodeID(peerID))
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
+			if err != nil {
+				panic(err)
+			}
+			isValidator := subnetValidators.Contains(ids.GenericNodeIDFromNodeID(shortNodeID))
 			// check if the peer is allowed to connect to the subnet
-			if !allower.IsAllowed(peerID, isValidator) {
+			if !allower.IsAllowed(shortNodeID, isValidator) {
 				return false
 			}
 
@@ -940,7 +964,11 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) set.Set[i
 	// send to peer and update metrics
 	for _, peer := range peers {
 		if peer.Send(n.onCloseCtx, msg) {
-			sentTo.Add(peer.ID())
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(peer.ID())
+			if err != nil {
+				panic(err)
+			}
+			sentTo.Add(shortNodeID)
 
 			// TODO: move send fail rate calculations into the peer metrics
 			// record metrics for success
@@ -1278,7 +1306,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		n.peerConfig,
 		tlsConn,
 		cert,
-		nodeID,
+		ids.GenericNodeIDFromNodeID(nodeID),
 		peer.NewThrottledMessageQueue(
 			n.peerConfig.Metrics,
 			nodeID,
@@ -1363,7 +1391,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		peer, _ := n.connectedPeers.GetByIndex(i)
 
 		nodeID := peer.ID()
-		weight := validators.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
+		weight := validators.GetWeight(nodeID)
 		if weight == 0 {
 			// this is not a validator skip it.
 			continue

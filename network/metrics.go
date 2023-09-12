@@ -37,7 +37,7 @@ type metrics struct {
 	peerConnectedLifetimeAverage    prometheus.Gauge
 
 	lock                       sync.RWMutex
-	peerConnectedStartTimes    map[ids.NodeID]float64
+	peerConnectedStartTimes    map[ids.GenericNodeID]float64
 	peerConnectedStartTimesSum float64
 }
 
@@ -144,7 +144,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 				Help:      "The average duration of all peer connections in nanoseconds",
 			},
 		),
-		peerConnectedStartTimes: make(map[ids.NodeID]float64),
+		peerConnectedStartTimes: make(map[ids.GenericNodeID]float64),
 	}
 
 	errs := wrappers.Errs{}

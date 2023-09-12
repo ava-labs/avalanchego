@@ -39,7 +39,7 @@ var (
 // messages with a remote peer.
 type Peer interface {
 	// ID returns the nodeID of the remote peer.
-	ID() ids.NodeID
+	ID() ids.GenericNodeID
 
 	// Cert returns the certificate that the remote peer is using to
 	// authenticate their messages.
@@ -115,7 +115,7 @@ type peer struct {
 	cert *staking.Certificate
 
 	// node ID of this peer.
-	id ids.NodeID
+	id ids.GenericNodeID
 
 	// queue of messages to send to this peer.
 	messageQueue MessageQueue
@@ -177,7 +177,7 @@ func Start(
 	config *Config,
 	conn net.Conn,
 	cert *staking.Certificate,
-	id ids.NodeID,
+	id ids.GenericNodeID,
 	messageQueue MessageQueue,
 ) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
@@ -203,7 +203,7 @@ func Start(
 	return p
 }
 
-func (p *peer) ID() ids.NodeID {
+func (p *peer) ID() ids.GenericNodeID {
 	return p.id
 }
 
@@ -353,9 +353,9 @@ func (p *peer) close() {
 // When this method returns, the connection is closed.
 func (p *peer) readMessages() {
 	// Track this node with the inbound message throttler.
-	p.InboundMsgThrottler.AddNode(ids.GenericNodeIDFromNodeID(p.id))
+	p.InboundMsgThrottler.AddNode(p.id)
 	defer func() {
-		p.InboundMsgThrottler.RemoveNode(ids.GenericNodeIDFromNodeID(p.id))
+		p.InboundMsgThrottler.RemoveNode(p.id)
 		p.StartClose()
 		p.close()
 	}()
@@ -408,7 +408,7 @@ func (p *peer) readMessages() {
 		onFinishedHandling := p.InboundMsgThrottler.Acquire(
 			p.onClosingCtx,
 			uint64(msgLen),
-			ids.GenericNodeIDFromNodeID(p.id),
+			p.id,
 		)
 
 		// If the peer is shutting down, there's no need to read the message.
@@ -444,7 +444,7 @@ func (p *peer) readMessages() {
 		// message is not handled at the network level.)
 		// [p.CPUTracker.StopProcessing] must be called when this loop iteration is
 		// finished.
-		p.ResourceTracker.StartProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
+		p.ResourceTracker.StartProcessing(p.id, p.Clock.Time())
 
 		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
@@ -452,7 +452,11 @@ func (p *peer) readMessages() {
 		)
 
 		// Parse the message
-		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(p.id)
+		if err != nil {
+			panic(err)
+		}
+		msg, err := p.MessageCreator.Parse(msgBytes, shortNodeID, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
@@ -464,7 +468,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			p.ResourceTracker.StopProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
+			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
 		}
 
@@ -475,7 +479,7 @@ func (p *peer) readMessages() {
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
 		p.handle(msg)
-		p.ResourceTracker.StopProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
+		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 	}
 }
 
@@ -630,7 +634,7 @@ func (p *peer) sendNetworkMessages() {
 				)
 			}
 		case <-sendPingsTicker.C:
-			if !p.Network.AllowConnection(ids.GenericNodeIDFromNodeID(p.id)) {
+			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug("disconnecting from peer",
 					zap.String("reason", "connection is no longer desired"),
 					zap.Stringer("nodeID", p.id),
@@ -723,7 +727,7 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 }
 
 func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
-	nodeID := ids.GenericNodeIDFromNodeID(p.id)
+	nodeID := p.id
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		nodeID,
 		constants.PrimaryNetworkID,
@@ -852,7 +856,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTime))
 
 	p.Metrics.ClockSkew.Observe(clockDifference)
-	generidNodeID := ids.GenericNodeIDFromNodeID(p.id)
+	generidNodeID := p.id
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(generidNodeID) {
