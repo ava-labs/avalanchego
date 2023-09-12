@@ -4,7 +4,7 @@
 package tests
 
 import (
-	"fmt"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/ginkgo/v2/formatter"
 )
@@ -20,5 +20,11 @@ import (
 // for an exhaustive list of color options.
 func Outf(format string, args ...interface{}) {
 	s := formatter.F(format, args...)
-	fmt.Fprint(formatter.ColorableStdOut, s)
+	// Use GinkgoWriter to ensure that output from this function is
+	// printed sequentially within other test output produced with
+	// GinkgoWriter (e.g. `STEP:...`) when tests are run in
+	// parallel. ginkgo collects and writes stdout separately from
+	// GinkgoWriter during parallel execution and the resulting output
+	// can be confusing.
+	ginkgo.GinkgoWriter.Print(s)
 }
