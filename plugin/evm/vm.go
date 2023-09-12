@@ -16,6 +16,7 @@ import (
 	"time"
 
 	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
+	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -297,9 +298,18 @@ func (vm *VM) Initialize(
 		g.Config = params.SubnetEVMDefaultChainConfig
 	}
 
-	// We enforce network upgrades here, regardless of the chain config
-	// provided in the genesis file.
-	g.Config.MandatoryNetworkUpgrades = params.GetMandatoryNetworkUpgrades(chainCtx.NetworkID)
+	mandatoryNetworkUpgrades, enforce := getMandatoryNetworkUpgrades(chainCtx.NetworkID)
+	if enforce {
+		// We enforce network upgrades here, regardless of the chain config
+		// provided in the genesis file
+		g.Config.MandatoryNetworkUpgrades = mandatoryNetworkUpgrades
+	} else {
+		// If we are not enforcing, then apply those only if they are not
+		// already set in the genesis file
+		if g.Config.MandatoryNetworkUpgrades == (params.MandatoryNetworkUpgrades{}) {
+			g.Config.MandatoryNetworkUpgrades = mandatoryNetworkUpgrades
+		}
+	}
 
 	// Load airdrop file if provided
 	if vm.config.AirdropFile != "" {
@@ -976,4 +986,19 @@ func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error
 	}
 
 	return nil
+}
+
+// getMandatoryNetworkUpgrades returns the mandatory network upgrades for the specified network ID,
+// along with a flag that indicates if returned upgrades should be strictly enforced.
+func getMandatoryNetworkUpgrades(networkID uint32) (params.MandatoryNetworkUpgrades, bool) {
+	switch networkID {
+	case avalanchegoConstants.MainnetID:
+		return params.MainnetNetworkUpgrades, true
+	case avalanchegoConstants.FujiID:
+		return params.FujiNetworkUpgrades, true
+	case avalanchegoConstants.UnitTestID:
+		return params.UnitTestNetworkUpgrades, false
+	default:
+		return params.LocalNetworkUpgrades, false
+	}
 }
