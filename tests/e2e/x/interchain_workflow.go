@@ -117,11 +117,11 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		e2e.Eventually(func() bool {
+		e2e.DefaultEventually(func() bool {
 			balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
 			require.NoError(err)
 			return balance.Cmp(big.NewInt(0)) > 0
-		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see recipient address funded before timeout")
+		}, "failed to see recipient address funded before timeout")
 
 		ginkgo.By("exporting AVAX from the X-Chain to the P-Chain", func() {
 			_, err := xWallet.IssueExportTx(

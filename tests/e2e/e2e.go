@@ -178,6 +178,11 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 	}
 }
 
+// Helper method calling Eventually with default timeout and polling intervals.
+func DefaultEventually(condition func() bool, msg string) {
+	Eventually(condition, DefaultTimeout, DefaultPollingInterval, msg)
+}
+
 // Add an ephemeral node that is only intended to be used by a single test. Its ID and
 // URI are not intended to be returned from the Network instance to minimize
 // accessibility from other tests.

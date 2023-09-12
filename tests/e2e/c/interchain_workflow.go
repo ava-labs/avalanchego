@@ -71,11 +71,11 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			_ = e2e.SendEthTransaction(ethClient, signedTx)
 
 			ginkgo.By("waiting for the C-Chain recipient address to have received the sent funds")
-			e2e.Eventually(func() bool {
+			e2e.DefaultEventually(func() bool {
 				balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
 				require.NoError(err)
 				return balance.Cmp(big.NewInt(0)) > 0
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see funds delivered before timeout")
+			}, "failed to see funds delivered before timeout")
 		})
 
 		// Wallet must be initialized after sending funds on the
