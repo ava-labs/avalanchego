@@ -23,14 +23,14 @@ var _ ResourceTracker = (*resourceTracker)(nil)
 
 type Tracker interface {
 	// Returns the current usage for the given node.
-	Usage(nodeID ids.NodeID, now time.Time) float64
+	Usage(nodeID ids.GenericNodeID, now time.Time) float64
 	// Returns the current usage by all nodes.
 	TotalUsage() float64
 	// Returns the duration between [now] and when the usage of [nodeID] reaches
 	// [value], assuming that the node uses no more resources.
 	// If the node's usage isn't known, or is already <= [value], returns the
 	// zero duration.
-	TimeUntilUsage(nodeID ids.NodeID, now time.Time, value float64) time.Duration
+	TimeUntilUsage(nodeID ids.GenericNodeID, now time.Time, value float64) time.Duration
 }
 
 type DiskTracker interface {
@@ -43,16 +43,16 @@ type ResourceTracker interface {
 	CPUTracker() Tracker
 	DiskTracker() DiskTracker
 	// Registers that the given node started processing at the given time.
-	StartProcessing(ids.NodeID, time.Time)
+	StartProcessing(ids.GenericNodeID, time.Time)
 	// Registers that the given node stopped processing at the given time.
-	StopProcessing(ids.NodeID, time.Time)
+	StopProcessing(ids.GenericNodeID, time.Time)
 }
 
 type cpuResourceTracker struct {
 	t *resourceTracker
 }
 
-func (t *cpuResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
+func (t *cpuResourceTracker) Usage(nodeID ids.GenericNodeID, now time.Time) float64 {
 	rt := t.t
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
@@ -80,7 +80,7 @@ func (t *cpuResourceTracker) TotalUsage() float64 {
 	return t.t.resources.CPUUsage()
 }
 
-func (t *cpuResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, value float64) time.Duration {
+func (t *cpuResourceTracker) TimeUntilUsage(nodeID ids.GenericNodeID, now time.Time, value float64) time.Duration {
 	rt := t.t
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
@@ -114,7 +114,7 @@ type diskResourceTracker struct {
 	t *resourceTracker
 }
 
-func (t *diskResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
+func (t *diskResourceTracker) Usage(nodeID ids.GenericNodeID, now time.Time) float64 {
 	rt := t.t
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
@@ -155,7 +155,7 @@ func (t *diskResourceTracker) TotalUsage() float64 {
 	return realReadUsage
 }
 
-func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, value float64) time.Duration {
+func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.GenericNodeID, now time.Time, value float64) time.Duration {
 	rt := t.t
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
@@ -200,7 +200,7 @@ type resourceTracker struct {
 	// utilized. This doesn't necessarily result in the meters being sorted
 	// based on their usage. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
-	meters  linkedhashmap.LinkedHashmap[ids.NodeID, meter.Meter]
+	meters  linkedhashmap.LinkedHashmap[ids.GenericNodeID, meter.Meter]
 	metrics *trackerMetrics
 }
 
@@ -215,7 +215,7 @@ func NewResourceTracker(
 		resources:       resources,
 		processingMeter: factory.New(halflife),
 		halflife:        halflife,
-		meters:          linkedhashmap.New[ids.NodeID, meter.Meter](),
+		meters:          linkedhashmap.New[ids.GenericNodeID, meter.Meter](),
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("resource_tracker", reg)
@@ -233,7 +233,7 @@ func (rt *resourceTracker) DiskTracker() DiskTracker {
 	return &diskResourceTracker{t: rt}
 }
 
-func (rt *resourceTracker) StartProcessing(nodeID ids.NodeID, now time.Time) {
+func (rt *resourceTracker) StartProcessing(nodeID ids.GenericNodeID, now time.Time) {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 
@@ -242,7 +242,7 @@ func (rt *resourceTracker) StartProcessing(nodeID ids.NodeID, now time.Time) {
 	rt.processingMeter.Inc(now, 1)
 }
 
-func (rt *resourceTracker) StopProcessing(nodeID ids.NodeID, now time.Time) {
+func (rt *resourceTracker) StopProcessing(nodeID ids.GenericNodeID, now time.Time) {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 
@@ -254,7 +254,7 @@ func (rt *resourceTracker) StopProcessing(nodeID ids.NodeID, now time.Time) {
 // getMeter returns the meter used to measure CPU time spent processing
 // messages from [nodeID].
 // assumes [rt.lock] is held.
-func (rt *resourceTracker) getMeter(nodeID ids.NodeID) meter.Meter {
+func (rt *resourceTracker) getMeter(nodeID ids.GenericNodeID) meter.Meter {
 	m, exists := rt.meters.Get(nodeID)
 	if exists {
 		return m

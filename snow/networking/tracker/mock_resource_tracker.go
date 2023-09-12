@@ -39,7 +39,7 @@ func (m *MockTracker) EXPECT() *MockTrackerMockRecorder {
 }
 
 // TimeUntilUsage mocks base method.
-func (m *MockTracker) TimeUntilUsage(arg0 ids.NodeID, arg1 time.Time, arg2 float64) time.Duration {
+func (m *MockTracker) TimeUntilUsage(arg0 ids.GenericNodeID, arg1 time.Time, arg2 float64) time.Duration {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TimeUntilUsage", arg0, arg1, arg2)
 	ret0, _ := ret[0].(time.Duration)
@@ -67,7 +67,7 @@ func (mr *MockTrackerMockRecorder) TotalUsage() *gomock.Call {
 }
 
 // Usage mocks base method.
-func (m *MockTracker) Usage(arg0 ids.NodeID, arg1 time.Time) float64 {
+func (m *MockTracker) Usage(arg0 ids.GenericNodeID, arg1 time.Time) float64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Usage", arg0, arg1)
 	ret0, _ := ret[0].(float64)

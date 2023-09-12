@@ -461,7 +461,9 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			zap.Stringer("messageOp", op),
 		)
 	}
-	h.resourceTracker.StartProcessing(nodeID, startTime)
+
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	h.resourceTracker.StartProcessing(genericNodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
 	defer func() {
@@ -473,7 +475,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			processingTime    = endTime.Sub(startTime)
 			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
-		h.resourceTracker.StopProcessing(nodeID, endTime)
+		h.resourceTracker.StopProcessing(genericNodeID, endTime)
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
@@ -797,14 +799,16 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			zap.Stringer("messageOp", op),
 		)
 	}
-	h.resourceTracker.StartProcessing(nodeID, startTime)
+
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	h.resourceTracker.StartProcessing(genericNodeID, startTime)
 	defer func() {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			processingTime    = endTime.Sub(startTime)
 		)
-		h.resourceTracker.StopProcessing(nodeID, endTime)
+		h.resourceTracker.StopProcessing(genericNodeID, endTime)
 		// There is no lock grabbed here, so both metrics are identical
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		messageHistograms.msgHandlingTime.Observe(float64(processingTime))

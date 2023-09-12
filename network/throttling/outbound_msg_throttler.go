@@ -26,12 +26,12 @@ type OutboundMsgThrottler interface {
 	// If this method returns true, Release([msg], [nodeID]) must be called (!) when
 	// the message is sent (or when we give up trying to send the message, if applicable.)
 	// If this method returns false, do not make a corresponding call to Release.
-	Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool
+	Acquire(msg message.OutboundMessage, nodeID ids.GenericNodeID) bool
 
 	// Mark that a message [msg] has been sent to [nodeID] or we have given up
 	// sending the message. Must correspond to a previous call to
 	// Acquire([msg], [nodeID]) that returned true.
-	Release(msg message.OutboundMessage, nodeID ids.NodeID)
+	Release(msg message.OutboundMessage, nodeID ids.GenericNodeID)
 }
 
 type outboundMsgThrottler struct {
@@ -54,14 +54,14 @@ func NewSybilOutboundMsgThrottler(
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
 			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
+			nodeToVdrBytesUsed:     make(map[ids.GenericNodeID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.GenericNodeID]uint64),
 		},
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
 
-func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool {
+func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.GenericNodeID) bool {
 	// no need to acquire for this message
 	if msg.BypassThrottling() {
 		return true
@@ -85,7 +85,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight := t.vdrs.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
+	weight := t.vdrs.GetWeight(nodeID)
 	if weight != 0 {
 		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 	}
@@ -124,7 +124,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	return true
 }
 
-func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.NodeID) {
+func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.GenericNodeID) {
 	// no need to release for this message
 	if msg.BypassThrottling() {
 		return
@@ -212,8 +212,8 @@ func NewNoOutboundThrottler() OutboundMsgThrottler {
 // [Acquire] always returns true. [Release] does nothing.
 type noOutboundMsgThrottler struct{}
 
-func (*noOutboundMsgThrottler) Acquire(message.OutboundMessage, ids.NodeID) bool {
+func (*noOutboundMsgThrottler) Acquire(message.OutboundMessage, ids.GenericNodeID) bool {
 	return true
 }
 
-func (*noOutboundMsgThrottler) Release(message.OutboundMessage, ids.NodeID) {}
+func (*noOutboundMsgThrottler) Release(message.OutboundMessage, ids.GenericNodeID) {}

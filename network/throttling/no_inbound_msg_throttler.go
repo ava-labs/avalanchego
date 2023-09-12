@@ -19,10 +19,10 @@ func NewNoInboundThrottler() InboundMsgThrottler {
 // [Acquire] always returns immediately.
 type noInboundMsgThrottler struct{}
 
-func (*noInboundMsgThrottler) Acquire(context.Context, uint64, ids.NodeID) ReleaseFunc {
+func (*noInboundMsgThrottler) Acquire(context.Context, uint64, ids.GenericNodeID) ReleaseFunc {
 	return noopRelease
 }
 
-func (*noInboundMsgThrottler) AddNode(ids.NodeID) {}
+func (*noInboundMsgThrottler) AddNode(ids.GenericNodeID) {}
 
-func (*noInboundMsgThrottler) RemoveNode(ids.NodeID) {}
+func (*noInboundMsgThrottler) RemoveNode(ids.GenericNodeID) {}

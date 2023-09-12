@@ -40,7 +40,7 @@ func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	release := throttler.Acquire(ctx, 2, nodeID)
 	release()
 }
@@ -53,10 +53,10 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestNodeID()
-	vdr2ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr1ID), nil, ids.Empty, 1))
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr2ID), nil, ids.Empty, 1))
+	vdr1ID := ids.GenerateTestGenericNodeID()
+	vdr2ID := ids.GenerateTestGenericNodeID()
+	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(vdr2ID, nil, ids.Empty, 1))
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
@@ -111,10 +111,10 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestNodeID()
-	vdr2ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr1ID), nil, ids.Empty, 1))
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr2ID), nil, ids.Empty, 1))
+	vdr1ID := ids.GenerateTestGenericNodeID()
+	vdr2ID := ids.GenerateTestGenericNodeID()
+	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(vdr2ID, nil, ids.Empty, 1))
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
@@ -219,7 +219,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	require.True(exists)
 	throttler.lock.Unlock()
 
-	nonVdrID := ids.GenerateTestNodeID()
+	nonVdrID := ids.GenerateTestGenericNodeID()
 	nonVdrDone := make(chan struct{})
 	go func() {
 		throttler.Acquire(context.Background(), 1, nonVdrID)
@@ -329,8 +329,8 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr1ID), nil, ids.Empty, 1))
+	vdr1ID := ids.GenerateTestGenericNodeID()
+	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
 		"",
@@ -339,7 +339,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 		config,
 	)
 	require.NoError(err)
-	nonVdrNodeID1 := ids.GenerateTestNodeID()
+	nonVdrNodeID1 := ids.GenerateTestGenericNodeID()
 	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID1)
 
 	// Acquiring more should block
@@ -355,7 +355,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	}
 
 	// A different non-validator should be able to acquire
-	nonVdrNodeID2 := ids.GenerateTestNodeID()
+	nonVdrNodeID2 := ids.GenerateTestGenericNodeID()
 	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID2)
 
 	// Validator should only be able to take [MaxAtLargeBytes]
@@ -376,9 +376,9 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr1ID), nil, ids.Empty, 1))
-	nonVdrNodeID := ids.GenerateTestNodeID()
+	vdr1ID := ids.GenerateTestGenericNodeID()
+	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
+	nonVdrNodeID := ids.GenerateTestGenericNodeID()
 
 	maxVdrBytes := config.VdrAllocSize + config.AtLargeAllocSize
 	maxBytes := maxVdrBytes

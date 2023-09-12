@@ -353,9 +353,9 @@ func (p *peer) close() {
 // When this method returns, the connection is closed.
 func (p *peer) readMessages() {
 	// Track this node with the inbound message throttler.
-	p.InboundMsgThrottler.AddNode(p.id)
+	p.InboundMsgThrottler.AddNode(ids.GenericNodeIDFromNodeID(p.id))
 	defer func() {
-		p.InboundMsgThrottler.RemoveNode(p.id)
+		p.InboundMsgThrottler.RemoveNode(ids.GenericNodeIDFromNodeID(p.id))
 		p.StartClose()
 		p.close()
 	}()
@@ -408,7 +408,7 @@ func (p *peer) readMessages() {
 		onFinishedHandling := p.InboundMsgThrottler.Acquire(
 			p.onClosingCtx,
 			uint64(msgLen),
-			p.id,
+			ids.GenericNodeIDFromNodeID(p.id),
 		)
 
 		// If the peer is shutting down, there's no need to read the message.
@@ -444,7 +444,7 @@ func (p *peer) readMessages() {
 		// message is not handled at the network level.)
 		// [p.CPUTracker.StopProcessing] must be called when this loop iteration is
 		// finished.
-		p.ResourceTracker.StartProcessing(p.id, p.Clock.Time())
+		p.ResourceTracker.StartProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
 
 		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
@@ -464,7 +464,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
+			p.ResourceTracker.StopProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
 			continue
 		}
 
@@ -475,7 +475,7 @@ func (p *peer) readMessages() {
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
 		p.handle(msg)
-		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
+		p.ResourceTracker.StopProcessing(ids.GenericNodeIDFromNodeID(p.id), p.Clock.Time())
 	}
 }
 

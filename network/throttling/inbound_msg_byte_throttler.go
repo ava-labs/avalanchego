@@ -37,11 +37,11 @@ func newInboundMsgByteThrottler(
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
 			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
+			nodeToVdrBytesUsed:     make(map[ids.GenericNodeID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.GenericNodeID]uint64),
 		},
 		waitingToAcquire:   linkedhashmap.New[uint64, *msgMetadata](),
-		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
+		nodeToWaitingMsgID: make(map[ids.GenericNodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
@@ -53,7 +53,7 @@ type msgMetadata struct {
 	// The number of bytes that were attempted to be acquired
 	msgSize uint64
 	// The sender of this incoming message
-	nodeID ids.NodeID
+	nodeID ids.GenericNodeID
 	// Closed when the message can be read.
 	closeOnAcquireChan chan struct{}
 }
@@ -66,7 +66,7 @@ type inboundMsgByteThrottler struct {
 	metrics   inboundMsgByteThrottlerMetrics
 	nextMsgID uint64
 	// Node ID --> Msg ID for a message this node is waiting to acquire
-	nodeToWaitingMsgID map[ids.NodeID]uint64
+	nodeToWaitingMsgID map[ids.GenericNodeID]uint64
 	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap[uint64, *msgMetadata]
 	// Invariant: The node is only waiting on a single message at a time
@@ -82,7 +82,7 @@ type inboundMsgByteThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // The returned ReleaseFunc must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc {
+func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.GenericNodeID) ReleaseFunc {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.awaitingRelease.Inc()
@@ -131,8 +131,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	weight := t.vdrs.GetWeight(genericNodeID)
+	weight := t.vdrs.GetWeight(nodeID)
 	if weight != 0 {
 		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 	}
@@ -195,7 +194,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.NodeID) {
+func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.GenericNodeID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))

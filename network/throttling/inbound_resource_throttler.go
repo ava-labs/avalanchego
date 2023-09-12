@@ -30,13 +30,13 @@ var (
 type SystemThrottler interface {
 	// Blocks until we can read a message from the given peer.
 	// If [ctx] is canceled, returns immediately.
-	Acquire(ctx context.Context, nodeID ids.NodeID)
+	Acquire(ctx context.Context, nodeID ids.GenericNodeID)
 }
 
 // A system throttler that always immediately returns on [Acquire].
 type noSystemThrottler struct{}
 
-func (noSystemThrottler) Acquire(context.Context, ids.NodeID) {}
+func (noSystemThrottler) Acquire(context.Context, ids.GenericNodeID) {}
 
 type SystemThrottlerConfig struct {
 	Clock mockable.Clock `json:"-"`
@@ -118,7 +118,7 @@ func NewSystemThrottler(
 	}, nil
 }
 
-func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
+func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.GenericNodeID) {
 	// [timer] fires when we should re-check whether this node's
 	// usage has fallen to an acceptable level.
 	// Lazily initialize timer only if we actually need to wait.
@@ -137,8 +137,7 @@ func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 	for {
 		now := t.Clock.Time()
 		// Get target usage for this node.
-		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-		target := t.targeter.TargetUsage(genericNodeID)
+		target := t.targeter.TargetUsage(nodeID)
 		// Get actual usage for this node.
 		usage := t.tracker.Usage(nodeID, now)
 		if usage <= target {

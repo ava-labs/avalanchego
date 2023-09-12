@@ -101,7 +101,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	}
 
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
-	if !q.outboundMsgThrottler.Acquire(msg, q.id) {
+	if !q.outboundMsgThrottler.Acquire(msg, ids.GenericNodeIDFromNodeID(q.id)) {
 		q.log.Debug(
 			"dropping outgoing message",
 			zap.String("reason", "rate-limiting"),
@@ -126,7 +126,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 			zap.Stringer("messageOp", msg.Op()),
 			zap.Stringer("nodeID", q.id),
 		)
-		q.outboundMsgThrottler.Release(msg, q.id)
+		q.outboundMsgThrottler.Release(msg, ids.GenericNodeIDFromNodeID(q.id))
 		q.onFailed.SendFailed(msg)
 		return false
 	}
@@ -170,7 +170,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 func (q *throttledMessageQueue) pop() message.OutboundMessage {
 	msg, _ := q.queue.PopLeft()
 
-	q.outboundMsgThrottler.Release(msg, q.id)
+	q.outboundMsgThrottler.Release(msg, ids.GenericNodeIDFromNodeID(q.id))
 	return msg
 }
 
@@ -186,7 +186,7 @@ func (q *throttledMessageQueue) Close() {
 
 	for q.queue.Len() > 0 {
 		msg, _ := q.queue.PopLeft()
-		q.outboundMsgThrottler.Release(msg, q.id)
+		q.outboundMsgThrottler.Release(msg, ids.GenericNodeIDFromNodeID(q.id))
 		q.onFailed.SendFailed(msg)
 	}
 	q.queue = nil

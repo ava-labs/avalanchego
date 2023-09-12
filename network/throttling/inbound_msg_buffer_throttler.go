@@ -24,8 +24,8 @@ func newInboundMsgBufferThrottler(
 ) (*inboundMsgBufferThrottler, error) {
 	t := &inboundMsgBufferThrottler{
 		maxProcessingMsgsPerNode: maxProcessingMsgsPerNode,
-		awaitingAcquire:          make(map[ids.NodeID]chan struct{}),
-		nodeToNumProcessingMsgs:  make(map[ids.NodeID]uint64),
+		awaitingAcquire:          make(map[ids.GenericNodeID]chan struct{}),
+		nodeToNumProcessingMsgs:  make(map[ids.GenericNodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
@@ -46,11 +46,11 @@ type inboundMsgBufferThrottler struct {
 	maxProcessingMsgsPerNode uint64
 	// Node ID --> Number of messages from this node we're currently processing.
 	// Must only be accessed when [lock] is held.
-	nodeToNumProcessingMsgs map[ids.NodeID]uint64
+	nodeToNumProcessingMsgs map[ids.GenericNodeID]uint64
 	// Node ID --> Channel, when closed
 	// causes a goroutine waiting in Acquire to return.
 	// Must only be accessed when [lock] is held.
-	awaitingAcquire map[ids.NodeID]chan struct{}
+	awaitingAcquire map[ids.GenericNodeID]chan struct{}
 }
 
 // Acquire returns when we've acquired space on the inbound message
@@ -60,7 +60,7 @@ type inboundMsgBufferThrottler struct {
 //
 // invariant: There should be a maximum of 1 blocking call to Acquire for a
 // given nodeID. Callers must enforce this invariant.
-func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) ReleaseFunc {
+func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.GenericNodeID) ReleaseFunc {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
@@ -107,7 +107,7 @@ func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.Node
 
 // release marks that we've finished processing a message from [nodeID]
 // and can release the space it took on the inbound message buffer.
-func (t *inboundMsgBufferThrottler) release(nodeID ids.NodeID) {
+func (t *inboundMsgBufferThrottler) release(nodeID ids.GenericNodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

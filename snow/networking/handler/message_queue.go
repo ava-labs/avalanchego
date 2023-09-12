@@ -227,7 +227,8 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
 	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
-	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	recentCPUUsage := m.cpuTracker.Usage(genericNodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUsage <= maxCPU
 }
