@@ -17,7 +17,7 @@ type Network interface {
 
 	// AllowConnection enables the network is signal to the peer that its
 	// connection is no longer desired and should be terminated.
-	AllowConnection(peerID ids.NodeID) bool
+	AllowConnection(peerID ids.GenericNodeID) bool
 
 	// Track allows the peer to notify the network of a potential new peer to
 	// connect to, given the [ips] of the peers it sent us during the peer

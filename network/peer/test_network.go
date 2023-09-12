@@ -15,7 +15,7 @@ type testNetwork struct{}
 
 func (testNetwork) Connected(ids.NodeID) {}
 
-func (testNetwork) AllowConnection(ids.NodeID) bool {
+func (testNetwork) AllowConnection(ids.GenericNodeID) bool {
 	return true
 }
 

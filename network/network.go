@@ -86,7 +86,7 @@ type Network interface {
 	// connect to the provided nodeID. If the node is attempting to connect to
 	// the minimum number of peers, then it should only connect if the peer is a
 	// validator or beacon.
-	WantsConnection(ids.NodeID) bool
+	WantsConnection(ids.GenericNodeID) bool
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
@@ -158,7 +158,7 @@ type network struct {
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
 	trackedIPs         map[ids.NodeID]*trackedIP
-	manuallyTrackedIDs set.Set[ids.NodeID]
+	manuallyTrackedIDs set.Set[ids.GenericNodeID]
 	connectingPeers    peer.Set
 	connectedPeers     peer.Set
 	closing            bool
@@ -466,9 +466,9 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
-func (n *network) AllowConnection(nodeID ids.NodeID) bool {
+func (n *network) AllowConnection(nodeID ids.GenericNodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(n.config.MyNodeID)) ||
+		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
 }
 
@@ -799,15 +799,15 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-func (n *network) WantsConnection(nodeID ids.NodeID) bool {
+func (n *network) WantsConnection(nodeID ids.GenericNodeID) bool {
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
 	return n.wantsConnection(nodeID)
 }
 
-func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID)) ||
+func (n *network) wantsConnection(nodeID ids.GenericNodeID) bool {
+	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
@@ -815,7 +815,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	n.manuallyTrackedIDs.Add(nodeID)
+	n.manuallyTrackedIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
 
 	_, connected := n.connectedPeers.GetByID(nodeID)
 	if connected {
@@ -962,7 +962,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.wantsConnection(nodeID) {
+		if n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
@@ -985,7 +985,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.wantsConnection(nodeID) {
+	if n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
 		prevIP := n.peerIPs[nodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked
@@ -1041,7 +1041,7 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
 	prevIP, previouslyTracked := n.peerIPs[nodeID]
 	shouldUpdateOurIP := previouslyTracked && prevIP.Timestamp < ip.Timestamp
-	shouldDial := !previouslyTracked && n.wantsConnection(nodeID)
+	shouldDial := !previouslyTracked && n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID))
 	return prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial
 }
 
@@ -1084,7 +1084,7 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			// trackedIPs and this goroutine. This prevents a memory leak when
 			// the tracked nodeID leaves the validator set and is never able to
 			// be connected to.
-			if !n.wantsConnection(nodeID) {
+			if !n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
@@ -1208,13 +1208,13 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// At this point we have successfully upgraded the connection and will
 	// return a nil error.
 
-	if nodeID == n.config.MyNodeID {
+	if ids.GenericNodeIDFromNodeID(nodeID).Equal(n.config.MyNodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo("dropping connection to myself")
 		return nil
 	}
 
-	if !n.AllowConnection(nodeID) {
+	if !n.AllowConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping undesired connection",
@@ -1345,7 +1345,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		return UptimeResult{}, errSubnetNotExist
 	}
 
-	myStake := validators.GetWeight(ids.GenericNodeIDFromNodeID(n.config.MyNodeID))
+	myStake := validators.GetWeight(n.config.MyNodeID)
 	if myStake == 0 {
 		return UptimeResult{}, errNotValidator
 	}

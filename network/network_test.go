@@ -157,11 +157,11 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.GenericNodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
-		nodeIDs   = make([]ids.NodeID, count)
+		nodeIDs   = make([]ids.GenericNodeID, count)
 		configs   = make([]*Config, count)
 	)
 	for i := 0; i < count; i++ {
@@ -196,7 +196,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.GenericNodeID, []Network, *sync.WaitGroup) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -223,12 +223,12 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		}
 
 		beacons := validators.NewSet()
-		require.NoError(beacons.Add(ids.GenericNodeIDFromNodeID(nodeIDs[0]), nil, ids.GenerateTestID(), 1))
+		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		primaryVdrs := validators.NewSet()
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			require.NoError(primaryVdrs.Add(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.GenerateTestID(), 1))
+			require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
 		vdrs := validators.NewManager()
@@ -286,7 +286,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(config.MyNodeID)
+			if err != nil {
+				panic(err)
+			}
+			net.ManuallyTrack(shortNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -337,7 +341,11 @@ func TestSend(t *testing.T) {
 	require.NoError(err)
 
 	toSend := set.Set[ids.NodeID]{}
-	toSend.Add(nodeIDs[1])
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeIDs[1])
+	if err != nil {
+		panic(err)
+	}
+	toSend.Add(shortNodeID)
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
 	require.Equal(toSend, sentTo)
 
@@ -375,11 +383,22 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.Of(nodeIDs...)
+	toSend := set.NewSet[ids.NodeID](len(nodeIDs))
+	for _, genericNodeID := range nodeIDs {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		toSend.Add(shortNodeID)
+	}
 	validNodeID := nodeIDs[1]
+	validShortNodeID, err := ids.NodeIDFromGenericNodeID(validNodeID)
+	if err != nil {
+		panic(err)
+	}
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
-	require.Contains(sentTo, validNodeID)
+	require.Contains(sentTo, validShortNodeID)
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -387,7 +406,7 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	// Test Gossip now
 	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
-	require.Contains(sentTo, validNodeID)
+	require.Contains(sentTo, validShortNodeID)
 
 	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -405,7 +424,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(nodeID), nil, ids.Empty, 1))
+	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
 	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: staking.CertificateFromX509(tlsCert.Leaf),
@@ -449,12 +468,12 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		}
 
 		beacons := validators.NewSet()
-		require.NoError(beacons.Add(ids.GenericNodeIDFromNodeID(nodeIDs[0]), nil, ids.GenerateTestID(), 1))
+		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		primaryVdrs := validators.NewSet()
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			require.NoError(primaryVdrs.Add(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.GenerateTestID(), 1))
+			require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
 		vdrs := validators.NewManager()
@@ -491,7 +510,11 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(config.MyNodeID)
+			if err != nil {
+				panic(err)
+			}
+			net.ManuallyTrack(shortNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -507,9 +530,12 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			network.peersLock.RLock()
 			defer network.peersLock.RUnlock()
 
-			nodeID := nodeIDs[0]
-			require.Contains(network.trackedIPs, nodeID)
-			ip := network.trackedIPs[nodeID]
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeIDs[0])
+			if err != nil {
+				panic(err)
+			}
+			require.Contains(network.trackedIPs, shortNodeID)
+			ip := network.trackedIPs[shortNodeID]
 			return ip.getDelay() != 0
 		},
 		10*time.Second,
@@ -529,7 +555,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 	primaryVdrs := validators.NewSet()
 	for _, nodeID := range nodeIDs {
-		require.NoError(primaryVdrs.Add(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.GenerateTestID(), 1))
+		require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
 	}
 
 	networks := make([]Network, len(configs))
@@ -547,7 +573,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		}
 
 		beacons := validators.NewSet()
-		require.NoError(beacons.Add(ids.GenericNodeIDFromNodeID(nodeIDs[0]), nil, ids.GenerateTestID(), 1))
+		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 
@@ -589,7 +615,11 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			peerAcks, err := net.Track(config.MyNodeID, []*ips.ClaimedIPPort{{
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(config.MyNodeID)
+			if err != nil {
+				panic(err)
+			}
+			peerAcks, err := net.Track(shortNodeID, []*ips.ClaimedIPPort{{
 				Cert:      staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
 				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
@@ -613,14 +643,18 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	network := networks[1].(*network)
-	require.NoError(primaryVdrs.RemoveWeight(ids.GenericNodeIDFromNodeID(nodeIDs[0]), 1))
+	require.NoError(primaryVdrs.RemoveWeight(nodeIDs[0], 1))
 	require.Eventually(
 		func() bool {
 			network.peersLock.RLock()
 			defer network.peersLock.RUnlock()
 
 			nodeID := nodeIDs[0]
-			_, ok := network.trackedIPs[nodeID]
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+			if err != nil {
+				panic(err)
+			}
+			_, ok := network.trackedIPs[shortNodeID]
 			return !ok
 		},
 		10*time.Second,

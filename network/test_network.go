@@ -251,13 +251,13 @@ func NewTestNetwork(
 }
 
 type nodeIDConnector struct {
-	nodeID ids.NodeID
+	nodeID ids.GenericNodeID
 }
 
-func newNodeIDConnector(nodeID ids.NodeID) *nodeIDConnector {
+func newNodeIDConnector(nodeID ids.GenericNodeID) *nodeIDConnector {
 	return &nodeIDConnector{nodeID: nodeID}
 }
 
 func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID, _ bool) bool {
-	return nodeID == f.nodeID
+	return f.nodeID.Equal(ids.GenericNodeIDFromNodeID(nodeID))
 }

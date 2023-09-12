@@ -360,7 +360,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = n.networkNamespace
-	n.Config.NetworkConfig.MyNodeID = n.ID
+	n.Config.NetworkConfig.MyNodeID = ids.GenericNodeIDFromNodeID(n.ID)
 	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs

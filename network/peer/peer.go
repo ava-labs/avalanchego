@@ -630,7 +630,7 @@ func (p *peer) sendNetworkMessages() {
 				)
 			}
 		case <-sendPingsTicker.C:
-			if !p.Network.AllowConnection(p.id) {
+			if !p.Network.AllowConnection(ids.GenericNodeIDFromNodeID(p.id)) {
 				p.Log.Debug("disconnecting from peer",
 					zap.String("reason", "connection is no longer desired"),
 					zap.Stringer("nodeID", p.id),
