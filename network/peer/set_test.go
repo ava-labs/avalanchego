@@ -16,28 +16,25 @@ func TestSet(t *testing.T) {
 	require := require.New(t)
 
 	set := NewSet()
-
-	nodeID1, nodeID2, unknownNodeID, nodeID3, nodeID4 := ids.NodeID{0x01}, ids.NodeID{0x02}, ids.NodeID{0xff}, ids.NodeID{0x03}, ids.NodeID{0x04}
-
 	peer1 := &peer{
-		id:              ids.GenericNodeIDFromNodeID(nodeID1),
+		id:              ids.GenericNodeIDFromNodeID(ids.NodeID{0x01}),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
 	}
 	updatedPeer1 := &peer{
-		id:              ids.GenericNodeIDFromNodeID(nodeID1),
+		id:              ids.GenericNodeIDFromNodeID(ids.NodeID{0x01}),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 1},
 	}
 	peer2 := &peer{
-		id: ids.GenericNodeIDFromNodeID(nodeID2),
+		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x02}),
 	}
 	unknownPeer := &peer{
-		id: ids.GenericNodeIDFromNodeID(unknownNodeID),
+		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0xff}),
 	}
 	peer3 := &peer{
-		id: ids.GenericNodeIDFromNodeID(nodeID3),
+		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x03}),
 	}
 	peer4 := &peer{
-		id: ids.GenericNodeIDFromNodeID(nodeID4),
+		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x04}),
 	}
 
 	// add of first peer is handled
@@ -68,7 +65,7 @@ func TestSet(t *testing.T) {
 	require.Equal(2, set.Len())
 
 	// removal of added peer is handled
-	set.Remove(nodeID1)
+	set.Remove(peer1.id)
 	_, peer1Found = set.GetByID(peer1.id)
 	require.False(peer1Found)
 	retrievedPeer2, peer2Found = set.GetByID(peer2.id)
@@ -81,7 +78,7 @@ func TestSet(t *testing.T) {
 	require.False(unknownPeerfound)
 
 	// removal of unknown peer is handled
-	set.Remove(unknownNodeID)
+	set.Remove(unknownPeer.id)
 	retrievedPeer2, peer2Found = set.GetByID(peer2.id)
 	require.True(peer2Found)
 	require.Equal(peer2.id, retrievedPeer2.ID())

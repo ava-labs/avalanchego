@@ -453,7 +453,7 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 		tracked.stopTracking()
 		delete(n.trackedIPs, shortNodeID)
 	}
-	n.connectingPeers.Remove(shortNodeID)
+	n.connectingPeers.Remove(nodeID)
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
@@ -985,12 +985,14 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	n.connectingPeers.Remove(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+
+	n.connectingPeers.Remove(genericNodeID)
 
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
+		if n.wantsConnection(genericNodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
@@ -1010,10 +1012,11 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	n.connectedPeers.Remove(nodeID)
+	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+	n.connectedPeers.Remove(genericNodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
+	if n.wantsConnection(genericNodeID) {
 		prevIP := n.peerIPs[nodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked

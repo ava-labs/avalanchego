@@ -33,7 +33,7 @@ type Set interface {
 	GetByIndex(index int) (Peer, bool)
 
 	// Remove any [peer] whose [peer.ID] is equal to [nodeID] from the set.
-	Remove(nodeID ids.NodeID)
+	Remove(nodeID ids.GenericNodeID)
 
 	// Len returns the number of peers currently in this set.
 	Len() int
@@ -92,9 +92,8 @@ func (s *peerSet) GetByIndex(index int) (Peer, bool) {
 	return s.peersSlice[index], true
 }
 
-func (s *peerSet) Remove(nodeID ids.NodeID) {
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	index, ok := s.peersMap[genericNodeID]
+func (s *peerSet) Remove(nodeID ids.GenericNodeID) {
+	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return
 	}
@@ -106,7 +105,7 @@ func (s *peerSet) Remove(nodeID ids.NodeID) {
 	s.peersMap[lastPeerID] = index
 	s.peersSlice[index] = lastPeer
 
-	delete(s.peersMap, genericNodeID)
+	delete(s.peersMap, nodeID)
 	s.peersSlice[lastIndex] = nil
 	s.peersSlice = s.peersSlice[:lastIndex]
 }
