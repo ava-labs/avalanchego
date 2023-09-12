@@ -35,7 +35,7 @@ import (
 
 func TestE2E(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "e2e test suites")
+	ginkgo.RunSpecs(t, "e2e test suites", ginkgo.Label("debug"))
 }
 
 var (

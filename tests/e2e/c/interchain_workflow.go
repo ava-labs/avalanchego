@@ -4,6 +4,8 @@
 package c
 
 import (
+	"context"
+	"fmt"
 	"math/big"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -21,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/gdexlab/go-render/render"
 )
 
 var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
@@ -31,7 +34,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		gasLimit = uint64(21000)   // Standard gas limit
 	)
 
-	ginkgo.It("should ensure that funds can be transferred from the C-Chain to the X-Chain and the P-Chain", func() {
+	ginkgo.It("should ensure that funds can be transferred from the C-Chain to the X-Chain and the P-Chain", ginkgo.Label("debug"), func() {
 		ginkgo.By("initializing a new eth client")
 		// Select a random node URI to use for both the eth client and
 		// the wallet to avoid having to verify that all nodes are at
@@ -110,13 +113,19 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			},
 		}
 
+		amt, _ := ethClient.SuggestGasPrice(context.Background())
+		_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] SUGGESTED GAS PRICE: %+v\n", amt)
 		ginkgo.By("exporting AVAX from the C-Chain to the X-Chain", func() {
-			_, err := cWallet.IssueExportTx(
+			exportTx, err := cWallet.IssueExportTx(
 				xWallet.BlockchainID(),
 				exportOutputs,
 				e2e.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX: %+v\n", render.AsCode(exportTx.UnsignedAtomicTx))
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX INPUTS: %+v\n", exportTx.UnsignedAtomicTx.InputUTXOs())
+			gas, _ := exportTx.UnsignedAtomicTx.GasUsed(true)
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX gas: %+v\n", gas)
 			require.NoError(err)
 		})
 
@@ -136,15 +145,21 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			require.NoError(err)
 			require.Positive(balances[avaxAssetID])
 		})
-
+		amt, _ = ethClient.SuggestGasPrice(context.Background())
+		_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] SUGGESTED GAS PRICE: %+v\n", amt)
 		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain", func() {
-			_, err := cWallet.IssueExportTx(
+			exportTx, err := cWallet.IssueExportTx(
 				constants.PlatformChainID,
 				exportOutputs,
 				e2e.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX: %+v\n", render.AsCode(exportTx.UnsignedAtomicTx))
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX INPUTS: %+v\n", exportTx.UnsignedAtomicTx.InputUTXOs())
+			gas, _ := exportTx.UnsignedAtomicTx.GasUsed(true)
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX gas: %+v\n", gas)
 			require.NoError(err)
+
 		})
 
 		ginkgo.By("importing AVAX from the C-Chain to the P-Chain", func() {

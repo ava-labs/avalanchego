@@ -5,8 +5,12 @@ package c
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/gdexlab/go-render/render"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm"
@@ -173,15 +177,18 @@ func (w *wallet) IssueAtomicTx(
 
 	for {
 		status, err := w.avaxClient.GetAtomicTxStatus(ctx, txID)
+		_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG]:STATUS %+v, %+v", status, err)
+
 		if err != nil {
 			return err
 		}
-
+		opOutput := render.AsCode(ops)
 		switch status {
 		case evm.Accepted:
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG]:ACCEPTED ATOMIC TX %+v, %+v", tx, ops)
 			return w.Backend.AcceptAtomicTx(ctx, tx)
 		case evm.Dropped, evm.Unknown:
-			return errNotCommitted
+			return fmt.Errorf("not committed %s, %s, %+v", status, txID, opOutput)
 		}
 
 		// The tx is Processing.
