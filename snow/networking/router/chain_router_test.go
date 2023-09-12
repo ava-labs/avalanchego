@@ -1474,14 +1474,14 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
-	chainRouter.Connected(peerNodeID, version.CurrentApp, constants.PrimaryNetworkID)
+	chainRouter.Connected(genericPeerNodeID, version.CurrentApp, constants.PrimaryNetworkID)
 
 	peerSubnetConnectedMsg0 := handler.Message{
 		InboundMessage: message.InternalConnectedSubnet(peerNodeID, subnetID0),
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
-	chainRouter.Connected(peerNodeID, version.CurrentApp, subnetID0)
+	chainRouter.Connected(genericPeerNodeID, version.CurrentApp, subnetID0)
 
 	myDisconnectedMsg := handler.Message{
 		InboundMessage: message.InternalDisconnected(myNodeID),
@@ -1509,7 +1509,7 @@ func TestConnectedSubnet(t *testing.T) {
 	chainRouter.Unbenched(constants.PlatformChainID, genericPeerNodeID)
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
-	chainRouter.Disconnected(peerNodeID)
+	chainRouter.Disconnected(genericPeerNodeID)
 }
 
 func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {

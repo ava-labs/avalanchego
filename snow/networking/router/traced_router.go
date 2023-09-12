@@ -131,11 +131,11 @@ func (r *tracedRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	r.router.AddChain(ctx, chain)
 }
 
-func (r *tracedRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (r *tracedRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	r.router.Connected(nodeID, nodeVersion, subnetID)
 }
 
-func (r *tracedRouter) Disconnected(nodeID ids.NodeID) {
+func (r *tracedRouter) Disconnected(nodeID ids.GenericNodeID) {
 	r.router.Disconnected(nodeID)
 }
 

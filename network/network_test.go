@@ -240,7 +240,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		config.Beacons = beacons
 		config.Validators = vdrs
 
-		var connected set.Set[ids.NodeID]
+		var connected set.Set[ids.GenericNodeID]
 		net, err := NewNetwork(
 			config,
 			msgCreator,
@@ -250,7 +250,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			dialer,
 			&testHandler{
 				InboundHandler: handlers[i],
-				ConnectedF: func(nodeID ids.NodeID, _ *version.Application, _ ids.ID) {
+				ConnectedF: func(nodeID ids.GenericNodeID, _ *version.Application, _ ids.ID) {
 					t.Logf("%s connected to %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -265,7 +265,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 						close(onAllConnected)
 					}
 				},
-				DisconnectedF: func(nodeID ids.NodeID) {
+				DisconnectedF: func(nodeID ids.GenericNodeID) {
 					t.Logf("%s disconnected from %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -491,7 +491,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			dialer,
 			&testHandler{
 				InboundHandler: nil,
-				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
+				ConnectedF: func(ids.GenericNodeID, *version.Application, ids.ID) {
 					require.FailNow("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,
@@ -584,7 +584,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			dialer,
 			&testHandler{
 				InboundHandler: nil,
-				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
+				ConnectedF: func(ids.GenericNodeID, *version.Application, ids.ID) {
 					require.FailNow("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,

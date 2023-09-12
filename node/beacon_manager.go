@@ -24,17 +24,17 @@ type beaconManager struct {
 	numConns      int64
 }
 
-func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (b *beaconManager) Connected(nodeID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID &&
-		b.beacons.Contains(ids.GenericNodeIDFromNodeID(nodeID)) &&
+		b.beacons.Contains(nodeID) &&
 		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
 		b.timer.Cancel()
 	}
 	b.Router.Connected(nodeID, nodeVersion, subnetID)
 }
 
-func (b *beaconManager) Disconnected(nodeID ids.NodeID) {
-	if b.beacons.Contains(ids.GenericNodeIDFromNodeID(nodeID)) {
+func (b *beaconManager) Disconnected(nodeID ids.GenericNodeID) {
+	if b.beacons.Contains(nodeID) {
 		atomic.AddInt64(&b.numConns, -1)
 	}
 	b.Router.Disconnected(nodeID)

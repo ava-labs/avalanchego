@@ -42,7 +42,7 @@ func (t *testExternalHandler) HandleInbound(_ context.Context, message message.I
 	)
 }
 
-func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Application, subnetID ids.ID) {
+func (t *testExternalHandler) Connected(nodeID ids.GenericNodeID, version *version.Application, subnetID ids.ID) {
 	t.log.Info(
 		"connected",
 		zap.Stringer("nodeID", nodeID),
@@ -51,7 +51,7 @@ func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Appl
 	)
 }
 
-func (t *testExternalHandler) Disconnected(nodeID ids.NodeID) {
+func (t *testExternalHandler) Disconnected(nodeID ids.GenericNodeID) {
 	t.log.Info(
 		"disconnected",
 		zap.Stringer("nodeID", nodeID),

@@ -26,12 +26,12 @@ const numValidators = 5_000
 func TestBeaconManager_DataRace(t *testing.T) {
 	require := require.New(t)
 
-	validatorIDs := make([]ids.NodeID, 0, numValidators)
+	validatorIDs := make([]ids.GenericNodeID, 0, numValidators)
 	validatorSet := validators.NewSet()
 	for i := 0; i < numValidators; i++ {
-		nodeID := ids.GenerateTestNodeID()
+		nodeID := ids.GenerateTestGenericNodeID()
 
-		require.NoError(validatorSet.Add(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.Empty, 1))
+		require.NoError(validatorSet.Add(nodeID, nil, ids.Empty, 1))
 		validatorIDs = append(validatorIDs, nodeID)
 	}
 
@@ -52,7 +52,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	mockRouter.EXPECT().
 		Connected(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(2 * numValidators).
-		Do(func(ids.NodeID, *version.Application, ids.ID) {
+		Do(func(ids.GenericNodeID, *version.Application, ids.ID) {
 			wg.Done()
 		})
 
@@ -73,7 +73,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	mockRouter.EXPECT().
 		Disconnected(gomock.Any()).
 		Times(numValidators).
-		Do(func(ids.NodeID) {
+		Do(func(ids.GenericNodeID) {
 			wg.Done()
 		})
 

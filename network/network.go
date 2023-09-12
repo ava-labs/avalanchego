@@ -414,10 +414,6 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 // Will not be called after [Disconnected] is called with this peer.
 func (n *network) Connected(nodeID ids.GenericNodeID) {
 	n.peersLock.Lock()
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
 		n.peerConfig.Log.Error(
@@ -465,9 +461,9 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(shortNodeID, peerVersion, constants.PrimaryNetworkID)
+	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
 	for subnetID := range peer.TrackedSubnets() {
-		n.router.Connected(shortNodeID, peerVersion, subnetID)
+		n.router.Connected(nodeID, peerVersion, subnetID)
 	}
 }
 
@@ -658,10 +654,6 @@ func (n *network) MarkTracked(peerID ids.GenericNodeID, ips []*p2p.PeerAck) erro
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
 func (n *network) Disconnected(nodeID ids.GenericNodeID) {
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
 	if !n.gossipTracker.StopTrackingPeer(nodeID) {
 		n.peerConfig.Log.Error(
 			"stopped non-existent peer tracker",
@@ -678,7 +670,7 @@ func (n *network) Disconnected(nodeID ids.GenericNodeID) {
 		n.disconnectedFromConnecting(nodeID)
 	}
 	if connected {
-		n.disconnectedFromConnected(peer, shortNodeID)
+		n.disconnectedFromConnected(peer, nodeID)
 	}
 }
 
@@ -993,23 +985,22 @@ func (n *network) disconnectedFromConnecting(nodeID ids.GenericNodeID) {
 	n.metrics.disconnected.Inc()
 }
 
-func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
+func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.GenericNodeID) {
 	n.router.Disconnected(nodeID)
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	n.connectedPeers.Remove(genericNodeID)
+	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.wantsConnection(genericNodeID) {
-		prevIP := n.peerIPs[genericNodeID]
+	if n.wantsConnection(nodeID) {
+		prevIP := n.peerIPs[nodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
-		n.trackedIPs[genericNodeID] = tracked
-		n.dial(n.onCloseCtx, genericNodeID, tracked)
+		n.trackedIPs[nodeID] = tracked
+		n.dial(n.onCloseCtx, nodeID, tracked)
 	} else {
-		delete(n.peerIPs, genericNodeID)
+		delete(n.peerIPs, nodeID)
 	}
 
 	n.metrics.markDisconnected(peer)

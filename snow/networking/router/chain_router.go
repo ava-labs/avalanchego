@@ -447,37 +447,36 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	}
 
 	myself := cr.peers[cr.myNodeID]
-	myNodeID, err := ids.NodeIDFromGenericNodeID(cr.myNodeID)
-	if err != nil {
-		panic(err)
-	}
 	for subnetID := range myself.trackedSubnets {
-		cr.connectedSubnet(myself, myNodeID, subnetID)
+		cr.connectedSubnet(myself, cr.myNodeID, subnetID)
 	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
-func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (cr *ChainRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-
-	connectedPeer, exists := cr.peers[genericNodeID]
+	connectedPeer, exists := cr.peers[nodeID]
 	if !exists {
 		connectedPeer = &peer{
 			version: nodeVersion,
 		}
-		cr.peers[genericNodeID] = connectedPeer
+		cr.peers[nodeID] = connectedPeer
 	}
 	connectedPeer.trackedSubnets.Add(subnetID)
 
 	// If this validator is benched on any chain, treat them as disconnected on all chains
-	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(nodeID)]; benched {
+	if _, benched := cr.benched[nodeID]; benched {
 		return
 	}
 
-	msg := message.InternalConnected(nodeID, nodeVersion)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+
+	msg := message.InternalConnected(shortNodeID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
 	// set, disconnect. we cannot put a subnet-only validator check here since
@@ -506,18 +505,21 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 }
 
 // Disconnected routes an incoming notification that a validator was connected
-func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
+func (cr *ChainRouter) Disconnected(nodeID ids.GenericNodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	peer := cr.peers[genericNodeID]
-	delete(cr.peers, genericNodeID)
-	if _, benched := cr.benched[ids.GenericNodeIDFromNodeID(nodeID)]; benched {
+	peer := cr.peers[nodeID]
+	delete(cr.peers, nodeID)
+	if _, benched := cr.benched[nodeID]; benched {
 		return
 	}
 
-	msg := message.InternalDisconnected(nodeID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	msg := message.InternalDisconnected(shortNodeID)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
 	// set, disconnect. we cannot put a subnet-only validator check here since
@@ -612,7 +614,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, genericNodeID ids.GenericNodeID
 	// We handle this case separately because the node may have been benched on
 	// a subnet that has no chains.
 	for subnetID := range peer.trackedSubnets {
-		cr.connectedSubnet(peer, nodeID, subnetID)
+		cr.connectedSubnet(peer, genericNodeID, subnetID)
 	}
 }
 
@@ -726,7 +728,7 @@ func (cr *ChainRouter) clearRequest(
 // or if the peer is already marked as connected to the subnet.
 // Invariant: should be called after *message.Connected is pushed to the P-chain
 // Invariant: should be called after the P-chain was provided in [AddChain]
-func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
+func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.GenericNodeID, subnetID ids.ID) {
 	// if connected to primary network, we can skip this
 	// because Connected has its own internal message
 	if subnetID == constants.PrimaryNetworkID {
@@ -738,7 +740,11 @@ func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID i
 		return
 	}
 
-	msg := message.InternalConnectedSubnet(nodeID, subnetID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	msg := message.InternalConnectedSubnet(shortNodeID, subnetID)
 	// We only push this message to the P-chain because it is the only chain
 	// that cares about the connectivity of all subnets. Others chains learn
 	// about the connectivity of their own subnet when they receive a

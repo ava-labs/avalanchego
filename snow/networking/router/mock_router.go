@@ -72,7 +72,7 @@ func (mr *MockRouterMockRecorder) Benched(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *MockRouter) Connected(arg0 ids.NodeID, arg1 *version.Application, arg2 ids.ID) {
+func (m *MockRouter) Connected(arg0 ids.GenericNodeID, arg1 *version.Application, arg2 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 }
@@ -84,7 +84,7 @@ func (mr *MockRouterMockRecorder) Connected(arg0, arg1, arg2 interface{}) *gomoc
 }
 
 // Disconnected mocks base method.
-func (m *MockRouter) Disconnected(arg0 ids.NodeID) {
+func (m *MockRouter) Disconnected(arg0 ids.GenericNodeID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Disconnected", arg0)
 }

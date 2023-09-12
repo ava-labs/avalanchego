@@ -17,7 +17,7 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (i *insecureValidatorManager) Connected(vdrID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
 		// Sybil protection is disabled so we don't have a txID that added the
 		// peer as a validator. Because each validator needs a txID associated
@@ -28,16 +28,14 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 		// Add will only error here if the total weight of the set would go over
 		// [math.MaxUint64]. In this case, we will just not mark this new peer
 		// as a validator.
-		generidVdr := ids.GenericNodeIDFromNodeID(vdrID)
-		_ = i.vdrs.Add(generidVdr, nil, dummyTxID, i.weight)
+		_ = i.vdrs.Add(vdrID, nil, dummyTxID, i.weight)
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }
 
-func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
+func (i *insecureValidatorManager) Disconnected(vdrID ids.GenericNodeID) {
 	// RemoveWeight will only error here if there was an error reported during
 	// Add.
-	generidVdr := ids.GenericNodeIDFromNodeID(vdrID)
-	_ = i.vdrs.RemoveWeight(generidVdr, i.weight)
+	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
 	i.Router.Disconnected(vdrID)
 }
