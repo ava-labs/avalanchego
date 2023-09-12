@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	common "github.com/ethereum/go-ethereum/common"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -33,6 +34,20 @@ func NewMockBlockContext(ctrl *gomock.Controller) *MockBlockContext {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockBlockContext) EXPECT() *MockBlockContextMockRecorder {
 	return m.recorder
+}
+
+// GetPredicateResults mocks base method.
+func (m *MockBlockContext) GetPredicateResults(arg0 common.Hash, arg1 common.Address) []byte {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPredicateResults", arg0, arg1)
+	ret0, _ := ret[0].([]byte)
+	return ret0
+}
+
+// GetPredicateResults indicates an expected call of GetPredicateResults.
+func (mr *MockBlockContextMockRecorder) GetPredicateResults(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicateResults", reflect.TypeOf((*MockBlockContext)(nil).GetPredicateResults), arg0, arg1)
 }
 
 // Number mocks base method.

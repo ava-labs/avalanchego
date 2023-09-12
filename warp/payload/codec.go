@@ -4,12 +4,15 @@
 package payload
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var errWrongType = errors.New("wrong payload type")
 
 const codecVersion = 0
 
@@ -23,6 +26,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&AddressedPayload{}),
+		lc.RegisterType(&BlockHashPayload{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {

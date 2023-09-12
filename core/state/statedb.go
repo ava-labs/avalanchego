@@ -109,7 +109,7 @@ type StateDB struct {
 	accessList *accessList
 	// Ordered storage slots to be used in predicate verification as set in the tx access list.
 	// Only set in PrepareAccessList, and un-modified through execution.
-	predicateStorageSlots map[common.Address][]byte
+	predicateStorageSlots map[common.Address][][]byte
 
 	// Transient storage
 	transientStorage transientStorage
@@ -169,7 +169,7 @@ func NewWithSnapshot(root common.Hash, db Database, snap snapshot.Snapshot) (*St
 		logs:                  make(map[common.Hash][]*types.Log),
 		preimages:             make(map[common.Hash][]byte),
 		journal:               newJournal(),
-		predicateStorageSlots: make(map[common.Address][]byte),
+		predicateStorageSlots: make(map[common.Address][][]byte),
 		accessList:            newAccessList(),
 		transientStorage:      newTransientStorage(),
 		hasher:                crypto.NewKeccakState(),
@@ -743,10 +743,14 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 }
 
 // copyPredicateStorageSlots creates a deep copy of the provided predicateStorageSlots map.
-func copyPredicateStorageSlots(predicateStorageSlots map[common.Address][]byte) map[common.Address][]byte {
-	res := make(map[common.Address][]byte, len(predicateStorageSlots))
-	for address, slots := range predicateStorageSlots {
-		res[address] = common.CopyBytes(slots)
+func copyPredicateStorageSlots(predicateStorageSlots map[common.Address][][]byte) map[common.Address][][]byte {
+	res := make(map[common.Address][][]byte, len(predicateStorageSlots))
+	for address, predicates := range predicateStorageSlots {
+		copiedPredicates := make([][]byte, len(predicates))
+		for i, predicate := range predicates {
+			copiedPredicates[i] = common.CopyBytes(predicate)
+		}
+		res[address] = copiedPredicates
 	}
 	return res
 }
@@ -1198,12 +1202,12 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 // During predicate verification, we require that a precompile address is only specififed in the access list
 // once to avoid a situation where we verify multiple predicate and only expose data from the last one.
 func (s *StateDB) preparePredicateStorageSlots(rules params.Rules, list types.AccessList) {
-	s.predicateStorageSlots = make(map[common.Address][]byte)
+	s.predicateStorageSlots = make(map[common.Address][][]byte)
 	for _, el := range list {
 		if !rules.PredicateExists(el.Address) {
 			continue
 		}
-		s.predicateStorageSlots[el.Address] = predicateutils.HashSliceToBytes(el.StorageKeys)
+		s.predicateStorageSlots[el.Address] = append(s.predicateStorageSlots[el.Address], predicateutils.HashSliceToBytes(el.StorageKeys))
 	}
 }
 
@@ -1242,14 +1246,30 @@ func (s *StateDB) SlotInAccessList(addr common.Address, slot common.Hash) (addre
 	return s.accessList.Contains(addr, slot)
 }
 
-// GetPredicateStorageSlots returns the storage slots associated with a given address, and whether or not
-// that address was included in the optional access list of the transaction.
-// The storage slots are returned in the same order as they appeared in the transaction.
-// These are the same storage slots that are used to verify any transaction
-// predicates for transactions with access list addresses that match a precompile address.
-func (s *StateDB) GetPredicateStorageSlots(address common.Address) ([]byte, bool) {
-	storageSlots, exists := s.predicateStorageSlots[address]
-	return storageSlots, exists
+// GetTxHash returns the current tx hash on the StateDB set by SetTxContext.
+func (s *StateDB) GetTxHash() common.Hash {
+	return s.thash
+}
+
+// GetPredicateStorageSlots returns the storage slots associated with the address, index pair.
+// A list of access tuples can be included within transaction types post EIP-2930. The address
+// is declared directly on the access tuple and the index is the i'th occurrence of an access
+// tuple with the specified address.
+//
+// Ex. AccessList[[AddrA, Predicate1], [AddrB, Predicate2], [AddrA, Predicate3]]
+// In this case, the caller could retrieve predicates 1-3 with the following calls:
+// GetPredicateStorageSlots(AddrA, 0) -> Predicate1
+// GetPredicateStorageSlots(AddrB, 0) -> Predicate2
+// GetPredicateStorageSlots(AddrA, 1) -> Predicate3
+func (s *StateDB) GetPredicateStorageSlots(address common.Address, index uint32) ([]byte, bool) {
+	predicates, exists := s.predicateStorageSlots[address]
+	if !exists {
+		return nil, false
+	}
+	if int(index) >= len(predicates) {
+		return nil, false
+	}
+	return predicates[index], true
 }
 
 // convertAccountSet converts a provided account set from address keyed to hash keyed.
@@ -1267,6 +1287,6 @@ func (s *StateDB) convertAccountSet(set map[common.Address]struct{}) map[common.
 }
 
 // SetPredicateStorageSlots sets the predicate storage slots for the given address
-func (s *StateDB) SetPredicateStorageSlots(address common.Address, predicate []byte) {
-	s.predicateStorageSlots[address] = predicate
+func (s *StateDB) SetPredicateStorageSlots(address common.Address, predicates [][]byte) {
+	s.predicateStorageSlots[address] = predicates
 }

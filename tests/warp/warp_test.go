@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		nonce, err := chainBWSClient.NonceAt(ctx, fundedAddress, nil)
 		gomega.Expect(err).Should(gomega.BeNil())
 
-		packedInput, err := warp.PackGetVerifiedWarpMessage()
+		packedInput, err := warp.PackGetVerifiedWarpMessage(0)
 		gomega.Expect(err).Should(gomega.BeNil())
 		tx := predicateutils.NewPredicateTx(
 			chainID,

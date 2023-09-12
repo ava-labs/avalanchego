@@ -4,7 +4,9 @@
 package evm
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,11 +18,15 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/subnet-evm/precompile/results"
+	"github.com/ava-labs/subnet-evm/warp/payload"
+	"github.com/ava-labs/subnet-evm/x/warp"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
@@ -121,6 +127,21 @@ func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *
 			if err := accepter.Accept(acceptCtx, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
 				return err
 			}
+		}
+	}
+
+	// If Warp is enabled, add the block hash as an unsigned message to the warp backend.
+	if rules.IsPrecompileEnabled(warp.ContractAddress) {
+		blockHashPayload, err := payload.NewBlockHashPayload(b.ethBlock.Hash())
+		if err != nil {
+			return fmt.Errorf("failed to create block hash payload: %w", err)
+		}
+		unsignedMessage, err := avalancheWarp.NewUnsignedMessage(b.vm.ctx.NetworkID, b.vm.ctx.ChainID, blockHashPayload.Bytes())
+		if err != nil {
+			return fmt.Errorf("failed to create unsigned message for block hash payload: %w", err)
+		}
+		if err := b.vm.warpBackend.AddMessage(unsignedMessage); err != nil {
+			return fmt.Errorf("failed to add block hash payload unsigned message: %w", err)
 		}
 	}
 
@@ -247,10 +268,37 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 
+	switch {
+	case !rules.IsDUpgrade && rules.PredicatesExist():
+		return errors.New("cannot enable predicates before DUpgrade activation")
+	case !rules.IsDUpgrade:
+		return nil
+	}
+
+	predicateResults := results.NewPredicateResults()
 	for _, tx := range b.ethBlock.Transactions() {
-		if err := core.CheckPredicates(rules, predicateContext, tx); err != nil {
+		results, err := core.CheckPredicates(rules, predicateContext, tx)
+		if err != nil {
 			return err
 		}
+		predicateResults.SetTxPredicateResults(tx.Hash(), results)
+	}
+	// TODO: document required gas constraints to ensure marshalling predicate results does not error
+	predicateResultsBytes, err := predicateResults.Bytes()
+	if err != nil {
+		return fmt.Errorf("failed to marshal predicate results: %w", err)
+	}
+	extraData := b.ethBlock.Extra()
+	if len(extraData) < params.DynamicFeeExtraDataSize {
+		return fmt.Errorf("header extra data too short for predicate verification found: %d, required: %d", len(extraData), params.DynamicFeeExtraDataSize)
+	}
+	headerPredicateResultsBytes := extraData[params.DynamicFeeExtraDataSize:]
+	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
+		parsedResults, err := results.ParsePredicateResults(headerPredicateResultsBytes)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("%w (remote: %x %v local: %x %v)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, parsedResults, predicateResultsBytes, predicateResults)
 	}
 	return nil
 }

@@ -180,7 +180,7 @@ func GetFeeConfigLastChangedAt(stateDB contract.StateDB) *big.Int {
 
 // StoreFeeConfig stores given [feeConfig] and block number in the [blockContext] to the [stateDB].
 // A validation on [feeConfig] is done before storing.
-func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.FeeConfig, blockContext contract.BlockContext) error {
+func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.FeeConfig, blockContext contract.ConfigurationBlockContext) error {
 	if err := feeConfig.Verify(); err != nil {
 		return fmt.Errorf("cannot verify fee config: %w", err)
 	}

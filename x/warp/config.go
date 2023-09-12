@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
-	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	warpValidators "github.com/ava-labs/subnet-evm/warp/validators"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -27,10 +27,10 @@ var (
 
 var (
 	errOverflowSignersGasCost  = errors.New("overflow calculating warp signers gas cost")
-	errNoProposerCtxPredicate  = errors.New("cannot verify warp predicate without proposer context")
 	errInvalidPredicateBytes   = errors.New("cannot unpack predicate bytes")
 	errInvalidWarpMsg          = errors.New("cannot unpack warp message")
 	errInvalidAddressedPayload = errors.New("cannot unpack addressed payload")
+	errInvalidBlockHashPayload = errors.New("cannot unpack block hash payload")
 	errCannotGetNumSigners     = errors.New("cannot fetch num signers from warp message")
 )
 
@@ -73,6 +73,7 @@ func (*Config) Key() string { return ConfigKey }
 
 // Verify tries to verify Config and returns an error accordingly.
 func (c *Config) Verify(precompileconfig.ChainConfig) error {
+	// TODO: return an error if Warp is enabled before DUpgrade
 	if c.QuorumNumerator > params.WarpQuorumDenominator {
 		return fmt.Errorf("cannot specify quorum numerator (%d) > quorum denominator (%d)", c.QuorumNumerator, params.WarpQuorumDenominator)
 	}
@@ -108,17 +109,11 @@ func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, txHash common
 
 // verifyWarpMessage checks that [warpMsg] can be parsed as an addressed payload and verifies the Warp Message Signature
 // within [predicateContext].
-func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.PredicateContext, warpMsg *warp.Message) error {
+func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.PredicateContext, warpMsg *warp.Message) bool {
 	// Use default quorum numerator unless config specifies a non-default option
 	quorumNumerator := params.WarpDefaultQuorumNumerator
 	if c.QuorumNumerator != 0 {
 		quorumNumerator = c.QuorumNumerator
-	}
-
-	// Verify the warp payload can be decoded to the expected type
-	_, err := warpPayload.ParseAddressedPayload(warpMsg.UnsignedMessage.Payload)
-	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidAddressedPayload, err)
 	}
 
 	log.Debug("verifying warp message", "warpMsg", warpMsg, "quorumNum", quorumNumerator, "quorumDenom", params.WarpQuorumDenominator)
@@ -131,10 +126,11 @@ func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.PredicateC
 		quorumNumerator,
 		params.WarpQuorumDenominator,
 	); err != nil {
-		return fmt.Errorf("warp signature verification failed: %w", err)
+		log.Debug("failed to verify warp signature", "msgID", warpMsg.ID(), "err", err)
+		return false
 	}
 
-	return nil
+	return true
 }
 
 // PredicateGas returns the amount of gas necessary to verify the predicate
@@ -176,43 +172,35 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 		return 0, fmt.Errorf("overflow adding signer gas (PrevTotal: %d, VerificationGas: %d)", totalGas, signerGas)
 	}
 
-	// TODO: charge for the Subnet validator set lookup
-	// ctx := context.Background()
-	// subnetID, err := predicateContext.SnowCtx.ValidatorState.GetSubnetID(ctx, warpMessage.SourceChainID)
-	// if err != nil {
-	// 	return 0, fmt.Errorf("failed to look up SubnetID for SourceChainID: %s", warpMessage.SourceChainID)
-	// }
-	// validatorSet, err := predicateContext.SnowCtx.ValidatorState.GetValidatorSet(ctx, predicateContext.ProposerVMBlockCtx.PChainHeight, subnetID)
-	// if err != nil {
-	// 	return 0, fmt.Errorf("failed to look up validator set verifying warp message: %w", err)
-	// }
-	// subnetLookupGasCost, overflow := math.SafeMul(uint64(len(validatorSet)), GasCostPerSourceSubnetValidator)
-	// if overflow {
-	// 	return 0, fmt.Errorf("overflow calculating gas cost for subnet (%s) validator set lookup of size %d", subnetID, len(validatorSet))
-	// }
-	// totalGas, overflow = math.SafeAdd(totalGas, subnetLookupGasCost)
-	// if overflow {
-	// 	return 0, fmt.Errorf("overflow adding subnet lookup gas (PrevTotal: %d, SubnetLookupGas: %d)", totalGas, subnetLookupGasCost)
-	// }
-
 	return totalGas, nil
 }
 
-// VerifyPredicate verifies the predicate represents a valid signed and properly formatted Avalanche Warp Message.
-func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) error {
-	if predicateContext.ProposerVMBlockCtx == nil {
-		return errNoProposerCtxPredicate
+func (c *Config) verifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) bool {
+	if predicateContext == nil || predicateContext.ProposerVMBlockCtx == nil {
+		return false
 	}
-	// Note: PredicateGas should be called before VerifyPredicate, so we should never reach an error case here.
+
 	unpackedPredicateBytes, err := predicateutils.UnpackPredicate(predicateBytes)
 	if err != nil {
-		return err
+		return false
 	}
 
 	// Note: PredicateGas should be called before VerifyPredicate, so we should never reach an error case here.
 	warpMessage, err := warp.ParseMessage(unpackedPredicateBytes)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidWarpMsg, err)
+		return false
 	}
 	return c.verifyWarpMessage(predicateContext, warpMessage)
+}
+
+// VerifyPredicate verifies the predicate represents a valid signed and properly formatted Avalanche Warp Message.
+func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, predicates [][]byte) []byte {
+	resultBitSet := set.NewBits()
+
+	for predicateIndex, predicateBytes := range predicates {
+		if c.verifyPredicate(predicateContext, predicateBytes) {
+			resultBitSet.Add(predicateIndex)
+		}
+	}
+	return resultBitSet.Bytes()
 }

@@ -32,6 +32,14 @@ type Config interface {
 	Verify(ChainConfig) error
 }
 
+// PredicateContext is the context passed in to the Predicater interface to verify
+// a precompile predicate within a specific ProposerVM wrapper.
+type PredicateContext struct {
+	SnowCtx *snow.Context
+	// ProposerVMBlockCtx defines the ProposerVM context the predicate is verified within
+	ProposerVMBlockCtx *block.Context
+}
+
 // Predicater is an optional interface for StatefulPrecompileContracts to implement.
 // If implemented, the predicate will be enforced on every transaction in a block, prior to
 // the block's execution.
@@ -41,17 +49,7 @@ type Config interface {
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
 type Predicater interface {
 	PredicateGas(storageSlots []byte) (uint64, error)
-	VerifyPredicate(predicateContext *PredicateContext, storageSlots []byte) error
-}
-
-// PredicateContext is the context passed in to the Predicater interface to verify
-// a precompile predicate within a specific ProposerVM header.
-// If the block is not verified within a ProposerVM header, then ProposerVMBlockCtx
-// may be nil.
-type PredicateContext struct {
-	SnowCtx *snow.Context
-	// ProposerVMBlockCtx defines the ProposerVM context the predicate is verified within
-	ProposerVMBlockCtx *block.Context
+	VerifyPredicate(predicateContext *PredicateContext, predicates [][]byte) []byte
 }
 
 // SharedMemoryWriter defines an interface to allow a precompile's Accepter to write operations

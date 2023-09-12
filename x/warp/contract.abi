@@ -44,14 +44,56 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      }
+    ],
+    "name": "getVerifiedWarpBlockHash",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "sourceChainID",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "blockHash",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct WarpBlockHash",
+        "name": "warpBlockHash",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bool",
+        "name": "valid",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "index",
+        "type": "uint32"
+      }
+    ],
     "name": "getVerifiedWarpMessage",
     "outputs": [
       {
         "components": [
           {
             "internalType": "bytes32",
-            "name": "originChainID",
+            "name": "sourceChainID",
             "type": "bytes32"
           },
           {
@@ -81,7 +123,7 @@
       },
       {
         "internalType": "bool",
-        "name": "exists",
+        "name": "valid",
         "type": "bool"
       }
     ],

@@ -40,7 +40,7 @@ func ParseAddressedPayload(b []byte) (*AddressedPayload, error) {
 	}
 	payload, ok := unmarshalledPayloadIntf.(*AddressedPayload)
 	if !ok {
-		return nil, fmt.Errorf("failed to parse unexpected type %T as addressed payload", unmarshalledPayloadIntf)
+		return nil, fmt.Errorf("%w: %T", errWrongType, unmarshalledPayloadIntf)
 	}
 	payload.bytes = b
 	return payload, nil
@@ -48,8 +48,8 @@ func ParseAddressedPayload(b []byte) (*AddressedPayload, error) {
 
 // initialize recalculates the result of Bytes().
 func (a *AddressedPayload) initialize() error {
-	aIntf := any(a)
-	bytes, err := c.Marshal(codecVersion, &aIntf)
+	payloadIntf := any(a)
+	bytes, err := c.Marshal(codecVersion, &payloadIntf)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal warp addressed payload: %w", err)
 	}
