@@ -305,20 +305,19 @@ func updateError(err error) error {
 	}
 }
 
-// Returns a key range that covers all keys with the
-// given [prefix].
-// Assumes the Database uses bytes.Compare for key
-// comparison and not a custom comparer.
+// Returns a key range that covers all keys with the given [prefix].
+// Assumes the Database uses bytes.Compare for key comparison and
+// not a custom comparer.
 func prefixBounds(prefix []byte) *pebble.IterOptions {
 	var upperBound []byte
 	for i := len(prefix) - 1; i >= 0; i-- {
-		c := prefix[i]
-		if c < 0xFF {
-			upperBound = make([]byte, i+1)
-			copy(upperBound, prefix)
-			upperBound[i] = c + 1
-			break
+		if prefix[i] == 0xFF {
+			continue
 		}
+		upperBound = make([]byte, i+1)
+		copy(upperBound, prefix)
+		upperBound[i] = prefix[i] + 1
+		break
 	}
 	return &pebble.IterOptions{
 		LowerBound: prefix,
