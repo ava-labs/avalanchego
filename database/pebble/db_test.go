@@ -104,9 +104,9 @@ func TestPrefixBounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.prefix), func(t *testing.T) {
-			itopts := prefixBounds(tt.prefix)
-			require.Equal(tt.expectedLower, itopts.LowerBound)
-			require.Equal(tt.expectedUpper, itopts.UpperBound)
+			bounds := prefixBounds(tt.prefix)
+			require.Equal(tt.expectedLower, bounds.LowerBound)
+			require.Equal(tt.expectedUpper, bounds.UpperBound)
 		})
 	}
 }
