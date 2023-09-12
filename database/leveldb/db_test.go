@@ -23,10 +23,6 @@ func TestInterface(t *testing.T) {
 		defer db.Close()
 
 		test(t, db)
-
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
-		_ = db.Close()
 	}
 }
 
@@ -38,10 +34,6 @@ func FuzzKeyValue(f *testing.F) {
 	defer db.Close()
 
 	database.FuzzKeyValue(f, db)
-
-	// The database may have been closed by the test, so we don't care if it
-	// errors here.
-	_ = db.Close()
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
@@ -52,10 +44,6 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	defer db.Close()
 
 	database.FuzzNewIteratorWithPrefix(f, db)
-
-	// The database may have been closed by the test, so we don't care if it
-	// errors here.
-	_ = db.Close()
 }
 
 func BenchmarkInterface(b *testing.B) {
