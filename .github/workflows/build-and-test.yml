@@ -9,7 +9,7 @@ on:
       - dev
   pull_request:
 
-# Cancel ongoing workflow runs if a new one is started.
+# Cancel ongoing workflow runs if a new one is started
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
