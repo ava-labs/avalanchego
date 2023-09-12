@@ -44,8 +44,8 @@ func TestEthTxGossip(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	importAccepted := make(chan core.NewTxPoolHeadEvent)
-	vm.txPool.SubscribeNewHeadEvent(importAccepted)
+	txPoolNewHeads := make(chan core.NewTxPoolHeadEvent)
+	vm.txPool.SubscribeNewHeadEvent(txPoolNewHeads)
 
 	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(err)
@@ -58,7 +58,7 @@ func TestEthTxGossip(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(blk.Accept(context.Background()))
-	<-importAccepted
+	<-txPoolNewHeads
 
 	// sender for the peer requesting gossip from [vm]
 	ctrl := gomock.NewController(t)
