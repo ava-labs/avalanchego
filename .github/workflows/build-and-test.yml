@@ -27,10 +27,6 @@ jobs:
         if: matrix.os == 'windows-2022'
         run: |
           echo "TIMEOUT=240s" >> $GITHUB_ENV
-      - name: TODO remove this debug step
-        shell: bash  
-        run: |
-          echo "TIMEOUT=${{ env.TIMEOUT }}"
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
