@@ -1211,30 +1211,45 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 		t *testing.T,
 		randSeed int64,
 		prefix []byte,
-		numKeyValues []byte,
+		numKeyValues uint,
 	) {
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
 		// Put a bunch of key-values
-		for i := 0; i < len(numKeyValues); i++ {
+		expected := map[string][]byte{}
+		for i := 0; i < int(numKeyValues); i++ {
 			key := make([]byte, r.Intn(maxKeyLen))
 			_, _ = r.Read(key) // #nosec G404
 
 			value := make([]byte, r.Intn(maxValueLen))
 			_, _ = r.Read(value) // #nosec G404
 
+			if bytes.HasPrefix(key, prefix) {
+				expected[string(key)] = value
+			}
+
 			require.NoError(db.Put(key, value))
 		}
 
 		iter := db.NewIteratorWithPrefix(prefix)
-		defer iter.Release()
 
-		// Iterate over the key-values and assert
-		// all keys have the prefix
+		// Assert the iterator returns the expected key-values.
+		got := map[string][]byte{}
 		for iter.Next() {
-			require.True(bytes.HasPrefix(iter.Key(), prefix))
+			got[string(iter.Key())] = iter.Value()
+			require.NoError(db.Delete(iter.Key()))
 		}
+		require.Equal(expected, got)
+
+		iter.Release()
+
+		// Clear the database for the next fuzz iteration.
+		iter = db.NewIterator()
+		for iter.Next() {
+			require.NoError(db.Delete(iter.Key()))
+		}
+		iter.Release()
 	})
 }
 
