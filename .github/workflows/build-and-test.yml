@@ -28,7 +28,7 @@ jobs:
           echo "TIMEOUT=240s" >> $GITHUB_ENV
       - name: TODO remove this debug step
         run: |
-          echo "TIMEOUT=$TIMEOUT"
+          echo "TIMEOUT=${{ env.TIMEOUT }}"
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
