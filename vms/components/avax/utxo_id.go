@@ -68,12 +68,12 @@ func UTXOIDFromString(s string) (*UTXOID, error) {
 
 	txID, err := ids.FromString(ss[0])
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errFailedDecodingUTXOIDTxID, err)
+		return nil, fmt.Errorf("%w: %w", errFailedDecodingUTXOIDTxID, err)
 	}
 
 	idx, err := strconv.ParseUint(ss[1], 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errFailedDecodingUTXOIDIndex, err)
+		return nil, fmt.Errorf("%w: %w", errFailedDecodingUTXOIDIndex, err)
 	}
 
 	return &UTXOID{

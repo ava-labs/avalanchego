@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 					},
 				},
 			}
-			staticClient := avm.NewStaticClient(e2e.Env.GetRandomNodeURI())
+			staticClient := avm.NewStaticClient(e2e.Env.GetRandomNodeURI().URI)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			resp, err := staticClient.BuildGenesis(ctx, &avmArgs)
 			cancel()
@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			Encoding:      formatting.Hex,
 		}
 
-		staticClient := api.NewStaticClient(e2e.Env.GetRandomNodeURI())
+		staticClient := api.NewStaticClient(e2e.Env.GetRandomNodeURI().URI)
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()

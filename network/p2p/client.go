@@ -23,6 +23,7 @@ var (
 // issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
+	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
@@ -32,12 +33,14 @@ type AppResponseCallback func(
 // CrossChainAppResponse for a CrossChainAppRequest issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type CrossChainAppResponseCallback func(
+	ctx context.Context,
 	chainID ids.ID,
 	responseBytes []byte,
 	err error,
 )
 
 type Client struct {
+	handlerID     uint64
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
@@ -93,8 +96,11 @@ func (c *Client) AppRequest(
 			return err
 		}
 
-		c.router.pendingAppRequests[requestID] = onResponse
-		c.router.requestID++
+		c.router.pendingAppRequests[requestID] = pendingAppRequest{
+			AppResponseCallback: onResponse,
+			metrics:             c.router.handlers[c.handlerID].metrics,
+		}
+		c.router.requestID += 2
 	}
 
 	return nil
@@ -147,14 +153,17 @@ func (c *Client) CrossChainAppRequest(
 	if err := c.sender.SendCrossChainAppRequest(
 		ctx,
 		chainID,
-		c.router.requestID,
+		requestID,
 		c.prefixMessage(appRequestBytes),
 	); err != nil {
 		return err
 	}
 
-	c.router.pendingCrossChainAppRequests[requestID] = onResponse
-	c.router.requestID++
+	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
+		CrossChainAppResponseCallback: onResponse,
+		metrics:                       c.router.handlers[c.handlerID].metrics,
+	}
+	c.router.requestID += 2
 
 	return nil
 }
