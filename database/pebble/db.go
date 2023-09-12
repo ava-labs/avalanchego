@@ -34,7 +34,7 @@ var (
 
 	defaultCacheSize = 512 * units.MiB
 	DefaultConfig    = Config{
-		CacheSize:                   int(defaultCacheSize),
+		CacheSize:                   defaultCacheSize,
 		BytesPerSync:                512 * units.KiB,
 		WALBytesPerSync:             0, // Default to no background syncing.
 		MemTableStopWritesThreshold: 8,
