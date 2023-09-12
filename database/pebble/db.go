@@ -320,7 +320,7 @@ func prefixBounds(prefix []byte) *pebble.IterOptions {
 		break
 	}
 	return &pebble.IterOptions{
-		LowerBound: prefix,
-		UpperBound: upperBound,
+		LowerBound: prefix,     // Note this bound is inclusive.
+		UpperBound: upperBound, // Note this bound is exclusive.
 	}
 }
