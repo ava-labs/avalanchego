@@ -41,7 +41,7 @@ type rawTestPeer struct {
 	config         *Config
 	conn           net.Conn
 	cert           *staking.Certificate
-	nodeID         ids.NodeID
+	nodeID         ids.GenericNodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -74,8 +74,8 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 	require.NoError(err)
 	cert1 := staking.CertificateFromX509(tlsCert1.Leaf)
 
-	nodeID0 := ids.NodeIDFromCert(cert0)
-	nodeID1 := ids.NodeIDFromCert(cert1)
+	nodeID0 := ids.GenericNodeIDFromCert(cert0)
+	nodeID1 := ids.GenericNodeIDFromCert(cert1)
 
 	mc := newMessageCreator(t)
 
@@ -151,19 +151,15 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 
 func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *testPeer) {
 	rawPeer0, rawPeer1 := makeRawTestPeers(t, trackedSubnets)
-
-	genericNodeID0 := ids.GenericNodeIDFromNodeID(rawPeer0.nodeID)
-	genericNodeID1 := ids.GenericNodeIDFromNodeID(rawPeer1.nodeID)
-
 	peer0 := &testPeer{
 		Peer: Start(
 			rawPeer0.config,
 			rawPeer0.conn,
 			rawPeer1.cert,
-			genericNodeID1,
+			rawPeer1.nodeID,
 			NewThrottledMessageQueue(
 				rawPeer0.config.Metrics,
-				genericNodeID1,
+				rawPeer1.nodeID,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -175,10 +171,10 @@ func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *te
 			rawPeer1.config,
 			rawPeer1.conn,
 			rawPeer0.cert,
-			genericNodeID0,
+			rawPeer0.nodeID,
 			NewThrottledMessageQueue(
 				rawPeer1.config.Metrics,
-				genericNodeID0,
+				rawPeer0.nodeID,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -207,18 +203,14 @@ func TestReady(t *testing.T) {
 	require := require.New(t)
 
 	rawPeer0, rawPeer1 := makeRawTestPeers(t, set.Set[ids.ID]{})
-
-	genericNodeID0 := ids.GenericNodeIDFromNodeID(rawPeer0.nodeID)
-	genericNodeID1 := ids.GenericNodeIDFromNodeID(rawPeer1.nodeID)
-
 	peer0 := Start(
 		rawPeer0.config,
 		rawPeer0.conn,
 		rawPeer1.cert,
-		genericNodeID1,
+		rawPeer1.nodeID,
 		NewThrottledMessageQueue(
 			rawPeer0.config.Metrics,
-			genericNodeID1,
+			rawPeer1.nodeID,
 			logging.NoLog{},
 			throttling.NewNoOutboundThrottler(),
 		),
@@ -230,10 +222,10 @@ func TestReady(t *testing.T) {
 		rawPeer1.config,
 		rawPeer1.conn,
 		rawPeer0.cert,
-		genericNodeID0,
+		rawPeer0.nodeID,
 		NewThrottledMessageQueue(
 			rawPeer1.config.Metrics,
-			genericNodeID0,
+			rawPeer0.nodeID,
 			logging.NoLog{},
 			throttling.NewNoOutboundThrottler(),
 		),

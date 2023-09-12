@@ -48,7 +48,7 @@ type Set interface {
 
 	// Info returns information about the requested peers if they are in the
 	// set.
-	Info(nodeIDs []ids.NodeID) []Info
+	Info(nodeIDs []ids.GenericNodeID) []Info
 }
 
 type peerSet struct {
@@ -146,10 +146,10 @@ func (s *peerSet) AllInfo() []Info {
 	return peerInfo
 }
 
-func (s *peerSet) Info(nodeIDs []ids.NodeID) []Info {
+func (s *peerSet) Info(nodeIDs []ids.GenericNodeID) []Info {
 	peerInfo := make([]Info, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
-		if peer, ok := s.GetByID(ids.GenericNodeIDFromNodeID(nodeID)); ok {
+		if peer, ok := s.GetByID(nodeID); ok {
 			peerInfo = append(peerInfo, peer.Info())
 		}
 	}

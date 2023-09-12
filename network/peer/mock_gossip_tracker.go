@@ -38,7 +38,7 @@ func (m *MockGossipTracker) EXPECT() *MockGossipTrackerMockRecorder {
 }
 
 // AddKnown mocks base method.
-func (m *MockGossipTracker) AddKnown(arg0 ids.NodeID, arg1, arg2 []ids.ID) ([]ids.ID, bool) {
+func (m *MockGossipTracker) AddKnown(arg0 ids.GenericNodeID, arg1, arg2 []ids.ID) ([]ids.ID, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddKnown", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]ids.ID)
@@ -67,10 +67,10 @@ func (mr *MockGossipTrackerMockRecorder) AddValidator(arg0 interface{}) *gomock.
 }
 
 // GetNodeID mocks base method.
-func (m *MockGossipTracker) GetNodeID(arg0 ids.ID) (ids.NodeID, bool) {
+func (m *MockGossipTracker) GetNodeID(arg0 ids.ID) (ids.GenericNodeID, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeID", arg0)
-	ret0, _ := ret[0].(ids.NodeID)
+	ret0, _ := ret[0].(ids.GenericNodeID)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -82,7 +82,7 @@ func (mr *MockGossipTrackerMockRecorder) GetNodeID(arg0 interface{}) *gomock.Cal
 }
 
 // GetUnknown mocks base method.
-func (m *MockGossipTracker) GetUnknown(arg0 ids.NodeID) ([]ValidatorID, bool) {
+func (m *MockGossipTracker) GetUnknown(arg0 ids.GenericNodeID) ([]ValidatorID, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUnknown", arg0)
 	ret0, _ := ret[0].([]ValidatorID)
@@ -97,7 +97,7 @@ func (mr *MockGossipTrackerMockRecorder) GetUnknown(arg0 interface{}) *gomock.Ca
 }
 
 // RemoveValidator mocks base method.
-func (m *MockGossipTracker) RemoveValidator(arg0 ids.NodeID) bool {
+func (m *MockGossipTracker) RemoveValidator(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveValidator", arg0)
 	ret0, _ := ret[0].(bool)
@@ -111,7 +111,7 @@ func (mr *MockGossipTrackerMockRecorder) RemoveValidator(arg0 interface{}) *gomo
 }
 
 // ResetValidator mocks base method.
-func (m *MockGossipTracker) ResetValidator(arg0 ids.NodeID) bool {
+func (m *MockGossipTracker) ResetValidator(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResetValidator", arg0)
 	ret0, _ := ret[0].(bool)
@@ -125,7 +125,7 @@ func (mr *MockGossipTrackerMockRecorder) ResetValidator(arg0 interface{}) *gomoc
 }
 
 // StartTrackingPeer mocks base method.
-func (m *MockGossipTracker) StartTrackingPeer(arg0 ids.NodeID) bool {
+func (m *MockGossipTracker) StartTrackingPeer(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StartTrackingPeer", arg0)
 	ret0, _ := ret[0].(bool)
@@ -139,7 +139,7 @@ func (mr *MockGossipTrackerMockRecorder) StartTrackingPeer(arg0 interface{}) *go
 }
 
 // StopTrackingPeer mocks base method.
-func (m *MockGossipTracker) StopTrackingPeer(arg0 ids.NodeID) bool {
+func (m *MockGossipTracker) StopTrackingPeer(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StopTrackingPeer", arg0)
 	ret0, _ := ret[0].(bool)
@@ -153,7 +153,7 @@ func (mr *MockGossipTrackerMockRecorder) StopTrackingPeer(arg0 interface{}) *gom
 }
 
 // Tracked mocks base method.
-func (m *MockGossipTracker) Tracked(arg0 ids.NodeID) bool {
+func (m *MockGossipTracker) Tracked(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Tracked", arg0)
 	ret0, _ := ret[0].(bool)

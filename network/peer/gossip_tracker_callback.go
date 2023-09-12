@@ -24,22 +24,18 @@ type GossipTrackerCallback struct {
 // OnValidatorAdded adds [validatorID] to the set of validators that can be
 // gossiped about
 func (g *GossipTrackerCallback) OnValidatorAdded(
-	genericNodeID ids.GenericNodeID,
+	nodeID ids.GenericNodeID,
 	_ *bls.PublicKey,
 	txID ids.ID,
 	_ uint64,
 ) {
-	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-	if err != nil {
-		panic(err)
-	}
 	vdr := ValidatorID{
 		NodeID: nodeID,
 		TxID:   txID,
 	}
 	if !g.GossipTracker.AddValidator(vdr) {
 		g.Log.Error("failed to add a validator",
-			zap.Stringer("nodeID", &genericNodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("txID", txID),
 		)
 	}
@@ -47,11 +43,7 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 
 // OnValidatorRemoved removes [validatorID] from the set of validators that can
 // be gossiped about.
-func (g *GossipTrackerCallback) OnValidatorRemoved(genericNodeID ids.GenericNodeID, _ uint64) {
-	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-	if err != nil {
-		panic(err)
-	}
+func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
 	if !g.GossipTracker.RemoveValidator(nodeID) {
 		g.Log.Error("failed to remove a validator",
 			zap.Stringer("nodeID", nodeID),

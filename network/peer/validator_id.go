@@ -8,7 +8,7 @@ import "github.com/ava-labs/avalanchego/ids"
 // ValidatorID represents a validator that we gossip to other peers
 type ValidatorID struct {
 	// The validator's ID
-	NodeID ids.NodeID
+	NodeID ids.GenericNodeID
 	// The Tx that added this into the validator set
 	TxID ids.ID
 }

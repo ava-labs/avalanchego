@@ -15,21 +15,21 @@ import (
 
 var (
 	// peers
-	p1 = ids.GenerateTestNodeID()
-	p2 = ids.GenerateTestNodeID()
-	p3 = ids.GenerateTestNodeID()
+	p1 = ids.GenerateTestGenericNodeID()
+	p2 = ids.GenerateTestGenericNodeID()
+	p3 = ids.GenerateTestGenericNodeID()
 
 	// validators
 	v1 = ValidatorID{
-		NodeID: ids.GenerateTestNodeID(),
+		NodeID: ids.GenerateTestGenericNodeID(),
 		TxID:   ids.GenerateTestID(),
 	}
 	v2 = ValidatorID{
-		NodeID: ids.GenerateTestNodeID(),
+		NodeID: ids.GenerateTestGenericNodeID(),
 		TxID:   ids.GenerateTestID(),
 	}
 	v3 = ValidatorID{
-		NodeID: ids.GenerateTestNodeID(),
+		NodeID: ids.GenerateTestGenericNodeID(),
 		TxID:   ids.GenerateTestID(),
 	}
 )
@@ -37,25 +37,25 @@ var (
 func TestGossipTracker_Contains(t *testing.T) {
 	tests := []struct {
 		name     string
-		track    []ids.NodeID
-		contains ids.NodeID
+		track    []ids.GenericNodeID
+		contains ids.GenericNodeID
 		expected bool
 	}{
 		{
 			name:     "empty",
-			track:    []ids.NodeID{},
+			track:    []ids.GenericNodeID{},
 			contains: p1,
 			expected: false,
 		},
 		{
 			name:     "populated - does not contain",
-			track:    []ids.NodeID{p1, p2},
+			track:    []ids.GenericNodeID{p1, p2},
 			contains: p3,
 			expected: false,
 		},
 		{
 			name:     "populated - contains",
-			track:    []ids.NodeID{p1, p2, p3},
+			track:    []ids.GenericNodeID{p1, p2, p3},
 			contains: p3,
 			expected: true,
 		},
@@ -80,19 +80,19 @@ func TestGossipTracker_Contains(t *testing.T) {
 func TestGossipTracker_StartTrackingPeer(t *testing.T) {
 	tests := []struct {
 		name            string
-		toStartTracking []ids.NodeID
+		toStartTracking []ids.GenericNodeID
 		expected        []bool
 	}{
 		{
 			// Tracking new peers always works
 			name:            "unique adds",
-			toStartTracking: []ids.NodeID{p1, p2, p3},
+			toStartTracking: []ids.GenericNodeID{p1, p2, p3},
 			expected:        []bool{true, true, true},
 		},
 		{
 			// We shouldn't be able to track a peer more than once
 			name:            "duplicate adds",
-			toStartTracking: []ids.NodeID{p1, p1, p1},
+			toStartTracking: []ids.GenericNodeID{p1, p1, p1},
 			expected:        []bool{true, false, false},
 		},
 	}
@@ -115,31 +115,31 @@ func TestGossipTracker_StartTrackingPeer(t *testing.T) {
 func TestGossipTracker_StopTrackingPeer(t *testing.T) {
 	tests := []struct {
 		name                  string
-		toStartTracking       []ids.NodeID
+		toStartTracking       []ids.GenericNodeID
 		expectedStartTracking []bool
-		toStopTracking        []ids.NodeID
+		toStopTracking        []ids.GenericNodeID
 		expectedStopTracking  []bool
 	}{
 		{
 			// We should be able to stop tracking that we are tracking
 			name:                 "stop tracking tracked peers",
-			toStartTracking:      []ids.NodeID{p1, p2, p3},
-			toStopTracking:       []ids.NodeID{p1, p2, p3},
+			toStartTracking:      []ids.GenericNodeID{p1, p2, p3},
+			toStopTracking:       []ids.GenericNodeID{p1, p2, p3},
 			expectedStopTracking: []bool{true, true, true},
 		},
 		{
 			// We shouldn't be able to stop tracking peers we've stopped tracking
 			name:                 "stop tracking twice",
-			toStartTracking:      []ids.NodeID{p1},
-			toStopTracking:       []ids.NodeID{p1, p1},
+			toStartTracking:      []ids.GenericNodeID{p1},
+			toStopTracking:       []ids.GenericNodeID{p1, p1},
 			expectedStopTracking: []bool{true, false},
 		},
 		{
 			// We shouldn't be able to stop tracking peers we were never tracking
 			name:                  "remove non-existent elements",
-			toStartTracking:       []ids.NodeID{},
+			toStartTracking:       []ids.GenericNodeID{},
 			expectedStartTracking: []bool{},
-			toStopTracking:        []ids.NodeID{p1, p2, p3},
+			toStopTracking:        []ids.GenericNodeID{p1, p2, p3},
 			expectedStopTracking:  []bool{false, false, false},
 		},
 	}
@@ -184,7 +184,7 @@ func TestGossipTracker_AddValidator(t *testing.T) {
 			name:       "already present txID but with different nodeID",
 			validators: []ValidatorID{v1},
 			args: args{validator: ValidatorID{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestGenericNodeID(),
 				TxID:   v1.TxID,
 			}},
 			expected: false,
@@ -224,7 +224,7 @@ func TestGossipTracker_AddValidator(t *testing.T) {
 
 func TestGossipTracker_RemoveValidator(t *testing.T) {
 	type args struct {
-		id ids.NodeID
+		id ids.GenericNodeID
 	}
 
 	tests := []struct {
@@ -265,7 +265,7 @@ func TestGossipTracker_RemoveValidator(t *testing.T) {
 
 func TestGossipTracker_ResetValidator(t *testing.T) {
 	type args struct {
-		id ids.NodeID
+		id ids.GenericNodeID
 	}
 
 	tests := []struct {
@@ -319,13 +319,13 @@ func TestGossipTracker_ResetValidator(t *testing.T) {
 
 func TestGossipTracker_AddKnown(t *testing.T) {
 	type args struct {
-		peerID ids.NodeID
+		peerID ids.GenericNodeID
 		txIDs  []ids.ID
 	}
 
 	tests := []struct {
 		name          string
-		trackedPeers  []ids.NodeID
+		trackedPeers  []ids.GenericNodeID
 		validators    []ValidatorID
 		args          args
 		expectedTxIDs []ids.ID
@@ -334,7 +334,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 		{
 			// We should not be able to update an untracked peer
 			name:          "untracked peer - empty",
-			trackedPeers:  []ids.NodeID{},
+			trackedPeers:  []ids.GenericNodeID{},
 			validators:    []ValidatorID{},
 			args:          args{peerID: p1, txIDs: []ids.ID{}},
 			expectedTxIDs: nil,
@@ -343,7 +343,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 		{
 			// We should not be able to update an untracked peer
 			name:          "untracked peer - populated",
-			trackedPeers:  []ids.NodeID{p2, p3},
+			trackedPeers:  []ids.GenericNodeID{p2, p3},
 			validators:    []ValidatorID{},
 			args:          args{peerID: p1, txIDs: []ids.ID{}},
 			expectedTxIDs: nil,
@@ -352,7 +352,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 		{
 			// We shouldn't be able to look up a peer that isn't tracked
 			name:          "untracked peer - unknown validator",
-			trackedPeers:  []ids.NodeID{},
+			trackedPeers:  []ids.GenericNodeID{},
 			validators:    []ValidatorID{},
 			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
 			expectedTxIDs: nil,
@@ -361,7 +361,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 		{
 			// We shouldn't fail on a validator that's not registered
 			name:          "tracked peer  - unknown validator",
-			trackedPeers:  []ids.NodeID{p1},
+			trackedPeers:  []ids.GenericNodeID{p1},
 			validators:    []ValidatorID{},
 			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
 			expectedTxIDs: []ids.ID{},
@@ -370,7 +370,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 		{
 			// We should be able to update a tracked validator
 			name:          "update tracked validator",
-			trackedPeers:  []ids.NodeID{p1, p2, p3},
+			trackedPeers:  []ids.GenericNodeID{p1, p2, p3},
 			validators:    []ValidatorID{v1},
 			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
 			expectedTxIDs: []ids.ID{v1.TxID},
@@ -404,8 +404,8 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 func TestGossipTracker_GetUnknown(t *testing.T) {
 	tests := []struct {
 		name            string
-		peerID          ids.NodeID
-		peersToTrack    []ids.NodeID
+		peerID          ids.GenericNodeID
+		peersToTrack    []ids.GenericNodeID
 		validators      []ValidatorID
 		expectedUnknown []ValidatorID
 		expectedOk      bool
@@ -414,14 +414,14 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 			name:            "non tracked peer",
 			peerID:          p1,
 			validators:      []ValidatorID{v2},
-			peersToTrack:    []ids.NodeID{},
+			peersToTrack:    []ids.GenericNodeID{},
 			expectedUnknown: nil,
 			expectedOk:      false,
 		},
 		{
 			name:            "only validators",
 			peerID:          p1,
-			peersToTrack:    []ids.NodeID{p1},
+			peersToTrack:    []ids.GenericNodeID{p1},
 			validators:      []ValidatorID{v2},
 			expectedUnknown: []ValidatorID{v2},
 			expectedOk:      true,
@@ -429,7 +429,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		{
 			name:            "only non-validators",
 			peerID:          p1,
-			peersToTrack:    []ids.NodeID{p1, p2},
+			peersToTrack:    []ids.GenericNodeID{p1, p2},
 			validators:      []ValidatorID{},
 			expectedUnknown: []ValidatorID{},
 			expectedOk:      true,
@@ -437,7 +437,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		{
 			name:            "validators and non-validators",
 			peerID:          p1,
-			peersToTrack:    []ids.NodeID{p1, p3},
+			peersToTrack:    []ids.GenericNodeID{p1, p3},
 			validators:      []ValidatorID{v2},
 			expectedUnknown: []ValidatorID{v2},
 			expectedOk:      true,
@@ -445,7 +445,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		{
 			name:            "same as limit",
 			peerID:          p1,
-			peersToTrack:    []ids.NodeID{p1},
+			peersToTrack:    []ids.GenericNodeID{p1},
 			validators:      []ValidatorID{v2, v3},
 			expectedUnknown: []ValidatorID{v2, v3},
 			expectedOk:      true,
@@ -614,7 +614,7 @@ func TestGossipTracker_Regression_IncorrectTxIDDeletion(t *testing.T) {
 	require.True(g.RemoveValidator(v1.NodeID))
 
 	require.False(g.AddValidator(ValidatorID{
-		NodeID: ids.GenerateTestNodeID(),
+		NodeID: ids.GenerateTestGenericNodeID(),
 		TxID:   v2.TxID,
 	}))
 }

@@ -43,16 +43,16 @@ type GossipTracker interface {
 	// Tracked returns if a peer is being tracked
 	// Returns:
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	Tracked(peerID ids.NodeID) bool
+	Tracked(peerID ids.GenericNodeID) bool
 
 	// StartTrackingPeer starts tracking a peer
 	// Returns:
 	// 	bool: False if [peerID] was already tracked. True otherwise.
-	StartTrackingPeer(peerID ids.NodeID) bool
+	StartTrackingPeer(peerID ids.GenericNodeID) bool
 	// StopTrackingPeer stops tracking a given peer
 	// Returns:
 	// 	bool: False if [peerID] was not tracked. True otherwise.
-	StopTrackingPeer(peerID ids.NodeID) bool
+	StopTrackingPeer(peerID ids.GenericNodeID) bool
 
 	// AddValidator adds a validator that can be gossiped about
 	// 	bool: False if a validator with the same node ID or txID as [validator]
@@ -61,14 +61,14 @@ type GossipTracker interface {
 	// GetNodeID maps a txID into a nodeIDs
 	// 	nodeID: The nodeID that was registered by [txID]
 	// 	bool: False if [validator] was not present. True otherwise.
-	GetNodeID(txID ids.ID) (ids.NodeID, bool)
+	GetNodeID(txID ids.ID) (ids.GenericNodeID, bool)
 	// RemoveValidator removes a validator that can be gossiped about
 	// 	bool: False if [validator] was already not present. True otherwise.
-	RemoveValidator(validatorID ids.NodeID) bool
+	RemoveValidator(validatorID ids.GenericNodeID) bool
 	// ResetValidator resets known gossip status of [validatorID] to unknown
 	// for all peers
 	// 	bool: False if [validator] was not present. True otherwise.
-	ResetValidator(validatorID ids.NodeID) bool
+	ResetValidator(validatorID ids.GenericNodeID) bool
 
 	// AddKnown adds [knownTxIDs] to the txIDs known by [peerID] and filters
 	// [txIDs] for non-validators.
@@ -76,7 +76,7 @@ type GossipTracker interface {
 	// 	txIDs: The txIDs in [txIDs] that are currently validators.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
 	AddKnown(
-		peerID ids.NodeID,
+		peerID ids.GenericNodeID,
 		knownTxIDs []ids.ID,
 		txIDs []ids.ID,
 	) ([]ids.ID, bool)
@@ -84,20 +84,20 @@ type GossipTracker interface {
 	// Returns:
 	// 	[]ValidatorID: a slice of ValidatorIDs that [peerID] doesn't know about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool)
+	GetUnknown(peerID ids.GenericNodeID) ([]ValidatorID, bool)
 }
 
 type gossipTracker struct {
 	lock sync.RWMutex
 	// a mapping of txIDs => the validator added to the validiator set by that
 	// tx.
-	txIDsToNodeIDs map[ids.ID]ids.NodeID
+	txIDsToNodeIDs map[ids.ID]ids.GenericNodeID
 	// a mapping of validators => the index they occupy in the bitsets
-	nodeIDsToIndices map[ids.NodeID]int
+	nodeIDsToIndices map[ids.GenericNodeID]int
 	// each validator in the index it occupies in the bitset
 	validatorIDs []ValidatorID
 	// a mapping of each peer => the validators they know about
-	trackedPeers map[ids.NodeID]set.Bits
+	trackedPeers map[ids.GenericNodeID]set.Bits
 
 	metrics gossipTrackerMetrics
 }
@@ -113,14 +113,14 @@ func NewGossipTracker(
 	}
 
 	return &gossipTracker{
-		txIDsToNodeIDs:   make(map[ids.ID]ids.NodeID),
-		nodeIDsToIndices: make(map[ids.NodeID]int),
-		trackedPeers:     make(map[ids.NodeID]set.Bits),
+		txIDsToNodeIDs:   make(map[ids.ID]ids.GenericNodeID),
+		nodeIDsToIndices: make(map[ids.GenericNodeID]int),
+		trackedPeers:     make(map[ids.GenericNodeID]set.Bits),
 		metrics:          m,
 	}, nil
 }
 
-func (g *gossipTracker) Tracked(peerID ids.NodeID) bool {
+func (g *gossipTracker) Tracked(peerID ids.GenericNodeID) bool {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -128,7 +128,7 @@ func (g *gossipTracker) Tracked(peerID ids.NodeID) bool {
 	return ok
 }
 
-func (g *gossipTracker) StartTrackingPeer(peerID ids.NodeID) bool {
+func (g *gossipTracker) StartTrackingPeer(peerID ids.GenericNodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -147,7 +147,7 @@ func (g *gossipTracker) StartTrackingPeer(peerID ids.NodeID) bool {
 	return true
 }
 
-func (g *gossipTracker) StopTrackingPeer(peerID ids.NodeID) bool {
+func (g *gossipTracker) StopTrackingPeer(peerID ids.GenericNodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -187,7 +187,7 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 	return true
 }
 
-func (g *gossipTracker) GetNodeID(txID ids.ID) (ids.NodeID, bool) {
+func (g *gossipTracker) GetNodeID(txID ids.ID) (ids.GenericNodeID, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -195,7 +195,7 @@ func (g *gossipTracker) GetNodeID(txID ids.ID) (ids.NodeID, bool) {
 	return nodeID, ok
 }
 
-func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
+func (g *gossipTracker) RemoveValidator(validatorID ids.GenericNodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -242,7 +242,7 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	return true
 }
 
-func (g *gossipTracker) ResetValidator(validatorID ids.NodeID) bool {
+func (g *gossipTracker) ResetValidator(validatorID ids.GenericNodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -264,7 +264,7 @@ func (g *gossipTracker) ResetValidator(validatorID ids.NodeID) bool {
 //  1. [peerID] SHOULD only be a nodeID that has been tracked with
 //     StartTrackingPeer().
 func (g *gossipTracker) AddKnown(
-	peerID ids.NodeID,
+	peerID ids.GenericNodeID,
 	knownTxIDs []ids.ID,
 	txIDs []ids.ID,
 ) ([]ids.ID, bool) {
@@ -299,7 +299,7 @@ func (g *gossipTracker) AddKnown(
 	return validatorTxIDs, true
 }
 
-func (g *gossipTracker) GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool) {
+func (g *gossipTracker) GetUnknown(peerID ids.GenericNodeID) ([]ValidatorID, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 

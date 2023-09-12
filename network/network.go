@@ -445,7 +445,7 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 			n.peerConfig.Log.Debug("resetting gossip due to ip change",
 				zap.Stringer("nodeID", nodeID),
 			)
-			_ = n.gossipTracker.ResetValidator(shortNodeID)
+			_ = n.gossipTracker.ResetValidator(nodeID)
 		}
 	}
 
@@ -555,7 +555,7 @@ func (n *network) Track(peerID ids.GenericNodeID, claimedIPPorts []*ips.ClaimedI
 			n.peerConfig.Log.Debug("resetting gossip due to ip change",
 				zap.Stringer("nodeID", nodeID),
 			)
-			_ = n.gossipTracker.ResetValidator(nodeID)
+			_ = n.gossipTracker.ResetValidator(ids.GenericNodeIDFromNodeID(nodeID))
 
 			// We should update any existing outbound connection attempts.
 			if isTracked {
@@ -587,11 +587,7 @@ func (n *network) Track(peerID ids.GenericNodeID, claimedIPPorts []*ips.ClaimedI
 	}
 
 	txIDsToAck := maps.Keys(newestTimestamp)
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
-	if err != nil {
-		panic(err)
-	}
-	txIDsToAck, ok := n.gossipTracker.AddKnown(shortNodeID, txIDsWithUpToDateIP, txIDsToAck)
+	txIDsToAck, ok := n.gossipTracker.AddKnown(peerID, txIDsWithUpToDateIP, txIDsToAck)
 	if !ok {
 		n.peerConfig.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", peerID),
@@ -637,17 +633,17 @@ func (n *network) MarkTracked(peerID ids.GenericNodeID, ips []*p2p.PeerAck) erro
 		// have updated the IP since I sent the PeerList message this is in
 		// response to. That means that I should re-gossip this node's IP to the
 		// peer.
-		myIP, previouslyTracked := n.peerIPs[nodeID]
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+		if err != nil {
+			panic(err)
+		}
+		myIP, previouslyTracked := n.peerIPs[shortNodeID]
 		if previouslyTracked && myIP.Timestamp <= ip.Timestamp {
 			txIDs = append(txIDs, txID)
 		}
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
-	if err != nil {
-		panic(err)
-	}
-	if _, ok := n.gossipTracker.AddKnown(shortNodeID, txIDs, nil); !ok {
+	if _, ok := n.gossipTracker.AddKnown(peerID, txIDs, nil); !ok {
 		n.peerConfig.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", peerID),
 		)
@@ -665,7 +661,7 @@ func (n *network) Disconnected(nodeID ids.GenericNodeID) {
 	if err != nil {
 		panic(err)
 	}
-	if !n.gossipTracker.StopTrackingPeer(shortNodeID) {
+	if !n.gossipTracker.StopTrackingPeer(nodeID) {
 		n.peerConfig.Log.Error(
 			"stopped non-existent peer tracker",
 			zap.Stringer("nodeID", nodeID),
@@ -687,11 +683,7 @@ func (n *network) Disconnected(nodeID ids.GenericNodeID) {
 
 func (n *network) Peers(peerID ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
 	// Only select validators that we haven't already sent to this peer
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
-	if err != nil {
-		panic(err)
-	}
-	unknownValidators, ok := n.gossipTracker.GetUnknown(shortNodeID)
+	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID)
 	if !ok {
 		n.peerConfig.Log.Debug(
 			"unable to find peer to gossip to",
@@ -715,8 +707,12 @@ func (n *network) Peers(peerID ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
 
 		validator := unknownValidators[drawn]
 		n.peersLock.RLock()
-		_, isConnected := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(validator.NodeID))
-		peerIP := n.peerIPs[validator.NodeID]
+		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(validator.NodeID)
+		if err != nil {
+			panic(err)
+		}
+		peerIP := n.peerIPs[shortNodeID]
 		n.peersLock.RUnlock()
 		if !isConnected {
 			n.peerConfig.Log.Verbo(
@@ -1297,11 +1293,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		zap.Stringer("nodeID", nodeID),
 	)
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
-	if !n.gossipTracker.StartTrackingPeer(shortNodeID) {
+	if !n.gossipTracker.StartTrackingPeer(nodeID) {
 		n.peerConfig.Log.Error(
 			"started duplicate peer tracker",
 			zap.Stringer("nodeID", nodeID),
@@ -1335,7 +1327,13 @@ func (n *network) PeerInfo(nodeIDs []ids.NodeID) []peer.Info {
 	if len(nodeIDs) == 0 {
 		return n.connectedPeers.AllInfo()
 	}
-	return n.connectedPeers.Info(nodeIDs)
+
+	genericNodeIDs := make([]ids.GenericNodeID, len(nodeIDs))
+	for idx, shortNodeID := range nodeIDs {
+		genericNodeIDs[idx] = ids.GenericNodeIDFromNodeID(shortNodeID)
+	}
+
+	return n.connectedPeers.Info(genericNodeIDs)
 }
 
 func (n *network) StartClose() {
