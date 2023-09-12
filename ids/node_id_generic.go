@@ -5,7 +5,6 @@ package ids
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -14,22 +13,15 @@ import (
 )
 
 var (
-	EmptyGenericNodeID = GenericNodeID{
-		id: string(EmptyNodeID[:]),
-	}
+	EmptyGenericNodeID = GenericNodeID(string(EmptyNodeID[:]))
 
 	_ utils.Sortable[GenericNodeID] = (*GenericNodeID)(nil)
 )
 
-type GenericNodeID struct {
-	// id is a string (instead of a []byte) to make GenericNodeID comparable
-	id string // TODO ABENGIA: consider exporting for serialization
-}
+type GenericNodeID string
 
 func GenericNodeIDFromBytes(bytes []byte) GenericNodeID {
-	return GenericNodeID{
-		id: string(bytes),
-	}
+	return GenericNodeID(string(bytes))
 }
 
 // GenericNodeIDFromNodeID attempt to convert a byte slice into a node id
@@ -37,33 +29,30 @@ func GenericNodeIDFromNodeID(nodeID NodeID) GenericNodeID {
 	if nodeID == EmptyNodeID {
 		return EmptyGenericNodeID
 	}
-	return GenericNodeID{
-		id: strings.Clone(string(nodeID.Bytes())),
-	}
+	return GenericNodeID(string(nodeID.Bytes()))
 }
 
 // GenericNodeIDFromString is the inverse of GenericNodeID.String()
 func GenericNodeIDFromString(nodeIDStr string) (GenericNodeID, error) {
 	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
 	if err != nil {
-		return GenericNodeID{}, err
+		return EmptyGenericNodeID, err
 	}
-	return GenericNodeID{id: string(asShort.Bytes())}, nil
+	return GenericNodeID(string(asShort.Bytes())), nil
 }
 
-func (nodeID *GenericNodeID) Bytes() []byte {
-	res := strings.Clone(nodeID.id)
-	return []byte(res)
+func (nodeID GenericNodeID) Bytes() []byte {
+	return []byte(nodeID)
 }
 
-func (nodeID *GenericNodeID) String() string {
+func (nodeID GenericNodeID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := cb58.Encode([]byte(nodeID.id))
+	str, _ := cb58.Encode([]byte(nodeID))
 	return NodeIDPrefix + str
 }
 
-func (nodeID *GenericNodeID) MarshalJSON() ([]byte, error) {
+func (nodeID GenericNodeID) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + nodeID.String() + "\""), nil
 }
 
@@ -86,7 +75,7 @@ func (nodeID *GenericNodeID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func (nodeID *GenericNodeID) MarshalText() ([]byte, error) {
+func (nodeID GenericNodeID) MarshalText() ([]byte, error) {
 	return []byte(nodeID.String()), nil
 }
 
@@ -94,17 +83,17 @@ func (nodeID *GenericNodeID) UnmarshalText(text []byte) error {
 	return nodeID.UnmarshalJSON(text)
 }
 
-func (nodeID *GenericNodeID) Less(other GenericNodeID) bool {
-	return nodeID.id < other.id
+func (nodeID GenericNodeID) Less(other GenericNodeID) bool {
+	return nodeID < other
 }
 
-func (nodeID *GenericNodeID) Equal(other GenericNodeID) bool {
-	return nodeID.id == other.id
+func (nodeID GenericNodeID) Equal(other GenericNodeID) bool {
+	return nodeID == other
 }
 
 func GenericNodeIDFromCert(cert *staking.Certificate) GenericNodeID {
 	bytes := hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
-	return GenericNodeID{id: string(bytes[:])}
+	return GenericNodeID(string(bytes[:]))
 }
