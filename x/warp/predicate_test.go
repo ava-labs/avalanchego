@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -250,6 +251,72 @@ func TestWarpNilProposerCtx(t *testing.T) {
 		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
 		GasErr:       nil,
 		PredicateRes: set.NewBits().Bytes(),
+	}
+
+	test.Run(t)
+}
+
+func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
+	require := require.New(t)
+	numKeys := 10
+	cChainID := ids.GenerateTestID()
+	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, cChainID, []byte{1, 2, 3})
+	require.NoError(err)
+
+	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+	blsSignatures := make([]*bls.Signature, 0, numKeys)
+	for i := 0; i < numKeys; i++ {
+		validatorOutput := &validators.GetValidatorOutput{
+			NodeID:    testVdrs[i].nodeID,
+			Weight:    20,
+			PublicKey: testVdrs[i].vdr.PublicKey,
+		}
+		getValidatorsOutput[testVdrs[i].nodeID] = validatorOutput
+		blsSignatures = append(blsSignatures, bls.Sign(testVdrs[i].sk, unsignedMsg.Bytes()))
+	}
+	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
+	require.NoError(err)
+	bitSet := set.NewBits()
+	for i := 0; i < numKeys; i++ {
+		bitSet.Add(i)
+	}
+	warpSignature := &avalancheWarp.BitSetSignature{
+		Signers: bitSet.Bytes(),
+	}
+	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
+	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
+	require.NoError(err)
+
+	predicateBytes := predicateutils.PackPredicate(warpMsg.Bytes())
+
+	snowCtx := snow.DefaultContextTest()
+	snowCtx.SubnetID = ids.GenerateTestID()
+	snowCtx.ChainID = ids.GenerateTestID()
+	snowCtx.CChainID = cChainID
+	snowCtx.NetworkID = networkID
+	snowCtx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+			require.Equal(chainID, cChainID)
+			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
+		},
+		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			require.Equal(snowCtx.SubnetID, subnetID)
+			return getValidatorsOutput, nil
+		},
+	}
+
+	test := testutils.PredicateTest{
+		Config: NewDefaultConfig(subnetEVMUtils.NewUint64(0)),
+		PredicateContext: &precompileconfig.PredicateContext{
+			SnowCtx: snowCtx,
+			ProposerVMBlockCtx: &block.Context{
+				PChainHeight: 1,
+			},
+		},
+		StorageSlots: [][]byte{predicateBytes},
+		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
+		GasErr:       nil,
+		PredicateRes: set.NewBits(0).Bytes(),
 	}
 
 	test.Run(t)
