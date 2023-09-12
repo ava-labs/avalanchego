@@ -1100,7 +1100,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, shortNodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1111,8 +1111,6 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 
 		prevHeight = parsedHeight
-		nodeID := ids.GenericNodeIDFromNodeID(shortNodeID)
-
 		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
 		if err != nil {
 			return err
@@ -1223,7 +1221,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		_, parsedHeight, shortNodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1233,7 +1231,6 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			break
 		}
 
-		nodeID := ids.GenericNodeIDFromNodeID(shortNodeID)
 		vdr, ok := validators[nodeID]
 		if !ok {
 			continue

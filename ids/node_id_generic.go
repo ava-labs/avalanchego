@@ -26,6 +26,12 @@ type GenericNodeID struct {
 	id string // TODO ABENGIA: consider exporting for serialization
 }
 
+func GenericNodeIDFromBytes(bytes []byte) GenericNodeID {
+	return GenericNodeID{
+		id: string(bytes),
+	}
+}
+
 // GenericNodeIDFromNodeID attempt to convert a byte slice into a node id
 func GenericNodeIDFromNodeID(nodeID NodeID) GenericNodeID {
 	if nodeID == EmptyNodeID {
@@ -43,11 +49,6 @@ func GenericNodeIDFromString(nodeIDStr string) (GenericNodeID, error) {
 		return GenericNodeID{}, err
 	}
 	return GenericNodeID{id: string(asShort.Bytes())}, nil
-}
-
-// WritableGenericNode is an helper which helps modifiying GenericNodeID content
-func WritableGenericNode(nodeID GenericNodeID) []byte {
-	return []byte(nodeID.id)
 }
 
 func (nodeID *GenericNodeID) Bytes() []byte {

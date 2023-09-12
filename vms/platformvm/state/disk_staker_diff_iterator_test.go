@@ -45,7 +45,7 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 			return
 		}
 
-		formattedKey := marshalDiffKey(subnetID, height, ids.GenericNodeIDFromNodeID(nodeID))
+		formattedKey := marshalDiffKey(subnetID, height, nodeID)
 		require.Equal(key, formattedKey)
 	})
 }

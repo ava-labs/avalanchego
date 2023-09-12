@@ -47,17 +47,17 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.GenericNodeID) []
 	return key
 }
 
-func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
+func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.GenericNodeID, error) {
 	if len(key) != diffKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+		return ids.Empty, 0, ids.EmptyGenericNodeID, errUnexpectedDiffKeyLength
 	}
 	var (
 		subnetID ids.ID
-		nodeID   ids.NodeID
+		nodeID   = ids.EmptyGenericNodeID
 	)
 	copy(ids.Writable(&subnetID), key)
 	height := unpackIterableHeight(key[ids.IDLen:])
-	copy(ids.WritableNode(&nodeID), key[diffKeyNodeIDOffset:])
+	nodeID = ids.GenericNodeIDFromBytes(key[diffKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
 }
 
