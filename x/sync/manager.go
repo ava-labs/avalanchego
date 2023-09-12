@@ -548,6 +548,8 @@ func (m *Manager) Wait(ctx context.Context) error {
 		// This should never happen.
 		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
 	}
+
+	m.config.Log.Info("completed", zap.Stringer("root", root))
 	return nil
 }
 
