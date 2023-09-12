@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/gdexlab/go-render/render"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-	"github.com/gdexlab/go-render/render"
 )
 
 var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
@@ -159,7 +159,6 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			gas, _ := exportTx.UnsignedAtomicTx.GasUsed(true)
 			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX gas: %+v\n", gas)
 			require.NoError(err)
-
 		})
 
 		ginkgo.By("importing AVAX from the C-Chain to the P-Chain", func() {

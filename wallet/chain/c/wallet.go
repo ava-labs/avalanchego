@@ -4,7 +4,6 @@
 package c
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -22,11 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var (
-	_ Wallet = (*wallet)(nil)
+var _ Wallet = (*wallet)(nil)
 
-	errNotCommitted = errors.New("not committed")
-)
+// errNotCommitted = errors.New("not committed")
 
 type Wallet interface {
 	Context
