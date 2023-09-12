@@ -97,7 +97,7 @@ func TestShutdown(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(chainCtx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(chainCtx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -235,7 +235,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -390,7 +390,7 @@ func TestRouterTimeout(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -861,7 +861,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -1135,7 +1135,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	ctx := snow.DefaultConsensusContextTest()
-	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
+	sb := subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vID), nil, ids.Empty, 1))
@@ -1307,7 +1307,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(requester.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(requester.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -1326,7 +1326,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(responder.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(responder.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -1553,9 +1553,10 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	ctx := snow.DefaultConsensusContextTest()
-	allowedID := ids.GenerateTestNodeID()
-	allowedSet := set.Of(allowedID)
-	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
+	shortAllowedID := ids.GenerateTestNodeID()
+	genericAllowedID := ids.GenericNodeIDFromNodeID(shortAllowedID)
+	allowedSet := set.Of(genericAllowedID)
+	sb := subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
@@ -1651,7 +1652,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
-		allowedID,
+		shortAllowedID,
 		engineType,
 	)
 	wg.Add(1)

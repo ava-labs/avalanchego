@@ -90,12 +90,12 @@ type Network interface {
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
-	ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort)
+	ManuallyTrack(nodeID ids.GenericNodeID, ip ips.IPPort)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
 	// info about all peers that have finished the handshake. Otherwise, returns
 	// info about the peers in [nodeIDs] that have finished the handshake.
-	PeerInfo(nodeIDs []ids.NodeID) []peer.Info
+	PeerInfo(nodeIDs []ids.GenericNodeID) []peer.Info
 
 	// NodeUptime returns given node's [subnetID] UptimeResults in the view of
 	// this node's peer validators.
@@ -152,12 +152,12 @@ type network struct {
 	// currently connected or attempting to connect to.
 	// Note: The txID provided inside of a claimed IP is not verified and should
 	//       not be accessed from this map.
-	peerIPs map[ids.NodeID]*ips.ClaimedIPPort
+	peerIPs map[ids.GenericNodeID]*ips.ClaimedIPPort
 	// trackedIPs contains the set of IPs that we are currently attempting to
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
-	trackedIPs         map[ids.NodeID]*trackedIP
+	trackedIPs         map[ids.GenericNodeID]*trackedIP
 	manuallyTrackedIDs set.Set[ids.GenericNodeID]
 	connectingPeers    peer.Set
 	connectedPeers     peer.Set
@@ -295,8 +295,8 @@ func NewNetwork(
 			time.Now(),
 		)),
 
-		peerIPs:         make(map[ids.NodeID]*ips.ClaimedIPPort),
-		trackedIPs:      make(map[ids.NodeID]*trackedIP),
+		peerIPs:         make(map[ids.GenericNodeID]*ips.ClaimedIPPort),
+		trackedIPs:      make(map[ids.GenericNodeID]*trackedIP),
 		gossipTracker:   config.GossipTracker,
 		connectingPeers: peer.NewSet(),
 		connectedPeers:  peer.NewSet(),
@@ -307,7 +307,12 @@ func NewNetwork(
 }
 
 func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID] {
-	peers := n.getPeers(nodeIDs, subnetID, allower)
+	genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+	for _, shortNodeID := range nodeIDs.List() {
+		genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(shortNodeID))
+	}
+
+	peers := n.getPeers(genericNodeIDs, subnetID, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
 		msg.Op(),
 		nodeIDs.Len()-len(peers),
@@ -430,15 +435,15 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 		Timestamp: peerIP.Timestamp,
 		Signature: peerIP.Signature,
 	}
-	prevIP, ok := n.peerIPs[shortNodeID]
+	prevIP, ok := n.peerIPs[nodeID]
 	if !ok {
 		// If the IP wasn't previously tracked, then we never could have
 		// gossiped it. This means we don't need to reset the validator's
 		// tracked set.
-		n.peerIPs[shortNodeID] = newIP
+		n.peerIPs[nodeID] = newIP
 	} else if prevIP.Timestamp < newIP.Timestamp {
 		// The previous IP was stale, so we should gossip the newer IP.
-		n.peerIPs[shortNodeID] = newIP
+		n.peerIPs[nodeID] = newIP
 
 		if !prevIP.IPPort.Equal(newIP.IPPort) {
 			// This IP is actually different, so we should gossip it.
@@ -449,9 +454,9 @@ func (n *network) Connected(nodeID ids.GenericNodeID) {
 		}
 	}
 
-	if tracked, ok := n.trackedIPs[shortNodeID]; ok {
+	if tracked, ok := n.trackedIPs[nodeID]; ok {
 		tracked.stopTracking()
-		delete(n.trackedIPs, shortNodeID)
+		delete(n.trackedIPs, nodeID)
 	}
 	n.connectingPeers.Remove(nodeID)
 	n.connectedPeers.Add(peer)
@@ -555,7 +560,7 @@ func (n *network) Track(peerID ids.GenericNodeID, claimedIPPorts []*ips.ClaimedI
 			n.peerConfig.Log.Debug("resetting gossip due to ip change",
 				zap.Stringer("nodeID", nodeID),
 			)
-			_ = n.gossipTracker.ResetValidator(ids.GenericNodeIDFromNodeID(nodeID))
+			_ = n.gossipTracker.ResetValidator(nodeID)
 
 			// We should update any existing outbound connection attempts.
 			if isTracked {
@@ -633,11 +638,7 @@ func (n *network) MarkTracked(peerID ids.GenericNodeID, ips []*p2p.PeerAck) erro
 		// have updated the IP since I sent the PeerList message this is in
 		// response to. That means that I should re-gossip this node's IP to the
 		// peer.
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-		if err != nil {
-			panic(err)
-		}
-		myIP, previouslyTracked := n.peerIPs[shortNodeID]
+		myIP, previouslyTracked := n.peerIPs[nodeID]
 		if previouslyTracked && myIP.Timestamp <= ip.Timestamp {
 			txIDs = append(txIDs, txID)
 		}
@@ -674,7 +675,7 @@ func (n *network) Disconnected(nodeID ids.GenericNodeID) {
 	n.peersLock.RUnlock()
 
 	if connecting {
-		n.disconnectedFromConnecting(shortNodeID)
+		n.disconnectedFromConnecting(nodeID)
 	}
 	if connected {
 		n.disconnectedFromConnected(peer, shortNodeID)
@@ -708,11 +709,7 @@ func (n *network) Peers(peerID ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
 		validator := unknownValidators[drawn]
 		n.peersLock.RLock()
 		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(validator.NodeID)
-		if err != nil {
-			panic(err)
-		}
-		peerIP := n.peerIPs[shortNodeID]
+		peerIP := n.peerIPs[validator.NodeID]
 		n.peersLock.RUnlock()
 		if !isConnected {
 			n.peerConfig.Log.Verbo(
@@ -827,13 +824,13 @@ func (n *network) wantsConnection(nodeID ids.GenericNodeID) bool {
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
-func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
+func (n *network) ManuallyTrack(nodeID ids.GenericNodeID, ip ips.IPPort) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	n.manuallyTrackedIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+	n.manuallyTrackedIDs.Add(nodeID)
 
-	_, connected := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(nodeID))
+	_, connected := n.connectedPeers.GetByID(nodeID)
 	if connected {
 		// If I'm currently connected to [nodeID] then they will have told me
 		// how to connect to them in the future, and I don't need to attempt to
@@ -858,7 +855,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 //   - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
 //     validators in [subnetID].
 func (n *network) getPeers(
-	nodeIDs set.Set[ids.NodeID],
+	nodeIDs set.Set[ids.GenericNodeID],
 	subnetID ids.ID,
 	allower subnets.Allower,
 ) []peer.Peer {
@@ -868,7 +865,7 @@ func (n *network) getPeers(
 	defer n.peersLock.RUnlock()
 
 	for nodeID := range nodeIDs {
-		peer, ok := n.connectedPeers.GetByID(ids.GenericNodeIDFromNodeID(nodeID))
+		peer, ok := n.connectedPeers.GetByID(nodeID)
 		if !ok {
 			continue
 		}
@@ -878,7 +875,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		isValidator := validators.Contains(n.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(nodeID))
+		isValidator := validators.Contains(n.config.Validators, subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
 		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
@@ -922,13 +919,9 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(peerID)
-			if err != nil {
-				panic(err)
-			}
-			isValidator := subnetValidators.Contains(ids.GenericNodeIDFromNodeID(shortNodeID))
+			isValidator := subnetValidators.Contains(peerID)
 			// check if the peer is allowed to connect to the subnet
-			if !allower.IsAllowed(shortNodeID, isValidator) {
+			if !allower.IsAllowed(peerID, isValidator) {
 				return false
 			}
 
@@ -977,18 +970,16 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) set.Set[i
 	return sentTo
 }
 
-func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
+func (n *network) disconnectedFromConnecting(nodeID ids.GenericNodeID) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-
-	n.connectingPeers.Remove(genericNodeID)
+	n.connectingPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.wantsConnection(genericNodeID) {
+		if n.wantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
@@ -1013,12 +1004,12 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 
 	// The peer that is disconnecting from us finished the handshake
 	if n.wantsConnection(genericNodeID) {
-		prevIP := n.peerIPs[nodeID]
+		prevIP := n.peerIPs[genericNodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
-		n.trackedIPs[nodeID] = tracked
-		n.dial(n.onCloseCtx, nodeID, tracked)
+		n.trackedIPs[genericNodeID] = tracked
+		n.dial(n.onCloseCtx, genericNodeID, tracked)
 	} else {
-		delete(n.peerIPs, nodeID)
+		delete(n.peerIPs, genericNodeID)
 	}
 
 	n.metrics.markDisconnected(peer)
@@ -1027,14 +1018,14 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 // ipAuth is a helper struct used to convey information about an
 // [*ips.ClaimedIPPort].
 type ipAuth struct {
-	nodeID   ids.NodeID
+	nodeID   ids.GenericNodeID
 	verified bool
 }
 
 func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 	ipAuths := make([]*ipAuth, len(ips))
 	for i, ip := range ips {
-		nodeID := ids.NodeIDFromCert(ip.Cert)
+		nodeID := ids.GenericNodeIDFromCert(ip.Cert)
 		n.peersLock.RLock()
 		_, _, shouldUpdateOurIP, shouldDial := n.peerIPStatus(nodeID, ip)
 		n.peersLock.RUnlock()
@@ -1065,10 +1056,10 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 }
 
 // peerIPStatus assumes the caller holds [peersLock]
-func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
+func (n *network) peerIPStatus(nodeID ids.GenericNodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
 	prevIP, previouslyTracked := n.peerIPs[nodeID]
 	shouldUpdateOurIP := previouslyTracked && prevIP.Timestamp < ip.Timestamp
-	shouldDial := !previouslyTracked && n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID))
+	shouldDial := !previouslyTracked && n.wantsConnection(nodeID)
 	return prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial
 }
 
@@ -1091,7 +1082,7 @@ func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.C
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
+func (n *network) dial(ctx context.Context, nodeID ids.GenericNodeID, ip *trackedIP) {
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -1111,7 +1102,7 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			// trackedIPs and this goroutine. This prevents a memory leak when
 			// the tracked nodeID leaves the validator set and is never able to
 			// be connected to.
-			if !n.wantsConnection(ids.GenericNodeIDFromNodeID(nodeID)) {
+			if !n.wantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
@@ -1124,9 +1115,8 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				return
 			}
 
-			genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-			_, connecting := n.connectingPeers.GetByID(genericNodeID)
-			_, connected := n.connectedPeers.GetByID(genericNodeID)
+			_, connecting := n.connectingPeers.GetByID(nodeID)
+			_, connected := n.connectedPeers.GetByID(nodeID)
 			n.peersLock.Unlock()
 
 			// While it may not be strictly needed to stop attempting to connect
@@ -1320,20 +1310,14 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	return nil
 }
 
-func (n *network) PeerInfo(nodeIDs []ids.NodeID) []peer.Info {
+func (n *network) PeerInfo(nodeIDs []ids.GenericNodeID) []peer.Info {
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
 	if len(nodeIDs) == 0 {
 		return n.connectedPeers.AllInfo()
 	}
-
-	genericNodeIDs := make([]ids.GenericNodeID, len(nodeIDs))
-	for idx, shortNodeID := range nodeIDs {
-		genericNodeIDs[idx] = ids.GenericNodeIDFromNodeID(shortNodeID)
-	}
-
-	return n.connectedPeers.Info(genericNodeIDs)
+	return n.connectedPeers.Info(nodeIDs)
 }
 
 func (n *network) StartClose() {

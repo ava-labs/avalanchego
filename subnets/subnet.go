@@ -15,7 +15,7 @@ var _ Subnet = (*subnet)(nil)
 
 type Allower interface {
 	// IsAllowed filters out nodes that are not allowed to connect to this subnet
-	IsAllowed(nodeID ids.NodeID, isValidator bool) bool
+	IsAllowed(nodeID ids.GenericNodeID, isValidator bool) bool
 }
 
 // Subnet keeps track of the currently bootstrapping chains in a subnet. If no
@@ -40,10 +40,10 @@ type subnet struct {
 	once             sync.Once
 	bootstrappedSema chan struct{}
 	config           Config
-	myNodeID         ids.NodeID
+	myNodeID         ids.GenericNodeID
 }
 
-func New(myNodeID ids.NodeID, config Config) Subnet {
+func New(myNodeID ids.GenericNodeID, config Config) Subnet {
 	return &subnet{
 		bootstrappedSema: make(chan struct{}),
 		config:           config,
@@ -93,12 +93,12 @@ func (s *subnet) Config() Config {
 	return s.config
 }
 
-func (s *subnet) IsAllowed(nodeID ids.NodeID, isValidator bool) bool {
+func (s *subnet) IsAllowed(nodeID ids.GenericNodeID, isValidator bool) bool {
 	// Case 1: NodeID is this node
 	// Case 2: This subnet is not validator-only subnet
 	// Case 3: NodeID is a validator for this chain
 	// Case 4: NodeID is explicitly allowed whether it's subnet validator or not
-	return nodeID == s.myNodeID ||
+	return nodeID.Equal(s.myNodeID) ||
 		!s.config.ValidatorOnly ||
 		isValidator ||
 		s.config.AllowedNodes.Contains(nodeID)

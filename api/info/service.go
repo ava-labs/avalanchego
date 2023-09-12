@@ -211,7 +211,7 @@ func (i *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply
 
 // PeersArgs are the arguments for calling Peers
 type PeersArgs struct {
-	NodeIDs []ids.NodeID `json:"nodeIDs"`
+	NodeIDs []ids.GenericNodeID `json:"nodeIDs"`
 }
 
 type Peer struct {

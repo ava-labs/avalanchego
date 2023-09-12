@@ -286,11 +286,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(config.MyNodeID)
-			if err != nil {
-				panic(err)
-			}
-			net.ManuallyTrack(shortNodeID, config.MyIPPort.IPPort())
+			net.ManuallyTrack(nodeIDs[0], config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -510,11 +506,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(config.MyNodeID)
-			if err != nil {
-				panic(err)
-			}
-			net.ManuallyTrack(shortNodeID, config.MyIPPort.IPPort())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -530,12 +522,8 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			network.peersLock.RLock()
 			defer network.peersLock.RUnlock()
 
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeIDs[0])
-			if err != nil {
-				panic(err)
-			}
-			require.Contains(network.trackedIPs, shortNodeID)
-			ip := network.trackedIPs[shortNodeID]
+			require.Contains(network.trackedIPs, nodeIDs[0])
+			ip := network.trackedIPs[nodeIDs[0]]
 			return ip.getDelay() != 0
 		},
 		10*time.Second,
@@ -646,11 +634,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			defer network.peersLock.RUnlock()
 
 			nodeID := nodeIDs[0]
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-			if err != nil {
-				panic(err)
-			}
-			_, ok := network.trackedIPs[shortNodeID]
+			_, ok := network.trackedIPs[nodeID]
 			return !ok
 		},
 		10*time.Second,

@@ -1599,7 +1599,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
+		subnets.New(ids.GenericNodeIDFromNodeID(consensusCtx.NodeID), subnets.Config{GossipConfig: gossipConfig}),
 	)
 	require.NoError(err)
 
@@ -1673,7 +1673,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		2,
 		cpuTracker,
 		vm,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		tracker.NewPeers(),
 	)
 	require.NoError(err)

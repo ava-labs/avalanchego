@@ -448,12 +448,12 @@ func (n *Node) Dispatch() error {
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
-		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
+		n.Net.ManuallyTrack(ids.GenericNodeIDFromNodeID(n.Config.StateSyncIDs[i]), peerIP)
 	}
 
 	// Add bootstrap nodes to the peer network
 	for _, bootstrapper := range n.Config.Bootstrappers {
-		n.Net.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
+		n.Net.ManuallyTrack(ids.GenericNodeIDFromNodeID(bootstrapper.ID), ips.IPPort(bootstrapper.IP))
 	}
 
 	// Start P2P connections

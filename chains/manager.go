@@ -293,7 +293,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 			// default to primary subnet config
 			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
 		}
-		sb = subnets.New(m.NodeID, sbConfig)
+		sb = subnets.New(ids.GenericNodeIDFromNodeID(m.NodeID), sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
 	}
 	addedChain := sb.AddChain(chainParams.ID)
@@ -1380,7 +1380,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 		return errNoPrimaryNetworkConfig
 	}
 
-	sb := subnets.New(m.NodeID, sbConfig)
+	sb := subnets.New(ids.GenericNodeIDFromNodeID(m.NodeID), sbConfig)
 	m.subnetsLock.Lock()
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)

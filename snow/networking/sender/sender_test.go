@@ -108,7 +108,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 	)
 	require.NoError(err)
 
@@ -128,7 +128,7 @@ func TestTimeout(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -367,7 +367,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 	)
 	require.NoError(err)
 
@@ -387,7 +387,7 @@ func TestReliableMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -517,7 +517,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 	)
 	require.NoError(err)
 
@@ -537,7 +537,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -830,7 +830,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -1052,7 +1052,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -1219,7 +1219,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), defaultSubnetConfig),
 			)
 			require.NoError(err)
 
