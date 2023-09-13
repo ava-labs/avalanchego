@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -21,68 +20,6 @@ import (
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
-
-func getBasicDB() (*merkleDB, error) {
-	return newDatabase(
-		context.Background(),
-		memdb.New(),
-		newDefaultConfig(),
-		&mockMetrics{},
-	)
-}
-
-// Writes []byte{i} -> []byte{i} for i in [0, 4]
-func writeBasicBatch(t *testing.T, db *merkleDB) {
-	require := require.New(t)
-
-	batch := db.NewBatch()
-	require.NoError(batch.Put([]byte{0}, []byte{0}))
-	require.NoError(batch.Put([]byte{1}, []byte{1}))
-	require.NoError(batch.Put([]byte{2}, []byte{2}))
-	require.NoError(batch.Put([]byte{3}, []byte{3}))
-	require.NoError(batch.Put([]byte{4}, []byte{4}))
-	require.NoError(batch.Write())
-}
-
-func newRandomProofNode(r *rand.Rand) ProofNode {
-	key := make([]byte, r.Intn(32)) // #nosec G404
-	_, _ = r.Read(key)              // #nosec G404
-	serializedKey := NewPath16(key)
-
-	val := make([]byte, r.Intn(64)) // #nosec G404
-	_, _ = r.Read(val)              // #nosec G404
-
-	children := map[byte]ids.ID{}
-	for j := 0; j < int(BranchFactor16); j++ {
-		if r.Float64() < 0.5 {
-			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
-			children[byte(j)] = childID
-		}
-	}
-
-	hasValue := rand.Intn(2) == 1 // #nosec G404
-	var valueOrHash maybe.Maybe[[]byte]
-	if hasValue {
-		// use the hash instead when length is greater than the hash length
-		if len(val) >= HashLength {
-			val = hashing.ComputeHash256(val)
-		} else if len(val) == 0 {
-			// We do this because when we encode a value of []byte{} we will later
-			// decode it as nil.
-			// Doing this prevents inconsistency when comparing the encoded and
-			// decoded values.
-			val = nil
-		}
-		valueOrHash = maybe.Some(val)
-	}
-
-	return ProofNode{
-		KeyPath:     serializedKey,
-		ValueOrHash: valueOrHash,
-		Children:    children,
-	}
-}
 
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
@@ -618,7 +555,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
 	require.Equal(NewPath16([]byte("key2")), proof.EndProof[2].KeyPath)
-	//require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
+	// require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
 	require.Equal(NewPath16([]byte("")), proof.EndProof[0].KeyPath)
 
 	require.NoError(proof.Verify(
@@ -1366,13 +1303,13 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 	}
 }
 
-func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	for i := 0; i < 1_000; i++ {
+func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		node := newRandomProofNode(rand)
 
 		// Marshal and unmarshal it.
@@ -1385,16 +1322,17 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		// Marshaling again should yield same result.
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
-	}
+	})
 }
 
-func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random range proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1441,16 +1379,17 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
-func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random change proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1502,7 +1441,7 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
@@ -1583,13 +1522,14 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
-func TestProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random proof.
 		proofLen := rand.Intn(32)
 		proofPath := make([]ProofNode, proofLen)
@@ -1626,7 +1566,7 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
 func TestProofProtoUnmarshal(t *testing.T) {
@@ -1669,43 +1609,40 @@ func TestProofProtoUnmarshal(t *testing.T) {
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	var (
-		numKeyValues  = 2048
-		deletePortion = 0.25
-	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
+		randSeed int64,
 		startBytes []byte,
 		endBytes []byte,
 		maxProofLen uint,
+		numKeyValues uint,
 	) {
 		require := require.New(t)
 
-		// Make sure proof bounds are valid
-		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
-			return
-		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
-			return
+			t.SkipNow()
 		}
+
+		// Make sure proof bounds are valid
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
+			t.SkipNow()
+		}
+
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
 
 		start := maybe.Nothing[[]byte]()
 		if len(startBytes) != 0 {
@@ -1754,7 +1691,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
-					require.Empty(rangeProof.EndProof[0].KeyPath)
+					require.Empty(rangeProof.EndProof[0].KeyPath.Bytes())
 				} else {
 					require.Empty(rangeProof.EndProof)
 				}
@@ -1800,33 +1737,27 @@ func FuzzRangeProofInvariants(f *testing.F) {
 	})
 }
 
-func FuzzProof(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	var (
-		numKeyValues  = 2048
-		deletePortion = 0.25
-	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
+func FuzzProofVerification(f *testing.F) {
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
+		randSeed int64,
+		numKeyValues uint,
 	) {
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		require := require.New(t)
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
 
 		proof, err := db.GetProof(
 			context.Background(),
@@ -1856,42 +1787,40 @@ func FuzzProof(f *testing.F) {
 }
 
 // Generate change proofs and verify that they are valid.
-func FuzzChangeProof(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
+func FuzzChangeProofVerification(f *testing.F) {
 	const (
 		numKeyValues  = defaultHistoryLength / 2
 		deletePortion = 0.25
 	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	startRootID, err := db.GetMerkleRoot(context.Background())
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	// Don't insert so many that we have insufficient history.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
-	endRootID, err := db.GetMerkleRoot(context.Background())
-	require.NoError(f, err)
 
 	f.Fuzz(func(
 		t *testing.T,
 		startBytes []byte,
 		endBytes []byte,
 		maxProofLen uint,
+		randSeed int64,
 	) {
 		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		startRootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		// Don't insert so many that we have insufficient history.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
+
+		endRootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
 
 		// Make sure proof bounds are valid
 		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
@@ -1929,27 +1858,5 @@ func FuzzChangeProof(f *testing.F) {
 			end,
 			endRootID,
 		))
-
-		// Insert another key-value pair
-		newKey := make([]byte, 32)
-		_, _ = rand.Read(newKey) // #nosec G404
-		newValue := make([]byte, 32)
-		_, _ = rand.Read(newValue) // #nosec G404
-		require.NoError(db.Put(newKey, newValue))
-
-		// Delete a key-value pair so database doesn't grow too large
-		iter := db.NewIterator()
-		require.NoError(db.Delete(iter.Key()))
-		iter.Release()
-
-		oldEndRootID := endRootID
-		endRootID, err = db.GetMerkleRoot(context.Background())
-		require.NoError(err)
-		if oldEndRootID != endRootID {
-			// Need this check because if we insert and then immediately
-			// delete a key-value pair, the root ID won't change and we'll
-			// error because start root ID == end root ID.
-			startRootID = oldEndRootID
-		}
 	})
 }
