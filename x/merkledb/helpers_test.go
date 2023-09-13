@@ -41,13 +41,13 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
-	serializedKey := newPath(key).Serialize()
+	serializedKey := NewPath16(key).Serialize()
 
 	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404
 
 	children := map[byte]ids.ID{}
-	for j := 0; j < NodeBranchFactor; j++ {
+	for j := 0; j < int(BranchFactor16); j++ {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
 			_, _ = r.Read(childID[:]) // #nosec G404
