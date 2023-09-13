@@ -485,7 +485,7 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 		if id == "" {
 			continue
 		}
-		nodeID, err := ids.NodeIDFromString(id)
+		nodeID, err := ids.GenericNodeIDFromString(id)
 		if err != nil {
 			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync peer id %s: %w", id, err)
 		}
@@ -545,14 +545,14 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	}
 
 	bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
-	bootstrapNodeIDs := make([]ids.NodeID, 0, len(bootstrapIDs))
+	bootstrapNodeIDs := make([]ids.GenericNodeID, 0, len(bootstrapIDs))
 	for _, bootstrapID := range bootstrapIDs {
 		id := strings.TrimSpace(bootstrapID)
 		if id == "" {
 			continue
 		}
 
-		nodeID, err := ids.NodeIDFromString(id)
+		nodeID, err := ids.GenericNodeIDFromString(id)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
 		}

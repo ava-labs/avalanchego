@@ -105,7 +105,7 @@ type Node struct {
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
-	ID ids.NodeID
+	ID ids.GenericNodeID
 
 	// Storage for this node
 	DBManager manager.Manager
@@ -302,7 +302,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		copy(ids.Writable(&dummyTxID), n.ID.Bytes())
 
 		err := primaryNetVdrs.Add(
-			ids.GenericNodeIDFromNodeID(n.ID),
+			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
@@ -360,7 +360,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = n.networkNamespace
-	n.Config.NetworkConfig.MyNodeID = ids.GenericNodeIDFromNodeID(n.ID)
+	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
@@ -448,12 +448,12 @@ func (n *Node) Dispatch() error {
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
-		n.Net.ManuallyTrack(ids.GenericNodeIDFromNodeID(n.Config.StateSyncIDs[i]), peerIP)
+		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
 	}
 
 	// Add bootstrap nodes to the peer network
 	for _, bootstrapper := range n.Config.Bootstrappers {
-		n.Net.ManuallyTrack(ids.GenericNodeIDFromNodeID(bootstrapper.ID), ips.IPPort(bootstrapper.IP))
+		n.Net.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}
 
 	// Start P2P connections
@@ -563,8 +563,7 @@ func (n *Node) initBootstrappers() error {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		genericNodeID := ids.GenericNodeIDFromNodeID(bootstrapper.ID)
-		if err := n.bootstrappers.Add(genericNodeID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -789,7 +788,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	// Routes incoming messages from peers to the appropriate chain
 	err = n.Config.ConsensusRouter.Initialize(
-		ids.GenericNodeIDFromNodeID(n.ID),
+		n.ID,
 		n.Log,
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
@@ -1354,7 +1353,7 @@ func (n *Node) Initialize(
 
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(stakingCert)
+	n.ID = ids.GenericNodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 

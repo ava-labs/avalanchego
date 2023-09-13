@@ -57,9 +57,13 @@ func main() {
 	avaxAssetID := pWallet.AVAXAssetID()
 
 	addValidatorStartTime := time.Now()
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: shortNodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(startTime.Add(duration).Unix()),
 			Wght:   weight,

@@ -110,7 +110,7 @@ func ExampleNewTestNetwork() {
 	// gossip will enable connecting to all the remaining nodes in the network.
 	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
 	for _, bootstrapper := range bootstrappers {
-		network.ManuallyTrack(ids.GenericNodeIDFromNodeID(bootstrapper.ID), ips.IPPort(bootstrapper.IP))
+		network.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}
 
 	// Typically network.StartClose() should be called based on receiving a

@@ -18,7 +18,7 @@ var _ Client = (*client)(nil)
 // See also AwaitBootstrapped.
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
-	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error)
+	GetNodeID(context.Context, ...rpc.Option) (ids.GenericNodeID, *signer.ProofOfPossession, error)
 	GetNodeIP(context.Context, ...rpc.Option) (string, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
@@ -48,7 +48,7 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 	return res, err
 }
 
-func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error) {
+func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.GenericNodeID, *signer.ProofOfPossession, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "info.getNodeID", struct{}{}, res, options...)
 	return res.NodeID, res.NodePOP, err

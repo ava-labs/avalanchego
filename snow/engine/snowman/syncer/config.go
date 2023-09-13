@@ -32,7 +32,7 @@ type Config struct {
 
 func NewConfig(
 	commonCfg common.Config,
-	stateSyncerIDs []ids.NodeID,
+	stateSyncerIDs []ids.GenericNodeID,
 	snowGetHandler common.AllGetsServer,
 	vm block.ChainVM,
 ) (Config, error) {
@@ -50,8 +50,7 @@ func NewConfig(
 		stateSyncBeacons = validators.NewSet()
 		for _, peerID := range stateSyncerIDs {
 			// Invariant: We never use the TxID or BLS keys populated here.
-			genericPeerID := ids.GenericNodeIDFromNodeID(peerID)
-			if err := stateSyncBeacons.Add(genericPeerID, nil, ids.Empty, 1); err != nil {
+			if err := stateSyncBeacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 				return Config{}, err
 			}
 		}

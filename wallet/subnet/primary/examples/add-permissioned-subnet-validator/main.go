@@ -60,9 +60,13 @@ func main() {
 	pWallet := wallet.P()
 
 	addValidatorStartTime := time.Now()
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 	addValidatorTx, err := pWallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: shortNodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(startTime.Add(duration).Unix()),
 			Wght:   weight,

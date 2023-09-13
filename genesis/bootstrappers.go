@@ -32,8 +32,8 @@ func init() {
 // Represents the relationship between the nodeID and the nodeIP.
 // The bootstrapper is sometimes called "anchor" or "beacon" node.
 type Bootstrapper struct {
-	ID ids.NodeID `json:"id"`
-	IP ips.IPDesc `json:"ip"`
+	ID ids.GenericNodeID `json:"id"`
+	IP ips.IPDesc        `json:"ip"`
 }
 
 // SampleBootstrappers returns the some beacons this node should connect to

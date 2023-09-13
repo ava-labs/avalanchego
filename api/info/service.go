@@ -44,7 +44,7 @@ type Info struct {
 
 type Parameters struct {
 	Version                       *version.Application
-	NodeID                        ids.NodeID
+	NodeID                        ids.GenericNodeID
 	NodePOP                       *signer.ProofOfPossession
 	NetworkID                     uint32
 	TxFee                         uint64
@@ -123,7 +123,7 @@ func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersio
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID  ids.NodeID                `json:"nodeID"`
+	NodeID  ids.GenericNodeID         `json:"nodeID"`
 	NodePOP *signer.ProofOfPossession `json:"nodePOP"`
 }
 

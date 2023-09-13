@@ -185,7 +185,7 @@ type ManagerConfig struct {
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
 	Validators                  validators.Manager         // Validators validating on this chain
-	NodeID                      ids.NodeID                 // The ID of this node
+	NodeID                      ids.GenericNodeID          // The ID of this node
 	NetworkID                   uint32                     // ID of the network this node is connected to
 	PartialSyncPrimaryNetwork   bool
 	Server                      server.Server // Handles HTTP API calls
@@ -224,7 +224,7 @@ type ManagerConfig struct {
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
 
-	StateSyncBeacons []ids.NodeID
+	StateSyncBeacons []ids.GenericNodeID
 
 	ChainDataDir string
 }
@@ -293,7 +293,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 			// default to primary subnet config
 			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
 		}
-		sb = subnets.New(ids.GenericNodeIDFromNodeID(m.NodeID), sbConfig)
+		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
 	}
 	addedChain := sb.AddChain(chainParams.ID)
@@ -465,12 +465,16 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(m.NodeID)
+	if err != nil {
+		panic(err)
+	}
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
 			SubnetID:  chainParams.SubnetID,
 			ChainID:   chainParams.ID,
-			NodeID:    m.NodeID,
+			NodeID:    shortNodeID,
 			PublicKey: bls.PublicFromSecretKey(m.StakingBLSKey),
 
 			XChainID:    m.XChainID,
@@ -1355,7 +1359,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		if !m.IsBootstrapped(constants.PlatformChainID) {
 			return "node is currently bootstrapping", nil
 		}
-		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, ids.GenericNodeIDFromNodeID(m.NodeID)) {
+		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, m.NodeID) {
 			return "node is not a primary network validator", nil
 		}
 
@@ -1380,7 +1384,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 		return errNoPrimaryNetworkConfig
 	}
 
-	sb := subnets.New(ids.GenericNodeIDFromNodeID(m.NodeID), sbConfig)
+	sb := subnets.New(m.NodeID, sbConfig)
 	m.subnetsLock.Lock()
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)
