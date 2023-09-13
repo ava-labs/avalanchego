@@ -40,10 +40,10 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 )
 
-// validateSubnetValidatorPrimaryNetworkRequirements verifies any primary
-// network requirements for [subnetValidator]. An error is returned they are
-// not fulfilled.
-func validateSubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
+// verifySubnetValidatorPrimaryNetworkRequirements verifies any primary
+// network requirements for [subnetValidator]. An error is returned they
+// are not fulfilled.
+func verifySubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
@@ -232,7 +232,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if err := validateSubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
 		return err
 	}
 
@@ -535,7 +535,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		if err := validateSubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
 			return err
 		}
 
