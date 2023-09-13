@@ -200,7 +200,7 @@ func TestGossiperGossip(t *testing.T) {
 	}
 }
 
-func TestEvery(t *testing.T) {
+func TestEvery(*testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
