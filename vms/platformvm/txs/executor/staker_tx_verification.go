@@ -40,8 +40,8 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 )
 
-// verifySubnetValidatorPrimaryNetworkRequirements verifies any primary
-// network requirements for [subnetValidator]. An error is returned they
+// verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
+// network requirements for [subnetValidator]. An error is returned if they
 // are not fulfilled.
 func verifySubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
