@@ -17,9 +17,9 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1} // k = 1
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1}) // k = 1
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(vdr1)
 
 	factory := NewNoEarlyTermFactory()
@@ -38,10 +38,10 @@ func TestNoEarlyTermResults(t *testing.T) {
 func TestNoEarlyTermString(t *testing.T) {
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -52,7 +52,7 @@ func TestNoEarlyTermString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
+	expected := `waiting on Bag[ids.GenericNodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
@@ -64,10 +64,10 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

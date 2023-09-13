@@ -18,7 +18,7 @@ func NewNoEarlyTermFactory() Factory {
 	return noEarlyTermFactory{}
 }
 
-func (noEarlyTermFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
+func (noEarlyTermFactory) New(vdrs bag.Bag[ids.GenericNodeID]) Poll {
 	return &noEarlyTermPoll{polled: vdrs}
 }
 
@@ -26,11 +26,11 @@ func (noEarlyTermFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 // query or a timeout occurs
 type noEarlyTermPoll struct {
 	votes  bag.Bag[ids.ID]
-	polled bag.Bag[ids.NodeID]
+	polled bag.Bag[ids.GenericNodeID]
 }
 
 // Vote registers a response for this poll
-func (p *noEarlyTermPoll) Vote(vdr ids.NodeID, vote ids.ID) {
+func (p *noEarlyTermPoll) Vote(vdr ids.GenericNodeID, vote ids.ID) {
 	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)
@@ -40,7 +40,7 @@ func (p *noEarlyTermPoll) Vote(vdr ids.NodeID, vote ids.ID) {
 }
 
 // Drop any future response for this poll
-func (p *noEarlyTermPoll) Drop(vdr ids.NodeID) {
+func (p *noEarlyTermPoll) Drop(vdr ids.GenericNodeID) {
 	p.polled.Remove(vdr)
 }
 

@@ -19,9 +19,9 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1} // k = 1
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1}) // k = 1
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(vdr1)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
@@ -42,10 +42,10 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -56,7 +56,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
+	expected := `waiting on Bag[ids.GenericNodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
@@ -70,10 +70,10 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -99,13 +99,13 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3}
-	vdr4 := ids.NodeID{4}
-	vdr5 := ids.NodeID{5} // k = 5
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+	vdr4 := ids.GenericNodeIDFromNodeID(ids.NodeID{4})
+	vdr5 := ids.GenericNodeIDFromNodeID(ids.NodeID{5}) // k = 5
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -142,12 +142,12 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	// A, then we cannot terminate early with alpha = k = 4
 	// If the final vote is cast for any of A, B, C, or D, then
 	// vertex A will have transitively received alpha = 4 votes
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3}
-	vdr4 := ids.NodeID{4}
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+	vdr4 := ids.GenericNodeIDFromNodeID(ids.NodeID{4})
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -176,11 +176,11 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 
 	alpha := 2
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3} // k = 3
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3}) // k = 3
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -204,10 +204,10 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NodeID{2}
-	vdr2 := ids.NodeID{3}
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -230,10 +230,10 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	alpha := 2
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
+	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
 
-	vdrs := bag.Bag[ids.NodeID]{}
+	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

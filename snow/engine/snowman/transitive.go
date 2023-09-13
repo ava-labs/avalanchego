@@ -274,7 +274,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
 		t:         t,
-		vdr:       nodeID,
+		vdr:       ids.GenericNodeIDFromNodeID(nodeID),
 		requestID: requestID,
 		response:  blkID,
 	}
@@ -299,7 +299,7 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 		ctx,
 		&voter{
 			t:         t,
-			vdr:       nodeID,
+			vdr:       ids.GenericNodeIDFromNodeID(nodeID),
 			requestID: requestID,
 		},
 	)
@@ -700,19 +700,22 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := bag.Bag[ids.NodeID]{}
-	for _, genericVdrID := range vdrIDs {
-		vdrID, err := ids.NodeIDFromGenericNodeID(genericVdrID)
-		if err != nil {
-			panic(err)
-		}
+	vdrBag := bag.Bag[ids.GenericNodeID]{}
+	for _, vdrID := range vdrIDs {
 		vdrBag.Add(vdrID)
 	}
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := set.Of(vdrList...)
+		vdrSet := set.NewSet[ids.NodeID](len(vdrList))
+		for _, vdr := range vdrList {
+			shortNode, err := ids.NodeIDFromGenericNodeID(vdr)
+			if err != nil {
+				panic(err)
+			}
+			vdrSet.Add(shortNode)
+		}
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}
 }
@@ -736,20 +739,22 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 		return
 	}
 
-	vdrBag := bag.Bag[ids.NodeID]{}
-	for _, genericVdrID := range vdrIDs {
-		vdrID, err := ids.NodeIDFromGenericNodeID(genericVdrID)
-		if err != nil {
-			panic(err)
-		}
+	vdrBag := bag.Bag[ids.GenericNodeID]{}
+	for _, vdrID := range vdrIDs {
 		vdrBag.Add(vdrID)
 	}
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrs := vdrBag.List()
-		sendTo := set.Of(vdrs...)
-
+		sendTo := set.NewSet[ids.NodeID](len(vdrs))
+		for _, vdr := range vdrs {
+			shortNode, err := ids.NodeIDFromGenericNodeID(vdr)
+			if err != nil {
+				panic(err)
+			}
+			sendTo.Add(shortNode)
+		}
 		if push {
 			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())
 			return
