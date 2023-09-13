@@ -31,6 +31,8 @@ const (
 	networkHealthCheckInterval = 200 * time.Millisecond
 
 	defaultEphemeralDirName = "ephemeral"
+
+	defaultChainConfigFilename = "config.json"
 )
 
 var (
@@ -110,6 +112,9 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
 	if flags == nil {
 		flags = testnet.FlagsMap{}
+	} else {
+		// Avoid modifying the input flags map
+		flags = flags.Copy()
 	}
 	return ln.AddLocalNode(w, &LocalNode{
 		NodeConfig: testnet.NodeConfig{
@@ -202,7 +207,19 @@ func StartNetwork(
 
 // Read a network from the provided directory.
 func ReadNetwork(dir string) (*LocalNetwork, error) {
-	network := &LocalNetwork{Dir: dir}
+	// Ensure a real and absolute network dir so that node
+	// configuration that embeds the network path will continue to
+	// work regardless of symlink and working directory changes.
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	realDir, err := filepath.EvalSymlinks(absDir)
+	if err != nil {
+		return nil, err
+	}
+
+	network := &LocalNetwork{Dir: realDir}
 	if err := network.ReadAll(); err != nil {
 		return nil, fmt.Errorf("failed to read local network: %w", err)
 	}
@@ -269,8 +286,11 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 		return err
 	}
 
-	if ln.CChainConfig == nil {
-		ln.CChainConfig = LocalCChainConfig()
+	if _, ok := ln.ChainConfigs["C"]; !ok {
+		if ln.ChainConfigs == nil {
+			ln.ChainConfigs = map[string]testnet.FlagsMap{}
+		}
+		ln.ChainConfigs["C"] = LocalCChainConfig()
 	}
 
 	// Default flags need to be set in advance of node config
@@ -474,26 +494,59 @@ func (ln *LocalNetwork) GetChainConfigDir() string {
 	return filepath.Join(ln.Dir, "chains")
 }
 
-func (ln *LocalNetwork) GetCChainConfigPath() string {
-	return filepath.Join(ln.GetChainConfigDir(), "C", "config.json")
-}
-
-func (ln *LocalNetwork) ReadCChainConfig() error {
-	chainConfig, err := testnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
+func (ln *LocalNetwork) ReadChainConfigs() error {
+	baseChainConfigDir := ln.GetChainConfigDir()
+	entries, err := os.ReadDir(baseChainConfigDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read chain config dir: %w", err)
 	}
-	ln.CChainConfig = *chainConfig
+
+	// Clear the map of data that may end up stale (e.g. if a given
+	// chain is in the map but no longer exists on disk)
+	ln.ChainConfigs = map[string]testnet.FlagsMap{}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			// Chain config files are expected to be nested under a
+			// directory with the name of the chain alias.
+			continue
+		}
+		chainAlias := entry.Name()
+		configPath := filepath.Join(baseChainConfigDir, chainAlias, defaultChainConfigFilename)
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			// No config file present
+			continue
+		}
+		chainConfig, err := testnet.ReadFlagsMap(configPath, fmt.Sprintf("%s chain config", chainAlias))
+		if err != nil {
+			return err
+		}
+		ln.ChainConfigs[chainAlias] = *chainConfig
+	}
+
 	return nil
 }
 
-func (ln *LocalNetwork) WriteCChainConfig() error {
-	path := ln.GetCChainConfigPath()
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create C-Chain config dir: %w", err)
+func (ln *LocalNetwork) WriteChainConfigs() error {
+	baseChainConfigDir := ln.GetChainConfigDir()
+
+	for chainAlias, chainConfig := range ln.ChainConfigs {
+		// Create the directory
+		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
+		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {
+			return fmt.Errorf("failed to create %s chain config dir: %w", chainAlias, err)
+		}
+
+		// Write the file
+		path := filepath.Join(chainConfigDir, defaultChainConfigFilename)
+		if err := chainConfig.Write(path, fmt.Sprintf("%s chain config", chainAlias)); err != nil {
+			return err
+		}
 	}
-	return ln.CChainConfig.Write(path, "C-Chain config")
+
+	// TODO(marun) Ensure the removal of chain aliases that aren't present in the map
+
+	return nil
 }
 
 // Used to marshal/unmarshal persistent local network defaults.
@@ -571,7 +624,7 @@ func (ln *LocalNetwork) WriteAll() error {
 	if err := ln.WriteGenesis(); err != nil {
 		return err
 	}
-	if err := ln.WriteCChainConfig(); err != nil {
+	if err := ln.WriteChainConfigs(); err != nil {
 		return err
 	}
 	if err := ln.WriteDefaults(); err != nil {
@@ -588,7 +641,7 @@ func (ln *LocalNetwork) ReadConfig() error {
 	if err := ln.ReadGenesis(); err != nil {
 		return err
 	}
-	if err := ln.ReadCChainConfig(); err != nil {
+	if err := ln.ReadChainConfigs(); err != nil {
 		return err
 	}
 	return ln.ReadDefaults()

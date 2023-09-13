@@ -25,6 +25,9 @@ go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
 ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
+# Enable subnet testing by building timestampvm
+./scripts/build_timestampvm.sh
+
 #################################
 E2E_USE_PERSISTENT_NETWORK="${E2E_USE_PERSISTENT_NETWORK:-}"
 TESTNETCTL_NETWORK_DIR="${TESTNETCTL_NETWORK_DIR:-}"

@@ -98,6 +98,15 @@ func (f FlagsMap) Write(path string, description string) error {
 	return nil
 }
 
+// Return a deep copy of the flags map.
+func (f FlagsMap) Copy() FlagsMap {
+	newMap := make(FlagsMap, len(f))
+	for k, v := range f {
+		newMap[k] = v
+	}
+	return newMap
+}
+
 // Utility function simplifying construction of a FlagsMap from a file.
 func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
 	bytes, err := os.ReadFile(path)
@@ -120,7 +129,7 @@ func DefaultJSONMarshal(v interface{}) ([]byte, error) {
 // common to all nodes in a given network.
 type NetworkConfig struct {
 	Genesis      *genesis.UnparsedConfig
-	CChainConfig FlagsMap
+	ChainConfigs map[string]FlagsMap
 	DefaultFlags FlagsMap
 	FundedKeys   []*secp256k1.PrivateKey
 }
