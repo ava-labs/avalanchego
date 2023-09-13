@@ -49,7 +49,7 @@ func (*StaticService) Encode(_ *http.Request, args *EncodeArgs, reply *EncodeRep
 
 	bytes, err := formatting.Encode(args.Encoding, argBytes)
 	if err != nil {
-		return fmt.Errorf("couldn't encode data as string: %s", err)
+		return fmt.Errorf("couldn't encode data as string: %w", err)
 	}
 	reply.Bytes = bytes
 	reply.Encoding = args.Encoding
@@ -72,7 +72,7 @@ type DecodeReply struct {
 func (*StaticService) Decode(_ *http.Request, args *DecodeArgs, reply *DecodeReply) error {
 	bytes, err := formatting.Decode(args.Encoding, args.Bytes)
 	if err != nil {
-		return fmt.Errorf("couldn't Decode data as string: %s", err)
+		return fmt.Errorf("couldn't Decode data as string: %w", err)
 	}
 	reply.Data = string(bytes)
 	reply.Encoding = args.Encoding

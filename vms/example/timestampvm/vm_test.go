@@ -7,12 +7,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/stretchr/testify/require"
 )
 
 var blockchainID = ids.ID{1, 2, 3}
@@ -161,7 +162,8 @@ func TestSetState(t *testing.T) {
 	require.True(vm.bootstrapped.Get())
 	// unknown
 	unknownState := snow.State(99)
-	require.ErrorIs(vm.SetState(ctx, unknownState), snow.ErrUnknownState)
+	err = vm.SetState(ctx, unknownState)
+	require.ErrorIs(err, snow.ErrUnknownState)
 }
 
 func newTestVM() (*VM, *snow.Context, chan common.Message, error) {

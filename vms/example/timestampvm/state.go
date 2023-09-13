@@ -15,7 +15,7 @@ var (
 	singletonStatePrefix = []byte("singleton")
 	blockStatePrefix     = []byte("block")
 
-	_ State = &state{}
+	_ State = (*state)(nil)
 )
 
 // State is a wrapper around avax.SingleTonState and BlockState

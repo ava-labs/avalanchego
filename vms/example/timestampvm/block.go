@@ -20,7 +20,7 @@ var (
 	errDatabaseGet       = errors.New("error while retrieving data from database")
 	errTimestampTooLate  = errors.New("block's timestamp is more than 1 hour ahead of local time")
 
-	_ snowman.Block = &Block{}
+	_ snowman.Block = (*Block)(nil)
 )
 
 // Block is a block on the chain.

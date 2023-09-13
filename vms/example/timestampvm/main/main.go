@@ -12,8 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+	"github.com/ava-labs/avalanchego/vms/example/timestampvm"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
-	"github.com/ava-labs/timestampvm/timestampvm"
 )
 
 func main() {

@@ -7,13 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
 	log "github.com/inconshreveable/log15"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -40,7 +41,7 @@ var (
 		Patch: 3,
 	}
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM = (*VM)(nil)
 )
 
 // VM implements the snowman.VM interface
@@ -48,8 +49,8 @@ var (
 // and a piece of data (a string)
 type VM struct {
 	// The context of this vm
-	snowCtx   *snow.Context
-	dbManager manager.Manager
+	snowCtx *snow.Context
+	db      database.Database
 
 	// State of this VM
 	state State
@@ -83,7 +84,7 @@ type VM struct {
 func (vm *VM) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisData []byte,
 	_ []byte,
 	_ []byte,
@@ -98,13 +99,13 @@ func (vm *VM) Initialize(
 	}
 	log.Info("Initializing Timestamp VM", "Version", version)
 
-	vm.dbManager = dbManager
+	vm.db = db
 	vm.snowCtx = snowCtx
 	vm.toEngine = toEngine
 	vm.verifiedBlocks = make(map[ids.ID]*Block)
 
 	// Create new state
-	vm.state = NewState(vm.dbManager.Current().Database, vm)
+	vm.state = NewState(vm.db, vm)
 
 	// Initialize genesis
 	if err := vm.initGenesis(genesisData); err != nil {
@@ -178,7 +179,7 @@ func (vm *VM) initGenesis(genesisData []byte) error {
 // CreateHandlers returns a map where:
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
-func (vm *VM) CreateHandlers(_ context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(_ context.Context) (map[string]http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -186,18 +187,15 @@ func (vm *VM) CreateHandlers(_ context.Context) (map[string]*common.HTTPHandler,
 		return nil, err
 	}
 
-	return map[string]*common.HTTPHandler{
-		"": {
-			LockOptions: common.WriteLock,
-			Handler:     server,
-		},
+	return map[string]http.Handler{
+		"": server,
 	}, nil
 }
 
 // CreateStaticHandlers returns a map where:
 // Keys: The path extension for this VM's static API
 // Values: The handler for that static API
-func (*VM) CreateStaticHandlers(_ context.Context) (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers(_ context.Context) (map[string]http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -205,11 +203,8 @@ func (*VM) CreateStaticHandlers(_ context.Context) (map[string]*common.HTTPHandl
 		return nil, err
 	}
 
-	return map[string]*common.HTTPHandler{
-		"": {
-			LockOptions: common.NoLock,
-			Handler:     server,
-		},
+	return map[string]http.Handler{
+		"": server,
 	}, nil
 }
 
@@ -278,6 +273,37 @@ func (vm *VM) getBlock(blkID ids.ID) (*Block, error) {
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted(_ context.Context) (ids.ID, error) { return vm.state.GetLastAccepted() }
+
+// VerifyHeightIndex implements the snowman.ChainVM interface
+func (*VM) VerifyHeightIndex(context.Context) error { return nil }
+
+// GetBlockIDAtHeight implements the snowman.ChainVM interface
+// Note: must return database.ErrNotFound if the index at height is unknown.
+//
+// This is called by the VM pre-ProposerVM fork and by the sync server
+// in [GetStateSummary].
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	// TODO(marun) Update to use similar implementation to xsvm
+	currentID, err := vm.LastAccepted(ctx)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	for {
+		currentBlock, err := vm.getBlock(currentID)
+		if err != nil {
+			return ids.ID{}, err
+		}
+		currentHeight := currentBlock.Height()
+		if currentHeight == height {
+			return currentID, nil
+		}
+		if currentHeight < height {
+			break
+		}
+		currentID = currentBlock.ID()
+	}
+	return ids.ID{}, database.ErrNotFound
+}
 
 // proposeBlock appends [data] to [p.mempool].
 // Then it notifies the consensus engine

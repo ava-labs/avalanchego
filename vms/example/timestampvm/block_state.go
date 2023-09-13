@@ -22,7 +22,7 @@ const (
 // persists lastAccepted block IDs with this key
 var lastAcceptedKey = []byte{lastAcceptedByte}
 
-var _ BlockState = &blockState{}
+var _ BlockState = (*blockState)(nil)
 
 // BlockState defines methods to manage state with Blocks and LastAcceptedIDs.
 type BlockState interface {
