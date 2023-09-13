@@ -52,7 +52,7 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetStateSummaryFrontierOp),

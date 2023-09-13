@@ -31,7 +31,7 @@ func TraceEngine(engine Engine, tracer trace.Tracer) Engine {
 	}
 }
 
-func (e *tracedEngine) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (e *tracedEngine) GetStateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.GetStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),

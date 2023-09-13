@@ -174,11 +174,11 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	}
 }
 
-func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summary []byte) {
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if nodeID == s.ctx.NodeID {
+	if nodeID.Equal(ids.GenericNodeIDFromNodeID(s.ctx.NodeID)) {
 		inMsg := message.InboundStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -207,7 +207,11 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,

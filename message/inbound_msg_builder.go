@@ -58,10 +58,10 @@ func InboundStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     StateSummaryFrontierOp,
 		message: &p2p.StateSummaryFrontier{
 			ChainId:   chainID.Bytes(),

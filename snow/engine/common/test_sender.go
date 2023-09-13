@@ -42,7 +42,7 @@ type SenderTest struct {
 
 	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
-	SendStateSummaryFrontierF    func(context.Context, ids.NodeID, uint32, []byte)
+	SendStateSummaryFrontierF    func(context.Context, ids.GenericNodeID, uint32, []byte)
 	SendGetAcceptedStateSummaryF func(context.Context, set.Set[ids.NodeID], uint32, []uint64)
 	SendAcceptedStateSummaryF    func(context.Context, ids.NodeID, uint32, []ids.ID)
 	SendGetAcceptedFrontierF     func(context.Context, set.Set[ids.NodeID], uint32)
@@ -122,7 +122,7 @@ func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorI
 // SendStateSummaryFrontier calls SendStateSummaryFrontierF if it was
 // initialized. If it wasn't initialized and this function shouldn't be called
 // and testing was initialized, then testing will fail.
-func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) {
+func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, summary []byte) {
 	if s.SendStateSummaryFrontierF != nil {
 		s.SendStateSummaryFrontierF(ctx, validatorID, requestID, summary)
 	} else if s.CantSendStateSummaryFrontier && s.T != nil {

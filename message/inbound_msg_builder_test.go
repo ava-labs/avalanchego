@@ -82,7 +82,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				chainID,
 				requestID,
 				summary,
-				nodeID,
+				genericNodeID,
 			)
 
 			require.Equal(StateSummaryFrontierOp, msg.Op())

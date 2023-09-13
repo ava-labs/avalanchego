@@ -40,7 +40,7 @@ func (s *tracedSender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs 
 	s.sender.SendGetStateSummaryFrontier(ctx, nodeIDs, requestID)
 }
 
-func (s *tracedSender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+func (s *tracedSender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summary []byte) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),

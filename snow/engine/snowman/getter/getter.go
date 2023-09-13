@@ -53,7 +53,7 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
 	// nodes, including those disabling state sync to serve state summaries if
 	// these are available

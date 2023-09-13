@@ -551,7 +551,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	switch msg := body.(type) {
 	// State messages should always be sent to the snowman engine
 	case *p2p.GetStateSummaryFrontier:
-		return engine.GetStateSummaryFrontier(ctx, shortNodeID, msg.RequestId)
+		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2p.StateSummaryFrontier:
 		return engine.StateSummaryFrontier(ctx, shortNodeID, msg.RequestId, msg.Summary)

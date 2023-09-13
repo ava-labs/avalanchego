@@ -67,7 +67,7 @@ type GetStateSummaryFrontierHandler interface {
 	//
 	// This engine should respond with an StateSummaryFrontier message with the
 	// same requestID, and the engine's current state summary frontier.
-	GetStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetStateSummaryFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // StateSummaryFrontierHandler defines how a consensus engine reacts to a state

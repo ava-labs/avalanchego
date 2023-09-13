@@ -935,7 +935,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendStateSummaryFrontier(context.Background(), nodeID, requestID, summary)
+				sender.SendStateSummaryFrontier(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, summary)
 			},
 		},
 		{

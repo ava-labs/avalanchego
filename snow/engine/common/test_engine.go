@@ -119,7 +119,8 @@ type EngineTest struct {
 	AcceptedFrontierF               func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	GetAcceptedF, AcceptedF         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
 	ChitsF                          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error
-	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
+	GetStateSummaryFrontierF        func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error
+	GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
@@ -273,7 +274,7 @@ func (e *EngineTest) Notify(ctx context.Context, msg Message) error {
 	return errNotify
 }
 
-func (e *EngineTest) GetStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+func (e *EngineTest) GetStateSummaryFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error {
 	if e.GetStateSummaryFrontierF != nil {
 		return e.GetStateSummaryFrontierF(ctx, validatorID, requestID)
 	}
