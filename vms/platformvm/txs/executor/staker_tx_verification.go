@@ -40,19 +40,22 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 )
 
-func validateSubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, validator txs.Validator) error {
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, validator.NodeID)
+// validateSubnetValidatorPrimaryNetworkRequirements verifies any primary
+// network requirements for [subnetValidator]. An error is returned they are
+// not fulfilled.
+func validateSubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
 			"%s %w of the primary network",
-			validator.NodeID,
+			subnetValidator.NodeID,
 			ErrNotValidator,
 		)
 	}
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
-			validator.NodeID,
+			subnetValidator.NodeID,
 			err,
 		)
 	}
@@ -60,8 +63,8 @@ func validateSubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, v
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
 	if !txs.BoundedBy(
-		validator.StartTime(),
-		validator.EndTime(),
+		subnetValidator.StartTime(),
+		subnetValidator.EndTime(),
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
