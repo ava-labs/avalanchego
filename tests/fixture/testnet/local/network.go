@@ -430,7 +430,9 @@ func (ln *LocalNetwork) Stop() error {
 	var errs []error
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range ln.Nodes {
-		if err := node.Stop(); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
+		defer cancel()
+		if err := node.Stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}

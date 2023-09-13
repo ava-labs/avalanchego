@@ -19,7 +19,7 @@ const (
 
 	DefaultNetworkStartTimeout = 2 * time.Minute
 	DefaultNodeInitTimeout     = 10 * time.Second
-	DefaultNodeStopTimeout     = 5 * time.Second
+	DefaultNodeStopTimeout     = 20 * time.Second
 )
 
 // A set of flags appropriate for local testing.

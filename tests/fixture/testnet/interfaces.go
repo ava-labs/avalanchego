@@ -24,5 +24,5 @@ type Node interface {
 	GetConfig() NodeConfig
 	GetProcessContext() node.NodeProcessContext
 	IsHealthy(ctx context.Context) (bool, error)
-	Stop() error
+	Stop(ctx context.Context) error
 }

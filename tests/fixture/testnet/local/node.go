@@ -251,7 +251,7 @@ func (n *LocalNode) GetProcess() (*os.Process, error) {
 
 // Signals the node process to stop and waits for the node process to
 // stop running.
-func (n *LocalNode) Stop() error {
+func (n *LocalNode) Stop(ctx context.Context) error {
 	proc, err := n.GetProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -267,8 +267,6 @@ func (n *LocalNode) Stop() error {
 	// Wait for the node process to stop
 	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
-	defer cancel()
 	for {
 		proc, err := n.GetProcess()
 		if err != nil {

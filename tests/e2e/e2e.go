@@ -195,8 +195,10 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 	// Ensure node is stopped on teardown. It's configuration is not removed to enable
 	// collection in CI to aid in troubleshooting failures.
 	ginkgo.DeferCleanup(func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
-		require.NoError(node.Stop())
+		tests.Outf("shutting down ephemeral node %q\n", node.GetID())
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
 	})
 
 	return node
