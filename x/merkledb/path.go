@@ -125,6 +125,7 @@ func (cp Path) Token(index int) byte {
 func (cp Path) bytesNeeded(tokens int) int {
 	return (tokens + cp.tokensPerByte - 1) / cp.tokensPerByte
 }
+
 func (cp Path) Append(token byte) Path {
 	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
@@ -132,7 +133,8 @@ func (cp Path) Append(token byte) Path {
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     cp.length + 1,
-		pathConfig: cp.pathConfig}
+		pathConfig: cp.pathConfig,
+	}
 }
 
 func (cp Path) Compare(other Path) int {
