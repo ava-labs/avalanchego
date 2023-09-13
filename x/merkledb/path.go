@@ -82,6 +82,10 @@ func NewPath16(p []byte) Path {
 	return NewPath(p, BranchFactor16)
 }
 
+func (cp Path) Length() int {
+	return cp.length
+}
+
 func (cp Path) Equal(other Path) bool {
 	return cp.length == other.length && cp.value == other.value
 }

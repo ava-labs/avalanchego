@@ -390,17 +390,7 @@ func (m *Manager) findNextKey(
 		nextKey = append(nextKey, 0)
 		return maybe.Some(nextKey), nil
 	}
-
-	// We want the first key larger than the [lastReceivedKey].
-	// This is done by taking two proofs for the same key
-	// (one that was just received as part of a proof, and one from the local db)
-	// and traversing them from the longest key to the shortest key.
-	// For each node in these proofs, compare if the children of that node exist
-	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.SerializedPath{
-		Value:        lastReceivedKey,
-		NibbleLength: 2 * len(lastReceivedKey),
-	}
+	proofKeyPath := merkledb.NewPath16(lastReceivedKey)
 
 	// If the received proof is an exclusion proof, the last node may be for a
 	// key that is after the [lastReceivedKey].
@@ -413,7 +403,7 @@ func (m *Manager) findNextKey(
 	}
 
 	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
+	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Bytes())
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
@@ -443,7 +433,7 @@ func (m *Manager) findNextKey(
 
 		// select the deepest proof node from the two proofs
 		switch {
-		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
+		case receivedProofNode.KeyPath.Length() > localProofNode.KeyPath.Length():
 			// there was a branch node in the received proof that isn't in the local proof
 			// see if the received proof node has children not present in the local proof
 			deepestNode = &receivedProofNode
@@ -451,7 +441,7 @@ func (m *Manager) findNextKey(
 			// we have dealt with this received node, so move on to the next received node
 			receivedProofNodeIndex--
 
-		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
+		case localProofNode.KeyPath.Length() > receivedProofNode.KeyPath.Length():
 			// there was a branch node in the local proof that isn't in the received proof
 			// see if the local proof node has children not present in the received proof
 			deepestNode = &localProofNode
@@ -485,13 +475,13 @@ func (m *Manager) findNextKey(
 		// node's children have keys larger than [proofKeyPath].
 		// Any child with a nibble greater than the [proofKeyPath]'s nibble at that
 		// index will have a larger key.
-		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
-			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
+		if deepestNode.KeyPath.Length() < proofKeyPath.Length() {
+			startingChildNibble = proofKeyPath.Token(deepestNode.KeyPath.Length()) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
-			nextKey = maybe.Some(deepestNode.KeyPath.AppendNibble(childIndex).Value)
+			nextKey = maybe.Some(deepestNode.KeyPath.Append(childIndex).Bytes())
 			break
 		}
 	}

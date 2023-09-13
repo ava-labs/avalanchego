@@ -658,7 +658,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		type keyAndID struct {
-			key merkledb.SerializedPath
+			key merkledb.Path
 			id  ids.ID
 		}
 
@@ -667,7 +667,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.KeyPath.AppendNibble(childIdx),
+					key: node.KeyPath.Append(childIdx),
 					id:  childID,
 				})
 			}
@@ -678,7 +678,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.KeyPath.AppendNibble(childIdx),
+					key: node.KeyPath.Append(childIdx),
 					id:  childID,
 				})
 			}
@@ -686,9 +686,9 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Sort in ascending order by key prefix.
 		serializedPathLess := func(i, j keyAndID) bool {
-			return bytes.Compare(i.key.Value, j.key.Value) < 0 ||
-				(bytes.Equal(i.key.Value, j.key.Value) &&
-					i.key.NibbleLength < j.key.NibbleLength)
+			return bytes.Compare(i.key.Bytes(), j.key.Bytes()) < 0 ||
+				(bytes.Equal(i.key.Bytes(), j.key.Bytes()) &&
+					i.key.Length() < j.key.Length())
 		}
 		slices.SortFunc(remoteKeyIDs, serializedPathLess)
 		slices.SortFunc(localKeyIDs, serializedPathLess)
@@ -701,12 +701,12 @@ func TestFindNextKeyRandom(t *testing.T) {
 				firstIdxOutOfRange   = len(keyIDs)
 			)
 			for i, keyID := range keyIDs {
-				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) > 0 {
+				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Bytes(), lastReceivedKey) > 0 {
 					firstIdxInRange = i
 					firstIdxInRangeFound = true
 					continue
 				}
-				if bytes.Compare(keyID.key.Value, rangeEnd) > 0 {
+				if bytes.Compare(keyID.key.Bytes(), rangeEnd) > 0 {
 					firstIdxOutOfRange = i
 					break
 				}
@@ -723,7 +723,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// Find smallest difference between the set of key/ID pairs proven by
 		// the remote/local proofs for key/ID pairs after the last received key.
 		var (
-			smallestDiffKey merkledb.SerializedPath
+			smallestDiffKey merkledb.Path
 			foundDiff       bool
 		)
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
@@ -767,12 +767,12 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		require.NoError(err)
 
-		if bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0 {
+		if bytes.Compare(smallestDiffKey.Bytes(), rangeEnd) >= 0 {
 			// The smallest key which differs is after the range end so the
 			// next key to get should be nil because we're done fetching the range.
 			require.True(gotFirstDiff.IsNothing())
 		} else {
-			require.Equal(smallestDiffKey.Value, gotFirstDiff.Value())
+			require.Equal(smallestDiffKey.Bytes(), gotFirstDiff.Value())
 		}
 	}
 }
