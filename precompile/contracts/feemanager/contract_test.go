@@ -63,6 +63,23 @@ var (
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
 		},
+		"set config from manager succeeds": {
+			Caller:     allowlist.TestManagerAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackSetFeeConfig(testFeeConfig)
+				require.NoError(t, err)
+
+				return input
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				feeConfig := GetStoredFeeConfig(state)
+				require.Equal(t, testFeeConfig, feeConfig)
+			},
+		},
 		"set invalid config from enabled address": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),

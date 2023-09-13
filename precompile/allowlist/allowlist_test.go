@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -22,12 +21,16 @@ var (
 )
 
 type dummyConfig struct {
+	precompileconfig.Upgrade
 	AllowListConfig
 }
 
-func (d *dummyConfig) Key() string        { return "dummy" }
-func (d *dummyConfig) Timestamp() *uint64 { return utils.NewUint64(0) }
-func (d *dummyConfig) IsDisabled() bool   { return false }
+func (d *dummyConfig) Key() string      { return "dummy" }
+func (d *dummyConfig) IsDisabled() bool { return false }
+func (d *dummyConfig) Verify(chainConfig precompileconfig.ChainConfig) error {
+	return d.AllowListConfig.Verify(chainConfig, d.Upgrade)
+}
+
 func (d *dummyConfig) Equal(cfg precompileconfig.Config) bool {
 	other, ok := (cfg).(*dummyConfig)
 	if !ok {
@@ -57,6 +60,7 @@ func TestAllowListRun(t *testing.T) {
 		Address:      dummyAddr,
 		Contract:     CreateAllowListPrecompile(dummyAddr),
 		Configurator: &dummyConfigurator{},
+		ConfigKey:    "dummy",
 	}
 	RunPrecompileWithAllowListTests(t, dummyModule, state.NewTestStateDB, nil)
 }
@@ -66,6 +70,7 @@ func BenchmarkAllowList(b *testing.B) {
 		Address:      dummyAddr,
 		Contract:     CreateAllowListPrecompile(dummyAddr),
 		Configurator: &dummyConfigurator{},
+		ConfigKey:    "dummy",
 	}
 	BenchPrecompileWithAllowList(b, dummyModule, state.NewTestStateDB, nil)
 }

@@ -43,7 +43,7 @@ var(
 		{{- range .Contract.Funcs}}
 		{{- $func := .}}
 		{{- if $contract.AllowList}}
-		{{- $roles := mkList "NoRole" "Enabled" "Admin"}}
+		{{- $roles := mkList "NoRole" "Enabled" "Manager" "Admin"}}
 		{{- range $role := $roles}}
 		{{- $fail := and (not $func.Original.IsConstant) (eq $role "NoRole")}}
 		"calling {{decapitalise $func.Normalized.Name}} from {{$role}} should {{- if $fail}} fail {{- else}} succeed{{- end}}":  {

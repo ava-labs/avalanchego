@@ -192,7 +192,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			getConfig: func() *params.ChainConfig {
 				config := *params.TestChainConfig
 				config.GenesisPrecompiles = params.Precompiles{
-					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil),
+					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil, nil),
 				}
 				return &config
 			},
@@ -266,7 +266,7 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 	require.Greater(block.Time, bc.lastAccepted.Time())
 
 	activatedGenesisConfig := *customg.Config
-	contractDeployerConfig := deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil)
+	contractDeployerConfig := deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil, nil)
 	activatedGenesisConfig.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
 		{
 			Config: contractDeployerConfig,
@@ -307,7 +307,7 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 
 	genesis.Config.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
 		{
-			Config: deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil),
+			Config: deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil, nil),
 		},
 	}
 	_, _, err = SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)

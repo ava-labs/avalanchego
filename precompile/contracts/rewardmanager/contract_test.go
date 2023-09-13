@@ -93,6 +93,59 @@ var (
 				require.False(t, isFeeRecipients)
 			},
 		},
+		"set allow fee recipients from manager succeeds": {
+			Caller:     allowlist.TestManagerAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackAllowFeeRecipients()
+				require.NoError(t, err)
+
+				return input
+			},
+			SuppliedGas: AllowFeeRecipientsGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				_, isFeeRecipients := GetStoredRewardAddress(state)
+				require.True(t, isFeeRecipients)
+			},
+		},
+		"set reward address from manager succeeds": {
+			Caller:     allowlist.TestManagerAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackSetRewardAddress(testAddr)
+				require.NoError(t, err)
+
+				return input
+			},
+			SuppliedGas: SetRewardAddressGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				address, isFeeRecipients := GetStoredRewardAddress(state)
+				require.Equal(t, testAddr, address)
+				require.False(t, isFeeRecipients)
+			},
+		},
+		"disable rewards from manager succeeds": {
+			Caller:     allowlist.TestManagerAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackDisableRewards()
+				require.NoError(t, err)
+
+				return input
+			},
+			SuppliedGas: DisableRewardsGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				address, isFeeRecipients := GetStoredRewardAddress(state)
+				require.False(t, isFeeRecipients)
+				require.Equal(t, constants.BlackholeAddr, address)
+			},
+		},
 		"disable rewards from enabled succeeds": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),

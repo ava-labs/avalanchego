@@ -17,7 +17,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 	admins := []common.Address{{1}}
 	chainConfig := *TestChainConfig
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(1), admins, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(1), admins, nil, nil),
 	}
 
 	type test struct {
@@ -30,7 +30,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedErrorString: "disable should be [true]",
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil),
+					Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil, nil),
 				},
 			},
 		},
@@ -74,8 +74,8 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 	admins := []common.Address{{1}}
 	chainConfig := *TestChainConfig
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey:       txallowlist.NewConfig(utils.NewUint64(1), admins, nil),
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(10), admins, nil),
+		txallowlist.ConfigKey:       txallowlist.NewConfig(utils.NewUint64(1), admins, nil, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(10), admins, nil, nil),
 	}
 
 	tests := map[string]upgradeCompatibilityTest{
@@ -88,7 +88,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -103,7 +103,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -113,7 +113,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil, nil),
 						},
 					},
 				},
@@ -129,7 +129,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -139,7 +139,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil, nil),
 						},
 					},
 				},
@@ -154,7 +154,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -177,7 +177,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -200,7 +200,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -211,7 +211,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 						},
 						{
 							// uses a different (empty) admin list, not allowed
-							Config: txallowlist.NewConfig(utils.NewUint64(7), []common.Address{}, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), []common.Address{}, nil, nil),
 						},
 					},
 				},
@@ -226,7 +226,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},
@@ -236,7 +236,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil, nil),
 						},
 					},
 				},

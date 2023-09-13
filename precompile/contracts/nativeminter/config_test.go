@@ -18,21 +18,22 @@ import (
 func TestVerify(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	enableds := []common.Address{allowlist.TestEnabledAddr}
+	managers := []common.Address{allowlist.TestManagerAddr}
 	tests := map[string]testutils.ConfigVerifyTest{
 		"invalid allow list config in native minter allowlist": {
-			Config:        NewConfig(utils.NewUint64(3), admins, admins, nil),
+			Config:        NewConfig(utils.NewUint64(3), admins, admins, nil, nil),
 			ExpectedError: "cannot set address",
 		},
 		"duplicate admins in config in native minter allowlist": {
-			Config:        NewConfig(utils.NewUint64(3), append(admins, admins[0]), enableds, nil),
+			Config:        NewConfig(utils.NewUint64(3), append(admins, admins[0]), enableds, managers, nil),
 			ExpectedError: "duplicate address",
 		},
 		"duplicate enableds in config in native minter allowlist": {
-			Config:        NewConfig(utils.NewUint64(3), admins, append(enableds, enableds[0]), nil),
+			Config:        NewConfig(utils.NewUint64(3), admins, append(enableds, enableds[0]), managers, nil),
 			ExpectedError: "duplicate address",
 		},
 		"nil amount in native minter config": {
-			Config: NewConfig(utils.NewUint64(3), admins, nil,
+			Config: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(123),
 					common.HexToAddress("0x02"): nil,
@@ -40,7 +41,7 @@ func TestVerify(t *testing.T) {
 			ExpectedError: "initial mint cannot contain nil",
 		},
 		"negative amount in native minter config": {
-			Config: NewConfig(utils.NewUint64(3), admins, nil,
+			Config: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(123),
 					common.HexToAddress("0x02"): math.NewHexOrDecimal256(-1),
@@ -54,50 +55,51 @@ func TestVerify(t *testing.T) {
 func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	enableds := []common.Address{allowlist.TestEnabledAddr}
+	managers := []common.Address{allowlist.TestManagerAddr}
 	tests := map[string]testutils.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   NewConfig(utils.NewUint64(3), admins, enableds, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds, managers, nil),
 			Other:    nil,
 			Expected: false,
 		},
 		"different type": {
-			Config:   NewConfig(utils.NewUint64(3), admins, enableds, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds, managers, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 		"different timestamps": {
-			Config:   NewConfig(utils.NewUint64(3), admins, nil, nil),
-			Other:    NewConfig(utils.NewUint64(4), admins, nil, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, nil, nil, nil),
+			Other:    NewConfig(utils.NewUint64(4), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial mint amounts": {
-			Config: NewConfig(utils.NewUint64(3), admins, nil,
+			Config: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
 				}),
-			Other: NewConfig(utils.NewUint64(3), admins, nil,
+			Other: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(2),
 				}),
 			Expected: false,
 		},
 		"different initial mint addresses": {
-			Config: NewConfig(utils.NewUint64(3), admins, nil,
+			Config: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
 				}),
-			Other: NewConfig(utils.NewUint64(3), admins, nil,
+			Other: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x02"): math.NewHexOrDecimal256(1),
 				}),
 			Expected: false,
 		},
 		"same config": {
-			Config: NewConfig(utils.NewUint64(3), admins, nil,
+			Config: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
 				}),
-			Other: NewConfig(utils.NewUint64(3), admins, nil,
+			Other: NewConfig(utils.NewUint64(3), admins, nil, nil,
 				map[common.Address]*math.HexOrDecimal256{
 					common.HexToAddress("0x01"): math.NewHexOrDecimal256(1),
 				}),

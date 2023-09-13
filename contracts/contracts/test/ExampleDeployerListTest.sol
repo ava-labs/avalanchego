@@ -12,6 +12,8 @@ import "./AllowListTest.sol";
 // The transactions are put together as steps of a complete test in contract_deployer_allow_list.ts.
 // TODO: a bunch of these tests have repeated code that should be combined
 contract ExampleDeployerListTest is AllowListTest {
+  address constant OTHER_ADDRESS = 0x0Fa8EA536Be85F32724D57A37758761B86416123;
+
   IAllowList allowList = IAllowList(DEPLOYER_LIST);
   ExampleDeployerList private example;
 

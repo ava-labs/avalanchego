@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	precompileconfig "github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	common "github.com/ethereum/go-ethereum/common"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -113,6 +114,20 @@ func (m *MockAccessibleState) GetBlockContext() BlockContext {
 func (mr *MockAccessibleStateMockRecorder) GetBlockContext() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockContext", reflect.TypeOf((*MockAccessibleState)(nil).GetBlockContext))
+}
+
+// GetChainConfig mocks base method.
+func (m *MockAccessibleState) GetChainConfig() precompileconfig.ChainConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChainConfig")
+	ret0, _ := ret[0].(precompileconfig.ChainConfig)
+	return ret0
+}
+
+// GetChainConfig indicates an expected call of GetChainConfig.
+func (mr *MockAccessibleStateMockRecorder) GetChainConfig() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainConfig", reflect.TypeOf((*MockAccessibleState)(nil).GetChainConfig))
 }
 
 // GetSnowContext mocks base method.

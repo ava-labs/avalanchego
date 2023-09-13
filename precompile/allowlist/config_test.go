@@ -13,6 +13,7 @@ var testModule = modules.Module{
 	Address:      dummyAddr,
 	Contract:     CreateAllowListPrecompile(dummyAddr),
 	Configurator: &dummyConfigurator{},
+	ConfigKey:    "dummy",
 }
 
 func TestVerifyAllowlist(t *testing.T) {

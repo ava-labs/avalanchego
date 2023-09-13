@@ -34,13 +34,14 @@ type Config struct {
 }
 
 // NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// {{.Contract.Type}} {{- if .Contract.AllowList}} with the given [admins] as members of the allowlist {{end}}.
-func NewConfig(blockTimestamp *uint64{{if .Contract.AllowList}}, admins []common.Address, enableds []common.Address,{{end}}) *Config {
+// {{.Contract.Type}} {{- if .Contract.AllowList}} with the given [admins], [enableds] and [managers] members of the allowlist {{end}}.
+func NewConfig(blockTimestamp *uint64{{if .Contract.AllowList}}, admins []common.Address, enableds []common.Address, managers []common.Address{{end}}) *Config {
 	return &Config{
 		{{- if .Contract.AllowList}}
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses: admins,
 			EnabledAddresses: enableds,
+			ManagerAddresses: managers,
 		},
 		{{- end}}
 		Upgrade: precompileconfig.Upgrade{BlockTimestamp: blockTimestamp},
@@ -66,7 +67,7 @@ func (*Config) Key() string { return ConfigKey }
 func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	{{- if .Contract.AllowList}}
 	// Verify AllowList first
-	if err := c.AllowListConfig.Verify(chainConfig); err != nil {
+	if err := c.AllowListConfig.Verify(chainConfig, c.Upgrade); err != nil {
 		return err
 	}
 	{{- end}}

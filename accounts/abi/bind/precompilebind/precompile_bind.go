@@ -37,13 +37,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
-)
-
-const (
-	setAdminFuncKey      = "setAdmin"
-	setEnabledFuncKey    = "setEnabled"
-	setNoneFuncKey       = "setNone"
-	readAllowListFuncKey = "readAllowList"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 )
 
 // BindedFiles contains the generated binding file contents.
@@ -133,10 +127,9 @@ func createPrecompileHook(abifilename string, template string) bind.BindHook {
 			// these functions are not needed for binded contract.
 			// AllowList struct can provide the same functionality,
 			// so we don't need to generate them.
-			delete(funcs, readAllowListFuncKey)
-			delete(funcs, setAdminFuncKey)
-			delete(funcs, setEnabledFuncKey)
-			delete(funcs, setNoneFuncKey)
+			for _, key := range allowlist.AllowListFuncKeys {
+				delete(funcs, key)
+			}
 		}
 
 		precompileContract := &tmplPrecompileContract{
@@ -156,7 +149,7 @@ func createPrecompileHook(abifilename string, template string) bind.BindHook {
 }
 
 func allowListEnabled(funcs map[string]*bind.TmplMethod) bool {
-	keys := []string{readAllowListFuncKey, setAdminFuncKey, setEnabledFuncKey, setNoneFuncKey}
+	keys := allowlist.AllowListFuncKeys
 	for _, key := range keys {
 		if _, ok := funcs[key]; !ok {
 			return false

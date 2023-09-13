@@ -8,6 +8,9 @@ interface IAllowList {
   // Set [addr] to be enabled on the precompile contract.
   function setEnabled(address addr) external;
 
+  // Set [addr] to have the manager role over the precompile contract.
+  function setManager(address addr) external;
+
   // Set [addr] to have no role for the precompile contract.
   function setNone(address addr) external;
 

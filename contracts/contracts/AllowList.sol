@@ -12,11 +12,13 @@ contract AllowList is Ownable {
   uint256 constant STATUS_NONE = 0;
   uint256 constant STATUS_ENABLED = 1;
   uint256 constant STATUS_ADMIN = 2;
+  uint256 constant STATUS_MANAGER = 3;
 
   enum Role {
     None,
     Enabled,
-    Admin
+    Admin,
+    Manager
   }
 
   constructor(address precompileAddr) Ownable() {
@@ -33,9 +35,14 @@ contract AllowList is Ownable {
     return result == STATUS_ADMIN;
   }
 
+  function isManager(address addr) public view returns (bool) {
+    uint256 result = allowList.readAllowList(addr);
+    return result == STATUS_MANAGER;
+  }
+
   function isEnabled(address addr) public view returns (bool) {
     uint256 result = allowList.readAllowList(addr);
-    // if address is ENABLED or ADMIN it can deploy
+    // if address is ENABLED or ADMIN or MANAGER it can deploy
     // in other words, if it's not NONE it can deploy.
     return result != STATUS_NONE;
   }
@@ -46,6 +53,14 @@ contract AllowList is Ownable {
 
   function _setAdmin(address addr) private {
     allowList.setAdmin(addr);
+  }
+
+  function setManager(address addr) public virtual onlyOwner {
+    _setManager(addr);
+  }
+
+  function _setManager(address addr) private {
+    allowList.setManager(addr);
   }
 
   function setEnabled(address addr) public virtual onlyOwner {

@@ -177,6 +177,7 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 		utils.NewUint64(1671542573),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
 		nil,
+		nil,
 		&rewardmanager.InitialRewardConfig{
 			AllowFeeRecipients: true,
 		})
@@ -184,6 +185,7 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 	testContractNativeMinterConfig := nativeminter.NewConfig(
 		utils.NewUint64(0),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
+		nil,
 		nil,
 		nil,
 	)
@@ -239,7 +241,7 @@ func TestActivePrecompiles(t *testing.T) {
 		UpgradeConfig: UpgradeConfig{
 			PrecompileUpgrades: []PrecompileUpgrade{
 				{
-					nativeminter.NewConfig(utils.NewUint64(0), nil, nil, nil), // enable at genesis
+					nativeminter.NewConfig(utils.NewUint64(0), nil, nil, nil, nil), // enable at genesis
 				},
 				{
 					nativeminter.NewDisableConfig(utils.NewUint64(1)), // disable at timestamp 1
@@ -280,7 +282,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 		UpgradeConfig: UpgradeConfig{
 			PrecompileUpgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewConfig(utils.NewUint64(100), nil, nil),
+					Config: txallowlist.NewConfig(utils.NewUint64(100), nil, nil, nil),
 				},
 			},
 		},

@@ -393,7 +393,7 @@ func TestBadTxAllowListBlock(t *testing.T) {
 				SubnetEVMTimestamp: utils.NewUint64(0),
 			},
 			GenesisPrecompiles: params.Precompiles{
-				txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(0), nil, nil),
+				txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(0), nil, nil, nil),
 			},
 		}
 		signer     = types.LatestSigner(config)
