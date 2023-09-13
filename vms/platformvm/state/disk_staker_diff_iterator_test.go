@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"github.com/thepudds/fzgen/fuzzer"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -21,7 +20,7 @@ func FuzzMarshalDiffKey(f *testing.F) {
 		var (
 			subnetID ids.ID
 			height   uint64
-			nodeID   ids.GenericNodeID
+			nodeID   = ids.EmptyGenericNodeID
 		)
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&subnetID, &height, &nodeID)
