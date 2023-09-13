@@ -26,24 +26,17 @@ var (
 // sorting. The inversed height is stored right after the Prefix, which is
 // MaxUint64 minus the desired Height.
 //
-// The inversedHeight is used instead of a storing the height  because the keys
-// are sorted in a reverse order.  The database have the iterator interface only
-// for  iterate in a ascending order (1000 -> 1001 -> 1001). The database will
-// only be quer database is to query a given key at a given height, (key "foo"
-// at height 1000) or the previous definition (key at the last definition bellow
-// 1000).
-
 // The inverse height is stored, instead of the height, as part of the key. That
 // is because the database interface only provides ascending iterators.
-// Archivedb main usage is to query a given key at a given height, or the
+// Archivedb's main usage is to query a given key at a given height, or the
 // immediate previous height. That is why the heights are being converted from
 // `height` to `MAX_INT64 - height`.
 //
 //	Example (Asumming MAX_INT64 is 10,000):
-//	 |	User given	|	Stored as 		|
-//	 |--------------|-------------------|
-//	 | foo:10		|	   foo:9910		|
-//	 | foo:20		| .    foo:9080		|
+//	 |  User given  |  Stored as   |
+//	 |--------------|--------------|
+//	 |    foo:10    |   foo:9910   |
+//	 |    foo:20    |   foo:9080   |
 //
 // The internal sorting will be `foo:9080`, `foo:9910` instead of (`foo:10`,
 // `foo:20`). The new sorting plays well with the descending iterator, having a
