@@ -244,7 +244,7 @@ func TestValidatorGossiper(t *testing.T) {
 	require.NoError(gossiper.Gossip(context.Background()))
 	require.Equal(1, calls)
 
-	// we not a validator, so we should not request gossip
+	// we are not a validator, so we should not request gossip
 	validators.validators = set.Set[ids.NodeID]{}
 	require.NoError(gossiper.Gossip(context.Background()))
 	require.Equal(2, calls)
