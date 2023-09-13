@@ -57,7 +57,7 @@ type Handler interface {
 	// ShouldHandle returns true if the node with the given ID is allowed to send
 	// messages to this chain. If the node is not allowed to send messages to
 	// this chain, the message should be dropped.
-	ShouldHandle(nodeID ids.NodeID) bool
+	ShouldHandle(nodeID ids.GenericNodeID) bool
 
 	SetEngineManager(engineManager *EngineManager)
 	GetEngineManager() *EngineManager
@@ -179,8 +179,8 @@ func (h *handler) Context() *snow.ConsensusContext {
 	return h.ctx
 }
 
-func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnet.IsAllowed(ids.GenericNodeIDFromNodeID(nodeID), h.validators.Contains(ids.GenericNodeIDFromNodeID(nodeID)))
+func (h *handler) ShouldHandle(nodeID ids.GenericNodeID) bool {
+	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
@@ -462,8 +462,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		)
 	}
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	h.resourceTracker.StartProcessing(genericNodeID, startTime)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
 	defer func() {
@@ -475,7 +474,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			processingTime    = endTime.Sub(startTime)
 			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
-		h.resourceTracker.StopProcessing(genericNodeID, endTime)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
@@ -545,16 +544,20 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
 	//            response fails.
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 	switch msg := body.(type) {
 	// State messages should always be sent to the snowman engine
 	case *p2p.GetStateSummaryFrontier:
-		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
+		return engine.GetStateSummaryFrontier(ctx, shortNodeID, msg.RequestId)
 
 	case *p2p.StateSummaryFrontier:
-		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
+		return engine.StateSummaryFrontier(ctx, shortNodeID, msg.RequestId, msg.Summary)
 
 	case *message.GetStateSummaryFrontierFailed:
-		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetStateSummaryFrontierFailed(ctx, shortNodeID, msg.RequestID)
 
 	case *p2p.GetAcceptedStateSummary:
 		// TODO: Enforce that the numbers are sorted to make this verification
@@ -566,12 +569,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.Uint32("requestID", msg.RequestId),
 				zap.String("field", "Heights"),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
+			return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
 		return engine.GetAcceptedStateSummary(
 			ctx,
-			nodeID,
+			shortNodeID,
 			msg.RequestId,
 			msg.Heights,
 		)
@@ -586,18 +589,18 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "SummaryIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
+			return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedStateSummary(ctx, nodeID, msg.RequestId, summaryIDs)
+		return engine.AcceptedStateSummary(ctx, shortNodeID, msg.RequestId, summaryIDs)
 
 	case *message.GetAcceptedStateSummaryFailed:
-		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestID)
 
 	// Bootstrapping messages may be forwarded to either avalanche or snowman
 	// engines, depending on the EngineType field
 	case *p2p.GetAcceptedFrontier:
-		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
+		return engine.GetAcceptedFrontier(ctx, shortNodeID, msg.RequestId)
 
 	case *p2p.AcceptedFrontier:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -609,13 +612,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
+			return engine.GetAcceptedFrontierFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
+		return engine.AcceptedFrontier(ctx, shortNodeID, msg.RequestId, containerID)
 
 	case *message.GetAcceptedFrontierFailed:
-		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetAcceptedFrontierFailed(ctx, shortNodeID, msg.RequestID)
 
 	case *p2p.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -630,7 +633,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
+		return engine.GetAccepted(ctx, shortNodeID, msg.RequestId, containerIDs)
 
 	case *p2p.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -642,13 +645,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestId)
+			return engine.GetAcceptedFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
-		return engine.Accepted(ctx, nodeID, msg.RequestId, containerIDs)
+		return engine.Accepted(ctx, shortNodeID, msg.RequestId, containerIDs)
 
 	case *message.GetAcceptedFailed:
-		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetAcceptedFailed(ctx, shortNodeID, msg.RequestID)
 
 	case *p2p.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -663,13 +666,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAncestors(ctx, nodeID, msg.RequestId, containerID)
+		return engine.GetAncestors(ctx, shortNodeID, msg.RequestId, containerID)
 
 	case *message.GetAncestorsFailed:
-		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetAncestorsFailed(ctx, shortNodeID, msg.RequestID)
 
 	case *p2p.Ancestors:
-		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
+		return engine.Ancestors(ctx, shortNodeID, msg.RequestId, msg.Containers)
 
 	case *p2p.Get:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -684,16 +687,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.Get(ctx, nodeID, msg.RequestId, containerID)
+		return engine.Get(ctx, shortNodeID, msg.RequestId, containerID)
 
 	case *message.GetFailed:
-		return engine.GetFailed(ctx, nodeID, msg.RequestID)
+		return engine.GetFailed(ctx, shortNodeID, msg.RequestID)
 
 	case *p2p.Put:
-		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
+		return engine.Put(ctx, shortNodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PushQuery:
-		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
+		return engine.PushQuery(ctx, shortNodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -708,7 +711,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
+		return engine.PullQuery(ctx, shortNodeID, msg.RequestId, containerID)
 
 	case *p2p.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
@@ -720,7 +723,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+			return engine.QueryFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
@@ -732,31 +735,31 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "AcceptedID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+			return engine.QueryFailed(ctx, shortNodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
+		return engine.Chits(ctx, shortNodeID, msg.RequestId, preferredID, acceptedID)
 
 	case *message.QueryFailed:
-		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
+		return engine.QueryFailed(ctx, shortNodeID, msg.RequestID)
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
-		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
+		err := h.peerTracker.Connected(ctx, shortNodeID, msg.NodeVersion)
 		if err != nil {
 			return err
 		}
-		return engine.Connected(ctx, nodeID, msg.NodeVersion)
+		return engine.Connected(ctx, shortNodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
-		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
+		return h.subnetConnector.ConnectedSubnet(ctx, shortNodeID, msg.SubnetID)
 
 	case *message.Disconnected:
-		err := h.peerTracker.Disconnected(ctx, nodeID)
+		err := h.peerTracker.Disconnected(ctx, shortNodeID)
 		if err != nil {
 			return err
 		}
-		return engine.Disconnected(ctx, nodeID)
+		return engine.Disconnected(ctx, shortNodeID)
 
 	default:
 		return fmt.Errorf(
@@ -800,15 +803,14 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 	}
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	h.resourceTracker.StartProcessing(genericNodeID, startTime)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			processingTime    = endTime.Sub(startTime)
 		)
-		h.resourceTracker.StopProcessing(genericNodeID, endTime)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		// There is no lock grabbed here, so both metrics are identical
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		messageHistograms.msgHandlingTime.Observe(float64(processingTime))
@@ -829,24 +831,28 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 	}
 
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 	switch m := body.(type) {
 	case *p2p.AppRequest:
 		return engine.AppRequest(
 			ctx,
-			nodeID,
+			shortNodeID,
 			m.RequestId,
 			msg.Expiration(),
 			m.AppBytes,
 		)
 
 	case *p2p.AppResponse:
-		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
+		return engine.AppResponse(ctx, shortNodeID, m.RequestId, m.AppBytes)
 
 	case *message.AppRequestFailed:
-		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
+		return engine.AppRequestFailed(ctx, shortNodeID, m.RequestID)
 
 	case *p2p.AppGossip:
-		return engine.AppGossip(ctx, nodeID, m.AppBytes)
+		return engine.AppGossip(ctx, shortNodeID, m.AppBytes)
 
 	case *message.CrossChainAppRequest:
 		return engine.CrossChainAppRequest(

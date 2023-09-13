@@ -55,7 +55,7 @@ func TestQueue(t *testing.T) {
 	// messages on [u.msgs]
 	cpuTracker.EXPECT().Usage(genericVdr1ID, gomock.Any()).Return(0.1).Times(1)
 	u.Push(context.Background(), msg1)
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok := u.Pop()
 	require.True(ok)
@@ -65,7 +65,7 @@ func TestQueue(t *testing.T) {
 
 	cpuTracker.EXPECT().Usage(genericVdr1ID, gomock.Any()).Return(0.0).Times(1)
 	u.Push(context.Background(), msg1)
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
@@ -75,7 +75,7 @@ func TestQueue(t *testing.T) {
 
 	cpuTracker.EXPECT().Usage(genericVdr1ID, gomock.Any()).Return(1.0).Times(1)
 	u.Push(context.Background(), msg1)
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
@@ -85,7 +85,7 @@ func TestQueue(t *testing.T) {
 
 	cpuTracker.EXPECT().Usage(genericVdr1ID, gomock.Any()).Return(0.0).Times(1)
 	u.Push(context.Background(), msg1)
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr1ID])
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
@@ -95,7 +95,7 @@ func TestQueue(t *testing.T) {
 
 	// Push msg1 from vdr1ID
 	u.Push(context.Background(), msg1)
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr1ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr1ID])
 	require.Equal(1, u.Len())
 
 	msg2 := Message{
@@ -113,7 +113,7 @@ func TestQueue(t *testing.T) {
 	// Push msg2 from vdr2ID
 	u.Push(context.Background(), msg2)
 	require.Equal(2, u.Len())
-	require.Equal(1, u.nodeToUnprocessedMsgs[vdr2ID])
+	require.Equal(1, u.nodeToUnprocessedMsgs[genericVdr2ID])
 	// Set vdr1's usage to 99% and vdr2's to .01
 	cpuTracker.EXPECT().Usage(genericVdr1ID, gomock.Any()).Return(.99).Times(2)
 	cpuTracker.EXPECT().Usage(genericVdr2ID, gomock.Any()).Return(.01).Times(1)

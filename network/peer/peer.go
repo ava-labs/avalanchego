@@ -452,11 +452,7 @@ func (p *peer) readMessages() {
 		)
 
 		// Parse the message
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(p.id)
-		if err != nil {
-			panic(err)
-		}
-		msg, err := p.MessageCreator.Parse(msgBytes, shortNodeID, onFinishedHandling)
+		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),

@@ -69,7 +69,7 @@ type messageQueue struct {
 	cond   *sync.Cond
 	closed bool
 	// Node ID --> Messages this node has in [msgs]
-	nodeToUnprocessedMsgs map[ids.NodeID]int
+	nodeToUnprocessedMsgs map[ids.GenericNodeID]int
 	// Unprocessed messages
 	msgAndCtxs []*msgAndContext
 }
@@ -87,7 +87,7 @@ func NewMessageQueue(
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
-		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
+		nodeToUnprocessedMsgs: make(map[ids.GenericNodeID]int),
 	}
 	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
 }
@@ -218,7 +218,7 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
 	nodeID := msg.NodeID()
-	weight := m.vdrs.GetWeight(ids.GenericNodeIDFromNodeID(nodeID))
+	weight := m.vdrs.GetWeight(nodeID)
 	// The sum of validator weights should never be 0, but handle
 	// that case for completeness here to avoid divide by 0.
 	portionWeight := float64(0)
@@ -227,8 +227,7 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
 	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	recentCPUUsage := m.cpuTracker.Usage(genericNodeID, m.clock.Time())
+	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUsage <= maxCPU
 }

@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	dummyNodeID             = ids.EmptyNodeID
+	dummyNodeID             = ids.EmptyGenericNodeID
 	dummyOnFinishedHandling = func() {}
 )
 

@@ -1605,7 +1605,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	var reqID uint32
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		inMsg, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
 
@@ -1733,7 +1733,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
@@ -1745,7 +1745,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAncestors)

@@ -17,7 +17,7 @@ type InboundMsgBuilder interface {
 	// Parse reads given bytes as InboundMessage
 	Parse(
 		bytes []byte,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		onFinishedHandling func(),
 	) (InboundMessage, error)
 }
@@ -32,7 +32,7 @@ func newInboundBuilder(builder *msgBuilder) InboundMsgBuilder {
 	}
 }
 
-func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (InboundMessage, error) {
+func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.GenericNodeID, onFinishedHandling func()) (InboundMessage, error) {
 	return b.builder.parseInbound(bytes, nodeID, onFinishedHandling)
 }
 
@@ -43,7 +43,7 @@ func InboundGetStateSummaryFrontier(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     GetStateSummaryFrontierOp,
 		message: &p2p.GetStateSummaryFrontier{
 			ChainId:   chainID.Bytes(),
@@ -61,7 +61,7 @@ func InboundStateSummaryFrontier(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     StateSummaryFrontierOp,
 		message: &p2p.StateSummaryFrontier{
 			ChainId:   chainID.Bytes(),
@@ -80,7 +80,7 @@ func InboundGetAcceptedStateSummary(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     GetAcceptedStateSummaryOp,
 		message: &p2p.GetAcceptedStateSummary{
 			ChainId:   chainID.Bytes(),
@@ -101,7 +101,7 @@ func InboundAcceptedStateSummary(
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     AcceptedStateSummaryOp,
 		message: &p2p.AcceptedStateSummary{
 			ChainId:    chainID.Bytes(),
@@ -120,7 +120,7 @@ func InboundGetAcceptedFrontier(
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     GetAcceptedFrontierOp,
 		message: &p2p.GetAcceptedFrontier{
 			ChainId:    chainID.Bytes(),
@@ -139,7 +139,7 @@ func InboundAcceptedFrontier(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     AcceptedFrontierOp,
 		message: &p2p.AcceptedFrontier{
 			ChainId:     chainID.Bytes(),
@@ -161,7 +161,7 @@ func InboundGetAccepted(
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     GetAcceptedOp,
 		message: &p2p.GetAccepted{
 			ChainId:      chainID.Bytes(),
@@ -183,7 +183,7 @@ func InboundAccepted(
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     AcceptedOp,
 		message: &p2p.Accepted{
 			ChainId:      chainID.Bytes(),
@@ -203,7 +203,7 @@ func InboundPushQuery(
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     PushQueryOp,
 		message: &p2p.PushQuery{
 			ChainId:    chainID.Bytes(),
@@ -225,7 +225,7 @@ func InboundPullQuery(
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     PullQueryOp,
 		message: &p2p.PullQuery{
 			ChainId:     chainID.Bytes(),
@@ -246,7 +246,7 @@ func InboundChits(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     ChitsOp,
 		message: &p2p.Chits{
 			ChainId:     chainID.Bytes(),
@@ -266,7 +266,7 @@ func InboundAppRequest(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     AppRequestOp,
 		message: &p2p.AppRequest{
 			ChainId:   chainID.Bytes(),
@@ -285,7 +285,7 @@ func InboundAppResponse(
 	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
+		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
 		op:     AppResponseOp,
 		message: &p2p.AppResponse{
 			ChainId:   chainID.Bytes(),
