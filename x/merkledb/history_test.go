@@ -86,12 +86,11 @@ func Test_History_Large(t *testing.T) {
 
 	numIters := 250
 
-	for i := 1; i < 10; i++ {
+	for i := 1; i < 5; i++ {
 		config := newDefaultConfig()
 		// History must be large enough to get the change proof
-		// after this loop. Multiply by four because every loop
-		// iteration we do two puts and up to two deletes.
-		config.HistoryLength = uint(4 * numIters)
+		// after this loop.
+		config.HistoryLength = uint(numIters)
 		db, err := New(
 			context.Background(),
 			memdb.New(),
@@ -105,6 +104,7 @@ func Test_History_Large(t *testing.T) {
 		r := rand.New(rand.NewSource(now)) // #nosec G404
 		// make sure they stay in sync
 		for x := 0; x < numIters; x++ {
+			batch := db.NewBatch()
 			addkey := make([]byte, r.Intn(50))
 			_, err := r.Read(addkey)
 			require.NoError(err)
@@ -112,12 +112,12 @@ func Test_History_Large(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			require.NoError(db.Put(addkey, val))
+			require.NoError(batch.Put(addkey, val))
 
 			addNilkey := make([]byte, r.Intn(50))
 			_, err = r.Read(addNilkey)
 			require.NoError(err)
-			require.NoError(db.Put(addNilkey, nil))
+			require.NoError(batch.Put(addNilkey, nil))
 
 			deleteKeyStart := make([]byte, r.Intn(50))
 			_, err = r.Read(deleteKeyStart)
@@ -125,20 +125,24 @@ func Test_History_Large(t *testing.T) {
 
 			it := db.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				require.NoError(db.Delete(it.Key()))
+				require.NoError(batch.Delete(it.Key()))
 			}
 			require.NoError(it.Error())
 			it.Release()
 
+			require.NoError(batch.Write())
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			roots = append(roots, root)
 		}
-		proof, err := db.GetRangeProofAtRoot(context.Background(), roots[0], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
-		require.NoError(err)
-		require.NotNil(proof)
 
-		require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[0]))
+		for i := 0; i < numIters; i += numIters / 10 {
+			proof, err := db.GetRangeProofAtRoot(context.Background(), roots[i], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
+			require.NoError(err)
+			require.NotNil(proof)
+
+			require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[i]))
+		}
 	}
 }
 
