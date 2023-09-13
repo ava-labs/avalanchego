@@ -66,7 +66,7 @@ func (c *DBClient) GetChangeProof(
 	}
 
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(resp.GetChangeProof()); err != nil {
+	if err := proof.UnmarshalProto(resp.GetChangeProof(), merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -118,7 +118,7 @@ func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, e
 	}
 
 	var proof merkledb.Proof
-	if err := proof.UnmarshalProto(resp.Proof); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof, merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -148,7 +148,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 	}
 
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(resp.Proof); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof, merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 	return &proof, nil

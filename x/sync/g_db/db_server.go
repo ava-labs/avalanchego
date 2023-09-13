@@ -94,7 +94,7 @@ func (s *DBServer) VerifyChangeProof(
 	req *pb.VerifyChangeProofRequest,
 ) (*pb.VerifyChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof); err != nil {
+	if err := proof.UnmarshalProto(req.Proof, merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 
@@ -126,7 +126,7 @@ func (s *DBServer) CommitChangeProof(
 	req *pb.CommitChangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof); err != nil {
+	if err := proof.UnmarshalProto(req.Proof, merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 
@@ -197,7 +197,7 @@ func (s *DBServer) CommitRangeProof(
 	req *pb.CommitRangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
+	if err := proof.UnmarshalProto(req.RangeProof, merkledb.BranchFactor16); err != nil {
 		return nil, err
 	}
 
