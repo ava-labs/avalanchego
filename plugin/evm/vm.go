@@ -142,12 +142,12 @@ const (
 	maxValidatorSetStaleness       = time.Minute
 	throttlingPeriod               = 10 * time.Second
 	throttlingLimit                = 2
+	gossipFrequency                = 10 * time.Second
 )
 
 var (
 	ethTxGossipConfig = gossip.Config{
 		Namespace: "eth_tx_gossip",
-		Frequency: 10 * time.Second,
 		PollSize:  10,
 	}
 	ethTxGossipHandlerConfig = gossip.HandlerConfig{
@@ -157,7 +157,6 @@ var (
 
 	atomicTxGossipConfig = gossip.Config{
 		Namespace: "atomic_tx_gossip",
-		Frequency: 10 * time.Second,
 		PollSize:  10,
 	}
 	atomicTxGossipHandlerConfig = gossip.HandlerConfig{
@@ -1056,7 +1055,11 @@ func (vm *VM) initBlockBuilding() error {
 		return err
 	}
 
-	ethTxGossiper, err := gossip.NewGossiper[GossipEthTx, *GossipEthTx](
+	var (
+		ethTxGossiper    gossip.Gossiper
+		atomicTxGossiper gossip.Gossiper
+	)
+	ethTxGossiper, err = gossip.NewPullGossiper[GossipEthTx, *GossipEthTx](
 		ethTxGossipConfig,
 		vm.ctx.Log,
 		ethTxPool,
@@ -1066,14 +1069,19 @@ func (vm *VM) initBlockBuilding() error {
 	if err != nil {
 		return err
 	}
+	ethTxGossiper = gossip.ValidatorGossiper{
+		Gossiper:   ethTxGossiper,
+		NodeID:     vm.ctx.NodeID,
+		Validators: vm.validators,
+	}
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		ethTxGossiper.Gossip(ctx)
+		gossip.Every(ctx, vm.ctx.Log, ethTxGossiper, gossipFrequency)
 		vm.shutdownWg.Done()
 	}()
 
-	atomicTxGossiper, err := gossip.NewGossiper[GossipAtomicTx, *GossipAtomicTx](
+	atomicTxGossiper, err = gossip.NewPullGossiper[GossipAtomicTx, *GossipAtomicTx](
 		atomicTxGossipConfig,
 		vm.ctx.Log,
 		vm.mempool,
@@ -1083,10 +1091,15 @@ func (vm *VM) initBlockBuilding() error {
 	if err != nil {
 		return err
 	}
+	atomicTxGossiper = gossip.ValidatorGossiper{
+		Gossiper:   atomicTxGossiper,
+		NodeID:     vm.ctx.NodeID,
+		Validators: vm.validators,
+	}
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		atomicTxGossiper.Gossip(ctx)
+		gossip.Every(ctx, vm.ctx.Log, atomicTxGossiper, gossipFrequency)
 		vm.shutdownWg.Done()
 	}()
 
