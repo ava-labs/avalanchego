@@ -26,9 +26,6 @@ func GenericNodeIDFromBytes(bytes []byte) GenericNodeID {
 
 // GenericNodeIDFromNodeID attempt to convert a byte slice into a node id
 func GenericNodeIDFromNodeID(nodeID NodeID) GenericNodeID {
-	if nodeID == EmptyNodeID {
-		return EmptyGenericNodeID
-	}
 	return GenericNodeID(string(nodeID.Bytes()))
 }
 

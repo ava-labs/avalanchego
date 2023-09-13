@@ -51,7 +51,7 @@ func (id NodeID) String() string {
 func NodeIDFromString(nodeIDStr string) (NodeID, error) {
 	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
 	if err != nil {
-		return NodeID{}, err
+		return EmptyNodeID, err
 	}
 	return NodeID(asShort), nil
 }

@@ -18,7 +18,7 @@ func TestNodeIDEquality(t *testing.T) {
 	id := NodeID{24}
 	idCopy := NodeID{24}
 	require.Equal(id, idCopy)
-	id2 := NodeID{}
+	id2 := EmptyNodeID
 	require.NotEqual(id, id2)
 }
 
@@ -93,7 +93,7 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 		out   []byte
 		err   error
 	}{
-		{"NodeID{}", NodeID{}, []byte("\"NodeID-111111111111111111116DBWJs\""), nil},
+		{"NodeID{}", EmptyNodeID, []byte("\"NodeID-111111111111111111116DBWJs\""), nil},
 		{
 			"ID(\"ava labs\")",
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
@@ -119,7 +119,7 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		out         NodeID
 		expectedErr error
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, nil},
+		{"NodeID{}", []byte("null"), EmptyNodeID, nil},
 		{
 			"NodeID(\"ava labs\")",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
@@ -129,31 +129,31 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		{
 			"missing start quote",
 			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
-			NodeID{},
+			EmptyNodeID,
 			errMissingQuotes,
 		},
 		{
 			"missing end quote",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
-			NodeID{},
+			EmptyNodeID,
 			errMissingQuotes,
 		},
 		{
 			"NodeID-",
 			[]byte("\"NodeID-\""),
-			NodeID{},
+			EmptyNodeID,
 			errShortNodeID,
 		},
 		{
 			"NodeID-1",
 			[]byte("\"NodeID-1\""),
-			NodeID{},
+			EmptyNodeID,
 			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
 			[]byte("\"NodeID-1\""),
-			NodeID{},
+			EmptyNodeID,
 			cb58.ErrMissingChecksum,
 		},
 	}
@@ -161,7 +161,7 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			require := require.New(t)
 
-			foo := NodeID{}
+			foo := EmptyNodeID
 			err := foo.UnmarshalJSON(tt.in)
 			require.ErrorIs(err, tt.expectedErr)
 			require.Equal(tt.out, foo)
@@ -175,7 +175,7 @@ func TestNodeIDString(t *testing.T) {
 		id       NodeID
 		expected string
 	}{
-		{"NodeID{}", NodeID{}, "NodeID-111111111111111111116DBWJs"},
+		{"NodeID{}", EmptyNodeID, "NodeID-111111111111111111116DBWJs"},
 		{"NodeID{24}", NodeID{24}, "NodeID-3BuDc2d1Efme5Apba6SJ8w3Tz7qeh6mHt"},
 	}
 	for _, tt := range tests {
@@ -203,13 +203,13 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 func TestNodeIDLess(t *testing.T) {
 	require := require.New(t)
 
-	id1 := NodeID{}
-	id2 := NodeID{}
+	id1 := EmptyNodeID
+	id2 := EmptyNodeID
 	require.False(id1.Less(id2))
 	require.False(id2.Less(id1))
 
 	id1 = NodeID{1}
-	id2 = NodeID{}
+	id2 = EmptyNodeID
 	require.False(id1.Less(id2))
 	require.True(id2.Less(id1))
 
