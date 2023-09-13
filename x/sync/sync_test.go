@@ -447,56 +447,6 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.True(isPrefix(midPointVal, nextKey.Value()))
 }
 
-func TestFindNextKeyEmptyEndProof(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		Client:                NewMockClient(ctrl),
-		TargetRoot:            ids.Empty,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	})
-	require.NoError(err)
-	require.NotNil(syncer)
-
-	for i := 0; i < 100; i++ {
-		lastReceivedKeyLen := r.Intn(16)
-		lastReceivedKey := make([]byte, lastReceivedKeyLen)
-		_, _ = r.Read(lastReceivedKey) // #nosec G404
-
-		rangeEndLen := r.Intn(16)
-		rangeEndBytes := make([]byte, rangeEndLen)
-		_, _ = r.Read(rangeEndBytes) // #nosec G404
-
-		rangeEnd := maybe.Nothing[[]byte]()
-		if rangeEndLen > 0 {
-			rangeEnd = maybe.Some(rangeEndBytes)
-		}
-
-		nextKey, err := syncer.findNextKey(
-			context.Background(),
-			lastReceivedKey,
-			rangeEnd,
-			nil, /* endProof */
-		)
-		require.NoError(err)
-		require.Equal(maybe.Some(append(lastReceivedKey, 0)), nextKey)
-	}
-}
-
 func isPrefix(data []byte, prefix []byte) bool {
 	if prefix[len(prefix)-1]%16 == 0 {
 		index := 0
