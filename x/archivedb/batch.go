@@ -3,9 +3,17 @@
 
 package archivedb
 
-import "github.com/ava-labs/avalanchego/database"
+import (
+	"errors"
 
-var _ database.Batch = (*batch)(nil)
+	"github.com/ava-labs/avalanchego/database"
+)
+
+var (
+	_ database.Batch = (*batch)(nil)
+
+	ErrNotLongerAvailable = errors.New("batch is no longer available")
+)
 
 // A thin wrapper on top of the database.Batch that also keeps track of the height.
 //
@@ -14,23 +22,22 @@ var _ database.Batch = (*batch)(nil)
 // database must be the following height from the last written to the database,
 // otherwise an error will be thrown
 type batch struct {
-	db     *archiveDB
-	ops    map[string]database.BatchOp
-	size   int
-	height uint64
-	inner  database.Batch
+	db            *archiveDB
+	ops           map[string]database.BatchOp
+	size          int
+	height        uint64
+	inner         database.Batch
+	noLongerValid bool
 }
 
 func newBatchWithHeight(db *archiveDB, height uint64) *batch {
-	inner := db.rawDB.NewBatch()
-	ops := make(map[string]database.BatchOp)
-	size := 0
 	return &batch{
-		db,
-		ops,
-		size,
-		height,
-		inner,
+		db:            db,
+		size:          0,
+		height:        height,
+		ops:           make(map[string]database.BatchOp),
+		inner:         db.rawDB.NewBatch(),
+		noLongerValid: false,
 	}
 }
 
@@ -41,6 +48,9 @@ func (c *batch) Height() uint64 {
 
 // Writes the changes to the database
 func (c *batch) Write() error {
+	if c.noLongerValid {
+		return ErrNotLongerAvailable
+	}
 	c.db.lock.Lock()
 	defer c.db.lock.Unlock()
 
@@ -55,12 +65,17 @@ func (c *batch) Write() error {
 		return err
 	}
 	c.db.currentHeight = c.height
+	c.Reset()              // release memory
+	c.noLongerValid = true // flag as batch as no longer usable
 
 	return nil
 }
 
 // Delete any previous state that may be stored in the database
 func (c *batch) Delete(key []byte) error {
+	if c.noLongerValid {
+		return ErrNotLongerAvailable
+	}
 	rawKey := newDBKey(key, c.height)
 	if value, exists := c.ops[string(rawKey)]; exists {
 		// decrese the size if there was any previous key/value
@@ -77,6 +92,9 @@ func (c *batch) Delete(key []byte) error {
 
 // Queues an insert for a key-value pair
 func (c *batch) Put(key []byte, value []byte) error {
+	if c.noLongerValid {
+		return ErrNotLongerAvailable
+	}
 	valueWithDeleteFlag := make([]byte, len(value)+1)
 	offset := copy(valueWithDeleteFlag, value)
 	valueWithDeleteFlag[offset] = 0 // not deleted element
