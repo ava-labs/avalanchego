@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var _ database.KeyValueReader = (*dbHeightReader)(nil)
+
 type dbHeightReader struct {
 	db                 *archiveDB
 	height             uint64
@@ -43,8 +45,7 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	reader.heightLastFoundKey = 0
 
 	if !iterator.Next() {
-		err := iterator.Error()
-		if err != nil {
+		if err := iterator.Error(); err != nil {
 			return nil, err
 		}
 
@@ -63,7 +64,7 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	rawValueLen := len(rawValue)
 	if rawValueLen == 0 {
 		// malformed, value should never ever be empty
-		return nil, database.ErrNotFound
+		return nil, ErrInvalidValue
 	}
 	if rawValue[rawValueLen-1] == 1 {
 		return nil, database.ErrNotFound

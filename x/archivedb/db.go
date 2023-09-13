@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	_ database.Batch          = (*dbBatchWithHeight)(nil)
-	_ database.KeyValueReader = (*dbHeightReader)(nil)
+	keyHeight             = []byte("archivedb.height")
+	ErrUnknownHeight      = errors.New("unknown height")
+	ErrInvalidBatchHeight = errors.New("invalid batch height")
+	ErrInvalidValue       = errors.New("invalid data value")
 )
 
 // ArchiveDb
@@ -55,12 +57,6 @@ type archiveDB struct {
 	// only allow to commit the next height
 	lock sync.RWMutex
 }
-
-var (
-	keyHeight             = []byte("archivedb.height")
-	ErrUnknownHeight      = errors.New("unknown height")
-	ErrInvalidBatchHeight = errors.New("invalid batch height")
-)
 
 func NewArchiveDB(
 	ctx context.Context,
@@ -118,6 +114,6 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 }
 
 // Creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch(height uint64) *dbBatchWithHeight {
+func (db *archiveDB) NewBatch(height uint64) *batch {
 	return newBatchWithHeight(db, height)
 }
