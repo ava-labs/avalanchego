@@ -84,6 +84,7 @@ func (c *batch) Delete(key []byte) error {
 	}
 	c.ops[string(rawKey)] = database.BatchOp{
 		Key:    rawKey,
+		Value:  []byte{1},
 		Delete: true,
 	}
 	c.size += len(rawKey) + 1
