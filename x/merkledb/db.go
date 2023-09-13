@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/semaphore"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -125,19 +126,18 @@ type Config struct {
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
-	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
-	// no limit will be used.
-	RootGenConcurrency int
+	// If 0 is specified, [runtime.NumCPU] will be used.
+	RootGenConcurrency uint
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
-	EvictionBatchSize int
+	EvictionBatchSize uint
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength int
+	HistoryLength uint
 	// The number of bytes to cache nodes with values.
-	ValueNodeCacheSize int
+	ValueNodeCacheSize uint
 	// The number of bytes to cache nodes without values.
-	IntermediateNodeCacheSize int
+	IntermediateNodeCacheSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -182,12 +182,9 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*trieView
 
-	// rootGenConcurrency is the number of goroutines to use when
-	// generating a new state root.
-	//
-	// TODO: Limit concurrency across all views, instead of only within
-	// a single view (see `workers` in hypersdk)
-	rootGenConcurrency int
+	// calculateNodeIDsSema controls the number of goroutines inside
+	// [calculateNodeIDsHelper] at any given time.
+	calculateNodeIDsSema *semaphore.Weighted
 }
 
 // New returns a new merkle database.
@@ -205,7 +202,7 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	rootGenConcurrency := runtime.NumCPU()
+	rootGenConcurrency := uint(runtime.NumCPU())
 	if config.RootGenConcurrency != 0 {
 		rootGenConcurrency = config.RootGenConcurrency
 	}
@@ -218,15 +215,15 @@ func newDatabase(
 		},
 	}
 	trieDB := &merkleDB{
-		metrics:            metrics,
-		baseDB:             db,
-		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
-		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
-		history:            newTrieHistory(config.HistoryLength),
-		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:         make([]*trieView, 0, defaultPreallocationSize),
-		rootGenConcurrency: rootGenConcurrency,
+		metrics:              metrics,
+		baseDB:               db,
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
+		history:              newTrieHistory(int(config.HistoryLength)),
+		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:           make([]*trieView, 0, defaultPreallocationSize),
+		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -245,7 +242,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, config.ValueNodeCacheSize); err != nil {
+			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
 				return nil, err
 			}
 		}
@@ -1085,9 +1082,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 	if err == nil {
 		// Root already exists, so calculate its id
-		if err := db.root.calculateID(db.metrics); err != nil {
-			return ids.Empty, err
-		}
+		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
 	if err != database.ErrNotFound {
@@ -1098,9 +1093,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	db.root = newNode(nil, RootPath)
 
 	// update its ID
-	if err := db.root.calculateID(db.metrics); err != nil {
-		return ids.Empty, err
-	}
+	db.root.calculateID(db.metrics)
 
 	if err := db.intermediateNodeDB.Put(RootPath, db.root); err != nil {
 		return ids.Empty, err
@@ -1211,9 +1204,11 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	return prefixedKey
 }
 
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
 func cacheEntrySize(p path, n *node) int {
 	if n == nil {
 		return len(p)
 	}
-	return len(p) + len(n.marshal())
+	// nodes cache their bytes representation so the total memory consumed is roughly twice that
+	return len(p) + 2*len(n.bytes())
 }

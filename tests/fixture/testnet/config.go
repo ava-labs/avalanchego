@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	DefaultNodeCount      = 5
+	DefaultNodeCount      = 2 // Minimum required to ensure connectivity-based health checks will pass
 	DefaultFundedKeyCount = 50
 
 	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
@@ -155,6 +155,12 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 
 	c.Genesis = genesis
 	return nil
+}
+
+// NodeURI associates a node ID with its API URI.
+type NodeURI struct {
+	NodeID ids.NodeID
+	URI    string
 }
 
 // NodeConfig defines configuration for an AvalancheGo node.
