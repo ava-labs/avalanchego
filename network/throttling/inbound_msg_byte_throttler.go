@@ -108,6 +108,29 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 		return t.metrics.awaitingRelease.Dec
 	}
 
+	// Take as many bytes as we can from [nodeID]'s validator allocation.
+	// Calculate [nodeID]'s validator allocation size based on its weight
+	// Return err before acquiring any bytes if we can't get the total weight.
+	vdrAllocationSize := uint64(0)
+	weight := t.vdrs.GetWeight(t.subnetID, nodeID)
+	totalWeight, err := t.vdrs.TotalWeight(t.subnetID)
+	if err != nil {
+		t.log.Error("Failed to get total weight of network validators",
+			zap.Stringer("subnetID", t.subnetID),
+			zap.Error(err),
+		)
+		t.lock.Unlock()
+		return t.metrics.awaitingRelease.Dec
+	}
+
+	if weight != 0 {
+		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalWeight))
+	}
+	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
+	// [vdrBytesAllowed] is the number of bytes this node
+	// may take from its validator allocation.
+	vdrBytesAllowed := vdrAllocationSize
+
 	// Take as many bytes as we can from the at-large allocation.
 	atLargeBytesUsed := math.Min(
 		// only give as many bytes as needed
@@ -130,27 +153,6 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 		}
 	}
 
-	// Take as many bytes as we can from [nodeID]'s validator allocation.
-	// Calculate [nodeID]'s validator allocation size based on its weight
-	vdrAllocationSize := uint64(0)
-	weight := t.vdrs.GetWeight(t.subnetID, nodeID)
-	totalWeight, err := t.vdrs.TotalWeight(t.subnetID)
-	if err != nil {
-		t.log.Error("Failed to get total weight of network validators",
-			zap.Stringer("subnetID", t.subnetID),
-			zap.Error(err),
-		)
-		t.lock.Unlock()
-		return t.metrics.awaitingRelease.Dec
-	}
-
-	if weight != 0 {
-		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalWeight))
-	}
-	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
-	// [vdrBytesAllowed] is the number of bytes this node
-	// may take from its validator allocation.
-	vdrBytesAllowed := vdrAllocationSize
 	if vdrBytesAlreadyUsed >= vdrAllocationSize {
 		// We're already using all the bytes we can from the validator allocation
 		vdrBytesAllowed = 0

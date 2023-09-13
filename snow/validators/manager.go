@@ -193,7 +193,7 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	defer m.lock.Unlock()
 	// If this was the last validator in the subnet
 	// and no callback listeners are registered, remove the subnet
-	if set.Len() == 0 && !set.HasCallbackRegistered() {
+	if set.Len() == 0 && !set.hasCallbackRegistered() {
 		delete(m.subnetToVdrs, subnetID)
 	}
 
@@ -246,7 +246,7 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		return nil, nil
+		return nil, ErrMissingValidators
 	}
 
 	return set.Sample(size)

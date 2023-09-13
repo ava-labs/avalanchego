@@ -237,7 +237,7 @@ func (s *vdrSet) len() int {
 	return len(s.vdrSlice)
 }
 
-func (s *vdrSet) HasCallbackRegistered() bool {
+func (s *vdrSet) hasCallbackRegistered() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

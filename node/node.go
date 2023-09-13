@@ -313,11 +313,10 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 		}
 
 		consensusRouter = &insecureValidatorManager{
-			subnetID: constants.PrimaryNetworkID,
-			log:      n.Log,
-			Router:   consensusRouter,
-			vdrs:     vdrs,
-			weight:   n.Config.SybilProtectionDisabledWeight,
+			log:    n.Log,
+			Router: consensusRouter,
+			vdrs:   vdrs,
+			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
@@ -343,7 +342,6 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 
 		consensusRouter = &beaconManager{
 			Router:        consensusRouter,
-			subnetID:      constants.PrimaryNetworkID,
 			timer:         timer,
 			beacons:       n.bootstrappers,
 			requiredConns: int64(requiredConns),
