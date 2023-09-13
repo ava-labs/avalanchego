@@ -382,10 +382,8 @@ func (m *Manager) findNextKey(
 	rangeEnd maybe.Maybe[[]byte],
 	endProof []merkledb.ProofNode,
 ) (maybe.Maybe[[]byte], error) {
-	if len(endProof) == 0 || (rangeEnd.HasValue() && bytes.Equal(rangeEnd.Value(), lastReceivedKey)) {
-		// The range is already complete if
-		// * endproof is empty if no end key was provided and no key values were sent back
-		// * the last key is equal to the end of the range
+	if len(endProof) == 0 {
+		// The range is already complete if endproof is empty since no end key was provided and no key values were sent back
 		return maybe.Nothing[[]byte](), nil
 	}
 
