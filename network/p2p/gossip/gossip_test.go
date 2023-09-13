@@ -201,19 +201,22 @@ func TestGossiperGossip(t *testing.T) {
 }
 
 func TestEvery(*testing.T) {
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
 	gossiper := &testGossiper{
 		gossipF: func(context.Context) error {
-			wg.Done()
+			if calls >= 10 {
+				cancel()
+				return nil
+			}
+
+			calls++
 			return nil
 		},
 	}
 
-	go Every(context.Background(), logging.NoLog{}, gossiper, time.Second)
-
-	wg.Wait()
+	go Every(ctx, logging.NoLog{}, gossiper, time.Millisecond)
+	<-ctx.Done()
 }
 
 func TestValidatorGossiper(t *testing.T) {
