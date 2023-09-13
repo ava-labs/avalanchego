@@ -375,9 +375,9 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 // Invariant 1: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 
-// Invariant 2: len(endproof) > 0
-// This should only occur if no keys were returned and no endkey was specified
-// if that happens then [lastReceivedKey] would equal [rangeEnd], which would violate Invariant 1
+// Invariant 2: len([endProof]) > 0
+// This only occurs when no keys were returned and no endkey was specified.
+// When that happens, [lastReceivedKey] would equal [rangeEnd], which would violate Invariant 1
 func (m *Manager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
