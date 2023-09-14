@@ -1082,18 +1082,30 @@ type GetCurrentSupplyArgs struct {
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
 	Supply json.Uint64 `json:"supply"`
+	Height json.Uint64 `json:"height"`
 }
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-func (s *Service) GetCurrentSupply(_ *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
+func (s *Service) GetCurrentSupply(r *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getCurrentSupply"),
 	)
 
 	supply, err := s.vm.state.GetCurrentSupply(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("fetching current supply failed: %w", err)
+	}
 	reply.Supply = json.Uint64(supply)
-	return err
+
+	ctx := r.Context()
+	height, err := s.vm.GetCurrentHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching current height failed: %w", err)
+	}
+	reply.Height = json.Uint64(height)
+
+	return nil
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators
