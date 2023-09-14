@@ -109,7 +109,8 @@ type RangeProofer interface {
 	) (*RangeProof, error)
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
-	// [start] is the smallest key in the range this [proof] covers.
+	// [start] is the smallest possible key in the range this [proof] covers.
+	// [end] is the largest possible key in the range this [proof] covers.
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
@@ -1129,7 +1130,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 
 // Returns all keys in range [start, end] that aren't in [keySet].
 // If [start] is nil, then the range has no lower bound.
-// If [end] is nil, then the range has no upper bound.
+// If [end] is maybe.Nothing, then the range has no upper bound.
 func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
