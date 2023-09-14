@@ -71,7 +71,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
 	peers.RegisterCallbackListener(startupTracker)
 
-	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
+	require.NoError(startupTracker.Connected(context.Background(), genericPeer, version.CurrentApp))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -176,7 +176,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantConnected = true
-	vm.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	vm.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 
@@ -191,18 +191,16 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
-	vdr0 := ids.GenerateTestNodeID()
-	genericVdr0 := ids.GenericNodeIDFromNodeID(vdr0)
-	require.NoError(peers.Add(genericVdr0, nil, ids.Empty, startupAlpha/2))
+	vdr0 := ids.GenerateTestGenericNodeID()
+	require.NoError(peers.Add(vdr0, nil, ids.Empty, startupAlpha/2))
 	require.NoError(bs.Connected(context.Background(), vdr0, version.CurrentApp))
 
 	require.NoError(bs.Start(context.Background(), 0))
 	require.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
-	vdr := ids.GenerateTestNodeID()
-	genericVdr := ids.GenericNodeIDFromNodeID(vdr)
-	require.NoError(peers.Add(genericVdr, nil, ids.Empty, startupAlpha))
+	vdr := ids.GenerateTestGenericNodeID()
+	require.NoError(peers.Add(vdr, nil, ids.Empty, startupAlpha))
 	require.NoError(bs.Connected(context.Background(), vdr, version.CurrentApp))
 	require.True(frontierRequested)
 }
@@ -701,10 +699,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.Equal(blkID2, requestedBlock)
 
 	// add another two validators to the fetch set to test behavior on empty response
-	newPeerID := ids.GenerateTestNodeID()
+	newPeerID := ids.GenerateTestGenericNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
-	newPeerID = ids.GenerateTestNodeID()
+	newPeerID = ids.GenerateTestGenericNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
 	require.NoError(bs.Ancestors(context.Background(), shortPeerID, requestID, [][]byte{blkBytes2}))
@@ -1365,9 +1363,8 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestNodeID()
-	genericPeer := ids.GenericNodeIDFromNodeID(peer)
-	require.NoError(peers.Add(genericPeer, nil, ids.Empty, 1))
+	peer := ids.GenerateTestGenericNodeID()
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)

@@ -146,7 +146,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	h.SetEngineManager(&handler.EngineManager{
@@ -450,7 +450,7 @@ func TestReliableMessages(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 1000
@@ -604,7 +604,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 2

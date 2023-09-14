@@ -15,8 +15,8 @@ import (
 type Connector interface {
 	Connected(
 		ctx context.Context,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		nodeVersion *version.Application,
 	) error
-	Disconnected(ctx context.Context, nodeID ids.NodeID) error
+	Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error
 }

@@ -53,8 +53,8 @@ type TestVM struct {
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
-	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
+	ConnectedF                  func(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error
+	DisconnectedF               func(ctx context.Context, nodeID ids.GenericNodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
@@ -262,7 +262,7 @@ func (vm *TestVM) CrossChainAppResponse(ctx context.Context, chainID ids.ID, req
 	return errCrossChainAppResponse
 }
 
-func (vm *TestVM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version.Application) error {
+func (vm *TestVM) Connected(ctx context.Context, id ids.GenericNodeID, nodeVersion *version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
@@ -272,7 +272,7 @@ func (vm *TestVM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *ver
 	return nil
 }
 
-func (vm *TestVM) Disconnected(ctx context.Context, id ids.NodeID) error {
+func (vm *TestVM) Disconnected(ctx context.Context, id ids.GenericNodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(ctx, id)
 	}

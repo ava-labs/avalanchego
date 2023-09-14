@@ -23,14 +23,14 @@ import (
 // Sample should always return up to [limit] peers, and less if fewer than
 // [limit] peers are available.
 func TestPeersSample(t *testing.T) {
-	nodeID1 := ids.GenerateTestNodeID()
-	nodeID2 := ids.GenerateTestNodeID()
-	nodeID3 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestGenericNodeID()
+	nodeID2 := ids.GenerateTestGenericNodeID()
+	nodeID3 := ids.GenerateTestGenericNodeID()
 
 	tests := []struct {
 		name         string
-		connected    set.Set[ids.NodeID]
-		disconnected set.Set[ids.NodeID]
+		connected    set.Set[ids.GenericNodeID]
+		disconnected set.Set[ids.GenericNodeID]
 		limit        int
 	}{
 		{
@@ -95,7 +95,7 @@ func TestPeersSample(t *testing.T) {
 				require.NoError(peers.Disconnected(context.Background(), disconnected))
 			}
 
-			sampleable := set.Set[ids.NodeID]{}
+			sampleable := set.Set[ids.GenericNodeID]{}
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
@@ -109,7 +109,7 @@ func TestPeersSample(t *testing.T) {
 func TestAppRequestAnyNodeSelection(t *testing.T) {
 	tests := []struct {
 		name     string
-		peers    []ids.NodeID
+		peers    []ids.GenericNodeID
 		expected error
 	}{
 		{
@@ -118,7 +118,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 		},
 		{
 			name:  "has peers",
-			peers: []ids.NodeID{ids.GenerateTestNodeID()},
+			peers: []ids.GenericNodeID{ids.GenerateTestGenericNodeID()},
 		},
 	}
 

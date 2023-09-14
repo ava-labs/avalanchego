@@ -16,14 +16,14 @@ import (
 func TestPeers(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	p := NewPeers()
 
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
-	p.OnValidatorAdded(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.Empty, 5)
+	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
@@ -31,15 +31,15 @@ func TestPeers(t *testing.T) {
 	require.Equal(uint64(5), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	p.OnValidatorWeightChanged(ids.GenericNodeIDFromNodeID(nodeID), 5, 10)
+	p.OnValidatorWeightChanged(nodeID, 5, 10)
 	require.Equal(uint64(10), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	p.OnValidatorRemoved(ids.GenericNodeIDFromNodeID(nodeID), 10)
+	p.OnValidatorRemoved(nodeID, 10)
 	require.Zero(p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	p.OnValidatorAdded(ids.GenericNodeIDFromNodeID(nodeID), nil, ids.Empty, 5)
+	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Equal(uint64(5), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 

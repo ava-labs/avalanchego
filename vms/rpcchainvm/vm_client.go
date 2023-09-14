@@ -411,7 +411,7 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*commo
 	return handlers, nil
 }
 
-func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (vm *VMClient) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
 		NodeId:  nodeID.Bytes(),
 		Version: nodeVersion.String(),
@@ -419,7 +419,7 @@ func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersio
 	return err
 }
 
-func (vm *VMClient) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (vm *VMClient) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	_, err := vm.client.Disconnected(ctx, &vmpb.DisconnectedRequest{
 		NodeId: nodeID.Bytes(),
 	})

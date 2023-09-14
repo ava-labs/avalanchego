@@ -71,7 +71,7 @@ type ValidatorHandler struct {
 }
 
 func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
-	if !v.ValidatorSet.Has(ctx, nodeID) {
+	if !v.ValidatorSet.Has(ctx, ids.GenericNodeIDFromNodeID(nodeID)) {
 		return ErrNotValidator
 	}
 
@@ -79,7 +79,7 @@ func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 }
 
 func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if !v.ValidatorSet.Has(ctx, nodeID) {
+	if !v.ValidatorSet.Has(ctx, ids.GenericNodeIDFromNodeID(nodeID)) {
 		return nil, ErrNotValidator
 	}
 

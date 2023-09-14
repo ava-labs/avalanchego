@@ -1730,7 +1730,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
-	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
+	require.NoError(bootstrapper.Connected(context.Background(), genericPeerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})

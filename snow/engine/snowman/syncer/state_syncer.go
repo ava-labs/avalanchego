@@ -559,7 +559,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
-func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
 	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 	return ss.startup(ctx)
 }
 
-func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}

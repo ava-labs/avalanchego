@@ -17,21 +17,21 @@ import (
 var _ ValidatorSet = (*testValidatorSet)(nil)
 
 type testValidatorSet struct {
-	validators set.Set[ids.NodeID]
+	validators set.Set[ids.GenericNodeID]
 }
 
-func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
+func (t testValidatorSet) Has(_ context.Context, nodeID ids.GenericNodeID) bool {
 	return t.validators.Contains(nodeID)
 }
 
 func TestValidatorHandlerAppGossip(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
 		validatorSet ValidatorSet
-		nodeID       ids.NodeID
+		nodeID       ids.GenericNodeID
 		expected     error
 	}{
 		{
@@ -58,20 +58,25 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 				ValidatorSet: tt.validatorSet,
 			}
 
-			err := handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(tt.nodeID)
+			if err != nil {
+				panic(err)
+			}
+
+			err = handler.AppGossip(context.Background(), shortNodeID, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}
 }
 
 func TestValidatorHandlerAppRequest(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
 		validatorSet ValidatorSet
-		nodeID       ids.NodeID
+		nodeID       ids.GenericNodeID
 		expected     error
 	}{
 		{
@@ -98,7 +103,12 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 				ValidatorSet: tt.validatorSet,
 			}
 
-			_, err := handler.AppRequest(context.Background(), tt.nodeID, time.Time{}, []byte("foobar"))
+			shortNodeID, err := ids.NodeIDFromGenericNodeID(tt.nodeID)
+			if err != nil {
+				panic(err)
+			}
+
+			_, err = handler.AppRequest(context.Background(), shortNodeID, time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}

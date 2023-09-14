@@ -21,10 +21,10 @@ var (
 // Peers contains a set of nodes that we are connected to.
 type Peers struct {
 	lock  sync.RWMutex
-	peers set.SampleableSet[ids.NodeID]
+	peers set.SampleableSet[ids.GenericNodeID]
 }
 
-func (p *Peers) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
+func (p *Peers) Connected(_ context.Context, nodeID ids.GenericNodeID, _ *version.Application) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -33,7 +33,7 @@ func (p *Peers) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Appli
 	return nil
 }
 
-func (p *Peers) Disconnected(_ context.Context, nodeID ids.NodeID) error {
+func (p *Peers) Disconnected(_ context.Context, nodeID ids.GenericNodeID) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -42,7 +42,7 @@ func (p *Peers) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
-func (p *Peers) Sample(_ context.Context, limit int) []ids.NodeID {
+func (p *Peers) Sample(_ context.Context, limit int) []ids.GenericNodeID {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 

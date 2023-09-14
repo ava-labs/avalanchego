@@ -339,7 +339,7 @@ func (e *tracedEngine) CrossChainAppRequestFailed(ctx context.Context, chainID i
 	return e.engine.CrossChainAppRequestFailed(ctx, chainID, requestID)
 }
 
-func (e *tracedEngine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (e *tracedEngine) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Connected", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Stringer("version", nodeVersion),
@@ -349,7 +349,7 @@ func (e *tracedEngine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 	return e.engine.Connected(ctx, nodeID, nodeVersion)
 }
 
-func (e *tracedEngine) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (e *tracedEngine) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Disconnected", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 	))

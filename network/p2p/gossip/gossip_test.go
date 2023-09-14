@@ -127,7 +127,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 			peers := &p2p.Peers{}
-			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
+			require.NoError(peers.Connected(context.Background(), ids.EmptyGenericNodeID, nil))
 
 			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
 			require.NoError(err)

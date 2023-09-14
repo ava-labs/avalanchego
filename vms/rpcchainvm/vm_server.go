@@ -401,7 +401,7 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 		return nil, err
 	}
 
-	return &emptypb.Empty{}, vm.vm.Connected(ctx, nodeID, peerVersion)
+	return &emptypb.Empty{}, vm.vm.Connected(ctx, ids.GenericNodeIDFromNodeID(nodeID), peerVersion)
 }
 
 func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
@@ -409,7 +409,7 @@ func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequ
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
+	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, ids.GenericNodeIDFromNodeID(nodeID))
 }
 
 // If the underlying VM doesn't actually implement this method, its [BuildBlock]

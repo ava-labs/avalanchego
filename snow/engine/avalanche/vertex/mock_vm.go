@@ -117,7 +117,7 @@ func (mr *MockLinearizableVMMockRecorder) BuildBlock(arg0 interface{}) *gomock.C
 }
 
 // Connected mocks base method.
-func (m *MockLinearizableVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
+func (m *MockLinearizableVM) Connected(arg0 context.Context, arg1 ids.GenericNodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -203,7 +203,7 @@ func (mr *MockLinearizableVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2
 }
 
 // Disconnected mocks base method.
-func (m *MockLinearizableVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
+func (m *MockLinearizableVM) Disconnected(arg0 context.Context, arg1 ids.GenericNodeID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)

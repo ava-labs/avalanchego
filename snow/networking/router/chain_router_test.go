@@ -119,7 +119,7 @@ func TestShutdown(t *testing.T) {
 		shutdownCalled <- struct{}{}
 		return nil
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
@@ -134,7 +134,7 @@ func TestShutdown(t *testing.T) {
 		shutdownCalled <- struct{}{}
 		return nil
 	}
-	engine.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	engine.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	engine.HaltF = func(context.Context) {}
@@ -254,7 +254,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
@@ -408,7 +408,7 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}

@@ -116,12 +116,11 @@ func TestHealthCheckSubnet(t *testing.T) {
 			handlerIntf.Start(context.Background(), false)
 
 			testVdrCount := 4
-			vdrIDs := set.NewSet[ids.NodeID](testVdrCount)
+			vdrIDs := set.NewSet[ids.GenericNodeID](testVdrCount)
 			for i := 0; i < testVdrCount; i++ {
-				vdrID := ids.GenerateTestNodeID()
+				vdrID := ids.GenerateTestGenericNodeID()
 				vdrIDs.Add(vdrID)
-
-				require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdrID), nil, ids.Empty, 100))
+				require.NoError(vdrs.Add(vdrID, nil, ids.Empty, 100))
 			}
 
 			for index, nodeID := range vdrIDs.List() {

@@ -33,7 +33,7 @@ type Peers interface {
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
-	PreferredPeers() set.Set[ids.NodeID]
+	PreferredPeers() set.Set[ids.GenericNodeID]
 }
 
 type lockedPeers struct {
@@ -70,14 +70,14 @@ func (p *lockedPeers) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeig
 	p.peers.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
 }
 
-func (p *lockedPeers) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+func (p *lockedPeers) Connected(ctx context.Context, nodeID ids.GenericNodeID, version *version.Application) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	return p.peers.Connected(ctx, nodeID, version)
 }
 
-func (p *lockedPeers) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (p *lockedPeers) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -98,7 +98,7 @@ func (p *lockedPeers) ConnectedPercent() float64 {
 	return p.peers.ConnectedPercent()
 }
 
-func (p *lockedPeers) PreferredPeers() set.Set[ids.NodeID] {
+func (p *lockedPeers) PreferredPeers() set.Set[ids.GenericNodeID] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -142,13 +142,13 @@ func (p *meteredPeers) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWei
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
-func (p *meteredPeers) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+func (p *meteredPeers) Connected(ctx context.Context, nodeID ids.GenericNodeID, version *version.Application) error {
 	err := p.Peers.Connected(ctx, nodeID, version)
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 	return err
 }
 
-func (p *meteredPeers) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (p *meteredPeers) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	err := p.Peers.Disconnected(ctx, nodeID)
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 	return err
@@ -196,23 +196,21 @@ func (p *peerData) OnValidatorWeightChanged(nodeID ids.GenericNodeID, oldWeight,
 	}
 }
 
-func (p *peerData) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	if weight, ok := p.validators[genericNodeID]; ok {
+func (p *peerData) Connected(_ context.Context, nodeID ids.GenericNodeID, _ *version.Application) error {
+	if weight, ok := p.validators[nodeID]; ok {
 		p.connectedWeight += weight
-		p.connectedValidators.Add(genericNodeID)
+		p.connectedValidators.Add(nodeID)
 	}
-	p.connectedPeers.Add(genericNodeID)
+	p.connectedPeers.Add(nodeID)
 	return nil
 }
 
-func (p *peerData) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	if weight, ok := p.validators[genericNodeID]; ok {
+func (p *peerData) Disconnected(_ context.Context, nodeID ids.GenericNodeID) error {
+	if weight, ok := p.validators[nodeID]; ok {
 		p.connectedWeight -= weight
-		p.connectedValidators.Remove(genericNodeID)
+		p.connectedValidators.Remove(nodeID)
 	}
-	p.connectedPeers.Remove(genericNodeID)
+	p.connectedPeers.Remove(nodeID)
 	return nil
 }
 
@@ -227,25 +225,17 @@ func (p *peerData) ConnectedPercent() float64 {
 	return float64(p.connectedWeight) / float64(p.totalWeight)
 }
 
-func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {
+func (p *peerData) PreferredPeers() set.Set[ids.GenericNodeID] {
 	if p.connectedValidators.Len() == 0 {
-		connectedPeers := set.NewSet[ids.NodeID](p.connectedPeers.Len())
-		for genericPeer := range p.connectedPeers {
-			peer, err := ids.NodeIDFromGenericNodeID(genericPeer)
-			if err != nil {
-				panic(err)
-			}
+		connectedPeers := set.NewSet[ids.GenericNodeID](p.connectedPeers.Len())
+		for peer := range p.connectedPeers {
 			connectedPeers.Add(peer)
 		}
 		return connectedPeers
 	}
 
-	connectedValidators := set.NewSet[ids.NodeID](p.connectedValidators.Len())
-	for genericPeer := range p.connectedValidators {
-		peer, err := ids.NodeIDFromGenericNodeID(genericPeer)
-		if err != nil {
-			panic(err)
-		}
+	connectedValidators := set.NewSet[ids.GenericNodeID](p.connectedValidators.Len())
+	for peer := range p.connectedValidators {
 		connectedValidators.Add(peer)
 	}
 	return connectedValidators

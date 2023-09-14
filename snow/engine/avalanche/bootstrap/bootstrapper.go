@@ -124,7 +124,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 	}
 
-	requestedVtxID, requested := b.OutstandingRequests.Remove(nodeID, requestID)
+	requestedVtxID, requested := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
 	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
@@ -231,7 +231,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
+	vtxID, ok := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
 			zap.String("reason", "no matching outstanding request"),
@@ -246,7 +246,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 
 func (b *bootstrapper) Connected(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	nodeVersion *version.Application,
 ) error {
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
@@ -265,7 +265,7 @@ func (b *bootstrapper) Connected(
 	return b.Startup(ctx)
 }
 
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		if err != nil {
 			return err
 		}
-		b.OutstandingRequests.Add(vdr, b.Config.SharedCfg.RequestID, vtxID)
+		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
 		b.Config.Sender.SendGetAncestors(ctx, ids.GenericNodeIDFromNodeID(vdr), b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)

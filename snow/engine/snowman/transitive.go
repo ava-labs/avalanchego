@@ -158,7 +158,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 
 	actualBlkID := blk.ID()
-	expectedBlkID, ok := t.blkReqs.Get(nodeID, requestID)
+	expectedBlkID, ok := t.blkReqs.Get(ids.GenericNodeIDFromNodeID(nodeID), requestID)
 	// If the provided block is not the requested block, we need to explicitly
 	// mark the request as failed to avoid having a dangling dependency.
 	if ok && actualBlkID != expectedBlkID {
@@ -191,7 +191,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
-	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
+	blkID, ok := t.blkReqs.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -673,7 +673,7 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 	}
 
 	t.RequestID++
-	t.blkReqs.Add(nodeID, t.RequestID, blkID)
+	t.blkReqs.Add(ids.GenericNodeIDFromNodeID(nodeID), t.RequestID, blkID)
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", t.RequestID),

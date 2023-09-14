@@ -745,21 +745,21 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
-		err := h.peerTracker.Connected(ctx, shortNodeID, msg.NodeVersion)
+		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
 		if err != nil {
 			return err
 		}
-		return engine.Connected(ctx, shortNodeID, msg.NodeVersion)
+		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
 		return h.subnetConnector.ConnectedSubnet(ctx, shortNodeID, msg.SubnetID)
 
 	case *message.Disconnected:
-		err := h.peerTracker.Disconnected(ctx, shortNodeID)
+		err := h.peerTracker.Disconnected(ctx, nodeID)
 		if err != nil {
 			return err
 		}
-		return engine.Disconnected(ctx, shortNodeID)
+		return engine.Disconnected(ctx, nodeID)
 
 	default:
 		return fmt.Errorf(

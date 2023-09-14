@@ -127,8 +127,8 @@ type EngineTest struct {
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, keys []uint64) error
 	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error
-	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
+	ConnectedF                  func(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error
+	DisconnectedF               func(ctx context.Context, nodeID ids.GenericNodeID) error
 	HealthF                     func(context.Context) (interface{}, error)
 	GetVMF                      func() VM
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
@@ -651,7 +651,7 @@ func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return errChits
 }
 
-func (e *EngineTest) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (e *EngineTest) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
 	if e.ConnectedF != nil {
 		return e.ConnectedF(ctx, nodeID, nodeVersion)
 	}
@@ -664,7 +664,7 @@ func (e *EngineTest) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersi
 	return errConnected
 }
 
-func (e *EngineTest) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (e *EngineTest) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
 	if e.DisconnectedF != nil {
 		return e.DisconnectedF(ctx, nodeID)
 	}

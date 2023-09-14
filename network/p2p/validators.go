@@ -22,7 +22,7 @@ var (
 )
 
 type ValidatorSet interface {
-	Has(ctx context.Context, nodeID ids.NodeID) bool
+	Has(ctx context.Context, nodeID ids.GenericNodeID) bool
 }
 
 func NewValidators(log logging.Logger, subnetID ids.ID, validators validators.State, maxValidatorSetStaleness time.Duration) *Validators {
@@ -71,29 +71,20 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
-func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
+func (v *Validators) Sample(ctx context.Context, limit int) []ids.GenericNodeID {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	v.refresh(ctx)
 
-	genericNodeIDs := v.validatorIDs.Sample(limit)
-	res := make([]ids.NodeID, 0, len(genericNodeIDs))
-	for _, genNodeID := range genericNodeIDs {
-		nodeID, err := ids.NodeIDFromGenericNodeID(genNodeID)
-		if err != nil {
-			panic(err)
-		}
-		res = append(res, nodeID)
-	}
-	return res
+	return v.validatorIDs.Sample(limit)
 }
 
-func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
+func (v *Validators) Has(ctx context.Context, nodeID ids.GenericNodeID) bool {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	v.refresh(ctx)
 
-	return v.validatorIDs.Contains(ids.GenericNodeIDFromNodeID(nodeID))
+	return v.validatorIDs.Contains(nodeID)
 }

@@ -208,7 +208,7 @@ func TestAppRequestResponse(t *testing.T) {
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			peers := &Peers{}
-			require.NoError(peers.Connected(context.Background(), nodeID, nil))
+			require.NoError(peers.Connected(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), nil))
 			client, err := router.RegisterAppProtocol(handlerID, handler, peers)
 			require.NoError(err)
 
@@ -346,7 +346,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
 	peers := &Peers{}
-	require.NoError(peers.Connected(context.Background(), nodeID, nil))
+	require.NoError(peers.Connected(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), nil))
 	client, err := router.RegisterAppProtocol(0x1, handler, peers)
 	require.NoError(err)
 

@@ -352,7 +352,7 @@ func NewNoOpInternalHandler(log logging.Logger) InternalHandler {
 
 func (nop *noOpInternalHandler) Connected(
 	_ context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	nodeVersion *version.Application,
 ) error {
 	nop.log.Debug("dropping request",
@@ -364,7 +364,7 @@ func (nop *noOpInternalHandler) Connected(
 	return nil
 }
 
-func (nop *noOpInternalHandler) Disconnected(_ context.Context, nodeID ids.NodeID) error {
+func (nop *noOpInternalHandler) Disconnected(_ context.Context, nodeID ids.GenericNodeID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.DisconnectedOp),

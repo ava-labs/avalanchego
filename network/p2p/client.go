@@ -61,7 +61,14 @@ func (c *Client) AppRequestAny(
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of(sampled...)
+	nodeIDs := set.NewSet[ids.NodeID](len(sampled))
+	for _, genericNodeID := range sampled {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		nodeIDs.Add(shortNodeID)
+	}
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 

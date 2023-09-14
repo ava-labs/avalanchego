@@ -116,7 +116,7 @@ func (mr *MockChainVMMockRecorder) BuildBlock(arg0 interface{}) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *MockChainVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
+func (m *MockChainVM) Connected(arg0 context.Context, arg1 ids.GenericNodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -202,7 +202,7 @@ func (mr *MockChainVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 
 }
 
 // Disconnected mocks base method.
-func (m *MockChainVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
+func (m *MockChainVM) Disconnected(arg0 context.Context, arg1 ids.GenericNodeID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
