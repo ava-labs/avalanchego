@@ -165,6 +165,10 @@ func (c *DBClient) CommitRangeProof(
 			IsNothing: startKey.IsNothing(),
 			Value:     startKey.Value(),
 		},
+		EndKey: &pb.MaybeBytes{
+			IsNothing: endKey.IsNothing(),
+			Value:     endKey.Value(),
+		},
 		RangeProof: proof.ToProto(),
 	})
 	return err
