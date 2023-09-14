@@ -1244,7 +1244,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			expectedErr: errCantFindSubnet,
+			expectedErr: state.ErrCantFindSubnet,
 		},
 		{
 			name: "no permission to remove validator",

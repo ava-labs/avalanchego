@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -290,6 +291,25 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	if d.cachedSubnets != nil {
 		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
 	}
+}
+
+func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	subnetIntf, _, err := d.GetTx(subnetID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w %q: %w",
+			ErrCantFindSubnet,
+			subnetID,
+			err,
+		)
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+	}
+
+	return subnet.Owner, nil
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
