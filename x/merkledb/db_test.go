@@ -301,7 +301,7 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(viewToCommit.(*trieView).isInvalid())
 }
 
-func Test_MerkleDB_Commit_Range_Proof_DeleteValues(t *testing.T) {
+func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
@@ -322,6 +322,9 @@ func Test_MerkleDB_Commit_Range_Proof_DeleteValues(t *testing.T) {
 	)
 	require.NoError(err)
 
+	// confirm there are no key.values in the proof
+	require.Empty(proof.KeyValues)
+
 	// add values to be deleted by proof commit
 	batch := db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("1")))
@@ -329,6 +332,7 @@ func Test_MerkleDB_Commit_Range_Proof_DeleteValues(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
+	// despite having no key/values in it, committing this proof implicitly speficies that key1-key3 need to be deleted.
 	require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
 
 	afterCommitRoot, err := db.GetMerkleRoot(context.Background())
@@ -337,7 +341,7 @@ func Test_MerkleDB_Commit_Range_Proof_DeleteValues(t *testing.T) {
 	require.Equal(startRoot, afterCommitRoot)
 }
 
-func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
+func Test_MerkleDB_CommitRangeProof_EmptyTrie(t *testing.T) {
 	require := require.New(t)
 
 	// Populate [db1] with 3 key-value pairs.
@@ -374,7 +378,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	require.Equal(db1Root, db2Root)
 }
 
-func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
+func Test_MerkleDB_CommitRangeProof_TrieWithInitialValues(t *testing.T) {
 	require := require.New(t)
 
 	// Populate [db1] with 3 key-value pairs.
