@@ -609,7 +609,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			continue
 		}
 
-		subnetTx, _, err := s.vm.state.GetTx(subnetID)
+		subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
 		if err == database.ErrNotFound {
 			continue
 		}
@@ -617,13 +617,9 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			return err
 		}
 
-		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
+		owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
-		}
-		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-		if !ok {
-			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
+			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
 		}
 
 		controlAddrs := make([]string, len(owner.Addrs))
