@@ -110,7 +110,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	bs := bsIntf.(*getter)
 
 	var accepted ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, containerID ids.ID) {
 		accepted = containerID
 	}
 
@@ -166,7 +166,7 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 

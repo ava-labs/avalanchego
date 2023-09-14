@@ -775,7 +775,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			nil,
-			nodeID,
+			genericNodeID,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
@@ -955,7 +955,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			nil,
-			nodeID,
+			genericNodeID,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}

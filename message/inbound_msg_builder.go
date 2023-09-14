@@ -96,12 +96,12 @@ func InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 ) InboundMessage {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     AcceptedStateSummaryOp,
 		message: &p2p.AcceptedStateSummary{
 			ChainId:    chainID.Bytes(),

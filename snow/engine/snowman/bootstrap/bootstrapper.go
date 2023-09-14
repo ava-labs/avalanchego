@@ -389,7 +389,7 @@ func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	b.Config.SharedCfg.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
-	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
+	b.Config.Sender.SendGetAncestors(ctx, ids.GenericNodeIDFromNodeID(validatorID), b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
 	return nil
 }
 

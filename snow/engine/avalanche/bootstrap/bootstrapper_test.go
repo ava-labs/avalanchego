@@ -229,7 +229,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 func TestBootstrapperByzantineResponses(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -296,7 +297,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Equal(vtxID0, vtxID)
 
@@ -325,8 +326,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	require.Equal(vtxID0, reqVtxID)
 
 	oldReqID := *requestID
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
-	require.NotEqual(oldReqID, *requestID)                                                       // should have sent a new request
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
+	require.NotEqual(oldReqID, *requestID)                                                            // should have sent a new request
 
 	oldReqID = *requestID
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -355,8 +356,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
-	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
+	require.Equal(oldReqID, *requestID)                                                                          // shouldn't have sent a new request
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -367,7 +368,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 func TestBootstrapperTxDependencies(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	txID0 := ids.GenerateTestID()
 	txID1 := ids.GenerateTestID()
@@ -475,7 +477,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Equal(vtxID0, vtxID)
 
@@ -511,7 +513,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *reqIDPtr, [][]byte{vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, tx0.Status())
 	require.Equal(choices.Accepted, tx1.Status())
@@ -523,7 +525,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -606,7 +609,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Contains([]ids.ID{vtxID1, vtxID0}, vtxID)
 
@@ -617,7 +620,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx1
 	require.Equal(vtxID1, requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
 	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
 	require.Equal(vtxID0, requested)
 
@@ -635,7 +638,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
 	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -645,7 +648,8 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 func TestBootstrapperFinalized(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -723,7 +727,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID
@@ -733,7 +737,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.Contains(requestIDs, vtxID1)
 
 	reqID := requestIDs[vtxID1]
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, reqID, [][]byte{vtxBytes1, vtxBytes0}))
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -751,7 +755,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	reqID = requestIDs[vtxID0]
-	require.NoError(bs.GetAncestorsFailed(context.Background(), peerID, reqID))
+	require.NoError(bs.GetAncestorsFailed(context.Background(), shortPeerID, reqID))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -761,7 +765,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -858,7 +863,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID
@@ -882,7 +887,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	reqID := requestIDs[vtxID2]
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -892,7 +897,8 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 func TestRestartBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	config, peerID, sender, manager, vm := newConfig(t)
+	config, shortPeerID, sender, manager, vm := newConfig(t)
+	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -1050,7 +1056,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID
@@ -1061,7 +1067,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.Contains(requestIDs, vtxID4)
 
 	vtx3ReqID := requestIDs[vtxID3]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}))
 	require.Contains(requestIDs, vtxID1)
 	require.True(bs.OutstandingRequests.RemoveAny(vtxID4))
 	require.True(bs.OutstandingRequests.RemoveAny(vtxID1))
@@ -1076,7 +1082,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.NotContains(requestIDs, vtxID3)
 
 	vtx5ReqID := requestIDs[vtxID5]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}))
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -1094,7 +1100,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	vtx1ReqID := requestIDs[vtxID1]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
+	require.NoError(bs.Ancestors(context.Background(), shortPeerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())

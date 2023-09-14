@@ -77,7 +77,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 	// Since all the DAGs are linearized, we only need to return the stop
 	// vertex.
 	if len(acceptedFrontier) > 0 {
-		gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier[0])
+		gh.sender.SendAcceptedFrontier(ctx, ids.GenericNodeIDFromNodeID(validatorID), requestID, acceptedFrontier[0])
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, acceptedVtxIDs)
 	return nil
 }
 
@@ -142,14 +142,14 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ancestorsBytes)
 	return nil
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
-		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
+		gh.sender.SendPut(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, vtx.Bytes())
 	}
 	return nil
 }

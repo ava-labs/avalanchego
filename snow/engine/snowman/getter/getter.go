@@ -85,7 +85,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {
-		gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, nil)
+		gh.sender.SendAcceptedStateSummary(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, nil)
 		return nil
 	}
 
@@ -122,7 +122,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		summaryIDs = append(summaryIDs, summary.ID())
 	}
 
-	gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, summaryIDs)
+	gh.sender.SendAcceptedStateSummary(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, summaryIDs)
 	return nil
 }
 
@@ -131,7 +131,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(ctx, nodeID, requestID, lastAccepted)
+	gh.sender.SendAcceptedFrontier(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, lastAccepted)
 	return nil
 }
 
@@ -143,7 +143,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
-	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedIDs)
+	gh.sender.SendAccepted(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, acceptedIDs)
 	return nil
 }
 
@@ -169,7 +169,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ancestorsBytes)
 	return nil
 }
 
@@ -189,6 +189,6 @@ func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, 
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(ctx, nodeID, requestID, blk.Bytes())
+	gh.sender.SendPut(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, blk.Bytes())
 	return nil
 }

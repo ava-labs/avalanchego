@@ -407,7 +407,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			return err
 		}
 		b.OutstandingRequests.Add(vdr, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(ctx, vdr, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		b.Config.Sender.SendGetAncestors(ctx, ids.GenericNodeIDFromNodeID(vdr), b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
 }

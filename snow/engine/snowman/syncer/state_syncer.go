@@ -519,15 +519,11 @@ func (ss *stateSyncer) restart(ctx context.Context) error {
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
-	vdrs := set.NewSet[ids.NodeID](1)
+	vdrs := set.NewSet[ids.GenericNodeID](1)
 	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
-		genericVdr, _ := ss.targetSeeders.Pop()
-		vdr, err := ids.NodeIDFromGenericNodeID(genericVdr)
-		if err != nil {
-			panic(err)
-		}
+		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
-		ss.pendingSeeders.Add(genericVdr)
+		ss.pendingSeeders.Add(vdr)
 	}
 
 	if vdrs.Len() > 0 {
@@ -539,14 +535,10 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
-	vdrs := set.NewSet[ids.NodeID](1)
+	vdrs := set.NewSet[ids.GenericNodeID](1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
-		nodeID, err := ids.NodeIDFromGenericNodeID(vdr)
-		if err != nil {
-			panic(err)
-		}
-		vdrs.Add(nodeID)
+		vdrs.Add(vdr)
 		ss.pendingVoters.Add(vdr)
 	}
 

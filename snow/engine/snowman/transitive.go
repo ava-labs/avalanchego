@@ -679,7 +679,7 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 		zap.Uint32("requestID", t.RequestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(ctx, nodeID, t.RequestID, blkID)
+	t.Sender.SendGet(ctx, ids.GenericNodeIDFromNodeID(nodeID), t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))

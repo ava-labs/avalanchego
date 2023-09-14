@@ -93,7 +93,7 @@ func New(
 	return s, nil
 }
 
-func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
+func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -106,14 +106,18 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+		if err != nil {
+			panic(err)
+		}
 		inMsg := message.InternalGetStateSummaryFrontierFailed(
-			nodeID,
+			shortNodeID,
 			s.ctx.ChainID,
 			requestID,
 		)
 		s.router.RegisterRequest(
 			ctx,
-			ids.GenericNodeIDFromNodeID(nodeID),
+			nodeID,
 			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
@@ -125,8 +129,8 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
+	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
+		nodeIDs.Remove(thisNodeID)
 		inMsg := message.InboundGetStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -145,10 +149,19 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 
 	// Send the message over the network.
 	var sentTo set.Set[ids.NodeID]
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDsList := nodeIDs.List()
+	for _, genericNodeID := range nodeIDsList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			shortNodeIDs,
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -163,7 +176,11 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	}
 
 	for nodeID := range nodeIDs {
-		if !sentTo.Contains(nodeID) {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+		if err != nil {
+			panic(err)
+		}
+		if !sentTo.Contains(shortNodeID) {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.GetStateSummaryFrontierOp),
 				zap.Stringer("nodeID", nodeID),
@@ -238,7 +255,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.Generi
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
+func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, heights []uint64) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -250,7 +267,16 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
-	for nodeID := range nodeIDs {
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodesList := nodeIDs.List()
+	for _, nodeID := range nodesList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
+	for nodeID := range shortNodeIDs {
 		inMsg := message.InternalGetAcceptedStateSummaryFailed(
 			nodeID,
 			s.ctx.ChainID,
@@ -270,8 +296,8 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
+	if shortNodeIDs.Contains(s.ctx.NodeID) {
+		shortNodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
@@ -295,7 +321,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			shortNodeIDs,
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -309,7 +335,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 		)
 	}
 
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -322,10 +348,10 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	}
 }
 
-func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if nodeID == s.ctx.NodeID {
+	if nodeID.Equal(ids.GenericNodeIDFromNodeID(s.ctx.NodeID)) {
 		inMsg := message.InboundAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
@@ -354,7 +380,11 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -372,19 +402,29 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
+func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDsList := nodeIDs.List()
+	for _, genericNodeID := range nodeIDsList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		inMsg := message.InternalGetAcceptedFrontierFailed(
 			nodeID,
 			s.ctx.ChainID,
@@ -405,8 +445,8 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
+	if shortNodeIDs.Contains(s.ctx.NodeID) {
+		shortNodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -430,7 +470,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			shortNodeIDs,
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -444,7 +484,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		)
 	}
 
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.GetAcceptedFrontierOp),
@@ -456,16 +496,21 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+
 	// Sending this message to myself.
-	if nodeID == s.ctx.NodeID {
+	if shortNodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
 			containerID,
-			nodeID,
+			shortNodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -489,10 +534,10 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	shortNodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		shortNodeIDs,
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -507,19 +552,29 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	}
 }
 
-func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDsList := nodeIDs.List()
+	for _, genericNodeID := range nodeIDsList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		inMsg := message.InternalGetAcceptedFailed(
 			nodeID,
 			s.ctx.ChainID,
@@ -540,8 +595,8 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
+	if shortNodeIDs.Contains(s.ctx.NodeID) {
+		shortNodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAccepted(
 			s.ctx.ChainID,
 			requestID,
@@ -567,7 +622,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			shortNodeIDs,
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -581,7 +636,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		)
 	}
 
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.GetAcceptedOp),
@@ -594,15 +649,20 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 	}
 }
 
-func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if nodeID == s.ctx.NodeID {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+
+	if shortNodeID == s.ctx.NodeID {
 		inMsg := message.InboundAccepted(
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
-			nodeID,
+			shortNodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -622,7 +682,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -640,20 +700,25 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	}
 }
 
-func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
+
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	inMsg := message.InternalGetAncestorsFailed(
-		nodeID,
+		shortNodeID,
 		s.ctx.ChainID,
 		requestID,
 		s.engineType,
 	)
 	s.router.RegisterRequest(
 		ctx,
-		ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID,
 		s.ctx.ChainID,
 		s.ctx.ChainID,
 		requestID,
@@ -663,14 +728,14 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	)
 
 	// Sending a GetAncestors to myself always fails.
-	if nodeID == s.ctx.NodeID {
+	if shortNodeID == s.ctx.NodeID {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
+	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetAncestorsOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
@@ -702,7 +767,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -726,7 +791,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 // SendAncestors sends an Ancestors message to the consensus engine running on
 // the specified chain on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
@@ -741,7 +806,11 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -763,20 +832,25 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
+
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	inMsg := message.InternalGetFailed(
-		nodeID,
+		shortNodeID,
 		s.ctx.ChainID,
 		requestID,
 		s.engineType,
 	)
 	s.router.RegisterRequest(
 		ctx,
-		ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID,
 		s.ctx.ChainID,
 		s.ctx.ChainID,
 		requestID,
@@ -786,14 +860,14 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	)
 
 	// Sending a Get to myself always fails.
-	if nodeID == s.ctx.NodeID {
+	if shortNodeID == s.ctx.NodeID {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
-	if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
+	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
@@ -815,7 +889,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// Send the message over the network.
 	var sentTo set.Set[ids.NodeID]
 	if err == nil {
-		nodeIDs := set.Of(nodeID)
+		nodeIDs := set.Of(shortNodeID)
 		sentTo = s.sender.Send(
 			outMsg,
 			nodeIDs,
@@ -851,7 +925,12 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // chain on the specified node.
 // The Put message signifies that this consensus engine is giving to the
 // recipient the contents of the specified container.
-func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
+func (s *sender) SendPut(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, container []byte) {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container, s.engineType)
 	if err != nil {
@@ -866,7 +945,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,

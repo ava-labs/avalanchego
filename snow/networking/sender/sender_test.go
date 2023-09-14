@@ -222,42 +222,59 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetStateSummaryFrontier(cancelledCtx, nodeIDs, requestID)
+
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendGetStateSummaryFrontier(cancelledCtx, genericNodeIDs, requestID)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAcceptedStateSummary(cancelledCtx, nodeIDs, requestID, nil)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendGetAcceptedStateSummary(cancelledCtx, genericNodeIDs, requestID, nil)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAcceptedFrontier(cancelledCtx, nodeIDs, requestID)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendGetAcceptedFrontier(cancelledCtx, genericNodeIDs, requestID)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAccepted(cancelledCtx, nodeIDs, requestID, nil)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendGetAccepted(cancelledCtx, genericNodeIDs, requestID, nil)
 		}
 		{
 			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAncestors(cancelledCtx, nodeID, requestID, ids.Empty)
+			sender.SendGetAncestors(cancelledCtx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ids.Empty)
 		}
 		{
 			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
-			sender.SendGet(cancelledCtx, nodeID, requestID, ids.Empty)
+			sender.SendGet(cancelledCtx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ids.Empty)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
@@ -676,9 +693,13 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
+				genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+				for _, nodeID := range nodeIDs.List() {
+					genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+				}
 				sender.SendGetStateSummaryFrontier(
 					context.Background(),
-					nodeIDs,
+					genericNodeIDs,
 					requestID,
 				)
 			},
@@ -719,7 +740,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
+				genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+				for _, nodeID := range nodeIDs.List() {
+					genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+				}
+				sender.SendGetAcceptedStateSummary(context.Background(), genericNodeIDs, requestID, heights)
 			},
 		},
 		{
@@ -759,7 +784,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
+				genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+				for _, nodeID := range nodeIDs.List() {
+					genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+				}
+				sender.SendGetAcceptedFrontier(context.Background(), genericNodeIDs, requestID)
 			},
 			engineType: engineType,
 		},
@@ -801,7 +830,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
+				genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+				for _, nodeID := range nodeIDs.List() {
+					genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+				}
+				sender.SendGetAccepted(context.Background(), genericNodeIDs, requestID, containerIDs)
 			},
 			engineType: engineType,
 		},
@@ -965,7 +998,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedStateSummary(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAcceptedStateSummary(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, summaryIDs)
 			},
 		},
 		{
@@ -993,7 +1026,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
+				sender.SendAcceptedFrontier(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, summaryIDs[0])
 			},
 		},
 		{
@@ -1023,7 +1056,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAccepted(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAccepted(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, summaryIDs)
 			},
 		},
 	}
@@ -1155,7 +1188,7 @@ func TestSender_Single_Request(t *testing.T) {
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendGetAncestors(context.Background(), nodeID, requestID, containerID)
+				sender.SendGetAncestors(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, containerID)
 			},
 		},
 		{
@@ -1194,7 +1227,7 @@ func TestSender_Single_Request(t *testing.T) {
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendGet(context.Background(), nodeID, requestID, containerID)
+				sender.SendGet(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), requestID, containerID)
 			},
 		},
 	}

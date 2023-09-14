@@ -102,9 +102,14 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	return syncer, fullVM, sender
 }
 
-func pickRandomFrom(nodes map[ids.NodeID]uint32) ids.NodeID {
+func pickRandomFrom(nodes map[ids.GenericNodeID]uint32) ids.NodeID {
+	res := ids.EmptyNodeID
 	for node := range nodes {
-		return node
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(node)
+		if err != nil {
+			panic(err)
+		}
+		res = shortNodeID
 	}
-	return ids.EmptyNodeID
+	return res
 }

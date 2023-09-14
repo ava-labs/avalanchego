@@ -354,17 +354,12 @@ func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
-	vdrs := set.NewSet[ids.NodeID](1)
+	vdrs := set.NewSet[ids.GenericNodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
-		genericVdr, _ := b.pendingSendAcceptedFrontier.Pop()
-		// Add the validator to the set to send the messages to
-		vdr, err := ids.NodeIDFromGenericNodeID(genericVdr)
-		if err != nil {
-			panic(err)
-		}
+		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		vdrs.Add(vdr)
 		// Add the validator to send pending receipt set
-		b.pendingReceiveAcceptedFrontier.Add(genericVdr)
+		b.pendingReceiveAcceptedFrontier.Add(vdr)
 	}
 
 	if vdrs.Len() > 0 {
@@ -375,15 +370,10 @@ func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted(ctx context.Context) {
-	vdrs := set.NewSet[ids.NodeID](1)
+	vdrs := set.NewSet[ids.GenericNodeID](1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
-		// Add the validator to the set to send the messages to
-		nodeID, err := ids.NodeIDFromGenericNodeID(vdr)
-		if err != nil {
-			panic(err)
-		}
-		vdrs.Add(nodeID)
+		vdrs.Add(vdr)
 		// Add the validator to send pending receipt set
 		b.pendingReceiveAccepted.Add(vdr)
 	}

@@ -52,7 +52,7 @@ type Sender interface {
 type StateSummarySender interface {
 	// SendGetStateSummaryFrontier requests that every node in [nodeIDs] sends a
 	// StateSummaryFrontier message.
-	SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32)
+	SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32)
 
 	// SendStateSummaryFrontier responds to a StateSummaryFrontier message with this
 	// engine's current state summary frontier.
@@ -63,11 +63,11 @@ type AcceptedStateSummarySender interface {
 	// SendGetAcceptedStateSummary requests that every node in [nodeIDs] sends an
 	// AcceptedStateSummary message with all the state summary IDs referenced by [heights]
 	// that the node thinks are accepted.
-	SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64)
+	SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, heights []uint64)
 
 	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
 	// set of summary ids that are accepted.
-	SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID)
+	SendAcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID)
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to
@@ -75,13 +75,13 @@ type AcceptedStateSummarySender interface {
 type FrontierSender interface {
 	// SendGetAcceptedFrontier requests that every node in [nodeIDs] sends an
 	// AcceptedFrontier message.
-	SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32)
+	SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32)
 
 	// SendAcceptedFrontier responds to a AcceptedFrontier message with this
 	// engine's current accepted frontier.
 	SendAcceptedFrontier(
 		ctx context.Context,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		requestID uint32,
 		containerID ids.ID,
 	)
@@ -95,14 +95,14 @@ type AcceptedSender interface {
 	// accepted.
 	SendGetAccepted(
 		ctx context.Context,
-		nodeIDs set.Set[ids.NodeID],
+		nodeIDs set.Set[ids.GenericNodeID],
 		requestID uint32,
 		containerIDs []ids.ID,
 	)
 
 	// SendAccepted responds to a GetAccepted message with a set of IDs of
 	// containers that are accepted.
-	SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID)
+	SendAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID)
 }
 
 // FetchSender defines how a consensus engine sends retrieval messages to other
@@ -110,18 +110,18 @@ type AcceptedSender interface {
 type FetchSender interface {
 	// Request that the specified node send the specified container to this
 	// node.
-	SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID)
+	SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID)
 
 	// SendGetAncestors requests that node [nodeID] send container [containerID]
 	// and its ancestors.
-	SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID)
+	SendGetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID)
 
 	// Tell the specified node about [container].
-	SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte)
+	SendPut(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, container []byte)
 
 	// Give the specified node several containers at once. Should be in response
 	// to a GetAncestors message with request ID [requestID] from the node.
-	SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte)
+	SendAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containers [][]byte)
 }
 
 // QuerySender defines how a consensus engine sends query messages to other
