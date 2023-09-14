@@ -226,7 +226,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				return err
 			}
 
-			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+			if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
 				s.log.Fatal(
 					"failed to send app response",
 					zap.Stringer("nodeID", nodeID),
@@ -250,7 +250,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		if len(proofBytes) < bytesLimit {
-			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+			if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
 				s.log.Fatal(
 					"failed to send app response",
 					zap.Stringer("nodeID", nodeID),
@@ -303,7 +303,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if err != nil {
 		return err
 	}
-	if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+	if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
 		s.log.Fatal(
 			"failed to send app response",
 			zap.Stringer("nodeID", nodeID),

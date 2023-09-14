@@ -252,7 +252,7 @@ func (c *networkClient) request(
 	requestID := c.requestID
 	c.requestID++
 
-	nodeIDs := set.Of(nodeID)
+	nodeIDs := set.Of(ids.GenericNodeIDFromNodeID(nodeID))
 
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {

@@ -48,7 +48,7 @@ func (c *Client) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return err
 }
 
-func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
+func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -67,7 +67,7 @@ func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	return err
 }
 
-func (c *Client) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (c *Client) SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error {
 	_, err := c.client.SendAppResponse(
 		ctx,
 		&appsenderpb.SendAppResponseMsg{
@@ -89,7 +89,7 @@ func (c *Client) SendAppGossip(ctx context.Context, msg []byte) error {
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], msg []byte) error {
+func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {

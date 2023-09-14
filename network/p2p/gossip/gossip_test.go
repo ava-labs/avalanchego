@@ -139,7 +139,7 @@ func TestGossiperGossip(t *testing.T) {
 
 			gossiped := make(chan struct{})
 			requestSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
+				Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
 					go func() {
 						require.NoError(responseRouter.AppRequest(ctx, ids.EmptyNodeID, requestID, time.Time{}, request))
 					}()
@@ -147,8 +147,12 @@ func TestGossiperGossip(t *testing.T) {
 
 			responseSender.EXPECT().
 				SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) {
-					require.NoError(requestRouter.AppResponse(ctx, nodeID, requestID, appResponseBytes))
+				Do(func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) {
+					shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+					if err != nil {
+						panic(err)
+					}
+					require.NoError(requestRouter.AppResponse(ctx, shortNodeID, requestID, appResponseBytes))
 					close(gossiped)
 				}).AnyTimes()
 

@@ -157,16 +157,16 @@ type NetworkAppSender interface {
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
-	SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error
+	SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	// A non-nil error should be considered fatal.
-	SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
+	SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
 	SendAppGossip(ctx context.Context, appGossipBytes []byte) error
-	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
+	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], appGossipBytes []byte) error
 }
 
 // CrossChainAppSender sends local VM-level messages to another VM.

@@ -108,7 +108,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 
-	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
+	return r.sender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, appResponse)
 }
 
 func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {

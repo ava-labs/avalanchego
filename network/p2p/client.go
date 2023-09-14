@@ -89,7 +89,7 @@ func (c *Client) AppRequest(
 
 		if err := c.sender.SendAppRequest(
 			ctx,
-			set.Of(nodeID),
+			set.Of(ids.GenericNodeIDFromNodeID(nodeID)),
 			requestID,
 			appRequestBytes,
 		); err != nil {
@@ -123,9 +123,14 @@ func (c *Client) AppGossipSpecific(
 	nodeIDs set.Set[ids.NodeID],
 	appGossipBytes []byte,
 ) error {
+	genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+	list := nodeIDs.List()
+	for _, shortNodeID := range list {
+		genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(shortNodeID))
+	}
 	return c.sender.SendAppGossipSpecific(
 		ctx,
-		nodeIDs,
+		genericNodeIDs,
 		c.prefixMessage(appGossipBytes),
 	)
 }

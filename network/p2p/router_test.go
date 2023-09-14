@@ -42,7 +42,7 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app request",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
 						for range nodeIDs {
 							go func() {
 								require.NoError(t, router.AppRequest(ctx, nodeID, requestID, time.Time{}, request))
@@ -50,7 +50,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					}).AnyTimes()
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
+					Do(func(ctx context.Context, _ ids.GenericNodeID, requestID uint32, response []byte) {
 						go func() {
 							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
@@ -78,7 +78,7 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app request failed",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
 						for range nodeIDs {
 							go func() {
 								require.NoError(t, router.AppRequestFailed(ctx, nodeID, requestID))
@@ -175,9 +175,13 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app gossip specific",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppGossipSpecific(gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], gossip []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], gossip []byte) {
 						for n := range nodeIDs {
-							nodeID := n
+							nodeID, err := ids.NodeIDFromGenericNodeID(n)
+							if err != nil {
+								panic(err)
+							}
+
 							go func() {
 								require.NoError(t, router.AppGossip(ctx, nodeID, gossip))
 							}()
@@ -322,7 +326,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	requestSent := &sync.WaitGroup{}
 	sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
+		Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
 			for range nodeIDs {
 				requestSent.Add(1)
 				go func() {

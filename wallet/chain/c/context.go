@@ -3,81 +3,73 @@
 
 package c
 
-import (
-	stdcontext "context"
+// var _ Context = (*context)(nil)
 
-	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/avm"
-)
+// type Context interface {
+// 	NetworkID() uint32
+// 	BlockchainID() ids.ID
+// 	AVAXAssetID() ids.ID
+// }
 
-var _ Context = (*context)(nil)
+// type context struct {
+// 	networkID    uint32
+// 	blockchainID ids.ID
+// 	avaxAssetID  ids.ID
+// }
 
-type Context interface {
-	NetworkID() uint32
-	BlockchainID() ids.ID
-	AVAXAssetID() ids.ID
-}
+// func NewContextFromURI(ctx stdcontext.Context, uri string) (Context, error) {
+// 	infoClient := info.NewClient(uri)
+// 	xChainClient := avm.NewClient(uri, "X")
+// 	return NewContextFromClients(ctx, infoClient, xChainClient)
+// }
 
-type context struct {
-	networkID    uint32
-	blockchainID ids.ID
-	avaxAssetID  ids.ID
-}
+// func NewContextFromClients(
+// 	ctx stdcontext.Context,
+// 	infoClient info.Client,
+// 	xChainClient avm.Client,
+// ) (Context, error) {
+// 	networkID, err := infoClient.GetNetworkID(ctx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func NewContextFromURI(ctx stdcontext.Context, uri string) (Context, error) {
-	infoClient := info.NewClient(uri)
-	xChainClient := avm.NewClient(uri, "X")
-	return NewContextFromClients(ctx, infoClient, xChainClient)
-}
+// 	chainID, err := infoClient.GetBlockchainID(ctx, "C")
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func NewContextFromClients(
-	ctx stdcontext.Context,
-	infoClient info.Client,
-	xChainClient avm.Client,
-) (Context, error) {
-	networkID, err := infoClient.GetNetworkID(ctx)
-	if err != nil {
-		return nil, err
-	}
+// 	asset, err := xChainClient.GetAssetDescription(ctx, "AVAX")
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	chainID, err := infoClient.GetBlockchainID(ctx, "C")
-	if err != nil {
-		return nil, err
-	}
+// 	return NewContext(
+// 		networkID,
+// 		chainID,
+// 		asset.AssetID,
+// 	), nil
+// }
 
-	asset, err := xChainClient.GetAssetDescription(ctx, "AVAX")
-	if err != nil {
-		return nil, err
-	}
+// func NewContext(
+// 	networkID uint32,
+// 	blockchainID ids.ID,
+// 	avaxAssetID ids.ID,
+// ) Context {
+// 	return &context{
+// 		networkID:    networkID,
+// 		blockchainID: blockchainID,
+// 		avaxAssetID:  avaxAssetID,
+// 	}
+// }
 
-	return NewContext(
-		networkID,
-		chainID,
-		asset.AssetID,
-	), nil
-}
+// func (c *context) NetworkID() uint32 {
+// 	return c.networkID
+// }
 
-func NewContext(
-	networkID uint32,
-	blockchainID ids.ID,
-	avaxAssetID ids.ID,
-) Context {
-	return &context{
-		networkID:    networkID,
-		blockchainID: blockchainID,
-		avaxAssetID:  avaxAssetID,
-	}
-}
+// func (c *context) BlockchainID() ids.ID {
+// 	return c.blockchainID
+// }
 
-func (c *context) NetworkID() uint32 {
-	return c.networkID
-}
-
-func (c *context) BlockchainID() ids.ID {
-	return c.blockchainID
-}
-
-func (c *context) AVAXAssetID() ids.ID {
-	return c.avaxAssetID
-}
+// func (c *context) AVAXAssetID() ids.ID {
+// 	return c.avaxAssetID
+// }

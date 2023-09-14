@@ -1355,15 +1355,25 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the
 // VM.
-func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = utils.Detach(ctx)
+
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDsList := nodeIDs.List()
+	for _, genericNodeID := range nodeIDsList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		inMsg := message.InternalAppRequestFailed(
 			nodeID,
 			s.ctx.ChainID,
@@ -1387,8 +1397,8 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
+	if shortNodeIDs.Contains(s.ctx.NodeID) {
+		shortNodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundAppRequest(
 			s.ctx.ChainID,
 			requestID,
@@ -1402,10 +1412,10 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
 	// unresponsive so we don't even bother sending messages to them. We just
 	// have them immediately fail.
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		if s.timeouts.IsBenched(ids.GenericNodeIDFromNodeID(nodeID), s.ctx.ChainID) {
 			s.failedDueToBench[message.AppRequestOp].Inc() // update metric
-			nodeIDs.Remove(nodeID)
+			nodeIDs.Remove(ids.GenericNodeIDFromNodeID(nodeID))
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid
@@ -1433,7 +1443,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			shortNodeIDs,
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -1447,7 +1457,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		)
 	}
 
-	for nodeID := range nodeIDs {
+	for nodeID := range shortNodeIDs {
 		if !sentTo.Contains(nodeID) {
 			if s.ctx.Log.Enabled(logging.Verbo) {
 				s.ctx.Log.Verbo("failed to send message",
@@ -1481,15 +1491,20 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
-	if nodeID == s.ctx.NodeID {
+	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	if err != nil {
+		panic(err)
+	}
+
+	if shortNodeID == s.ctx.NodeID {
 		inMsg := message.InboundAppResponse(
 			s.ctx.ChainID,
 			requestID,
 			appResponseBytes,
-			nodeID,
+			shortNodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return nil
@@ -1513,7 +1528,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of(nodeID)
+	nodeIDs := set.Of(shortNodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -1541,7 +1556,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.GenericNodeID], appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1554,15 +1569,25 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 		return nil
 	}
 
+	shortNodeIDs := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDsList := nodeIDs.List()
+	for _, genericNodeID := range nodeIDsList {
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
+		if err != nil {
+			panic(err)
+		}
+		shortNodeIDs.Add(shortNodeID)
+	}
+
 	// Send the message over the network.
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		shortNodeIDs,
 		s.ctx.SubnetID,
 		s.subnet,
 	)
 	if sentTo.Len() == 0 {
-		for nodeID := range nodeIDs {
+		for nodeID := range shortNodeIDs {
 			if !sentTo.Contains(nodeID) {
 				if s.ctx.Log.Enabled(logging.Verbo) {
 					s.ctx.Log.Verbo("failed to send message",

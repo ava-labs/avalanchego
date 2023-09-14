@@ -303,7 +303,11 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			require.NoError(sender.SendAppRequest(cancelledCtx, nodeIDs, requestID, nil))
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			require.NoError(sender.SendAppRequest(cancelledCtx, genericNodeIDs, requestID, nil))
 		}
 		{
 			chainID := ids.GenerateTestID()

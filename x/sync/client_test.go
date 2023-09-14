@@ -129,7 +129,7 @@ func sendRangeProofRequest(
 		gomock.Any(), // requestID
 		gomock.Any(), // responseBytes
 	).DoAndReturn(
-		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
+		func(_ context.Context, _ ids.GenericNodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
 			var responseProto pb.RangeProof
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
@@ -443,7 +443,7 @@ func sendChangeProofRequest(
 		gomock.Any(), // requestID
 		gomock.Any(), // responseBytes
 	).DoAndReturn(
-		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
+		func(_ context.Context, _ ids.GenericNodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
 			var responseProto pb.SyncGetChangeProofResponse
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
