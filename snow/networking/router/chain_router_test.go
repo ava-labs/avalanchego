@@ -413,12 +413,12 @@ func TestRouterTimeout(t *testing.T) {
 	}
 	bootstrapper.HaltF = func(context.Context) {}
 
-	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetStateSummaryFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedStateSummaryFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetAcceptedStateSummaryFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedStateSummaryFailed = true
 		return nil

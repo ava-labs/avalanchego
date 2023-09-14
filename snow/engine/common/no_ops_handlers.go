@@ -37,7 +37,7 @@ func NewNoOpStateSummaryFrontierHandler(log logging.Logger) StateSummaryFrontier
 	return &noOpStateSummaryFrontierHandler{log: log}
 }
 
-func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
+func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
@@ -47,7 +47,7 @@ func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Conte
 	return nil
 }
 
-func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(_ context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetStateSummaryFrontierFailedOp),
@@ -65,7 +65,7 @@ func NewNoOpAcceptedStateSummaryHandler(log logging.Logger) AcceptedStateSummary
 	return &noOpAcceptedStateSummaryHandler{log: log}
 }
 
-func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
+func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
@@ -75,7 +75,7 @@ func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Conte
 	return nil
 }
 
-func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(_ context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryFailedOp),

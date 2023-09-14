@@ -108,7 +108,7 @@ func New(
 	}
 }
 
-func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -119,8 +119,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 		return nil
 	}
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	if !ss.pendingSeeders.Contains(genericNodeID) {
+	if !ss.pendingSeeders.Contains(nodeID) {
 		ss.Ctx.Log.Debug("received unexpected StateSummaryFrontier message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -128,7 +127,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 	}
 
 	// Mark that we received a response from [nodeID]
-	ss.pendingSeeders.Remove(genericNodeID)
+	ss.pendingSeeders.Remove(nodeID)
 
 	// retrieve summary ID and register frontier;
 	// make sure next beacons are reached out
@@ -159,7 +158,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 	return ss.receivedStateSummaryFrontier(ctx)
 }
 
-func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -171,9 +170,8 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID
 	}
 
 	// Mark that we didn't get a response from [nodeID]
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	ss.failedSeeders.Add(genericNodeID)
-	ss.pendingSeeders.Remove(genericNodeID)
+	ss.failedSeeders.Add(nodeID)
+	ss.pendingSeeders.Remove(nodeID)
 
 	return ss.receivedStateSummaryFrontier(ctx)
 }
@@ -214,7 +212,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -224,9 +222,8 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		)
 		return nil
 	}
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
 
-	if !ss.pendingVoters.Contains(genericNodeID) {
+	if !ss.pendingVoters.Contains(nodeID) {
 		ss.Ctx.Log.Debug("received unexpected AcceptedStateSummary message",
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -234,9 +231,9 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	// Mark that we received a response from [nodeID]
-	ss.pendingVoters.Remove(genericNodeID)
+	ss.pendingVoters.Remove(nodeID)
 
-	nodeWeight := ss.StateSyncBeacons.GetWeight(genericNodeID)
+	nodeWeight := ss.StateSyncBeacons.GetWeight(nodeID)
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringers("summaryIDs", summaryIDs),
@@ -387,7 +384,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	return preferredStateSummary
 }
 
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
@@ -401,8 +398,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	// If we can't get a response from [nodeID], act as though they said that
 	// they think none of the containers we sent them in GetAccepted are
 	// accepted
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	ss.failedVoters.Add(genericNodeID)
+	ss.failedVoters.Add(nodeID)
 
 	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }

@@ -197,8 +197,24 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 
-	bootstrapper.GetStateSummaryFrontierFailedF = failed
-	bootstrapper.GetAcceptedStateSummaryFailedF = failed
+	genericFailed := func(ctx context.Context, nodeID ids.GenericNodeID, _ uint32) error {
+		require.NoError(ctx.Err())
+
+		failedLock.Lock()
+		defer failedLock.Unlock()
+
+		shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+		if err != nil {
+			panic(err)
+		}
+
+		failedVDRs.Add(shortNodeID)
+		wg.Done()
+		return nil
+	}
+
+	bootstrapper.GetStateSummaryFrontierFailedF = genericFailed
+	bootstrapper.GetAcceptedStateSummaryFailedF = genericFailed
 	bootstrapper.GetAcceptedFrontierFailedF = failed
 	bootstrapper.GetAcceptedFailedF = failed
 	bootstrapper.GetAncestorsFailedF = failed

@@ -119,14 +119,14 @@ type EngineTest struct {
 	AcceptedFrontierF               func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	GetAcceptedF, AcceptedF         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
 	ChitsF                          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error
-	GetStateSummaryFrontierF        func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error
-	GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
+	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF,
+	GetAcceptedStateSummaryFailedF func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
-	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys []uint64) error
-	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
+	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summary []byte) error
+	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, keys []uint64) error
+	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthF                     func(context.Context) (interface{}, error)
@@ -287,7 +287,7 @@ func (e *EngineTest) GetStateSummaryFrontier(ctx context.Context, validatorID id
 	return errGetStateSummaryFrontier
 }
 
-func (e *EngineTest) StateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) error {
+func (e *EngineTest) StateSummaryFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, summary []byte) error {
 	if e.StateSummaryFrontierF != nil {
 		return e.StateSummaryFrontierF(ctx, validatorID, requestID, summary)
 	}
@@ -300,7 +300,7 @@ func (e *EngineTest) StateSummaryFrontier(ctx context.Context, validatorID ids.N
 	return errStateSummaryFrontier
 }
 
-func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error {
 	if e.GetStateSummaryFrontierFailedF != nil {
 		return e.GetStateSummaryFrontierFailedF(ctx, validatorID, requestID)
 	}
@@ -313,7 +313,7 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validato
 	return errGetStateSummaryFrontierFailed
 }
 
-func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys []uint64) error {
+func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, keys []uint64) error {
 	if e.GetAcceptedStateSummaryF != nil {
 		return e.GetAcceptedStateSummaryF(ctx, validatorID, requestID, keys)
 	}
@@ -326,7 +326,7 @@ func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID id
 	return errGetAcceptedStateSummary
 }
 
-func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error {
 	if e.AcceptedStateSummaryF != nil {
 		return e.AcceptedStateSummaryF(ctx, validatorID, requestID, summaryIDs)
 	}
@@ -339,7 +339,7 @@ func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.N
 	return errAcceptedStateSummary
 }
 
-func (e *EngineTest) GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+func (e *EngineTest) GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error {
 	if e.GetAcceptedStateSummaryFailedF != nil {
 		return e.GetAcceptedStateSummaryFailedF(ctx, validatorID, requestID)
 	}

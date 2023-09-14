@@ -554,10 +554,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2p.StateSummaryFrontier:
-		return engine.StateSummaryFrontier(ctx, shortNodeID, msg.RequestId, msg.Summary)
+		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
 
 	case *message.GetStateSummaryFrontierFailed:
-		return engine.GetStateSummaryFrontierFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAcceptedStateSummary:
 		// TODO: Enforce that the numbers are sorted to make this verification
@@ -569,12 +569,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.Uint32("requestID", msg.RequestId),
 				zap.String("field", "Heights"),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		return engine.GetAcceptedStateSummary(
 			ctx,
-			shortNodeID,
+			nodeID,
 			msg.RequestId,
 			msg.Heights,
 		)
@@ -589,13 +589,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "SummaryIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedStateSummary(ctx, shortNodeID, msg.RequestId, summaryIDs)
+		return engine.AcceptedStateSummary(ctx, nodeID, msg.RequestId, summaryIDs)
 
 	case *message.GetAcceptedStateSummaryFailed:
-		return engine.GetAcceptedStateSummaryFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
 
 	// Bootstrapping messages may be forwarded to either avalanche or snowman
 	// engines, depending on the EngineType field

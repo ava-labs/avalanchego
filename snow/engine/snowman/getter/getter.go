@@ -81,11 +81,11 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.Generi
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, heights []uint64) error {
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {
-		gh.sender.SendAcceptedStateSummary(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, nil)
+		gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, nil)
 		return nil
 	}
 
@@ -122,7 +122,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		summaryIDs = append(summaryIDs, summary.ID())
 	}
 
-	gh.sender.SendAcceptedStateSummary(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, summaryIDs)
+	gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, summaryIDs)
 	return nil
 }
 

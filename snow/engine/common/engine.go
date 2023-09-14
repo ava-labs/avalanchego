@@ -80,7 +80,7 @@ type StateSummaryFrontierHandler interface {
 	// this message is in response to a GetStateSummaryFrontier message, is
 	// utilizing a unique requestID, or that the summary bytes are from a valid
 	// state summary.
-	StateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) error
+	StateSummaryFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, summary []byte) error
 
 	// Notify this engine that a get state summary frontier request it issued
 	// has failed.
@@ -92,7 +92,7 @@ type StateSummaryFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetStateSummaryFrontier message.
-	GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // GetAcceptedStateSummaryHandler defines how a consensus engine reacts to a get
@@ -109,7 +109,7 @@ type GetAcceptedStateSummaryHandler interface {
 	// This engine should respond with an AcceptedStateSummary message with the
 	// same requestID, and the subset of the state summaries that this node has
 	// locally available.
-	GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys []uint64) error
+	GetAcceptedStateSummary(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, keys []uint64) error
 }
 
 // AcceptedStateSummaryHandler defines how a consensus engine reacts to an
@@ -122,7 +122,7 @@ type AcceptedStateSummaryHandler interface {
 	// this message is in response to a GetAcceptedStateSummary message,
 	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
 	// state summaries requested by key from a GetAcceptedStateSummary message.
-	AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
+	AcceptedStateSummary(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error
 
 	// Notify this engine that a get accepted state summary request it issued has
 	// failed.
@@ -134,7 +134,7 @@ type AcceptedStateSummaryHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedStateSummary message.
-	GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
