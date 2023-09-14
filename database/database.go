@@ -21,6 +21,7 @@ type KeyValueReader interface {
 	Has(key []byte) (bool, error)
 
 	// Get retrieves the given key if it's present in the key-value data store.
+	// Returns ErrNotFound if the key is not present in the key-value data store.
 	//
 	// Note: [key] is safe to modify and read after calling Get.
 	// The returned byte slice is safe to read, but cannot be modified.
