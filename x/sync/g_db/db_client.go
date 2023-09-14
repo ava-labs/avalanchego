@@ -157,6 +157,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 func (c *DBClient) CommitRangeProof(
 	ctx context.Context,
 	startKey maybe.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
 	proof *merkledb.RangeProof,
 ) error {
 	_, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
