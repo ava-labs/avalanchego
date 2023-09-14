@@ -270,7 +270,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}
@@ -600,7 +600,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx
 			}
-			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID) error {
+			engine.ChitsF = func(context.Context, ids.GenericNodeID, uint32, ids.ID, ids.ID) error {
 				close(messageReceived)
 				return nil
 			}

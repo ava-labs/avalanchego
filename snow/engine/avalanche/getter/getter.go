@@ -146,10 +146,10 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, re
 	return nil
 }
 
-func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) Get(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
-		gh.sender.SendPut(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, vtx.Bytes())
+		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
 	}
 	return nil
 }

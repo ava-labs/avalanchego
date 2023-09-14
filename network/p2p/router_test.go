@@ -26,7 +26,7 @@ func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
 	request := []byte("request")
 	response := []byte("response")
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	chainID := ids.GenerateTestID()
 
 	ctxKey := new(string)
@@ -58,11 +58,11 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppRequest(context.Background(), nodeID, gomock.Any(), request).
-					DoAndReturn(func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+					DoAndReturn(func(context.Context, ids.GenericNodeID, time.Time, []byte) ([]byte, error) {
 						return response, nil
 					})
 
-				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.GenericNodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.GenericNodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -163,7 +163,7 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
+					DoAndReturn(func(context.Context, ids.GenericNodeID, []byte) error {
 						defer wg.Done()
 						return nil
 					})
@@ -177,11 +177,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendAppGossipSpecific(gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], gossip []byte) {
 						for n := range nodeIDs {
-							nodeID, err := ids.NodeIDFromGenericNodeID(n)
-							if err != nil {
-								panic(err)
-							}
-
+							nodeID := n
 							go func() {
 								require.NoError(t, router.AppGossip(ctx, nodeID, gossip))
 							}()
@@ -189,7 +185,7 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
+					DoAndReturn(func(context.Context, ids.GenericNodeID, []byte) error {
 						defer wg.Done()
 						return nil
 					})
@@ -208,7 +204,7 @@ func TestAppRequestResponse(t *testing.T) {
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			peers := &Peers{}
-			require.NoError(peers.Connected(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), nil))
+			require.NoError(peers.Connected(context.Background(), nodeID, nil))
 			client, err := router.RegisterAppProtocol(handlerID, handler, peers)
 			require.NoError(err)
 
@@ -231,14 +227,14 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unregistered app request message",
 			requestFunc: func(router *Router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
+				return router.AppRequest(context.Background(), ids.GenerateTestGenericNodeID(), 0, time.Time{}, []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty app request message",
 			requestFunc: func(router *Router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
+				return router.AppRequest(context.Background(), ids.GenerateTestGenericNodeID(), 0, time.Time{}, []byte{})
 			},
 			err: nil,
 		},
@@ -259,28 +255,28 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unregistered gossip message",
 			requestFunc: func(router *Router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
+				return router.AppGossip(context.Background(), ids.GenerateTestGenericNodeID(), []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty gossip message",
 			requestFunc: func(router *Router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
+				return router.AppGossip(context.Background(), ids.GenerateTestGenericNodeID(), []byte{})
 			},
 			err: nil,
 		},
 		{
 			name: "drop unrequested app request failed",
 			requestFunc: func(router *Router) error {
-				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
+				return router.AppRequestFailed(context.Background(), ids.GenerateTestGenericNodeID(), 0)
 			},
 			err: ErrUnrequestedResponse,
 		},
 		{
 			name: "drop unrequested app response",
 			requestFunc: func(router *Router) error {
-				return router.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, nil)
+				return router.AppResponse(context.Background(), ids.GenerateTestGenericNodeID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -322,7 +318,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	handler := mocks.NewMockHandler(ctrl)
 	sender := common.NewMockSender(ctrl)
 	router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	requestSent := &sync.WaitGroup{}
 	sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -339,14 +335,14 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	timeout := &sync.WaitGroup{}
 	response := []byte("response")
 	handler.EXPECT().AppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, request []byte) ([]byte, error) {
+		DoAndReturn(func(ctx context.Context, nodeID ids.GenericNodeID, deadline time.Time, request []byte) ([]byte, error) {
 			timeout.Wait()
 			return response, nil
 		}).AnyTimes()
 	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
 	peers := &Peers{}
-	require.NoError(peers.Connected(context.Background(), ids.GenericNodeIDFromNodeID(nodeID), nil))
+	require.NoError(peers.Connected(context.Background(), nodeID, nil))
 	client, err := router.RegisterAppProtocol(0x1, handler, peers)
 	require.NoError(err)
 

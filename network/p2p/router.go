@@ -198,7 +198,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}, nil
 }
 
-func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (r *Router) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(request)
 	if !ok {
@@ -220,7 +220,7 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	return nil
 }
 
-func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
@@ -232,7 +232,7 @@ func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 	return nil
 }
 
-func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (r *Router) AppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
@@ -244,7 +244,7 @@ func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 	return nil
 }
 
-func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte) error {
+func (r *Router) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, gossip []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(gossip)
 	if !ok {

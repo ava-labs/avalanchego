@@ -28,14 +28,14 @@ type Handler interface {
 	// AppGossip is called when handling an AppGossip message.
 	AppGossip(
 		ctx context.Context,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		gossipBytes []byte,
 	) error
 	// AppRequest is called when handling an AppRequest message.
 	// Returns the bytes for the response corresponding to [requestBytes]
 	AppRequest(
 		ctx context.Context,
-		nodeID ids.NodeID,
+		nodeID ids.GenericNodeID,
 		deadline time.Time,
 		requestBytes []byte,
 	) ([]byte, error)
@@ -52,11 +52,11 @@ type Handler interface {
 
 type NoOpHandler struct{}
 
-func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) error {
+func (NoOpHandler) AppGossip(context.Context, ids.GenericNodeID, []byte) error {
 	return nil
 }
 
-func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+func (NoOpHandler) AppRequest(context.Context, ids.GenericNodeID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
 }
 
@@ -70,16 +70,16 @@ type ValidatorHandler struct {
 	ValidatorSet ValidatorSet
 }
 
-func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
-	if !v.ValidatorSet.Has(ctx, ids.GenericNodeIDFromNodeID(nodeID)) {
+func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, gossipBytes []byte) error {
+	if !v.ValidatorSet.Has(ctx, nodeID) {
 		return ErrNotValidator
 	}
 
 	return v.Handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
-func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if !v.ValidatorSet.Has(ctx, ids.GenericNodeIDFromNodeID(nodeID)) {
+func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if !v.ValidatorSet.Has(ctx, nodeID) {
 		return nil, ErrNotValidator
 	}
 
@@ -94,7 +94,7 @@ type responder struct {
 	sender    common.AppSender
 }
 
-func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (r *responder) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.AppRequest(ctx, nodeID, deadline, request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
@@ -108,10 +108,10 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 
-	return r.sender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, appResponse)
+	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
-func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+func (r *responder) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error {
 	err := r.handler.AppGossip(ctx, nodeID, msg)
 	if err != nil {
 		r.log.Debug("failed to handle message",

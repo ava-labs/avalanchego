@@ -72,7 +72,7 @@ func New(
 	}
 }
 
-func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),

@@ -15,7 +15,7 @@ var _ Throttler = (*SlidingWindowThrottler)(nil)
 
 type Throttler interface {
 	// Handle returns true if a message from [nodeID] should be handled.
-	Handle(nodeID ids.NodeID) bool
+	Handle(nodeID ids.GenericNodeID) bool
 }
 
 // NewSlidingWindowThrottler returns a new instance of SlidingWindowThrottler.
@@ -30,11 +30,11 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 		windows: [2]window{
 			{
 				start: now,
-				hits:  make(map[ids.NodeID]float64),
+				hits:  make(map[ids.GenericNodeID]float64),
 			},
 			{
 				start: now.Add(-period),
-				hits:  make(map[ids.NodeID]float64),
+				hits:  make(map[ids.GenericNodeID]float64),
 			},
 		},
 	}
@@ -44,7 +44,7 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 // of hits from a node in the evaluation period beginning at [start]
 type window struct {
 	start time.Time
-	hits  map[ids.NodeID]float64
+	hits  map[ids.GenericNodeID]float64
 }
 
 // SlidingWindowThrottler is an implementation of the sliding window throttling
@@ -64,7 +64,7 @@ type SlidingWindowThrottler struct {
 //
 // This is calculated by adding the current period's count to a weighted count
 // of the previous period.
-func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
+func (s *SlidingWindowThrottler) Handle(nodeID ids.GenericNodeID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -98,6 +98,6 @@ func (s *SlidingWindowThrottler) rotate(t time.Time) {
 	s.current = 1 - s.current
 	s.windows[s.current] = window{
 		start: t,
-		hits:  make(map[ids.NodeID]float64),
+		hits:  make(map[ids.GenericNodeID]float64),
 	}
 }

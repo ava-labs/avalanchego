@@ -186,18 +186,7 @@ func TestTimeout(t *testing.T) {
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	failed := func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
-		require.NoError(ctx.Err())
-
-		failedLock.Lock()
-		defer failedLock.Unlock()
-
-		failedVDRs.Add(nodeID)
-		wg.Done()
-		return nil
-	}
-
-	genericFailed := func(ctx context.Context, nodeID ids.GenericNodeID, _ uint32) error {
+	failed := func(ctx context.Context, nodeID ids.GenericNodeID, _ uint32) error {
 		require.NoError(ctx.Err())
 
 		failedLock.Lock()
@@ -213,11 +202,11 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 
-	bootstrapper.GetStateSummaryFrontierFailedF = genericFailed
-	bootstrapper.GetAcceptedStateSummaryFailedF = genericFailed
-	bootstrapper.GetAcceptedFrontierFailedF = genericFailed
-	bootstrapper.GetAcceptedFailedF = genericFailed
-	bootstrapper.GetAncestorsFailedF = genericFailed
+	bootstrapper.GetStateSummaryFrontierFailedF = failed
+	bootstrapper.GetAcceptedStateSummaryFailedF = failed
+	bootstrapper.GetAcceptedFrontierFailedF = failed
+	bootstrapper.GetAcceptedFailedF = failed
+	bootstrapper.GetAncestorsFailedF = failed
 	bootstrapper.GetFailedF = failed
 	bootstrapper.QueryFailedF = failed
 	bootstrapper.AppRequestFailedF = failed
@@ -458,7 +447,7 @@ func TestReliableMessages(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.GenericNodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -612,7 +601,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.GenericNodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}

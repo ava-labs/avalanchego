@@ -118,7 +118,7 @@ func (g *Gossiper[_, _]) gossip(ctx context.Context) error {
 
 func (g *Gossiper[T, U]) handleResponse(
 	_ context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	responseBytes []byte,
 	err error,
 ) {

@@ -24,7 +24,7 @@ var (
 // Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	responseBytes []byte,
 	err error,
 )
@@ -60,15 +60,7 @@ func (c *Client) AppRequestAny(
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
-
-	nodeIDs := set.NewSet[ids.NodeID](len(sampled))
-	for _, genericNodeID := range sampled {
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-		if err != nil {
-			panic(err)
-		}
-		nodeIDs.Add(shortNodeID)
-	}
+	nodeIDs := set.Of(sampled...)
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
@@ -76,7 +68,7 @@ func (c *Client) AppRequestAny(
 // [onResponse] is invoked upon an error or a response.
 func (c *Client) AppRequest(
 	ctx context.Context,
-	nodeIDs set.Set[ids.NodeID],
+	nodeIDs set.Set[ids.GenericNodeID],
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
@@ -96,7 +88,7 @@ func (c *Client) AppRequest(
 
 		if err := c.sender.SendAppRequest(
 			ctx,
-			set.Of(ids.GenericNodeIDFromNodeID(nodeID)),
+			set.Of(nodeID),
 			requestID,
 			appRequestBytes,
 		); err != nil {
@@ -127,17 +119,12 @@ func (c *Client) AppGossip(
 // AppGossipSpecific sends a gossip message to a predetermined set of peers.
 func (c *Client) AppGossipSpecific(
 	ctx context.Context,
-	nodeIDs set.Set[ids.NodeID],
+	nodeIDs set.Set[ids.GenericNodeID],
 	appGossipBytes []byte,
 ) error {
-	genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
-	list := nodeIDs.List()
-	for _, shortNodeID := range list {
-		genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(shortNodeID))
-	}
 	return c.sender.SendAppGossipSpecific(
 		ctx,
-		genericNodeIDs,
+		nodeIDs,
 		c.prefixMessage(appGossipBytes),
 	)
 }

@@ -58,12 +58,7 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 				ValidatorSet: tt.validatorSet,
 			}
 
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(tt.nodeID)
-			if err != nil {
-				panic(err)
-			}
-
-			err = handler.AppGossip(context.Background(), shortNodeID, []byte("foobar"))
+			err := handler.AppGossip(context.Background(), nodeID, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}
@@ -103,12 +98,7 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 				ValidatorSet: tt.validatorSet,
 			}
 
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(tt.nodeID)
-			if err != nil {
-				panic(err)
-			}
-
-			_, err = handler.AppRequest(context.Background(), shortNodeID, time.Time{}, []byte("foobar"))
+			_, err := handler.AppRequest(context.Background(), tt.nodeID, time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}

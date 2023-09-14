@@ -258,7 +258,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
 		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
@@ -438,17 +438,17 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	bootstrapper.GetFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetFailed = true
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.QueryFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledQueryFailed = true
 		return nil
 	}
-	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.AppRequestFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledAppRequestFailed = true
 		return nil
@@ -1171,7 +1171,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -1595,7 +1595,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil

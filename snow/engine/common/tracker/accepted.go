@@ -19,10 +19,10 @@ type Accepted interface {
 
 	// SetLastAccepted updates the latest accepted block for [nodeID] to
 	// [blockID]. If [nodeID] is not currently a validator, this is a noop.
-	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID)
+	SetLastAccepted(nodeID ids.GenericNodeID, blockID ids.ID)
 	// LastAccepted returns the latest known accepted block of [nodeID]. If
 	// [nodeID]'s last accepted block was never unknown, false will be returned.
-	LastAccepted(nodeID ids.NodeID) (ids.ID, bool)
+	LastAccepted(nodeID ids.GenericNodeID) (ids.ID, bool)
 }
 
 type accepted struct {
@@ -54,21 +54,19 @@ func (a *accepted) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
 
 func (*accepted) OnValidatorWeightChanged(_ ids.GenericNodeID, _, _ uint64) {}
 
-func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID) {
+func (a *accepted) SetLastAccepted(nodeID ids.GenericNodeID, frontier ids.ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	if a.validators.Contains(genericNodeID) {
-		a.frontier[genericNodeID] = frontier
+	if a.validators.Contains(nodeID) {
+		a.frontier[nodeID] = frontier
 	}
 }
 
-func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, bool) {
+func (a *accepted) LastAccepted(nodeID ids.GenericNodeID) (ids.ID, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	acceptedID, ok := a.frontier[genericNodeID]
+	acceptedID, ok := a.frontier[nodeID]
 	return acceptedID, ok
 }

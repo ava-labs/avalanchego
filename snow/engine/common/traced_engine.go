@@ -189,7 +189,7 @@ func (e *tracedEngine) GetAncestorsFailed(ctx context.Context, nodeID ids.Generi
 	return e.engine.GetAncestorsFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *tracedEngine) Get(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Get", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -200,7 +200,7 @@ func (e *tracedEngine) Get(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return e.engine.Get(ctx, nodeID, requestID, containerID)
 }
 
-func (e *tracedEngine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error {
+func (e *tracedEngine) Put(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, container []byte) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Put", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -211,7 +211,7 @@ func (e *tracedEngine) Put(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return e.engine.Put(ctx, nodeID, requestID, container)
 }
 
-func (e *tracedEngine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (e *tracedEngine) GetFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.GetFailed", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -221,7 +221,7 @@ func (e *tracedEngine) GetFailed(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.GetFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *tracedEngine) PullQuery(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.PullQuery", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -232,7 +232,7 @@ func (e *tracedEngine) PullQuery(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.PullQuery(ctx, nodeID, requestID, containerID)
 }
 
-func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error {
+func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, container []byte) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.PushQuery", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -243,7 +243,7 @@ func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.PushQuery(ctx, nodeID, requestID, container)
 }
 
-func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error {
+func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Chits", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -255,7 +255,7 @@ func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID u
 	return e.engine.Chits(ctx, nodeID, requestID, preferredID, acceptedID)
 }
 
-func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.QueryFailed", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -265,7 +265,7 @@ func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.NodeID, reque
 	return e.engine.QueryFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (e *tracedEngine) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AppRequest", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -276,7 +276,7 @@ func (e *tracedEngine) AppRequest(ctx context.Context, nodeID ids.NodeID, reques
 	return e.engine.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
-func (e *tracedEngine) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (e *tracedEngine) AppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AppResponse", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -287,7 +287,7 @@ func (e *tracedEngine) AppResponse(ctx context.Context, nodeID ids.NodeID, reque
 	return e.engine.AppResponse(ctx, nodeID, requestID, response)
 }
 
-func (e *tracedEngine) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (e *tracedEngine) AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AppRequestFailed", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -297,7 +297,7 @@ func (e *tracedEngine) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, 
 	return e.engine.AppRequestFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+func (e *tracedEngine) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AppGossip", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int("gossipLen", len(msg)),

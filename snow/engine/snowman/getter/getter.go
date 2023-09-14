@@ -173,7 +173,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, re
 	return nil
 }
 
-func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) Get(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkID ids.ID) error {
 	blk, err := gh.vm.GetBlock(ctx, blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
@@ -189,6 +189,6 @@ func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, 
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, blk.Bytes())
+	gh.sender.SendPut(ctx, nodeID, requestID, blk.Bytes())
 	return nil
 }

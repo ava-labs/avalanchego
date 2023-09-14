@@ -46,7 +46,7 @@ func (m *MockLinearizableVM) EXPECT() *MockLinearizableVMMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *MockLinearizableVM) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
+func (m *MockLinearizableVM) AppGossip(arg0 context.Context, arg1 ids.GenericNodeID, arg2 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -60,7 +60,7 @@ func (mr *MockLinearizableVMMockRecorder) AppGossip(arg0, arg1, arg2 interface{}
 }
 
 // AppRequest mocks base method.
-func (m *MockLinearizableVM) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
+func (m *MockLinearizableVM) AppRequest(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
@@ -74,7 +74,7 @@ func (mr *MockLinearizableVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
+func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -88,7 +88,7 @@ func (mr *MockLinearizableVMMockRecorder) AppRequestFailed(arg0, arg1, arg2 inte
 }
 
 // AppResponse mocks base method.
-func (m *MockLinearizableVM) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []byte) error {
+func (m *MockLinearizableVM) AppResponse(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32, arg3 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppResponse", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)

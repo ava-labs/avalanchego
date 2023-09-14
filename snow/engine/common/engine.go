@@ -307,7 +307,7 @@ type GetHandler interface {
 	// This engine should respond with a Put message with the same requestID if
 	// the container was locally available. Otherwise, the message can be safely
 	// dropped.
-	Get(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
+	Get(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, containerID ids.ID) error
 }
 
 // PutHandler defines how a consensus engine reacts to put messages from other
@@ -319,7 +319,7 @@ type PutHandler interface {
 	// this message is utilizing a unique requestID.
 	Put(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		container []byte,
 	) error
@@ -332,7 +332,7 @@ type PutHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the Get message.
-	GetFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from
@@ -351,7 +351,7 @@ type QueryHandler interface {
 	// requestID that was passed in here.
 	PullQuery(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		containerID ids.ID,
 	) error
@@ -372,7 +372,7 @@ type QueryHandler interface {
 	// was passed in here.
 	PushQuery(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		container []byte,
 	) error
@@ -388,7 +388,7 @@ type ChitsHandler interface {
 	// However, the validatorID is assumed to be authenticated.
 	Chits(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		preferredID ids.ID,
 		acceptedID ids.ID,
@@ -403,7 +403,7 @@ type ChitsHandler interface {
 	//
 	// The validatorID and the requestID are assumed to be the same as those
 	// sent in the Query message.
-	QueryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	QueryFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // NetworkAppHandler defines how a consensus engine reacts to app specific
@@ -422,7 +422,7 @@ type NetworkAppHandler interface {
 	// This node should typically send an AppResponse to [nodeID] in response to
 	// a valid message using the same request ID before the deadline. However,
 	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
+	AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
@@ -434,7 +434,7 @@ type NetworkAppHandler interface {
 	// * This engine sent a request to [nodeID] with ID [requestID].
 	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -453,7 +453,7 @@ type NetworkAppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another AppRequest, or it may give
 	// up trying to get the requested information.
-	AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error
+	AppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error
 
 	// Notify this engine of a gossip message from [nodeID].
 	//
@@ -465,7 +465,7 @@ type NetworkAppHandler interface {
 	//
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error
 }
 
 // CrossChainAppHandler defines how a consensus engine reacts to cross-chain app

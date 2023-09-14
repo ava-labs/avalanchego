@@ -687,16 +687,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.Get(ctx, shortNodeID, msg.RequestId, containerID)
+		return engine.Get(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetFailed:
-		return engine.GetFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.Put:
-		return engine.Put(ctx, shortNodeID, msg.RequestId, msg.Container)
+		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PushQuery:
-		return engine.PushQuery(ctx, shortNodeID, msg.RequestId, msg.Container)
+		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -711,7 +711,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.PullQuery(ctx, shortNodeID, msg.RequestId, containerID)
+		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
 
 	case *p2p.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
@@ -723,7 +723,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
@@ -735,13 +735,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "AcceptedID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, shortNodeID, msg.RequestId, preferredID, acceptedID)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
 
 	case *message.QueryFailed:
-		return engine.QueryFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
@@ -831,28 +831,24 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
 	switch m := body.(type) {
 	case *p2p.AppRequest:
 		return engine.AppRequest(
 			ctx,
-			shortNodeID,
+			nodeID,
 			m.RequestId,
 			msg.Expiration(),
 			m.AppBytes,
 		)
 
 	case *p2p.AppResponse:
-		return engine.AppResponse(ctx, shortNodeID, m.RequestId, m.AppBytes)
+		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
 	case *message.AppRequestFailed:
-		return engine.AppRequestFailed(ctx, shortNodeID, m.RequestID)
+		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
 
 	case *p2p.AppGossip:
-		return engine.AppGossip(ctx, shortNodeID, m.AppBytes)
+		return engine.AppGossip(ctx, nodeID, m.AppBytes)
 
 	case *message.CrossChainAppRequest:
 		return engine.CrossChainAppRequest(

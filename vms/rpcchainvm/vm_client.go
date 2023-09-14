@@ -579,7 +579,7 @@ func (vm *VMClient) CrossChainAppResponse(ctx context.Context, chainID ids.ID, r
 	return err
 }
 
-func (vm *VMClient) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VMClient) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error {
 	_, err := vm.client.AppRequest(
 		ctx,
 		&vmpb.AppRequestMsg{
@@ -592,7 +592,7 @@ func (vm *VMClient) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 	return err
 }
 
-func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error {
 	_, err := vm.client.AppResponse(
 		ctx,
 		&vmpb.AppResponseMsg{
@@ -604,7 +604,7 @@ func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.NodeID, requestI
 	return err
 }
 
-func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	_, err := vm.client.AppRequestFailed(
 		ctx,
 		&vmpb.AppRequestFailedMsg{
@@ -615,7 +615,7 @@ func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, req
 	return err
 }
 
-func (vm *VMClient) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+func (vm *VMClient) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		ctx,
 		&vmpb.AppGossipMsg{

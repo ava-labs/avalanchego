@@ -70,7 +70,7 @@ type Handler[T Gossipable] struct {
 	sentBytes prometheus.Counter
 }
 
-func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (h Handler[T]) AppRequest(_ context.Context, _ ids.GenericNodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
 	request := &sdk.PullGossipRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, err

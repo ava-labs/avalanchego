@@ -75,25 +75,25 @@ func (*network) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) e
 	return nil
 }
 
-func (*network) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
+func (*network) AppRequestFailed(context.Context, ids.GenericNodeID, uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*network) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
+func (*network) AppRequest(context.Context, ids.GenericNodeID, uint32, time.Time, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*network) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
+func (*network) AppResponse(context.Context, ids.GenericNodeID, uint32, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(_ context.Context, nodeID ids.GenericNodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),

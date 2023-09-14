@@ -17,7 +17,7 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 	previousWindowStartTime := time.Time{}
 	currentWindowStartTime := previousWindowStartTime.Add(period)
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 
 	type call struct {
 		time      time.Time

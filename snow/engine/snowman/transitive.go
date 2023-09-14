@@ -134,7 +134,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) Put(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	if err != nil {
 		if t.Ctx.Log.Enabled(logging.Verbo) {
@@ -158,7 +158,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 
 	actualBlkID := blk.ID()
-	expectedBlkID, ok := t.blkReqs.Get(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+	expectedBlkID, ok := t.blkReqs.Get(nodeID, requestID)
 	// If the provided block is not the requested block, we need to explicitly
 	// mark the request as failed to avoid having a dangling dependency.
 	if ok && actualBlkID != expectedBlkID {
@@ -188,10 +188,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
-	blkID, ok := t.blkReqs.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -207,7 +207,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkID ids.ID) error {
 	t.sendChits(ctx, nodeID, requestID)
 
 	// Try to issue [blkID] to consensus.
@@ -219,7 +219,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkBytes []byte) error {
 	t.sendChits(ctx, nodeID, requestID)
 
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
@@ -258,7 +258,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, acceptedID ids.ID) error {
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkID ids.ID, acceptedID ids.ID) error {
 	t.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID)
 
 	t.Ctx.Log.Verbo("called Chits for the block",
@@ -274,7 +274,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
 		t:         t,
-		vdr:       ids.GenericNodeIDFromNodeID(nodeID),
+		vdr:       nodeID,
 		requestID: requestID,
 		response:  blkID,
 	}
@@ -289,7 +289,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	lastAccepted, ok := t.acceptedFrontiers.LastAccepted(nodeID)
 	if ok {
 		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
@@ -299,7 +299,7 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 		ctx,
 		&voter{
 			t:         t,
-			vdr:       ids.GenericNodeIDFromNodeID(nodeID),
+			vdr:       nodeID,
 			requestID: requestID,
 		},
 	)
@@ -453,14 +453,14 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 	return t.VM.GetBlock(ctx, blkID)
 }
 
-func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
+func (t *Transitive) sendChits(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
-		t.Sender.SendChits(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, lastAccepted, lastAccepted)
+		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	} else {
-		t.Sender.SendChits(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, t.Consensus.Preference(), lastAccepted)
+		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)
 	}
 }
 
@@ -532,7 +532,7 @@ func (t *Transitive) repoll(ctx context.Context) {
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.GenericNodeID, blkID ids.ID) (bool, error) {
 	blk, err := t.GetBlock(ctx, blkID)
 	if err != nil {
 		t.sendRequest(ctx, nodeID, blkID)
@@ -544,7 +544,7 @@ func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
+func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.GenericNodeID, blk snowman.Block) (bool, error) {
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
@@ -666,20 +666,20 @@ func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) er
 }
 
 // Request that [vdr] send us block [blkID]
-func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) {
+func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.GenericNodeID, blkID ids.ID) {
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
 	}
 
 	t.RequestID++
-	t.blkReqs.Add(ids.GenericNodeIDFromNodeID(nodeID), t.RequestID, blkID)
+	t.blkReqs.Add(nodeID, t.RequestID, blkID)
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", t.RequestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(ctx, ids.GenericNodeIDFromNodeID(nodeID), t.RequestID, blkID)
+	t.Sender.SendGet(ctx, nodeID, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
