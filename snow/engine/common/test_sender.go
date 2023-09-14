@@ -53,9 +53,9 @@ type SenderTest struct {
 	SendGetAncestorsF            func(context.Context, ids.GenericNodeID, uint32, ids.ID)
 	SendPutF                     func(context.Context, ids.GenericNodeID, uint32, []byte)
 	SendAncestorsF               func(context.Context, ids.GenericNodeID, uint32, [][]byte)
-	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte)
-	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID)
-	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID)
+	SendPushQueryF               func(context.Context, set.Set[ids.GenericNodeID], uint32, []byte)
+	SendPullQueryF               func(context.Context, set.Set[ids.GenericNodeID], uint32, ids.ID)
+	SendChitsF                   func(context.Context, ids.GenericNodeID, uint32, ids.ID, ids.ID)
 	SendGossipF                  func(context.Context, []byte)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
@@ -243,7 +243,7 @@ func (s *SenderTest) SendAncestors(ctx context.Context, vdr ids.GenericNodeID, r
 // SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs set.Set[ids.NodeID], requestID uint32, vtx []byte) {
+func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs set.Set[ids.GenericNodeID], requestID uint32, vtx []byte) {
 	if s.SendPushQueryF != nil {
 		s.SendPushQueryF(ctx, vdrs, requestID, vtx)
 	} else if s.CantSendPushQuery && s.T != nil {
@@ -254,7 +254,7 @@ func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs set.Set[ids.NodeID]
 // SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID], requestID uint32, vtxID ids.ID) {
+func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.GenericNodeID], requestID uint32, vtxID ids.ID) {
 	if s.SendPullQueryF != nil {
 		s.SendPullQueryF(ctx, vdrs, requestID, vtxID)
 	} else if s.CantSendPullQuery && s.T != nil {
@@ -265,7 +265,7 @@ func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID]
 // SendChits calls SendChitsF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
+func (s *SenderTest) SendChits(ctx context.Context, vdr ids.GenericNodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
 	if s.SendChitsF != nil {
 		s.SendChitsF(ctx, vdr, requestID, preferredID, acceptedID)
 	} else if s.CantSendChits && s.T != nil {

@@ -458,9 +458,9 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
-		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
+		t.Sender.SendChits(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, lastAccepted, lastAccepted)
 	} else {
-		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)
+		t.Sender.SendChits(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, t.Consensus.Preference(), lastAccepted)
 	}
 }
 
@@ -708,13 +708,9 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := set.NewSet[ids.NodeID](len(vdrList))
+		vdrSet := set.NewSet[ids.GenericNodeID](len(vdrList))
 		for _, vdr := range vdrList {
-			shortNode, err := ids.NodeIDFromGenericNodeID(vdr)
-			if err != nil {
-				panic(err)
-			}
-			vdrSet.Add(shortNode)
+			vdrSet.Add(vdr)
 		}
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}
@@ -747,13 +743,9 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrs := vdrBag.List()
-		sendTo := set.NewSet[ids.NodeID](len(vdrs))
+		sendTo := set.NewSet[ids.GenericNodeID](len(vdrs))
 		for _, vdr := range vdrs {
-			shortNode, err := ids.NodeIDFromGenericNodeID(vdr)
-			if err != nil {
-				panic(err)
-			}
-			sendTo.Add(shortNode)
+			sendTo.Add(vdr)
 		}
 		if push {
 			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())

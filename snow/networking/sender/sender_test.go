@@ -281,14 +281,22 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendPullQuery(cancelledCtx, genericNodeIDs, requestID, ids.Empty)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
+			for _, nodeID := range nodeIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendPushQuery(cancelledCtx, genericNodeIDs, requestID, nil)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
@@ -464,7 +472,11 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.NodeID{1})
 
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
+			genericNodeIDs := set.NewSet[ids.GenericNodeID](len(vdrIDs))
+			for _, nodeID := range vdrIDs.List() {
+				genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(nodeID))
+			}
+			sender.SendPullQuery(context.Background(), genericNodeIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -613,8 +625,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := set.Set[ids.NodeID]{}
-			vdrIDs.Add(ids.GenerateTestNodeID())
+			vdrIDs := set.Set[ids.GenericNodeID]{}
+			vdrIDs.Add(ids.GenerateTestGenericNodeID())
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 		}
 	}()

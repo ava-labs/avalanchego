@@ -157,7 +157,7 @@ func (s *tracedSender) SendPut(ctx context.Context, nodeID ids.GenericNodeID, re
 	s.sender.SendPut(ctx, nodeID, requestID, container)
 }
 
-func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, container []byte) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPushQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("containerLen", len(container)),
@@ -167,7 +167,7 @@ func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.No
 	s.sender.SendPushQuery(ctx, nodeIDs, requestID, container)
 }
 
-func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, containerID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPullQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("containerID", containerID),
@@ -177,7 +177,7 @@ func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.No
 	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
