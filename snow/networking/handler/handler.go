@@ -600,7 +600,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	// Bootstrapping messages may be forwarded to either avalanche or snowman
 	// engines, depending on the EngineType field
 	case *p2p.GetAcceptedFrontier:
-		return engine.GetAcceptedFrontier(ctx, shortNodeID, msg.RequestId)
+		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2p.AcceptedFrontier:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -612,13 +612,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFrontierFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedFrontier(ctx, shortNodeID, msg.RequestId, containerID)
+		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetAcceptedFrontierFailed:
-		return engine.GetAcceptedFrontierFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -633,7 +633,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAccepted(ctx, shortNodeID, msg.RequestId, containerIDs)
+		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
 
 	case *p2p.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -645,13 +645,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(ctx, shortNodeID, msg.RequestId)
+			return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Accepted(ctx, shortNodeID, msg.RequestId, containerIDs)
+		return engine.Accepted(ctx, nodeID, msg.RequestId, containerIDs)
 
 	case *message.GetAcceptedFailed:
-		return engine.GetAcceptedFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -666,13 +666,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAncestors(ctx, shortNodeID, msg.RequestId, containerID)
+		return engine.GetAncestors(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetAncestorsFailed:
-		return engine.GetAncestorsFailed(ctx, shortNodeID, msg.RequestID)
+		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.Ancestors:
-		return engine.Ancestors(ctx, shortNodeID, msg.RequestId, msg.Containers)
+		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
 
 	case *p2p.Get:
 		containerID, err := ids.ToID(msg.ContainerId)

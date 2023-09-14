@@ -155,9 +155,9 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
 		b.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -166,8 +166,6 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-
 	lenBlks := len(blks)
 	if lenBlks == 0 {
 		b.Ctx.Log.Debug("received Ancestors with no block",
@@ -175,14 +173,14 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 		)
 
-		b.markUnavailable(genericNodeID)
+		b.markUnavailable(nodeID)
 
 		// Send another request for this
 		return b.fetch(ctx, wantedBlkID)
 	}
 
 	// This node has responded - so add it back into the set
-	b.fetchFrom.Add(genericNodeID)
+	b.fetchFrom.Add(nodeID)
 
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
 		blks = blks[:b.Config.AncestorsMaxContainersReceived]
@@ -227,8 +225,8 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	return b.process(ctx, requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -238,8 +236,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// This node timed out their request, so we can add them back to [fetchFrom]
-	genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
-	b.fetchFrom.Add(genericNodeID)
+	b.fetchFrom.Add(nodeID)
 
 	// Send another request for this
 	return b.fetch(ctx, blkID)

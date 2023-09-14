@@ -151,7 +151,7 @@ type GetAcceptedFrontierHandler interface {
 	//
 	// This engine should respond with an AcceptedFrontier message with the same
 	// requestID, and the engine's current accepted frontier.
-	GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // AcceptedFrontierHandler defines how a consensus engine reacts to accepted
@@ -165,7 +165,7 @@ type AcceptedFrontierHandler interface {
 	// frontier.
 	AcceptedFrontier(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		containerID ids.ID,
 	) error
@@ -180,7 +180,7 @@ type AcceptedFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedFrontier message.
-	GetAcceptedFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFrontierFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // GetAcceptedHandler defines how a consensus engine reacts to a get accepted
@@ -197,7 +197,7 @@ type GetAcceptedHandler interface {
 	// are accepted.
 	GetAccepted(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
@@ -215,7 +215,7 @@ type AcceptedHandler interface {
 	// containerIDs from a GetAccepted message.
 	Accepted(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
@@ -229,7 +229,7 @@ type AcceptedHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAccepted message.
-	GetAcceptedFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // GetAncestorsHandler defines how a consensus engine reacts to a get ancestors
@@ -251,7 +251,7 @@ type GetAncestorsHandler interface {
 	// If this engine doesn't have some ancestors, it should reply with its best
 	// effort attempt at getting them. If this engine doesn't have [containerID]
 	// it can ignore this message.
-	GetAncestors(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetAncestors(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32, containerID ids.ID) error
 }
 
 // AncestorsHandler defines how a consensus engine reacts to bootstrapping
@@ -274,7 +274,7 @@ type AncestorsHandler interface {
 	// containers in [containers] are valid.
 	Ancestors(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 		requestID uint32,
 		containers [][]byte,
 	) error
@@ -288,7 +288,7 @@ type AncestorsHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the GetAncestors message.
-	GetAncestorsFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	GetAncestorsFailed(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error
 }
 
 // GetHandler defines how a consensus engine reacts to get message from another

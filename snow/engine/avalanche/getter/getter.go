@@ -72,28 +72,28 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.GenericN
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge(ctx)
 	// Since all the DAGs are linearized, we only need to return the stop
 	// vertex.
 	if len(acceptedFrontier) > 0 {
-		gh.sender.SendAcceptedFrontier(ctx, ids.GenericNodeIDFromNodeID(validatorID), requestID, acceptedFrontier[0])
+		gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier[0])
 	}
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedVtxIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),
@@ -142,7 +142,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ancestorsBytes)
+	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil
 }
 

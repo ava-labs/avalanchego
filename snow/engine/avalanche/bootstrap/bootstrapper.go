@@ -105,7 +105,7 @@ func (b *bootstrapper) Clear() error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxs [][]byte) error {
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors contains no vertices",
@@ -124,7 +124,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 	}
 
-	requestedVtxID, requested := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+	requestedVtxID, requested := b.OutstandingRequests.Remove(nodeID, requestID)
 	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
@@ -230,8 +230,8 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	return b.process(ctx, processVertices...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	vtxID, ok := b.OutstandingRequests.Remove(ids.GenericNodeIDFromNodeID(nodeID), requestID)
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
 			zap.String("reason", "no matching outstanding request"),

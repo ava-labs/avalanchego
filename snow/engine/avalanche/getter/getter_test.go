@@ -83,7 +83,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, containerID ids.ID) {
 		accepted = containerID
 	}
-	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyGenericNodeID, 0))
 	require.Equal(vtxID, accepted)
 }
 
@@ -130,7 +130,7 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs))
+	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyGenericNodeID, 0, vtxIDs))
 
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)

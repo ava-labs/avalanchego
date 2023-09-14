@@ -423,17 +423,17 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAcceptedStateSummaryFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAncestorsFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetAncestorsFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil

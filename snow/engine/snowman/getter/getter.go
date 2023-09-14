@@ -126,16 +126,16 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.Generi
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
 	lastAccepted, err := gh.vm.LastAccepted(ctx)
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, lastAccepted)
+	gh.sender.SendAcceptedFrontier(ctx, nodeID, requestID, lastAccepted)
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
@@ -143,11 +143,11 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
-	gh.sender.SendAccepted(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, acceptedIDs)
+	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
 		ctx,
 		gh.log,
@@ -169,7 +169,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, ancestorsBytes)
+	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil
 }
 

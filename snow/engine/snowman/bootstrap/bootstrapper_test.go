@@ -402,16 +402,16 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request blk1
 
 	oldReqID := *requestID
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID+1, [][]byte{blkBytes1})) // respond with wrong request ID
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID+1, [][]byte{blkBytes1})) // respond with wrong request ID
 	require.Equal(oldReqID, *requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), ids.NodeID{1, 2, 3}, *requestID, [][]byte{blkBytes1})) // respond from wrong peer
+	require.NoError(bs.Ancestors(context.Background(), ids.GenerateTestGenericNodeID(), *requestID, [][]byte{blkBytes1})) // respond from wrong peer
 	require.Equal(oldReqID, *requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{blkBytes0})) // respond with wrong block
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes0})) // respond with wrong block
 	require.NotEqual(oldReqID, *requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
@@ -550,10 +550,10 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request blk2
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{blkBytes2})) // respond with blk2
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2})) // respond with blk2
 	require.Equal(blkID1, requested)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{blkBytes1})) // respond with blk1
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1})) // respond with blk1
 	require.Equal(blkID1, requested)
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
@@ -705,25 +705,17 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	newPeerID = ids.GenerateTestGenericNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, requestID, [][]byte{blkBytes2}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes2}))
 	require.Equal(blkID1, requestedBlock)
 
 	peerToBlacklist := requestedVdr
 
 	// respond with empty
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(peerToBlacklist)
-	if err != nil {
-		panic(err)
-	}
-	require.NoError(bs.Ancestors(context.Background(), shortNodeID, requestID, nil))
+	require.NoError(bs.Ancestors(context.Background(), peerToBlacklist, requestID, nil))
 	require.NotEqual(peerToBlacklist, requestedVdr)
 	require.Equal(blkID1, requestedBlock)
 
-	shortNodeID, err = ids.NodeIDFromGenericNodeID(requestedVdr)
-	if err != nil {
-		panic(err)
-	}
-	require.NoError(bs.Ancestors(context.Background(), shortNodeID, requestID, [][]byte{blkBytes1})) // respond with blk1
+	require.NoError(bs.Ancestors(context.Background(), requestedVdr, requestID, [][]byte{blkBytes1})) // respond with blk1
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
@@ -864,8 +856,8 @@ func TestBootstrapperAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))                                         // should request blk2
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, *requestID, [][]byte{blkBytes2, blkBytes1})) // respond with blk2 and blk1
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))                                    // should request blk2
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2, blkBytes1})) // respond with blk2 and blk1
 	require.Equal(blkID2, requested)
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
@@ -987,7 +979,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	reqIDBlk2, ok := requestIDs[blkID2]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
@@ -1149,7 +1141,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	reqID, ok := requestIDs[blkID3]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, reqID, [][]byte{blkBytes3, blkBytes2}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2}))
 
 	require.Contains(requestIDs, blkID1)
 
@@ -1164,11 +1156,11 @@ func TestRestartBootstrapping(t *testing.T) {
 	blk4RequestID, ok := requestIDs[blkID4]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, blk1RequestID, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
 
 	require.NotEqual(snow.NormalOp, config.Ctx.State.Get().State)
 
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, blk4RequestID, [][]byte{blkBytes4}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
@@ -1255,7 +1247,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 
 	reqID, ok := requestIDs[blk0.ID()]
 	require.True(ok)
-	require.NoError(bs.Ancestors(context.Background(), shortPeerID, reqID, [][]byte{blk0.Bytes()}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blk0.Bytes()}))
 
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Processing, blk0.Status())

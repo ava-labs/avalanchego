@@ -215,9 +215,9 @@ func TestTimeout(t *testing.T) {
 
 	bootstrapper.GetStateSummaryFrontierFailedF = genericFailed
 	bootstrapper.GetAcceptedStateSummaryFailedF = genericFailed
-	bootstrapper.GetAcceptedFrontierFailedF = failed
-	bootstrapper.GetAcceptedFailedF = failed
-	bootstrapper.GetAncestorsFailedF = failed
+	bootstrapper.GetAcceptedFrontierFailedF = genericFailed
+	bootstrapper.GetAcceptedFailedF = genericFailed
+	bootstrapper.GetAncestorsFailedF = genericFailed
 	bootstrapper.GetFailedF = failed
 	bootstrapper.QueryFailedF = failed
 	bootstrapper.AppRequestFailedF = failed

@@ -1540,10 +1540,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
-	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	genericPeerID := ids.GenericNodeIDFromNodeID(peerID)
+	peerID := ids.GenericNodeIDFromNodeID(ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	beacons := validators.NewSet()
-	require.NoError(beacons.Add(genericPeerID, nil, ids.Empty, 1))
+	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1730,7 +1729,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
-	require.NoError(bootstrapper.Connected(context.Background(), genericPeerID, version.CurrentApp))
+	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
