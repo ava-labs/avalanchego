@@ -352,7 +352,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 
 	largestHandledKey := work.end
 
-	// Add all the key-value pairs we got to the database.
+	// Replace all the key-value pairs in the DB from start to end with values from the response.
 	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, proof); err != nil {
 		m.setError(err)
 		return
