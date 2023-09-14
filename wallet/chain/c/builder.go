@@ -5,11 +5,13 @@ package c
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	stdcontext "context"
 
 	"github.com/ava-labs/coreth/plugin/evm"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -356,6 +358,7 @@ func (b *builder) NewExportTx(
 		}
 
 		nonce, err := b.backend.Nonce(ctx, addr)
+		_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] nonce for address %s nonce %d", addr, nonce)
 		if err != nil {
 			return nil, err
 		}

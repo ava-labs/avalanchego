@@ -122,11 +122,11 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				e2e.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			require.NoError(err)
 			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX: %+v\n", render.AsCode(exportTx.UnsignedAtomicTx))
 			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX INPUTS: %+v\n", exportTx.UnsignedAtomicTx.InputUTXOs())
 			gas, _ := exportTx.UnsignedAtomicTx.GasUsed(true)
 			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] EXPORT TX gas: %+v\n", gas)
-			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the C-Chain to the X-Chain", func() {

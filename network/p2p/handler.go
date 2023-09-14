@@ -103,7 +103,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Uint64("handlerID", r.handlerID),
-			zap.Binary("message", request),
+			// zap.Binary("message", request),
 		)
 		return nil
 	}
@@ -118,7 +118,7 @@ func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 			zap.Stringer("messageOp", message.AppGossipOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint64("handlerID", r.handlerID),
-			zap.Binary("message", msg),
+			// zap.Binary("message", msg),
 		)
 	}
 	return nil
@@ -133,7 +133,7 @@ func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Uint64("handlerID", r.handlerID),
-			zap.Binary("message", request),
+			// zap.Binary("message", request),
 		)
 		return nil
 	}

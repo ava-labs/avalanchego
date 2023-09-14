@@ -12,6 +12,7 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/coreth/plugin/evm"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -124,6 +125,7 @@ func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
 			if err != nil {
 				return err
 			}
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] update nonce for address %s nonce %d", input.Address, nonce)
 			account.Nonce = newNonce
 		}
 	default:
