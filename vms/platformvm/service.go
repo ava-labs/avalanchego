@@ -107,16 +107,9 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	)
 
 	ctx := r.Context()
-	lastAcceptedID, err := s.vm.LastAccepted(ctx)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
-	}
-	lastAccepted, err := s.vm.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	response.Height = json.Uint64(lastAccepted.Height())
-	return nil
+	height, err := s.vm.GetCurrentHeight(ctx)
+	response.Height = json.Uint64(height)
+	return err
 }
 
 // ExportKeyArgs are arguments for ExportKey
