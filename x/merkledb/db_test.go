@@ -332,7 +332,7 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	// despite having no key/values in it, committing this proof implicitly speficies that key1-key3 need to be deleted.
+	// despite having no key/values in it, committing this proof should delete key1-key3.
 	require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
 
 	afterCommitRoot, err := db.GetMerkleRoot(context.Background())
