@@ -125,7 +125,7 @@ func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
 			if err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] update nonce for address %s nonce %d", input.Address, nonce)
+			_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "[DEBUG] update nonce for address %s nonce %d", input.Address, newNonce)
 			account.Nonce = newNonce
 		}
 	default:
