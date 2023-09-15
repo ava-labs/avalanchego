@@ -119,24 +119,30 @@ func (db *intermediateNodeDB) Get(key Path) (*node, error) {
 	return parseNode(key, nodeBytes)
 }
 
+// constructDBKey returns a key that can be used in [db.baseDB].
+// We need to be able to differentiate between two paths of equal
+// byte length but different token length so we add padding to differentiate.
+// Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
-	// We need differentiate between two paths of equal byte length but different token length
-	// so add the modulo remainder as a key suffix
-	dbKey := db.bufferPool.Get().([]byte)
-	defer db.bufferPool.Put(dbKey)
-	compressedKey := key.Bytes()
-	keyLen := len(compressedKey) + 1
-	if cap(dbKey) >= keyLen {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		dbKey = dbKey[:keyLen]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		db.bufferPool.Put(dbKey)
-		dbKey = make([]byte, keyLen)
+	pathBytes := key.Bytes()
+
+	// add one additional byte to store padding when the path
+	// has a length that fits into a whole number of bytes
+	remainder := key.Length() % key.tokensPerByte
+	keyLen := len(pathBytes)
+	if remainder == 0 {
+		keyLen++
 	}
-	copy(dbKey, compressedKey)
-	dbKey[len(compressedKey)] = byte(key.length % key.tokensPerByte)
+	dbKey := getBufferFromPool(db.bufferPool, keyLen)
+	defer db.bufferPool.Put(dbKey)
+
+	copy(dbKey, pathBytes)
+	if remainder == 0 {
+		dbKey[keyLen-1] = 0b1000_0000
+	} else {
+		dbKey[keyLen-1] |= 0b0000_0001 << (Byte - (byte(remainder) * key.tokenBitSize))
+	}
+
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }
 
