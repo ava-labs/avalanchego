@@ -462,7 +462,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
+	subnetValidatorNodeID := ids.ShortNodeID(preFundedKeys[0].PublicKey().Address())
 	genericSubnetValidatorNodeID := ids.GenericNodeIDFromNodeID(subnetValidatorNodeID)
 	// Starts after the corre
 	subnetVdr1StartTime := defaultValidateStartTime
@@ -493,7 +493,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
+	subnetVdr2NodeID := ids.ShortNodeID(preFundedKeys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
@@ -572,11 +572,11 @@ func TestTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-				1,                                  // Weight
-				uint64(subnetVdr1StartTime.Unix()), // Start time
-				uint64(subnetVdr1EndTime.Unix()),   // end time
-				ids.NodeID(subnetValidatorNodeID),  // Node ID
-				subnetID,                           // Subnet ID
+				1,                                      // Weight
+				uint64(subnetVdr1StartTime.Unix()),     // Start time
+				uint64(subnetVdr1EndTime.Unix()),       // end time
+				ids.ShortNodeID(subnetValidatorNodeID), // Node ID
+				subnetID,                               // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
 			)
@@ -617,7 +617,7 @@ func TestTrackedSubnet(t *testing.T) {
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
 
-			nodeID := ids.NodeID(subnetValidatorNodeID)
+			nodeID := ids.ShortNodeID(subnetValidatorNodeID)
 			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.GenericNodeIDFromNodeID(nodeID)))
 		})
 	}

@@ -246,7 +246,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	}
 
 	// Assume all initial nodes are validator ids
-	validatorIDs := make([]ids.NodeID, 0, len(ln.Nodes))
+	validatorIDs := make([]ids.ShortNodeID, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		validatorIDs = append(validatorIDs, node.NodeID)
 	}
@@ -377,7 +377,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
 
-	healthyNodes := set.NewSet[ids.NodeID](len(ln.Nodes))
+	healthyNodes := set.NewSet[ids.ShortNodeID](len(ln.Nodes))
 	for healthyNodes.Len() < len(ln.Nodes) {
 		for _, node := range ln.Nodes {
 			if healthyNodes.Contains(node.NodeID) {

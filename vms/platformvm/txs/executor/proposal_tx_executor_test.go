@@ -25,9 +25,9 @@ import (
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
-	nodeID := ids.NodeID(rewardAddress)
+	nodeID := ids.ShortNodeID(rewardAddress)
 
-	newValidatorID := ids.GenerateTestNodeID()
+	newValidatorID := ids.GenerateTestShortNodeID()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
@@ -95,7 +95,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		stakeAmount   uint64
 		startTime     uint64
 		endTime       uint64
-		nodeID        ids.NodeID
+		nodeID        ids.ShortNodeID
 		rewardAddress ids.ShortID
 		feeKeys       []*secp256k1.PrivateKey
 		setup         func(*environment)
@@ -298,7 +298,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix())+1,
-			ids.NodeID(nodeID),
+			ids.ShortNodeID(nodeID),
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -330,7 +330,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(nodeID),
+			ids.ShortNodeID(nodeID),
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -355,7 +355,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	// Add a validator to pending validator set of primary network
 	key, err := testKeyfactory.NewPrivateKey()
 	require.NoError(err)
-	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
+	pendingDSValidatorID := ids.ShortNodeID(key.PublicKey().Address())
 
 	// starts validating primary network 10 seconds after genesis
 	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
@@ -516,8 +516,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,               // weight
 			uint64(newTimestamp.Unix()), // start time
 			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.ShortNodeID(nodeID), // node ID
+			testSubnet1.ID(),        // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -548,7 +548,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		ids.NodeID(nodeID),                      // node ID
+		ids.ShortNodeID(nodeID),                 // node ID
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
@@ -573,7 +573,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight, // weight
 			uint64(defaultValidateStartTime.Unix())+1, // start time
 			uint64(defaultValidateEndTime.Unix()),     // end time
-			ids.NodeID(nodeID),                        // node ID
+			ids.ShortNodeID(nodeID),                   // node ID
 			testSubnet1.ID(),                          // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -606,8 +606,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.ShortNodeID(nodeID), // node ID
+			testSubnet1.ID(),        // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
@@ -642,8 +642,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.ShortNodeID(nodeID), // node ID
+			testSubnet1.ID(),        // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -677,8 +677,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.ShortNodeID(nodeID), // node ID
+			testSubnet1.ID(),        // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -721,7 +721,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 
 	{
 		// Case: Validator's start time too early
@@ -789,7 +789,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(preFundedKeys[0].Address()),
+			ids.ShortNodeID(preFundedKeys[0].Address()),
 			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -862,7 +862,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.GenerateTestNodeID(),
+			ids.GenerateTestShortNodeID(),
 			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},

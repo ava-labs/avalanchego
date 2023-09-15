@@ -60,7 +60,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
-	nodeID := ids.NodeID{
+	nodeID := ids.ShortNodeID{
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44,
@@ -725,7 +725,7 @@ func TestAddPermissionlessSubnetValidator(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
-	nodeID := ids.NodeID{
+	nodeID := ids.ShortNodeID{
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44,
@@ -1440,7 +1440,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 					},
 					StakeOuts: nil,
 				}
@@ -1453,7 +1453,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -1476,7 +1476,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: invalidBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -1501,7 +1501,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1531,7 +1531,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -1564,7 +1564,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1593,7 +1593,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1631,7 +1631,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1670,7 +1670,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1709,7 +1709,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1748,7 +1748,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   2,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -1787,7 +1787,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Wght:   2,
 					},
 					Subnet: constants.PrimaryNetworkID,

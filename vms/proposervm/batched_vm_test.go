@@ -1039,9 +1039,9 @@ func initTestRemoteProposerVM(
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {

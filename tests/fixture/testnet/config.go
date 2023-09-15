@@ -126,7 +126,7 @@ type NetworkConfig struct {
 }
 
 // Ensure genesis is generated if not already present.
-func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeID) error {
+func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.ShortNodeID) error {
 	if c.Genesis != nil {
 		return nil
 	}
@@ -159,13 +159,13 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 
 // NodeURI associates a node ID with its API URI.
 type NodeURI struct {
-	NodeID ids.NodeID
+	NodeID ids.ShortNodeID
 	URI    string
 }
 
 // NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
-	NodeID ids.NodeID
+	NodeID ids.ShortNodeID
 	Flags  FlagsMap
 }
 
@@ -309,7 +309,7 @@ func NewTestGenesis(
 	networkID uint32,
 	xChainBalances XChainBalanceMap,
 	cChainBalances core.GenesisAlloc,
-	validatorIDs []ids.NodeID,
+	validatorIDs []ids.ShortNodeID,
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
 	switch networkID {

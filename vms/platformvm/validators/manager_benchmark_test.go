@@ -70,7 +70,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		Staker: api.Staker{
 			StartTime: json.Uint64(genesisTime.Unix()),
 			EndTime:   json.Uint64(genesisEndTime.Unix()),
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    ids.GenerateTestShortNodeID(),
 		},
 		RewardOwner: &api.Owner{
 			Threshold: 1,

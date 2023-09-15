@@ -25,7 +25,7 @@ type ClientStaker struct {
 	// the amount of tokens being staked.
 	StakeAmount *uint64
 	// the node ID of the staker
-	NodeID ids.NodeID
+	NodeID ids.ShortNodeID
 }
 
 // ClientOwner is the repr. of a reward owner sent over client

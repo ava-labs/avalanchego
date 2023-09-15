@@ -63,7 +63,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 			},
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  1,
 				End:    1 + uint64(unsignedTransformTx.MinStakeDuration),
 				Wght:   unsignedTransformTx.MinValidatorStake,

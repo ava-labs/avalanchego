@@ -107,7 +107,7 @@ type ProposalTxBuilder interface {
 		stakeAmount,
 		startTime,
 		endTime uint64,
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -125,7 +125,7 @@ type ProposalTxBuilder interface {
 		stakeAmount,
 		startTime,
 		endTime uint64,
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -142,7 +142,7 @@ type ProposalTxBuilder interface {
 		weight,
 		startTime,
 		endTime uint64,
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -153,7 +153,7 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for removing the validator
 	// changeAddr: address to send change to, if there is any
 	NewRemoveSubnetValidatorTx(
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -429,7 +429,7 @@ func (b *builder) NewAddValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
@@ -472,7 +472,7 @@ func (b *builder) NewAddDelegatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
@@ -513,7 +513,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	weight,
 	startTime,
 	endTime uint64,
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
@@ -556,7 +556,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,

@@ -4,80 +4,62 @@
 package ids
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const (
-	NodeIDPrefix = "NodeID-"
-	NodeIDLen    = ShortIDLen
-)
-
 var (
-	EmptyNodeID = NodeID{}
+	EmptyGenericNodeID = GenericNodeID(string(EmptyNodeID[:]))
 
-	errShortNodeID = errors.New("insufficient NodeID length")
-
-	_ utils.Sortable[NodeID] = NodeID{}
+	_ utils.Sortable[GenericNodeID] = (*GenericNodeID)(nil)
 )
 
-type NodeID ShortID
+type GenericNodeID string
 
-// WritableNode is an helper which helps modifiying NodeID content
-func WritableNode(id *NodeID) []byte {
-	return id[:]
+func GenericNodeIDFromBytes(bytes []byte) GenericNodeID {
+	return GenericNodeID(string(bytes))
 }
 
-func (id NodeID) Bytes() []byte {
-	return id[:]
+// GenericNodeIDFromNodeID attempt to convert a byte slice into a node id
+func GenericNodeIDFromNodeID(nodeID ShortNodeID) GenericNodeID {
+	return GenericNodeID(string(nodeID.Bytes()))
 }
 
-// ToNodeID attempt to convert a byte slice into a node id
-func ToNodeID(bytes []byte) (NodeID, error) {
-	nodeID, err := ToShortID(bytes)
-	return NodeID(nodeID), err
-}
-
-func (id NodeID) String() string {
-	return ShortID(id).PrefixedString(NodeIDPrefix)
-}
-
-// NodeIDFromString is the inverse of NodeID.String()
-func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
+// GenericNodeIDFromString is the inverse of GenericNodeID.String()
+func GenericNodeIDFromString(nodeIDStr string) (GenericNodeID, error) {
+	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
 	if err != nil {
-		return EmptyNodeID, err
+		return EmptyGenericNodeID, err
 	}
-	return NodeID(asShort), nil
+	return GenericNodeID(string(asShort.Bytes())), nil
 }
 
-// NodeIDFromGenericNodeID is the inverse of NodeID.String()
-func NodeIDFromGenericNodeID(genericNodeID GenericNodeID) (NodeID, error) {
-	if genericNodeID == EmptyGenericNodeID {
-		return EmptyNodeID, nil
-	}
-	res, err := ToNodeID(genericNodeID.Bytes())
-	if err != nil {
-		return EmptyNodeID, fmt.Errorf("failed converting GenericNodeID to NodeID, %w", err)
-	}
-	return res, nil
+func (nodeID GenericNodeID) Bytes() []byte {
+	return []byte(nodeID)
 }
 
-func (id NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + id.String() + "\""), nil
+func (nodeID GenericNodeID) String() string {
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	str, _ := cb58.Encode([]byte(nodeID))
+	return ShortNodeIDPrefix + str
 }
 
-func (id *NodeID) UnmarshalJSON(b []byte) error {
+func (nodeID GenericNodeID) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + nodeID.String() + "\""), nil
+}
+
+func (nodeID *GenericNodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) <= 2+len(NodeIDPrefix) {
-		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(NodeIDPrefix))
+	}
+	if len(str) <= 2+len(ShortNodeIDPrefix) {
+		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(ShortNodeIDPrefix))
 	}
 
 	lastIndex := len(str) - 1
@@ -86,24 +68,42 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 	}
 
 	var err error
-	*id, err = NodeIDFromString(str[1:lastIndex])
+	*nodeID, err = GenericNodeIDFromString(str[1:lastIndex])
 	return err
 }
 
-func (id NodeID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
+func (nodeID GenericNodeID) MarshalText() ([]byte, error) {
+	return []byte(nodeID.String()), nil
 }
 
-func (id *NodeID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+func (nodeID *GenericNodeID) UnmarshalText(text []byte) error {
+	return nodeID.UnmarshalJSON(text)
 }
 
-func (id NodeID) Less(other NodeID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (nodeID GenericNodeID) Less(other GenericNodeID) bool {
+	return nodeID < other
 }
 
-func NodeIDFromCert(cert *staking.Certificate) NodeID {
-	return hashing.ComputeHash160Array(
+func (nodeID GenericNodeID) Equal(other GenericNodeID) bool {
+	return nodeID == other
+}
+
+func GenericNodeIDFromCert(cert *staking.Certificate) GenericNodeID {
+	bytes := hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
+	return GenericNodeID(string(bytes[:]))
+}
+
+func (nodeID GenericNodeID) ToSize(newSize int) GenericNodeID {
+	if len(nodeID) >= newSize {
+		return nodeID // leave unchanged if it's longer than required
+	}
+	pad := make([]byte, newSize-len(nodeID))
+	for idx := range pad {
+		pad[idx] = 0x00
+	}
+	bytes := nodeID.Bytes()
+	bytes = append(bytes, pad...)
+	return GenericNodeIDFromBytes(bytes)
 }

@@ -154,9 +154,9 @@ func initTestProposerVM(
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -897,7 +897,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		return defaultPChainHeight, nil
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-		nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+		nodeID1 := ids.GenericNodeIDFromNodeID(ids.ShortNodeID{1})
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			nodeID1: {
 				NodeID: nodeID1,
@@ -1167,7 +1167,7 @@ func TestInnerVMRollback(t *testing.T) {
 		return defaultPChainHeight, nil
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-		genericNodeID := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
+		genericNodeID := ids.GenericNodeIDFromNodeID(ids.ShortNodeID{1})
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			genericNodeID: {
 				NodeID: genericNodeID,
@@ -1824,9 +1824,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -2034,9 +2034,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {

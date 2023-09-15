@@ -758,7 +758,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	reply.Validators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
-	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
+	vdrToDelegators := map[ids.ShortNodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
 	nodeIDs := set.Set[ids.GenericNodeID]{}
@@ -1204,7 +1204,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 
 	// Parse the node ID
 	var (
-		nodeID ids.NodeID
+		nodeID ids.ShortNodeID
 		err    error
 	)
 	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
@@ -1320,7 +1320,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	}
 
 	var (
-		nodeID ids.NodeID
+		nodeID ids.ShortNodeID
 		err    error
 	)
 	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
@@ -2573,7 +2573,7 @@ type jsonGetValidatorOutput struct {
 }
 
 func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
-	m := make(map[ids.NodeID]*jsonGetValidatorOutput, len(v.Validators))
+	m := make(map[ids.ShortNodeID]*jsonGetValidatorOutput, len(v.Validators))
 	for _, vdr := range v.Validators {
 		vdrJSON := &jsonGetValidatorOutput{
 			Weight: json.Uint64(vdr.Weight),

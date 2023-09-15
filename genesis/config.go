@@ -59,9 +59,9 @@ func (a Allocation) Less(other Allocation) bool {
 }
 
 type Staker struct {
-	NodeID        ids.NodeID  `json:"nodeID"`
-	RewardAddress ids.ShortID `json:"rewardAddress"`
-	DelegationFee uint32      `json:"delegationFee"`
+	NodeID        ids.ShortNodeID `json:"nodeID"`
+	RewardAddress ids.ShortID     `json:"rewardAddress"`
+	DelegationFee uint32          `json:"delegationFee"`
 }
 
 func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {

@@ -285,7 +285,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
-					ids.GenerateTestNodeID(),
+					ids.GenerateTestShortNodeID(),
 					ids.GenerateTestShortID(),
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
@@ -478,7 +478,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	delegatorNodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -526,7 +526,7 @@ func TestGetStake(t *testing.T) {
 	// Make sure this works for pending stakers
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
-	pendingStakerNodeID := ids.GenerateTestNodeID()
+	pendingStakerNodeID := ids.GenerateTestShortNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
@@ -605,7 +605,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
+	validatorNodeID := ids.ShortNodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 

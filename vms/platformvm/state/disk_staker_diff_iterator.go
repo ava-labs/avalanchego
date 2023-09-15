@@ -15,7 +15,7 @@ const (
 	// startDiffKey = [subnetID] + [inverseHeight]
 	startDiffKeyLength = ids.IDLen + database.Uint64Size
 	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	diffKeyLength = startDiffKeyLength + ids.NodeIDLen
+	diffKeyLength = startDiffKeyLength + ids.ShortNodeIDLen
 	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
 	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 

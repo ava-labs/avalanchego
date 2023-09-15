@@ -15,8 +15,8 @@ import (
 func TestNodeIDEquality(t *testing.T) {
 	require := require.New(t)
 
-	id := NodeID{24}
-	idCopy := NodeID{24}
+	id := ShortNodeID{24}
+	idCopy := ShortNodeID{24}
 	require.Equal(id, idCopy)
 	id2 := EmptyNodeID
 	require.NotEqual(id, id2)
@@ -38,20 +38,20 @@ func TestShortIDBytesAndWritableIsolation(t *testing.T) {
 func TestNodeIDBytesAndWritableIsolation(t *testing.T) {
 	require := require.New(t)
 
-	id := NodeID{24}
+	id := ShortNodeID{24}
 	idBytes := id.Bytes()
 	idBytes[0] = 25
-	require.Equal(NodeID{24}, id)
+	require.Equal(ShortNodeID{24}, id)
 
 	idBytes = WritableNode(&id)
 	idBytes[0] = 25
-	require.Equal(NodeID{25}, id)
+	require.Equal(ShortNodeID{25}, id)
 }
 
 func TestNodeIDFromString(t *testing.T) {
 	require := require.New(t)
 
-	id := NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
+	id := ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
 	id2, err := NodeIDFromString(idStr)
 	require.NoError(err)
@@ -89,14 +89,14 @@ func TestNodeIDFromStringError(t *testing.T) {
 func TestNodeIDMarshalJSON(t *testing.T) {
 	tests := []struct {
 		label string
-		in    NodeID
+		in    ShortNodeID
 		out   []byte
 		err   error
 	}{
 		{"NodeID{}", EmptyNodeID, []byte("\"NodeID-111111111111111111116DBWJs\""), nil},
 		{
 			"ID(\"ava labs\")",
-			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+			ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
 			nil,
 		},
@@ -116,14 +116,14 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		label       string
 		in          []byte
-		out         NodeID
+		out         ShortNodeID
 		expectedErr error
 	}{
 		{"NodeID{}", []byte("null"), EmptyNodeID, nil},
 		{
 			"NodeID(\"ava labs\")",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
-			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+			ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			nil,
 		},
 		{
@@ -172,11 +172,11 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 func TestNodeIDString(t *testing.T) {
 	tests := []struct {
 		label    string
-		id       NodeID
+		id       ShortNodeID
 		expected string
 	}{
 		{"NodeID{}", EmptyNodeID, "NodeID-111111111111111111116DBWJs"},
-		{"NodeID{24}", NodeID{24}, "NodeID-3BuDc2d1Efme5Apba6SJ8w3Tz7qeh6mHt"},
+		{"NodeID{24}", ShortNodeID{24}, "NodeID-3BuDc2d1Efme5Apba6SJ8w3Tz7qeh6mHt"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -188,14 +188,14 @@ func TestNodeIDString(t *testing.T) {
 func TestNodeIDMapMarshalling(t *testing.T) {
 	require := require.New(t)
 
-	originalMap := map[NodeID]int{
+	originalMap := map[ShortNodeID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
 	require.NoError(err)
 
-	var unmarshalledMap map[NodeID]int
+	var unmarshalledMap map[ShortNodeID]int
 	require.NoError(json.Unmarshal(mapJSON, &unmarshalledMap))
 	require.Equal(originalMap, unmarshalledMap)
 }
@@ -208,18 +208,18 @@ func TestNodeIDLess(t *testing.T) {
 	require.False(id1.Less(id2))
 	require.False(id2.Less(id1))
 
-	id1 = NodeID{1}
+	id1 = ShortNodeID{1}
 	id2 = EmptyNodeID
 	require.False(id1.Less(id2))
 	require.True(id2.Less(id1))
 
-	id1 = NodeID{1}
-	id2 = NodeID{1}
+	id1 = ShortNodeID{1}
+	id2 = ShortNodeID{1}
 	require.False(id1.Less(id2))
 	require.False(id2.Less(id1))
 
-	id1 = NodeID{1}
-	id2 = NodeID{1, 2}
+	id1 = ShortNodeID{1}
+	id2 = ShortNodeID{1, 2}
 	require.True(id1.Less(id2))
 	require.False(id2.Less(id1))
 }

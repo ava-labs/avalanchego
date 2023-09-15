@@ -87,11 +87,11 @@ func (utxo UTXO) Less(other UTXO) bool {
 // [NodeID] is the node ID of the staker
 // [Uptime] is the observed uptime of this staker
 type Staker struct {
-	TxID      ids.ID      `json:"txID"`
-	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
-	Weight    json.Uint64 `json:"weight"`
-	NodeID    ids.NodeID  `json:"nodeID"`
+	TxID      ids.ID          `json:"txID"`
+	StartTime json.Uint64     `json:"startTime"`
+	EndTime   json.Uint64     `json:"endTime"`
+	Weight    json.Uint64     `json:"weight"`
+	NodeID    ids.ShortNodeID `json:"nodeID"`
 
 	// Deprecated: Use Weight instead
 	// TODO: remove [StakeAmount] after enough time for dependencies to update

@@ -236,7 +236,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt
@@ -360,7 +360,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
@@ -580,7 +580,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt
@@ -743,7 +743,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt

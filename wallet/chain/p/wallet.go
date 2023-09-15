@@ -75,7 +75,7 @@ type Wallet interface {
 	//
 	// - [nodeID] is the validator being removed from [subnetID].
 	IssueRemoveSubnetValidatorTx(
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		subnetID ids.ID,
 		options ...common.Option,
 	) (*txs.Tx, error)
@@ -309,7 +309,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 }
 
 func (w *wallet) IssueRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {

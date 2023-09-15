@@ -19,12 +19,12 @@ func GenerateTestShortID() ShortID {
 	return newShortID
 }
 
-// GenerateTestNodeID returns a new ID that should only be used for testing
-func GenerateTestNodeID() NodeID {
-	return NodeID(GenerateTestShortID())
+// GenerateTestShortNodeID returns a new ID that should only be used for testing
+func GenerateTestShortNodeID() ShortNodeID {
+	return ShortNodeID(GenerateTestShortID())
 }
 
 // GenerateTestNodeID returns a new ID that should only be used for testing
 func GenerateTestGenericNodeID() GenericNodeID {
-	return GenericNodeIDFromNodeID(GenerateTestNodeID())
+	return GenericNodeIDFromNodeID(GenerateTestShortNodeID())
 }
