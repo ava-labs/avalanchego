@@ -51,14 +51,26 @@ func (p *earlyTermNoTraversalPoll) Drop(vdr ids.NodeID) {
 	p.polled.Remove(vdr)
 }
 
-// Finished returns true when all validators have voted
+// Finished returns true when one of the following conditions is met.
+//
+//  1. There are no outstanding votes.
+//  2. It is impossible for the poll to achieve an alpha majority after applying
+//     transitive voting.
+//  3. A single element has achieved an alpha majority.
 func (p *earlyTermNoTraversalPoll) Finished() bool {
 	remaining := p.polled.Len()
+	if remaining == 0 {
+		return true // Case 1
+	}
+
 	received := p.votes.Len()
+	maxPossibleVotes := received + remaining
+	if maxPossibleVotes < p.alpha {
+		return true // Case 2
+	}
+
 	_, freq := p.votes.Mode()
-	return remaining == 0 || // All k nodes responded
-		freq >= p.alpha || // An alpha majority has returned
-		received+remaining < p.alpha // An alpha majority can never return
+	return freq >= p.alpha // Case 3
 }
 
 // Result returns the result of this poll
