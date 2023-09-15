@@ -192,7 +192,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	}
 
 	// The database.Database spec treats a nil [limit] as a key after all keys
-	// but pebble treats a nil [limit] as a key before all keys.
+	// but pebble treats a nil [limit] as a key before all keys in Compact.
 	// Use the greatest key in the database as the [limit] to get the desired behavior.
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
