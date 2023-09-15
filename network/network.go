@@ -306,13 +306,8 @@ func NewNetwork(
 	return n, nil
 }
 
-func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID] {
-	genericNodeIDs := set.NewSet[ids.GenericNodeID](len(nodeIDs))
-	for _, shortNodeID := range nodeIDs.List() {
-		genericNodeIDs.Add(ids.GenericNodeIDFromNodeID(shortNodeID))
-	}
-
-	peers := n.getPeers(genericNodeIDs, subnetID, allower)
+func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.GenericNodeID] {
+	peers := n.getPeers(nodeIDs, subnetID, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
 		msg.Op(),
 		nodeIDs.Len()-len(peers),
@@ -327,7 +322,7 @@ func (n *network) Gossip(
 	numNonValidatorsToSend int,
 	numPeersToSend int,
 	allower subnets.Allower,
-) set.Set[ids.NodeID] {
+) set.Set[ids.GenericNodeID] {
 	peers := n.samplePeers(subnetID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend, allower)
 	return n.send(msg, peers)
 }
@@ -938,18 +933,14 @@ func (n *network) samplePeers(
 // send takes ownership of the provided message reference. So, the provided
 // message should only be inspected if the reference has been externally
 // increased.
-func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) set.Set[ids.NodeID] {
-	sentTo := set.NewSet[ids.NodeID](len(peers))
+func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) set.Set[ids.GenericNodeID] {
+	sentTo := set.NewSet[ids.GenericNodeID](len(peers))
 	now := n.peerConfig.Clock.Time()
 
 	// send to peer and update metrics
 	for _, peer := range peers {
 		if peer.Send(n.onCloseCtx, msg) {
-			shortNodeID, err := ids.NodeIDFromGenericNodeID(peer.ID())
-			if err != nil {
-				panic(err)
-			}
-			sentTo.Add(shortNodeID)
+			sentTo.Add(peer.ID())
 
 			// TODO: move send fail rate calculations into the peer metrics
 			// record metrics for success

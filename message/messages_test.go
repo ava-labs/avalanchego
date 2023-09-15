@@ -876,7 +876,7 @@ func TestInboundMessageToString(t *testing.T) {
 
 	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
 
-	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
+	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyGenericNodeID, ids.Empty, 1)
 	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
 }
 

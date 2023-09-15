@@ -24,8 +24,8 @@ type ExternalSenderTest struct {
 
 	CantSend, CantGossip bool
 
-	SendF   func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
-	GossipF func(msg message.OutboundMessage, subnetID ids.ID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int, allower subnets.Allower) set.Set[ids.NodeID]
+	SendF   func(msg message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.GenericNodeID]
+	GossipF func(msg message.OutboundMessage, subnetID ids.ID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int, allower subnets.Allower) set.Set[ids.GenericNodeID]
 }
 
 // Default set the default callable value to [cant]
@@ -36,10 +36,10 @@ func (s *ExternalSenderTest) Default(cant bool) {
 
 func (s *ExternalSenderTest) Send(
 	msg message.OutboundMessage,
-	nodeIDs set.Set[ids.NodeID],
+	nodeIDs set.Set[ids.GenericNodeID],
 	subnetID ids.ID,
 	allower subnets.Allower,
-) set.Set[ids.NodeID] {
+) set.Set[ids.GenericNodeID] {
 	if s.SendF != nil {
 		return s.SendF(msg, nodeIDs, subnetID, allower)
 	}
@@ -62,7 +62,7 @@ func (s *ExternalSenderTest) Gossip(
 	numNonValidatorsToSend int,
 	numPeersToSend int,
 	allower subnets.Allower,
-) set.Set[ids.NodeID] {
+) set.Set[ids.GenericNodeID] {
 	if s.GossipF != nil {
 		return s.GossipF(msg, subnetID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend, allower)
 	}

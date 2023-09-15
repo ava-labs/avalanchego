@@ -94,3 +94,16 @@ func GenericNodeIDFromCert(cert *staking.Certificate) GenericNodeID {
 	)
 	return GenericNodeID(string(bytes[:]))
 }
+
+func (nodeID GenericNodeID) ToSize(newSize int) GenericNodeID {
+	if len(nodeID) >= newSize {
+		return nodeID // leave unchanged if it's longer than required
+	}
+	pad := make([]byte, newSize-len(nodeID))
+	for idx := range pad {
+		pad[idx] = 0x00
+	}
+	bytes := nodeID.Bytes()
+	bytes = append(bytes, pad...)
+	return GenericNodeIDFromBytes(bytes)
+}

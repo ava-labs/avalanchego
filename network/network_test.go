@@ -336,12 +336,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.Set[ids.NodeID]{}
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeIDs[1])
-	if err != nil {
-		panic(err)
-	}
-	toSend.Add(shortNodeID)
+	toSend := set.Of(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
 	require.Equal(toSend, sentTo)
 
@@ -379,22 +374,11 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.NewSet[ids.NodeID](len(nodeIDs))
-	for _, genericNodeID := range nodeIDs {
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-		if err != nil {
-			panic(err)
-		}
-		toSend.Add(shortNodeID)
-	}
+	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	validShortNodeID, err := ids.NodeIDFromGenericNodeID(validNodeID)
-	if err != nil {
-		panic(err)
-	}
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
-	require.Contains(sentTo, validShortNodeID)
+	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -402,7 +386,7 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	// Test Gossip now
 	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
-	require.Contains(sentTo, validShortNodeID)
+	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())

@@ -418,12 +418,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 			continue
 		}
 
-		vdrID, err := ids.NodeIDFromGenericNodeID(validatorID)
-		if err != nil {
-			panic(err)
-		}
-
-		msg := message.InternalConnected(vdrID, peer.version)
+		msg := message.InternalConnected(validatorID, peer.version)
 		chain.Push(ctx,
 			handler.Message{
 				InboundMessage: msg,
@@ -471,12 +466,7 @@ func (cr *ChainRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.
 		return
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
-
-	msg := message.InternalConnected(shortNodeID, nodeVersion)
+	msg := message.InternalConnected(nodeID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
 	// set, disconnect. we cannot put a subnet-only validator check here since
@@ -515,11 +505,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.GenericNodeID) {
 		return
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
-	msg := message.InternalDisconnected(shortNodeID)
+	msg := message.InternalDisconnected(nodeID)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
 	// set, disconnect. we cannot put a subnet-only validator check here since
@@ -538,19 +524,14 @@ func (cr *ChainRouter) Disconnected(nodeID ids.GenericNodeID) {
 }
 
 // Benched routes an incoming notification that a validator was benched
-func (cr *ChainRouter) Benched(chainID ids.ID, genericNodeID ids.GenericNodeID) {
+func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.GenericNodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-	if err != nil {
-		panic(err)
-	}
-
-	benchedChains, exists := cr.benched[genericNodeID]
+	benchedChains, exists := cr.benched[nodeID]
 	benchedChains.Add(chainID)
-	cr.benched[genericNodeID] = benchedChains
-	peer, hasPeer := cr.peers[genericNodeID]
+	cr.benched[nodeID] = benchedChains
+	peer, hasPeer := cr.peers[nodeID]
 	if exists || !hasPeer {
 		// If the set already existed, then the node was previously benched.
 		return
@@ -575,24 +556,20 @@ func (cr *ChainRouter) Benched(chainID ids.ID, genericNodeID ids.GenericNodeID) 
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
-func (cr *ChainRouter) Unbenched(chainID ids.ID, genericNodeID ids.GenericNodeID) {
+func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.GenericNodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	benchedChains := cr.benched[genericNodeID]
+	benchedChains := cr.benched[nodeID]
 	benchedChains.Remove(chainID)
 	if benchedChains.Len() != 0 {
-		cr.benched[genericNodeID] = benchedChains
+		cr.benched[nodeID] = benchedChains
 		return // This node is still benched
 	}
 
-	delete(cr.benched, genericNodeID)
+	delete(cr.benched, nodeID)
 
-	nodeID, err := ids.NodeIDFromGenericNodeID(genericNodeID)
-	if err != nil {
-		panic(err)
-	}
-	peer, found := cr.peers[genericNodeID]
+	peer, found := cr.peers[nodeID]
 	if !found {
 		return
 	}
@@ -614,7 +591,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, genericNodeID ids.GenericNodeID
 	// We handle this case separately because the node may have been benched on
 	// a subnet that has no chains.
 	for subnetID := range peer.trackedSubnets {
-		cr.connectedSubnet(peer, genericNodeID, subnetID)
+		cr.connectedSubnet(peer, nodeID, subnetID)
 	}
 }
 
@@ -740,11 +717,7 @@ func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.GenericNodeID, sub
 		return
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
-	if err != nil {
-		panic(err)
-	}
-	msg := message.InternalConnectedSubnet(shortNodeID, subnetID)
+	msg := message.InternalConnectedSubnet(nodeID, subnetID)
 	// We only push this message to the P-chain because it is the only chain
 	// that cares about the connectivity of all subnets. Others chains learn
 	// about the connectivity of their own subnet when they receive a

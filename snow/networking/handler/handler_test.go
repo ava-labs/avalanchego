@@ -99,7 +99,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
 
-	nodeID := ids.EmptyNodeID
+	nodeID := ids.EmptyGenericNodeID
 	reqID := uint32(1)
 	chainID := ids.ID{}
 	msg := Message{
@@ -210,7 +210,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	handler.Start(context.Background(), false)
 
-	nodeID := ids.EmptyNodeID
+	nodeID := ids.EmptyGenericNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
@@ -290,7 +290,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	handler.Start(context.Background(), false)
 
-	nodeID := ids.EmptyNodeID
+	nodeID := ids.EmptyGenericNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inInboundMessage := Message{
@@ -397,7 +397,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	connector := validators.NewMockSubnetConnector(ctrl)
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestGenericNodeID()
 	subnetID := ids.GenerateTestID()
 
 	handler, err := New(
@@ -449,7 +449,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	// Handler should call subnet connector when ConnectedSubnet message is received
 	var wg sync.WaitGroup
 	connector.EXPECT().ConnectedSubnet(gomock.Any(), nodeID, subnetID).Do(
-		func(context.Context, ids.NodeID, ids.ID) {
+		func(context.Context, ids.GenericNodeID, ids.ID) {
 			wg.Done()
 		})
 
@@ -623,7 +623,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 					uint32(0),
 					ids.Empty,
 					ids.Empty,
-					ids.EmptyNodeID,
+					ids.EmptyGenericNodeID,
 				),
 				EngineType: test.requestedEngineType,
 			})

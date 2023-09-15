@@ -36,8 +36,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 		chainID                     = ids.GenerateTestID()
 		requestID            uint32 = 12345
 		deadline                    = time.Hour
-		nodeID                      = ids.GenerateTestNodeID()
-		genericNodeID               = ids.GenericNodeIDFromNodeID(nodeID)
+		nodeID                      = ids.GenerateTestGenericNodeID()
 		summary                     = []byte{9, 8, 7}
 		appBytes                    = []byte{1, 3, 3, 7}
 		container                   = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
@@ -63,7 +62,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(GetStateSummaryFrontierOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.GetStateSummaryFrontier{}, msg.Message())
@@ -82,11 +81,11 @@ func TestInboundMsgBuilder(t *testing.T) {
 				chainID,
 				requestID,
 				summary,
-				genericNodeID,
+				nodeID,
 			)
 
 			require.Equal(StateSummaryFrontierOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.StateSummaryFrontier{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.StateSummaryFrontier)
@@ -112,7 +111,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(GetAcceptedStateSummaryOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.GetAcceptedStateSummary{}, msg.Message())
@@ -132,11 +131,11 @@ func TestInboundMsgBuilder(t *testing.T) {
 				chainID,
 				requestID,
 				summaryIDs,
-				genericNodeID,
+				nodeID,
 			)
 
 			require.Equal(AcceptedStateSummaryOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.AcceptedStateSummary{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.AcceptedStateSummary)
@@ -167,7 +166,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(GetAcceptedFrontierOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.GetAcceptedFrontier{}, msg.Message())
@@ -191,7 +190,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			)
 
 			require.Equal(AcceptedFrontierOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.AcceptedFrontier{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.AcceptedFrontier)
@@ -218,7 +217,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(GetAcceptedOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.GetAccepted{}, msg.Message())
@@ -242,7 +241,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			)
 
 			require.Equal(AcceptedOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.Accepted{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.Accepted)
@@ -274,7 +273,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(PushQueryOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.PushQuery{}, msg.Message())
@@ -303,7 +302,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(PullQueryOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.PullQuery{}, msg.Message())
@@ -329,7 +328,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			)
 
 			require.Equal(ChitsOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.Chits{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.Chits)
@@ -356,7 +355,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			end := time.Now()
 
 			require.Equal(AppRequestOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
 			require.IsType(&p2p.AppRequest{}, msg.Message())
@@ -380,7 +379,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			)
 
 			require.Equal(AppResponseOp, msg.Op())
-			require.Equal(genericNodeID, msg.NodeID())
+			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
 			require.IsType(&p2p.AppResponse{}, msg.Message())
 			innerMsg := msg.Message().(*p2p.AppResponse)

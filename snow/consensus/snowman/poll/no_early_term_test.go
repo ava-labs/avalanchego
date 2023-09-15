@@ -17,7 +17,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1}) // k = 1
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen) // k = 1
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(vdr1)
@@ -38,8 +38,8 @@ func TestNoEarlyTermResults(t *testing.T) {
 func TestNoEarlyTermString(t *testing.T) {
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen) // k = 2
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
@@ -64,8 +64,8 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen) // k = 2
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(

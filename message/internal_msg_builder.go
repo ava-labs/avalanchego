@@ -99,12 +99,12 @@ func (m *GetStateSummaryFrontierFailed) GetRequestId() uint32 {
 }
 
 func InternalGetStateSummaryFrontierFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetStateSummaryFrontierFailedOp,
 		message: &GetStateSummaryFrontierFailed{
 			ChainID:   chainID,
@@ -135,12 +135,12 @@ func (m *GetAcceptedStateSummaryFailed) GetRequestId() uint32 {
 }
 
 func InternalGetAcceptedStateSummaryFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetAcceptedStateSummaryFailedOp,
 		message: &GetAcceptedStateSummaryFailed{
 			ChainID:   chainID,
@@ -176,13 +176,13 @@ func (m *GetAcceptedFrontierFailed) GetEngineType() p2p.EngineType {
 }
 
 func InternalGetAcceptedFrontierFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetAcceptedFrontierFailedOp,
 		message: &GetAcceptedFrontierFailed{
 			ChainID:    chainID,
@@ -219,13 +219,13 @@ func (m *GetAcceptedFailed) GetEngineType() p2p.EngineType {
 }
 
 func InternalGetAcceptedFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetAcceptedFailedOp,
 		message: &GetAcceptedFailed{
 			ChainID:    chainID,
@@ -262,13 +262,13 @@ func (m *GetAncestorsFailed) GetEngineType() p2p.EngineType {
 }
 
 func InternalGetAncestorsFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetAncestorsFailedOp,
 		message: &GetAncestorsFailed{
 			ChainID:    chainID,
@@ -305,13 +305,13 @@ func (m *GetFailed) GetEngineType() p2p.EngineType {
 }
 
 func InternalGetFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     GetFailedOp,
 		message: &GetFailed{
 			ChainID:    chainID,
@@ -348,13 +348,13 @@ func (m *QueryFailed) GetEngineType() p2p.EngineType {
 }
 
 func InternalQueryFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     QueryFailedOp,
 		message: &QueryFailed{
 			ChainID:    chainID,
@@ -386,12 +386,12 @@ func (m *AppRequestFailed) GetRequestId() uint32 {
 }
 
 func InternalAppRequestFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	chainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     AppRequestFailedOp,
 		message: &AppRequestFailed{
 			ChainID:   chainID,
@@ -428,7 +428,7 @@ func (m *CrossChainAppRequest) GetRequestId() uint32 {
 }
 
 func InternalCrossChainAppRequest(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
@@ -436,7 +436,7 @@ func InternalCrossChainAppRequest(
 	msg []byte,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     CrossChainAppRequestOp,
 		message: &CrossChainAppRequest{
 			SourceChainID:      sourceChainID,
@@ -474,13 +474,13 @@ func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
 }
 
 func InternalCrossChainAppRequestFailed(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     CrossChainAppRequestFailedOp,
 		message: &CrossChainAppRequestFailed{
 			SourceChainID:      sourceChainID,
@@ -518,14 +518,14 @@ func (m *CrossChainAppResponse) GetRequestId() uint32 {
 }
 
 func InternalCrossChainAppResponse(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
 	msg []byte,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     CrossChainAppResponseOp,
 		message: &CrossChainAppResponse{
 			SourceChainID:      sourceChainID,
@@ -548,9 +548,9 @@ func (m *Connected) String() string {
 	)
 }
 
-func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
+func InternalConnected(nodeID ids.GenericNodeID, nodeVersion *version.Application) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     ConnectedOp,
 		message: &Connected{
 			NodeVersion: nodeVersion,
@@ -574,9 +574,9 @@ func (m *ConnectedSubnet) String() string {
 
 // InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
 // connected to the subnet with the given [subnetID].
-func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage {
+func InternalConnectedSubnet(nodeID ids.GenericNodeID, subnetID ids.ID) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     ConnectedSubnetOp,
 		message: &ConnectedSubnet{
 			SubnetID: subnetID,
@@ -591,9 +591,9 @@ func (Disconnected) String() string {
 	return ""
 }
 
-func InternalDisconnected(nodeID ids.NodeID) InboundMessage {
+func InternalDisconnected(nodeID ids.GenericNodeID) InboundMessage {
 	return &inboundMessage{
-		nodeID:     ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID:     nodeID,
 		op:         DisconnectedOp,
 		message:    disconnected,
 		expiration: mockable.MaxTime,
@@ -612,11 +612,11 @@ func (m *VMMessage) String() string {
 }
 
 func InternalVMMessage(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	notification uint32,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID: ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID: nodeID,
 		op:     NotifyOp,
 		message: &VMMessage{
 			Notification: notification,
@@ -632,10 +632,10 @@ func (GossipRequest) String() string {
 }
 
 func InternalGossipRequest(
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 ) InboundMessage {
 	return &inboundMessage{
-		nodeID:     ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID:     nodeID,
 		op:         GossipRequestOp,
 		message:    gossipRequest,
 		expiration: mockable.MaxTime,
@@ -648,9 +648,9 @@ func (Timeout) String() string {
 	return ""
 }
 
-func InternalTimeout(nodeID ids.NodeID) InboundMessage {
+func InternalTimeout(nodeID ids.GenericNodeID) InboundMessage {
 	return &inboundMessage{
-		nodeID:     ids.GenericNodeIDFromNodeID(nodeID),
+		nodeID:     nodeID,
 		op:         TimeoutOp,
 		message:    timeout,
 		expiration: mockable.MaxTime,

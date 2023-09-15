@@ -465,8 +465,8 @@ func (vm *VM) Connected(_ context.Context, nodeID ids.GenericNodeID, _ *version.
 	return vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID)
 }
 
-func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
-	return vm.uptimeManager.Connect(ids.GenericNodeIDFromNodeID(nodeID), subnetID)
+func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.GenericNodeID, subnetID ids.ID) error {
+	return vm.uptimeManager.Connect(nodeID, subnetID)
 }
 
 func (vm *VM) Disconnected(_ context.Context, nodeID ids.GenericNodeID) error {

@@ -373,10 +373,10 @@ func TestSetString(t *testing.T) {
 	require := require.New(t)
 
 	nodeID0 := ids.EmptyGenericNodeID
-	nodeID1 := ids.GenericNodeIDFromNodeID(ids.NodeID{
+	nodeID1 := ids.GenericNodeIDFromBytes([]byte{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	})
+	}).ToSize(ids.NodeIDLen)
 
 	s := NewSet()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))

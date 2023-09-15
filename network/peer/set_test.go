@@ -17,24 +17,24 @@ func TestSet(t *testing.T) {
 
 	set := NewSet()
 	peer1 := &peer{
-		id:              ids.GenericNodeIDFromNodeID(ids.NodeID{0x01}),
+		id:              ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
 	}
 	updatedPeer1 := &peer{
-		id:              ids.GenericNodeIDFromNodeID(ids.NodeID{0x01}),
+		id:              ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 1},
 	}
 	peer2 := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x02}),
+		id: ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen),
 	}
 	unknownPeer := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0xff}),
+		id: ids.GenericNodeIDFromBytes([]byte{0xff}).ToSize(ids.NodeIDLen),
 	}
 	peer3 := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x03}),
+		id: ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.NodeIDLen),
 	}
 	peer4 := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x04}),
+		id: ids.GenericNodeIDFromBytes([]byte{0x04}).ToSize(ids.NodeIDLen),
 	}
 
 	// add of first peer is handled
@@ -104,10 +104,10 @@ func TestSetSample(t *testing.T) {
 	set := NewSet()
 
 	peer1 := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x01}),
+		id: ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen),
 	}
 	peer2 := &peer{
-		id: ids.GenericNodeIDFromNodeID(ids.NodeID{0x02}),
+		id: ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen),
 	}
 
 	// Case: Empty

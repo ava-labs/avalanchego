@@ -43,9 +43,9 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen)
+	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.NodeIDLen)
 
 	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
 
@@ -92,9 +92,9 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen)
+	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.NodeIDLen)
 
 	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
 
@@ -141,9 +141,9 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-	vdr3 := ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen)
+	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.NodeIDLen)
 
 	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
 
@@ -202,8 +202,8 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen) // k = 2
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
@@ -240,8 +240,8 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-	vdr2 := ids.GenericNodeIDFromNodeID(ids.NodeID{2}) // k = 2
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen)
+	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.NodeIDLen) // k = 2
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(
@@ -275,7 +275,7 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.GenericNodeIDFromNodeID(ids.NodeID{1}) // k = 1
+	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.NodeIDLen) // k = 1
 
 	vdrs := bag.Bag[ids.GenericNodeID]{}
 	vdrs.Add(vdr1)
