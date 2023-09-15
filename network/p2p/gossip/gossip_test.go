@@ -22,13 +22,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+var (
+	_ p2p.ValidatorSet = (*testValidatorSet)(nil)
+	_ Gossiper         = (*testGossiper)(nil)
+)
+
 func TestGossiperShutdown(t *testing.T) {
 	require := require.New(t)
 
-	config := Config{Frequency: time.Second}
 	metrics := prometheus.NewRegistry()
-	gossiper, err := NewGossiper[testTx](
-		config,
+	gossiper, err := NewPullGossiper[testTx](
+		Config{},
 		logging.NoLog{},
 		nil,
 		nil,
@@ -41,7 +45,7 @@ func TestGossiperShutdown(t *testing.T) {
 	wg.Add(1)
 
 	go func() {
-		gossiper.Gossip(ctx)
+		Every(ctx, logging.NoLog{}, gossiper, time.Second)
 		wg.Done()
 	}()
 
@@ -166,10 +170,9 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 
 			config := Config{
-				Frequency: 500 * time.Millisecond,
-				PollSize:  1,
+				PollSize: 1,
 			}
-			gossiper, err := NewGossiper[testTx, *testTx](
+			gossiper, err := NewPullGossiper[testTx, *testTx](
 				config,
 				logging.NoLog{},
 				requestSet,
@@ -182,7 +185,7 @@ func TestGossiperGossip(t *testing.T) {
 				received.Add(tx)
 			}
 
-			require.NoError(gossiper.gossip(context.Background()))
+			require.NoError(gossiper.Gossip(context.Background()))
 			<-gossiped
 
 			require.Len(requestSet.set, tt.expectedLen)
@@ -195,4 +198,70 @@ func TestGossiperGossip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEvery(*testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	gossiper := &testGossiper{
+		gossipF: func(context.Context) error {
+			if calls >= 10 {
+				cancel()
+				return nil
+			}
+
+			calls++
+			return nil
+		},
+	}
+
+	go Every(ctx, logging.NoLog{}, gossiper, time.Millisecond)
+	<-ctx.Done()
+}
+
+func TestValidatorGossiper(t *testing.T) {
+	require := require.New(t)
+
+	nodeID := ids.GenerateTestNodeID()
+
+	validators := testValidatorSet{
+		validators: set.Of(nodeID),
+	}
+
+	calls := 0
+	gossiper := ValidatorGossiper{
+		Gossiper: &testGossiper{
+			gossipF: func(context.Context) error {
+				calls++
+				return nil
+			},
+		},
+		NodeID:     nodeID,
+		Validators: validators,
+	}
+
+	// we are a validator, so we should request gossip
+	require.NoError(gossiper.Gossip(context.Background()))
+	require.Equal(1, calls)
+
+	// we are not a validator, so we should not request gossip
+	validators.validators = set.Set[ids.NodeID]{}
+	require.NoError(gossiper.Gossip(context.Background()))
+	require.Equal(2, calls)
+}
+
+type testGossiper struct {
+	gossipF func(ctx context.Context) error
+}
+
+func (t *testGossiper) Gossip(ctx context.Context) error {
+	return t.gossipF(ctx)
+}
+
+type testValidatorSet struct {
+	validators set.Set[ids.NodeID]
+}
+
+func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
+	return t.validators.Contains(nodeID)
 }
