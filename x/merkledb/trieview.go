@@ -298,8 +298,10 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	wg.Wait()
 	close(updatedChildren)
 
+	keyLength := n.key.length
 	for child := range updatedChildren {
-		n.updateChild(child)
+		index := child.key.Token(keyLength)
+		n.addChildWithoutNode(index, n.children[index].compressedPath, child.id, child.hasValue())
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.

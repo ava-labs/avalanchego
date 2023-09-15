@@ -181,3 +181,109 @@ func Test_Path_Extend(t *testing.T) {
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(1), extendedP.Token(1))
 }
+
+func FuzzPathExtend(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		first []byte,
+		second []byte,
+		branchFactorBit1 bool,
+		branchFactorBit2 bool,
+		forceFirstOdd bool,
+		forceSecondOdd bool) {
+
+		require := require.New(t)
+		branchFactor := BranchFactor2
+		switch {
+		case !branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor2
+		case !branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor4
+		case branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor16
+		case branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor256
+		}
+
+		path1 := NewPath(first, branchFactor)
+		if forceFirstOdd && path1.Length() > 0 {
+			path1 = path1.Take(path1.Length() - 1)
+		}
+		path2 := NewPath(second, branchFactor)
+		if forceSecondOdd && path2.Length() > 0 {
+			path2 = path2.Take(path2.Length() - 1)
+		}
+		extendedP := path1.Extend(path2)
+		for i := 0; i < path1.Length(); i++ {
+			require.Equal(path1.Token(i), extendedP.Token(i))
+		}
+		for i := 0; i < path2.Length(); i++ {
+			require.Equal(path2.Token(i), extendedP.Token(i+path1.Length()))
+		}
+	})
+}
+
+func FuzzPathSkip(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		first []byte,
+		tokensToSkip uint,
+		branchFactorBit1 bool,
+		branchFactorBit2 bool) {
+		require := require.New(t)
+		branchFactor := BranchFactor2
+		switch {
+		case !branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor2
+		case !branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor4
+		case branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor16
+		case branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor256
+		}
+
+		path1 := NewPath(first, branchFactor)
+		if int(tokensToSkip) >= path1.Length() {
+			t.SkipNow()
+		}
+		path2 := path1.Skip(int(tokensToSkip))
+		require.Equal(path1.Length()-int(tokensToSkip), path2.Length())
+		for i := 0; i < path2.Length(); i++ {
+			require.Equal(path1.Token(int(tokensToSkip)+i), path2.Token(i))
+		}
+	})
+}
+
+func FuzzPathTake(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		first []byte,
+		tokensToTake uint,
+		branchFactorBit1 bool,
+		branchFactorBit2 bool) {
+		require := require.New(t)
+		branchFactor := BranchFactor2
+		switch {
+		case !branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor2
+		case !branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor4
+		case branchFactorBit1 && !branchFactorBit2:
+			branchFactor = BranchFactor16
+		case branchFactorBit1 && branchFactorBit2:
+			branchFactor = BranchFactor256
+		}
+
+		path1 := NewPath(first, branchFactor)
+		if int(tokensToTake) >= path1.Length() {
+			t.SkipNow()
+		}
+		path2 := path1.Take(int(tokensToTake))
+		require.Equal(int(tokensToTake), path2.Length())
+
+		for i := 0; i < path2.Length(); i++ {
+			require.Equal(path1.Token(i), path2.Token(i))
+		}
+	})
+}

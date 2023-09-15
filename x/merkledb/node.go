@@ -136,11 +136,6 @@ func (n *node) addChild(child *node) {
 	)
 }
 
-func (n *node) updateChild(c *node) {
-	index := c.key.Token(n.key.length)
-	n.addChildWithoutNode(index, n.children[index].compressedPath, c.id, c.hasValue())
-}
-
 // Adds a child to [n] without a reference to the child node.
 func (n *node) addChildWithoutNode(index byte, compressedPath Path, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()

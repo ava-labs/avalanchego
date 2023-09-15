@@ -82,6 +82,7 @@ func NewPath16(p []byte) Path {
 	return NewPath(p, BranchFactor16)
 }
 
+// Length returns the number of tokens in the current Path
 func (cp Path) Length() int {
 	return cp.length
 }
@@ -118,15 +119,12 @@ func (cp Path) HasStrictPrefix(prefix Path) bool {
 }
 
 // Token returns the token at the specified index
-// grabs the token's byte, then shifts it, and then masks out any bits from other tokens stored in the same byte
+// grabs the token's storage byte, shifts it, then masks out any bits from other tokens stored in the same byte
 func (cp Path) Token(index int) byte {
 	return (cp.value[index/cp.tokensPerByte] >> cp.shift(index)) & cp.mask
 }
 
-func (cp Path) bytesNeeded(tokens int) int {
-	return (tokens + cp.tokensPerByte - 1) / cp.tokensPerByte
-}
-
+// Append returns a new Path that equals the current Path with the passed token appended to the end
 func (cp Path) Append(token byte) Path {
 	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
@@ -138,12 +136,19 @@ func (cp Path) Append(token byte) Path {
 	}
 }
 
+// Greater returns true if current Path is greater than other Path
+func (cp Path) Greater(other Path) bool {
+	return cp.value > other.value || (cp.value == other.value && cp.length > other.length)
+}
+
+// Equals returns true if current Path is equal to other Path
 func (cp Path) Equals(other Path) bool {
 	return cp.value == other.value && cp.length == other.length
 }
 
-func (cp Path) Greater(other Path) bool {
-	return cp.value > other.value || (cp.value == other.value && cp.length > other.length)
+// Less returns true if current Path is less than other Path
+func (cp Path) Less(other Path) bool {
+	return cp.value < other.value || (cp.value == other.value && cp.length < other.length)
 }
 
 // shift indicates how many bits to shift the token at the index to get the raw token value
@@ -153,10 +158,12 @@ func (cp Path) shift(index int) byte {
 	return Byte - (cp.tokenBitSize * byte(index%cp.tokensPerByte+1))
 }
 
-func (cp Path) Less(other Path) bool {
-	return cp.value < other.value || (cp.value == other.value && cp.length < other.length)
+// bytesNeeded returns the number of bytes needed to store the passed number of tokens
+func (cp Path) bytesNeeded(tokens int) int {
+	return (tokens + cp.tokensPerByte - 1) / cp.tokensPerByte
 }
 
+// Extend returns a new Path that equals the passed Path appended to the current Path
 func (cp Path) Extend(path Path) Path {
 	if cp.length == 0 {
 		return path
@@ -165,11 +172,10 @@ func (cp Path) Extend(path Path) Path {
 		return cp
 	}
 
-	remainder := cp.length % cp.tokensPerByte
 	totalLength := cp.length + path.length
 	buffer := make([]byte, cp.bytesNeeded(totalLength))
 	copy(buffer, cp.value)
-	if remainder == 0 {
+	if cp.length%cp.tokensPerByte == 0 {
 		copy(buffer[len(cp.value):], path.value)
 		return Path{
 			value:      *(*string)(unsafe.Pointer(&buffer)),
@@ -193,10 +199,7 @@ func (cp Path) Extend(path Path) Path {
 	}
 }
 
-func (cp Path) Slice(start, end int) Path {
-	return cp.Skip(start).Take(end)
-}
-
+// Skip returns a new Path that contains the last cp.length-tokensToSkip tokens of the current Path
 func (cp Path) Skip(tokensToSkip int) Path {
 	newLength := cp.length - tokensToSkip
 	result := Path{
@@ -230,6 +233,7 @@ func (cp Path) Skip(tokensToSkip int) Path {
 	}
 }
 
+// Take returns a new Path that contains the first tokensToTake tokens of the current Path
 func (cp Path) Take(tokensToTake int) Path {
 	if tokensToTake%cp.tokensPerByte == 0 {
 		return Path{
@@ -254,6 +258,7 @@ func (cp Path) Take(tokensToTake int) Path {
 	}
 }
 
+// Bytes returns the raw bytes of the Path
 // Invariant: The returned value must not be modified.
 func (cp Path) Bytes() []byte {
 	// avoid copying during the conversion
