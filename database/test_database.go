@@ -1329,6 +1329,6 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 		iter.Release()
 
 		// Clear the database for the next fuzz iteration.
-		AtomicClear(db, db)
+		require.NoError(AtomicClear(db, db))
 	})
 }
