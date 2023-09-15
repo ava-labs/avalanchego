@@ -77,7 +77,7 @@ func (a *atomic) CrossChainAppResponse(
 
 func (a *atomic) AppRequest(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestID uint32,
 	deadline time.Time,
 	msg []byte,
@@ -94,7 +94,7 @@ func (a *atomic) AppRequest(
 
 func (a *atomic) AppRequestFailed(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestID uint32,
 ) error {
 	h := a.handler.Get()
@@ -107,7 +107,7 @@ func (a *atomic) AppRequestFailed(
 
 func (a *atomic) AppResponse(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestID uint32,
 	msg []byte,
 ) error {
@@ -122,7 +122,7 @@ func (a *atomic) AppResponse(
 
 func (a *atomic) AppGossip(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	msg []byte,
 ) error {
 	h := a.handler.Get()

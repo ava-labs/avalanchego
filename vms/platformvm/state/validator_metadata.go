@@ -83,7 +83,7 @@ type validatorState interface {
 	// [subnetID] hasn't been loaded. This call will not result in a write to
 	// disk.
 	LoadValidatorMetadata(
-		vdrID ids.GenericNodeID,
+		vdrID ids.NodeID,
 		subnetID ids.ID,
 		metadata *validatorMetadata,
 	)
@@ -91,7 +91,7 @@ type validatorState interface {
 	// GetUptime returns the current uptime measurements of [vdrID] on
 	// [subnetID].
 	GetUptime(
-		vdrID ids.GenericNodeID,
+		vdrID ids.NodeID,
 		subnetID ids.ID,
 	) (upDuration time.Duration, lastUpdated time.Time, err error)
 
@@ -99,7 +99,7 @@ type validatorState interface {
 	// Unless these measurements are deleted first, the next call to
 	// WriteUptimes will write this update to disk.
 	SetUptime(
-		vdrID ids.GenericNodeID,
+		vdrID ids.NodeID,
 		subnetID ids.ID,
 		upDuration time.Duration,
 		lastUpdated time.Time,
@@ -109,7 +109,7 @@ type validatorState interface {
 	// [subnetID].
 	GetDelegateeReward(
 		subnetID ids.ID,
-		vdrID ids.GenericNodeID,
+		vdrID ids.NodeID,
 	) (amount uint64, err error)
 
 	// SetDelegateeReward updates the rewards accrued to [vdrID] on [subnetID].
@@ -117,7 +117,7 @@ type validatorState interface {
 	// WriteUptimes will write this update to disk.
 	SetDelegateeReward(
 		subnetID ids.ID,
-		vdrID ids.GenericNodeID,
+		vdrID ids.NodeID,
 		amount uint64,
 	) error
 
@@ -125,7 +125,7 @@ type validatorState interface {
 	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
 	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
 	// will not result in a write to disk.
-	DeleteValidatorMetadata(vdrID ids.GenericNodeID, subnetID ids.ID)
+	DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID)
 
 	// WriteValidatorMetadata writes all staged updates from prior calls to
 	// SetUptime or SetDelegateeReward.
@@ -136,20 +136,20 @@ type validatorState interface {
 }
 
 type metadata struct {
-	metadata map[ids.GenericNodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
+	metadata map[ids.NodeID]map[ids.ID]*validatorMetadata // vdrID -> subnetID -> metadata
 	// updatedMetadata tracks the updates since WriteValidatorMetadata was last called
-	updatedMetadata map[ids.GenericNodeID]set.Set[ids.ID] // vdrID -> subnetIDs
+	updatedMetadata map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
 }
 
 func newValidatorState() validatorState {
 	return &metadata{
-		metadata:        make(map[ids.GenericNodeID]map[ids.ID]*validatorMetadata),
-		updatedMetadata: make(map[ids.GenericNodeID]set.Set[ids.ID]),
+		metadata:        make(map[ids.NodeID]map[ids.ID]*validatorMetadata),
+		updatedMetadata: make(map[ids.NodeID]set.Set[ids.ID]),
 	}
 }
 
 func (m *metadata) LoadValidatorMetadata(
-	vdrID ids.GenericNodeID,
+	vdrID ids.NodeID,
 	subnetID ids.ID,
 	uptime *validatorMetadata,
 ) {
@@ -162,7 +162,7 @@ func (m *metadata) LoadValidatorMetadata(
 }
 
 func (m *metadata) GetUptime(
-	vdrID ids.GenericNodeID,
+	vdrID ids.NodeID,
 	subnetID ids.ID,
 ) (time.Duration, time.Time, error) {
 	metadata, exists := m.metadata[vdrID][subnetID]
@@ -173,7 +173,7 @@ func (m *metadata) GetUptime(
 }
 
 func (m *metadata) SetUptime(
-	vdrID ids.GenericNodeID,
+	vdrID ids.NodeID,
 	subnetID ids.ID,
 	upDuration time.Duration,
 	lastUpdated time.Time,
@@ -191,7 +191,7 @@ func (m *metadata) SetUptime(
 
 func (m *metadata) GetDelegateeReward(
 	subnetID ids.ID,
-	vdrID ids.GenericNodeID,
+	vdrID ids.NodeID,
 ) (uint64, error) {
 	metadata, exists := m.metadata[vdrID][subnetID]
 	if !exists {
@@ -202,7 +202,7 @@ func (m *metadata) GetDelegateeReward(
 
 func (m *metadata) SetDelegateeReward(
 	subnetID ids.ID,
-	vdrID ids.GenericNodeID,
+	vdrID ids.NodeID,
 	amount uint64,
 ) error {
 	metadata, exists := m.metadata[vdrID][subnetID]
@@ -215,7 +215,7 @@ func (m *metadata) SetDelegateeReward(
 	return nil
 }
 
-func (m *metadata) DeleteValidatorMetadata(vdrID ids.GenericNodeID, subnetID ids.ID) {
+func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	subnetMetadata := m.metadata[vdrID]
 	delete(subnetMetadata, subnetID)
 	if len(subnetMetadata) == 0 {
@@ -255,7 +255,7 @@ func (m *metadata) WriteValidatorMetadata(
 	return nil
 }
 
-func (m *metadata) addUpdatedMetadata(vdrID ids.GenericNodeID, subnetID ids.ID) {
+func (m *metadata) addUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 	updatedSubnetMetadata, ok := m.updatedMetadata[vdrID]
 	if !ok {
 		updatedSubnetMetadata = set.Set[ids.ID]{}

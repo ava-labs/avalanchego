@@ -82,7 +82,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),

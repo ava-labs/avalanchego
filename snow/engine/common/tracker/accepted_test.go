@@ -14,7 +14,7 @@ import (
 func TestAccepted(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	blkID0 := ids.GenerateTestID()
 	blkID1 := ids.GenerateTestID()
 

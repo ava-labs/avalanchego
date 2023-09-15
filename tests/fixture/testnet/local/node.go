@@ -71,8 +71,8 @@ func ReadNode(dataDir string) (*LocalNode, error) {
 
 // Retrieve the ID of the node. The returned value may be nil if the
 // node configuration has not yet been populated or read.
-func (n *LocalNode) GetID() ids.GenericNodeID {
-	return ids.GenericNodeIDFromNodeID(n.NodeConfig.NodeID)
+func (n *LocalNode) GetID() ids.NodeID {
+	return ids.NodeIDFromShortNodeID(n.NodeConfig.NodeID)
 }
 
 // Retrieve backend-agnostic node configuration.

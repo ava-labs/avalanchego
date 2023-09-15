@@ -39,7 +39,7 @@ func (m *MockCalculator) EXPECT() *MockCalculatorMockRecorder {
 }
 
 // CalculateUptime mocks base method.
-func (m *MockCalculator) CalculateUptime(arg0 ids.GenericNodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
+func (m *MockCalculator) CalculateUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CalculateUptime", arg0, arg1)
 	ret0, _ := ret[0].(time.Duration)
@@ -55,7 +55,7 @@ func (mr *MockCalculatorMockRecorder) CalculateUptime(arg0, arg1 interface{}) *g
 }
 
 // CalculateUptimePercent mocks base method.
-func (m *MockCalculator) CalculateUptimePercent(arg0 ids.GenericNodeID, arg1 ids.ID) (float64, error) {
+func (m *MockCalculator) CalculateUptimePercent(arg0 ids.NodeID, arg1 ids.ID) (float64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CalculateUptimePercent", arg0, arg1)
 	ret0, _ := ret[0].(float64)
@@ -70,7 +70,7 @@ func (mr *MockCalculatorMockRecorder) CalculateUptimePercent(arg0, arg1 interfac
 }
 
 // CalculateUptimePercentFrom mocks base method.
-func (m *MockCalculator) CalculateUptimePercentFrom(arg0 ids.GenericNodeID, arg1 ids.ID, arg2 time.Time) (float64, error) {
+func (m *MockCalculator) CalculateUptimePercentFrom(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Time) (float64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CalculateUptimePercentFrom", arg0, arg1, arg2)
 	ret0, _ := ret[0].(float64)

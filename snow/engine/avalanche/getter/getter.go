@@ -52,7 +52,7 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetStateSummaryFrontierOp),
@@ -62,7 +62,7 @@ func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.GenericN
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, _ []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []uint64) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -72,7 +72,7 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.GenericN
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.GenericNodeID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge(ctx)
 	// Since all the DAGs are linearized, we only need to return the stop
 	// vertex.
@@ -82,7 +82,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.Gener
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
@@ -93,7 +93,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.GenericNodeID, req
 	return nil
 }
 
-func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),
@@ -146,7 +146,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.GenericNodeID, re
 	return nil
 }
 
-func (gh *getter) Get(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
 		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())

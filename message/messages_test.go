@@ -839,7 +839,7 @@ func TestMessage(t *testing.T) {
 			bytesSaved := encodedMsg.BytesSavedCompression()
 			require.Equal(tv.bytesSaved, bytesSaved > 0)
 
-			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyGenericNodeID, func() {})
+			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
 			require.NoError(err)
 			require.Equal(tv.op, parsedMsg.Op())
 		})
@@ -871,12 +871,12 @@ func TestInboundMessageToString(t *testing.T) {
 	msgBytes, err := proto.Marshal(msg)
 	require.NoError(err)
 
-	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyGenericNodeID, func() {})
+	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
 	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
 
-	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyGenericNodeID, ids.Empty, 1)
+	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
 	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
 }
 
@@ -897,7 +897,7 @@ func TestEmptyInboundMessage(t *testing.T) {
 	msgBytes, err := proto.Marshal(msg)
 	require.NoError(err)
 
-	_, err = mb.parseInbound(msgBytes, ids.EmptyGenericNodeID, func() {})
+	_, err = mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.ErrorIs(err, errUnknownMessageType)
 }
 
@@ -922,7 +922,7 @@ func TestNilInboundMessage(t *testing.T) {
 	msgBytes, err := proto.Marshal(msg)
 	require.NoError(err)
 
-	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyGenericNodeID, func() {})
+	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
 	require.IsType(&p2p.Ping{}, parsedMsg.message)

@@ -24,7 +24,7 @@ var (
 type Set interface {
 	Add(Beacon) error
 
-	RemoveByID(ids.GenericNodeID) error
+	RemoveByID(ids.NodeID) error
 	RemoveByIP(ips.IPPort) error
 
 	Len() int
@@ -34,14 +34,14 @@ type Set interface {
 }
 
 type set struct {
-	ids     map[ids.GenericNodeID]int
+	ids     map[ids.NodeID]int
 	ips     map[string]int
 	beacons []Beacon
 }
 
 func NewSet() Set {
 	return &set{
-		ids: make(map[ids.GenericNodeID]int),
+		ids: make(map[ids.NodeID]int),
 		ips: make(map[string]int),
 	}
 }
@@ -65,7 +65,7 @@ func (s *set) Add(b Beacon) error {
 	return nil
 }
 
-func (s *set) RemoveByID(idToRemove ids.GenericNodeID) error {
+func (s *set) RemoveByID(idToRemove ids.NodeID) error {
 	indexToRemove, exists := s.ids[idToRemove]
 	if !exists {
 		return errUnknownID

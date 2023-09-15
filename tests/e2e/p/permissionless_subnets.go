@@ -52,7 +52,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
 				gomega.Expect(validatorIDs).Should(gomega.HaveLen(1))
-				validatorID, err = ids.NodeIDFromGenericNodeID(validatorIDs[0])
+				validatorID, err = ids.ShortNodeIDFromNodeID(validatorIDs[0])
 				gomega.Expect(err).Should(gomega.BeNil())
 			})
 

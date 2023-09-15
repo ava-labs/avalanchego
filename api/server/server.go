@@ -108,7 +108,7 @@ func New(
 	listener net.Listener,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	tracingEnabled bool,
 	tracer trace.Tracer,
 	namespace string,

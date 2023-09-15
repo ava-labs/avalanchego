@@ -29,14 +29,14 @@ var (
 // ValidatorState defines the functions that must be implemented to get
 // the canonical validator set for warp message validation.
 type ValidatorState interface {
-	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error)
+	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
 type Validator struct {
 	PublicKey      *bls.PublicKey
 	PublicKeyBytes []byte
 	Weight         uint64
-	NodeIDs        []ids.GenericNodeID
+	NodeIDs        []ids.NodeID
 }
 
 func (v *Validator) Less(o *Validator) bool {

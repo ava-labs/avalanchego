@@ -34,7 +34,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *block.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -63,7 +63,7 @@ func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *bl
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestGenericNodeID()
+	peer := ids.GenerateTestNodeID()
 	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	peerTracker := tracker.NewPeers()
@@ -175,13 +175,13 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantConnected = true
-	vm.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	vm.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false
-	sender.SendGetAcceptedFrontierF = func(context.Context, set.Set[ids.GenericNodeID], uint32) {
+	sender.SendGetAcceptedFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {
 		frontierRequested = true
 	}
 
@@ -190,7 +190,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
-	vdr0 := ids.GenerateTestGenericNodeID()
+	vdr0 := ids.GenerateTestNodeID()
 	require.NoError(peers.Add(vdr0, nil, ids.Empty, startupAlpha/2))
 	require.NoError(bs.Connected(context.Background(), vdr0, version.CurrentApp))
 
@@ -198,7 +198,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
-	vdr := ids.GenerateTestGenericNodeID()
+	vdr := ids.GenerateTestNodeID()
 	require.NoError(peers.Add(vdr, nil, ids.Empty, startupAlpha))
 	require.NoError(bs.Connected(context.Background(), vdr, version.CurrentApp))
 	require.True(frontierRequested)
@@ -390,7 +390,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	requestID := new(uint32)
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Equal(blkID1, vtxID)
 		*requestID = reqID
@@ -403,7 +403,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID+1, [][]byte{blkBytes1})) // respond with wrong request ID
 	require.Equal(oldReqID, *requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), ids.GenerateTestGenericNodeID(), *requestID, [][]byte{blkBytes1})) // respond from wrong peer
+	require.NoError(bs.Ancestors(context.Background(), ids.GenerateTestNodeID(), *requestID, [][]byte{blkBytes1})) // respond from wrong peer
 	require.Equal(oldReqID, *requestID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes0})) // respond with wrong block
@@ -538,7 +538,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
 		*requestID = reqID
@@ -680,10 +680,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	requestedVdr := ids.EmptyGenericNodeID
+	requestedVdr := ids.EmptyNodeID
 	requestID := uint32(0)
 	requestedBlock := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, blkID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		requestedVdr = vdr
 		requestID = reqID
 		requestedBlock = blkID
@@ -695,10 +695,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.Equal(blkID2, requestedBlock)
 
 	// add another two validators to the fetch set to test behavior on empty response
-	newPeerID := ids.GenerateTestGenericNodeID()
+	newPeerID := ids.GenerateTestNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
-	newPeerID = ids.GenerateTestGenericNodeID()
+	newPeerID = ids.GenerateTestNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes2}))
@@ -844,7 +844,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
 		*requestID = reqID
@@ -963,7 +963,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		requestIDs[vtxID] = reqID
 	}
@@ -1123,7 +1123,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		requestIDs[vtxID] = reqID
 	}
@@ -1229,7 +1229,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		requestIDs[vtxID] = reqID
 	}
@@ -1347,7 +1347,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestGenericNodeID()
+	peer := ids.GenerateTestNodeID()
 	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	peerTracker := tracker.NewPeers()

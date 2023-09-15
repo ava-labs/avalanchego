@@ -68,7 +68,7 @@ type Client interface {
 
 type client struct {
 	networkClient       NetworkClient
-	stateSyncNodes      []ids.GenericNodeID
+	stateSyncNodes      []ids.NodeID
 	stateSyncNodeIdx    uint32
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
@@ -77,7 +77,7 @@ type client struct {
 
 type ClientConfig struct {
 	NetworkClient       NetworkClient
-	StateSyncNodeIDs    []ids.GenericNodeID
+	StateSyncNodeIDs    []ids.NodeID
 	StateSyncMinVersion *version.Application
 	Log                 logging.Logger
 	Metrics             SyncMetrics
@@ -339,10 +339,10 @@ func getAndParse[T any](
 // Returns [errAppSendFailed] if we failed to send an AppRequest/AppResponse.
 // This should be treated as fatal.
 // It's safe to call this method multiple times concurrently.
-func (c *client) get(ctx context.Context, request []byte) (ids.GenericNodeID, []byte, error) {
+func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	var (
 		response []byte
-		nodeID   ids.GenericNodeID
+		nodeID   ids.NodeID
 		err      error
 	)
 

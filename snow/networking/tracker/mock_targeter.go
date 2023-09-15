@@ -38,7 +38,7 @@ func (m *MockTargeter) EXPECT() *MockTargeterMockRecorder {
 }
 
 // TargetUsage mocks base method.
-func (m *MockTargeter) TargetUsage(arg0 ids.GenericNodeID) float64 {
+func (m *MockTargeter) TargetUsage(arg0 ids.NodeID) float64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TargetUsage", arg0)
 	ret0, _ := ret[0].(float64)

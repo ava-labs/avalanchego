@@ -59,7 +59,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	// so to test the effect of cap on number of requests sent out
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
-		beaconID := ids.GenerateTestGenericNodeID()
+		beaconID := ids.GenerateTestNodeID()
 		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
@@ -102,8 +102,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	return syncer, fullVM, sender
 }
 
-func pickRandomFrom(nodes map[ids.GenericNodeID]uint32) ids.GenericNodeID {
-	res := ids.EmptyGenericNodeID
+func pickRandomFrom(nodes map[ids.NodeID]uint32) ids.NodeID {
+	res := ids.EmptyNodeID
 	for node := range nodes {
 		res = node
 	}

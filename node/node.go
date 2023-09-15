@@ -105,7 +105,7 @@ type Node struct {
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
-	ID ids.GenericNodeID
+	ID ids.NodeID
 
 	// Storage for this node
 	DBManager manager.Manager
@@ -1353,7 +1353,7 @@ func (n *Node) Initialize(
 
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.GenericNodeIDFromCert(stakingCert)
+	n.ID = ids.NodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 

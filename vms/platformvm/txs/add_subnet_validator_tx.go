@@ -29,8 +29,8 @@ type AddSubnetValidatorTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-func (tx *AddSubnetValidatorTx) NodeID() ids.GenericNodeID {
-	return ids.GenericNodeIDFromNodeID(tx.SubnetValidator.NodeID)
+func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID {
+	return ids.NodeIDFromShortNodeID(tx.SubnetValidator.NodeID)
 }
 
 func (*AddSubnetValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {

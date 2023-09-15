@@ -695,7 +695,7 @@ type GetCurrentValidatorsArgs struct {
 	// is empty, it fetches all current validators. If
 	// some nodeIDs are not currently validators, they
 	// will be omitted from the response.
-	NodeIDs []ids.GenericNodeID `json:"nodeIDs"`
+	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
 // GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
@@ -761,7 +761,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	vdrToDelegators := map[ids.ShortNodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.GenericNodeID]{}
+	nodeIDs := set.Set[ids.NodeID]{}
 	for _, nodeID := range args.NodeIDs {
 		nodeIDs.Add(nodeID)
 	}
@@ -810,7 +810,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 	for _, currentStaker := range targetStakers {
 		nodeID := currentStaker.NodeID
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(currentStaker.NodeID)
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(currentStaker.NodeID)
 		if err != nil {
 			return err
 		}
@@ -962,7 +962,7 @@ type GetPendingValidatorsArgs struct {
 	// is empty, it fetches all pending validators. If
 	// some requested nodeIDs are not pending validators,
 	// they are omitted from the response.
-	NodeIDs []ids.GenericNodeID `json:"nodeIDs"`
+	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
 // GetPendingValidatorsReply are the results from calling GetPendingValidators.
@@ -982,7 +982,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.GenericNodeID]{}
+	nodeIDs := set.Set[ids.NodeID]{}
 	for _, nodeID := range args.NodeIDs {
 		nodeIDs.Add(nodeID)
 	}
@@ -1029,7 +1029,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 
 	for _, pendingStaker := range targetStakers {
 		nodeID := pendingStaker.NodeID
-		shortNodeID, err := ids.NodeIDFromGenericNodeID(pendingStaker.NodeID)
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(pendingStaker.NodeID)
 		if err != nil {
 			return err
 		}
@@ -1125,7 +1125,7 @@ type SampleValidatorsArgs struct {
 
 // SampleValidatorsReply are the results from calling Sample
 type SampleValidatorsReply struct {
-	Validators []ids.GenericNodeID `json:"validators"`
+	Validators []ids.NodeID `json:"validators"`
 }
 
 // SampleValidators returns a sampling of the list of current validators
@@ -1149,7 +1149,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		return fmt.Errorf("sampling errored with %w", err)
 	}
 	if sample == nil {
-		reply.Validators = []ids.GenericNodeID{}
+		reply.Validators = []ids.NodeID{}
 	} else {
 		utils.Sort(sample)
 		reply.Validators = sample
@@ -1207,8 +1207,8 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		nodeID ids.ShortNodeID
 		err    error
 	)
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID, err = ids.NodeIDFromGenericNodeID(s.vm.ctx.NodeID)
+	if args.NodeID == ids.EmptyShortNodeID { // If ID unspecified, use this node's ID
+		nodeID, err = ids.ShortNodeIDFromNodeID(s.vm.ctx.NodeID)
 		if err != nil {
 			return err
 		}
@@ -1323,8 +1323,8 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		nodeID ids.ShortNodeID
 		err    error
 	)
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID, err = ids.NodeIDFromGenericNodeID(s.vm.ctx.NodeID)
+	if args.NodeID == ids.EmptyShortNodeID { // If ID unspecified, use this node's ID
+		nodeID, err = ids.ShortNodeIDFromNodeID(s.vm.ctx.NodeID)
 		if err != nil {
 			return err
 		}
@@ -2453,10 +2453,10 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 
 // GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
 type GetMaxStakeAmountArgs struct {
-	SubnetID  ids.ID            `json:"subnetID"`
-	NodeID    ids.GenericNodeID `json:"nodeID"`
-	StartTime json.Uint64       `json:"startTime"`
-	EndTime   json.Uint64       `json:"endTime"`
+	SubnetID  ids.ID      `json:"subnetID"`
+	NodeID    ids.NodeID  `json:"nodeID"`
+	StartTime json.Uint64 `json:"startTime"`
+	EndTime   json.Uint64 `json:"endTime"`
 }
 
 // GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
@@ -2586,7 +2586,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 			}
 			vdrJSON.PublicKey = &pk
 		}
-		nodeID, err := ids.NodeIDFromGenericNodeID(vdr.NodeID)
+		nodeID, err := ids.ShortNodeIDFromNodeID(vdr.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -2596,7 +2596,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 }
 
 func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
-	var m map[ids.GenericNodeID]*jsonGetValidatorOutput
+	var m map[ids.NodeID]*jsonGetValidatorOutput
 	if err := stdjson.Unmarshal(b, &m); err != nil {
 		return err
 	}
@@ -2606,7 +2606,7 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	v.Validators = make(map[ids.GenericNodeID]*validators.GetValidatorOutput, len(m))
+	v.Validators = make(map[ids.NodeID]*validators.GetValidatorOutput, len(m))
 	for nodeID, vdrJSON := range m {
 		vdr := &validators.GetValidatorOutput{
 			NodeID: nodeID,
@@ -2631,7 +2631,7 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 
 // GetValidatorsAtReply is the response from GetValidatorsAt
 type GetValidatorsAtReply struct {
-	Validators map[ids.GenericNodeID]*validators.GetValidatorOutput
+	Validators map[ids.NodeID]*validators.GetValidatorOutput
 }
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
@@ -2646,12 +2646,12 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	)
 
 	ctx := r.Context()
-	dataWithGenericNodeID, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
+	dataWithNodeID, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
 	}
-	res := make(map[ids.GenericNodeID]*validators.GetValidatorOutput)
-	for nodeID, data := range dataWithGenericNodeID {
+	res := make(map[ids.NodeID]*validators.GetValidatorOutput)
+	for nodeID, data := range dataWithNodeID {
 		res[nodeID] = data
 	}
 	reply.Validators = res

@@ -43,18 +43,18 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
-	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
-	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	vdr2 := ids.NodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
+	vdr3 := ids.NodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
 
-	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := bag.Bag[ids.GenericNodeID]{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.GenericNodeID]{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
@@ -92,18 +92,18 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
-	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
-	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	vdr2 := ids.NodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
+	vdr3 := ids.NodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
 
-	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := bag.Bag[ids.GenericNodeID]{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.GenericNodeID]{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
@@ -141,22 +141,22 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
-	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
-	vdr3 := ids.GenericNodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	vdr2 := ids.NodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen)
+	vdr3 := ids.NodeIDFromBytes([]byte{0x03}).ToSize(ids.ShortNodeIDLen)
 
-	vdrs := []ids.GenericNodeID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := bag.Bag[ids.GenericNodeID]{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.GenericNodeID]{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(2, vdrBag))
 
-	vdrBag = bag.Bag[ids.GenericNodeID]{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	require.True(s.Add(3, vdrBag))
 	require.Equal(s.Len(), 3)
@@ -202,10 +202,10 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
-	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen) // k = 2
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	vdr2 := ids.NodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen) // k = 2
 
-	vdrs := bag.Bag[ids.GenericNodeID]{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -240,10 +240,10 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
-	vdr2 := ids.GenericNodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen) // k = 2
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	vdr2 := ids.NodeIDFromBytes([]byte{0x02}).ToSize(ids.ShortNodeIDLen) // k = 2
 
-	vdrs := bag.Bag[ids.GenericNodeID]{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -275,14 +275,14 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen) // k = 1
+	vdr1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen) // k = 1
 
-	vdrs := bag.Bag[ids.GenericNodeID]{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
-        waiting on Bag[ids.GenericNodeID]: (Size = 1)
+        waiting on Bag[ids.NodeID]: (Size = 1)
             NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
         received Bag[ids.ID]: (Size = 0)`
 	require.True(s.Add(0, vdrs))

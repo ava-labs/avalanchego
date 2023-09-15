@@ -75,13 +75,13 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.GenericNodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.GenericNodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
+	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
 	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.GenericNodeID, error)
+	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
 	// and returns the txID
 	//
@@ -240,7 +240,7 @@ type Client interface {
 	GetMaxStakeAmount(
 		ctx context.Context,
 		subnetID ids.ID,
-		nodeID ids.GenericNodeID,
+		nodeID ids.NodeID,
 		startTime uint64,
 		endTime uint64,
 		options ...rpc.Option,
@@ -258,7 +258,7 @@ type Client interface {
 		subnetID ids.ID,
 		height uint64,
 		options ...rpc.Option,
-	) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error)
+	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
@@ -427,7 +427,7 @@ func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options
 func (c *client) GetCurrentValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.GenericNodeID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]ClientPermissionlessValidator, error) {
 	res := &GetCurrentValidatorsReply{}
@@ -444,7 +444,7 @@ func (c *client) GetCurrentValidators(
 func (c *client) GetPendingValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.GenericNodeID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]interface{}, []interface{}, error) {
 	res := &GetPendingValidatorsReply{}
@@ -463,7 +463,7 @@ func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options 
 	return uint64(res.Supply), uint64(res.Height), err
 }
 
-func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.GenericNodeID, error) {
+func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "platform.sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
@@ -821,7 +821,7 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 	return uint64(amount), err
 }
 
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.GenericNodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
+func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
 	res := &GetMaxStakeAmountReply{}
 	err := c.requester.SendRequest(ctx, "platform.getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
@@ -860,7 +860,7 @@ func (c *client) GetValidatorsAt(
 	subnetID ids.ID,
 	height uint64,
 	options ...rpc.Option,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,

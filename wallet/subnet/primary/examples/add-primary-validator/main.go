@@ -57,7 +57,7 @@ func main() {
 	avaxAssetID := pWallet.AVAXAssetID()
 
 	addValidatorStartTime := time.Now()
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(nodeID)
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
 	if err != nil {
 		panic(err)
 	}

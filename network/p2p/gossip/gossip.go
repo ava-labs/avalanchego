@@ -42,7 +42,7 @@ type GossipableAny[T any] interface {
 type ValidatorGossiper struct {
 	Gossiper
 
-	NodeID     ids.GenericNodeID
+	NodeID     ids.NodeID
 	Validators p2p.ValidatorSet
 }
 
@@ -127,7 +127,7 @@ func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
 
 func (p *PullGossiper[T, U]) handleResponse(
 	_ context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 ) {

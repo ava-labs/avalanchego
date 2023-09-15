@@ -45,7 +45,7 @@ func (m *MockChainVM) EXPECT() *MockChainVMMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *MockChainVM) AppGossip(arg0 context.Context, arg1 ids.GenericNodeID, arg2 []byte) error {
+func (m *MockChainVM) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -59,7 +59,7 @@ func (mr *MockChainVMMockRecorder) AppGossip(arg0, arg1, arg2 interface{}) *gomo
 }
 
 // AppRequest mocks base method.
-func (m *MockChainVM) AppRequest(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
+func (m *MockChainVM) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
@@ -73,7 +73,7 @@ func (mr *MockChainVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg4 inter
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32) error {
+func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -87,7 +87,7 @@ func (mr *MockChainVMMockRecorder) AppRequestFailed(arg0, arg1, arg2 interface{}
 }
 
 // AppResponse mocks base method.
-func (m *MockChainVM) AppResponse(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32, arg3 []byte) error {
+func (m *MockChainVM) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppResponse", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -116,7 +116,7 @@ func (mr *MockChainVMMockRecorder) BuildBlock(arg0 interface{}) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *MockChainVM) Connected(arg0 context.Context, arg1 ids.GenericNodeID, arg2 *version.Application) error {
+func (m *MockChainVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -202,7 +202,7 @@ func (mr *MockChainVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 
 }
 
 // Disconnected mocks base method.
-func (m *MockChainVM) Disconnected(arg0 context.Context, arg1 ids.GenericNodeID) error {
+func (m *MockChainVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)

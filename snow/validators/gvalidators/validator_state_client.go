@@ -59,7 +59,7 @@ func (c *Client) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	resp, err := c.client.GetValidatorSet(ctx, &pb.GetValidatorSetRequest{
 		Height:   height,
 		SubnetId: subnetID.Bytes(),
@@ -68,13 +68,13 @@ func (c *Client) GetValidatorSet(
 		return nil, err
 	}
 
-	vdrs := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, len(resp.Validators))
+	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
-		nodeID, err := ids.ToNodeID(validator.NodeId)
+		shortNodeID, err := ids.ToShortNodeID(validator.NodeId)
 		if err != nil {
 			return nil, err
 		}
-		genericNodeID := ids.GenericNodeIDFromNodeID(nodeID)
+		nodeID := ids.NodeIDFromShortNodeID(shortNodeID)
 
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
@@ -87,8 +87,8 @@ func (c *Client) GetValidatorSet(
 				return nil, errFailedPublicKeyDeserialize
 			}
 		}
-		vdrs[genericNodeID] = &validators.GetValidatorOutput{
-			NodeID:    genericNodeID,
+		vdrs[nodeID] = &validators.GetValidatorOutput{
+			NodeID:    nodeID,
 			PublicKey: publicKey,
 			Weight:    validator.Weight,
 		}

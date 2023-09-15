@@ -106,7 +106,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
-	nodeID := ids.GenericNodeIDFromBytes(req.NodeId)
+	nodeID := ids.NodeIDFromBytes(req.NodeId)
 
 	publicKey, err := bls.PublicKeyFromBytes(req.PublicKey)
 	if err != nil {
@@ -389,7 +389,7 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 }
 
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -399,15 +399,15 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 		return nil, err
 	}
 
-	return &emptypb.Empty{}, vm.vm.Connected(ctx, ids.GenericNodeIDFromNodeID(nodeID), peerVersion)
+	return &emptypb.Empty{}, vm.vm.Connected(ctx, ids.NodeIDFromShortNodeID(nodeID), peerVersion)
 }
 
 func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, ids.GenericNodeIDFromNodeID(nodeID))
+	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, ids.NodeIDFromShortNodeID(nodeID))
 }
 
 // If the underlying VM doesn't actually implement this method, its [BuildBlock]
@@ -589,7 +589,7 @@ func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossCh
 }
 
 func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -597,31 +597,31 @@ func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*e
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(ctx, ids.GenericNodeIDFromNodeID(nodeID), req.RequestId, deadline, req.Request)
+	return &emptypb.Empty{}, vm.vm.AppRequest(ctx, ids.NodeIDFromShortNodeID(nodeID), req.RequestId, deadline, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, ids.GenericNodeIDFromNodeID(nodeID), req.RequestId)
+	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, ids.NodeIDFromShortNodeID(nodeID), req.RequestId)
 }
 
 func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), req.RequestId, req.Response)
+	return &emptypb.Empty{}, vm.vm.AppResponse(ctx, ids.NodeIDFromShortNodeID(nodeID), req.RequestId, req.Response)
 }
 
 func (vm *VMServer) AppGossip(ctx context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
+	nodeID, err := ids.ToShortNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppGossip(ctx, ids.GenericNodeIDFromNodeID(nodeID), req.Msg)
+	return &emptypb.Empty{}, vm.vm.AppGossip(ctx, ids.NodeIDFromShortNodeID(nodeID), req.Msg)
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {

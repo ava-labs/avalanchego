@@ -66,7 +66,7 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(pChainHeight, builtBlock.PChainHeight())
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
-	require.Equal(ids.EmptyGenericNodeID, builtBlock.Proposer())
+	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
 	require.NoError(builtBlock.Verify(false, ids.Empty))
 

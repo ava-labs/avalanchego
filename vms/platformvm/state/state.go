@@ -154,7 +154,7 @@ type State interface {
 	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
-		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 		subnetID ids.ID,
@@ -173,7 +173,7 @@ type State interface {
 	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
-		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 	) error
@@ -682,7 +682,7 @@ func newState(
 	}, nil
 }
 
-func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
+func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
@@ -694,7 +694,7 @@ func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
+func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
@@ -710,7 +710,7 @@ func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 	return s.currentStakers.GetStakerIterator(), nil
 }
 
-func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.GenericNodeID) (*Staker, error) {
+func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
@@ -722,7 +722,7 @@ func (s *state) DeletePendingValidator(staker *Staker) {
 	s.pendingStakers.DeleteValidator(staker)
 }
 
-func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.GenericNodeID) (StakerIterator, error) {
+func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
@@ -996,7 +996,7 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
-func (s *state) GetStartTime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Time, error) {
+func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
 	staker, err := s.currentStakers.GetValidator(subnetID, nodeID)
 	if err != nil {
 		return time.Time{}, err
@@ -1081,7 +1081,7 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 
 func (s *state) ApplyValidatorWeightDiffs(
 	ctx context.Context,
-	validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
 	subnetID ids.ID,
@@ -1146,7 +1146,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		defer diffIter.Release()
 
 		for diffIter.Next() {
-			genericNodeID := ids.GenericNodeIDFromBytes(diffIter.Key())
+			nodeID := ids.NodeIDFromBytes(diffIter.Key())
 
 			weightDiff := ValidatorWeightDiff{}
 			_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
@@ -1154,7 +1154,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 				return err
 			}
 
-			if err := applyWeightDiff(validators, genericNodeID, &weightDiff); err != nil {
+			if err := applyWeightDiff(validators, nodeID, &weightDiff); err != nil {
 				return err
 			}
 		}
@@ -1164,8 +1164,8 @@ func (s *state) ApplyValidatorWeightDiffs(
 }
 
 func applyWeightDiff(
-	vdrs map[ids.GenericNodeID]*validators.GetValidatorOutput,
-	nodeID ids.GenericNodeID,
+	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
+	nodeID ids.NodeID,
 	weightDiff *ValidatorWeightDiff,
 ) error {
 	vdr, ok := vdrs[nodeID]
@@ -1202,7 +1202,7 @@ func applyWeightDiff(
 
 func (s *state) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
-	validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
 ) error {

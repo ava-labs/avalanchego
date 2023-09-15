@@ -157,11 +157,11 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.GenericNodeID, []*Config) {
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
-		nodeIDs   = make([]ids.GenericNodeID, count)
+		nodeIDs   = make([]ids.NodeID, count)
 		configs   = make([]*Config, count)
 	)
 	for i := 0; i < count; i++ {
@@ -196,7 +196,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.GenericNodeID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -240,7 +240,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		config.Beacons = beacons
 		config.Validators = vdrs
 
-		var connected set.Set[ids.GenericNodeID]
+		var connected set.Set[ids.NodeID]
 		net, err := NewNetwork(
 			config,
 			msgCreator,
@@ -250,7 +250,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			dialer,
 			&testHandler{
 				InboundHandler: handlers[i],
-				ConnectedF: func(nodeID ids.GenericNodeID, _ *version.Application, _ ids.ID) {
+				ConnectedF: func(nodeID ids.NodeID, _ *version.Application, _ ids.ID) {
 					t.Logf("%s connected to %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -265,7 +265,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 						close(onAllConnected)
 					}
 				},
-				DisconnectedF: func(nodeID ids.GenericNodeID) {
+				DisconnectedF: func(nodeID ids.NodeID) {
 					t.Logf("%s disconnected from %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -406,7 +406,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	_, err := network.Track(ids.EmptyGenericNodeID, []*ips.ClaimedIPPort{{
+	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: staking.CertificateFromX509(tlsCert.Leaf),
 		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
@@ -475,7 +475,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			dialer,
 			&testHandler{
 				InboundHandler: nil,
-				ConnectedF: func(ids.GenericNodeID, *version.Application, ids.ID) {
+				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
 					require.FailNow("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,
@@ -568,7 +568,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			dialer,
 			&testHandler{
 				InboundHandler: nil,
-				ConnectedF: func(ids.GenericNodeID, *version.Application, ids.ID) {
+				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
 					require.FailNow("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,

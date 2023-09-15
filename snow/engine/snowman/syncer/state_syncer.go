@@ -62,20 +62,20 @@ type stateSyncer struct {
 	frontierSeeders validators.Set
 	// IDs of validators we should request state summary frontier from.
 	// Will be consumed seeders are reached out for frontier.
-	targetSeeders set.Set[ids.GenericNodeID]
+	targetSeeders set.Set[ids.NodeID]
 	// IDs of validators we requested a state summary frontier from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingSeeders set.Set[ids.GenericNodeID]
+	pendingSeeders set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their state summary frontier
-	failedSeeders set.Set[ids.GenericNodeID]
+	failedSeeders set.Set[ids.NodeID]
 
 	// IDs of validators we should request filtering the accepted state summaries from
-	targetVoters set.Set[ids.GenericNodeID]
+	targetVoters set.Set[ids.NodeID]
 	// IDs of validators we requested filtering the accepted state summaries from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingVoters set.Set[ids.GenericNodeID]
+	pendingVoters set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their filtered accepted state summaries
-	failedVoters set.Set[ids.GenericNodeID]
+	failedVoters set.Set[ids.NodeID]
 
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]*weightedSummary
@@ -108,7 +108,7 @@ func New(
 	}
 }
 
-func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryBytes []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -158,7 +158,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Gene
 	return ss.receivedStateSummaryFrontier(ctx)
 }
 
-func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -212,7 +212,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -384,7 +384,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	return preferredStateSummary
 }
 
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
@@ -515,7 +515,7 @@ func (ss *stateSyncer) restart(ctx context.Context) error {
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
-	vdrs := set.NewSet[ids.GenericNodeID](1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
@@ -531,7 +531,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
-	vdrs := set.NewSet[ids.GenericNodeID](1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
@@ -559,7 +559,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
-func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
+func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.GenericNodeID, 
 	return ss.startup(ctx)
 }
 
-func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
+func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}

@@ -26,7 +26,7 @@ func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
 	request := []byte("request")
 	response := []byte("response")
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
 
 	ctxKey := new(string)
@@ -42,7 +42,7 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app request",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 						for range nodeIDs {
 							go func() {
 								require.NoError(t, router.AppRequest(ctx, nodeID, requestID, time.Time{}, request))
@@ -50,7 +50,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					}).AnyTimes()
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, _ ids.GenericNodeID, requestID uint32, response []byte) {
+					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
 						go func() {
 							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
@@ -58,11 +58,11 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppRequest(context.Background(), nodeID, gomock.Any(), request).
-					DoAndReturn(func(context.Context, ids.GenericNodeID, time.Time, []byte) ([]byte, error) {
+					DoAndReturn(func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
 						return response, nil
 					})
 
-				callback := func(ctx context.Context, actualNodeID ids.GenericNodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app request failed",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 						for range nodeIDs {
 							go func() {
 								require.NoError(t, router.AppRequestFailed(ctx, nodeID, requestID))
@@ -86,7 +86,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(_ context.Context, actualNodeID ids.GenericNodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -163,7 +163,7 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.GenericNodeID, []byte) error {
+					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
 						defer wg.Done()
 						return nil
 					})
@@ -175,7 +175,7 @@ func TestAppRequestResponse(t *testing.T) {
 			name: "app gossip specific",
 			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.EXPECT().SendAppGossipSpecific(gomock.Any(), gomock.Any(), gomock.Any()).
-					Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], gossip []byte) {
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], gossip []byte) {
 						for n := range nodeIDs {
 							nodeID := n
 							go func() {
@@ -185,7 +185,7 @@ func TestAppRequestResponse(t *testing.T) {
 					}).AnyTimes()
 				handler.EXPECT().
 					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.GenericNodeID, []byte) error {
+					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
 						defer wg.Done()
 						return nil
 					})
@@ -227,14 +227,14 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unregistered app request message",
 			requestFunc: func(router *Router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestGenericNodeID(), 0, time.Time{}, []byte{unregistered})
+				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty app request message",
 			requestFunc: func(router *Router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestGenericNodeID(), 0, time.Time{}, []byte{})
+				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
 			},
 			err: nil,
 		},
@@ -255,28 +255,28 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unregistered gossip message",
 			requestFunc: func(router *Router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestGenericNodeID(), []byte{unregistered})
+				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty gossip message",
 			requestFunc: func(router *Router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestGenericNodeID(), []byte{})
+				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
 			},
 			err: nil,
 		},
 		{
 			name: "drop unrequested app request failed",
 			requestFunc: func(router *Router) error {
-				return router.AppRequestFailed(context.Background(), ids.GenerateTestGenericNodeID(), 0)
+				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
 			},
 			err: ErrUnrequestedResponse,
 		},
 		{
 			name: "drop unrequested app response",
 			requestFunc: func(router *Router) error {
-				return router.AppResponse(context.Background(), ids.GenerateTestGenericNodeID(), 0, nil)
+				return router.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -318,11 +318,11 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	handler := mocks.NewMockHandler(ctrl)
 	sender := common.NewMockSender(ctrl)
 	router := NewRouter(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 
 	requestSent := &sync.WaitGroup{}
 	sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
+		Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 			for range nodeIDs {
 				requestSent.Add(1)
 				go func() {
@@ -335,7 +335,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	timeout := &sync.WaitGroup{}
 	response := []byte("response")
 	handler.EXPECT().AppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, nodeID ids.GenericNodeID, deadline time.Time, request []byte) ([]byte, error) {
+		DoAndReturn(func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, request []byte) ([]byte, error) {
 			timeout.Wait()
 			return response, nil
 		}).AnyTimes()

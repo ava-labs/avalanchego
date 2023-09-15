@@ -74,8 +74,8 @@ func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID {
 	return tx.Subnet
 }
 
-func (tx *AddPermissionlessValidatorTx) NodeID() ids.GenericNodeID {
-	return ids.GenericNodeIDFromNodeID(tx.Validator.NodeID)
+func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID {
+	return ids.NodeIDFromShortNodeID(tx.Validator.NodeID)
 }
 
 func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
@@ -123,7 +123,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.Validator.NodeID == ids.EmptyNodeID:
+	case tx.Validator.NodeID == ids.EmptyShortNodeID:
 		return errEmptyNodeID
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake

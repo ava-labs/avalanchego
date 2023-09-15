@@ -55,7 +55,7 @@ type MessageQueue interface {
 type throttledMessageQueue struct {
 	onFailed SendFailedCallback
 	// [id] of the peer we're sending messages to
-	id                   ids.GenericNodeID
+	id                   ids.NodeID
 	log                  logging.Logger
 	outboundMsgThrottler throttling.OutboundMsgThrottler
 
@@ -74,7 +74,7 @@ type throttledMessageQueue struct {
 
 func NewThrottledMessageQueue(
 	onFailed SendFailedCallback,
-	id ids.GenericNodeID,
+	id ids.NodeID,
 	log logging.Logger,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) MessageQueue {

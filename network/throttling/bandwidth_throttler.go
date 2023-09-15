@@ -31,7 +31,7 @@ type bandwidthThrottler interface {
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// It's safe for multiple goroutines to concurrently call Acquire.
 	// Returns immediately if [ctx] is canceled.
-	Acquire(ctx context.Context, msgSize uint64, nodeID ids.GenericNodeID)
+	Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID)
 
 	// Add a new node to this throttler.
 	// Must be called before Acquire(..., [nodeID]) is called.
@@ -41,14 +41,14 @@ type bandwidthThrottler interface {
 	// Its bandwidth allocation can hold up to [maxBurstSize] at a time.
 	// [maxBurstSize] must be at least the maximum message size.
 	// It's safe for multiple goroutines to concurrently call AddNode.
-	AddNode(nodeID ids.GenericNodeID)
+	AddNode(nodeID ids.NodeID)
 
 	// Remove a node from this throttler.
 	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// Must be called when we stop reading messages from [nodeID].
 	// It's safe for multiple goroutines to concurrently call RemoveNode.
-	RemoveNode(nodeID ids.GenericNodeID)
+	RemoveNode(nodeID ids.NodeID)
 }
 
 type BandwidthThrottlerConfig struct {
@@ -68,7 +68,7 @@ func newBandwidthThrottler(
 	t := &bandwidthThrottlerImpl{
 		BandwidthThrottlerConfig: config,
 		log:                      log,
-		limiters:                 make(map[ids.GenericNodeID]*rate.Limiter),
+		limiters:                 make(map[ids.NodeID]*rate.Limiter),
 		metrics: bandwidthThrottlerMetrics{
 			acquireLatency: metric.NewAveragerWithErrs(
 				namespace,
@@ -100,14 +100,14 @@ type bandwidthThrottlerImpl struct {
 	lock    sync.RWMutex
 	// Node ID --> token bucket based rate limiter where each token
 	// is a byte of bandwidth.
-	limiters map[ids.GenericNodeID]*rate.Limiter
+	limiters map[ids.NodeID]*rate.Limiter
 }
 
 // See BandwidthThrottler.
 func (t *bandwidthThrottlerImpl) Acquire(
 	ctx context.Context,
 	msgSize uint64,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) {
 	startTime := time.Now()
 	t.metrics.awaitingAcquire.Inc()
@@ -138,7 +138,7 @@ func (t *bandwidthThrottlerImpl) Acquire(
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottlerImpl) AddNode(nodeID ids.GenericNodeID) {
+func (t *bandwidthThrottlerImpl) AddNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -152,7 +152,7 @@ func (t *bandwidthThrottlerImpl) AddNode(nodeID ids.GenericNodeID) {
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottlerImpl) RemoveNode(nodeID ids.GenericNodeID) {
+func (t *bandwidthThrottlerImpl) RemoveNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

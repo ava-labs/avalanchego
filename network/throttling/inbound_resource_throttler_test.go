@@ -56,7 +56,7 @@ func TestSystemThrottler(t *testing.T) {
 	config := SystemThrottlerConfig{
 		MaxRecheckDelay: maxRecheckDelay,
 	}
-	vdrID, nonVdrID := ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
+	vdrID, nonVdrID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)
@@ -138,7 +138,7 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	config := SystemThrottlerConfig{
 		MaxRecheckDelay: maxRecheckDelay,
 	}
-	vdrID := ids.GenerateTestGenericNodeID()
+	vdrID := ids.GenerateTestNodeID()
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)

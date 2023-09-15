@@ -93,7 +93,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
-			validatorsSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.GenericNodeID]*validators.GetValidatorOutput)
+			validatorsSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 			if err := takeValidatorsSnapshotAtCurrentHeightAndTest(vm, validatorsSetByHeightAndSubnet); err != nil {
 				return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 			}
@@ -198,9 +198,9 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightAndSubnet map[uint64]map[ids.ID]map[ids.GenericNodeID]*validators.GetValidatorOutput) error {
+func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightAndSubnet map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput) error {
 	if validatorsSetByHeightAndSubnet == nil {
-		validatorsSetByHeightAndSubnet = make(map[uint64]map[ids.ID]map[ids.GenericNodeID]*validators.GetValidatorOutput)
+		validatorsSetByHeightAndSubnet = make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 	}
 
 	lastBlkID := vm.state.GetLastAccepted()
@@ -211,7 +211,7 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 	height := lastBlk.Height()
 	validatorsSetBySubnet, ok := validatorsSetByHeightAndSubnet[height]
 	if !ok {
-		validatorsSetByHeightAndSubnet[height] = make(map[ids.ID]map[ids.GenericNodeID]*validators.GetValidatorOutput)
+		validatorsSetByHeightAndSubnet[height] = make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 		validatorsSetBySubnet = validatorsSetByHeightAndSubnet[height]
 	}
 
@@ -223,7 +223,7 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 		v := *stakerIt.Value()
 		validatorsSet, ok := validatorsSetBySubnet[v.SubnetID]
 		if !ok {
-			validatorsSetBySubnet[v.SubnetID] = make(map[ids.GenericNodeID]*validators.GetValidatorOutput)
+			validatorsSetBySubnet[v.SubnetID] = make(map[ids.NodeID]*validators.GetValidatorOutput)
 			validatorsSet = validatorsSetBySubnet[v.SubnetID]
 		}
 

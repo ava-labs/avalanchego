@@ -131,7 +131,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 			peers := &p2p.Peers{}
-			require.NoError(peers.Connected(context.Background(), ids.EmptyGenericNodeID, nil))
+			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
 
 			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
 			require.NoError(err)
@@ -143,15 +143,15 @@ func TestGossiperGossip(t *testing.T) {
 
 			gossiped := make(chan struct{})
 			requestSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, request []byte) {
+				Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 					go func() {
-						require.NoError(responseRouter.AppRequest(ctx, ids.EmptyGenericNodeID, requestID, time.Time{}, request))
+						require.NoError(responseRouter.AppRequest(ctx, ids.EmptyNodeID, requestID, time.Time{}, request))
 					}()
 				}).AnyTimes()
 
 			responseSender.EXPECT().
 				SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) {
+				Do(func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) {
 					require.NoError(requestRouter.AppResponse(ctx, nodeID, requestID, appResponseBytes))
 					close(gossiped)
 				}).AnyTimes()
@@ -222,7 +222,7 @@ func TestEvery(*testing.T) {
 func TestValidatorGossiper(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 
 	validators := testValidatorSet{
 		validators: set.Of(nodeID),
@@ -245,7 +245,7 @@ func TestValidatorGossiper(t *testing.T) {
 	require.Equal(1, calls)
 
 	// we are not a validator, so we should not request gossip
-	validators.validators = set.Set[ids.GenericNodeID]{}
+	validators.validators = set.Set[ids.NodeID]{}
 	require.NoError(gossiper.Gossip(context.Background()))
 	require.Equal(2, calls)
 }
@@ -259,9 +259,9 @@ func (t *testGossiper) Gossip(ctx context.Context) error {
 }
 
 type testValidatorSet struct {
-	validators set.Set[ids.GenericNodeID]
+	validators set.Set[ids.NodeID]
 }
 
-func (t testValidatorSet) Has(_ context.Context, nodeID ids.GenericNodeID) bool {
+func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
 }

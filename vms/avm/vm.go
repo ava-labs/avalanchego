@@ -120,11 +120,11 @@ type VM struct {
 	network      network.Network
 }
 
-func (*VM) Connected(context.Context, ids.GenericNodeID, *version.Application) error {
+func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
 	return nil
 }
 
-func (*VM) Disconnected(context.Context, ids.GenericNodeID) error {
+func (*VM) Disconnected(context.Context, ids.NodeID) error {
 	return nil
 }
 

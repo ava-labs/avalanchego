@@ -161,7 +161,7 @@ func (mr *MockHandlerMockRecorder) SetOnStopped(arg0 interface{}) *gomock.Call {
 }
 
 // ShouldHandle mocks base method.
-func (m *MockHandler) ShouldHandle(arg0 ids.GenericNodeID) bool {
+func (m *MockHandler) ShouldHandle(arg0 ids.NodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ShouldHandle", arg0)
 	ret0, _ := ret[0].(bool)

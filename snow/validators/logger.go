@@ -20,7 +20,7 @@ type logger struct {
 	log      logging.Logger
 	enabled  *utils.Atomic[bool]
 	subnetID ids.ID
-	nodeIDs  set.Set[ids.GenericNodeID]
+	nodeIDs  set.Set[ids.NodeID]
 }
 
 // NewLogger returns a callback listener that will log validator set changes for
@@ -29,7 +29,7 @@ func NewLogger(
 	log logging.Logger,
 	enabled *utils.Atomic[bool],
 	subnetID ids.ID,
-	nodeIDs ...ids.GenericNodeID,
+	nodeIDs ...ids.NodeID,
 ) SetCallbackListener {
 	nodeIDSet := set.Of(nodeIDs...)
 	return &logger{
@@ -41,7 +41,7 @@ func NewLogger(
 }
 
 func (l *logger) OnValidatorAdded(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	pk *bls.PublicKey,
 	txID ids.ID,
 	weight uint64,
@@ -62,7 +62,7 @@ func (l *logger) OnValidatorAdded(
 }
 
 func (l *logger) OnValidatorRemoved(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	weight uint64,
 ) {
 	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
@@ -75,7 +75,7 @@ func (l *logger) OnValidatorRemoved(
 }
 
 func (l *logger) OnValidatorWeightChanged(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	oldWeight uint64,
 	newWeight uint64,
 ) {

@@ -40,7 +40,7 @@ func (m *MockWindower) EXPECT() *MockWindowerMockRecorder {
 }
 
 // Delay mocks base method.
-func (m *MockWindower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.GenericNodeID) (time.Duration, error) {
+func (m *MockWindower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID) (time.Duration, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delay", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(time.Duration)
@@ -55,10 +55,10 @@ func (mr *MockWindowerMockRecorder) Delay(arg0, arg1, arg2, arg3 interface{}) *g
 }
 
 // Proposers mocks base method.
-func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64) ([]ids.GenericNodeID, error) {
+func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64) ([]ids.NodeID, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Proposers", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]ids.GenericNodeID)
+	ret0, _ := ret[0].([]ids.NodeID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

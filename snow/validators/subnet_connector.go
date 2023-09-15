@@ -12,5 +12,5 @@ import (
 // SubnetConnector represents a handler that is called when a connection is
 // marked as connected to a subnet
 type SubnetConnector interface {
-	ConnectedSubnet(ctx context.Context, nodeID ids.GenericNodeID, subnetID ids.ID) error
+	ConnectedSubnet(ctx context.Context, nodeID ids.NodeID, subnetID ids.ID) error
 }

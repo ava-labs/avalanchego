@@ -24,7 +24,7 @@ var errUnknownVertex = errors.New("unknown vertex")
 
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
-	peer := ids.GenerateTestGenericNodeID()
+	peer := ids.GenerateTestNodeID()
 	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
@@ -80,10 +80,10 @@ func TestAcceptedFrontier(t *testing.T) {
 	}
 
 	var accepted ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, containerID ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
 		accepted = containerID
 	}
-	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyGenericNodeID, 0))
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
 	require.Equal(vtxID, accepted)
 }
 
@@ -126,11 +126,11 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyGenericNodeID, 0, vtxIDs))
+	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs))
 
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)

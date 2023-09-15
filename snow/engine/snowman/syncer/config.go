@@ -32,7 +32,7 @@ type Config struct {
 
 func NewConfig(
 	commonCfg common.Config,
-	stateSyncerIDs []ids.GenericNodeID,
+	stateSyncerIDs []ids.NodeID,
 	snowGetHandler common.AllGetsServer,
 	vm block.ChainVM,
 ) (Config, error) {

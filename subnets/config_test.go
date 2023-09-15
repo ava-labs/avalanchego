@@ -43,7 +43,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid allowed node IDs",
 			s: Config{
-				AllowedNodes:        set.Of(ids.GenerateTestGenericNodeID()),
+				AllowedNodes:        set.Of(ids.GenerateTestNodeID()),
 				ValidatorOnly:       false,
 				ConsensusParameters: validParameters,
 			},

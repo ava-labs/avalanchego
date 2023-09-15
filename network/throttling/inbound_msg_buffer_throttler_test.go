@@ -21,7 +21,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
 	require.NoError(err)
 
-	nodeID1, nodeID2 := ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
+	nodeID1, nodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	// Acquire shouldn't block for first 3
 	throttler.Acquire(context.Background(), nodeID1)
 	throttler.Acquire(context.Background(), nodeID1)
@@ -74,7 +74,7 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	require.NoError(err)
 
 	vdr1Context, vdr1ContextCancelFunc := context.WithCancel(context.Background())
-	nodeID1 := ids.GenerateTestGenericNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
 	// Acquire shouldn't block for first 3
 	throttler.Acquire(vdr1Context, nodeID1)
 	throttler.Acquire(vdr1Context, nodeID1)

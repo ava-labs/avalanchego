@@ -68,10 +68,10 @@ func (mr *MockStakerMockRecorder) EndTime() *gomock.Call {
 }
 
 // NodeID mocks base method.
-func (m *MockStaker) NodeID() ids.GenericNodeID {
+func (m *MockStaker) NodeID() ids.NodeID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NodeID")
-	ret0, _ := ret[0].(ids.GenericNodeID)
+	ret0, _ := ret[0].(ids.NodeID)
 	return ret0
 }
 

@@ -48,7 +48,7 @@ func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
 }
 
 // Record that a response of type [op] took [latency]
-func (m *metrics) Observe(nodeID ids.GenericNodeID, chainID ids.ID, op message.Op, latency time.Duration) {
+func (m *metrics) Observe(nodeID ids.NodeID, chainID ids.ID, op message.Op, latency time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -112,7 +112,7 @@ func newChainMetrics(ctx *snow.ConsensusContext, summaryEnabled bool) (*chainMet
 	return cm, errs.Err
 }
 
-func (cm *chainMetrics) observe(nodeID ids.GenericNodeID, op message.Op, latency time.Duration) {
+func (cm *chainMetrics) observe(nodeID ids.NodeID, op message.Op, latency time.Duration) {
 	lat := float64(latency)
 	if msg, exists := cm.messageLatencies[op]; exists {
 		msg.Observe(lat)

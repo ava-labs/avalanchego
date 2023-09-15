@@ -48,7 +48,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 		return nil
 	}
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
 	tx := getValidTx(env.txBuilder, t)
@@ -95,7 +95,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	env.Builder.MarkDropped(txID, errTestingDropped)
 
 	// show that the invalid tx is not requested
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	require.NoError(err)

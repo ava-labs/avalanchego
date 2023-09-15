@@ -72,11 +72,11 @@ type ChainRouter struct {
 	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
-	myNodeID     ids.GenericNodeID
-	peers        map[ids.GenericNodeID]*peer
+	myNodeID     ids.NodeID
+	peers        map[ids.NodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
-	benched                map[ids.GenericNodeID]set.Set[ids.ID]
+	benched                map[ids.NodeID]set.Set[ids.ID]
 	criticalChains         set.Set[ids.ID]
 	sybilProtectionEnabled bool
 	onFatal                func(exitCode int)
@@ -93,7 +93,7 @@ type ChainRouter struct {
 // [timeouts] associated with the request that caused the incoming message, if
 // applicable.
 func (cr *ChainRouter) Initialize(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
@@ -109,12 +109,12 @@ func (cr *ChainRouter) Initialize(
 	cr.chainHandlers = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout
-	cr.benched = make(map[ids.GenericNodeID]set.Set[ids.ID])
+	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
 	cr.sybilProtectionEnabled = sybilProtectionEnabled
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
-	cr.peers = make(map[ids.GenericNodeID]*peer)
+	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
 
 	// Mark myself as connected
@@ -147,7 +147,7 @@ func (cr *ChainRouter) Initialize(
 // reply in time.
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestingChainID ids.ID,
 	respondingChainID ids.ID,
 	requestID uint32,
@@ -448,7 +448,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 }
 
 // Connected routes an incoming notification that a validator was just connected
-func (cr *ChainRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -495,7 +495,7 @@ func (cr *ChainRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.
 }
 
 // Disconnected routes an incoming notification that a validator was connected
-func (cr *ChainRouter) Disconnected(nodeID ids.GenericNodeID) {
+func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -524,7 +524,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.GenericNodeID) {
 }
 
 // Benched routes an incoming notification that a validator was benched
-func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.GenericNodeID) {
+func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -556,7 +556,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.GenericNodeID) {
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
-func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.GenericNodeID) {
+func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -674,7 +674,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
@@ -705,7 +705,7 @@ func (cr *ChainRouter) clearRequest(
 // or if the peer is already marked as connected to the subnet.
 // Invariant: should be called after *message.Connected is pushed to the P-chain
 // Invariant: should be called after the P-chain was provided in [AddChain]
-func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.GenericNodeID, subnetID ids.ID) {
+func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
 	// if connected to primary network, we can skip this
 	// because Connected has its own internal message
 	if subnetID == constants.PrimaryNetworkID {

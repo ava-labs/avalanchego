@@ -19,32 +19,32 @@ type Accepted interface {
 
 	// SetLastAccepted updates the latest accepted block for [nodeID] to
 	// [blockID]. If [nodeID] is not currently a validator, this is a noop.
-	SetLastAccepted(nodeID ids.GenericNodeID, blockID ids.ID)
+	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID)
 	// LastAccepted returns the latest known accepted block of [nodeID]. If
 	// [nodeID]'s last accepted block was never unknown, false will be returned.
-	LastAccepted(nodeID ids.GenericNodeID) (ids.ID, bool)
+	LastAccepted(nodeID ids.NodeID) (ids.ID, bool)
 }
 
 type accepted struct {
 	lock       sync.RWMutex
-	validators set.Set[ids.GenericNodeID]
-	frontier   map[ids.GenericNodeID]ids.ID
+	validators set.Set[ids.NodeID]
+	frontier   map[ids.NodeID]ids.ID
 }
 
 func NewAccepted() Accepted {
 	return &accepted{
-		frontier: make(map[ids.GenericNodeID]ids.ID),
+		frontier: make(map[ids.NodeID]ids.ID),
 	}
 }
 
-func (a *accepted) OnValidatorAdded(nodeID ids.GenericNodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
+func (a *accepted) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	a.validators.Add(nodeID)
 }
 
-func (a *accepted) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
+func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -52,9 +52,9 @@ func (a *accepted) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
 	delete(a.frontier, nodeID)
 }
 
-func (*accepted) OnValidatorWeightChanged(_ ids.GenericNodeID, _, _ uint64) {}
+func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
 
-func (a *accepted) SetLastAccepted(nodeID ids.GenericNodeID, frontier ids.ID) {
+func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -63,7 +63,7 @@ func (a *accepted) SetLastAccepted(nodeID ids.GenericNodeID, frontier ids.ID) {
 	}
 }
 
-func (a *accepted) LastAccepted(nodeID ids.GenericNodeID) (ids.ID, bool) {
+func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 

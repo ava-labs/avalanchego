@@ -47,7 +47,7 @@ func TestShutdown(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -66,7 +66,7 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -119,7 +119,7 @@ func TestShutdown(t *testing.T) {
 		shutdownCalled <- struct{}{}
 		return nil
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
@@ -134,7 +134,7 @@ func TestShutdown(t *testing.T) {
 		shutdownCalled <- struct{}{}
 		return nil
 	}
-	engine.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	engine.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	engine.HaltF = func(context.Context) {}
@@ -182,9 +182,9 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.EmptyGenericNodeID
+	nodeID := ids.EmptyNodeID
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
@@ -206,7 +206,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	chainRouter := ChainRouter{}
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -254,11 +254,11 @@ func TestShutdownTimesOut(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
-	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
@@ -345,7 +345,7 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -372,7 +372,7 @@ func TestRouterTimeout(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -408,47 +408,47 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
 
-	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetStateSummaryFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedStateSummaryFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetAcceptedStateSummaryFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedStateSummaryFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFrontierFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAncestorsFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetAncestorsFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	bootstrapper.GetFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.GetFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetFailed = true
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.QueryFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledQueryFailed = true
 		return nil
 	}
-	bootstrapper.AppRequestFailedF = func(context.Context, ids.GenericNodeID, uint32) error {
+	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledAppRequestFailed = true
 		return nil
@@ -482,7 +482,7 @@ func TestRouterTimeout(t *testing.T) {
 	})
 	h.Start(context.Background(), false)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(0)
 	{
 		wg.Add(1)
@@ -699,7 +699,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -723,7 +723,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).AnyTimes()
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
@@ -826,7 +826,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -842,7 +842,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -906,7 +906,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	}
 	h.Start(context.Background(), false)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
@@ -1114,7 +1114,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -1134,7 +1134,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
-	vID := ids.GenerateTestGenericNodeID()
+	vID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1168,7 +1168,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -1208,7 +1208,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	reqID := uint32(0)
 
 	// Non-validator case
-	nID := ids.GenerateTestGenericNodeID()
+	nID := ids.GenerateTestNodeID()
 
 	calledF = false
 	inMsg = message.InboundPullQuery(
@@ -1260,7 +1260,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	// Create chain router
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
 		nodeID,
@@ -1278,7 +1278,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// Set up validators
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	// Create bootstrapper, engine and handler
 	requester := snow.DefaultConsensusContextTest()
@@ -1407,8 +1407,8 @@ func TestConnectedSubnet(t *testing.T) {
 	go tm.Dispatch()
 
 	// Create chain router
-	myNodeID := ids.GenerateTestGenericNodeID()
-	peerNodeID := ids.GenerateTestGenericNodeID()
+	myNodeID := ids.GenerateTestNodeID()
+	peerNodeID := ids.GenerateTestNodeID()
 
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
@@ -1529,7 +1529,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
@@ -1547,12 +1547,12 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	ctx := snow.DefaultConsensusContextTest()
-	shortAllowedID := ids.GenerateTestGenericNodeID()
+	shortAllowedID := ids.GenerateTestNodeID()
 	allowedSet := set.Of(shortAllowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewSet()
-	vID := ids.GenerateTestGenericNodeID()
+	vID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -1588,7 +1588,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -1622,7 +1622,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	reqID := uint32(0)
 
 	// Non-validator case
-	nID := ids.GenerateTestGenericNodeID()
+	nID := ids.GenerateTestNodeID()
 
 	calledF = false
 	inMsg = message.InboundPullQuery(

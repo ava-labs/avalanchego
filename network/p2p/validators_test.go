@@ -20,8 +20,8 @@ import (
 
 func TestValidatorsSample(t *testing.T) {
 	errFoobar := errors.New("foobar")
-	nodeID1 := ids.GenerateTestGenericNodeID()
-	nodeID2 := ids.GenerateTestGenericNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
 
 	type call struct {
 		limit int
@@ -31,11 +31,11 @@ func TestValidatorsSample(t *testing.T) {
 		height              uint64
 		getCurrentHeightErr error
 
-		validators         []ids.GenericNodeID
+		validators         []ids.NodeID
 		getValidatorSetErr error
 
 		// superset of possible values in the result
-		expected []ids.GenericNodeID
+		expected []ids.NodeID
 	}
 
 	tests := []struct {
@@ -53,8 +53,8 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Second),
 					limit:      2,
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1},
-					expected:   []ids.GenericNodeID{nodeID1},
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
 				},
 			},
 		},
@@ -68,8 +68,8 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Second),
 					limit:      1,
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1},
-					expected:   []ids.GenericNodeID{nodeID1},
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
 				},
 			},
 		},
@@ -83,8 +83,8 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Second),
 					limit:      1,
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1, nodeID2},
-					expected:   []ids.GenericNodeID{nodeID1, nodeID2},
+					validators: []ids.NodeID{nodeID1, nodeID2},
+					expected:   []ids.NodeID{nodeID1, nodeID2},
 				},
 			},
 		},
@@ -96,8 +96,8 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Second),
 					limit:      1,
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1},
-					expected:   []ids.GenericNodeID{nodeID1},
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
 				},
 			},
 		},
@@ -109,8 +109,8 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      1,
 					time:       time.Time{}.Add(time.Hour),
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1},
-					expected:   []ids.GenericNodeID{nodeID1},
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
 				},
 			},
 		},
@@ -122,7 +122,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:               1,
 					time:                time.Time{}.Add(time.Hour),
 					getCurrentHeightErr: errFoobar,
-					expected:            []ids.GenericNodeID{},
+					expected:            []ids.NodeID{},
 				},
 			},
 		},
@@ -134,15 +134,15 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      1,
 					time:       time.Time{}.Add(time.Second),
 					height:     1,
-					validators: []ids.GenericNodeID{nodeID1},
-					expected:   []ids.GenericNodeID{nodeID1},
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
 				},
 				{
 					limit:              1,
 					time:               time.Time{}.Add(time.Hour),
 					height:             1,
 					getValidatorSetErr: errFoobar,
-					expected:           []ids.GenericNodeID{},
+					expected:           []ids.NodeID{},
 				},
 			},
 		},
@@ -165,7 +165,7 @@ func TestValidatorsSample(t *testing.T) {
 					continue
 				}
 
-				validatorSet := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, 0)
+				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
 				for _, validator := range call.validators {
 					validatorSet[validator] = nil
 				}

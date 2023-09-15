@@ -13,22 +13,22 @@ var TestNetwork Network = testNetwork{}
 
 type testNetwork struct{}
 
-func (testNetwork) Connected(ids.GenericNodeID) {}
+func (testNetwork) Connected(ids.NodeID) {}
 
-func (testNetwork) AllowConnection(ids.GenericNodeID) bool {
+func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
 }
 
-func (testNetwork) Track(ids.GenericNodeID, []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
+func (testNetwork) Track(ids.NodeID, []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
 	return nil, nil
 }
 
-func (testNetwork) MarkTracked(ids.GenericNodeID, []*p2p.PeerAck) error {
+func (testNetwork) MarkTracked(ids.NodeID, []*p2p.PeerAck) error {
 	return nil
 }
 
-func (testNetwork) Disconnected(ids.GenericNodeID) {}
+func (testNetwork) Disconnected(ids.NodeID) {}
 
-func (testNetwork) Peers(ids.GenericNodeID) ([]ips.ClaimedIPPort, error) {
+func (testNetwork) Peers(ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	return nil, nil
 }

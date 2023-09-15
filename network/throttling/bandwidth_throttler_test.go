@@ -34,7 +34,7 @@ func TestBandwidthThrottler(t *testing.T) {
 	require.Empty(throttler.limiters)
 
 	// Add a node
-	nodeID1 := ids.GenerateTestGenericNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
 	throttler.AddNode(nodeID1)
 	require.Len(throttler.limiters, 1)
 

@@ -57,7 +57,7 @@ type Handler interface {
 	// ShouldHandle returns true if the node with the given ID is allowed to send
 	// messages to this chain. If the node is not allowed to send messages to
 	// this chain, the message should be dropped.
-	ShouldHandle(nodeID ids.GenericNodeID) bool
+	ShouldHandle(nodeID ids.NodeID) bool
 
 	SetEngineManager(engineManager *EngineManager)
 	GetEngineManager() *EngineManager
@@ -179,7 +179,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 	return h.ctx
 }
 
-func (h *handler) ShouldHandle(nodeID ids.GenericNodeID) bool {
+func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 

@@ -71,7 +71,7 @@ type State interface {
 	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
-		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 		subnetID ids.ID,
@@ -89,7 +89,7 @@ type State interface {
 	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
-		validators map[ids.GenericNodeID]*validators.GetValidatorOutput,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 	) error
@@ -108,7 +108,7 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.GenericNodeID]*validators.GetValidatorOutput]),
+		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -132,7 +132,7 @@ type manager struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.GenericNodeID]*validators.GetValidatorOutput]
+	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -196,7 +196,7 @@ func (m *manager) GetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
@@ -208,7 +208,7 @@ func (m *manager) GetValidatorSet(
 	startTime := m.clk.Time()
 
 	var (
-		validatorSet  map[ids.GenericNodeID]*validators.GetValidatorOutput
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
 		currentHeight uint64
 		err           error
 	)
@@ -231,10 +231,10 @@ func (m *manager) GetValidatorSet(
 	return validatorSet, nil
 }
 
-func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.GenericNodeID]*validators.GetValidatorOutput] {
+func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
 	// Only cache tracked subnets
 	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
-		return &cache.Empty[uint64, map[ids.GenericNodeID]*validators.GetValidatorOutput]{}
+		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
 	validatorSetsCache, exists := m.caches[subnetID]
@@ -242,7 +242,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return validatorSetsCache
 	}
 
-	validatorSetsCache = &cache.LRU[uint64, map[ids.GenericNodeID]*validators.GetValidatorOutput]{
+	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
 		Size: validatorSetsCacheSize,
 	}
 	m.caches[subnetID] = validatorSetsCache
@@ -252,7 +252,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 func (m *manager) makePrimaryNetworkValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -290,7 +290,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
@@ -308,7 +308,7 @@ func (m *manager) makeSubnetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetValidatorSet, primaryValidatorSet, currentHeight, err := m.getCurrentValidatorSets(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
@@ -360,7 +360,7 @@ func (m *manager) makeSubnetValidatorSet(
 func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.GenericNodeID]*validators.GetValidatorOutput, map[ids.GenericNodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
 		// TODO: Require that the current validator set for all subnets is

@@ -141,7 +141,7 @@ func TestGetValidatorSet(t *testing.T) {
 	sk0, err := bls.NewSecretKey()
 	require.NoError(err)
 	vdr0 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestGenericNodeID(),
+		NodeID:    ids.GenerateTestNodeID(),
 		PublicKey: bls.PublicFromSecretKey(sk0),
 		Weight:    1,
 	}
@@ -149,18 +149,18 @@ func TestGetValidatorSet(t *testing.T) {
 	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 	vdr1 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestGenericNodeID(),
+		NodeID:    ids.GenerateTestNodeID(),
 		PublicKey: bls.PublicFromSecretKey(sk1),
 		Weight:    2,
 	}
 
 	vdr2 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestGenericNodeID(),
+		NodeID:    ids.GenerateTestNodeID(),
 		PublicKey: nil,
 		Weight:    3,
 	}
 
-	expectedVdrs := map[ids.GenericNodeID]*validators.GetValidatorOutput{
+	expectedVdrs := map[ids.NodeID]*validators.GetValidatorOutput{
 		vdr0.NodeID: vdr0,
 		vdr1.NodeID: vdr1,
 		vdr2.NodeID: vdr2,
@@ -205,7 +205,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}
 }
 
-func benchmarkGetValidatorSet(b *testing.B, vs map[ids.GenericNodeID]*validators.GetValidatorOutput) {
+func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
@@ -224,15 +224,15 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.GenericNodeID]*validators
 	b.StopTimer()
 }
 
-func setupValidatorSet(b *testing.B, size int) map[ids.GenericNodeID]*validators.GetValidatorOutput {
+func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetValidatorOutput {
 	b.Helper()
 
-	set := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, size)
+	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
 	sk, err := bls.NewSecretKey()
 	require.NoError(b, err)
 	pk := bls.PublicFromSecretKey(sk)
 	for i := 0; i < size; i++ {
-		id := ids.GenerateTestGenericNodeID()
+		id := ids.GenerateTestNodeID()
 		set[id] = &validators.GetValidatorOutput{
 			NodeID:    id,
 			PublicKey: pk,

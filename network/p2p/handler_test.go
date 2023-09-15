@@ -17,21 +17,21 @@ import (
 var _ ValidatorSet = (*testValidatorSet)(nil)
 
 type testValidatorSet struct {
-	validators set.Set[ids.GenericNodeID]
+	validators set.Set[ids.NodeID]
 }
 
-func (t testValidatorSet) Has(_ context.Context, nodeID ids.GenericNodeID) bool {
+func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
 }
 
 func TestValidatorHandlerAppGossip(t *testing.T) {
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
 		validatorSet ValidatorSet
-		nodeID       ids.GenericNodeID
+		nodeID       ids.NodeID
 		expected     error
 	}{
 		{
@@ -65,13 +65,13 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 }
 
 func TestValidatorHandlerAppRequest(t *testing.T) {
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
 		validatorSet ValidatorSet
-		nodeID       ids.GenericNodeID
+		nodeID       ids.NodeID
 		expected     error
 	}{
 		{

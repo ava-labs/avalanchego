@@ -36,7 +36,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 		chainID                     = ids.GenerateTestID()
 		requestID            uint32 = 12345
 		deadline                    = time.Hour
-		nodeID                      = ids.GenerateTestGenericNodeID()
+		nodeID                      = ids.GenerateTestNodeID()
 		summary                     = []byte{9, 8, 7}
 		appBytes                    = []byte{1, 3, 3, 7}
 		container                   = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}

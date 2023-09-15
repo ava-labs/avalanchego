@@ -76,7 +76,7 @@ type bootstrapper struct {
 	// nodeID will be added back to [fetchFrom] unless the Ancestors message is
 	// empty. This is to attempt to prevent requesting containers from that peer
 	// again.
-	fetchFrom set.Set[ids.GenericNodeID]
+	fetchFrom set.Set[ids.NodeID]
 
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.
@@ -155,7 +155,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, blks [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
@@ -225,7 +225,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, 
 	return b.process(ctx, requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
@@ -242,7 +242,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.Generi
 	return b.fetch(ctx, blkID)
 }
 
-func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error {
+func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -263,7 +263,7 @@ func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.GenericNodeID, 
 	return b.Startup(ctx)
 }
 
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
@@ -395,7 +395,7 @@ func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 // markUnavailable removes [nodeID] from the set of peers used to fetch
 // ancestors. If the set becomes empty, it is reset to the currently preferred
 // peers so bootstrapping can continue.
-func (b *bootstrapper) markUnavailable(nodeID ids.GenericNodeID) {
+func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	b.fetchFrom.Remove(nodeID)
 
 	// if [fetchFrom] has become empty, reset it to the currently preferred

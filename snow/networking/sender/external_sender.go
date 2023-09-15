@@ -16,10 +16,10 @@ type ExternalSender interface {
 	// Send a message to a specific set of nodes
 	Send(
 		msg message.OutboundMessage,
-		nodeIDs set.Set[ids.GenericNodeID],
+		nodeIDs set.Set[ids.NodeID],
 		subnetID ids.ID,
 		allower subnets.Allower,
-	) set.Set[ids.GenericNodeID]
+	) set.Set[ids.NodeID]
 
 	// Send a message to a random group of nodes in a subnet.
 	// Nodes are sampled based on their validator status.
@@ -30,5 +30,5 @@ type ExternalSender interface {
 		numNonValidatorsToSend int,
 		numPeersToSend int,
 		allower subnets.Allower,
-	) set.Set[ids.GenericNodeID]
+	) set.Set[ids.NodeID]
 }

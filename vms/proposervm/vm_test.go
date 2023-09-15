@@ -151,14 +151,14 @@ func initTestProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
+			nodeID1  = ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.NodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.NodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
@@ -180,7 +180,7 @@ func initTestProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = ids.ID{1}
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -896,9 +896,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-		nodeID1 := ids.GenericNodeIDFromNodeID(ids.ShortNodeID{1})
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		nodeID1 := ids.NodeIDFromShortNodeID(ids.ShortNodeID{1})
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			nodeID1: {
 				NodeID: nodeID1,
 				Weight: 100,
@@ -907,7 +907,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1166,11 +1166,11 @@ func TestInnerVMRollback(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-		genericNodeID := ids.GenericNodeIDFromNodeID(ids.ShortNodeID{1})
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
-			genericNodeID: {
-				NodeID: genericNodeID,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		nodeID := ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			nodeID: {
+				NodeID: nodeID,
 				Weight: 100,
 			},
 		}, nil
@@ -1200,7 +1200,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1353,9 +1353,9 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		thisNodeID := proVM.ctx.NodeID
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNodeID: {
 				NodeID: thisNodeID,
 				Weight: 10,
@@ -1821,14 +1821,14 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
+			nodeID1  = ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.NodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.NodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
@@ -1849,7 +1849,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2031,14 +2031,14 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
+			nodeID1  = ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.NodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.NodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
@@ -2059,7 +2059,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2214,7 +2214,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2447,7 +2447,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	}
 
 	snowCtx := snow.DefaultContextTest()
-	snowCtx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2606,7 +2606,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = &validators.TestState{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
@@ -2615,7 +2615,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return nil, nil
 		},
 	}

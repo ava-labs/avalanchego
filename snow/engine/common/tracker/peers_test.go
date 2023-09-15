@@ -16,7 +16,7 @@ import (
 func TestPeers(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 
 	p := NewPeers()
 

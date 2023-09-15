@@ -77,7 +77,7 @@ func TestBaseStakersValidator(t *testing.T) {
 	_, err := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = v.GetValidator(delegator.SubnetID, ids.GenerateTestGenericNodeID())
+	_, err = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = v.GetValidator(delegator.SubnetID, delegator.NodeID)
@@ -117,7 +117,7 @@ func TestBaseStakersDelegator(t *testing.T) {
 
 	v.PutDelegator(delegator)
 
-	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, ids.GenerateTestGenericNodeID())
+	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, ids.GenerateTestNodeID())
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
 	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
@@ -150,7 +150,7 @@ func TestDiffStakersValidator(t *testing.T) {
 	_, status := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
 	require.Equal(unmodified, status)
 
-	_, status = v.GetValidator(delegator.SubnetID, ids.GenerateTestGenericNodeID())
+	_, status = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
 	require.Equal(unmodified, status)
 
 	// delegator addition shouldn't change validatorStatus
@@ -222,7 +222,7 @@ func newTestStaker() *Staker {
 	endTime := startTime.Add(28 * 24 * time.Hour)
 	return &Staker{
 		TxID:            ids.GenerateTestID(),
-		NodeID:          ids.GenerateTestGenericNodeID(),
+		NodeID:          ids.GenerateTestNodeID(),
 		SubnetID:        ids.GenerateTestID(),
 		Weight:          1,
 		StartTime:       startTime,

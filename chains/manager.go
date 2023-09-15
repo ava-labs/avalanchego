@@ -185,7 +185,7 @@ type ManagerConfig struct {
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
 	Validators                  validators.Manager         // Validators validating on this chain
-	NodeID                      ids.GenericNodeID          // The ID of this node
+	NodeID                      ids.NodeID                 // The ID of this node
 	NetworkID                   uint32                     // ID of the network this node is connected to
 	PartialSyncPrimaryNetwork   bool
 	Server                      server.Server // Handles HTTP API calls
@@ -224,7 +224,7 @@ type ManagerConfig struct {
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
 
-	StateSyncBeacons []ids.GenericNodeID
+	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
 }

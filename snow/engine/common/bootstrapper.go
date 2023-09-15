@@ -48,23 +48,23 @@ type bootstrapper struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier set.Set[ids.GenericNodeID]
+	pendingSendAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators we requested an accepted frontier from but haven't
 	// received a reply yet
-	pendingReceiveAcceptedFrontier set.Set[ids.GenericNodeID]
+	pendingReceiveAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier set.Set[ids.GenericNodeID]
+	failedAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet set.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted set.Set[ids.GenericNodeID]
+	pendingSendAccepted set.Set[ids.NodeID]
 	// IDs of validators we requested filtering the accepted frontier from but
 	// haven't received a reply yet
-	pendingReceiveAccepted set.Set[ids.GenericNodeID]
+	pendingReceiveAccepted set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
-	failedAccepted set.Set[ids.GenericNodeID]
+	failedAccepted set.Set[ids.NodeID]
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
@@ -80,7 +80,7 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) error {
+func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
@@ -104,7 +104,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.GenericN
 	return b.markAcceptedFrontierReceived(ctx, nodeID)
 }
 
-func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
@@ -128,7 +128,7 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 	return b.markAcceptedFrontierReceived(ctx, nodeID)
 }
 
-func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID ids.GenericNodeID) error {
+func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID ids.NodeID) error {
 	// Mark that we received a response from [nodeID]
 	b.pendingReceiveAcceptedFrontier.Remove(nodeID)
 
@@ -177,7 +177,7 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 	return nil
 }
 
-func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync Accepted message",
@@ -262,7 +262,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.GenericNodeID, r
 	return b.Bootstrapable.ForceAccepted(ctx, accepted)
 }
 
-func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
@@ -349,7 +349,7 @@ func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
-	vdrs := set.NewSet[ids.GenericNodeID](1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		vdrs.Add(vdr)
@@ -365,7 +365,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted(ctx context.Context) {
-	vdrs := set.NewSet[ids.GenericNodeID](1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		vdrs.Add(vdr)

@@ -23,7 +23,7 @@ var (
 
 type Message interface {
 	// Handle this message with the correct message handler
-	Handle(handler Handler, nodeID ids.GenericNodeID, requestID uint32) error
+	Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error
 
 	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)

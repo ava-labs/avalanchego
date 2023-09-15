@@ -20,7 +20,7 @@ func FuzzMarshalDiffKey(f *testing.F) {
 		var (
 			subnetID ids.ID
 			height   uint64
-			nodeID   = ids.EmptyGenericNodeID
+			nodeID   = ids.EmptyNodeID
 		)
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&subnetID, &height, &nodeID)
@@ -57,8 +57,8 @@ func TestDiffIteration(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 
-	nodeID0 := ids.GenericNodeIDFromBytes([]byte{0x00}).ToSize(ids.ShortNodeIDLen)
-	nodeID1 := ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
+	nodeID0 := ids.NodeIDFromBytes([]byte{0x00}).ToSize(ids.ShortNodeIDLen)
+	nodeID1 := ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen)
 
 	subnetID0Height0NodeID0 := marshalDiffKey(subnetID0, 0, nodeID0)
 	subnetID0Height1NodeID0 := marshalDiffKey(subnetID0, 1, nodeID0)

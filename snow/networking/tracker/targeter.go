@@ -14,7 +14,7 @@ var _ Targeter = (*targeter)(nil)
 
 type Targeter interface {
 	// Returns the target usage of the given node.
-	TargetUsage(nodeID ids.GenericNodeID) float64
+	TargetUsage(nodeID ids.NodeID) float64
 }
 
 type TargeterConfig struct {
@@ -53,7 +53,7 @@ type targeter struct {
 	maxNonVdrNodeUsage float64
 }
 
-func (t *targeter) TargetUsage(nodeID ids.GenericNodeID) float64 {
+func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	// This node's at-large allocation is min([remaining at large], [max at large for a given peer])
 	usage := t.tracker.TotalUsage()
 	baseAlloc := math.Max(0, t.maxNonVdrUsage-usage)

@@ -76,7 +76,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			},
 		},
 	}}
-	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	thisNodeID, err := ids.ShortNodeIDFromNodeID(ctx.NodeID)
 	require.NoError(err)
 	addValidatorTx = &AddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -195,7 +195,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			},
 		},
 	}}
-	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	thisNodeID, err := ids.ShortNodeIDFromNodeID(ctx.NodeID)
 	require.NoError(err)
 	addValidatorTx = &AddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{

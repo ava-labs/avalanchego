@@ -38,7 +38,7 @@ import (
 
 var (
 	initialTxID             = ids.GenerateTestID()
-	initialNodeID           = ids.GenerateTestGenericNodeID()
+	initialNodeID           = ids.GenerateTestNodeID()
 	initialTime             = time.Now().Round(time.Second)
 	initialValidatorEndTime = initialTime.Add(28 * 24 * time.Hour)
 )
@@ -89,7 +89,7 @@ func TestStateSyncGenesis(t *testing.T) {
 func newInitializedState(require *require.Assertions) (State, database.Database) {
 	s, db := newUninitializedState(require)
 
-	initialShortNodeID, err := ids.NodeIDFromGenericNodeID(initialNodeID)
+	initialShortNodeID, err := ids.ShortNodeIDFromNodeID(initialNodeID)
 	require.NoError(err)
 
 	initialValidator := &txs.AddValidatorTx{
@@ -343,7 +343,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	for i := 0; i < numNodes; i++ {
 		stakers[i] = Staker{
 			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestGenericNodeID(),
+			NodeID:          ids.GenerateTestNodeID(),
 			Weight:          uint64(i + 1),
 			StartTime:       startTime.Add(time.Duration(i) * time.Second),
 			EndTime:         endTime.Add(time.Duration(i) * time.Second),
@@ -365,20 +365,20 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		removedDelegators []Staker
 		removedValidators []Staker
 
-		expectedPrimaryValidatorSet map[ids.GenericNodeID]*validators.GetValidatorOutput
-		expectedSubnetValidatorSet  map[ids.GenericNodeID]*validators.GetValidatorOutput
+		expectedPrimaryValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
+		expectedSubnetValidatorSet  map[ids.NodeID]*validators.GetValidatorOutput
 	}
 	diffs := []diff{
 		{
 			// Do nothing
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
-			expectedSubnetValidatorSet:  map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{
 			// Add a subnet validator
 			addedValidators:             []Staker{stakers[0]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
-			expectedSubnetValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[0].NodeID: {
 					NodeID: stakers[0].NodeID,
 					Weight: stakers[0].Weight,
@@ -388,47 +388,47 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		{
 			// Remove a subnet validator
 			removedValidators:           []Staker{stakers[0]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
-			expectedSubnetValidatorSet:  map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{ // Add a primary network validator
 			addedValidators: []Staker{stakers[1]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
 					NodeID:    stakers[1].NodeID,
 					PublicKey: stakers[1].PublicKey,
 					Weight:    stakers[1].Weight,
 				},
 			},
-			expectedSubnetValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{
 			// Do nothing
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
 					NodeID:    stakers[1].NodeID,
 					PublicKey: stakers[1].PublicKey,
 					Weight:    stakers[1].Weight,
 				},
 			},
-			expectedSubnetValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{ // Remove a primary network validator
 			removedValidators:           []Staker{stakers[1]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
-			expectedSubnetValidatorSet:  map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{
 			// Add 2 subnet validators and a primary network validator
 			addedValidators: []Staker{stakers[0], stakers[1], stakers[2]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
 					NodeID:    stakers[1].NodeID,
 					PublicKey: stakers[1].PublicKey,
 					Weight:    stakers[1].Weight,
 				},
 			},
-			expectedSubnetValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[0].NodeID: {
 					NodeID: stakers[0].NodeID,
 					Weight: stakers[0].Weight,
@@ -442,8 +442,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		{
 			// Remove 2 subnet validators and a primary network validator.
 			removedValidators:           []Staker{stakers[0], stakers[1], stakers[2]},
-			expectedPrimaryValidatorSet: map[ids.GenericNodeID]*validators.GetValidatorOutput{},
-			expectedSubnetValidatorSet:  map[ids.GenericNodeID]*validators.GetValidatorOutput{},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 	}
 	for currentIndex, diff := range diffs {
@@ -516,9 +516,9 @@ func TestStateAddRemoveValidator(t *testing.T) {
 }
 
 func copyValidatorSet(
-	input map[ids.GenericNodeID]*validators.GetValidatorOutput,
-) map[ids.GenericNodeID]*validators.GetValidatorOutput {
-	result := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, len(input))
+	input map[ids.NodeID]*validators.GetValidatorOutput,
+) map[ids.NodeID]*validators.GetValidatorOutput {
+	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
 	for nodeID, vdr := range input {
 		vdrCopy := *vdr
 		result[nodeID] = &vdrCopy
@@ -528,8 +528,8 @@ func copyValidatorSet(
 
 func requireEqualWeightsValidatorSet(
 	require *require.Assertions,
-	expected map[ids.GenericNodeID]*validators.GetValidatorOutput,
-	actual map[ids.GenericNodeID]*validators.GetValidatorOutput,
+	expected map[ids.NodeID]*validators.GetValidatorOutput,
+	actual map[ids.NodeID]*validators.GetValidatorOutput,
 ) {
 	require.Len(actual, len(expected))
 	for nodeID, expectedVdr := range expected {
@@ -543,8 +543,8 @@ func requireEqualWeightsValidatorSet(
 
 func requireEqualPublicKeysValidatorSet(
 	require *require.Assertions,
-	expected map[ids.GenericNodeID]*validators.GetValidatorOutput,
-	actual map[ids.GenericNodeID]*validators.GetValidatorOutput,
+	expected map[ids.NodeID]*validators.GetValidatorOutput,
+	actual map[ids.NodeID]*validators.GetValidatorOutput,
 ) {
 	require.Len(actual, len(expected))
 	for nodeID, expectedVdr := range expected {

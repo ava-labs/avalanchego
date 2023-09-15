@@ -36,7 +36,7 @@ var (
 type InboundMessage interface {
 	fmt.Stringer
 	// NodeID returns the ID of the node that sent this message
-	NodeID() ids.GenericNodeID
+	NodeID() ids.NodeID
 	// Op returns the op that describes this message type
 	Op() Op
 	// Message returns the message that was sent
@@ -53,7 +53,7 @@ type InboundMessage interface {
 }
 
 type inboundMessage struct {
-	nodeID                ids.GenericNodeID
+	nodeID                ids.NodeID
 	op                    Op
 	message               fmt.Stringer
 	expiration            time.Time
@@ -61,7 +61,7 @@ type inboundMessage struct {
 	bytesSavedCompression int
 }
 
-func (m *inboundMessage) NodeID() ids.GenericNodeID {
+func (m *inboundMessage) NodeID() ids.NodeID {
 	return m.nodeID
 }
 
@@ -357,7 +357,7 @@ func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression
 
 func (mb *msgBuilder) parseInbound(
 	bytes []byte,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	onFinishedHandling func(),
 ) (*inboundMessage, error) {
 	m, bytesSavedCompression, op, err := mb.unmarshal(bytes)

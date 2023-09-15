@@ -116,9 +116,9 @@ func TestHealthCheckSubnet(t *testing.T) {
 			handlerIntf.Start(context.Background(), false)
 
 			testVdrCount := 4
-			vdrIDs := set.NewSet[ids.GenericNodeID](testVdrCount)
+			vdrIDs := set.NewSet[ids.NodeID](testVdrCount)
 			for i := 0; i < testVdrCount; i++ {
-				vdrID := ids.GenerateTestGenericNodeID()
+				vdrID := ids.GenerateTestNodeID()
 				vdrIDs.Add(vdrID)
 				require.NoError(vdrs.Add(vdrID, nil, ids.Empty, 100))
 			}

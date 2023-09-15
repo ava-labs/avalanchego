@@ -18,47 +18,47 @@ func TestRequests(t *testing.T) {
 
 	require.Empty(req)
 
-	_, removed := req.Remove(ids.EmptyGenericNodeID, 0)
+	_, removed := req.Remove(ids.EmptyNodeID, 0)
 	require.False(removed)
 
 	require.False(req.RemoveAny(ids.Empty))
 	require.False(req.Contains(ids.Empty))
 
-	req.Add(ids.EmptyGenericNodeID, 0, ids.Empty)
+	req.Add(ids.EmptyNodeID, 0, ids.Empty)
 	require.Equal(1, req.Len())
 
-	_, removed = req.Remove(ids.EmptyGenericNodeID, 1)
+	_, removed = req.Remove(ids.EmptyNodeID, 1)
 	require.False(removed)
 
-	_, removed = req.Remove(ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen), 0)
+	_, removed = req.Remove(ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen), 0)
 	require.False(removed)
 
 	require.True(req.Contains(ids.Empty))
 	require.Equal(1, req.Len())
 
-	req.Add(ids.EmptyGenericNodeID, 10, ids.Empty.Prefix(0))
+	req.Add(ids.EmptyNodeID, 10, ids.Empty.Prefix(0))
 	require.Equal(2, req.Len())
 
-	_, removed = req.Remove(ids.EmptyGenericNodeID, 1)
+	_, removed = req.Remove(ids.EmptyNodeID, 1)
 	require.False(removed)
 
-	_, removed = req.Remove(ids.GenericNodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen), 0)
+	_, removed = req.Remove(ids.NodeIDFromBytes([]byte{0x01}).ToSize(ids.ShortNodeIDLen), 0)
 	require.False(removed)
 
 	require.True(req.Contains(ids.Empty))
 	require.Equal(2, req.Len())
 
-	removedID, removed := req.Remove(ids.EmptyGenericNodeID, 0)
+	removedID, removed := req.Remove(ids.EmptyNodeID, 0)
 	require.True(removed)
 	require.Equal(ids.Empty, removedID)
 
-	removedID, removed = req.Remove(ids.EmptyGenericNodeID, 10)
+	removedID, removed = req.Remove(ids.EmptyNodeID, 10)
 	require.True(removed)
 	require.Equal(ids.Empty.Prefix(0), removedID)
 
 	require.Zero(req.Len())
 
-	req.Add(ids.EmptyGenericNodeID, 0, ids.Empty)
+	req.Add(ids.EmptyNodeID, 0, ids.Empty)
 	require.Equal(1, req.Len())
 
 	require.True(req.RemoveAny(ids.Empty))

@@ -17,7 +17,7 @@ type InboundMsgBuilder interface {
 	// Parse reads given bytes as InboundMessage
 	Parse(
 		bytes []byte,
-		nodeID ids.GenericNodeID,
+		nodeID ids.NodeID,
 		onFinishedHandling func(),
 	) (InboundMessage, error)
 }
@@ -32,7 +32,7 @@ func newInboundBuilder(builder *msgBuilder) InboundMsgBuilder {
 	}
 }
 
-func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.GenericNodeID, onFinishedHandling func()) (InboundMessage, error) {
+func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (InboundMessage, error) {
 	return b.builder.parseInbound(bytes, nodeID, onFinishedHandling)
 }
 
@@ -40,7 +40,7 @@ func InboundGetStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -58,7 +58,7 @@ func InboundStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -77,7 +77,7 @@ func InboundGetAcceptedStateSummary(
 	requestID uint32,
 	heights []uint64,
 	deadline time.Duration,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -96,7 +96,7 @@ func InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
@@ -116,7 +116,7 @@ func InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
@@ -136,7 +136,7 @@ func InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerID ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -155,7 +155,7 @@ func InboundGetAccepted(
 	requestID uint32,
 	deadline time.Duration,
 	containerIDs []ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
@@ -178,7 +178,7 @@ func InboundAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -199,7 +199,7 @@ func InboundPushQuery(
 	requestID uint32,
 	deadline time.Duration,
 	container []byte,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
@@ -221,7 +221,7 @@ func InboundPullQuery(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
@@ -243,7 +243,7 @@ func InboundChits(
 	requestID uint32,
 	preferredID ids.ID,
 	acceptedID ids.ID,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -263,7 +263,7 @@ func InboundAppRequest(
 	requestID uint32,
 	deadline time.Duration,
 	msg []byte,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -282,7 +282,7 @@ func InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
 	msg []byte,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,

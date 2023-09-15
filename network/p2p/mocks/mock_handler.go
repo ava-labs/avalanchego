@@ -40,7 +40,7 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *MockHandler) AppGossip(arg0 context.Context, arg1 ids.GenericNodeID, arg2 []byte) error {
+func (m *MockHandler) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -54,7 +54,7 @@ func (mr *MockHandlerMockRecorder) AppGossip(arg0, arg1, arg2 interface{}) *gomo
 }
 
 // AppRequest mocks base method.
-func (m *MockHandler) AppRequest(arg0 context.Context, arg1 ids.GenericNodeID, arg2 time.Time, arg3 []byte) ([]byte, error) {
+func (m *MockHandler) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 time.Time, arg3 []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]byte)

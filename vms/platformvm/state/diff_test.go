@@ -92,7 +92,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	currentValidator := &Staker{
 		TxID:     ids.GenerateTestID(),
 		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestGenericNodeID(),
+		NodeID:   ids.GenerateTestNodeID(),
 	}
 	d.PutCurrentValidator(currentValidator)
 
@@ -129,7 +129,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	pendingValidator := &Staker{
 		TxID:     ids.GenerateTestID(),
 		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestGenericNodeID(),
+		NodeID:   ids.GenerateTestNodeID(),
 	}
 	d.PutPendingValidator(pendingValidator)
 
@@ -154,7 +154,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	currentDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
 		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestGenericNodeID(),
+		NodeID:   ids.GenerateTestNodeID(),
 	}
 
 	state := NewMockState(ctrl)
@@ -203,7 +203,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	pendingDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
 		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestGenericNodeID(),
+		NodeID:   ids.GenerateTestNodeID(),
 	}
 
 	state := NewMockState(ctrl)

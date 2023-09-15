@@ -27,20 +27,20 @@ type InboundMsgThrottler interface {
 	// needs to be called so that any allocated resources will be released
 	// invariant: There should be a maximum of 1 blocking call to Acquire for a
 	//            given nodeID. Callers must enforce this invariant.
-	Acquire(ctx context.Context, msgSize uint64, nodeID ids.GenericNodeID) ReleaseFunc
+	Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc
 
 	// Add a new node to this throttler.
 	// Must be called before Acquire(..., [nodeID]) is called.
 	// RemoveNode([nodeID]) must have been called since the last time
 	// AddNode([nodeID], ...) was called, if any.
-	AddNode(nodeID ids.GenericNodeID)
+	AddNode(nodeID ids.NodeID)
 
 	// Remove a node from this throttler.
 	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// Must be called when we stop reading messages from [nodeID].
 	// It's safe for multiple goroutines to concurrently call RemoveNode.
-	RemoveNode(nodeID ids.GenericNodeID)
+	RemoveNode(nodeID ids.NodeID)
 }
 
 type InboundMsgThrottlerConfig struct {
@@ -153,7 +153,7 @@ type inboundMsgThrottler struct {
 // or when we give up trying to read the message, if applicable.
 // Even if [ctx] is canceled, The returned release function
 // needs to be called so that any allocated resources will be released.
-func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.GenericNodeID) ReleaseFunc {
+func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc {
 	// Acquire space on the inbound message buffer
 	bufferRelease := t.bufferThrottler.Acquire(ctx, nodeID)
 	// Acquire bandwidth
@@ -171,11 +171,11 @@ func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeI
 }
 
 // See BandwidthThrottler.
-func (t *inboundMsgThrottler) AddNode(nodeID ids.GenericNodeID) {
+func (t *inboundMsgThrottler) AddNode(nodeID ids.NodeID) {
 	t.bandwidthThrottler.AddNode(nodeID)
 }
 
 // See BandwidthThrottler.
-func (t *inboundMsgThrottler) RemoveNode(nodeID ids.GenericNodeID) {
+func (t *inboundMsgThrottler) RemoveNode(nodeID ids.NodeID) {
 	t.bandwidthThrottler.RemoveNode(nodeID)
 }

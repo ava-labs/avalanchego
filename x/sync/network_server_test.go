@@ -39,7 +39,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
-		nodeID                   ids.GenericNodeID
+		nodeID                   ids.NodeID
 		proofNil                 bool
 	}{
 		"proof too large": {
@@ -107,7 +107,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				gomock.Any(), // requestID
 				gomock.Any(), // responseBytes
 			).DoAndReturn(
-				func(_ context.Context, _ ids.GenericNodeID, requestID uint32, responseBytes []byte) error {
+				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
 						var proofProto pb.RangeProof
@@ -197,7 +197,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
-		nodeID                   ids.GenericNodeID
+		nodeID                   ids.NodeID
 		proofNil                 bool
 		expectRangeProof         bool // Otherwise expect change proof
 	}{
@@ -290,7 +290,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				gomock.Any(), // requestID
 				gomock.Any(), // responseBytes
 			).DoAndReturn(
-				func(_ context.Context, _ ids.GenericNodeID, requestID uint32, responseBytes []byte) error {
+				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					if test.proofNil {
 						return nil
 					}
@@ -440,7 +440,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 
 			err = handler.AppRequest(
 				context.Background(),
-				ids.EmptyGenericNodeID,
+				ids.EmptyNodeID,
 				0,
 				time.Now().Add(10*time.Second),
 				requestBytes,

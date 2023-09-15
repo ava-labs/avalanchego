@@ -649,7 +649,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 		innerArgs := GetCurrentValidatorsArgs{
 			SubnetID: constants.PrimaryNetworkID,
-			NodeIDs:  []ids.GenericNodeID{ids.GenericNodeIDFromNodeID(vdr.NodeID)},
+			NodeIDs:  []ids.NodeID{ids.NodeIDFromShortNodeID(vdr.NodeID)},
 		}
 		innerResponse := GetCurrentValidatorsReply{}
 		require.NoError(service.GetCurrentValidators(nil, &innerArgs, &innerResponse))
@@ -791,18 +791,18 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 	require := require.New(t)
 
 	reply := &GetValidatorsAtReply{
-		Validators: make(map[ids.GenericNodeID]*validators.GetValidatorOutput),
+		Validators: make(map[ids.NodeID]*validators.GetValidatorOutput),
 	}
 
 	{
-		reply.Validators[ids.EmptyGenericNodeID] = &validators.GetValidatorOutput{
-			NodeID:    ids.EmptyGenericNodeID,
+		reply.Validators[ids.EmptyNodeID] = &validators.GetValidatorOutput{
+			NodeID:    ids.EmptyNodeID,
 			PublicKey: nil,
 			Weight:    0,
 		}
 	}
 	{
-		nodeID := ids.GenerateTestGenericNodeID()
+		nodeID := ids.GenerateTestNodeID()
 		sk, err := bls.NewSecretKey()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{

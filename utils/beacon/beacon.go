@@ -11,23 +11,23 @@ import (
 var _ Beacon = (*beacon)(nil)
 
 type Beacon interface {
-	ID() ids.GenericNodeID
+	ID() ids.NodeID
 	IP() ips.IPPort
 }
 
 type beacon struct {
-	id ids.GenericNodeID
+	id ids.NodeID
 	ip ips.IPPort
 }
 
-func New(id ids.GenericNodeID, ip ips.IPPort) Beacon {
+func New(id ids.NodeID, ip ips.IPPort) Beacon {
 	return &beacon{
 		id: id,
 		ip: ip,
 	}
 }
 
-func (b *beacon) ID() ids.GenericNodeID {
+func (b *beacon) ID() ids.NodeID {
 	return b.id
 }
 

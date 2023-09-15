@@ -48,7 +48,7 @@ func (t *testTx) Accept(ctx context.Context) error {
 	return nil
 }
 
-func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -77,7 +77,7 @@ func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *ve
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestGenericNodeID()
+	peer := ids.GenerateTestNodeID()
 	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
@@ -296,7 +296,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Equal(vtxID0, vtxID)
 
@@ -475,7 +475,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Equal(vtxID0, vtxID)
 
@@ -606,7 +606,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 		require.Contains([]ids.ID{vtxID1, vtxID0}, vtxID)
 
@@ -723,7 +723,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID
@@ -858,7 +858,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID
@@ -1050,7 +1050,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.GenericNodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
 
 		requestIDs[vtxID] = reqID

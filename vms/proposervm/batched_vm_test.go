@@ -1036,14 +1036,14 @@ func initTestRemoteProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
-			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
-			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
+			nodeID1  = ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen)
+			nodeID2  = ids.NodeIDFromBytes([]byte{2}).ToSize(ids.ShortNodeIDLen)
+			nodeID3  = ids.NodeIDFromBytes([]byte{3}).ToSize(ids.ShortNodeIDLen)
 		)
-		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
@@ -1064,7 +1064,7 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

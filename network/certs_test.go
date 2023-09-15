@@ -21,7 +21,7 @@ var (
 	tlsConfigs []*tls.Config
 )
 
-func getTLS(t *testing.T, index int) (ids.GenericNodeID, *tls.Certificate, *tls.Config) {
+func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config) {
 	certLock.Lock()
 	defer certLock.Unlock()
 
@@ -36,6 +36,6 @@ func getTLS(t *testing.T, index int) (ids.GenericNodeID, *tls.Certificate, *tls.
 
 	tlsCert := tlsCerts[index]
 	cert := staking.CertificateFromX509(tlsCert.Leaf)
-	nodeID := ids.GenericNodeIDFromCert(cert)
+	nodeID := ids.NodeIDFromCert(cert)
 	return nodeID, tlsCert, tlsConfigs[index]
 }

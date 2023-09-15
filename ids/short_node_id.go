@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	EmptyNodeID = ShortNodeID{}
+	EmptyShortNodeID = ShortNodeID{}
 
 	errShortNodeID = errors.New("insufficient ShortNodeID length")
 
@@ -28,8 +28,8 @@ var (
 
 type ShortNodeID ShortID
 
-// WritableNode is an helper which helps modifiying NodeID content
-func WritableNode(id *ShortNodeID) []byte {
+// WritableShortNode is an helper which helps modifiying NodeID content
+func WritableShortNode(id *ShortNodeID) []byte {
 	return id[:]
 }
 
@@ -37,8 +37,8 @@ func (id ShortNodeID) Bytes() []byte {
 	return id[:]
 }
 
-// ToNodeID attempt to convert a byte slice into a node id
-func ToNodeID(bytes []byte) (ShortNodeID, error) {
+// ToShortNodeID attempt to convert a byte slice into a node id
+func ToShortNodeID(bytes []byte) (ShortNodeID, error) {
 	nodeID, err := ToShortID(bytes)
 	return ShortNodeID(nodeID), err
 }
@@ -47,23 +47,23 @@ func (id ShortNodeID) String() string {
 	return ShortID(id).PrefixedString(ShortNodeIDPrefix)
 }
 
-// NodeIDFromString is the inverse of NodeID.String()
-func NodeIDFromString(nodeIDStr string) (ShortNodeID, error) {
+// ShortNodeIDFromString is the inverse of NodeID.String()
+func ShortNodeIDFromString(nodeIDStr string) (ShortNodeID, error) {
 	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
 	if err != nil {
-		return EmptyNodeID, err
+		return EmptyShortNodeID, err
 	}
 	return ShortNodeID(asShort), nil
 }
 
-// NodeIDFromGenericNodeID is the inverse of NodeID.String()
-func NodeIDFromGenericNodeID(genericNodeID GenericNodeID) (ShortNodeID, error) {
-	if genericNodeID == EmptyGenericNodeID {
-		return EmptyNodeID, nil
+// ShortNodeIDFromNodeID is the inverse of NodeID.String()
+func ShortNodeIDFromNodeID(nodeID NodeID) (ShortNodeID, error) {
+	if nodeID == EmptyNodeID {
+		return EmptyShortNodeID, nil
 	}
-	res, err := ToNodeID(genericNodeID.Bytes())
+	res, err := ToShortNodeID(nodeID.Bytes())
 	if err != nil {
-		return EmptyNodeID, fmt.Errorf("failed converting GenericNodeID to NodeID, %w", err)
+		return EmptyShortNodeID, fmt.Errorf("failed converting NodeID to ShortNodeID, %w", err)
 	}
 	return res, nil
 }
@@ -86,7 +86,7 @@ func (id *ShortNodeID) UnmarshalJSON(b []byte) error {
 	}
 
 	var err error
-	*id, err = NodeIDFromString(str[1:lastIndex])
+	*id, err = ShortNodeIDFromString(str[1:lastIndex])
 	return err
 }
 
@@ -102,7 +102,7 @@ func (id ShortNodeID) Less(other ShortNodeID) bool {
 	return bytes.Compare(id[:], other[:]) == -1
 }
 
-func NodeIDFromCert(cert *staking.Certificate) ShortNodeID {
+func ShortNodeIDFromCert(cert *staking.Certificate) ShortNodeID {
 	return hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)

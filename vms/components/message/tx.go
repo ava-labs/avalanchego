@@ -13,6 +13,6 @@ type Tx struct {
 	Tx []byte `serialize:"true"`
 }
 
-func (msg *Tx) Handle(handler Handler, nodeID ids.GenericNodeID, requestID uint32) error {
+func (msg *Tx) Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error {
 	return handler.HandleTx(nodeID, requestID, msg)
 }

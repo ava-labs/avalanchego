@@ -24,7 +24,7 @@ type GossipTrackerCallback struct {
 // OnValidatorAdded adds [validatorID] to the set of validators that can be
 // gossiped about
 func (g *GossipTrackerCallback) OnValidatorAdded(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	_ *bls.PublicKey,
 	txID ids.ID,
 	_ uint64,
@@ -43,7 +43,7 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 
 // OnValidatorRemoved removes [validatorID] from the set of validators that can
 // be gossiped about.
-func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.GenericNodeID, _ uint64) {
+func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	if !g.GossipTracker.RemoveValidator(nodeID) {
 		g.Log.Error("failed to remove a validator",
 			zap.Stringer("nodeID", nodeID),
@@ -53,4 +53,4 @@ func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.GenericNodeID, _ u
 
 // OnValidatorWeightChanged does nothing because PeerList gossip doesn't care
 // about validator weights.
-func (*GossipTrackerCallback) OnValidatorWeightChanged(ids.GenericNodeID, uint64, uint64) {}
+func (*GossipTrackerCallback) OnValidatorWeightChanged(ids.NodeID, uint64, uint64) {}

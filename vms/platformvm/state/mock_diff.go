@@ -203,7 +203,7 @@ func (mr *MockDiffMockRecorder) GetChains(arg0 interface{}) *gomock.Call {
 }
 
 // GetCurrentDelegatorIterator mocks base method.
-func (m *MockDiff) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.GenericNodeID) (StakerIterator, error) {
+func (m *MockDiff) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentDelegatorIterator", arg0, arg1)
 	ret0, _ := ret[0].(StakerIterator)
@@ -248,7 +248,7 @@ func (mr *MockDiffMockRecorder) GetCurrentSupply(arg0 interface{}) *gomock.Call 
 }
 
 // GetCurrentValidator mocks base method.
-func (m *MockDiff) GetCurrentValidator(arg0 ids.ID, arg1 ids.GenericNodeID) (*Staker, error) {
+func (m *MockDiff) GetCurrentValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentValidator", arg0, arg1)
 	ret0, _ := ret[0].(*Staker)
@@ -263,7 +263,7 @@ func (mr *MockDiffMockRecorder) GetCurrentValidator(arg0, arg1 interface{}) *gom
 }
 
 // GetDelegateeReward mocks base method.
-func (m *MockDiff) GetDelegateeReward(arg0 ids.ID, arg1 ids.GenericNodeID) (uint64, error) {
+func (m *MockDiff) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDelegateeReward", arg0, arg1)
 	ret0, _ := ret[0].(uint64)
@@ -278,7 +278,7 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 interface{}) *gomo
 }
 
 // GetPendingDelegatorIterator mocks base method.
-func (m *MockDiff) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.GenericNodeID) (StakerIterator, error) {
+func (m *MockDiff) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingDelegatorIterator", arg0, arg1)
 	ret0, _ := ret[0].(StakerIterator)
@@ -308,7 +308,7 @@ func (mr *MockDiffMockRecorder) GetPendingStakerIterator() *gomock.Call {
 }
 
 // GetPendingValidator mocks base method.
-func (m *MockDiff) GetPendingValidator(arg0 ids.ID, arg1 ids.GenericNodeID) (*Staker, error) {
+func (m *MockDiff) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingValidator", arg0, arg1)
 	ret0, _ := ret[0].(*Staker)
@@ -473,7 +473,7 @@ func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock
 }
 
 // SetDelegateeReward mocks base method.
-func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.GenericNodeID, arg2 uint64) error {
+func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetDelegateeReward", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

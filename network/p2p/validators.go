@@ -22,7 +22,7 @@ var (
 )
 
 type ValidatorSet interface {
-	Has(ctx context.Context, nodeID ids.GenericNodeID) bool
+	Has(ctx context.Context, nodeID ids.NodeID) bool
 }
 
 func NewValidators(log logging.Logger, subnetID ids.ID, validators validators.State, maxValidatorSetStaleness time.Duration) *Validators {
@@ -41,7 +41,7 @@ type Validators struct {
 	validators validators.State
 
 	lock                     sync.Mutex
-	validatorIDs             set.SampleableSet[ids.GenericNodeID]
+	validatorIDs             set.SampleableSet[ids.NodeID]
 	lastUpdated              time.Time
 	maxValidatorSetStaleness time.Duration
 }
@@ -71,7 +71,7 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
-func (v *Validators) Sample(ctx context.Context, limit int) []ids.GenericNodeID {
+func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
@@ -80,7 +80,7 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.GenericNodeID 
 	return v.validatorIDs.Sample(limit)
 }
 
-func (v *Validators) Has(ctx context.Context, nodeID ids.GenericNodeID) bool {
+func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 

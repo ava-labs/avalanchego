@@ -53,8 +53,8 @@ func (*AddDelegatorTx) SubnetID() ids.ID {
 	return constants.PrimaryNetworkID
 }
 
-func (tx *AddDelegatorTx) NodeID() ids.GenericNodeID {
-	return ids.GenericNodeIDFromNodeID(tx.Validator.NodeID)
+func (tx *AddDelegatorTx) NodeID() ids.NodeID {
+	return ids.NodeIDFromShortNodeID(tx.Validator.NodeID)
 }
 
 func (*AddDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {

@@ -20,10 +20,10 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return nil, nil
 		},
 	}
@@ -40,12 +40,12 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
-	validatorID := ids.GenerateTestGenericNodeID()
-	nonValidatorID := ids.GenerateTestGenericNodeID()
+	validatorID := ids.GenerateTestNodeID()
+	nonValidatorID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-			return map[ids.GenericNodeID]*validators.GetValidatorOutput{
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return map[ids.NodeID]*validators.GetValidatorOutput{
 				validatorID: {
 					NodeID: validatorID,
 					Weight: 10,
@@ -70,14 +70,14 @@ func TestWindowerChangeByHeight(t *testing.T) {
 
 	subnetID := ids.ID{0, 1}
 	chainID := ids.ID{0, 2}
-	validatorIDs := make([]ids.GenericNodeID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.GenericNodeIDFromBytes([]byte{uint8(i) + 1}).ToSize(ids.ShortNodeIDLen)
+		validatorIDs[i] = ids.NodeIDFromBytes([]byte{uint8(i) + 1}).ToSize(ids.ShortNodeIDLen)
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, MaxWindows)
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
 			for _, id := range validatorIDs {
 				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,
@@ -132,14 +132,14 @@ func TestWindowerChangeByChain(t *testing.T) {
 	chainID1 := ids.ID{}
 	_, _ = rand.Read(ids.Writable(&chainID1)) // #nosec G404
 
-	validatorIDs := make([]ids.GenericNodeID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.GenericNodeIDFromBytes([]byte{uint8(i) + 1}).ToSize(ids.ShortNodeIDLen)
+		validatorIDs[i] = ids.NodeIDFromBytes([]byte{uint8(i) + 1}).ToSize(ids.ShortNodeIDLen)
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.GenericNodeID]*validators.GetValidatorOutput, MaxWindows)
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
 			for _, id := range validatorIDs {
 				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,

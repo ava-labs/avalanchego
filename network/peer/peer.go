@@ -39,7 +39,7 @@ var (
 // messages with a remote peer.
 type Peer interface {
 	// ID returns the nodeID of the remote peer.
-	ID() ids.GenericNodeID
+	ID() ids.NodeID
 
 	// Cert returns the certificate that the remote peer is using to
 	// authenticate their messages.
@@ -115,7 +115,7 @@ type peer struct {
 	cert *staking.Certificate
 
 	// node ID of this peer.
-	id ids.GenericNodeID
+	id ids.NodeID
 
 	// queue of messages to send to this peer.
 	messageQueue MessageQueue
@@ -177,7 +177,7 @@ func Start(
 	config *Config,
 	conn net.Conn,
 	cert *staking.Certificate,
-	id ids.GenericNodeID,
+	id ids.NodeID,
 	messageQueue MessageQueue,
 ) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
@@ -203,7 +203,7 @@ func Start(
 	return p
 }
 
-func (p *peer) ID() ids.GenericNodeID {
+func (p *peer) ID() ids.NodeID {
 	return p.id
 }
 

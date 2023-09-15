@@ -39,7 +39,7 @@ func Trace(router Router, tracer trace.Tracer) Router {
 }
 
 func (r *tracedRouter) Initialize(
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
@@ -68,7 +68,7 @@ func (r *tracedRouter) Initialize(
 
 func (r *tracedRouter) RegisterRequest(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestingChainID ids.ID,
 	respondingChainID ids.ID,
 	requestID uint32,
@@ -131,19 +131,19 @@ func (r *tracedRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	r.router.AddChain(ctx, chain)
 }
 
-func (r *tracedRouter) Connected(nodeID ids.GenericNodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (r *tracedRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	r.router.Connected(nodeID, nodeVersion, subnetID)
 }
 
-func (r *tracedRouter) Disconnected(nodeID ids.GenericNodeID) {
+func (r *tracedRouter) Disconnected(nodeID ids.NodeID) {
 	r.router.Disconnected(nodeID)
 }
 
-func (r *tracedRouter) Benched(chainID ids.ID, nodeID ids.GenericNodeID) {
+func (r *tracedRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	r.router.Benched(chainID, nodeID)
 }
 
-func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.GenericNodeID) {
+func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	r.router.Unbenched(chainID, nodeID)
 }
 

@@ -65,7 +65,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	subnetAuth := &secp256k1fx.Input{
 		SigIndices: []uint32{0, 1},
 	}
-	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	thisNodeID, err := ids.ShortNodeIDFromNodeID(ctx.NodeID)
 	require.NoError(err)
 	addSubnetValidatorTx = &AddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -178,7 +178,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	subnetAuth := &secp256k1fx.Input{
 		SigIndices: []uint32{0, 1},
 	}
-	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	thisNodeID, err := ids.ShortNodeIDFromNodeID(ctx.NodeID)
 	require.NoError(err)
 	addSubnetValidatorTx = &AddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{

@@ -24,7 +24,7 @@ func TestLockedCalculator(t *testing.T) {
 	require.NotNil(lc)
 
 	// Should still error because ctx is nil
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 	_, _, err := lc.CalculateUptime(nodeID, subnetID)
 	require.ErrorIs(err, errStillBootstrapping)

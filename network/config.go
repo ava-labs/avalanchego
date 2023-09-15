@@ -119,7 +119,7 @@ type Config struct {
 	TLSKeyLogFile string `json:"tlsKeyLogFile"`
 
 	Namespace          string            `json:"namespace"`
-	MyNodeID           ids.GenericNodeID `json:"myNodeID"`
+	MyNodeID           ids.NodeID        `json:"myNodeID"`
 	MyIPPort           ips.DynamicIPPort `json:"myIP"`
 	NetworkID          uint32            `json:"networkID"`
 	MaxClockDifference time.Duration     `json:"maxClockDifference"`

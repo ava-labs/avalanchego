@@ -24,7 +24,7 @@ var (
 // Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 )
@@ -68,7 +68,7 @@ func (c *Client) AppRequestAny(
 // [onResponse] is invoked upon an error or a response.
 func (c *Client) AppRequest(
 	ctx context.Context,
-	nodeIDs set.Set[ids.GenericNodeID],
+	nodeIDs set.Set[ids.NodeID],
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
@@ -119,7 +119,7 @@ func (c *Client) AppGossip(
 // AppGossipSpecific sends a gossip message to a predetermined set of peers.
 func (c *Client) AppGossipSpecific(
 	ctx context.Context,
-	nodeIDs set.Set[ids.GenericNodeID],
+	nodeIDs set.Set[ids.NodeID],
 	appGossipBytes []byte,
 ) error {
 	return c.sender.SendAppGossipSpecific(

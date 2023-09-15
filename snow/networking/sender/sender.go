@@ -93,7 +93,7 @@ func New(
 	return s, nil
 }
 
-func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32) {
+func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -144,7 +144,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -174,7 +174,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	}
 }
 
-func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summary []byte) {
+func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
@@ -234,7 +234,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.Generi
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, heights []uint64) {
+func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -287,7 +287,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -318,7 +318,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	}
 }
 
-func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) {
+func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	if nodeID.Equal(s.ctx.NodeID) {
@@ -368,7 +368,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.Generi
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32) {
+func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -422,7 +422,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -452,7 +452,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
@@ -503,7 +503,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.GenericNod
 	}
 }
 
-func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -559,7 +559,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.Generi
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -590,7 +590,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.Generi
 	}
 }
 
-func (s *sender) SendAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	if nodeID.Equal(s.ctx.NodeID) {
@@ -636,7 +636,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.GenericNodeID, req
 	}
 }
 
-func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -722,7 +722,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.GenericNodeID,
 // SendAncestors sends an Ancestors message to the consensus engine running on
 // the specified chain on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *sender) SendAncestors(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
@@ -759,7 +759,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.GenericNodeID, requ
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *sender) SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -809,7 +809,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestI
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		nodeIDs := set.Of(nodeID)
 		sentTo = s.sender.Send(
@@ -847,7 +847,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestI
 // chain on the specified node.
 // The Put message signifies that this consensus engine is giving to the
 // recipient the contents of the specified container.
-func (s *sender) SendPut(_ context.Context, nodeID ids.GenericNodeID, requestID uint32, container []byte) {
+func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container, s.engineType)
 	if err != nil {
@@ -894,7 +894,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.GenericNodeID, requestID 
 // The PushQuery message signifies that this consensus engine would like each
 // node to send their preferred frontier given the existence of the specified
 // container.
-func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, container []byte) {
+func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -972,7 +972,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 
 	// Send the message over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -1026,7 +1026,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 // the specified chains on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each
 // node to send their preferred frontier.
-func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -1103,7 +1103,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 	)
 
 	// Send the message over the network.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -1146,7 +1146,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, preferredID, acceptedID ids.ID) {
+func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// If [nodeID] is myself, send this message directly
@@ -1247,7 +1247,7 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the
 // VM.
-func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.GenericNodeID], requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -1321,7 +1321,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.Generic
 
 	// Send the message over the network.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	var sentTo set.Set[ids.GenericNodeID]
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
@@ -1373,7 +1373,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.Generic
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) error {
+func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
 	if nodeID.Equal(s.ctx.NodeID) {
@@ -1433,7 +1433,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, 
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.GenericNodeID], appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {

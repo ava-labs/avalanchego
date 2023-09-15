@@ -27,8 +27,8 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestGenericNodeID()
-	vdr2ID := ids.GenerateTestGenericNodeID()
+	vdr1ID := ids.GenerateTestNodeID()
+	vdr2ID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
 	require.NoError(vdrs.Add(vdr2ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
@@ -105,7 +105,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	acquired = throttlerIntf.Acquire(msg, vdr2ID)
 	require.False(acquired)
 	// Should also fail for non-validators
-	acquired = throttlerIntf.Acquire(msg, ids.GenerateTestGenericNodeID())
+	acquired = throttlerIntf.Acquire(msg, ids.GenerateTestNodeID())
 	require.False(acquired)
 
 	// Release config.MaxAtLargeBytes+1 (1025) bytes
@@ -123,7 +123,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 
 	// Non-validator should be able to take the rest of the at-large bytes
 	// nonVdrID at-large bytes used: 513
-	nonVdrID := ids.GenerateTestGenericNodeID()
+	nonVdrID := ids.GenerateTestNodeID()
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrID)
 	require.True(acquired)
@@ -171,7 +171,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestGenericNodeID()
+	vdr1ID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
@@ -182,7 +182,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	)
 	require.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
-	nonVdrNodeID1 := ids.GenerateTestGenericNodeID()
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
 	msg := testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes)
 	acquired := throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	require.True(acquired)
@@ -193,7 +193,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	require.False(acquired)
 
 	// A different non-validator should be able to acquire
-	nonVdrNodeID2 := ids.GenerateTestGenericNodeID()
+	nonVdrNodeID2 := ids.GenerateTestNodeID()
 	msg = testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes)
 	acquired = throttlerIntf.Acquire(msg, nonVdrNodeID2)
 	require.True(acquired)
@@ -218,7 +218,7 @@ func TestBypassThrottling(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestGenericNodeID()
+	vdr1ID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
@@ -229,7 +229,7 @@ func TestBypassThrottling(t *testing.T) {
 	)
 	require.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
-	nonVdrNodeID1 := ids.GenerateTestGenericNodeID()
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
 	msg := message.NewMockOutboundMessage(ctrl)
 	msg.EXPECT().BypassThrottling().Return(true).AnyTimes()
 	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()

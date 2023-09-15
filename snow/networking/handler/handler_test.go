@@ -42,7 +42,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
-	vdr0 := ids.GenerateTestGenericNodeID()
+	vdr0 := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vdr0, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -78,11 +78,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		require.FailNow("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-	bootstrapper.GetAcceptedF = func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -99,7 +99,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
 
-	nodeID := ids.EmptyGenericNodeID
+	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	chainID := ids.ID{}
 	msg := Message{
@@ -140,7 +140,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -180,7 +180,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errFatal
 	}
 
@@ -210,7 +210,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	handler.Start(context.Background(), false)
 
-	nodeID := ids.EmptyGenericNodeID
+	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
@@ -233,7 +233,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -270,7 +270,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}
@@ -290,7 +290,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	handler.Start(context.Background(), false)
 
-	nodeID := ids.EmptyGenericNodeID
+	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inInboundMessage := Message{
@@ -314,7 +314,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -385,7 +385,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -397,7 +397,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	connector := validators.NewMockSubnetConnector(ctrl)
 
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 
 	handler, err := New(
@@ -449,7 +449,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	// Handler should call subnet connector when ConnectedSubnet message is received
 	var wg sync.WaitGroup
 	connector.EXPECT().ConnectedSubnet(gomock.Any(), nodeID, subnetID).Do(
-		func(context.Context, ids.GenericNodeID, ids.ID) {
+		func(context.Context, ids.NodeID, ids.ID) {
 			wg.Done()
 		})
 
@@ -563,7 +563,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			messageReceived := make(chan struct{})
 			ctx := snow.DefaultConsensusContextTest()
 			vdrs := validators.NewSet()
-			require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+			require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 			resourceTracker, err := tracker.NewResourceTracker(
 				prometheus.NewRegistry(),
@@ -580,7 +580,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				testThreadPoolSize,
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
-				subnets.New(ids.EmptyGenericNodeID, subnets.Config{}),
+				subnets.New(ids.EmptyNodeID, subnets.Config{}),
 				commontracker.NewPeers(),
 			)
 			require.NoError(err)
@@ -600,7 +600,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx
 			}
-			engine.ChitsF = func(context.Context, ids.GenericNodeID, uint32, ids.ID, ids.ID) error {
+			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID) error {
 				close(messageReceived)
 				return nil
 			}
@@ -623,7 +623,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 					uint32(0),
 					ids.Empty,
 					ids.Empty,
-					ids.EmptyGenericNodeID,
+					ids.EmptyNodeID,
 				),
 				EngineType: test.requestedEngineType,
 			})

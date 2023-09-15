@@ -54,7 +54,7 @@ func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -84,7 +84,7 @@ func TestTimeout(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -146,7 +146,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	h.SetEngineManager(&handler.EngineManager{
@@ -175,18 +175,18 @@ func TestTimeout(t *testing.T) {
 
 	var (
 		wg           = sync.WaitGroup{}
-		vdrIDs       = set.Set[ids.GenericNodeID]{}
+		vdrIDs       = set.Set[ids.NodeID]{}
 		chains       = set.Set[ids.ID]{}
 		requestID    uint32
 		failedLock   sync.Mutex
-		failedVDRs   = set.Set[ids.GenericNodeID]{}
+		failedVDRs   = set.Set[ids.NodeID]{}
 		failedChains = set.Set[ids.ID]{}
 	)
 
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	failed := func(ctx context.Context, nodeID ids.GenericNodeID, _ uint32) error {
+	failed := func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
 		require.NoError(ctx.Err())
 
 		failedLock.Lock()
@@ -218,63 +218,63 @@ func TestTimeout(t *testing.T) {
 
 	sendAll := func() {
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetStateSummaryFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedStateSummary(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAccepted(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeID := ids.GenerateTestGenericNodeID()
+			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAncestors(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
-			nodeID := ids.GenerateTestGenericNodeID()
+			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
 			sender.SendGet(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := set.Of(ids.GenerateTestGenericNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
@@ -290,13 +290,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Send messages to disconnected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.GenericNodeID] {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		return nil
 	}
 	sendAll()
 
 	// Send messages to connected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.GenericNodeID] {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		return nodeIDs
 	}
 	sendAll()
@@ -311,7 +311,7 @@ func TestReliableMessages(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -342,7 +342,7 @@ func TestReliableMessages(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -405,7 +405,7 @@ func TestReliableMessages(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 1000
@@ -413,7 +413,7 @@ func TestReliableMessages(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.GenericNodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -444,8 +444,8 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := set.Set[ids.GenericNodeID]{}
-			vdrIDs.Add(ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen))
+			vdrIDs := set.Set[ids.NodeID]{}
+			vdrIDs.Add(ids.NodeIDFromBytes([]byte{1}).ToSize(ids.ShortNodeIDLen))
 
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
@@ -462,7 +462,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestGenericNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -492,7 +492,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
-		ids.EmptyGenericNodeID,
+		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
 		time.Second,
@@ -555,7 +555,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(context.Context, ids.GenericNodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 2
@@ -563,7 +563,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.GenericNodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -596,8 +596,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := set.Set[ids.GenericNodeID]{}
-			vdrIDs.Add(ids.GenerateTestGenericNodeID())
+			vdrIDs := set.Set[ids.NodeID]{}
+			vdrIDs.Add(ids.GenerateTestNodeID())
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
@@ -611,9 +611,9 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 	var (
 		chainID       = ids.GenerateTestID()
 		subnetID      = ids.GenerateTestID()
-		myNodeID      = ids.GenerateTestGenericNodeID()
-		successNodeID = ids.GenerateTestGenericNodeID()
-		failedNodeID  = ids.GenerateTestGenericNodeID()
+		myNodeID      = ids.GenerateTestNodeID()
+		successNodeID = ids.GenerateTestNodeID()
+		failedNodeID  = ids.GenerateTestNodeID()
 		deadline      = time.Second
 		requestID     = uint32(1337)
 		ctx           = snow.DefaultContextTest()
@@ -632,19 +632,19 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 	type test struct {
 		name                    string
-		failedMsgF              func(nodeID ids.GenericNodeID) message.InboundMessage
+		failedMsgF              func(nodeID ids.NodeID) message.InboundMessage
 		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender)
-		sendF                   func(require *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.GenericNodeID])
+		sendF                   func(require *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID])
 		engineType              p2p.EngineType
 	}
 
 	tests := []test{
 		{
 			name: "GetStateSummaryFrontier",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetStateSummaryFrontierFailed(
 					nodeID,
 					chainID,
@@ -675,7 +675,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.GenericNodeID]) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetStateSummaryFrontier(
 					context.Background(),
 					nodeIDs,
@@ -685,7 +685,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		},
 		{
 			name: "GetAcceptedStateSummary",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetAcceptedStateSummaryFailed(
 					nodeID,
 					chainID,
@@ -718,13 +718,13 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.GenericNodeID]) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
 			},
 		},
 		{
 			name: "GetAcceptedFrontier",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetAcceptedFrontierFailed(
 					nodeID,
 					chainID,
@@ -758,14 +758,14 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.GenericNodeID]) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
 			},
 			engineType: engineType,
 		},
 		{
 			name: "GetAccepted",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetAcceptedFailed(
 					nodeID,
 					chainID,
@@ -800,7 +800,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.GenericNodeID]) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
 			},
 			engineType: engineType,
@@ -818,7 +818,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
 				nodeIDs        = set.Of(successNodeID, failedNodeID, myNodeID)
-				nodeIDsCopy    set.Set[ids.GenericNodeID]
+				nodeIDsCopy    set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
 			snowCtx.Registerer = prometheus.NewRegistry()
@@ -883,8 +883,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 	var (
 		chainID           = ids.GenerateTestID()
 		subnetID          = ids.GenerateTestID()
-		myNodeID          = ids.GenerateTestGenericNodeID()
-		destinationNodeID = ids.GenerateTestGenericNodeID()
+		myNodeID          = ids.GenerateTestNodeID()
+		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
 		ctx               = snow.DefaultContextTest()
@@ -906,7 +906,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender)
-		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID)
+		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
 	}
 
 	tests := []test{
@@ -934,7 +934,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendStateSummaryFrontier(context.Background(), nodeID, requestID, summary)
 			},
 		},
@@ -964,7 +964,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendAcceptedStateSummary(context.Background(), nodeID, requestID, summaryIDs)
 			},
 		},
@@ -992,7 +992,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
 			},
 		},
@@ -1022,7 +1022,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendAccepted(context.Background(), nodeID, requestID, summaryIDs)
 			},
 		},
@@ -1091,8 +1091,8 @@ func TestSender_Single_Request(t *testing.T) {
 	var (
 		chainID           = ids.GenerateTestID()
 		subnetID          = ids.GenerateTestID()
-		myNodeID          = ids.GenerateTestGenericNodeID()
-		destinationNodeID = ids.GenerateTestGenericNodeID()
+		myNodeID          = ids.GenerateTestNodeID()
+		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
 		ctx               = snow.DefaultContextTest()
@@ -1110,18 +1110,18 @@ func TestSender_Single_Request(t *testing.T) {
 
 	type test struct {
 		name                    string
-		failedMsgF              func(nodeID ids.GenericNodeID) message.InboundMessage
+		failedMsgF              func(nodeID ids.NodeID) message.InboundMessage
 		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
-		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo set.Set[ids.GenericNodeID])
-		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID)
+		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID])
+		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
 	}
 
 	tests := []test{
 		{
 			name: "GetAncestors",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetAncestorsFailed(
 					nodeID,
 					chainID,
@@ -1146,7 +1146,7 @@ func TestSender_Single_Request(t *testing.T) {
 					engineType,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.GenericNodeID]) {
+			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(),              // Outbound message
 					set.Of(destinationNodeID), // Node IDs
@@ -1154,13 +1154,13 @@ func TestSender_Single_Request(t *testing.T) {
 					gomock.Any(),
 				).Return(sentTo)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendGetAncestors(context.Background(), nodeID, requestID, containerID)
 			},
 		},
 		{
 			name: "Get",
-			failedMsgF: func(nodeID ids.GenericNodeID) message.InboundMessage {
+			failedMsgF: func(nodeID ids.NodeID) message.InboundMessage {
 				return message.InternalGetFailed(
 					nodeID,
 					chainID,
@@ -1185,7 +1185,7 @@ func TestSender_Single_Request(t *testing.T) {
 					engineType,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.GenericNodeID]) {
+			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(),              // Outbound message
 					set.Of(destinationNodeID), // Node IDs
@@ -1193,7 +1193,7 @@ func TestSender_Single_Request(t *testing.T) {
 					gomock.Any(),
 				).Return(sentTo)
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.GenericNodeID) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendGet(context.Background(), nodeID, requestID, containerID)
 			},
 		},
@@ -1329,7 +1329,7 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.setMsgCreatorExpect(msgCreator)
 
 				// Make sure we're sending the message
-				tt.setExternalSenderExpect(externalSender, set.Set[ids.GenericNodeID]{})
+				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
 
 				tt.sendF(require, sender, destinationNodeID)
 

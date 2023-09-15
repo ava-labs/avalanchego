@@ -21,16 +21,16 @@ type uptime struct {
 type TestState struct {
 	dbReadError  error
 	dbWriteError error
-	nodes        map[ids.GenericNodeID]map[ids.ID]*uptime
+	nodes        map[ids.NodeID]map[ids.ID]*uptime
 }
 
 func NewTestState() *TestState {
 	return &TestState{
-		nodes: make(map[ids.GenericNodeID]map[ids.ID]*uptime),
+		nodes: make(map[ids.NodeID]map[ids.ID]*uptime),
 	}
 }
 
-func (s *TestState) AddNode(nodeID ids.GenericNodeID, subnetID ids.ID, startTime time.Time) {
+func (s *TestState) AddNode(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) {
 	subnetUptimes, ok := s.nodes[nodeID]
 	if !ok {
 		subnetUptimes = make(map[ids.ID]*uptime)
@@ -43,7 +43,7 @@ func (s *TestState) AddNode(nodeID ids.GenericNodeID, subnetID ids.ID, startTime
 	}
 }
 
-func (s *TestState) GetUptime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
+func (s *TestState) GetUptime(nodeID ids.NodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
 	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound
@@ -51,7 +51,7 @@ func (s *TestState) GetUptime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.D
 	return up.upDuration, up.lastUpdated, s.dbReadError
 }
 
-func (s *TestState) SetUptime(nodeID ids.GenericNodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
+func (s *TestState) SetUptime(nodeID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
 	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return database.ErrNotFound
@@ -61,7 +61,7 @@ func (s *TestState) SetUptime(nodeID ids.GenericNodeID, subnetID ids.ID, upDurat
 	return s.dbWriteError
 }
 
-func (s *TestState) GetStartTime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Time, error) {
+func (s *TestState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
 	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return time.Time{}, database.ErrNotFound

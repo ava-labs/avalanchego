@@ -41,7 +41,7 @@ type rawTestPeer struct {
 	config         *Config
 	conn           net.Conn
 	cert           *staking.Certificate
-	nodeID         ids.GenericNodeID
+	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -74,8 +74,8 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 	require.NoError(err)
 	cert1 := staking.CertificateFromX509(tlsCert1.Leaf)
 
-	nodeID0 := ids.GenericNodeIDFromCert(cert0)
-	nodeID1 := ids.GenericNodeIDFromCert(cert1)
+	nodeID0 := ids.NodeIDFromCert(cert0)
+	nodeID1 := ids.NodeIDFromCert(cert1)
 
 	mc := newMessageCreator(t)
 

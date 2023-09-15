@@ -44,7 +44,7 @@ type Info struct {
 
 type Parameters struct {
 	Version                       *version.Application
-	NodeID                        ids.GenericNodeID
+	NodeID                        ids.NodeID
 	NodePOP                       *signer.ProofOfPossession
 	NetworkID                     uint32
 	TxFee                         uint64
@@ -123,7 +123,7 @@ func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersio
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID  ids.GenericNodeID         `json:"nodeID"`
+	NodeID  ids.NodeID                `json:"nodeID"`
 	NodePOP *signer.ProofOfPossession `json:"nodePOP"`
 }
 
@@ -211,7 +211,7 @@ func (i *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply
 
 // PeersArgs are the arguments for calling Peers
 type PeersArgs struct {
-	NodeIDs []ids.GenericNodeID `json:"nodeIDs"`
+	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
 type Peer struct {

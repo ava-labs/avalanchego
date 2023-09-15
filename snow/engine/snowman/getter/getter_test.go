@@ -60,7 +60,7 @@ func testSetup(
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestGenericNodeID()
+	peer := ids.GenerateTestNodeID()
 	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	commonConfig := common.Config{
@@ -110,11 +110,11 @@ func TestAcceptedFrontier(t *testing.T) {
 	bs := bsIntf.(*getter)
 
 	var accepted ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, containerID ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
 		accepted = containerID
 	}
 
-	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyGenericNodeID, 0))
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
 	require.Equal(blkID, accepted)
 }
 
@@ -166,11 +166,11 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ context.Context, _ ids.GenericNodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyGenericNodeID, 0, blkIDs))
+	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
 
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)

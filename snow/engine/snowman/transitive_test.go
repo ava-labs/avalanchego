@@ -32,13 +32,13 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.GenericNodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr := ids.GenerateTestGenericNodeID()
+	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
@@ -86,7 +86,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.GenericNod
 	return vdr, vals, sender, vm, te, gBlk
 }
 
-func setupDefaultConfig(t *testing.T) (ids.GenericNodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	commonCfg := common.DefaultConfigTest()
 	engCfg := DefaultConfigs()
 	return setup(t, commonCfg, engCfg)
@@ -129,7 +129,7 @@ func TestEngineAdd(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.False(*asked)
 		*asked = true
@@ -187,7 +187,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
 		require.False(*chitted)
 		*chitted = true
 		require.Equal(uint32(15), requestID)
@@ -208,7 +208,7 @@ func TestEngineQuery(t *testing.T) {
 
 	asked := new(bool)
 	getRequestID := new(uint32)
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		require.False(*asked)
 		*asked = true
 		*getRequestID = requestID
@@ -226,11 +226,11 @@ func TestEngineQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blockID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blockID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blockID)
@@ -265,7 +265,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	*asked = false
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		require.False(*asked)
 		*asked = true
 		*getRequestID = requestID
@@ -276,11 +276,11 @@ func TestEngineQuery(t *testing.T) {
 
 	*queried = false
 	*queryRequestID = 0
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blockID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blockID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blockID)
@@ -332,9 +332,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr0 := ids.GenerateTestGenericNodeID()
-	vdr1 := ids.GenerateTestGenericNodeID()
-	vdr2 := ids.GenerateTestGenericNodeID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
+	vdr2 := ids.GenerateTestNodeID()
 
 	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
@@ -385,11 +385,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk0.ID(), blkID)
@@ -431,7 +431,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	asked := new(bool)
 	getRequestID := new(uint32)
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		require.False(*asked)
 		*asked = true
 		*getRequestID = requestID
@@ -458,11 +458,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	*queried = false
 	secondQueryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*secondQueryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
@@ -502,7 +502,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 		BytesV:  []byte{2},
 	}
 
-	sender.SendGetF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) {}
+	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -569,7 +569,7 @@ func TestEngineFetchBlock(t *testing.T) {
 	}
 
 	added := new(bool)
-	sender.SendPutF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blk []byte) {
+	sender.SendPutF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blk []byte) {
 		require.Equal(vdr, inVdr)
 		require.Equal(uint32(123), requestID)
 		require.Equal(gBlk.Bytes(), blk)
@@ -617,7 +617,7 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
 		require.False(*chitted)
 		*chitted = true
 		require.Equal(vdr, inVdr)
@@ -627,10 +627,10 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	queried := new(bool)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.True(inVdrs.Equals(vdrSet))
 		require.Equal(blk.ID(), blkID)
@@ -668,15 +668,15 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 	}
 
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], _ uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID) {
 		require.FailNow("should not be sending pulls when we are the block producer")
 	}
 
 	pushSent := new(bool)
-	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], _ uint32, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
 		require.False(*pushSent)
 		*pushSent = true
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
@@ -696,10 +696,10 @@ func TestEngineRepoll(t *testing.T) {
 	sender.Default(true)
 
 	queried := new(bool)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
@@ -727,9 +727,9 @@ func TestVoteCanceling(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr0 := ids.GenerateTestGenericNodeID()
-	vdr1 := ids.GenerateTestGenericNodeID()
-	vdr2 := ids.GenerateTestGenericNodeID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
+	vdr2 := ids.GenerateTestNodeID()
 
 	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
@@ -779,11 +779,11 @@ func TestVoteCanceling(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.Bytes(), blkBytes)
@@ -798,7 +798,7 @@ func TestVoteCanceling(t *testing.T) {
 	require.Equal(1, te.polls.Len())
 
 	repolled := new(bool)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		*repolled = true
 	}
 	require.NoError(te.QueryFailed(context.Background(), vdr1, *queryRequestID))
@@ -905,7 +905,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, requestID uint32, _ ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID) {
 		*reqID = requestID
 	}
 
@@ -949,7 +949,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	var reqID uint32
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], requestID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, _ ids.ID) {
 		reqID = requestID
 	}
 
@@ -961,7 +961,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, requestID uint32, _ ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID) {
 		reqID = requestID
 	}
 
@@ -1004,7 +1004,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	var reqID uint32
-	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], requestID uint32, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, _ []byte) {
 		reqID = requestID
 	}
 
@@ -1016,7 +1016,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, requestID uint32, _ ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID) {
 		reqID = requestID
 	}
 
@@ -1084,7 +1084,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		}
 	}
 
-	sender.SendGetF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) {}
+	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(blockingBlk.Bytes(), b)
@@ -1156,9 +1156,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	require.NoError(te.issue(context.Background(), blockingBlk, false))
 
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(issuedBlk.ID(), blkID)
@@ -1198,7 +1198,7 @@ func TestEngineRetryFetch(t *testing.T) {
 	vm.CantGetBlock = false
 
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, requestID uint32, _ ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID) {
 		*reqID = requestID
 	}
 	sender.CantSendChits = false
@@ -1213,7 +1213,7 @@ func TestEngineRetryFetch(t *testing.T) {
 	vm.CantGetBlock = false
 
 	called := new(bool)
-	sender.SendGetF = func(context.Context, ids.GenericNodeID, uint32, ids.ID) {
+	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {
 		*called = true
 	}
 
@@ -1255,7 +1255,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	invalidBlkID := invalidBlk.ID()
 
 	reqID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], requestID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, _ ids.ID) {
 		*reqID = requestID
 	}
 
@@ -1308,7 +1308,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
-	secondVdr := ids.GenerateTestGenericNodeID()
+	secondVdr := ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(secondVdr, nil, ids.Empty, 1))
 
 	sender.Default(true)
@@ -1356,7 +1356,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, reqVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.Equal(vdr, reqVdr)
 		require.Equal(missingBlk.ID(), blkID)
@@ -1447,7 +1447,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, reqVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.Equal(vdr, reqVdr)
 		require.Equal(missingBlk.ID(), blkID)
@@ -1498,7 +1498,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr := ids.GenerateTestGenericNodeID()
+	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
@@ -1568,7 +1568,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	numPulled := new(int)
-	sender.SendPullQueryF = func(context.Context, set.Set[ids.GenericNodeID], uint32, ids.ID) {
+	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID) {
 		*numPulled++
 	}
 
@@ -1595,8 +1595,8 @@ func TestEngineDoubleChit(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr0 := ids.GenerateTestGenericNodeID()
-	vdr1 := ids.GenerateTestGenericNodeID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
 
 	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
@@ -1646,11 +1646,11 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False((*queried))
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blkID)
@@ -1691,7 +1691,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr := ids.GenerateTestGenericNodeID()
+	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
@@ -1751,11 +1751,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], rID uint32, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], rID uint32, _ []byte) {
 		reqID = rID
 		require.False(queried)
 		queried = true
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
@@ -1863,7 +1863,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		asked bool
 		reqID uint32
 	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], rID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID) {
 		asked = true
 		reqID = rID
 	}
@@ -1877,7 +1877,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 	sender.SendPullQueryF = nil
 	asked = false
 
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, rID uint32, _ ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, rID uint32, _ ids.ID) {
 		asked = true
 		reqID = rID
 	}
@@ -1955,7 +1955,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], rID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID) {
 		queried = true
 		reqID = rID
 	}
@@ -1981,10 +1981,10 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	queried = false
 	var asked bool
-	sender.SendPullQueryF = func(context.Context, set.Set[ids.GenericNodeID], uint32, ids.ID) {
+	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID) {
 		queried = true
 	}
-	sender.SendGetF = func(_ context.Context, _ ids.GenericNodeID, rID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, rID uint32, blkID ids.ID) {
 		asked = true
 		reqID = rID
 
@@ -2069,7 +2069,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], rID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID) {
 		queried = true
 		reqID = rID
 	}
@@ -2153,7 +2153,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], rID uint32, _ ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID) {
 		queried = true
 		reqID = rID
 	}
@@ -2227,10 +2227,10 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		}
 	}
 
-	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], _ uint32, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
 		require.NotEqual(nonPreferredBlk.Bytes(), blkBytes)
 	}
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		require.NotEqual(nonPreferredBlk.ID(), blkID)
 	}
 
@@ -2254,7 +2254,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.GenericNodeID]{}
+	expectedVdrSet := set.Set[ids.NodeID]{}
 	expectedVdrSet.Add(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
@@ -2307,7 +2307,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.False(*asked)
 		require.Equal(blk1.ID(), blkID)
@@ -2324,12 +2324,12 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
 
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.GenericNodeID]{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
@@ -2355,10 +2355,10 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 
 	sendReqID := new(uint32)
-	reqVdr := new(ids.GenericNodeID)
+	reqVdr := new(ids.NodeID)
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		require.Equal(blk2.ID(), blkID)
 
 		*sendReqID = requestID
@@ -2393,7 +2393,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	*queried = false
 	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
@@ -2426,7 +2426,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.GenericNodeID]{}
+	expectedVdrSet := set.Set[ids.NodeID]{}
 	expectedVdrSet.Add(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
@@ -2492,7 +2492,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.False(*asked)
 		require.Equal(blk2.ID(), blkID)
@@ -2509,7 +2509,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// We should not PushQuery [blk3] because [blk2] wasn't issued.
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
@@ -2522,11 +2522,11 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require.True(*queried)
 
 	sendReqID := new(uint32)
-	reqVdr := new(ids.GenericNodeID)
-	*reqVdr = ids.GenericNodeIDFromNodeID(ids.EmptyNodeID)
+	reqVdr := new(ids.NodeID)
+	*reqVdr = ids.NodeIDFromShortNodeID(ids.EmptyShortNodeID)
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
-	sender.SendGetF = func(_ context.Context, inVdr ids.GenericNodeID, requestID uint32, blkID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
 			require.FailNow("Unexpectedly sent a Get request for blk1")
@@ -2626,7 +2626,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	queryRequestGPID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.Equal(grandParentBlk.ID(), blkID)
 		*queryRequestGPID = requestID
 	}
@@ -2663,7 +2663,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	queryRequestAID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.Equal(parentBlkA.ID(), blkID)
 		*queryRequestAID = requestID
 	}
@@ -2690,7 +2690,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	sentQuery := new(bool)
-	sender.SendPushQueryF = func(context.Context, set.Set[ids.GenericNodeID], uint32, []byte) {
+	sender.SendPushQueryF = func(context.Context, set.Set[ids.NodeID], uint32, []byte) {
 		*sentQuery = true
 	}
 
@@ -2717,7 +2717,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vals := validators.NewSet()
 	engCfg.Validators = vals
 
-	vdr := ids.GenerateTestGenericNodeID()
+	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
@@ -2763,7 +2763,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	}
 
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
 		require.Contains(inVdrs, vdr)
 		require.Equal(blk.Bytes(), blkBytes)
 		*queryRequestID = requestID
@@ -2784,7 +2784,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.Equal(choices.Processing, blk.Status())
 
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.GenericNodeID], requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		require.Contains(inVdrs, vdr)
 		require.Equal(blk.ID(), blkID)
 		*queryRequestID = requestID

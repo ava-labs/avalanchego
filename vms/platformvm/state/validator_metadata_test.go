@@ -21,7 +21,7 @@ func TestValidatorUptimes(t *testing.T) {
 	state := newValidatorState()
 
 	// get non-existent uptime
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 	_, _, err := state.GetUptime(nodeID, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -85,7 +85,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
 
 	// load uptime
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 	testUptimeReward := &validatorMetadata{
 		UpDuration:      time.Hour,
@@ -122,7 +122,7 @@ func TestValidatorDelegateeRewards(t *testing.T) {
 	state := newValidatorState()
 
 	// get non-existent delegatee reward
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 	_, err := state.GetDelegateeReward(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)

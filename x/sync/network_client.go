@@ -44,14 +44,14 @@ type NetworkClient interface {
 		ctx context.Context,
 		minVersion *version.Application,
 		request []byte,
-	) (ids.GenericNodeID, []byte, error)
+	) (ids.NodeID, []byte, error)
 
 	// Sends [request] to [nodeID] and returns the response.
 	// Blocks until the number of outstanding requests is
 	// below the limit before sending the request.
 	Request(
 		ctx context.Context,
-		nodeID ids.GenericNodeID,
+		nodeID ids.NodeID,
 		request []byte,
 	) ([]byte, error)
 
@@ -60,26 +60,26 @@ type NetworkClient interface {
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	AppResponse(context.Context, ids.GenericNodeID, uint32, []byte) error
+	AppResponse(context.Context, ids.NodeID, uint32, []byte) error
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	AppRequestFailed(context.Context, ids.GenericNodeID, uint32) error
+	AppRequestFailed(context.Context, ids.NodeID, uint32) error
 
 	// Adds the given [nodeID] to the peer
 	// list so that it can receive messages.
 	// If [nodeID] is this node's ID, this is a no-op.
-	Connected(context.Context, ids.GenericNodeID, *version.Application) error
+	Connected(context.Context, ids.NodeID, *version.Application) error
 
 	// Removes given [nodeID] from the peer list.
-	Disconnected(context.Context, ids.GenericNodeID) error
+	Disconnected(context.Context, ids.NodeID) error
 }
 
 type networkClient struct {
 	lock sync.Mutex
 	log  logging.Logger
 	// This node's ID
-	myNodeID ids.GenericNodeID
+	myNodeID ids.NodeID
 	// requestID counter used to track outbound requests
 	requestID uint32
 	// requestID => handler for the response/failure
@@ -94,7 +94,7 @@ type networkClient struct {
 
 func NewNetworkClient(
 	appSender common.AppSender,
-	myNodeID ids.GenericNodeID,
+	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
 	metricsNamespace string,
@@ -117,7 +117,7 @@ func NewNetworkClient(
 
 func (c *networkClient) AppResponse(
 	_ context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestID uint32,
 	response []byte,
 ) error {
@@ -149,7 +149,7 @@ func (c *networkClient) AppResponse(
 
 func (c *networkClient) AppRequestFailed(
 	_ context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	requestID uint32,
 ) error {
 	c.lock.Lock()
@@ -194,16 +194,16 @@ func (c *networkClient) RequestAny(
 	ctx context.Context,
 	minVersion *version.Application,
 	request []byte,
-) (ids.GenericNodeID, []byte, error) {
+) (ids.NodeID, []byte, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
-		return ids.EmptyGenericNodeID, nil, errAcquiringSemaphore
+		return ids.EmptyNodeID, nil, errAcquiringSemaphore
 	}
 	defer c.activeRequests.Release(1)
 
 	nodeID, ok := c.peers.GetAnyPeer(minVersion)
 	if !ok {
-		return ids.EmptyGenericNodeID, nil, fmt.Errorf(
+		return ids.EmptyNodeID, nil, fmt.Errorf(
 			"no peers found matching version %s out of %d peers",
 			minVersion, c.peers.Size(),
 		)
@@ -216,7 +216,7 @@ func (c *networkClient) RequestAny(
 // If [errAppSendFailed] is returned this should be considered fatal.
 func (c *networkClient) Request(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	request []byte,
 ) ([]byte, error) {
 	// Take a slot from total [activeRequests]
@@ -239,7 +239,7 @@ func (c *networkClient) Request(
 // Assumes [c.lock] is not held and unlocks [c.lock] before returning.
 func (c *networkClient) request(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	request []byte,
 ) ([]byte, error) {
 	c.lock.Lock()
@@ -300,7 +300,7 @@ func (c *networkClient) request(
 
 func (c *networkClient) Connected(
 	_ context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
 	if nodeID == c.myNodeID {
@@ -313,7 +313,7 @@ func (c *networkClient) Connected(
 	return nil
 }
 
-func (c *networkClient) Disconnected(_ context.Context, nodeID ids.GenericNodeID) error {
+func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping deregistering self as peer")
 		return nil

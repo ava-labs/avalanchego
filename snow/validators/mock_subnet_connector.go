@@ -39,7 +39,7 @@ func (m *MockSubnetConnector) EXPECT() *MockSubnetConnectorMockRecorder {
 }
 
 // ConnectedSubnet mocks base method.
-func (m *MockSubnetConnector) ConnectedSubnet(arg0 context.Context, arg1 ids.GenericNodeID, arg2 ids.ID) error {
+func (m *MockSubnetConnector) ConnectedSubnet(arg0 context.Context, arg1 ids.NodeID, arg2 ids.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConnectedSubnet", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

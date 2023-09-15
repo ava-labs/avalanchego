@@ -1428,7 +1428,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: Validator{
-						NodeID: ids.EmptyNodeID,
+						NodeID: ids.EmptyShortNodeID,
 					},
 				}
 			},

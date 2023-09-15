@@ -35,7 +35,7 @@ func NewLockedCalculator() LockedCalculator {
 	return &lockedCalculator{}
 }
 
-func (c *lockedCalculator) CalculateUptime(nodeID ids.GenericNodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
+func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -49,7 +49,7 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.GenericNodeID, subnetID id
 	return c.c.CalculateUptime(nodeID, subnetID)
 }
 
-func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.GenericNodeID, subnetID ids.ID) (float64, error) {
+func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID, subnetID ids.ID) (float64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -63,7 +63,7 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.GenericNodeID, subn
 	return c.c.CalculateUptimePercent(nodeID, subnetID)
 }
 
-func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.GenericNodeID, subnetID ids.ID, startTime time.Time) (float64, error) {
+func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) (float64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

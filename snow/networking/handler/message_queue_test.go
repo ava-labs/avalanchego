@@ -29,7 +29,7 @@ func TestQueue(t *testing.T) {
 	require := require.New(t)
 	cpuTracker := tracker.NewMockTracker(ctrl)
 	vdrs := validators.NewSet()
-	vdr1ID, vdr2ID := ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
+	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
 	require.NoError(vdrs.Add(vdr2ID, nil, ids.Empty, 1))
 	mIntf, err := NewMessageQueue(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry(), message.SynchronousOps)
@@ -129,7 +129,7 @@ func TestQueue(t *testing.T) {
 
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
-	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
+	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	msg3 := Message{
 		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, engineType),
 		EngineType:     engineType,

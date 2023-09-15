@@ -15,7 +15,7 @@ import (
 func TestSubnet(t *testing.T) {
 	require := require.New(t)
 
-	myNodeID := ids.GenerateTestGenericNodeID()
+	myNodeID := ids.GenerateTestNodeID()
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
 	chainID2 := ids.GenerateTestID()
@@ -43,28 +43,28 @@ func TestSubnet(t *testing.T) {
 func TestIsAllowed(t *testing.T) {
 	require := require.New(t)
 
-	myNodeID := ids.GenerateTestGenericNodeID()
+	myNodeID := ids.GenerateTestNodeID()
 	// Test with no rules
 	s := New(myNodeID, Config{})
-	require.True(s.IsAllowed(ids.GenerateTestGenericNodeID(), true), "Validator should be allowed with no rules")
-	require.True(s.IsAllowed(ids.GenerateTestGenericNodeID(), false), "Non-validator should be allowed with no rules")
+	require.True(s.IsAllowed(ids.GenerateTestNodeID(), true), "Validator should be allowed with no rules")
+	require.True(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should be allowed with no rules")
 
 	// Test with validator only rules
 	s = New(myNodeID, Config{
 		ValidatorOnly: true,
 	})
-	require.True(s.IsAllowed(ids.GenerateTestGenericNodeID(), true), "Validator should be allowed with validator only rules")
+	require.True(s.IsAllowed(ids.GenerateTestNodeID(), true), "Validator should be allowed with validator only rules")
 	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")
-	require.False(s.IsAllowed(ids.GenerateTestGenericNodeID(), false), "Non-validator should not be allowed with validator only rules")
+	require.False(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should not be allowed with validator only rules")
 
 	// Test with validator only rules and allowed nodes
-	allowedNodeID := ids.GenerateTestGenericNodeID()
+	allowedNodeID := ids.GenerateTestNodeID()
 	s = New(myNodeID, Config{
 		ValidatorOnly: true,
 		AllowedNodes:  set.Of(allowedNodeID),
 	})
 	require.True(s.IsAllowed(allowedNodeID, true), "Validator should be allowed with validator only rules and allowed nodes")
 	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")
-	require.False(s.IsAllowed(ids.GenerateTestGenericNodeID(), false), "Non-validator should not be allowed with validator only rules and allowed nodes")
+	require.False(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should not be allowed with validator only rules and allowed nodes")
 	require.True(s.IsAllowed(allowedNodeID, true), "Non-validator allowed node should be allowed with validator only rules and allowed nodes")
 }

@@ -89,7 +89,7 @@ var (
 type stakerStatus uint
 
 type staker struct {
-	nodeID             ids.GenericNodeID
+	nodeID             ids.NodeID
 	rewardAddress      ids.ShortID
 	startTime, endTime time.Time
 }
@@ -99,8 +99,8 @@ type test struct {
 	stakers               []staker
 	subnetStakers         []staker
 	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.GenericNodeID]stakerStatus
-	expectedSubnetStakers map[ids.GenericNodeID]stakerStatus
+	expectedStakers       map[ids.NodeID]stakerStatus
+	expectedSubnetStakers map[ids.NodeID]stakerStatus
 }
 
 type environment struct {

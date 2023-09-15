@@ -48,8 +48,8 @@ func TestCPUTracker(t *testing.T) {
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
 	require.NoError(err)
 
-	node1 := ids.GenerateTestGenericNodeID()
-	node2 := ids.GenerateTestGenericNodeID()
+	node1 := ids.GenerateTestNodeID()
+	node2 := ids.GenerateTestNodeID()
 
 	// Note that all the durations between start and end are [halflife].
 	startTime1 := time.Now()
@@ -101,7 +101,7 @@ func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, halflife)
 	require.NoError(err)
 	now := time.Now()
-	nodeID := ids.GenerateTestGenericNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
 	tracker.StartProcessing(nodeID, now)
 	// One halflife passes; stop the meter
@@ -125,5 +125,5 @@ func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
 	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
 	// Make sure it returns the zero duration if the node isn't known
-	require.Zero(cpuTracker.TimeUntilUsage(ids.GenerateTestGenericNodeID(), now, 0.0001))
+	require.Zero(cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
 }

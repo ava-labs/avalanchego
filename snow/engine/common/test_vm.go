@@ -53,13 +53,13 @@ type TestVM struct {
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
-	ConnectedF                  func(ctx context.Context, nodeID ids.GenericNodeID, nodeVersion *version.Application) error
-	DisconnectedF               func(ctx context.Context, nodeID ids.GenericNodeID) error
+	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
-	AppRequestF                 func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF                func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, msg []byte) error
-	AppGossipF                  func(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error
+	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
@@ -171,7 +171,7 @@ func (vm *TestVM) HealthCheck(ctx context.Context) (interface{}, error) {
 	return nil, errHealthCheck
 }
 
-func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	if vm.AppRequestF != nil {
 		return vm.AppRequestF(ctx, nodeID, requestID, deadline, request)
 	}
@@ -184,7 +184,7 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.GenericNodeID, requ
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	if vm.AppRequestFailedF != nil {
 		return vm.AppRequestFailedF(ctx, nodeID, requestID)
 	}
@@ -197,7 +197,7 @@ func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.GenericNodeID
 	return errAppRequestFailed
 }
 
-func (vm *TestVM) AppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, response []byte) error {
+func (vm *TestVM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	if vm.AppResponseF != nil {
 		return vm.AppResponseF(ctx, nodeID, requestID, response)
 	}
@@ -210,7 +210,7 @@ func (vm *TestVM) AppResponse(ctx context.Context, nodeID ids.GenericNodeID, req
 	return errAppResponse
 }
 
-func (vm *TestVM) AppGossip(ctx context.Context, nodeID ids.GenericNodeID, msg []byte) error {
+func (vm *TestVM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	if vm.AppGossipF != nil {
 		return vm.AppGossipF(ctx, nodeID, msg)
 	}
@@ -262,7 +262,7 @@ func (vm *TestVM) CrossChainAppResponse(ctx context.Context, chainID ids.ID, req
 	return errCrossChainAppResponse
 }
 
-func (vm *TestVM) Connected(ctx context.Context, id ids.GenericNodeID, nodeVersion *version.Application) error {
+func (vm *TestVM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
@@ -272,7 +272,7 @@ func (vm *TestVM) Connected(ctx context.Context, id ids.GenericNodeID, nodeVersi
 	return nil
 }
 
-func (vm *TestVM) Disconnected(ctx context.Context, id ids.GenericNodeID) error {
+func (vm *TestVM) Disconnected(ctx context.Context, id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(ctx, id)
 	}

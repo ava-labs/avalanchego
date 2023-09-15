@@ -105,7 +105,7 @@ func (b *bootstrapper) Clear() error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, vtxs [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors contains no vertices",
@@ -230,7 +230,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.GenericNodeID, 
 	return b.process(ctx, processVertices...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
@@ -246,7 +246,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.Generi
 
 func (b *bootstrapper) Connected(
 	ctx context.Context,
-	nodeID ids.GenericNodeID,
+	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
@@ -265,7 +265,7 @@ func (b *bootstrapper) Connected(
 	return b.Startup(ctx)
 }
 
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.GenericNodeID) error {
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
