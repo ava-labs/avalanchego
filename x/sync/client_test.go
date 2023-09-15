@@ -69,7 +69,7 @@ func sendRangeProofRequest(
 		// Serves the range proof.
 		server = NewNetworkServer(sender, serverDB, logging.NoLog{})
 
-		clientNodeID, serverNodeID = ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+		clientNodeID, serverNodeID = ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
 
 		// "Sends" the request from the client to the server and
 		// "receives" the response from the server. In reality,
@@ -100,7 +100,7 @@ func sendRangeProofRequest(
 		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
-		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
+		func(_ context.Context, _ *version.Application, request []byte) (ids.GenericNodeID, []byte, error) {
 			go func() {
 				// Get response from server
 				require.NoError(server.AppRequest(context.Background(), clientNodeID, 0, time.Now().Add(time.Hour), request))
@@ -386,7 +386,7 @@ func sendChangeProofRequest(
 		// Serves the change proof.
 		server = NewNetworkServer(sender, serverDB, logging.NoLog{})
 
-		clientNodeID, serverNodeID = ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+		clientNodeID, serverNodeID = ids.GenerateTestGenericNodeID(), ids.GenerateTestGenericNodeID()
 
 		// "Sends" the request from the client to the server and
 		// "receives" the response from the server. In reality,
@@ -417,7 +417,7 @@ func sendChangeProofRequest(
 		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
-		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
+		func(_ context.Context, _ *version.Application, request []byte) (ids.GenericNodeID, []byte, error) {
 			go func() {
 				// Get response from server
 				require.NoError(server.AppRequest(context.Background(), clientNodeID, 0, time.Now().Add(time.Hour), request))
@@ -805,7 +805,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(ids.EmptyNodeID, nil, errAppSendFailed).Times(2)
+	).Return(ids.EmptyGenericNodeID, nil, errAppSendFailed).Times(2)
 
 	_, err := client.GetChangeProof(
 		context.Background(),

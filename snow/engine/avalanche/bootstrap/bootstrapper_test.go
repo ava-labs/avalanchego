@@ -48,7 +48,7 @@ func (t *testTx) Accept(ctx context.Context) error {
 	return nil
 }
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -77,8 +77,8 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(ids.GenericNodeIDFromNodeID(peer), nil, ids.Empty, 1))
+	peer := ids.GenerateTestGenericNodeID()
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
 	require.NoError(err)
@@ -229,8 +229,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 func TestBootstrapperByzantineResponses(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -368,8 +367,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 func TestBootstrapperTxDependencies(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	txID0 := ids.GenerateTestID()
 	txID1 := ids.GenerateTestID()
@@ -525,8 +523,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -648,8 +645,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 func TestBootstrapperFinalized(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -765,8 +761,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -897,8 +892,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 func TestRestartBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, manager, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()

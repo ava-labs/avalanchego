@@ -24,8 +24,8 @@ var errUnknownVertex = errors.New("unknown vertex")
 
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
-	peer := ids.GenerateTestNodeID()
-	require.NoError(t, peers.Add(ids.GenericNodeIDFromNodeID(peer), nil, ids.Empty, 1))
+	peer := ids.GenerateTestGenericNodeID()
+	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)

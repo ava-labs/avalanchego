@@ -39,7 +39,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
-		nodeID                   ids.NodeID
+		nodeID                   ids.GenericNodeID
 		proofNil                 bool
 	}{
 		"proof too large": {
@@ -197,7 +197,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
-		nodeID                   ids.NodeID
+		nodeID                   ids.GenericNodeID
 		proofNil                 bool
 		expectRangeProof         bool // Otherwise expect change proof
 	}{
@@ -440,7 +440,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 
 			err = handler.AppRequest(
 				context.Background(),
-				ids.EmptyNodeID,
+				ids.EmptyGenericNodeID,
 				0,
 				time.Now().Add(10*time.Second),
 				requestBytes,

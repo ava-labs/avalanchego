@@ -60,8 +60,8 @@ func testSetup(
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestNodeID()
-	require.NoError(t, peers.Add(ids.GenericNodeIDFromNodeID(peer), nil, ids.Empty, 1))
+	peer := ids.GenerateTestGenericNodeID()
+	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,

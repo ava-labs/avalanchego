@@ -74,7 +74,7 @@ func NewNetworkServer(appSender common.AppSender, db DB, log logging.Logger) *Ne
 // Sends a response back to the sender if length of response returned by the handler > 0.
 func (s *NetworkServer) AppRequest(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	requestID uint32,
 	deadline time.Time,
 	request []byte,
@@ -162,7 +162,7 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 // If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
@@ -226,7 +226,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				return err
 			}
 
-			if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
 				s.log.Fatal(
 					"failed to send app response",
 					zap.Stringer("nodeID", nodeID),
@@ -250,7 +250,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		if len(proofBytes) < bytesLimit {
-			if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
 				s.log.Fatal(
 					"failed to send app response",
 					zap.Stringer("nodeID", nodeID),
@@ -273,7 +273,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 // If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeID ids.GenericNodeID,
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
@@ -303,7 +303,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if err != nil {
 		return err
 	}
-	if err := s.appSender.SendAppResponse(ctx, ids.GenericNodeIDFromNodeID(nodeID), requestID, proofBytes); err != nil {
+	if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
 		s.log.Fatal(
 			"failed to send app response",
 			zap.Stringer("nodeID", nodeID),

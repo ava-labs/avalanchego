@@ -15,9 +15,9 @@ import (
 func TestAveragerHeap(t *testing.T) {
 	require := require.New(t)
 
-	n0 := ids.GenerateTestNodeID()
-	n1 := ids.GenerateTestNodeID()
-	n2 := ids.GenerateTestNodeID()
+	n0 := ids.GenerateTestGenericNodeID()
+	n1 := ids.GenerateTestGenericNodeID()
+	n2 := ids.GenerateTestGenericNodeID()
 
 	tests := []struct {
 		h AveragerHeap

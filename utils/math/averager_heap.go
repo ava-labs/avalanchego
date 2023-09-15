@@ -19,29 +19,29 @@ type AveragerHeap interface {
 	// Add the average to the heap. If [nodeID] is already in the heap, the
 	// average will be replaced and the old average will be returned. If there
 	// was not an old average, false will be returned.
-	Add(nodeID ids.NodeID, averager Averager) (Averager, bool)
+	Add(nodeID ids.GenericNodeID, averager Averager) (Averager, bool)
 	// Remove attempts to remove the average that was added with the provided
 	// [nodeID], if none is contained in the heap, [false] will be returned.
-	Remove(nodeID ids.NodeID) (Averager, bool)
+	Remove(nodeID ids.GenericNodeID) (Averager, bool)
 	// Pop attempts to remove the node with either the largest or smallest
 	// average, depending on if this is a max heap or a min heap, respectively.
-	Pop() (ids.NodeID, Averager, bool)
+	Pop() (ids.GenericNodeID, Averager, bool)
 	// Peek attempts to return the node with either the largest or smallest
 	// average, depending on if this is a max heap or a min heap, respectively.
-	Peek() (ids.NodeID, Averager, bool)
+	Peek() (ids.GenericNodeID, Averager, bool)
 	// Len returns the number of nodes that are currently in the heap.
 	Len() int
 }
 
 type averagerHeapEntry struct {
-	nodeID   ids.NodeID
+	nodeID   ids.GenericNodeID
 	averager Averager
 	index    int
 }
 
 type averagerHeapBackend struct {
 	isMaxHeap     bool
-	nodeIDToEntry map[ids.NodeID]*averagerHeapEntry
+	nodeIDToEntry map[ids.GenericNodeID]*averagerHeapEntry
 	entries       []*averagerHeapEntry
 }
 
@@ -53,7 +53,7 @@ type averagerHeap struct {
 // thread safe.
 func NewMinAveragerHeap() AveragerHeap {
 	return averagerHeap{b: &averagerHeapBackend{
-		nodeIDToEntry: make(map[ids.NodeID]*averagerHeapEntry),
+		nodeIDToEntry: make(map[ids.GenericNodeID]*averagerHeapEntry),
 	}}
 }
 
@@ -62,11 +62,11 @@ func NewMinAveragerHeap() AveragerHeap {
 func NewMaxAveragerHeap() AveragerHeap {
 	return averagerHeap{b: &averagerHeapBackend{
 		isMaxHeap:     true,
-		nodeIDToEntry: make(map[ids.NodeID]*averagerHeapEntry),
+		nodeIDToEntry: make(map[ids.GenericNodeID]*averagerHeapEntry),
 	}}
 }
 
-func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool) {
+func (h averagerHeap) Add(nodeID ids.GenericNodeID, averager Averager) (Averager, bool) {
 	if e, exists := h.b.nodeIDToEntry[nodeID]; exists {
 		oldAverager := e.averager
 		e.averager = averager
@@ -81,7 +81,7 @@ func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool)
 	return nil, false
 }
 
-func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
+func (h averagerHeap) Remove(nodeID ids.GenericNodeID) (Averager, bool) {
 	e, exists := h.b.nodeIDToEntry[nodeID]
 	if !exists {
 		return nil, false
@@ -90,18 +90,18 @@ func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
 	return e.averager, true
 }
 
-func (h averagerHeap) Pop() (ids.NodeID, Averager, bool) {
+func (h averagerHeap) Pop() (ids.GenericNodeID, Averager, bool) {
 	if len(h.b.entries) == 0 {
-		return ids.EmptyNodeID, nil, false
+		return ids.EmptyGenericNodeID, nil, false
 	}
 	e := h.b.entries[0]
 	heap.Pop(h.b)
 	return e.nodeID, e.averager, true
 }
 
-func (h averagerHeap) Peek() (ids.NodeID, Averager, bool) {
+func (h averagerHeap) Peek() (ids.GenericNodeID, Averager, bool) {
 	if len(h.b.entries) == 0 {
-		return ids.EmptyNodeID, nil, false
+		return ids.EmptyGenericNodeID, nil, false
 	}
 	e := h.b.entries[0]
 	return e.nodeID, e.averager, true

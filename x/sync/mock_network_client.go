@@ -37,7 +37,7 @@ func (m *MockNetworkClient) EXPECT() *MockNetworkClientMockRecorder {
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
+func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -51,7 +51,7 @@ func (mr *MockNetworkClientMockRecorder) AppRequestFailed(arg0, arg1, arg2 inter
 }
 
 // AppResponse mocks base method.
-func (m *MockNetworkClient) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []byte) error {
+func (m *MockNetworkClient) AppResponse(arg0 context.Context, arg1 ids.GenericNodeID, arg2 uint32, arg3 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppResponse", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -65,7 +65,7 @@ func (mr *MockNetworkClientMockRecorder) AppResponse(arg0, arg1, arg2, arg3 inte
 }
 
 // Connected mocks base method.
-func (m *MockNetworkClient) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
+func (m *MockNetworkClient) Connected(arg0 context.Context, arg1 ids.GenericNodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -79,7 +79,7 @@ func (mr *MockNetworkClientMockRecorder) Connected(arg0, arg1, arg2 interface{})
 }
 
 // Disconnected mocks base method.
-func (m *MockNetworkClient) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
+func (m *MockNetworkClient) Disconnected(arg0 context.Context, arg1 ids.GenericNodeID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -93,7 +93,7 @@ func (mr *MockNetworkClientMockRecorder) Disconnected(arg0, arg1 interface{}) *g
 }
 
 // Request mocks base method.
-func (m *MockNetworkClient) Request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (m *MockNetworkClient) Request(ctx context.Context, nodeID ids.GenericNodeID, request []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Request", ctx, nodeID, request)
 	ret0, _ := ret[0].([]byte)
@@ -108,10 +108,10 @@ func (mr *MockNetworkClientMockRecorder) Request(ctx, nodeID, request interface{
 }
 
 // RequestAny mocks base method.
-func (m *MockNetworkClient) RequestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error) {
+func (m *MockNetworkClient) RequestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.GenericNodeID, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RequestAny", ctx, minVersion, request)
-	ret0, _ := ret[0].(ids.NodeID)
+	ret0, _ := ret[0].(ids.GenericNodeID)
 	ret1, _ := ret[1].([]byte)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -124,7 +124,7 @@ func (mr *MockNetworkClientMockRecorder) RequestAny(ctx, minVersion, request int
 }
 
 // TrackBandwidth mocks base method.
-func (m *MockNetworkClient) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
+func (m *MockNetworkClient) TrackBandwidth(nodeID ids.GenericNodeID, bandwidth float64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "TrackBandwidth", nodeID, bandwidth)
 }

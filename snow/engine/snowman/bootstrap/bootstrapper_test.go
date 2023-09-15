@@ -34,7 +34,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
+func newConfig(t *testing.T) (Config, ids.GenericNodeID, *common.SenderTest, *block.TestVM) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -63,15 +63,14 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestNodeID()
-	genericPeer := ids.GenericNodeIDFromNodeID(peer)
-	require.NoError(peers.Add(genericPeer, nil, ids.Empty, 1))
+	peer := ids.GenerateTestGenericNodeID()
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
 	peers.RegisterCallbackListener(startupTracker)
 
-	require.NoError(startupTracker.Connected(context.Background(), genericPeer, version.CurrentApp))
+	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -295,8 +294,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -422,8 +420,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 func TestBootstrapperPartialFetch(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -567,8 +564,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 func TestBootstrapperEmptyResponse(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -730,8 +726,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 func TestBootstrapperAncestors(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -869,8 +864,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 func TestBootstrapperFinalized(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -990,8 +984,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 func TestRestartBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkID1 := ids.Empty.Prefix(1)
@@ -1173,8 +1166,7 @@ func TestRestartBootstrapping(t *testing.T) {
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	require := require.New(t)
 
-	config, shortPeerID, sender, vm := newConfig(t)
-	peerID := ids.GenericNodeIDFromNodeID(shortPeerID)
+	config, peerID, sender, vm := newConfig(t)
 
 	blk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

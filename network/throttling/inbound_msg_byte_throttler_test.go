@@ -25,8 +25,8 @@ func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
 		NodeMaxAtLargeBytes: 1,
 	}
 	vdrs := validators.NewSet()
-	vdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(ids.GenericNodeIDFromNodeID(vdr), nil, ids.Empty, 1))
+	vdr := ids.GenerateTestGenericNodeID()
+	require.NoError(vdrs.Add(vdr, nil, ids.Empty, 1))
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
