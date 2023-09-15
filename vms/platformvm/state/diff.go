@@ -296,13 +296,7 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 
 	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
 	subnetID := createSubnetTx.ID()
-	if d.subnetOwners == nil {
-		d.subnetOwners = map[ids.ID]fx.Owner{
-			subnetID: castTx.Owner,
-		}
-	} else {
-		d.subnetOwners[subnetID] = castTx.Owner
-	}
+	d.SetSubnetOwner(subnetID, castTx.Owner)
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {

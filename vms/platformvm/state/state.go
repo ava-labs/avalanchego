@@ -824,13 +824,7 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 
 	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
 	subnetID := createSubnetTx.ID()
-	if s.subnetOwners == nil {
-		s.subnetOwners = map[ids.ID]fx.Owner{
-			subnetID: castTx.Owner,
-		}
-	} else {
-		s.subnetOwners[subnetID] = castTx.Owner
-	}
+	s.SetSubnetOwner(subnetID, castTx.Owner)
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
