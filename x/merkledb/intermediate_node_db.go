@@ -126,7 +126,8 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 func (db *intermediateNodeDB) constructDBKey(key path) []byte {
 	compressedKey := key.Serialize()
 
-	// add one additional byte to store padding when the path has a length that fits into a whole number of bytes
+	// add one additional byte to store padding when the path
+	// has a length that fits into a whole number of bytes
 	remainder := compressedKey.NibbleLength % 2
 	keyLen := len(compressedKey.Value)
 	if remainder == 0 {
