@@ -190,8 +190,8 @@ func FuzzPathExtend(f *testing.F) {
 		branchFactorBit1 bool,
 		branchFactorBit2 bool,
 		forceFirstOdd bool,
-		forceSecondOdd bool) {
-
+		forceSecondOdd bool,
+	) {
 		require := require.New(t)
 		branchFactor := BranchFactor2
 		switch {
@@ -229,7 +229,8 @@ func FuzzPathSkip(f *testing.F) {
 		first []byte,
 		tokensToSkip uint,
 		branchFactorBit1 bool,
-		branchFactorBit2 bool) {
+		branchFactorBit2 bool,
+	) {
 		require := require.New(t)
 		branchFactor := BranchFactor2
 		switch {
@@ -261,7 +262,8 @@ func FuzzPathTake(f *testing.F) {
 		first []byte,
 		tokensToTake uint,
 		branchFactorBit1 bool,
-		branchFactorBit2 bool) {
+		branchFactorBit2 bool,
+	) {
 		require := require.New(t)
 		branchFactor := BranchFactor2
 		switch {
