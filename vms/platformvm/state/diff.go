@@ -294,22 +294,7 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
-	subnetIntf, _, err := d.GetTx(subnetID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%w %q: %w",
-			ErrCantFindSubnet,
-			subnetID,
-			err,
-		)
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
-	}
-
-	return subnet.Owner, nil
+	return retrieveSubnetOwnerFromTx(d, subnetID)
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
