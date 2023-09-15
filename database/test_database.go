@@ -1312,19 +1312,23 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 			require.NoError(db.Put(key, value))
 		}
 
+		expectedList := maps.Keys(expected)
+		slices.Sort(expectedList)
+
 		iter := db.NewIteratorWithStartAndPrefix(start, prefix)
 
 		// Assert the iterator returns the expected key-values.
-		got := map[string][]byte{}
+		numIterElts := 0
 		for iter.Next() {
 			val := iter.Value()
 			if len(val) == 0 {
 				val = nil
 			}
-			got[string(iter.Key())] = val
-			require.NoError(db.Delete(iter.Key()))
+			keyStr := string(iter.Key())
+			require.Equal(expectedList[numIterElts], keyStr)
+			require.Equal(expected[keyStr], val)
+			numIterElts++
 		}
-		require.Equal(expected, got)
 
 		iter.Release()
 
