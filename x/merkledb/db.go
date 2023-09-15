@@ -1129,8 +1129,8 @@ func (db *merkleDB) getHistoricalViewForRange(
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
-// If [start] is nil, then the range has no lower bound.
-// If [end] is maybe.Nothing, then the range has no upper bound.
+// If [start] is Nothing, then the range has no lower bound.
+// If [end] is Nothing, then the range has no upper bound.
 func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
