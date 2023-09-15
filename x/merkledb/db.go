@@ -109,8 +109,9 @@ type RangeProofer interface {
 	) (*RangeProof, error)
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
-	// [start] is the smallest key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error
+	// [start] is the smallest possible key in the range this [proof] covers.
+	// [end] is the largest possible key in the range this [proof] covers.
+	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
 type MerkleDB interface {
@@ -334,7 +335,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	return view.commitToDB(ctx)
 }
 
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error {
+func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -352,11 +353,11 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 		}
 	}
 
-	var largestKey []byte
+	largestKey := end
 	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
-	keysToDelete, err := db.getKeysNotInSet(start.Value(), largestKey, keys)
+	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return err
 	}
@@ -1128,19 +1129,19 @@ func (db *merkleDB) getHistoricalViewForRange(
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
-// If [start] is nil, then the range has no lower bound.
-// If [end] is nil, then the range has no upper bound.
-func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
+// If [start] is Nothing, then the range has no lower bound.
+// If [end] is Nothing, then the range has no upper bound.
+func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	it := db.NewIteratorWithStart(start)
+	it := db.NewIteratorWithStart(start.Value())
 	defer it.Release()
 
 	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
-		if len(end) != 0 && bytes.Compare(key, end) > 0 {
+		if end.HasValue() && bytes.Compare(key, end.Value()) > 0 {
 			break
 		}
 		if !keySet.Contains(string(key)) {
@@ -1187,21 +1188,28 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 // The returned []byte is taken from [bufferPool] and
 // should be returned to it when the caller is done with it.
 func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
-	prefixedKey := bufferPool.Get().([]byte)
 	prefixLen := len(prefix)
 	keyLen := prefixLen + len(key)
-	if cap(prefixedKey) >= keyLen {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		prefixedKey = prefixedKey[:keyLen]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		bufferPool.Put(prefixedKey)
-		prefixedKey = make([]byte, keyLen)
-	}
+	prefixedKey := getBufferFromPool(bufferPool, keyLen)
 	copy(prefixedKey, prefix)
 	copy(prefixedKey[prefixLen:], key)
 	return prefixedKey
+}
+
+// Returns a []byte from [bufferPool] with length exactly [size].
+// The []byte is not guaranteed to be zeroed.
+func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
+	buffer := bufferPool.Get().([]byte)
+	if cap(buffer) >= size {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		buffer = buffer[:size]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		bufferPool.Put(buffer)
+		buffer = make([]byte, size)
+	}
+	return buffer
 }
 
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
