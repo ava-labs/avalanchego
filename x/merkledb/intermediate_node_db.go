@@ -139,7 +139,7 @@ func (db *intermediateNodeDB) constructDBKey(key path) []byte {
 	if remainder == 0 {
 		dbKey[keyLen-1] = 0b1000_0000
 	} else {
-		dbKey[keyLen-1] += 0b0000_1000
+		dbKey[keyLen-1] |= 0b0000_1000
 	}
 
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
