@@ -127,12 +127,16 @@ func (db *intermediateNodeDB) constructDBKey(key path) []byte {
 	compressedKey := key.Serialize()
 
 	// add one additional byte to store padding when the path has a length that fits into a whole number of bytes
-	keyLen := len(compressedKey.Value) + (1 - compressedKey.NibbleLength%2)
+	remainder := compressedKey.NibbleLength % 2
+	keyLen := len(compressedKey.Value)
+	if remainder == 0 {
+		keyLen++
+	}
 	dbKey := getBufferFromPool(db.bufferPool, keyLen)
 	defer db.bufferPool.Put(dbKey)
 
 	copy(dbKey, compressedKey.Value)
-	if compressedKey.NibbleLength%2 == 0 {
+	if remainder == 0 {
 		dbKey[keyLen-1] = 0b1000_0000
 	} else {
 		dbKey[keyLen-1] += 0b0000_1000
