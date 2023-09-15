@@ -151,6 +151,7 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 
 func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *testPeer) {
 	rawPeer0, rawPeer1 := makeRawTestPeers(t, trackedSubnets)
+
 	peer0 := &testPeer{
 		Peer: Start(
 			rawPeer0.config,

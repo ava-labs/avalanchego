@@ -58,7 +58,7 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 				ValidatorSet: tt.validatorSet,
 			}
 
-			err := handler.AppGossip(context.Background(), nodeID, []byte("foobar"))
+			err := handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}

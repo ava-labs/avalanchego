@@ -1096,7 +1096,6 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				n.peersLock.Unlock()
 				return
 			}
-
 			_, connecting := n.connectingPeers.GetByID(nodeID)
 			_, connected := n.connectedPeers.GetByID(nodeID)
 			n.peersLock.Unlock()

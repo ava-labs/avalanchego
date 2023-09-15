@@ -286,7 +286,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(nodeIDs[0], config.MyIPPort.IPPort())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -506,8 +506,9 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			network.peersLock.RLock()
 			defer network.peersLock.RUnlock()
 
-			require.Contains(network.trackedIPs, nodeIDs[0])
-			ip := network.trackedIPs[nodeIDs[0]]
+			nodeID := nodeIDs[0]
+			require.Contains(network.trackedIPs, nodeID)
+			ip := network.trackedIPs[nodeID]
 			return ip.getDelay() != 0
 		},
 		10*time.Second,

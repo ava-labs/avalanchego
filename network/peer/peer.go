@@ -723,9 +723,8 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 }
 
 func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
-	nodeID := p.id
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
-		nodeID,
+		p.id,
 		constants.PrimaryNetworkID,
 	)
 	if err != nil {
@@ -739,7 +738,7 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 
 	subnetUptimes := make([]*p2p.SubnetUptime, 0, p.trackedSubnets.Len())
 	for subnetID := range p.trackedSubnets {
-		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(nodeID, subnetID)
+		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
 		if err != nil {
 			p.Log.Debug("failed to get peer uptime percentage",
 				zap.Stringer("nodeID", p.id),
@@ -852,10 +851,9 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTime))
 
 	p.Metrics.ClockSkew.Observe(clockDifference)
-	generidNodeID := p.id
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
-		if p.Beacons.Contains(generidNodeID) {
+		if p.Beacons.Contains(p.id) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
@@ -884,7 +882,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	p.version = peerVersion
 
 	if p.VersionCompatibility.Version().Before(peerVersion) {
-		if p.Beacons.Contains(generidNodeID) {
+		if p.Beacons.Contains(p.id) {
 			p.Log.Info("beacon attempting to connect with newer version. You may want to update your client",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("beaconVersion", peerVersion),

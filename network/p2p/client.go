@@ -60,6 +60,7 @@ func (c *Client) AppRequestAny(
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
+
 	nodeIDs := set.Of(sampled...)
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
