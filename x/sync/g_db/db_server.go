@@ -206,6 +206,11 @@ func (s *DBServer) CommitRangeProof(
 		start = maybe.Some(req.StartKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, &proof)
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, end, &proof)
 	return &emptypb.Empty{}, err
 }
