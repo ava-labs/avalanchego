@@ -983,6 +983,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		beaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
+
 		if reachedSeeders%2 == 0 {
 			require.NoError(syncer.StateSummaryFrontier(
 				context.Background(),

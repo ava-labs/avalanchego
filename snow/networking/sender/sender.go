@@ -401,13 +401,13 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if thisNode := s.ctx.NodeID; nodeIDs.Contains(thisNode) {
-		nodeIDs.Remove(thisNode)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
-			thisNode,
+			s.ctx.NodeID,
 			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -456,7 +456,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if thisNode := s.ctx.NodeID; nodeID.Equal(thisNode) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -1034,7 +1034,6 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
-
 	for nodeID := range nodeIDs {
 		inMsg := message.InternalQueryFailed(
 			nodeID,

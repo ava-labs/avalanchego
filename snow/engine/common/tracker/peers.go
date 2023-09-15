@@ -228,15 +228,11 @@ func (p *peerData) ConnectedPercent() float64 {
 func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {
 	if p.connectedValidators.Len() == 0 {
 		connectedPeers := set.NewSet[ids.NodeID](p.connectedPeers.Len())
-		for peer := range p.connectedPeers {
-			connectedPeers.Add(peer)
-		}
+		connectedPeers.Union(p.connectedPeers)
 		return connectedPeers
 	}
 
 	connectedValidators := set.NewSet[ids.NodeID](p.connectedValidators.Len())
-	for peer := range p.connectedValidators {
-		connectedValidators.Add(peer)
-	}
+	connectedValidators.Union(p.connectedValidators)
 	return connectedValidators
 }

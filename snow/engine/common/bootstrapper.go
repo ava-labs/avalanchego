@@ -187,6 +187,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		)
 		return nil
 	}
+
 	if !b.pendingReceiveAccepted.Contains(nodeID) {
 		b.Ctx.Log.Debug("received unexpected Accepted message",
 			zap.Stringer("nodeID", nodeID),
@@ -352,6 +353,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
+		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
 		// Add the validator to send pending receipt set
 		b.pendingReceiveAcceptedFrontier.Add(vdr)
@@ -368,6 +370,7 @@ func (b *bootstrapper) sendGetAccepted(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
+		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
 		// Add the validator to send pending receipt set
 		b.pendingReceiveAccepted.Add(vdr)

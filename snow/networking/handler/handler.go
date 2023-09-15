@@ -461,7 +461,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			zap.Stringer("messageOp", op),
 		)
 	}
-
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
@@ -798,7 +797,6 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			zap.Stringer("messageOp", op),
 		)
 	}
-
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (

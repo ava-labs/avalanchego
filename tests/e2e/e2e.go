@@ -84,7 +84,7 @@ func InitTestEnvironment(envBytes []byte) {
 func (te *TestEnvironment) GetRandomNodeURI() testnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.ShortNodeID, nodeURI.URI)
 	return nodeURI
 }
 
@@ -116,7 +116,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.ShortNodeID, nodeURI.URI)
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          nodeURI.URI,
 		AVAXKeychain: keychain,
@@ -135,7 +135,7 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 
 // Create a new eth client targeting the specified node URI.
 func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
-	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.ShortNodeID, nodeURI.URI)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)

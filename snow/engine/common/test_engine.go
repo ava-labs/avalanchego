@@ -107,26 +107,21 @@ type EngineTest struct {
 
 	CantGetVM bool
 
-	StartF                       func(ctx context.Context, startReqID uint32) error
-	IsBootstrappedF              func() bool
-	ContextF                     func() *snow.ConsensusContext
-	HaltF                        func(context.Context)
-	TimeoutF, GossipF, ShutdownF func(context.Context) error
-	NotifyF                      func(context.Context, Message) error
-	GetF, PullQueryF             func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	GetAncestorsF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF             func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
-	AncestorsF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
-	AcceptedFrontierF            func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	GetAcceptedF, AcceptedF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
-	ChitsF                       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error
-	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAncestorsFailedF,
-	GetAcceptedStateSummaryFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	GetFailedF,
-	QueryFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-
-	GetAcceptedFrontierF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-
+	StartF                          func(ctx context.Context, startReqID uint32) error
+	IsBootstrappedF                 func() bool
+	ContextF                        func() *snow.ConsensusContext
+	HaltF                           func(context.Context)
+	TimeoutF, GossipF, ShutdownF    func(context.Context) error
+	NotifyF                         func(context.Context, Message) error
+	GetF, GetAncestorsF, PullQueryF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	PutF, PushQueryF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
+	AncestorsF                      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
+	AcceptedFrontierF               func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetAcceptedF, AcceptedF         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
+	ChitsF                          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error
+	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
+	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
+	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys []uint64) error

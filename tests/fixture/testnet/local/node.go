@@ -72,7 +72,7 @@ func ReadNode(dataDir string) (*LocalNode, error) {
 // Retrieve the ID of the node. The returned value may be nil if the
 // node configuration has not yet been populated or read.
 func (n *LocalNode) GetID() ids.NodeID {
-	return ids.NodeIDFromShortNodeID(n.NodeConfig.NodeID)
+	return ids.NodeIDFromShortNodeID(n.NodeConfig.ShortNodeID)
 }
 
 // Retrieve backend-agnostic node configuration.
@@ -184,12 +184,12 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 	}
 
 	// Determine appropriate level of node description detail
-	nodeDescription := fmt.Sprintf("node %q", n.NodeID)
+	nodeDescription := fmt.Sprintf("node %q", n.ShortNodeID)
 	isEphemeralNode := filepath.Base(filepath.Dir(n.GetDataDir())) == defaultEphemeralDirName
 	if isEphemeralNode {
 		nodeDescription = "ephemeral " + nodeDescription
 	}
-	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.NodeID.String()
+	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.ShortNodeID.String()
 	if nonDefaultNodeDir {
 		// Only include the data dir if its base is not the default (the node ID)
 		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, n.GetDataDir())
@@ -280,7 +280,7 @@ func (n *LocalNode) Stop() error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.NodeID, ctx.Err())
+			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.ShortNodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -329,12 +329,12 @@ func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
 	for len(n.URI) == 0 {
 		err := n.ReadProcessContext()
 		if err != nil {
-			return fmt.Errorf("failed to read process context for node %q: %w", n.NodeID, err)
+			return fmt.Errorf("failed to read process context for node %q: %w", n.ShortNodeID, err)
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
+			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.ShortNodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}

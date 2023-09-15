@@ -53,7 +53,7 @@ func (l *logger) OnValidatorAdded(
 		}
 		l.log.Info("node added to validator set",
 			zap.Stringer("subnetID", l.subnetID),
-			zap.Stringer("nodeID", &nodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Reflect("publicKey", types.JSONByteSlice(pkBytes)),
 			zap.Stringer("txID", txID),
 			zap.Uint64("weight", weight),
@@ -68,7 +68,7 @@ func (l *logger) OnValidatorRemoved(
 	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
 		l.log.Info("node removed from validator set",
 			zap.Stringer("subnetID", l.subnetID),
-			zap.Stringer("nodeID", &nodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Uint64("weight", weight),
 		)
 	}
@@ -82,7 +82,7 @@ func (l *logger) OnValidatorWeightChanged(
 	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
 		l.log.Info("validator weight changed",
 			zap.Stringer("subnetID", l.subnetID),
-			zap.Stringer("nodeID", &nodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Uint64("previousWeight ", oldWeight),
 			zap.Uint64("newWeight ", newWeight),
 		)

@@ -120,6 +120,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			for i := 0; i < testVdrCount; i++ {
 				vdrID := ids.GenerateTestNodeID()
 				vdrIDs.Add(vdrID)
+
 				require.NoError(vdrs.Add(vdrID, nil, ids.Empty, 100))
 			}
 

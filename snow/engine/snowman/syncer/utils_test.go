@@ -103,9 +103,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 }
 
 func pickRandomFrom(nodes map[ids.NodeID]uint32) ids.NodeID {
-	res := ids.EmptyNodeID
 	for node := range nodes {
-		res = node
+		return node
 	}
-	return res
+	return ids.EmptyNodeID
 }

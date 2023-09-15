@@ -1409,7 +1409,6 @@ func TestConnectedSubnet(t *testing.T) {
 	// Create chain router
 	myNodeID := ids.GenerateTestNodeID()
 	peerNodeID := ids.GenerateTestNodeID()
-
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 	trackedSubnets := set.Set[ids.ID]{}
@@ -1547,8 +1546,8 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	ctx := snow.DefaultConsensusContextTest()
-	shortAllowedID := ids.GenerateTestNodeID()
-	allowedSet := set.Of(shortAllowedID)
+	allowedID := ids.GenerateTestNodeID()
+	allowedSet := set.Of(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewSet()
@@ -1645,7 +1644,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
-		shortAllowedID,
+		allowedID,
 		engineType,
 	)
 	wg.Add(1)

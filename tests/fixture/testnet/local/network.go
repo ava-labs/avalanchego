@@ -248,7 +248,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	// Assume all initial nodes are validator ids
 	validatorIDs := make([]ids.ShortNodeID, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
-		validatorIDs = append(validatorIDs, node.NodeID)
+		validatorIDs = append(validatorIDs, node.ShortNodeID)
 	}
 
 	if keyCount > 0 {
@@ -315,7 +315,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 	dataDir := node.GetDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
-		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
+		dataDir = filepath.Join(nodeParentDir, node.ShortNodeID.String())
 		flags[config.DataDirKey] = dataDir
 	}
 
@@ -365,7 +365,7 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 		}
 
 		// Collect bootstrap nodes for subsequently started nodes to use
-		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
+		bootstrapIDs = append(bootstrapIDs, node.ShortNodeID.String())
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
 	}
 
@@ -380,7 +380,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	healthyNodes := set.NewSet[ids.ShortNodeID](len(ln.Nodes))
 	for healthyNodes.Len() < len(ln.Nodes) {
 		for _, node := range ln.Nodes {
-			if healthyNodes.Contains(node.NodeID) {
+			if healthyNodes.Contains(node.ShortNodeID) {
 				continue
 			}
 
@@ -392,8 +392,8 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 				continue
 			}
 
-			healthyNodes.Add(node.NodeID)
-			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
+			healthyNodes.Add(node.ShortNodeID)
+			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.ShortNodeID, node.URI); err != nil {
 				return err
 			}
 		}
@@ -417,8 +417,8 @@ func (ln *LocalNetwork) GetURIs() []testnet.NodeURI {
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
 			uris = append(uris, testnet.NodeURI{
-				NodeID: node.NodeID,
-				URI:    node.URI,
+				ShortNodeID: node.ShortNodeID,
+				URI:         node.URI,
 			})
 		}
 	}
@@ -431,7 +431,7 @@ func (ln *LocalNetwork) Stop() error {
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range ln.Nodes {
 		if err := node.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
+			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.ShortNodeID, err))
 		}
 	}
 	if len(errs) > 0 {
@@ -679,7 +679,7 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		}
 
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
-		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
+		bootstrapIDs = append(bootstrapIDs, node.ShortNodeID.String())
 	}
 	if len(bootstrapIDs) == 0 {
 		return nil, errMissingBootstrapNodes

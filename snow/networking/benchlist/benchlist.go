@@ -195,7 +195,7 @@ func (b *benchlist) remove(node *benchData) {
 	// Update state
 	id := node.nodeID
 	b.log.Debug("removing node from benchlist",
-		zap.Stringer("nodeID", &id),
+		zap.Stringer("nodeID", id),
 	)
 	heap.Remove(&b.benchedQueue, node.index)
 	b.benchlistSet.Remove(id)
@@ -302,7 +302,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	if err != nil {
 		// This should never happen
 		b.log.Error("overflow calculating new benched stake",
-			zap.Stringer("nodeID", &nodeID),
+			zap.Stringer("nodeID", nodeID),
 		)
 		return
 	}
@@ -313,7 +313,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	if float64(newBenchedStake) > maxBenchedStake {
 		b.log.Debug("not benching node",
 			zap.String("reason", "benched stake would exceed max"),
-			zap.Stringer("nodeID", &nodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Float64("benchedStake", float64(newBenchedStake)),
 			zap.Float64("maxBenchedStake", maxBenchedStake),
 		)
@@ -341,7 +341,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 		&benchData{nodeID: nodeID, benchedUntil: benchedUntil},
 	)
 	b.log.Debug("benching validator after consecutive failed queries",
-		zap.Stringer("nodeID", &nodeID),
+		zap.Stringer("nodeID", nodeID),
 		zap.Duration("benchDuration", benchedUntil.Sub(now)),
 		zap.Int("numFailedQueries", b.threshold),
 	)
