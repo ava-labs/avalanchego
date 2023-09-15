@@ -15,6 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var (
+	blkID1 = ids.ID{1}
+	blkID2 = ids.ID{2}
+	blkID3 = ids.ID{3}
+	blkID4 = ids.ID{4}
+
+	vdr1 = ids.NodeID{1}
+	vdr2 = ids.NodeID{2}
+	vdr3 = ids.NodeID{3}
+	vdr4 = ids.NodeID{4}
+	vdr5 = ids.NodeID{5}
+)
+
 func TestNewSetErrorOnMetrics(t *testing.T) {
 	require := require.New(t)
 
@@ -42,14 +55,9 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	// create validators
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
-
-	// create two polls for the two vtxs
+	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
@@ -57,25 +65,20 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
-	// vote vtx1 for poll 1
-	// vote vtx2 for poll 2
-	vtx1 := ids.ID{1}
-	vtx2 := ids.ID{2}
-
 	// vote out of order
-	require.Empty(s.Vote(1, vdr1, vtx1))
-	require.Empty(s.Vote(2, vdr2, vtx2))
-	require.Empty(s.Vote(2, vdr3, vtx2))
+	require.Empty(s.Vote(1, vdr1, blkID1))
+	require.Empty(s.Vote(2, vdr2, blkID2))
+	require.Empty(s.Vote(2, vdr3, blkID2))
 
 	// poll 2 finished
-	require.Empty(s.Vote(2, vdr1, vtx2)) // expect 2 to not have finished because 1 is still pending
+	require.Empty(s.Vote(2, vdr1, blkID2)) // expect 2 to not have finished because 1 is still pending
 
-	require.Empty(s.Vote(1, vdr2, vtx1))
+	require.Empty(s.Vote(1, vdr2, blkID1))
 
-	results := s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
+	results := s.Vote(1, vdr3, blkID1) // poll 1 finished, poll 2 should be finished as well
 	require.Len(results, 2)
-	require.Equal(vtx1, results[0].List()[0])
-	require.Equal(vtx2, results[1].List()[0])
+	require.Equal(blkID1, results[0].List()[0])
+	require.Equal(blkID2, results[1].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
@@ -87,14 +90,9 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	// create validators
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
-
-	// create two polls for the two vtxs
+	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
@@ -102,25 +100,20 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
-	// vote vtx1 for poll 1
-	// vote vtx2 for poll 2
-	vtx1 := ids.ID{1}
-	vtx2 := ids.ID{2}
-
 	// vote out of order
-	require.Empty(s.Vote(1, vdr1, vtx1))
-	require.Empty(s.Vote(2, vdr2, vtx2))
-	require.Empty(s.Vote(2, vdr3, vtx2))
+	require.Empty(s.Vote(1, vdr1, blkID1))
+	require.Empty(s.Vote(2, vdr2, blkID2))
+	require.Empty(s.Vote(2, vdr3, blkID2))
 
-	require.Empty(s.Vote(1, vdr2, vtx1))
+	require.Empty(s.Vote(1, vdr2, blkID1))
 
-	results := s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
-	require.Len(results, 1)          // because 1 is the oldest
-	require.Equal(vtx1, results[0].List()[0])
+	results := s.Vote(1, vdr3, blkID1) // poll 1 finished, poll 2 still remaining
+	require.Len(results, 1)            // because 1 is the oldest
+	require.Equal(blkID1, results[0].List()[0])
 
-	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	require.Len(results, 1)         // because 2 is the oldest now
-	require.Equal(vtx2, results[0].List()[0])
+	results = s.Vote(2, vdr1, blkID2) // poll 2 finished
+	require.Len(results, 1)           // because 2 is the oldest now
+	require.Equal(blkID2, results[0].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
@@ -132,14 +125,9 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	// create validators
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	vdr3 := ids.NodeID{3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
-
-	// create three polls for the two vtxs
+	// create three polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
@@ -150,32 +138,25 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	require.True(s.Add(3, vdrBag))
 	require.Equal(s.Len(), 3)
 
-	// vote vtx1 for poll 1
-	// vote vtx2 for poll 2
-	// vote vtx3 for poll 3
-	vtx1 := ids.ID{1}
-	vtx2 := ids.ID{2}
-	vtx3 := ids.ID{3}
-
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
-	require.Empty(s.Vote(2, vdr3, vtx2))
-	require.Empty(s.Vote(2, vdr2, vtx2))
-	require.Empty(s.Vote(2, vdr1, vtx2))
+	require.Empty(s.Vote(2, vdr3, blkID2))
+	require.Empty(s.Vote(2, vdr2, blkID2))
+	require.Empty(s.Vote(2, vdr1, blkID2))
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
-	require.Empty(s.Vote(3, vdr2, vtx3))
-	require.Empty(s.Vote(3, vdr3, vtx3))
-	require.Empty(s.Vote(3, vdr1, vtx3))
+	require.Empty(s.Vote(3, vdr2, blkID3))
+	require.Empty(s.Vote(3, vdr3, blkID3))
+	require.Empty(s.Vote(3, vdr1, blkID3))
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
-	require.Empty(s.Vote(1, vdr1, vtx1))
-	require.Empty(s.Vote(1, vdr2, vtx1))
-	results := s.Vote(1, vdr3, vtx1)
+	require.Empty(s.Vote(1, vdr1, blkID1))
+	require.Empty(s.Vote(1, vdr2, blkID1))
+	results := s.Vote(1, vdr3, blkID1)
 	require.Len(results, 3)
-	require.Equal(vtx1, results[0].List()[0])
-	require.Equal(vtx2, results[1].List()[0])
-	require.Equal(vtx3, results[2].List()[0])
+	require.Equal(blkID1, results[0].List()[0])
+	require.Equal(blkID2, results[1].List()[0])
+	require.Equal(blkID3, results[2].List()[0])
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
@@ -187,12 +168,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vtxID := ids.ID{1}
-
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
-
-	vdrs := bag.Of(vdr1, vdr2)
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	require.Zero(s.Len())
 
@@ -202,16 +178,16 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	require.False(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
 
-	require.Empty(s.Vote(1, vdr1, vtxID))
-	require.Empty(s.Vote(0, vdr1, vtxID))
-	require.Empty(s.Vote(0, vdr1, vtxID))
+	require.Empty(s.Vote(1, vdr1, blkID1))
+	require.Empty(s.Vote(0, vdr1, blkID1))
+	require.Empty(s.Vote(0, vdr1, blkID1))
 
-	results := s.Vote(0, vdr2, vtxID)
+	results := s.Vote(0, vdr2, blkID1)
 	require.Len(results, 1)
 	list := results[0].List()
 	require.Len(list, 1)
-	require.Equal(vtxID, list[0])
-	require.Equal(2, results[0].Count(vtxID))
+	require.Equal(blkID1, list[0])
+	require.Equal(2, results[0].Count(blkID1))
 }
 
 func TestCreateAndFinishFailedPoll(t *testing.T) {
@@ -223,10 +199,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
-
-	vdrs := bag.Of(vdr1, vdr2)
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	require.Zero(s.Len())
 
@@ -254,9 +227,7 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.NodeID{1} // k = 1
-
-	vdrs := bag.Of(vdr1)
+	vdrs := bag.Of(vdr1) // k = 1
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
