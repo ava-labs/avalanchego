@@ -21,8 +21,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(vdr1)
+	vdrs := bag.Of(vdr1)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -45,11 +44,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -73,11 +68,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -105,14 +96,7 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 	vdr4 := ids.NodeID{4}
 	vdr5 := ids.NodeID{5} // k = 5
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-		vdr3,
-		vdr4,
-		vdr5,
-	)
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -147,13 +131,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdr3 := ids.NodeID{3}
 	vdr4 := ids.NodeID{4}
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-		vdr3,
-		vdr4,
-	)
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -180,12 +158,7 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 	vdr2 := ids.NodeID{2}
 	vdr3 := ids.NodeID{3} // k = 3
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-		vdr3,
-	)
+	vdrs := bag.Of(vdr1, vdr2, vdr3)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -207,12 +180,7 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	vdr1 := ids.NodeID{2}
 	vdr2 := ids.NodeID{3}
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-		vdr2,
-	) // k = 3
+	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
@@ -233,12 +201,7 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2}
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-		vdr2,
-	) // k = 3
+	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
 	poll := factory.New(vdrs)
