@@ -6,6 +6,7 @@ package database
 import (
 	"bytes"
 	"io"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ import (
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestOverwriteKeyValue,
 	TestEmptyKey,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
@@ -48,7 +50,9 @@ var Tests = []func(t *testing.T, db Database){
 	TestCompactNoPanic,
 	TestMemorySafetyDatabase,
 	TestMemorySafetyBatch,
+	TestAtomicClear,
 	TestClear,
+	TestAtomicClearPrefix,
 	TestClearPrefix,
 	TestModifyValueAfterPut,
 	TestModifyValueAfterBatchPut,
@@ -98,6 +102,22 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.Equal(ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
+}
+
+func TestOverwriteKeyValue(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte("hello")
+	value1 := []byte("world1")
+	value2 := []byte("world2")
+
+	require.NoError(db.Put(key, value1))
+
+	require.NoError(db.Put(key, value2))
+
+	gotValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value2, gotValue)
 }
 
 func TestKeyEmptyValue(t *testing.T, db Database) {
@@ -921,8 +941,20 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	require.ErrorIs(err, ErrClosed)
 }
 
-// TestClear tests to make sure the deletion helper works as expected.
+func TestAtomicClear(t *testing.T, db Database) {
+	testClear(t, db, func(db Database) error {
+		return AtomicClear(db, db)
+	})
+}
+
 func TestClear(t *testing.T, db Database) {
+	testClear(t, db, func(db Database) error {
+		return Clear(db, math.MaxInt)
+	})
+}
+
+// testClear tests to make sure the deletion helper works as expected.
+func testClear(t *testing.T, db Database, clearF func(Database) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -942,7 +974,7 @@ func TestClear(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(Clear(db, db))
+	require.NoError(clearF(db))
 
 	count, err = Count(db)
 	require.NoError(err)
@@ -951,8 +983,20 @@ func TestClear(t *testing.T, db Database) {
 	require.NoError(db.Close())
 }
 
-// TestClearPrefix tests to make sure prefix deletion works as expected.
+func TestAtomicClearPrefix(t *testing.T, db Database) {
+	testClearPrefix(t, db, func(db Database, prefix []byte) error {
+		return AtomicClearPrefix(db, db, prefix)
+	})
+}
+
 func TestClearPrefix(t *testing.T, db Database) {
+	testClearPrefix(t, db, func(db Database, prefix []byte) error {
+		return ClearPrefix(db, prefix, math.MaxInt)
+	})
+}
+
+// testClearPrefix tests to make sure prefix deletion works as expected.
+func testClearPrefix(t *testing.T, db Database, clearF func(Database, []byte) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -972,7 +1016,7 @@ func TestClearPrefix(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(ClearPrefix(db, db, []byte("hello")))
+	require.NoError(clearF(db, []byte("hello")))
 
 	count, err = Count(db)
 	require.NoError(err)

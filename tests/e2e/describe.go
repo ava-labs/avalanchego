@@ -24,3 +24,9 @@ func DescribeXChainSerial(text string, body func()) bool {
 func DescribePChain(text string, body func()) bool {
 	return ginkgo.Describe("[P-Chain] "+text, body)
 }
+
+// DescribeCChain annotates the tests for C-Chain.
+// Can run with any type of cluster (e.g., local, fuji, mainnet).
+func DescribeCChain(text string, body func()) bool {
+	return ginkgo.Describe("[C-Chain] "+text, body)
+}
