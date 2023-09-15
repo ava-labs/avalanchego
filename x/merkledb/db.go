@@ -1195,6 +1195,8 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	return prefixedKey
 }
 
+// Returns a []byte from [bufferPool] with length exactly [size].
+// The []byte is not guaranteed to be zeroed.
 func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
 	buffer := bufferPool.Get().([]byte)
 	if cap(buffer) >= size {
