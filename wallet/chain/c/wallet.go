@@ -3,189 +3,204 @@
 
 package c
 
-// var (
-// 	_ Wallet = (*wallet)(nil)
+import (
+	"errors"
+	"math/big"
+	"time"
 
-// 	errNotCommitted = errors.New("not committed")
-// )
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/plugin/evm"
 
-// type Wallet interface {
-// 	Context
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
-// 	// Builder returns the builder that will be used to create the transactions.
-// 	Builder() Builder
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+)
 
-// 	// Signer returns the signer that will be used to sign the transactions.
-// 	Signer() Signer
+var (
+	_ Wallet = (*wallet)(nil)
 
-// 	// IssueImportTx creates, signs, and issues an import transaction that
-// 	// attempts to consume all the available UTXOs and import the funds to [to].
-// 	//
-// 	// - [chainID] specifies the chain to be importing funds from.
-// 	// - [to] specifies where to send the imported funds to.
-// 	IssueImportTx(
-// 		chainID ids.ID,
-// 		to ethcommon.Address,
-// 		options ...common.Option,
-// 	) (*evm.Tx, error)
+	errNotCommitted = errors.New("not committed")
+)
 
-// 	// IssueExportTx creates, signs, and issues an export transaction that
-// 	// attempts to send all the provided [outputs] to the requested [chainID].
-// 	//
-// 	// - [chainID] specifies the chain to be exporting the funds to.
-// 	// - [outputs] specifies the outputs to send to the [chainID].
-// 	IssueExportTx(
-// 		chainID ids.ID,
-// 		outputs []*secp256k1fx.TransferOutput,
-// 		options ...common.Option,
-// 	) (*evm.Tx, error)
+type Wallet interface {
+	Context
 
-// 	// IssueUnsignedTx signs and issues the unsigned tx.
-// 	IssueUnsignedAtomicTx(
-// 		utx evm.UnsignedAtomicTx,
-// 		options ...common.Option,
-// 	) (*evm.Tx, error)
+	// Builder returns the builder that will be used to create the transactions.
+	Builder() Builder
 
-// 	// IssueAtomicTx issues the signed tx.
-// 	IssueAtomicTx(
-// 		tx *evm.Tx,
-// 		options ...common.Option,
-// 	) error
-// }
+	// Signer returns the signer that will be used to sign the transactions.
+	Signer() Signer
 
-// func NewWallet(
-// 	builder Builder,
-// 	signer Signer,
-// 	avaxClient evm.Client,
-// 	ethClient ethclient.Client,
-// 	backend Backend,
-// ) Wallet {
-// 	return &wallet{
-// 		Backend:    backend,
-// 		builder:    builder,
-// 		signer:     signer,
-// 		avaxClient: avaxClient,
-// 		ethClient:  ethClient,
-// 	}
-// }
+	// IssueImportTx creates, signs, and issues an import transaction that
+	// attempts to consume all the available UTXOs and import the funds to [to].
+	//
+	// - [chainID] specifies the chain to be importing funds from.
+	// - [to] specifies where to send the imported funds to.
+	IssueImportTx(
+		chainID ids.ID,
+		to ethcommon.Address,
+		options ...common.Option,
+	) (*evm.Tx, error)
 
-// type wallet struct {
-// 	Backend
-// 	builder    Builder
-// 	signer     Signer
-// 	avaxClient evm.Client
-// 	ethClient  ethclient.Client
-// }
+	// IssueExportTx creates, signs, and issues an export transaction that
+	// attempts to send all the provided [outputs] to the requested [chainID].
+	//
+	// - [chainID] specifies the chain to be exporting the funds to.
+	// - [outputs] specifies the outputs to send to the [chainID].
+	IssueExportTx(
+		chainID ids.ID,
+		outputs []*secp256k1fx.TransferOutput,
+		options ...common.Option,
+	) (*evm.Tx, error)
 
-// func (w *wallet) Builder() Builder {
-// 	return w.builder
-// }
+	// IssueUnsignedTx signs and issues the unsigned tx.
+	IssueUnsignedAtomicTx(
+		utx evm.UnsignedAtomicTx,
+		options ...common.Option,
+	) (*evm.Tx, error)
 
-// func (w *wallet) Signer() Signer {
-// 	return w.signer
-// }
+	// IssueAtomicTx issues the signed tx.
+	IssueAtomicTx(
+		tx *evm.Tx,
+		options ...common.Option,
+	) error
+}
 
-// func (w *wallet) IssueImportTx(
-// 	chainID ids.ID,
-// 	to ethcommon.Address,
-// 	options ...common.Option,
-// ) (*evm.Tx, error) {
-// 	baseFee, err := w.baseFee(options)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func NewWallet(
+	builder Builder,
+	signer Signer,
+	avaxClient evm.Client,
+	ethClient ethclient.Client,
+	backend Backend,
+) Wallet {
+	return &wallet{
+		Backend:    backend,
+		builder:    builder,
+		signer:     signer,
+		avaxClient: avaxClient,
+		ethClient:  ethClient,
+	}
+}
 
-// 	utx, err := w.builder.NewImportTx(chainID, to, baseFee, options...)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return w.IssueUnsignedAtomicTx(utx, options...)
-// }
+type wallet struct {
+	Backend
+	builder    Builder
+	signer     Signer
+	avaxClient evm.Client
+	ethClient  ethclient.Client
+}
 
-// func (w *wallet) IssueExportTx(
-// 	chainID ids.ID,
-// 	outputs []*secp256k1fx.TransferOutput,
-// 	options ...common.Option,
-// ) (*evm.Tx, error) {
-// 	baseFee, err := w.baseFee(options)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (w *wallet) Builder() Builder {
+	return w.builder
+}
 
-// 	utx, err := w.builder.NewExportTx(chainID, outputs, baseFee, options...)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return w.IssueUnsignedAtomicTx(utx, options...)
-// }
+func (w *wallet) Signer() Signer {
+	return w.signer
+}
 
-// func (w *wallet) IssueUnsignedAtomicTx(
-// 	utx evm.UnsignedAtomicTx,
-// 	options ...common.Option,
-// ) (*evm.Tx, error) {
-// 	ops := common.NewOptions(options)
-// 	ctx := ops.Context()
-// 	tx, err := w.signer.SignUnsignedAtomic(ctx, utx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (w *wallet) IssueImportTx(
+	chainID ids.ID,
+	to ethcommon.Address,
+	options ...common.Option,
+) (*evm.Tx, error) {
+	baseFee, err := w.baseFee(options)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return tx, w.IssueAtomicTx(tx, options...)
-// }
+	utx, err := w.builder.NewImportTx(chainID, to, baseFee, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedAtomicTx(utx, options...)
+}
 
-// func (w *wallet) IssueAtomicTx(
-// 	tx *evm.Tx,
-// 	options ...common.Option,
-// ) error {
-// 	ops := common.NewOptions(options)
-// 	ctx := ops.Context()
-// 	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
-// 	if err != nil {
-// 		return err
-// 	}
+func (w *wallet) IssueExportTx(
+	chainID ids.ID,
+	outputs []*secp256k1fx.TransferOutput,
+	options ...common.Option,
+) (*evm.Tx, error) {
+	baseFee, err := w.baseFee(options)
+	if err != nil {
+		return nil, err
+	}
 
-// 	if f := ops.PostIssuanceFunc(); f != nil {
-// 		f(txID)
-// 	}
+	utx, err := w.builder.NewExportTx(chainID, outputs, baseFee, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedAtomicTx(utx, options...)
+}
 
-// 	if ops.AssumeDecided() {
-// 		return w.Backend.AcceptAtomicTx(ctx, tx)
-// 	}
+func (w *wallet) IssueUnsignedAtomicTx(
+	utx evm.UnsignedAtomicTx,
+	options ...common.Option,
+) (*evm.Tx, error) {
+	ops := common.NewOptions(options)
+	ctx := ops.Context()
+	tx, err := w.signer.SignUnsignedAtomic(ctx, utx)
+	if err != nil {
+		return nil, err
+	}
 
-// 	pollFrequency := ops.PollFrequency()
-// 	ticker := time.NewTicker(pollFrequency)
-// 	defer ticker.Stop()
+	return tx, w.IssueAtomicTx(tx, options...)
+}
 
-// 	for {
-// 		status, err := w.avaxClient.GetAtomicTxStatus(ctx, txID)
-// 		if err != nil {
-// 			return err
-// 		}
+func (w *wallet) IssueAtomicTx(
+	tx *evm.Tx,
+	options ...common.Option,
+) error {
+	ops := common.NewOptions(options)
+	ctx := ops.Context()
+	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
+	if err != nil {
+		return err
+	}
 
-// 		switch status {
-// 		case evm.Accepted:
-// 			return w.Backend.AcceptAtomicTx(ctx, tx)
-// 		case evm.Dropped, evm.Unknown:
-// 			return errNotCommitted
-// 		}
+	if f := ops.PostIssuanceFunc(); f != nil {
+		f(txID)
+	}
 
-// 		// The tx is Processing.
+	if ops.AssumeDecided() {
+		return w.Backend.AcceptAtomicTx(ctx, tx)
+	}
 
-// 		select {
-// 		case <-ticker.C:
-// 		case <-ctx.Done():
-// 			return ctx.Err()
-// 		}
-// 	}
-// }
+	pollFrequency := ops.PollFrequency()
+	ticker := time.NewTicker(pollFrequency)
+	defer ticker.Stop()
 
-// func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
-// 	ops := common.NewOptions(options)
-// 	baseFee := ops.BaseFee(nil)
-// 	if baseFee != nil {
-// 		return baseFee, nil
-// 	}
+	for {
+		status, err := w.avaxClient.GetAtomicTxStatus(ctx, txID)
+		if err != nil {
+			return err
+		}
 
-// 	ctx := ops.Context()
-// 	return w.ethClient.EstimateBaseFee(ctx)
-// }
+		switch status {
+		case evm.Accepted:
+			return w.Backend.AcceptAtomicTx(ctx, tx)
+		case evm.Dropped, evm.Unknown:
+			return errNotCommitted
+		}
+
+		// The tx is Processing.
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
+	ops := common.NewOptions(options)
+	baseFee := ops.BaseFee(nil)
+	if baseFee != nil {
+		return baseFee, nil
+	}
+
+	ctx := ops.Context()
+	return w.ethClient.EstimateBaseFee(ctx)
+}

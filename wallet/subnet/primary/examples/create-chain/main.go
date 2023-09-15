@@ -3,54 +3,67 @@
 
 package main
 
-// func main() {
-// 	key := genesis.EWOQKey
-// 	uri := primary.LocalAPIURI
-// 	kc := secp256k1fx.NewKeychain(key)
-// 	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
-// 	genesisHex := "00000000000000000000000000017b5490493f8a2fff444ac8b54e27b3339d7c60dcffffffffffffffff"
-// 	vmID := ids.ID{'x', 's', 'v', 'm'}
-// 	name := "let there"
+import (
+	"context"
+	"encoding/hex"
+	"log"
+	"time"
 
-// 	subnetID, err := ids.FromString(subnetIDStr)
-// 	if err != nil {
-// 		log.Fatalf("failed to parse subnet ID: %s\n", err)
-// 	}
+	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+)
 
-// 	genesisBytes, err := hex.DecodeString(genesisHex)
-// 	if err != nil {
-// 		log.Fatalf("failed to parse genesis bytes: %s\n", err)
-// 	}
+func main() {
+	key := genesis.EWOQKey
+	uri := primary.LocalAPIURI
+	kc := secp256k1fx.NewKeychain(key)
+	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
+	genesisHex := "00000000000000000000000000017b5490493f8a2fff444ac8b54e27b3339d7c60dcffffffffffffffff"
+	vmID := ids.ID{'x', 's', 'v', 'm'}
+	name := "let there"
 
-// 	ctx := context.Background()
+	subnetID, err := ids.FromString(subnetIDStr)
+	if err != nil {
+		log.Fatalf("failed to parse subnet ID: %s\n", err)
+	}
 
-// 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
-// 	// [uri] is hosting and registers [subnetID].
-// 	walletSyncStartTime := time.Now()
-// 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-// 		URI:              uri,
-// 		AVAXKeychain:     kc,
-// 		EthKeychain:      kc,
-// 		PChainTxsToFetch: set.Of(subnetID),
-// 	})
-// 	if err != nil {
-// 		log.Fatalf("failed to initialize wallet: %s\n", err)
-// 	}
-// 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
+	genesisBytes, err := hex.DecodeString(genesisHex)
+	if err != nil {
+		log.Fatalf("failed to parse genesis bytes: %s\n", err)
+	}
 
-// 	// Get the P-chain wallet
-// 	pWallet := wallet.P()
+	ctx := context.Background()
 
-// 	createChainStartTime := time.Now()
-// 	createChainTx, err := pWallet.IssueCreateChainTx(
-// 		subnetID,
-// 		genesisBytes,
-// 		vmID,
-// 		nil,
-// 		name,
-// 	)
-// 	if err != nil {
-// 		log.Fatalf("failed to issue create chain transaction: %s\n", err)
-// 	}
-// 	log.Printf("created new chain %s in %s\n", createChainTx.ID(), time.Since(createChainStartTime))
-// }
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting and registers [subnetID].
+	walletSyncStartTime := time.Now()
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:              uri,
+		AVAXKeychain:     kc,
+		EthKeychain:      kc,
+		PChainTxsToFetch: set.Of(subnetID),
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize wallet: %s\n", err)
+	}
+	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
+
+	// Get the P-chain wallet
+	pWallet := wallet.P()
+
+	createChainStartTime := time.Now()
+	createChainTx, err := pWallet.IssueCreateChainTx(
+		subnetID,
+		genesisBytes,
+		vmID,
+		nil,
+		name,
+	)
+	if err != nil {
+		log.Fatalf("failed to issue create chain transaction: %s\n", err)
+	}
+	log.Printf("created new chain %s in %s\n", createChainTx.ID(), time.Since(createChainStartTime))
+}
