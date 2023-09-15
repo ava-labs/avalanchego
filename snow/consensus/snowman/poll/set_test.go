@@ -50,12 +50,10 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
@@ -63,8 +61,6 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	// vote vtx2 for poll 2
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
-
-	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	require.Empty(s.Vote(1, vdr1, vtx1))
@@ -76,7 +72,7 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 
 	require.Empty(s.Vote(1, vdr2, vtx1))
 
-	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
+	results := s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
 	require.Len(results, 2)
 	require.Equal(vtx1, results[0].List()[0])
 	require.Equal(vtx2, results[1].List()[0])
@@ -99,12 +95,10 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
@@ -113,8 +107,6 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
-	var results []bag.Bag[ids.ID]
-
 	// vote out of order
 	require.Empty(s.Vote(1, vdr1, vtx1))
 	require.Empty(s.Vote(2, vdr2, vtx2))
@@ -122,8 +114,8 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	require.Empty(s.Vote(1, vdr2, vtx1))
 
-	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
-	require.Len(results, 1)         // because 1 is the oldest
+	results := s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
+	require.Len(results, 1)          // because 1 is the oldest
 	require.Equal(vtx1, results[0].List()[0])
 
 	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
@@ -148,16 +140,13 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag := bag.Of(vdrs...)
 	require.True(s.Add(1, vdrBag))
 
-	vdrBag = bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(2, vdrBag))
 
-	vdrBag = bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrs...)
+	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(3, vdrBag))
 	require.Equal(s.Len(), 3)
 
@@ -167,8 +156,6 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 	vtx3 := ids.ID{3}
-
-	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
@@ -184,7 +171,7 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
 	require.Empty(s.Vote(1, vdr1, vtx1))
 	require.Empty(s.Vote(1, vdr2, vtx1))
-	results = s.Vote(1, vdr3, vtx1)
+	results := s.Vote(1, vdr3, vtx1)
 	require.Len(results, 3)
 	require.Equal(vtx1, results[0].List()[0])
 	require.Equal(vtx2, results[1].List()[0])
@@ -205,11 +192,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	require.Zero(s.Len())
 
@@ -243,11 +226,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	require.Zero(s.Len())
 
@@ -277,8 +256,7 @@ func TestSetString(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(vdr1)
+	vdrs := bag.Of(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
