@@ -465,7 +465,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start Path, end mayb
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodePath.length%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodePath.length%2 == 0 && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -638,7 +638,7 @@ func verifyAllChangeProofKeyValuesPresent(
 
 		// Check the value of any node with a key that is within the range.
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodePath.length%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodePath.length%2 == 0 && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -838,8 +838,8 @@ func addPathInfo(
 				compressedPath = existingChild.compressedPath
 			}
 			childPath := keyPath.Append(index).Extend(compressedPath)
-			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
-				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
+			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
+				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We don't know if the child had a value or not, but it doesn't matter.
 				// We only need the IDs to be correct so that the calculated hash is correct.
 				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)

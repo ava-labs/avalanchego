@@ -86,10 +86,6 @@ func (cp Path) Length() int {
 	return cp.length
 }
 
-func (cp Path) Equal(other Path) bool {
-	return cp.length == other.length && cp.value == other.value
-}
-
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (cp Path) HasPrefix(prefix Path) bool {
 	prefixValue := prefix.value
@@ -116,14 +112,15 @@ func (cp Path) HasPrefix(prefix Path) bool {
 	return strings.HasPrefix(cp.value, prefixValue[:reducedSize])
 }
 
-// Returns true iff [prefix] is a prefix of [s] but not equal to it.
+// HasStrictPrefix Returns true iff [prefix] is a prefix of [s] but not equal to it.
 func (cp Path) HasStrictPrefix(prefix Path) bool {
-	return cp.HasPrefix(prefix) && !cp.Equal(prefix)
+	return cp.HasPrefix(prefix) && !cp.Equals(prefix)
 }
 
+// Token returns the token at the specified index
+// grabs the token's byte, then shifts it, and then masks out any bits from other tokens stored in the same byte
 func (cp Path) Token(index int) byte {
-	offset := index % cp.tokensPerByte
-	return (cp.value[index/cp.tokensPerByte] >> cp.shift(offset)) & cp.mask
+	return (cp.value[index/cp.tokensPerByte] >> cp.shift(index)) & cp.mask
 }
 
 func (cp Path) bytesNeeded(tokens int) int {
@@ -133,7 +130,7 @@ func (cp Path) bytesNeeded(tokens int) int {
 func (cp Path) Append(token byte) Path {
 	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
-	buffer[len(buffer)-1] += token << cp.shift(cp.length%cp.tokensPerByte)
+	buffer[len(buffer)-1] += token << cp.shift(cp.length)
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     cp.length + 1,
@@ -141,26 +138,23 @@ func (cp Path) Append(token byte) Path {
 	}
 }
 
-func (cp Path) Compare(other Path) int {
-	result := strings.Compare(cp.value, other.value)
-	if result != 0 {
-		return result
-	}
-	switch {
-	case cp.length < other.length:
-		return -1
-	case cp.length == other.length:
-		return 0
-	}
-	return 1
+func (cp Path) Equals(other Path) bool {
+	return cp.value == other.value && cp.length == other.length
 }
 
-func (cp Path) shift(offset int) byte {
-	return Byte - (cp.tokenBitSize * byte(offset+1))
+func (cp Path) Greater(other Path) bool {
+	return cp.value > other.value || (cp.value == other.value && cp.length > other.length)
+}
+
+// shift indicates how many bits to shift the token at the index to get the raw token value
+// varies from (8-[tokenBitSize]) -> (0)
+// when remainder of index varies from (0) -> (cp.tokensPerByte-1)
+func (cp Path) shift(index int) byte {
+	return Byte - (cp.tokenBitSize * byte(index%cp.tokensPerByte+1))
 }
 
 func (cp Path) Less(other Path) bool {
-	return cp.Compare(other) == -1
+	return cp.value < other.value || (cp.value == other.value && cp.length < other.length)
 }
 
 func (cp Path) Extend(path Path) Path {
@@ -183,14 +177,14 @@ func (cp Path) Extend(path Path) Path {
 			pathConfig: cp.pathConfig,
 		}
 	}
-	shift := cp.shift(remainder - 1)
-	reverseShift := Byte - shift
-	buffer[len(cp.value)-1] += path.value[0] >> reverseShift
+	shiftLeft := cp.shift(cp.length - 1)
+	shiftRight := Byte - shiftLeft
+	buffer[len(cp.value)-1] += path.value[0] >> shiftRight
 
 	for i := 0; i < len(path.value)-1; i++ {
-		buffer[len(cp.value)+i] += path.value[i]<<shift + path.value[i+1]>>reverseShift
+		buffer[len(cp.value)+i] += path.value[i]<<shiftLeft + path.value[i+1]>>shiftRight
 	}
-	buffer[len(buffer)-1] += path.value[len(path.value)-1] << shift
+	buffer[len(buffer)-1] += path.value[len(path.value)-1] << shiftLeft
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
@@ -213,8 +207,7 @@ func (cp Path) Skip(tokensToSkip int) Path {
 		return result
 	}
 
-	remainder := tokensToSkip % cp.tokensPerByte
-	if remainder == 0 {
+	if tokensToSkip%cp.tokensPerByte == 0 {
 		result.value = cp.value[tokensToSkip/cp.tokensPerByte:]
 		return result
 	}
@@ -222,13 +215,13 @@ func (cp Path) Skip(tokensToSkip int) Path {
 	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
 
 	buffer := make([]byte, cp.bytesNeeded(newLength))
-	shift := cp.shift(remainder - 1)
-	reverseShift := Byte - shift
+	shiftRight := cp.shift(tokensToSkip - 1)
+	shiftLeft := Byte - shiftRight
 
 	for i := 0; i < len(remainingBytes)-1; i++ {
-		buffer[i] += remainingBytes[i]<<reverseShift + remainingBytes[i+1]>>shift
+		buffer[i] += remainingBytes[i]<<shiftLeft + remainingBytes[i+1]>>shiftRight
 	}
-	buffer[len(buffer)-1] += remainingBytes[len(remainingBytes)-1] << reverseShift
+	buffer[len(buffer)-1] += remainingBytes[len(remainingBytes)-1] << shiftLeft
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
@@ -238,8 +231,7 @@ func (cp Path) Skip(tokensToSkip int) Path {
 }
 
 func (cp Path) Take(tokensToTake int) Path {
-	remainder := tokensToTake % cp.tokensPerByte
-	if remainder == 0 {
+	if tokensToTake%cp.tokensPerByte == 0 {
 		return Path{
 			value:      cp.value[:tokensToTake/cp.tokensPerByte],
 			length:     tokensToTake,
@@ -250,7 +242,7 @@ func (cp Path) Take(tokensToTake int) Path {
 	// ensure length rounds up
 	buffer := make([]byte, cp.bytesNeeded(tokensToTake))
 	copy(buffer, cp.value)
-	shift := cp.shift(remainder - 1)
+	shift := cp.shift(tokensToTake - 1)
 
 	// zero out remainder bits
 	buffer[len(buffer)-1] = (buffer[len(buffer)-1] >> shift) << shift

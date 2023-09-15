@@ -180,8 +180,8 @@ func (th *trieHistory) getValueChanges(
 		// Add the changes from this commit to [combinedChanges].
 		for key, valueChange := range changes.values {
 			// The key is outside the range [start, end].
-			if (startPath.HasValue() && key.Compare(startPath.Value()) < 0) ||
-				(end.HasValue() && key.Compare(endPath.Value()) > 0) {
+			if (startPath.HasValue() && key.Less(startPath.Value())) ||
+				(end.HasValue() && key.Greater(endPath.Value())) {
 				continue
 			}
 
@@ -256,8 +256,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		}
 
 		for key, valueChange := range changes.values {
-			if (startPath.IsNothing() || key.Compare(startPath.Value()) >= 0) &&
-				(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
+			if (startPath.IsNothing() || !key.Less(startPath.Value())) &&
+				(endPath.IsNothing() || !key.Greater(endPath.Value())) {
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.before
 				} else {

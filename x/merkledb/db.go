@@ -648,7 +648,7 @@ func (db *merkleDB) GetChangeProof(
 		commonNodeIndex := 0
 		for ; commonNodeIndex < len(result.StartProof) &&
 			commonNodeIndex < len(result.EndProof) &&
-			result.StartProof[commonNodeIndex].KeyPath.Equal(result.EndProof[commonNodeIndex].KeyPath); commonNodeIndex++ {
+			result.StartProof[commonNodeIndex].KeyPath.Equals(result.EndProof[commonNodeIndex].KeyPath); commonNodeIndex++ {
 		}
 		result.StartProof = result.StartProof[commonNodeIndex:]
 	}

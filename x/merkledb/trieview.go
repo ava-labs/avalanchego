@@ -343,7 +343,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	closestNode := proofPath[len(proofPath)-1]
 
-	if closestNode.key.Compare(keyPath) == 0 {
+	if closestNode.key.Equals(keyPath) {
 		// There is a node with the given [key].
 		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
 		return proof, nil
@@ -444,7 +444,7 @@ func (t *trieView) GetRangeProof(
 		i := 0
 		for ; i < len(result.StartProof) &&
 			i < len(result.EndProof) &&
-			result.StartProof[i].KeyPath.Equal(result.EndProof[i].KeyPath); i++ {
+			result.StartProof[i].KeyPath.Equals(result.EndProof[i].KeyPath); i++ {
 		}
 		result.StartProof = result.StartProof[i:]
 	}
@@ -616,7 +616,7 @@ func (t *trieView) remove(key Path) error {
 
 	nodeToDelete := nodePath[len(nodePath)-1]
 
-	if nodeToDelete.key.Compare(key) != 0 || !nodeToDelete.hasValue() {
+	if !nodeToDelete.key.Equals(key) || !nodeToDelete.hasValue() {
 		// the key wasn't in the trie or doesn't have a value so there's nothing to do
 		return nil
 	}
@@ -836,7 +836,7 @@ func (t *trieView) insert(
 	closestNode := pathToNode[len(pathToNode)-1]
 
 	// a node with that exact path already exists so update its value
-	if closestNode.key.Compare(key) == 0 {
+	if closestNode.key.Equals(key) {
 		closestNode.setValue(value)
 		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil

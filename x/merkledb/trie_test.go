@@ -29,7 +29,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, err
 		}
 		closestNode := nodePath[len(nodePath)-1]
-		if closestNode.key.Compare(path) != 0 || closestNode == nil {
+		if !closestNode.key.Equals(path) || closestNode == nil {
 			return nil, database.ErrNotFound
 		}
 
@@ -46,7 +46,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, err
 		}
 		closestNode := nodePath[len(nodePath)-1]
-		if closestNode.key.Compare(path) != 0 || closestNode == nil {
+		if !closestNode.key.Equals(path) || closestNode == nil {
 			return nil, database.ErrNotFound
 		}
 
