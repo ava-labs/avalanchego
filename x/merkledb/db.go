@@ -1188,21 +1188,28 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 // The returned []byte is taken from [bufferPool] and
 // should be returned to it when the caller is done with it.
 func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
-	prefixedKey := bufferPool.Get().([]byte)
 	prefixLen := len(prefix)
 	keyLen := prefixLen + len(key)
-	if cap(prefixedKey) >= keyLen {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		prefixedKey = prefixedKey[:keyLen]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		bufferPool.Put(prefixedKey)
-		prefixedKey = make([]byte, keyLen)
-	}
+	prefixedKey := getBufferFromPool(bufferPool, keyLen)
 	copy(prefixedKey, prefix)
 	copy(prefixedKey[prefixLen:], key)
 	return prefixedKey
+}
+
+// Returns a []byte from [bufferPool] with length exactly [size].
+// The []byte is not guaranteed to be zeroed.
+func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
+	buffer := bufferPool.Get().([]byte)
+	if cap(buffer) >= size {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		buffer = buffer[:size]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		bufferPool.Put(buffer)
+		buffer = make([]byte, size)
+	}
+	return buffer
 }
 
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
