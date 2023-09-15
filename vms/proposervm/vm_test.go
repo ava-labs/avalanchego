@@ -153,10 +153,10 @@ func initTestProposerVM(
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
-			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
-			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+			thisNode = proVM.ctx.NodeID
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -180,7 +180,7 @@ func initTestProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = ids.ID{1}
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -907,7 +907,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1200,7 +1200,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1354,7 +1354,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	}()
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
-		thisNodeID := ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
+		thisNodeID := proVM.ctx.NodeID
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNodeID: {
 				NodeID: thisNodeID,
@@ -1823,10 +1823,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
-			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
-			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+			thisNode = proVM.ctx.NodeID
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -1849,7 +1849,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2033,10 +2033,10 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
-			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
-			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+			thisNode = proVM.ctx.NodeID
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -2059,7 +2059,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2214,7 +2214,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2447,7 +2447,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	}
 
 	snowCtx := snow.DefaultContextTest()
-	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
+	snowCtx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2606,7 +2606,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = &validators.TestState{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {

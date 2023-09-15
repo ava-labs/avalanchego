@@ -63,7 +63,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			vdrs.RegisterCallbackListener(peerTracker)
 
 			sb := subnets.New(
-				ids.GenericNodeIDFromNodeID(ctx.NodeID),
+				ctx.NodeID,
 				subnets.Config{
 					ConsensusParameters: test.consensusParams,
 				},

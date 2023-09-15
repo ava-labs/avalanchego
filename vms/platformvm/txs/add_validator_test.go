@@ -76,6 +76,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			},
 		},
 	}}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addValidatorTx = &AddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -84,7 +86,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			Outs:         outputs,
 		}},
 		Validator: Validator{
-			NodeID: ctx.NodeID,
+			NodeID: thisNodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
@@ -193,6 +195,8 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			},
 		},
 	}}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addValidatorTx = &AddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -201,7 +205,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Outs:         outputs,
 		}},
 		Validator: Validator{
-			NodeID: ctx.NodeID,
+			NodeID: thisNodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,

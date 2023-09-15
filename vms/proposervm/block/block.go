@@ -36,7 +36,7 @@ type SignedBlock interface {
 
 	PChainHeight() uint64
 	Timestamp() time.Time
-	Proposer() ids.NodeID
+	Proposer() ids.GenericNodeID
 
 	Verify(shouldHaveProposer bool, chainID ids.ID) error
 }
@@ -56,7 +56,7 @@ type statelessBlock struct {
 	id        ids.ID
 	timestamp time.Time
 	cert      *staking.Certificate
-	proposer  ids.NodeID
+	proposer  ids.GenericNodeID
 	bytes     []byte
 }
 
@@ -88,6 +88,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 	if len(b.StatelessBlock.Certificate) == 0 {
+		b.proposer = ids.EmptyGenericNodeID
 		return nil
 	}
 
@@ -97,7 +98,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	}
 
 	b.cert = cert
-	b.proposer = ids.NodeIDFromCert(cert)
+	b.proposer = ids.GenericNodeIDFromCert(cert)
 	return nil
 }
 
@@ -109,7 +110,7 @@ func (b *statelessBlock) Timestamp() time.Time {
 	return b.timestamp
 }
 
-func (b *statelessBlock) Proposer() ids.NodeID {
+func (b *statelessBlock) Proposer() ids.GenericNodeID {
 	return b.proposer
 }
 

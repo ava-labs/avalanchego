@@ -65,6 +65,8 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	subnetAuth := &secp256k1fx.Input{
 		SigIndices: []uint32{0, 1},
 	}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addSubnetValidatorTx = &AddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -75,7 +77,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		}},
 		SubnetValidator: SubnetValidator{
 			Validator: Validator{
-				NodeID: ctx.NodeID,
+				NodeID: thisNodeID,
 				Start:  uint64(clk.Time().Unix()),
 				End:    uint64(clk.Time().Add(time.Hour).Unix()),
 				Wght:   validatorWeight,
@@ -176,6 +178,8 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	subnetAuth := &secp256k1fx.Input{
 		SigIndices: []uint32{0, 1},
 	}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addSubnetValidatorTx = &AddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -186,7 +190,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		}},
 		SubnetValidator: SubnetValidator{
 			Validator: Validator{
-				NodeID: ctx.NodeID,
+				NodeID: thisNodeID,
 				Start:  uint64(clk.Time().Unix()),
 				End:    uint64(clk.Time().Add(time.Hour).Unix()),
 				Wght:   validatorWeight,

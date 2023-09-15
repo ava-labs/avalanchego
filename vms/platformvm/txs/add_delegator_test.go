@@ -76,6 +76,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			},
 		},
 	}}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addDelegatorTx = &AddDelegatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -85,7 +87,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Validator: Validator{
-			NodeID: ctx.NodeID,
+			NodeID: thisNodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
@@ -176,6 +178,8 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			},
 		},
 	}}
+	thisNodeID, err := ids.NodeIDFromGenericNodeID(ctx.NodeID)
+	require.NoError(err)
 	addDelegatorTx = &AddDelegatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
@@ -185,7 +189,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Validator: Validator{
-			NodeID: ctx.NodeID,
+			NodeID: thisNodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,

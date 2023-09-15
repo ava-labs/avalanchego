@@ -1620,12 +1620,11 @@ func (s *state) initValidatorSets() error {
 	if err != nil {
 		return err
 	}
-	genericNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
 
-	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, genericNodeID)
+	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
 	primaryValidators.RegisterCallbackListener(vl)
 
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(genericNodeID))
+	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
 	for subnetID := range s.cfg.TrackedSubnets {
@@ -1639,7 +1638,7 @@ func (s *state) initValidatorSets() error {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
 
-		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, genericNodeID)
+		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
 		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil
@@ -2072,8 +2071,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		return nil
 	}
 
-	genericThisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(genericThisNodeID))
+	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }

@@ -106,10 +106,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
+	nodeID := ids.GenericNodeIDFromBytes(req.NodeId)
+
 	publicKey, err := bls.PublicKeyFromBytes(req.PublicKey)
 	if err != nil {
 		return nil, err

@@ -1207,9 +1207,15 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	}
 
 	// Parse the node ID
-	var nodeID ids.NodeID
+	var (
+		nodeID ids.NodeID
+		err    error
+	)
 	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID = s.vm.ctx.NodeID
+		nodeID, err = ids.NodeIDFromGenericNodeID(s.vm.ctx.NodeID)
+		if err != nil {
+			return err
+		}
 	} else {
 		nodeID = args.NodeID
 	}
@@ -1317,9 +1323,15 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		return errStartTimeTooLate
 	}
 
-	var nodeID ids.NodeID
+	var (
+		nodeID ids.NodeID
+		err    error
+	)
 	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID = s.vm.ctx.NodeID
+		nodeID, err = ids.NodeIDFromGenericNodeID(s.vm.ctx.NodeID)
+		if err != nil {
+			return err
+		}
 	} else {
 		nodeID = args.NodeID
 	}
@@ -1960,7 +1972,7 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	return validators.Contains(ids.GenericNodeIDFromNodeID(s.vm.ctx.NodeID))
+	return validators.Contains(s.vm.ctx.NodeID)
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {

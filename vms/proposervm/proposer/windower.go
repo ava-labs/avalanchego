@@ -33,7 +33,7 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-	) ([]ids.NodeID, error)
+	) ([]ids.GenericNodeID, error)
 	// Delay returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
 	// [pChainHeight].
@@ -41,7 +41,7 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-		validatorID ids.NodeID,
+		validatorID ids.GenericNodeID,
 	) (time.Duration, error)
 }
 
@@ -64,7 +64,7 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.NodeID, error) {
+func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.GenericNodeID, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
@@ -75,12 +75,8 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	validators := make([]validatorData, 0, len(validatorsMap))
 	weight := uint64(0)
 	for k, v := range validatorsMap {
-		nodeID, err := ids.NodeIDFromGenericNodeID(k)
-		if err != nil {
-			return nil, err
-		}
 		validators = append(validators, validatorData{
-			id:     nodeID,
+			id:     k,
 			weight: v.Weight,
 		})
 		newWeight, err := math.Add64(weight, v.Weight)
@@ -118,15 +114,15 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		return nil, err
 	}
 
-	nodeIDs := make([]ids.NodeID, numToSample)
+	nodeIDs := make([]ids.GenericNodeID, numToSample)
 	for i, index := range indices {
 		nodeIDs[i] = validators[index].id
 	}
 	return nodeIDs, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
-	if validatorID == ids.EmptyNodeID {
+func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.GenericNodeID) (time.Duration, error) {
+	if validatorID == ids.EmptyGenericNodeID {
 		return MaxDelay, nil
 	}
 

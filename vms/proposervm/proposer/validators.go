@@ -11,7 +11,7 @@ import (
 var _ utils.Sortable[validatorData] = validatorData{}
 
 type validatorData struct {
-	id     ids.NodeID
+	id     ids.GenericNodeID
 	weight uint64
 }
 

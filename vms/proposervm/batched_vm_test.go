@@ -1038,10 +1038,10 @@ func initTestRemoteProposerVM(
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.GenericNodeID]*validators.GetValidatorOutput, error) {
 		var (
-			thisNode = ids.GenericNodeIDFromNodeID(proVM.ctx.NodeID)
-			nodeID1  = ids.GenericNodeIDFromNodeID(ids.NodeID{1})
-			nodeID2  = ids.GenericNodeIDFromNodeID(ids.NodeID{2})
-			nodeID3  = ids.GenericNodeIDFromNodeID(ids.NodeID{3})
+			thisNode = proVM.ctx.NodeID
+			nodeID1  = ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
+			nodeID2  = ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
+			nodeID3  = ids.GenericNodeIDFromBytes([]byte{3}).ToSize(ids.NodeIDLen)
 		)
 		return map[ids.GenericNodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -1064,7 +1064,7 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.GenericNodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

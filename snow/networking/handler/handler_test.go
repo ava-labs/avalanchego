@@ -60,7 +60,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -157,7 +157,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -250,7 +250,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -331,7 +331,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -408,7 +408,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		connector,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 	)
 	require.NoError(err)

@@ -120,7 +120,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		execConfig,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    ids.GenerateTestGenericNodeID(),
 			Log:       logging.NoLog{},
 		},
 		metrics,

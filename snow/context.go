@@ -34,7 +34,7 @@ type Context struct {
 	NetworkID uint32
 	SubnetID  ids.ID
 	ChainID   ids.ID
-	NodeID    ids.NodeID
+	NodeID    ids.GenericNodeID
 	PublicKey *bls.PublicKey
 
 	XChainID    ids.ID
@@ -107,7 +107,7 @@ func DefaultContextTest() *Context {
 		NetworkID:    0,
 		SubnetID:     ids.Empty,
 		ChainID:      ids.Empty,
-		NodeID:       ids.EmptyNodeID,
+		NodeID:       ids.EmptyGenericNodeID,
 		PublicKey:    pk,
 		Log:          logging.NoLog{},
 		BCLookup:     ids.NewAliaser(),

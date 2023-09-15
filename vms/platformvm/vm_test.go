@@ -1598,13 +1598,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ids.GenericNodeIDFromNodeID(consensusCtx.NodeID), subnets.Config{GossipConfig: gossipConfig}),
+		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
 	)
 	require.NoError(err)
 
 	var reqID uint32
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.GenericNodeID] {
-		inMsg, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
 
@@ -1672,7 +1672,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		2,
 		cpuTracker,
 		vm,
-		subnets.New(ids.GenericNodeIDFromNodeID(ctx.NodeID), subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
 	)
 	require.NoError(err)
@@ -1732,7 +1732,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.GenericNodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
@@ -1744,7 +1744,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.GenericNodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.GenericNodeID] {
-		inMsgIntf, err := mc.Parse(msg.Bytes(), ids.GenericNodeIDFromNodeID(ctx.NodeID), func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAncestors)

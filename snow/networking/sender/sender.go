@@ -125,13 +125,13 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
-			ids.GenericNodeIDFromNodeID(s.ctx.NodeID),
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -178,7 +178,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.Generi
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if nodeID.Equal(ids.GenericNodeIDFromNodeID(s.ctx.NodeID)) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -266,14 +266,14 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
 			heights,
 			deadline,
-			thisNodeID,
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -321,7 +321,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, summaryIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if nodeID.Equal(ids.GenericNodeIDFromNodeID(s.ctx.NodeID)) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
@@ -401,7 +401,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if thisNode := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNode) {
+	if thisNode := s.ctx.NodeID; nodeIDs.Contains(thisNode) {
 		nodeIDs.Remove(thisNode)
 		inMsg := message.InboundGetAcceptedFrontier(
 			s.ctx.ChainID,
@@ -456,7 +456,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.GenericNod
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if thisNode := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNode) {
+	if thisNode := s.ctx.NodeID; nodeID.Equal(thisNode) {
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -536,14 +536,14 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.Generi
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundGetAccepted(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
 			containerIDs,
-			thisNodeID,
+			s.ctx.NodeID,
 			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -593,12 +593,12 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.Generi
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNodeID) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundAccepted(
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
-			thisNodeID,
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -659,7 +659,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.GenericNodeID,
 	)
 
 	// Sending a GetAncestors to myself always fails.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNodeID) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -782,7 +782,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.GenericNodeID, requestI
 	)
 
 	// Sending a Get to myself always fails.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNodeID) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -927,14 +927,14 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundPushQuery(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
 			container,
-			thisNodeID,
+			s.ctx.NodeID,
 			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -1060,14 +1060,14 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.GenericN
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundPullQuery(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
 			containerID,
-			thisNodeID,
+			s.ctx.NodeID,
 			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -1151,13 +1151,13 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.GenericNodeID, reques
 
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNodeID) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundChits(
 			s.ctx.ChainID,
 			requestID,
 			preferredID,
 			acceptedID,
-			thisNodeID,
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -1201,16 +1201,15 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	ctx = utils.Detach(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
-	thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
 	failedMsg := message.InternalCrossChainAppRequestFailed(
-		thisNodeID,
+		s.ctx.NodeID,
 		chainID,
 		s.ctx.ChainID,
 		requestID,
 	)
 	s.router.RegisterRequest(
 		ctx,
-		thisNodeID,
+		s.ctx.NodeID,
 		s.ctx.ChainID,
 		chainID,
 		requestID,
@@ -1220,7 +1219,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	)
 
 	inMsg := message.InternalCrossChainAppRequest(
-		thisNodeID,
+		s.ctx.NodeID,
 		s.ctx.ChainID,
 		chainID,
 		requestID,
@@ -1234,9 +1233,8 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
-	thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID)
 	inMsg := message.InternalCrossChainAppResponse(
-		thisNodeID,
+		s.ctx.NodeID,
 		s.ctx.ChainID,
 		chainID,
 		requestID,
@@ -1281,14 +1279,14 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.Generic
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeIDs.Contains(thisNodeID) {
-		nodeIDs.Remove(thisNodeID)
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := message.InboundAppRequest(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
 			appRequestBytes,
-			thisNodeID,
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -1378,12 +1376,12 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.Generic
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.GenericNodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
-	if thisNodeID := ids.GenericNodeIDFromNodeID(s.ctx.NodeID); nodeID.Equal(thisNodeID) {
+	if nodeID.Equal(s.ctx.NodeID) {
 		inMsg := message.InboundAppResponse(
 			s.ctx.ChainID,
 			requestID,
 			appResponseBytes,
-			thisNodeID,
+			s.ctx.NodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return nil

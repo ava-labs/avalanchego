@@ -465,16 +465,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
-	shortNodeID, err := ids.NodeIDFromGenericNodeID(m.NodeID)
-	if err != nil {
-		panic(err)
-	}
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
 			SubnetID:  chainParams.SubnetID,
 			ChainID:   chainParams.ID,
-			NodeID:    shortNodeID,
+			NodeID:    m.NodeID,
 			PublicKey: bls.PublicFromSecretKey(m.StakingBLSKey),
 
 			XChainID:    m.XChainID,
