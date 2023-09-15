@@ -127,23 +127,25 @@ func Test_IntermediateNodeDB(t *testing.T) {
 }
 
 func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
+	cacheSize := 200
+	evictionBatchSize := cacheSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		evictionBatchSize,
+	)
+
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
 	) {
 		require := require.New(t)
-		cacheSize := 200
-		evictionBatchSize := cacheSize
-		baseDB := memdb.New()
-		db := newIntermediateNodeDB(
-			baseDB,
-			&sync.Pool{
-				New: func() interface{} { return make([]byte, 0) },
-			},
-			&mockMetrics{},
-			cacheSize,
-			evictionBatchSize,
-		)
+
 		p := newPath(key)
 		constructedKey := db.constructDBKey(p)
 		baseLength := len(p)/2 + len(intermediateNodePrefix)
