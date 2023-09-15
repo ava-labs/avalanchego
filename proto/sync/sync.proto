@@ -122,7 +122,8 @@ message GetRangeProofResponse {
 
 message CommitRangeProofRequest {
   MaybeBytes start_key = 1;
-  RangeProof range_proof = 2;
+  MaybeBytes end_key = 2;
+  RangeProof range_proof = 3;
 }
 
 message ChangeProof {
