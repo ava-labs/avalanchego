@@ -14,6 +14,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"golang.org/x/sync/errgroup"
@@ -1240,20 +1241,23 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 
 			require.NoError(db.Put(key, value))
 		}
+		expectedList := maps.Keys(expected)
+		slices.Sort(expectedList)
 
 		iter := db.NewIteratorWithPrefix(prefix)
 
 		// Assert the iterator returns the expected key-values.
-		got := map[string][]byte{}
+		numIterElts := 0
 		for iter.Next() {
 			val := iter.Value()
 			if len(val) == 0 {
 				val = nil
 			}
-			got[string(iter.Key())] = val
-			require.NoError(db.Delete(iter.Key()))
+			require.Equal(expectedList[numIterElts], string(iter.Key()))
+			require.Equal(expected[string(iter.Key())], val)
+			numIterElts++
 		}
-		require.Equal(expected, got)
+		require.Equal(len(expectedList), numIterElts)
 
 		iter.Release()
 
