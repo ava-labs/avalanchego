@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -261,12 +262,20 @@ func TestDiffSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// Put a subnet
-	createSubnetTx := &txs.Tx{}
+	createSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
 	d.AddSubnet(createSubnetTx)
 
 	// Assert that we get the subnet back
 	// [state] returns 1 subnet.
-	parentStateCreateSubnetTx := &txs.Tx{}
+	parentStateCreateSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
 	state.EXPECT().GetSubnets().Return([]*txs.Tx{parentStateCreateSubnetTx}, nil).Times(1)
 	gotSubnets, err := d.GetSubnets()
 	require.NoError(err)
