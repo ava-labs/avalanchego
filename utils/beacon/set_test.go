@@ -16,9 +16,9 @@ import (
 func TestSet(t *testing.T) {
 	require := require.New(t)
 
-	id0 := ids.NodeID{0}
-	id1 := ids.NodeID{1}
-	id2 := ids.NodeID{2}
+	id0 := ids.GenericNodeIDFromBytes([]byte{0}).ToSize(ids.NodeIDLen)
+	id1 := ids.GenericNodeIDFromBytes([]byte{1}).ToSize(ids.NodeIDLen)
+	id2 := ids.GenericNodeIDFromBytes([]byte{2}).ToSize(ids.NodeIDLen)
 
 	ip0 := ips.IPPort{
 		IP:   net.IPv4zero,
