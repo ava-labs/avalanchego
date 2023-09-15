@@ -20,9 +20,9 @@ func TestInterface(t *testing.T) {
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 		require.NoError(t, err)
 
-		defer db.Close()
-
 		test(t, db)
+
+		_ = db.Close()
 	}
 }
 
