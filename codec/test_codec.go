@@ -48,10 +48,6 @@ var (
 	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
 		TestMultipleTags,
 	}
-
-	FuzzTests = []func(c GeneralCodec, f *testing.F){
-		FuzzStructUnmarshal,
-	}
 )
 
 // The below structs and interfaces exist
