@@ -19,8 +19,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(vdr1)
+	vdrs := bag.Of(vdr1)
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
@@ -41,11 +40,7 @@ func TestNoEarlyTermString(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
@@ -67,11 +62,7 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2)
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
