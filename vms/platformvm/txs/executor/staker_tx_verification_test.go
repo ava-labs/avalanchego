@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -381,7 +381,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
-			expectedErr: ErrValidatorSubset,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
 			name: "flow check fails",
@@ -530,7 +530,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				backend = tt.backendF(ctrl)
@@ -640,8 +639,8 @@ func TestGetValidatorRules(t *testing.T) {
 				assetID:           customAssetID,
 				minValidatorStake: config.MinValidatorStake,
 				maxValidatorStake: config.MaxValidatorStake,
-				minStakeDuration:  time.Duration(1337) * time.Second,
-				maxStakeDuration:  time.Duration(42) * time.Second,
+				minStakeDuration:  1337 * time.Second,
+				maxStakeDuration:  42 * time.Second,
 				minDelegationFee:  config.MinDelegationFee,
 			},
 			expectedErr: nil,
@@ -652,7 +651,6 @@ func TestGetValidatorRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getValidatorRules(tt.backend, chainState, tt.subnetID)
@@ -760,8 +758,8 @@ func TestGetDelegatorRules(t *testing.T) {
 				assetID:                  customAssetID,
 				minDelegatorStake:        config.MinDelegatorStake,
 				maxValidatorStake:        config.MaxValidatorStake,
-				minStakeDuration:         time.Duration(1337) * time.Second,
-				maxStakeDuration:         time.Duration(42) * time.Second,
+				minStakeDuration:         1337 * time.Second,
+				maxStakeDuration:         42 * time.Second,
 				maxValidatorWeightFactor: 21,
 			},
 			expectedErr: nil,
@@ -771,7 +769,6 @@ func TestGetDelegatorRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getDelegatorRules(tt.backend, chainState, tt.subnetID)

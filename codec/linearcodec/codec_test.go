@@ -22,3 +22,8 @@ func TestMultipleTags(t *testing.T) {
 		test(c, t)
 	}
 }
+
+func FuzzStructUnmarshalLinearCodec(f *testing.F) {
+	c := NewDefault()
+	codec.FuzzStructUnmarshal(c, f)
+}

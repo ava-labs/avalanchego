@@ -3,11 +3,7 @@
 
 package sync
 
-// TODO danlaine: We create a new response handler for every request.
-// Look into making a struct to handle requests/responses that uses a sync pool
-// to avoid allocations.
-
-var _ ResponseHandler = &responseHandler{}
+var _ ResponseHandler = (*responseHandler)(nil)
 
 // Handles responses/failure notifications for a sent request.
 // Exactly one of OnResponse or OnFailure is eventually called.

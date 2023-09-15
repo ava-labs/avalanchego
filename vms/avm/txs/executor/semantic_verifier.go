@@ -151,7 +151,7 @@ func (v *SemanticVerifier) verifyTransfer(
 	in *avax.TransferableInput,
 	cred verify.Verifiable,
 ) error {
-	utxo, err := v.State.GetUTXOFromID(&in.UTXOID)
+	utxo, err := v.State.GetUTXO(in.UTXOID.InputID())
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (v *SemanticVerifier) verifyOperation(
 		utxos     = make([]interface{}, numUTXOs)
 	)
 	for i, utxoID := range op.UTXOIDs {
-		utxo, err := v.State.GetUTXOFromID(utxoID)
+		utxo, err := v.State.GetUTXO(utxoID.InputID())
 		if err != nil {
 			return err
 		}

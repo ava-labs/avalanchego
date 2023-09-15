@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
@@ -24,12 +26,16 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		test(f, db)
-	}
+func FuzzKeyValue(f *testing.F) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+	database.FuzzKeyValue(f, db)
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.
@@ -55,8 +61,7 @@ func TestCorruption(t *testing.T) {
 			corruptableBatch := db.NewBatch()
 			require.NotNil(t, corruptableBatch)
 
-			err := corruptableBatch.Put(key, value)
-			require.NoError(t, err)
+			require.NoError(t, corruptableBatch.Put(key, value))
 
 			return corruptableBatch.Write()
 		},
@@ -72,7 +77,128 @@ func TestCorruption(t *testing.T) {
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
 			err := testFn(corruptableDB)
-			require.ErrorIsf(tt, err, errTest, "not received the corruption error")
+			require.ErrorIs(tt, err, errTest)
+		})
+	}
+}
+
+func TestIterator(t *testing.T) {
+	errIter := errors.New("iterator error")
+
+	type test struct {
+		name              string
+		databaseErrBefore error
+		modifyIter        func(*gomock.Controller, *iterator)
+		op                func(*require.Assertions, *iterator)
+		expectedErr       error
+	}
+
+	tests := []test{
+		{
+			name:              "corrupted database; Next",
+			databaseErrBefore: errTest,
+			expectedErr:       errTest,
+			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			op: func(require *require.Assertions, iter *iterator) {
+				require.False(iter.Next())
+			},
+		},
+		{
+			name:              "Next corrupts database",
+			databaseErrBefore: nil,
+			expectedErr:       errIter,
+			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
+				mockInnerIter := database.NewMockIterator(ctrl)
+				mockInnerIter.EXPECT().Next().Return(false)
+				mockInnerIter.EXPECT().Error().Return(errIter)
+				iter.Iterator = mockInnerIter
+			},
+			op: func(require *require.Assertions, iter *iterator) {
+				require.False(iter.Next())
+			},
+		},
+		{
+			name:              "corrupted database; Error",
+			databaseErrBefore: errTest,
+			expectedErr:       errTest,
+			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			op: func(require *require.Assertions, iter *iterator) {
+				err := iter.Error()
+				require.ErrorIs(err, errTest)
+			},
+		},
+		{
+			name:              "Error corrupts database",
+			databaseErrBefore: nil,
+			expectedErr:       errIter,
+			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
+				mockInnerIter := database.NewMockIterator(ctrl)
+				mockInnerIter.EXPECT().Error().Return(errIter)
+				iter.Iterator = mockInnerIter
+			},
+			op: func(require *require.Assertions, iter *iterator) {
+				err := iter.Error()
+				require.ErrorIs(err, errIter)
+			},
+		},
+		{
+			name:              "corrupted database; Key",
+			databaseErrBefore: errTest,
+			expectedErr:       errTest,
+			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			op: func(require *require.Assertions, iter *iterator) {
+				_ = iter.Key()
+			},
+		},
+		{
+			name:              "corrupted database; Value",
+			databaseErrBefore: errTest,
+			expectedErr:       errTest,
+			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			op: func(require *require.Assertions, iter *iterator) {
+				_ = iter.Value()
+			},
+		},
+		{
+			name:              "corrupted database; Release",
+			databaseErrBefore: errTest,
+			expectedErr:       errTest,
+			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			op: func(require *require.Assertions, iter *iterator) {
+				iter.Release()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			// Make a database
+			baseDB := memdb.New()
+			corruptableDB := New(baseDB)
+
+			// Put a key-value pair in the database.
+			require.NoError(corruptableDB.Put([]byte{0}, []byte{1}))
+
+			// Mark database as corupted, if applicable
+			_ = corruptableDB.handleError(tt.databaseErrBefore)
+
+			// Make an iterator
+			iter := &iterator{
+				Iterator: corruptableDB.NewIterator(),
+				db:       corruptableDB,
+			}
+
+			// Modify the iterator (optional)
+			tt.modifyIter(ctrl, iter)
+
+			// Do an iterator operation
+			tt.op(require, iter)
+
+			err := corruptableDB.corrupted()
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

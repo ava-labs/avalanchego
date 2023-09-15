@@ -17,7 +17,8 @@ func TestStatusValid(t *testing.T) {
 	require.NoError(Rejected.Valid())
 	require.NoError(Processing.Valid())
 	require.NoError(Unknown.Valid())
-	require.ErrorIs(Status(math.MaxInt32).Valid(), errUnknownStatus)
+	err := Status(math.MaxInt32).Valid()
+	require.ErrorIs(err, errUnknownStatus)
 }
 
 func TestStatusDecided(t *testing.T) {

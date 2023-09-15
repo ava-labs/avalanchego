@@ -52,8 +52,8 @@ const (
 
 var (
 	ErrEmptyPassword = errors.New("empty password")
-	errPassMaxLength = fmt.Errorf("password exceeds maximum length of %d chars", maxPassLen)
-	errWeakPassword  = errors.New("password is too weak")
+	ErrPassMaxLength = fmt.Errorf("password exceeds maximum length of %d chars", maxPassLen)
+	ErrWeakPassword  = errors.New("password is too weak")
 )
 
 // SufficientlyStrong returns true if [password] has strength greater than or
@@ -72,9 +72,9 @@ func IsValid(password string, minimumStrength Strength) error {
 	case len(password) == 0:
 		return ErrEmptyPassword
 	case len(password) > maxPassLen:
-		return errPassMaxLength
+		return ErrPassMaxLength
 	case !SufficientlyStrong(password, minimumStrength):
-		return errWeakPassword
+		return ErrWeakPassword
 	default:
 		return nil
 	}

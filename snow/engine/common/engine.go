@@ -161,13 +161,13 @@ type AcceptedFrontierHandler interface {
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a GetAcceptedFrontier message, is
-	// utilizing a unique requestID, or that the containerIDs from a valid
+	// utilizing a unique requestID, or that the containerID is a valid
 	// frontier.
 	AcceptedFrontier(
 		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	) error
 
 	// Notify this engine that a get accepted frontier request it issued has
@@ -390,8 +390,8 @@ type ChitsHandler interface {
 		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
-		preferredContainerIDs []ids.ID,
-		acceptedContainerIDs []ids.ID,
+		preferredID ids.ID,
+		acceptedID ids.ID,
 	) error
 
 	// Notify this engine that a query it issued has failed.

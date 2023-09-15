@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Accepted = (*accepted)(nil)
@@ -16,24 +17,23 @@ var _ Accepted = (*accepted)(nil)
 type Accepted interface {
 	validators.SetCallbackListener
 
-	// SetAcceptedFrontier updates the latest frontier for [nodeID] to
-	// [frontier]. If [nodeID] is not currently a validator, this is a noop.
-	SetAcceptedFrontier(nodeID ids.NodeID, frontier []ids.ID)
-	// AcceptedFrontier returns the latest known accepted frontier of [nodeID].
-	// If [nodeID]'s last accepted frontier is unknown, an empty slice will be
-	// returned.
-	AcceptedFrontier(nodeID ids.NodeID) []ids.ID
+	// SetLastAccepted updates the latest accepted block for [nodeID] to
+	// [blockID]. If [nodeID] is not currently a validator, this is a noop.
+	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID)
+	// LastAccepted returns the latest known accepted block of [nodeID]. If
+	// [nodeID]'s last accepted block was never unknown, false will be returned.
+	LastAccepted(nodeID ids.NodeID) (ids.ID, bool)
 }
 
 type accepted struct {
-	lock sync.RWMutex
-	// frontier contains an entry for all current validators
-	frontier map[ids.NodeID][]ids.ID
+	lock       sync.RWMutex
+	validators set.Set[ids.NodeID]
+	frontier   map[ids.NodeID]ids.ID
 }
 
 func NewAccepted() Accepted {
 	return &accepted{
-		frontier: make(map[ids.NodeID][]ids.ID),
+		frontier: make(map[ids.NodeID]ids.ID),
 	}
 }
 
@@ -41,30 +41,32 @@ func (a *accepted) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.I
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	a.frontier[nodeID] = nil
+	a.validators.Add(nodeID)
 }
 
 func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
+	a.validators.Remove(nodeID)
 	delete(a.frontier, nodeID)
 }
 
 func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
 
-func (a *accepted) SetAcceptedFrontier(nodeID ids.NodeID, frontier []ids.ID) {
+func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if _, ok := a.frontier[nodeID]; ok {
+	if a.validators.Contains(nodeID) {
 		a.frontier[nodeID] = frontier
 	}
 }
 
-func (a *accepted) AcceptedFrontier(nodeID ids.NodeID) []ids.ID {
+func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	return a.frontier[nodeID]
+	acceptedID, ok := a.frontier[nodeID]
+	return acceptedID, ok
 }

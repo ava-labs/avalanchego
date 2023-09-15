@@ -3,9 +3,7 @@
 
 package meter
 
-import (
-	"time"
-)
+import "time"
 
 // Meter tracks a continuous exponential moving average of the % of time this
 // meter has been running.

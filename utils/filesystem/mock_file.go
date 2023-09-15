@@ -3,9 +3,7 @@
 
 package filesystem
 
-import (
-	"io/fs"
-)
+import "io/fs"
 
 var _ fs.DirEntry = MockFile{}
 

@@ -22,13 +22,13 @@ type metrics struct {
 	numSubnetPeers                  *prometheus.GaugeVec
 	timeSinceLastMsgSent            prometheus.Gauge
 	timeSinceLastMsgReceived        prometheus.Gauge
-	sendQueuePortionFull            prometheus.Gauge
 	sendFailRate                    prometheus.Gauge
 	connected                       prometheus.Counter
 	disconnected                    prometheus.Counter
 	acceptFailed                    prometheus.Counter
 	inboundConnRateLimited          prometheus.Counter
 	inboundConnAllowed              prometheus.Counter
+	tlsConnRejected                 prometheus.Counter
 	numUselessPeerListBytes         prometheus.Counter
 	nodeUptimeWeightedAverage       prometheus.Gauge
 	nodeUptimeRewardingStake        prometheus.Gauge
@@ -71,11 +71,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "time_since_last_msg_sent",
 			Help:      "Time (in ns) since the last msg was sent",
 		}),
-		sendQueuePortionFull: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "send_queue_portion_full",
-			Help:      "Percentage of use in Send Queue",
-		}),
 		sendFailRate: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "send_fail_rate",
@@ -100,6 +95,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Namespace: namespace,
 			Name:      "inbound_conn_throttler_allowed",
 			Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
+		}),
+		tlsConnRejected: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "tls_conn_rejected",
+			Help:      "Times this node rejected a connection due to an unsupported TLS certificate",
 		}),
 		numUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -154,12 +154,12 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.numSubnetPeers),
 		registerer.Register(m.timeSinceLastMsgReceived),
 		registerer.Register(m.timeSinceLastMsgSent),
-		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
 		registerer.Register(m.acceptFailed),
 		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.tlsConnRejected),
 		registerer.Register(m.numUselessPeerListBytes),
 		registerer.Register(m.inboundConnRateLimited),
 		registerer.Register(m.nodeUptimeWeightedAverage),

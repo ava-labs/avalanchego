@@ -39,8 +39,8 @@ func TestInputVerifyNil(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.ErrorIs(tt.in.Verify(), tt.expectedErr)
+			err := tt.in.Verify()
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

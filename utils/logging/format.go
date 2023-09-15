@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 // Format modes available
@@ -59,7 +59,7 @@ func ToFormat(h string, fd uintptr) (Format, error) {
 	case "JSON":
 		return JSON, nil
 	case "AUTO":
-		if !terminal.IsTerminal(int(fd)) {
+		if !term.IsTerminal(int(fd)) {
 			return Plain, nil
 		}
 		return Colors, nil

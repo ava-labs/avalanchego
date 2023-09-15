@@ -78,7 +78,7 @@ func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 			return fmt.Errorf("input failed verification: %w", err)
 		}
 	}
-	if !utils.IsSortedAndUniqueSortable(tx.ImportedInputs) {
+	if !utils.IsSortedAndUnique(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 

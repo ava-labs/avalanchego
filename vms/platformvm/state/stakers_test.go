@@ -235,17 +235,19 @@ func newTestStaker() *Staker {
 }
 
 func assertIteratorsEqual(t *testing.T, expected, actual StakerIterator) {
+	require := require.New(t)
+
 	t.Helper()
 
 	for expected.Next() {
-		require.True(t, actual.Next())
+		require.True(actual.Next())
 
 		expectedStaker := expected.Value()
 		actualStaker := actual.Value()
 
-		require.Equal(t, expectedStaker, actualStaker)
+		require.Equal(expectedStaker, actualStaker)
 	}
-	require.False(t, actual.Next())
+	require.False(actual.Next())
 
 	expected.Release()
 	actual.Release()

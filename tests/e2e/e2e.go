@@ -6,30 +6,34 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"math/big"
+	"math/rand"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
-	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/interfaces"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture"
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-type ClusterType byte
-
 const (
-	Unknown ClusterType = iota
-	StandAlone
-	PreExisting
-
 	// Enough for primary.NewWallet to fetch initial UTXOs.
 	DefaultWalletCreationTimeout = 5 * time.Second
 
@@ -37,307 +41,209 @@ const (
 	// Enough for test/custom networks.
 	DefaultConfirmTxTimeout = 20 * time.Second
 
-	DefaultShutdownTimeout = 2 * time.Minute
+	// This interval should represent the upper bound of the time
+	// required to start a new node on a local test network.
+	DefaultNodeStartTimeout = 20 * time.Second
+
+	// A long default timeout used to timeout failed operations but
+	// unlikely to induce flaking due to unexpected resource
+	// contention.
+	DefaultTimeout = 2 * time.Minute
+
+	// Interval appropriate for network operations that should be
+	// retried periodically but not too often.
+	DefaultPollingInterval = 500 * time.Millisecond
 )
 
-// Env is the global struct containing all we need to test
-var (
-	Env = &TestEnvironment{
-		testEnvironmentConfig: &testEnvironmentConfig{
-			clusterType: Unknown,
-		},
-	}
-
-	errGRPCAndURIsSpecified = errors.New("either network-runner-grpc-endpoint or uris should be specified, not both")
-	errNoKeyFile            = errors.New("test keys file not provided")
-	errUnknownClusterType   = errors.New("unhandled cluster type")
-	errNotNetworkRunnerCLI  = errors.New("not network-runner cli")
-)
-
-type testEnvironmentConfig struct {
-	clusterType               ClusterType
-	logLevel                  string
-	networkRunnerGRPCEndpoint string
-	avalancheGoExecPath       string
-	avalancheGoLogLevel       string
-	testKeysFile              string
-
-	// we snapshot initial state, right after starting cluster
-	// to be able to reset state if needed and isolate tests
-	snapshotName string
-}
+// Env is used to access shared test fixture. Intended to be
+// initialized by SynchronizedBeforeSuite.
+var Env *TestEnvironment
 
 type TestEnvironment struct {
-	*testEnvironmentConfig
+	// The directory where the test network configuration is stored
+	NetworkDir string
+	// URIs used to access the API endpoints of nodes of the network
+	URIs []testnet.NodeURI
+	// The URI used to access the http server that allocates test data
+	TestDataServerURI string
 
-	runnerMu     sync.RWMutex
-	runnerCli    runner_sdk.Client
-	runnerGRPCEp string
-
-	urisMu sync.RWMutex
-	uris   []string
-
-	testKeysMu sync.RWMutex
-	testKeys   []*secp256k1.PrivateKey
-
-	snapMu  sync.RWMutex
-	snapped bool
+	require *require.Assertions
 }
 
-// should be called only once
-// must be called before StartCluster
-// Note that either networkRunnerGRPCEp or uris must be specified
-func (te *TestEnvironment) ConfigCluster(
-	logLevel string,
-	networkRunnerGRPCEp string,
-	avalancheGoExecPath string,
-	avalancheGoLogLevel string,
-	uris string,
-	testKeysFile string,
-) error {
-	if avalancheGoExecPath != "" {
-		if _, err := os.Stat(avalancheGoExecPath); err != nil {
-			return fmt.Errorf("could not find avalanchego binary: %w", err)
-		}
+func InitTestEnvironment(envBytes []byte) {
+	require := require.New(ginkgo.GinkgoT())
+	require.Nil(Env, "env already initialized")
+	Env = &TestEnvironment{
+		require: require,
 	}
-
-	te.testKeysFile = testKeysFile
-	te.snapshotName = "ginkgo" + time.Now().String()
-	switch {
-	case networkRunnerGRPCEp != "" && len(uris) == 0:
-		te.clusterType = StandAlone
-		te.logLevel = logLevel
-		te.networkRunnerGRPCEndpoint = networkRunnerGRPCEp
-		te.avalancheGoExecPath = avalancheGoExecPath
-		te.avalancheGoLogLevel = avalancheGoLogLevel
-
-		err := te.setRunnerClient(te.logLevel, te.networkRunnerGRPCEndpoint)
-		if err != nil {
-			return fmt.Errorf("could not setup network-runner client: %w", err)
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		presp, err := te.GetRunnerClient().Ping(ctx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not ping network-runner client: %w", err)
-		}
-		tests.Outf("{{green}}network-runner running in PID %d{{/}}\n", presp.Pid)
-
-		// URIs will be set upon cluster start here
-		return nil
-
-	case networkRunnerGRPCEp == "" && len(uris) != 0:
-		te.clusterType = PreExisting
-		uriSlice := strings.Split(uris, ",")
-		te.setURIs(uriSlice)
-		tests.Outf("{{green}}URIs:{{/}} %q\n", uriSlice)
-		return nil
-
-	default:
-		return errGRPCAndURIsSpecified
-	}
+	require.NoError(json.Unmarshal(envBytes, Env))
 }
 
-func (te *TestEnvironment) LoadKeys() error {
-	// load test keys
-	if len(te.testKeysFile) == 0 {
-		return errNoKeyFile
-	}
-	testKeys, err := tests.LoadHexTestKeys(te.testKeysFile)
-	if err != nil {
-		return fmt.Errorf("failed loading test keys: %w", err)
-	}
-	te.setTestKeys(testKeys)
-	return nil
+// Retrieve a random URI to naively attempt to spread API load across
+// nodes.
+func (te *TestEnvironment) GetRandomNodeURI() testnet.NodeURI {
+	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
+	nodeURI := te.URIs[r.Intn(len(te.URIs))]
+	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	return nodeURI
 }
 
-func (te *TestEnvironment) StartCluster() error {
-	switch te.clusterType {
-	case StandAlone:
-		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", te.avalancheGoExecPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		resp, err := te.GetRunnerClient().Start(ctx, te.avalancheGoExecPath,
-			runner_sdk.WithNumNodes(5),
-			runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, te.avalancheGoLogLevel)),
-		)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not start network-runner: %w", err)
-		}
-		tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
-
-		// start is async, so wait some time for cluster health
-		time.Sleep(time.Minute)
-
-		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-		_, err = te.GetRunnerClient().Health(ctx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not check health network-runner: %w", err)
-		}
-
-		return te.refreshURIs()
-
-	case PreExisting:
-		return nil // nothing to do, really
-
-	default:
-		return errUnknownClusterType
-	}
+// Retrieve the network to target for testing.
+func (te *TestEnvironment) GetNetwork() testnet.Network {
+	network, err := local.ReadNetwork(te.NetworkDir)
+	te.require.NoError(err)
+	return network
 }
 
-func (te *TestEnvironment) refreshURIs() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	uriSlice, err := te.GetRunnerClient().URIs(ctx)
-	cancel()
-	if err != nil {
-		return fmt.Errorf("could not retrieve URIs: %w", err)
-	}
-	te.setURIs(uriSlice)
-	tests.Outf("{{green}}URIs:{{/}} %q\n", uriSlice)
-	return nil
+// Retrieve the specified number of funded keys allocated for the caller's exclusive use.
+func (te *TestEnvironment) AllocateFundedKeys(count int) []*secp256k1.PrivateKey {
+	keys, err := fixture.AllocateFundedKeys(te.TestDataServerURI, count)
+	te.require.NoError(err)
+	tests.Outf("{{blue}} allocated funded key(s): %+v{{/}}\n", keys)
+	return keys
 }
 
-func (te *TestEnvironment) setRunnerClient(logLevel string, gRPCEp string) error {
-	te.runnerMu.Lock()
-	defer te.runnerMu.Unlock()
+// Retrieve a funded key allocated for the caller's exclusive use.
+func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
+	return te.AllocateFundedKeys(1)[0]
+}
 
-	cli, err := runner_sdk.New(runner_sdk.Config{
-		LogLevel:    logLevel,
-		Endpoint:    gRPCEp,
-		DialTimeout: 10 * time.Second,
+// Create a new keychain with the specified number of test keys.
+func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
+	keys := te.AllocateFundedKeys(count)
+	return secp256k1fx.NewKeychain(keys...)
+}
+
+// Create a new wallet for the provided keychain against the specified node URI.
+func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
+	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
+		URI:          nodeURI.URI,
+		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
 	})
-	if err != nil {
-		return err
-	}
-	if te.runnerCli != nil {
-		te.runnerCli.Close()
-	}
-	te.runnerCli = cli
-	te.runnerGRPCEp = gRPCEp
-	return err
+	te.require.NoError(err)
+	return primary.NewWalletWithOptions(
+		baseWallet,
+		common.WithPostIssuanceFunc(
+			func(id ids.ID) {
+				tests.Outf(" issued transaction with ID: %s\n", id)
+			},
+		),
+	)
 }
 
-func (te *TestEnvironment) GetRunnerClient() (cli runner_sdk.Client) {
-	te.runnerMu.RLock()
-	cli = te.runnerCli
-	te.runnerMu.RUnlock()
-	return cli
+// Create a new eth client targeting the specified node URI.
+func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
+	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	client, err := ethclient.Dial(uri)
+	te.require.NoError(err)
+	return client
 }
 
-func (te *TestEnvironment) closeRunnerClient() (err error) {
-	te.runnerMu.Lock()
-	err = te.runnerCli.Close()
-	te.runnerMu.Unlock()
-	return err
+// Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
+func ContextWithTimeout(duration time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	ginkgo.DeferCleanup(cancel)
+	return ctx
 }
 
-func (te *TestEnvironment) GetRunnerGRPCEndpoint() (ep string) {
-	te.runnerMu.RLock()
-	ep = te.runnerGRPCEp
-	te.runnerMu.RUnlock()
-	return ep
+// Helper simplifying use of a timed context configured with the default timeout.
+func DefaultContext() context.Context {
+	return ContextWithTimeout(DefaultTimeout)
 }
 
-func (te *TestEnvironment) setURIs(us []string) {
-	te.urisMu.Lock()
-	te.uris = us
-	te.urisMu.Unlock()
+// Helper simplifying use via an option of a timed context configured with the default timeout.
+func WithDefaultContext() common.Option {
+	return common.WithContext(DefaultContext())
 }
 
-func (te *TestEnvironment) GetURIs() []string {
-	te.urisMu.RLock()
-	us := te.uris
-	te.urisMu.RUnlock()
-	return us
+// Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's
+// version calls the condition function with a goroutine and ginkgo assertions don't work
+// properly in goroutines.
+func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string) {
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), waitFor)
+	defer cancel()
+	for !condition() {
+		select {
+		case <-ctx.Done():
+			require.Fail(ginkgo.GinkgoT(), msg)
+		case <-ticker.C:
+		}
+	}
 }
 
-func (te *TestEnvironment) setTestKeys(ks []*secp256k1.PrivateKey) {
-	te.testKeysMu.Lock()
-	te.testKeys = ks
-	te.testKeysMu.Unlock()
+// Add an ephemeral node that is only intended to be used by a single test. Its ID and
+// URI are not intended to be returned from the Network instance to minimize
+// accessibility from other tests.
+func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.Node {
+	require := require.New(ginkgo.GinkgoT())
+
+	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, flags)
+	require.NoError(err)
+
+	// Ensure node is stopped on teardown. It's configuration is not removed to enable
+	// collection in CI to aid in troubleshooting failures.
+	ginkgo.DeferCleanup(func() {
+		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
+		require.NoError(node.Stop())
+	})
+
+	return node
 }
 
-func (te *TestEnvironment) GetTestKeys() ([]*secp256k1.PrivateKey, []ids.ShortID, *secp256k1fx.Keychain) {
-	te.testKeysMu.RLock()
-	testKeys := te.testKeys
-	te.testKeysMu.RUnlock()
-	testKeyAddrs := make([]ids.ShortID, len(testKeys))
-	for i := range testKeyAddrs {
-		testKeyAddrs[i] = testKeys[i].PublicKey().Address()
-	}
-	keyChain := secp256k1fx.NewKeychain(testKeys...)
-	return testKeys, testKeyAddrs, keyChain
+// Wait for the given node to report healthy.
+func WaitForHealthy(node testnet.Node) {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
 }
 
-func (te *TestEnvironment) ShutdownCluster() error {
-	if te.GetRunnerGRPCEndpoint() == "" {
-		// we connected directly to existing cluster
-		// nothing to shutdown
-		return nil
-	}
+// Sends an eth transaction, waits for the transaction receipt to be issued
+// and checks that the receipt indicates success.
+func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+	require := require.New(ginkgo.GinkgoT())
 
-	runnerCli := te.GetRunnerClient()
-	if runnerCli == nil {
-		return errNotNetworkRunnerCLI
-	}
+	txID := signedTx.Hash()
+	tests.Outf(" sending eth transaction with ID: %s\n", txID)
 
-	tests.Outf("{{red}}shutting down network-runner cluster{{/}}\n")
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-	_, err := runnerCli.Stop(ctx)
-	cancel()
-	if err != nil {
-		return err
-	}
+	require.NoError(ethClient.SendTransaction(DefaultContext(), signedTx))
 
-	tests.Outf("{{red}}shutting down network-runner client{{/}}\n")
-	return te.closeRunnerClient()
+	// Wait for the receipt
+	var receipt *types.Receipt
+	Eventually(func() bool {
+		var err error
+		receipt, err = ethClient.TransactionReceipt(DefaultContext(), txID)
+		if errors.Is(err, interfaces.NotFound) {
+			return false // Transaction is still pending
+		}
+		require.NoError(err)
+		return true
+	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
+
+	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	return receipt
 }
 
-func (te *TestEnvironment) SnapInitialState() error {
-	te.snapMu.RLock()
-	defer te.snapMu.RUnlock()
-
-	if te.snapped {
-		return nil // initial state snapshot already captured
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	_, err := te.runnerCli.SaveSnapshot(ctx, te.snapshotName)
-	cancel()
-	if err != nil {
-		return err
-	}
-	te.snapped = true
-	return nil
+// Determines the suggested gas price for the configured client that will
+// maximize the chances of transaction acceptance.
+func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
+	gasPrice, err := ethClient.SuggestGasPrice(DefaultContext())
+	require.NoError(ginkgo.GinkgoT(), err)
+	// Double the suggested gas price to maximize the chances of
+	// acceptance. Maybe this can be revisited pending resolution of
+	// https://github.com/ava-labs/coreth/issues/314.
+	gasPrice.Add(gasPrice, gasPrice)
+	return gasPrice
 }
 
-func (te *TestEnvironment) RestoreInitialState(switchOffNetworkFirst bool) error {
-	te.snapMu.Lock()
-	defer te.snapMu.Unlock()
-
-	if switchOffNetworkFirst {
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-		_, err := te.GetRunnerClient().Stop(ctx)
-		cancel()
-		gomega.Expect(err).Should(gomega.BeNil())
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	_, err := te.GetRunnerClient().LoadSnapshot(ctx, te.snapshotName)
-	cancel()
-	if err != nil {
-		return err
-	}
-
-	// make sure cluster goes back to health before moving on
-	ctx, cancel = context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-	_, err = te.GetRunnerClient().Health(ctx)
-	cancel()
-	if err != nil {
-		return fmt.Errorf("could not check health network-runner: %w", err)
-	}
-
-	return te.refreshURIs()
+// Helper simplifying use via an option of a gas price appropriate for testing.
+func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
+	baseFee := SuggestGasPrice(ethClient)
+	return common.WithBaseFee(baseFee)
 }

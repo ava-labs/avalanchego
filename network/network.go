@@ -283,8 +283,8 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
 		dialer:                      dialer,
-		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig),
-		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig),
+		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
 
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
@@ -746,13 +746,6 @@ func (n *network) Dispatch() error {
 		// Note: listener.Accept is rate limited outside of this package, so a
 		// peer can not just arbitrarily spin up goroutines here.
 		go func() {
-			// We pessimistically drop an incoming connection if the remote
-			// address is found in connectedIPs, myIPs, or peerAliasIPs. This
-			// protects our node from spending CPU cycles on TLS handshakes to
-			// upgrade connections from existing peers. Specifically, this can
-			// occur when one of our existing peers attempts to connect to one
-			// our IP aliases (that they aren't yet aware is an alias).
-			//
 			// Note: Calling [RemoteAddr] with the Proxy protocol enabled may
 			// block for up to ProxyReadHeaderTimeout. Therefore, we ensure to
 			// call this function inside the go-routine, rather than the main

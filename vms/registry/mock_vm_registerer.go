@@ -13,7 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	vms "github.com/ava-labs/avalanchego/vms"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockVMRegisterer is a mock of VMRegisterer interface.

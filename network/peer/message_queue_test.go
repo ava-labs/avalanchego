@@ -35,7 +35,8 @@ func TestMessageQueue(t *testing.T) {
 	for i := 0; i < numToSend; i++ {
 		testID := ids.GenerateTestID()
 		testID2 := ids.GenerateTestID()
-		m, err := mc.Pong(uint32(i),
+		m, err := mc.Ping(
+			uint32(i),
 			[]*p2p.SubnetUptime{
 				{SubnetId: testID[:], Uptime: uint32(i)},
 				{SubnetId: testID2[:], Uptime: uint32(i)},

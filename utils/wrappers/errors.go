@@ -3,9 +3,7 @@
 
 package wrappers
 
-import (
-	"strings"
-)
+import "strings"
 
 var _ error = (*aggregate)(nil)
 

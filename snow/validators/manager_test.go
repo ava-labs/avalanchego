@@ -20,13 +20,12 @@ func TestAdd(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := Add(m, subnetID, nodeID, nil, ids.Empty, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
 
-	err = Add(m, subnetID, nodeID, nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
 
 	require.Equal(uint64(1), s.Weight())
 }
@@ -40,7 +39,7 @@ func TestAddWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := AddWeight(m, subnetID, nodeID, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
@@ -48,11 +47,9 @@ func TestAddWeight(t *testing.T) {
 	err = AddWeight(m, subnetID, nodeID, 1)
 	require.ErrorIs(err, errMissingValidator)
 
-	err = Add(m, subnetID, nodeID, nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
 
-	err = AddWeight(m, subnetID, nodeID, 1)
-	require.NoError(err)
+	require.NoError(AddWeight(m, subnetID, nodeID, 1))
 
 	require.Equal(uint64(2), s.Weight())
 }
@@ -66,21 +63,18 @@ func TestRemoveWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := RemoveWeight(m, subnetID, nodeID, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
 
-	err = Add(m, subnetID, nodeID, nil, ids.Empty, 2)
-	require.NoError(err)
+	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 2))
 
-	err = RemoveWeight(m, subnetID, nodeID, 1)
-	require.NoError(err)
+	require.NoError(RemoveWeight(m, subnetID, nodeID, 1))
 
 	require.Equal(uint64(1), s.Weight())
 
-	err = RemoveWeight(m, subnetID, nodeID, 1)
-	require.NoError(err)
+	require.NoError(RemoveWeight(m, subnetID, nodeID, 1))
 
 	require.Zero(s.Weight())
 }
@@ -93,24 +87,15 @@ func TestContains(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 
-	contains := Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.False(Contains(m, subnetID, nodeID))
 
 	s := NewSet()
 	m.Add(subnetID, s)
+	require.False(Contains(m, subnetID, nodeID))
 
-	contains = Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
+	require.True(Contains(m, subnetID, nodeID))
 
-	err := Add(m, subnetID, nodeID, nil, ids.Empty, 1)
-	require.NoError(err)
-
-	contains = Contains(m, subnetID, nodeID)
-	require.True(contains)
-
-	err = RemoveWeight(m, subnetID, nodeID, 1)
-	require.NoError(err)
-
-	contains = Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.NoError(RemoveWeight(m, subnetID, nodeID, 1))
+	require.False(Contains(m, subnetID, nodeID))
 }

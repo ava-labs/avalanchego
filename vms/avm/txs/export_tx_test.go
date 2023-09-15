@@ -168,14 +168,13 @@ func TestExportTxSerialization(t *testing.T) {
 		0x8f, 0xe0, 0x2a, 0xf3, 0xcc, 0x31, 0x32, 0xef, 0xfe, 0x7d,
 		0x3d, 0x9f, 0x14, 0x94, 0x01,
 	}
-	err = tx.SignSECP256K1Fx(
+	require.NoError(tx.SignSECP256K1Fx(
 		parser.Codec(),
 		[][]*secp256k1.PrivateKey{
 			{keys[0], keys[0]},
 			{keys[0], keys[0]},
 		},
-	)
-	require.NoError(err)
+	))
 	require.Equal(tx.ID().String(), "2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D")
 
 	// there are two credentials

@@ -76,10 +76,6 @@ func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	return parentState.GetUTXO(utxoID)
 }
 
-func (d *diff) GetUTXOFromID(utxoID *avax.UTXOID) (*avax.UTXO, error) {
-	return d.GetUTXO(utxoID.InputID())
-}
-
 func (d *diff) AddUTXO(utxo *avax.UTXO) {
 	d.modifiedUTXOs[utxo.InputID()] = utxo
 }
@@ -104,7 +100,7 @@ func (d *diff) AddTx(tx *txs.Tx) {
 	d.addedTxs[tx.ID()] = tx
 }
 
-func (d *diff) GetBlockID(height uint64) (ids.ID, error) {
+func (d *diff) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := d.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
@@ -113,7 +109,7 @@ func (d *diff) GetBlockID(height uint64) (ids.ID, error) {
 	if !ok {
 		return ids.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.GetBlockID(height)
+	return parentState.GetBlockIDAtHeight(height)
 }
 
 func (d *diff) GetBlock(blkID ids.ID) (blocks.Block, error) {

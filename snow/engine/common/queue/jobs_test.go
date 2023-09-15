@@ -6,6 +6,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"math"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,7 +33,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		},
 		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return set.Set[ids.ID]{parentID: struct{}{}}, nil
+				return set.Of(parentID), nil
 			}
 			return set.Set[ids.ID]{}, nil
 		},
@@ -62,12 +63,8 @@ func TestNew(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	dbSize, err := database.Size(db)
 	require.NoError(err)
@@ -83,12 +80,8 @@ func TestPushAndExecute(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
@@ -104,14 +97,11 @@ func TestPushAndExecute(t *testing.T) {
 	require.NoError(err)
 	require.True(has)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(parser))
 
 	has, err = jobs.Has(jobID)
 	require.NoError(err)
@@ -152,12 +142,8 @@ func TestRemoveDependency(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
@@ -218,9 +204,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
@@ -233,8 +217,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
@@ -251,9 +234,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID := ids.GenerateTestID()
@@ -267,8 +248,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
@@ -286,9 +266,7 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -296,8 +274,7 @@ func TestMissingJobs(t *testing.T) {
 	jobs.AddMissingID(job0ID)
 	jobs.AddMissingID(job1ID)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	numMissingIDs := jobs.NumMissingIDs()
 	require.Equal(2, numMissingIDs)
@@ -313,14 +290,11 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs.RemoveMissingID(job1ID)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	missingIDSet = set.Set[ids.ID]{}
 	missingIDSet.Add(jobs.MissingIDs()...)
@@ -339,12 +313,8 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
@@ -403,15 +373,11 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	// Create jobs queue from the same database and ensure that the jobs queue
 	// recovers correctly.
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	missingIDs := jobs.MissingIDs()
-	require.Equal(1, len(missingIDs))
+	require.Len(missingIDs, 1)
 
 	require.Equal(missingIDs[0], job0.ID())
 
@@ -436,12 +402,8 @@ func TestInitializeNumJobs(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -489,19 +451,12 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.NoError(err)
 	require.Equal(uint64(2), jobs.state.numJobs)
 
-	err = jobs.Commit()
-	require.NoError(err)
-
-	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
-	require.NoError(err)
-
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
+	require.NoError(database.Clear(jobs.state.metadataDB, math.MaxInt))
+	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	require.Equal(uint64(2), jobs.state.numJobs)
 }
 
@@ -512,12 +467,8 @@ func TestClearAll(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)

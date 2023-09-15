@@ -3,9 +3,7 @@
 
 package health
 
-import (
-	"time"
-)
+import "time"
 
 // notYetRunResult is the result that is returned when a HealthCheck hasn't been
 // run yet.

@@ -3,9 +3,7 @@
 
 package block
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func Parse(bytes []byte) (Block, error) {
 	var block Block

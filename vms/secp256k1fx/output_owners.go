@@ -22,11 +22,11 @@ var (
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
 	ErrMarshal              = errors.New("cannot marshal without ctx")
-
-	_ verify.State = (*OutputOwners)(nil)
 )
 
 type OutputOwners struct {
+	verify.IsNotState `json:"-"`
+
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
@@ -98,9 +98,7 @@ func (out *OutputOwners) Addresses() [][]byte {
 
 // AddressesSet returns addresses as a set
 func (out *OutputOwners) AddressesSet() set.Set[ids.ShortID] {
-	set := set.NewSet[ids.ShortID](len(out.Addrs))
-	set.Add(out.Addrs...)
-	return set
+	return set.Of(out.Addrs...)
 }
 
 // Equals returns true if the provided owners create the same condition
@@ -128,15 +126,11 @@ func (out *OutputOwners) Verify() error {
 		return ErrOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
 		return ErrOutputUnoptimized
-	case !utils.IsSortedAndUniqueSortable(out.Addrs):
+	case !utils.IsSortedAndUnique(out.Addrs):
 		return ErrAddrsNotSortedUnique
 	default:
 		return nil
 	}
-}
-
-func (out *OutputOwners) VerifyState() error {
-	return out.Verify()
 }
 
 func (out *OutputOwners) Sort() {

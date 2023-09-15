@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -76,7 +76,7 @@ func TestStatus(t *testing.T) {
 				statelessBlk.EXPECT().ID().Return(blkID)
 
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, choices.Accepted, nil)
+				state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, nil)
 
 				manager := &manager{
 					backend: &backend{
@@ -98,7 +98,7 @@ func TestStatus(t *testing.T) {
 				statelessBlk.EXPECT().ID().Return(blkID)
 
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
+				state.EXPECT().GetStatelessBlock(blkID).Return(nil, database.ErrNotFound)
 
 				manager := &manager{
 					backend: &backend{
@@ -117,7 +117,6 @@ func TestStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk := tt.blockF(ctrl)
 			require.Equal(t, tt.expectedStatus, blk.Status())
@@ -241,13 +240,11 @@ func TestBlockOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk := tt.blkF()
 			options, err := blk.Options(context.Background())
+			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)

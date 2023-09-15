@@ -243,13 +243,10 @@ func TestUTXOLess(t *testing.T) {
 		largerAddr  = ids.ShortID{1}
 	)
 	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr[:])
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	largerAddrStr, err := address.FormatBech32("avax", largerAddr[:])
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	type test struct {
 		name     string
 		utxo1    UTXO

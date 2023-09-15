@@ -5,11 +5,18 @@ package resource
 
 import (
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
@@ -62,6 +69,9 @@ type Manager interface {
 }
 
 type manager struct {
+	log            logging.Logger
+	processMetrics *metrics
+
 	processesLock sync.Mutex
 	processes     map[int]*proc
 
@@ -78,14 +88,29 @@ type manager struct {
 	onClose   chan struct{}
 }
 
-func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) Manager {
+func NewManager(
+	log logging.Logger,
+	diskPath string,
+	frequency,
+	cpuHalflife,
+	diskHalflife time.Duration,
+	metricsRegisterer prometheus.Registerer,
+) (Manager, error) {
+	processMetrics, err := newMetrics("system_resources", metricsRegisterer)
+	if err != nil {
+		return nil, err
+	}
+
 	m := &manager{
+		log:                log,
+		processMetrics:     processMetrics,
 		processes:          make(map[int]*proc),
 		onClose:            make(chan struct{}),
 		availableDiskBytes: math.MaxUint64,
 	}
+
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
-	return m
+	return m, nil
 }
 
 func (m *manager) CPUUsage() float64 {
@@ -115,7 +140,10 @@ func (m *manager) TrackProcess(pid int) {
 		return
 	}
 
-	process := &proc{p: p}
+	process := &proc{
+		p:   p,
+		log: m.log,
+	}
 
 	m.processesLock.Lock()
 	m.processes[pid] = process
@@ -149,6 +177,13 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+		if getBytesErr != nil {
+			m.log.Verbo("failed to lookup resource",
+				zap.String("resource", "system disk"),
+				zap.String("path", diskPath),
+				zap.Error(getBytesErr),
+			)
+		}
 
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
@@ -187,21 +222,34 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 		totalCPU += cpu
 		totalRead += read
 		totalWrite += write
+
+		processIDStr := strconv.Itoa(int(p.p.Pid))
+		m.processMetrics.numCPUCycles.WithLabelValues(processIDStr).Set(p.lastTotalCPU)
+		m.processMetrics.numDiskReads.WithLabelValues(processIDStr).Set(float64(p.numReads))
+		m.processMetrics.numDiskReadBytes.WithLabelValues(processIDStr).Set(float64(p.lastReadBytes))
+		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.numWrites))
+		m.processMetrics.numDiskWritesBytes.WithLabelValues(processIDStr).Set(float64(p.lastWriteBytes))
 	}
 
 	return totalCPU, totalRead, totalWrite
 }
 
 type proc struct {
-	p *process.Process
+	p   *process.Process
+	log logging.Logger
 
 	initialized bool
 
 	// [lastTotalCPU] is the most recent measurement of total CPU usage.
 	lastTotalCPU float64
 
+	// [numReads] is the total number of disk reads performed.
+	numReads uint64
 	// [lastReadBytes] is the most recent measurement of total disk bytes read.
 	lastReadBytes uint64
+
+	// [numWrites] is the total number of disk writes performed.
+	numWrites uint64
 	// [lastWriteBytes] is the most recent measurement of total disk bytes
 	// written.
 	lastWriteBytes uint64
@@ -212,12 +260,24 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 	// assume that the utilization is 0.
 	times, err := p.p.Times()
 	if err != nil {
-		return 0, 0, 0
+		p.log.Verbo("failed to lookup resource",
+			zap.String("resource", "process CPU"),
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
+		times = &cpu.TimesStat{}
 	}
 
+	// Note: IOCounters is not implemented on macos and therefore always returns
+	// an error on macos.
 	io, err := p.p.IOCounters()
 	if err != nil {
-		return 0, 0, 0
+		p.log.Verbo("failed to lookup resource",
+			zap.String("resource", "process IO"),
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
+		io = &process.IOCountersStat{}
 	}
 
 	var (
@@ -243,7 +303,9 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 
 	p.initialized = true
 	p.lastTotalCPU = totalCPU
+	p.numReads = io.ReadCount
 	p.lastReadBytes = io.ReadBytes
+	p.numWrites = io.WriteCount
 	p.lastWriteBytes = io.WriteBytes
 
 	return cpu, read, write

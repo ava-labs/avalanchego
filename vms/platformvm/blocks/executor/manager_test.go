@@ -6,13 +6,12 @@ package executor
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
@@ -20,7 +19,6 @@ import (
 func TestGetBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	statelessBlk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	require.NoError(err)
@@ -34,13 +32,13 @@ func TestGetBlock(t *testing.T) {
 
 	{
 		// Case: block isn't in memory or database
-		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
+		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, database.ErrNotFound).Times(1)
 		_, err := manager.GetBlock(statelessBlk.ID())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 	{
 		// Case: block isn't in memory but is in database.
-		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(statelessBlk, choices.Accepted, nil).Times(1)
+		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(statelessBlk, nil).Times(1)
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())

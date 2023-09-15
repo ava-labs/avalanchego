@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
@@ -33,7 +35,7 @@ func (b *TestBuilder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (ava
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
 	if b.CantBuildVtx && b.T != nil {
-		b.T.Fatal(errBuild)
+		require.FailNow(b.T, errBuild.Error())
 	}
 	return nil, errBuild
 }

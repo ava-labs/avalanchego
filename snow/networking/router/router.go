@@ -32,7 +32,7 @@ type Router interface {
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains set.Set[ids.ID],
-		stakingEnabled bool,
+		sybilProtectionEnabled bool,
 		trackedSubnets set.Set[ids.ID],
 		onFatal func(exitCode int),
 		healthConfig HealthConfig,

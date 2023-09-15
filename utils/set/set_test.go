@@ -26,7 +26,6 @@ func TestSet(t *testing.T) {
 	s.Add(id1)
 	require.True(s.Contains(id1))
 	require.Len(s.List(), 1)
-	require.Equal(len(s.List()), 1)
 	require.Equal(id1, s.List()[0])
 
 	s.Clear()
@@ -47,17 +46,58 @@ func TestSet(t *testing.T) {
 	require.False(s.Overlaps(s2))
 }
 
+func TestOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []int
+		expected []int
+	}{
+		{
+			name:     "nil",
+			elements: nil,
+			expected: []int{},
+		},
+		{
+			name:     "empty",
+			elements: []int{},
+			expected: []int{},
+		},
+		{
+			name:     "unique elements",
+			elements: []int{1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "duplicate elements",
+			elements: []int{1, 2, 3, 1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := Of(tt.elements...)
+
+			require.Len(s, len(tt.expected))
+			for _, expected := range tt.expected {
+				require.True(s.Contains(expected))
+			}
+		})
+	}
+}
+
 func TestSetCappedList(t *testing.T) {
 	require := require.New(t)
 	s := Set[int]{}
 
 	id := 0
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 
 	s.Add(id)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Equal(s.CappedList(1)[0], id)
 	require.Len(s.CappedList(2), 1)
@@ -66,7 +106,7 @@ func TestSetCappedList(t *testing.T) {
 	id2 := 1
 	s.Add(id2)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Len(s.CappedList(2), 2)
 	require.Len(s.CappedList(3), 2)
@@ -77,14 +117,16 @@ func TestSetCappedList(t *testing.T) {
 }
 
 func TestSetClear(t *testing.T) {
+	require := require.New(t)
+
 	set := Set[int]{}
 	for i := 0; i < 25; i++ {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Len(t, set, 0)
+	require.Empty(set)
 	set.Add(1337)
-	require.Len(t, set, 1)
+	require.Len(set, 1)
 }
 
 func TestSetPop(t *testing.T) {
@@ -146,8 +188,7 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
 	set := Set[int]{}
 	{
-		err := set.UnmarshalJSON([]byte("[]"))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte("[]")))
 		require.Empty(set)
 	}
 	id1, id2 := 1, 2
@@ -156,29 +197,25 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	id2JSON, err := json.Marshal(id2)
 	require.NoError(err)
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON)))))
 		require.Len(set, 1)
 		require.Contains(set, id1)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
 		require.Len(set, 2)
 		require.Contains(set, id1)
 		require.Contains(set, id2)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
 		require.Contains(set, 5)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
@@ -187,10 +224,8 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	{
 		set1 := Set[int]{}
 		set2 := Set[int]{}
-		err := set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
-		err = set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
+		require.NoError(set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON)))))
 		require.Equal(set1, set2)
 	}
 }

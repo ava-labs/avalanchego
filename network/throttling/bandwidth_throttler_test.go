@@ -31,7 +31,7 @@ func TestBandwidthThrottler(t *testing.T) {
 	require.NotNil(throttler.limiters)
 	require.Equal(config.RefillRate, throttler.RefillRate)
 	require.Equal(config.MaxBurstSize, throttler.MaxBurstSize)
-	require.Len(throttler.limiters, 0)
+	require.Empty(throttler.limiters)
 
 	// Add a node
 	nodeID1 := ids.GenerateTestNodeID()
@@ -40,7 +40,7 @@ func TestBandwidthThrottler(t *testing.T) {
 
 	// Remove the node
 	throttler.RemoveNode(nodeID1)
-	require.Len(throttler.limiters, 0)
+	require.Empty(throttler.limiters)
 
 	// Add the node back
 	throttler.AddNode(nodeID1)

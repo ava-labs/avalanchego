@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -22,28 +21,23 @@ import (
 )
 
 func TestSetsAndGets(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
 					vm := vmIntf.(secp256k1fx.VM)
-					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -51,7 +45,7 @@ func TestSetsAndGets(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: avax.Asset{ID: ids.Empty},
-		Out:   &avax.TestVerifiable{},
+		Out:   &avax.TestState{},
 	}
 	utxoID := utxo.InputID()
 
@@ -74,63 +68,38 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 
 	txID := tx.ID()
 
-	state.AddUTXO(utxo)
-	state.AddTx(tx)
-	state.AddStatus(txID, choices.Accepted)
+	env.vm.state.AddUTXO(utxo)
+	env.vm.state.AddTx(tx)
 
-	resultUTXO, err := state.GetUTXO(utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultTx, err := state.GetTx(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultStatus, err := state.GetStatus(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resultUTXO, err := env.vm.state.GetUTXO(utxoID)
+	require.NoError(err)
+	resultTx, err := env.vm.state.GetTx(txID)
+	require.NoError(err)
 
-	if resultUTXO.OutputIndex != 1 {
-		t.Fatalf("Wrong UTXO returned")
-	}
-	if resultTx.ID() != tx.ID() {
-		t.Fatalf("Wrong Tx returned")
-	}
-	if resultStatus != choices.Accepted {
-		t.Fatalf("Wrong Status returned")
-	}
+	require.Equal(uint32(1), resultUTXO.OutputIndex)
+	require.Equal(tx.ID(), resultTx.ID())
 }
 
 func TestFundingNoAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
 					vm := vmIntf.(secp256k1fx.VM)
-					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(t, env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -138,17 +107,18 @@ func TestFundingNoAddresses(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: avax.Asset{ID: ids.Empty},
-		Out:   &avax.TestVerifiable{},
+		Out:   &avax.TestState{},
 	}
 
-	state.AddUTXO(utxo)
-	state.DeleteUTXO(utxo.InputID())
+	env.vm.state.AddUTXO(utxo)
+	env.vm.state.DeleteUTXO(utxo.InputID())
 }
 
 func TestFundingAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
@@ -157,17 +127,11 @@ func TestFundingAddresses(t *testing.T) {
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -180,18 +144,18 @@ func TestFundingAddresses(t *testing.T) {
 		},
 	}
 
-	state.AddUTXO(utxo)
-	require.NoError(t, state.Commit())
+	env.vm.state.AddUTXO(utxo)
+	require.NoError(env.vm.state.Commit())
 
-	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Len(t, utxos, 1)
-	require.Equal(t, utxo.InputID(), utxos[0])
+	utxos, err := env.vm.state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
+	require.NoError(err)
+	require.Len(utxos, 1)
+	require.Equal(utxo.InputID(), utxos[0])
 
-	state.DeleteUTXO(utxo.InputID())
-	require.NoError(t, state.Commit())
+	env.vm.state.DeleteUTXO(utxo.InputID())
+	require.NoError(env.vm.state.Commit())
 
-	utxos, err = state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Empty(t, utxos)
+	utxos, err = env.vm.state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
+	require.NoError(err)
+	require.Empty(utxos)
 }

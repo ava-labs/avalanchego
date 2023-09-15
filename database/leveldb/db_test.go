@@ -18,36 +18,32 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
-		}
-
-		defer db.Close()
+		require.NoError(t, err)
 
 		test(t, db)
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
 		_ = db.Close()
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		folder := f.TempDir()
-		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			require.NoError(f, err)
-		}
+func FuzzKeyValue(f *testing.F) {
+	folder := f.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(f, err)
 
-		defer db.Close()
+	defer db.Close()
 
-		test(f, db)
+	database.FuzzKeyValue(f, db)
+}
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
-		_ = db.Close()
-	}
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	folder := f.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(f, err)
+
+	defer db.Close()
+
+	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
 func BenchmarkInterface(b *testing.B) {
@@ -57,9 +53,7 @@ func BenchmarkInterface(b *testing.B) {
 			folder := b.TempDir()
 
 			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			bench(b, db, "leveldb", keys, values)
 

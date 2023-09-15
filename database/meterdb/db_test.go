@@ -18,23 +18,24 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		baseDB := memdb.New()
 		db, err := New("", prometheus.NewRegistry(), baseDB)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		test(t, db)
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		baseDB := memdb.New()
-		db, err := New("", prometheus.NewRegistry(), baseDB)
-		if err != nil {
-			require.NoError(f, err)
-		}
-		test(f, db)
-	}
+func FuzzKeyValue(f *testing.F) {
+	baseDB := memdb.New()
+	db, err := New("", prometheus.NewRegistry(), baseDB)
+	require.NoError(f, err)
+	database.FuzzKeyValue(f, db)
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	baseDB := memdb.New()
+	db, err := New("", prometheus.NewRegistry(), baseDB)
+	require.NoError(f, err)
+	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
 func BenchmarkInterface(b *testing.B) {
@@ -43,9 +44,7 @@ func BenchmarkInterface(b *testing.B) {
 		for _, bench := range database.Benchmarks {
 			baseDB := memdb.New()
 			db, err := New("", prometheus.NewRegistry(), baseDB)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 			bench(b, db, "meterdb", keys, values)
 		}
 	}

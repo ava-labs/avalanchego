@@ -115,8 +115,7 @@ func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	require.NoError(err)
 
 	key2 := PrivateKey{}
-	err = key2.UnmarshalJSON(keyJSON)
-	require.NoError(err)
+	require.NoError(key2.UnmarshalJSON(keyJSON))
 	require.Equal(key.PublicKey(), key2.PublicKey())
 }
 
@@ -238,4 +237,25 @@ func TestSigning(t *testing.T) {
 			require.Equal(tt.sig, bytes)
 		})
 	}
+}
+
+func FuzzVerifySignature(f *testing.F) {
+	factory := Factory{}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		privateKey, err := factory.NewPrivateKey()
+		require.NoError(err)
+
+		publicKey := privateKey.PublicKey()
+
+		sig, err := privateKey.Sign(data)
+		require.NoError(err)
+
+		recoveredPublicKey, err := factory.RecoverPublicKey(data, sig)
+		require.NoError(err)
+
+		require.Equal(publicKey.Bytes(), recoveredPublicKey.Bytes())
+	})
 }

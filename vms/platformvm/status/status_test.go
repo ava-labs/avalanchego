@@ -26,8 +26,7 @@ func TestStatusJSON(t *testing.T) {
 		require.NoError(err)
 
 		var parsedStatus Status
-		err = json.Unmarshal(statusJSON, &parsedStatus)
-		require.NoError(err)
+		require.NoError(json.Unmarshal(statusJSON, &parsedStatus))
 		require.Equal(status, parsedStatus)
 	}
 
@@ -39,8 +38,7 @@ func TestStatusJSON(t *testing.T) {
 
 	{
 		status := Committed
-		err := json.Unmarshal([]byte("null"), &status)
-		require.NoError(err)
+		require.NoError(json.Unmarshal([]byte("null"), &status))
 		require.Equal(Committed, status)
 	}
 

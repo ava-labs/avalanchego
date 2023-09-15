@@ -14,10 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-const blockCacheSize = 8192
+const blockCacheSize = 64 * units.MiB
 
 var (
 	errBlockWrongVersion = errors.New("wrong version")
@@ -28,6 +31,7 @@ var (
 type BlockState interface {
 	GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	PutBlock(blk block.Block, status choices.Status) error
+	DeleteBlock(blkID ids.ID) error
 }
 
 type blockState struct {
@@ -45,10 +49,20 @@ type blockWrapper struct {
 	block block.Block
 }
 
+func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
+	if bw == nil {
+		return ids.IDLen + constants.PointerOverhead
+	}
+	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
+}
+
 func NewBlockState(db database.Database) BlockState {
 	return &blockState{
-		blkCache: &cache.LRU[ids.ID, *blockWrapper]{Size: blockCacheSize},
-		db:       db,
+		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
+			blockCacheSize,
+			cachedBlockSize,
+		),
+		db: db,
 	}
 }
 
@@ -56,7 +70,10 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		fmt.Sprintf("%s_block_cache", namespace),
 		metrics,
-		&cache.LRU[ids.ID, *blockWrapper]{Size: blockCacheSize},
+		cache.NewSizedLRU[ids.ID, *blockWrapper](
+			blockCacheSize,
+			cachedBlockSize,
+		),
 	)
 
 	return &blockState{
@@ -117,4 +134,9 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 	blkID := blk.ID()
 	s.blkCache.Put(blkID, &blkWrapper)
 	return s.db.Put(blkID[:], bytes)
+}
+
+func (s *blockState) DeleteBlock(blkID ids.ID) error {
+	s.blkCache.Evict(blkID)
+	return s.db.Delete(blkID[:])
 }

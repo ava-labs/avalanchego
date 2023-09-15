@@ -31,24 +31,19 @@ func TestNewSingleLevelDB(t *testing.T) {
 	db, err := leveldb.New(dbPath, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	err = db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 
 	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	require.NoError(err)
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(v1)
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(v1))
 
 	_, exists := manager.Previous()
-	require.False(exists, "there should be no previous database")
+	require.False(exists)
+	require.Len(manager.GetDatabases(), 1)
 
-	dbs := manager.GetDatabases()
-	require.Len(dbs, 1)
-
-	err = manager.Close()
-	require.NoError(err)
+	require.NoError(manager.Close())
 }
 
 func TestNewCreatesSingleDB(t *testing.T) {
@@ -62,17 +57,14 @@ func TestNewCreatesSingleDB(t *testing.T) {
 	require.NoError(err)
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(v1)
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(v1))
 
 	_, exists := manager.Previous()
-	require.False(exists, "there should be no previous database")
+	require.False(exists)
 
-	dbs := manager.GetDatabases()
-	require.Len(dbs, 1)
+	require.Len(manager.GetDatabases(), 1)
 
-	err = manager.Close()
-	require.NoError(err)
+	require.NoError(manager.Close())
 }
 
 func TestNewInvalidMemberPresent(t *testing.T) {
@@ -99,26 +91,22 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	db2, err := leveldb.New(dbPath2, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	err = db2.Close()
-	require.NoError(err)
+	require.NoError(db2.Close())
 
 	_, err = NewLevelDB(dir, nil, logging.NoLog{}, v2, "", prometheus.NewRegistry())
 	require.ErrorIs(err, leveldb.ErrCouldNotOpen)
 
-	err = db1.Close()
-	require.NoError(err)
+	require.NoError(db1.Close())
 
 	f, err := os.Create(filepath.Join(dir, "dummy"))
 	require.NoError(err)
 
-	err = f.Close()
-	require.NoError(err)
+	require.NoError(f.Close())
 
 	db, err := NewLevelDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	require.NoError(err, "expected not to error with a non-directory file being present")
 
-	err = db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 }
 
 func TestNewSortsDatabases(t *testing.T) {
@@ -159,33 +147,28 @@ func TestNewSortsDatabases(t *testing.T) {
 		db, err := leveldb.New(dbPath, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 		require.NoError(err)
 
-		err = db.Close()
-		require.NoError(err)
+		require.NoError(db.Close())
 	}
 
 	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, vers[0], "", prometheus.NewRegistry())
 	require.NoError(err)
 
 	defer func() {
-		err = manager.Close()
-		require.NoError(err, "problem closing database manager")
+		require.NoError(manager.Close())
 	}()
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(vers[0])
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(vers[0]))
 
 	prev, exists := manager.Previous()
-	require.True(exists, "expected to find a previous database")
-	cmp = prev.Version.Compare(vers[1])
-	require.Equal(0, cmp, "incorrect version on previous database")
+	require.True(exists)
+	require.Zero(prev.Version.Compare(vers[1]))
 
 	dbs := manager.GetDatabases()
-	require.Equal(len(vers), len(dbs))
+	require.Len(dbs, len(vers))
 
 	for i, db := range dbs {
-		cmp = db.Version.Compare(vers[i])
-		require.Equal(0, cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
+		require.Zero(db.Version.Compare(vers[i]))
 	}
 }
 
@@ -401,7 +384,7 @@ func TestNewManagerFromDBs(t *testing.T) {
 	dbs := m.GetDatabases()
 	require.Len(dbs, len(versions))
 	for i, db := range dbs {
-		require.Equal(0, db.Version.Compare(versions[i]))
+		require.Zero(db.Version.Compare(versions[i]))
 	}
 }
 

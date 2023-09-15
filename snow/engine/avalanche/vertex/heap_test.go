@@ -6,6 +6,8 @@ package vertex
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -14,6 +16,8 @@ import (
 // This example inserts several ints into an IntHeap, checks the minimum,
 // and removes them in order of priority.
 func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
+	require := require.New(t)
+
 	h := NewHeap()
 
 	vtx0 := &avalanche.TestVertex{
@@ -59,48 +63,40 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 	}
 
 	vtxZ := h.Pop()
-	if vtxZ.ID() != vtx4.ID() {
-		t.Fatalf("Heap did not pop unknown element first")
-	}
+	require.Equal(vtx4.ID(), vtxZ.ID())
 
 	vtxA := h.Pop()
-	if height, err := vtxA.Height(); err != nil || height != 3 {
-		t.Fatalf("First height from heap was incorrect")
-	} else if vtxA.ID() != vtx3.ID() {
-		t.Fatalf("Incorrect ID on vertex popped from heap")
-	}
+	height, err := vtxA.Height()
+	require.NoError(err)
+	require.Equal(uint64(3), height)
+	require.Equal(vtx3.ID(), vtxA.ID())
 
 	vtxB := h.Pop()
-	if height, err := vtxB.Height(); err != nil || height != 1 {
-		t.Fatalf("First height from heap was incorrect")
-	} else if vtxB.ID() != vtx1.ID() && vtxB.ID() != vtx2.ID() {
-		t.Fatalf("Incorrect ID on vertex popped from heap")
-	}
+	height, err = vtxB.Height()
+	require.NoError(err)
+	require.Equal(uint64(1), height)
+	require.Contains([]ids.ID{vtx1.ID(), vtx2.ID()}, vtxB.ID())
 
 	vtxC := h.Pop()
-	if height, err := vtxC.Height(); err != nil || height != 1 {
-		t.Fatalf("First height from heap was incorrect")
-	} else if vtxC.ID() != vtx1.ID() && vtxC.ID() != vtx2.ID() {
-		t.Fatalf("Incorrect ID on vertex popped from heap")
-	}
+	height, err = vtxC.Height()
+	require.NoError(err)
+	require.Equal(uint64(1), height)
+	require.Contains([]ids.ID{vtx1.ID(), vtx2.ID()}, vtxC.ID())
 
-	if vtxB.ID() == vtxC.ID() {
-		t.Fatalf("Heap returned same element more than once")
-	}
+	require.NotEqual(vtxB.ID(), vtxC.ID())
 
 	vtxD := h.Pop()
-	if height, err := vtxD.Height(); err != nil || height != 0 {
-		t.Fatalf("Last height returned was incorrect")
-	} else if vtxD.ID() != vtx0.ID() {
-		t.Fatalf("Last item from heap had incorrect ID")
-	}
+	height, err = vtxD.Height()
+	require.NoError(err)
+	require.Zero(height)
+	require.Equal(vtx0.ID(), vtxD.ID())
 
-	if h.Len() != 0 {
-		t.Fatalf("Heap was not empty after popping all of its elements")
-	}
+	require.Zero(h.Len())
 }
 
 func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
+	require := require.New(t)
+
 	h := NewHeap()
 
 	vtx0 := &avalanche.TestVertex{
@@ -134,16 +130,9 @@ func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
 		HeightV: 2,
 	}
 
-	pushed1 := h.Push(vtx0)
-	pushed2 := h.Push(vtx1)
-	pushed3 := h.Push(vtx2)
-	pushed4 := h.Push(vtx3)
-	switch {
-	case h.Len() != 3:
-		t.Fatalf("Unique Vertex Heap has incorrect length: %d", h.Len())
-	case !(pushed1 && pushed2 && pushed3):
-		t.Fatalf("Failed to push a new unique element")
-	case pushed4:
-		t.Fatalf("Pushed non-unique element to the unique vertex heap")
-	}
+	require.True(h.Push(vtx0))
+	require.True(h.Push(vtx1))
+	require.True(h.Push(vtx2))
+	require.False(h.Push(vtx3))
+	require.Equal(3, h.Len())
 }

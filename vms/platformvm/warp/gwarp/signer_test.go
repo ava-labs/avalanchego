@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -17,11 +18,12 @@ import (
 )
 
 type testSigner struct {
-	client  *Client
-	server  warp.Signer
-	sk      *bls.SecretKey
-	chainID ids.ID
-	closeFn func()
+	client    *Client
+	server    warp.Signer
+	sk        *bls.SecretKey
+	networkID uint32
+	chainID   ids.ID
+	closeFn   func()
 }
 
 func setupSigner(t testing.TB) *testSigner {
@@ -33,15 +35,14 @@ func setupSigner(t testing.TB) *testSigner {
 	chainID := ids.GenerateTestID()
 
 	s := &testSigner{
-		server:  warp.NewSigner(sk, chainID),
-		sk:      sk,
-		chainID: chainID,
+		server:    warp.NewSigner(sk, constants.UnitTestID, chainID),
+		sk:        sk,
+		networkID: constants.UnitTestID,
+		chainID:   chainID,
 	}
 
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -65,7 +66,7 @@ func setupSigner(t testing.TB) *testSigner {
 func TestInterface(t *testing.T) {
 	for _, test := range warp.SignerTests {
 		s := setupSigner(t)
-		test(t, s.client, s.sk, s.chainID)
+		test(t, s.client, s.sk, s.networkID, s.chainID)
 		s.closeFn()
 	}
 }

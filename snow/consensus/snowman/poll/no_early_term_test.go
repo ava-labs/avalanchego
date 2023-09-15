@@ -6,91 +6,61 @@ package poll
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 func TestNoEarlyTermResults(t *testing.T) {
-	vtxID := ids.ID{1}
+	require := require.New(t)
 
-	vdr1 := ids.NodeID{1} // k = 1
-
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(vdr1)
+	vdrs := bag.Of(vdr1) // k = 1
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
 
-	poll.Vote(vdr1, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving k votes")
-	}
+	poll.Vote(vdr1, blkID1)
+	require.True(poll.Finished())
 
 	result := poll.Result()
-	if list := result.List(); len(list) != 1 {
-		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; retVtxID != vtxID {
-		t.Fatalf("Wrong vertex returned")
-	} else if result.Count(vtxID) != 1 {
-		t.Fatalf("Wrong number of votes returned")
-	}
+	list := result.List()
+	require.Len(list, 1)
+	require.Equal(blkID1, list[0])
+	require.Equal(1, result.Count(blkID1))
 }
 
 func TestNoEarlyTermString(t *testing.T) {
-	vtxID := ids.ID{1}
-
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
-
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
 
-	poll.Vote(vdr1, vtxID)
+	poll.Vote(vdr1, blkID1)
 
-	expected := `waiting on Bag: (Size = 1)
+	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
-received Bag: (Size = 1)
+received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
-	if result := poll.String(); expected != result {
-		t.Fatalf("Poll should have returned %s but returned %s", expected, result)
-	}
+	require.Equal(t, expected, poll.String())
 }
 
 func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
-	vtxID := ids.ID{1}
+	require := require.New(t)
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2} // k = 2
-
-	vdrs := bag.Bag[ids.NodeID]{}
-	vdrs.Add(
-		vdr1,
-		vdr2,
-	)
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	factory := NewNoEarlyTermFactory()
 	poll := factory.New(vdrs)
 
-	poll.Vote(vdr1, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after less than alpha votes")
-	}
-	poll.Vote(vdr1, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after getting a duplicated vote")
-	}
+	poll.Vote(vdr1, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr1, blkID1)
+	require.False(poll.Finished())
+
 	poll.Drop(vdr1)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after getting a duplicated vote")
-	}
-	poll.Vote(vdr2, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving k votes")
-	}
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID1)
+	require.True(poll.Finished())
 }

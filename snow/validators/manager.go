@@ -19,7 +19,7 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
-	errMissingValidators = errors.New("missing validators")
+	ErrMissingValidators = errors.New("missing validators")
 )
 
 // Manager holds the validator set of each subnet
@@ -104,7 +104,7 @@ func (m *manager) String() string {
 func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
-		return fmt.Errorf("%w: %s", errMissingValidators, subnetID)
+		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
 	}
 	return vdrs.Add(nodeID, pk, txID, weight)
 }
@@ -117,7 +117,7 @@ func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID 
 func AddWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
-		return fmt.Errorf("%w: %s", errMissingValidators, subnetID)
+		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
 	}
 	return vdrs.AddWeight(nodeID, weight)
 }
@@ -130,7 +130,7 @@ func AddWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) err
 func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
-		return fmt.Errorf("%w: %s", errMissingValidators, subnetID)
+		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
 	}
 	return vdrs.RemoveWeight(nodeID, weight)
 }
@@ -144,4 +144,14 @@ func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
 		return false
 	}
 	return vdrs.Contains(nodeID)
+}
+
+func NodeIDs(m Manager, subnetID ids.ID) ([]ids.NodeID, error) {
+	vdrs, exist := m.Get(subnetID)
+	if !exist {
+		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
+	}
+
+	vdrsMap := vdrs.Map()
+	return maps.Keys(vdrsMap), nil
 }

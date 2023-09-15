@@ -10,7 +10,7 @@ package codec
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockManager is a mock of Manager interface.
@@ -63,18 +63,6 @@ func (m *MockManager) RegisterCodec(arg0 uint16, arg1 Codec) error {
 func (mr *MockManagerMockRecorder) RegisterCodec(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterCodec", reflect.TypeOf((*MockManager)(nil).RegisterCodec), arg0, arg1)
-}
-
-// SetMaxSize mocks base method.
-func (m *MockManager) SetMaxSize(arg0 int) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetMaxSize", arg0)
-}
-
-// SetMaxSize indicates an expected call of SetMaxSize.
-func (mr *MockManagerMockRecorder) SetMaxSize(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMaxSize", reflect.TypeOf((*MockManager)(nil).SetMaxSize), arg0)
 }
 
 // Size mocks base method.

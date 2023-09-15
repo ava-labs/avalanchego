@@ -3,9 +3,7 @@
 
 package network
 
-import (
-	"net"
-)
+import "net"
 
 var _ net.Conn = (*testConn)(nil)
 

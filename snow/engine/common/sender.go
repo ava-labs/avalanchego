@@ -12,7 +12,28 @@ import (
 )
 
 // Sender defines how a consensus engine sends messages and requests to other
-// validators
+// validators.
+//
+// Messages can be categorized as either: requests, responses, or gossip. Gossip
+// messages do not include requestIDs, because no response is expected from the
+// peer. However, both requests and responses include requestIDs.
+//
+// It is expected that each [nodeID + requestID + expected response type] that
+// is outstanding at any given time is unique.
+//
+// As an example, it is valid to send `Get(nodeA, request0)` and
+// `PullQuery(nodeA, request0)` because they have different expected response
+// types, `Put` and `Chits`.
+//
+// Additionally, after having sent `Get(nodeA, request0)` and receiving either
+// `Put(nodeA, request0)` or `GetFailed(nodeA, request0)`, it is valid to resend
+// `Get(nodeA, request0)`. Because the initial `Get` request is no longer
+// outstanding.
+//
+// This means that requestIDs can be reused. In practice, requests always have a
+// reasonable maximum timeout, so it is generally safe to assume that by the
+// time the requestID space has been exhausted, the beginning of the requestID
+// space is free of conflicts.
 type Sender interface {
 	snow.Acceptor
 
@@ -62,7 +83,7 @@ type FrontierSender interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	)
 }
 
@@ -117,7 +138,7 @@ type QuerySender interface {
 	SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
 
 	// Send chits to the specified node
-	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID)
+	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted

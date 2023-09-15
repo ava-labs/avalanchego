@@ -27,8 +27,7 @@ var (
 )
 
 func TestNewKeychain(t *testing.T) {
-	require := require.New(t)
-	require.NotNil(NewKeychain())
+	require.NotNil(t, NewKeychain())
 }
 
 func TestKeychainGetUnknownAddr(t *testing.T) {
@@ -67,7 +66,7 @@ func TestKeychainNew(t *testing.T) {
 	require := require.New(t)
 	kc := NewKeychain()
 
-	require.Equal(0, kc.Addresses().Len())
+	require.Zero(kc.Addresses().Len())
 
 	sk, err := kc.New()
 	require.NoError(err)

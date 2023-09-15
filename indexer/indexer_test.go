@@ -9,17 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
@@ -77,11 +75,11 @@ func TestNewIndexer(t *testing.T) {
 	require.True(idxr.indexingEnabled)
 	require.True(idxr.allowIncompleteIndex)
 	require.NotNil(idxr.blockIndices)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 	require.NotNil(idxr.txIndices)
-	require.Len(idxr.txIndices, 0)
+	require.Empty(idxr.txIndices)
 	require.NotNil(idxr.vtxIndices)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.vtxIndices)
 	require.NotNil(idxr.blockAcceptorGroup)
 	require.NotNil(idxr.txAcceptorGroup)
 	require.NotNil(idxr.vertexAcceptorGroup)
@@ -130,7 +128,6 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 func TestIndexer(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
@@ -178,8 +175,8 @@ func TestIndexer(t *testing.T) {
 	require.Equal("index/chain1", server.bases[0])
 	require.Equal("/block", server.endpoints[0])
 	require.Len(idxr.blockIndices, 1)
-	require.Len(idxr.txIndices, 0)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.txIndices)
+	require.Empty(idxr.vtxIndices)
 
 	// Accept a container
 	blkID, blkBytes := ids.GenerateTestID(), utils.RandomBytes(32)
@@ -236,9 +233,9 @@ func TestIndexer(t *testing.T) {
 	idxr = idxrIntf.(*indexer)
 	now = time.Now()
 	idxr.clock.Set(now)
-	require.Len(idxr.blockIndices, 0)
-	require.Len(idxr.txIndices, 0)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.blockIndices)
+	require.Empty(idxr.txIndices)
+	require.Empty(idxr.vtxIndices)
 	require.True(idxr.hasRunBefore)
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -324,21 +321,11 @@ func TestIndexer(t *testing.T) {
 	txID, txBytes := ids.GenerateTestID(), utils.RandomBytes(32)
 	expectedTx := Container{
 		ID:        txID,
-		Bytes:     blkBytes,
+		Bytes:     txBytes,
 		Timestamp: now.UnixNano(),
 	}
-	// Mocked VM knows about this tx now
-	dagVM.EXPECT().GetTx(gomock.Any(), txID).Return(
-		&snowstorm.TestTx{
-			TestDecidable: choices.TestDecidable{
-				IDV:     txID,
-				StatusV: choices.Accepted,
-			},
-			BytesV: txBytes,
-		}, nil,
-	).AnyTimes()
 
-	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
+	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, txBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	require.NotNil(txIdx)
@@ -411,7 +398,6 @@ func TestIncompleteIndex(t *testing.T) {
 	// Create an indexer with indexing disabled
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	config := Config{
@@ -445,7 +431,7 @@ func TestIncompleteIndex(t *testing.T) {
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.True(isIncomplete)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 
 	// Close and re-open the indexer, this time with indexing enabled
 	require.NoError(config.DB.(*versiondb.Database).Commit())
@@ -493,7 +479,6 @@ func TestIncompleteIndex(t *testing.T) {
 func TestIgnoreNonDefaultChains(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
@@ -523,5 +508,5 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	// RegisterChain should return without adding an index for this chain
 	chainVM := mocks.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 }

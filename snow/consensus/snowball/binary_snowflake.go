@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var _ BinarySnowflake = (*binarySnowflake)(nil)
 
@@ -34,7 +32,7 @@ func (sf *binarySnowflake) Initialize(beta, choice int) {
 
 func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	if sf.finalized {
-		return // This instace is already decided.
+		return // This instance is already decided.
 	}
 
 	if preference := sf.Preference(); preference == choice {

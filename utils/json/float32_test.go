@@ -6,9 +6,13 @@ package json
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFloat32(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		f                    Float32
 		expectedStr          string
@@ -45,17 +49,11 @@ func TestFloat32(t *testing.T) {
 
 	for _, tt := range tests {
 		jsonBytes, err := tt.f.MarshalJSON()
-		if err != nil {
-			t.Fatalf("couldn't marshal %f: %s", float32(tt.f), err)
-		} else if string(jsonBytes) != fmt.Sprintf("\"%s\"", tt.expectedStr) {
-			t.Fatalf("expected %f to marshal to %s but got %s", tt.f, tt.expectedStr, string(jsonBytes))
-		}
+		require.NoError(err)
+		require.Equal(fmt.Sprintf(`"%s"`, tt.expectedStr), string(jsonBytes))
 
 		var f Float32
-		if err := f.UnmarshalJSON(jsonBytes); err != nil {
-			t.Fatalf("couldn't unmarshal %s to Float32: %s", string(jsonBytes), err)
-		} else if float32(f) != tt.expectedUnmarshalled {
-			t.Fatalf("expected %s to unmarshal to %f but got %f", string(jsonBytes), tt.expectedUnmarshalled, f)
-		}
+		require.NoError(f.UnmarshalJSON(jsonBytes))
+		require.Equal(tt.expectedUnmarshalled, float32(f))
 	}
 }

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -26,8 +26,6 @@ const engineType = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 
 func TestQueue(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	cpuTracker := tracker.NewMockTracker(ctrl)
 	vdrs := validators.NewSet()
@@ -60,7 +58,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok := u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -70,7 +68,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -80,7 +78,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -90,7 +88,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -126,7 +124,7 @@ func TestQueue(t *testing.T) {
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.Equal(msg1, gotMsg1)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 
 	// u is now empty

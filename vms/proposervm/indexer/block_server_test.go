@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
@@ -35,7 +37,7 @@ func (tsb *TestBlockServer) GetFullPostForkBlock(ctx context.Context, blkID ids.
 		return tsb.GetFullPostForkBlockF(ctx, blkID)
 	}
 	if tsb.CantGetFullPostForkBlock && tsb.T != nil {
-		tsb.T.Fatal(errGetWrappingBlk)
+		require.FailNow(tsb.T, errGetWrappingBlk.Error())
 	}
 	return nil, errGetWrappingBlk
 }
@@ -45,7 +47,7 @@ func (tsb *TestBlockServer) Commit() error {
 		return tsb.CommitF()
 	}
 	if tsb.CantCommit && tsb.T != nil {
-		tsb.T.Fatal(errCommit)
+		require.FailNow(tsb.T, errCommit.Error())
 	}
 	return errCommit
 }

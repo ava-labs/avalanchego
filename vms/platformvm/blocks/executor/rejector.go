@@ -6,7 +6,6 @@ package executor
 import (
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
@@ -17,6 +16,7 @@ var _ blocks.Visitor = (*rejector)(nil)
 // being shutdown.
 type rejector struct {
 	*backend
+	addTxsToMempool bool
 }
 
 func (r *rejector) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
@@ -67,6 +67,10 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
+	if !r.addTxsToMempool {
+		return nil
+	}
+
 	for _, tx := range b.Txs() {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
@@ -78,6 +82,5 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 		}
 	}
 
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	return nil
 }

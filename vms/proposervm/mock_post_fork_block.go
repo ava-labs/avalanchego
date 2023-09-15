@@ -16,7 +16,7 @@ import (
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockPostForkBlock is a mock of PostForkBlock interface.

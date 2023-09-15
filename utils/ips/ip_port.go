@@ -12,7 +12,44 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errBadIP = errors.New("bad ip format")
+const nullStr = "null"
+
+var (
+	errMissingQuotes = errors.New("first and last characters should be quotes")
+	errBadIP         = errors.New("bad ip format")
+)
+
+type IPDesc IPPort
+
+func (ipDesc IPDesc) String() string {
+	return IPPort(ipDesc).String()
+}
+
+func (ipDesc IPDesc) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + ipDesc.String() + `"`), nil
+}
+
+func (ipDesc *IPDesc) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == nullStr { // If "null", do nothing
+		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
+	}
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
+	}
+
+	ipPort, err := ToIPPort(str[1:lastIndex])
+	if err != nil {
+		return fmt.Errorf("couldn't decode to IPPort: %w", err)
+	}
+	*ipDesc = IPDesc(ipPort)
+
+	return nil
+}
 
 // An IP and a port.
 type IPPort struct {

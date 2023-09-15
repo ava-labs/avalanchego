@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -21,6 +22,13 @@ type Bag[T comparable] struct {
 
 	threshold    int
 	metThreshold set.Set[T]
+}
+
+// Of returns a Bag initialized with [elts]
+func Of[T comparable](elts ...T) Bag[T] {
+	var b Bag[T]
+	b.Add(elts...)
+	return b
 }
 
 func (b *Bag[T]) init() {
@@ -93,8 +101,6 @@ func (b *Bag[T]) Equals(other Bag[T]) bool {
 
 // Mode returns the most common element in the bag and the count of that element.
 // If there's a tie, any of the tied element may be returned.
-// TODO for Stephen: Does the above violate an assumption made by Snowball?
-// If the bag is empty, the zero value and 0 are returned.
 func (b *Bag[T]) Mode() (T, int) {
 	var (
 		mode     T
@@ -154,10 +160,10 @@ func (b *Bag[T]) Remove(elt T) {
 	b.size -= count
 }
 
-func (b *Bag[_]) PrefixedString(prefix string) string {
+func (b *Bag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
+	sb.WriteString(fmt.Sprintf("Bag[%T]: (Size = %d)", utils.Zero[T](), b.Len()))
 	for elt, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %d", prefix, elt, count))
 	}

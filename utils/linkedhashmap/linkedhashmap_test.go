@@ -15,7 +15,7 @@ func TestLinkedHashmap(t *testing.T) {
 	require := require.New(t)
 
 	lh := New[ids.ID, int]()
-	require.Equal(0, lh.Len(), "a new hashmap should be empty")
+	require.Zero(lh.Len(), "a new hashmap should be empty")
 
 	key0 := ids.GenerateTestID()
 	_, exists := lh.Get(key0)
@@ -32,17 +32,17 @@ func TestLinkedHashmap(t *testing.T) {
 
 	val0, exists := lh.Get(key0)
 	require.True(exists, "should have found the value")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey0, val0, exists := lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey0, val0, exists = lh.Newest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	key1 := ids.GenerateTestID()
 	lh.Put(key1, 1)
@@ -55,7 +55,7 @@ func TestLinkedHashmap(t *testing.T) {
 	rkey0, val0, exists = lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey1, val1, exists := lh.Newest()
 	require.True(exists, "should have found the value")
@@ -87,7 +87,7 @@ func TestLinkedHashmap(t *testing.T) {
 	rkey0, val0, exists = lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey1, val1, exists = lh.Newest()
 	require.True(exists, "should have found the value")

@@ -3,7 +3,11 @@
 
 package logging
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestLog(t *testing.T) {
 	log := NewLogger("", NewWrappedCore(Info, Discard, Plain.ConsoleEncoder()))
@@ -17,7 +21,5 @@ func TestLog(t *testing.T) {
 	}
 	log.RecoverAndExit(panicFunc, exitFunc)
 
-	if !*recovered {
-		t.Fatalf("Exit function was never called")
-	}
+	require.True(t, *recovered)
 }

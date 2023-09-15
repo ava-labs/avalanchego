@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -134,19 +135,22 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			)
 			return nil
 		}
-		b.Ctx.Log.Debug("failed to parse requested vertex",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("vtxID", requestedVtxID),
-			zap.Error(err),
-		)
-		b.Ctx.Log.Verbo("failed to parse requested vertex",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("vtxID", requestedVtxID),
-			zap.Binary("vtxBytes", vtxs[0]),
-			zap.Error(err),
-		)
+		if b.Ctx.Log.Enabled(logging.Verbo) {
+			b.Ctx.Log.Verbo("failed to parse requested vertex",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Stringer("vtxID", requestedVtxID),
+				zap.Binary("vtxBytes", vtxs[0]),
+				zap.Error(err),
+			)
+		} else {
+			b.Ctx.Log.Debug("failed to parse requested vertex",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Stringer("vtxID", requestedVtxID),
+				zap.Error(err),
+			)
+		}
 		return b.fetch(ctx, requestedVtxID)
 	}
 
