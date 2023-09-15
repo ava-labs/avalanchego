@@ -319,6 +319,16 @@ func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	return parentState.GetSubnetOwner(subnetID)
 }
 
+func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	if d.subnetOwners == nil {
+		d.subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: owner,
+		}
+	} else {
+		d.subnetOwners[subnetID] = owner
+	}
+}
+
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	tx, exists := d.transformedSubnets[subnetID]
 	if exists {
@@ -561,6 +571,9 @@ func (d *diff) Apply(baseState State) error {
 		} else {
 			baseState.DeleteUTXO(utxoID)
 		}
+	}
+	for subnetID, owner := range d.subnetOwners {
+		baseState.SetSubnetOwner(subnetID, owner)
 	}
 	return nil
 }

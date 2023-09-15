@@ -116,6 +116,7 @@ type Chain interface {
 	AddSubnet(createSubnetTx *txs.Tx)
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
+	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -352,6 +353,9 @@ type state struct {
 	addedSubnets  []*txs.Tx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
+
+	// Subnet ID --> Owner of the subnet
+	subnetOwners map[ids.ID]fx.Owner
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
@@ -817,9 +821,24 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
+
+	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
+	subnetID := createSubnetTx.ID()
+	if s.subnetOwners == nil {
+		s.subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: castTx.Owner,
+		}
+	} else {
+		s.subnetOwners[subnetID] = castTx.Owner
+	}
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	owner, exists := s.subnetOwners[subnetID]
+	if exists {
+		return owner, nil
+	}
+
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -836,6 +855,16 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	}
 
 	return subnet.Owner, nil
+}
+
+func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	if s.subnetOwners == nil {
+		s.subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: owner,
+		}
+	} else {
+		s.subnetOwners[subnetID] = owner
+	}
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
