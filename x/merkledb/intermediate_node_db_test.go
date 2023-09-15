@@ -178,7 +178,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	constructedKey := db.constructDBKey(newPath([]byte{}))
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(0b1000_0000, constructedKey[len(constructedKey)-1])
+	require.Equal(byte(0b1000_0000), constructedKey[len(constructedKey)-1])
 
 	db.bufferPool = &sync.Pool{
 		New: func() interface{} {
