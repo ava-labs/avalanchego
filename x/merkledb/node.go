@@ -60,7 +60,7 @@ func newNode(parent *node, key Path) *node {
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(key Path, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
+	if err := codec.decodeDBNode(nodeBytes, &n, key.branchFactor); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -81,7 +81,7 @@ func (n *node) hasValue() bool {
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
 	if n.nodeBytes == nil {
-		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
+		n.nodeBytes = codec.encodeDBNode(&n.dbNode, n.key.branchFactor)
 	}
 
 	return n.nodeBytes

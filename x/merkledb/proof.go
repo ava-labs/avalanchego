@@ -42,10 +42,11 @@ var (
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrInvalidChildIndex           = fmt.Errorf("child index must be less than %d", int(BranchFactor16))
+	ErrInvalidChildIndex           = "child index must be less than %d"
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
-	ErrNilSerializedPath           = errors.New("serialized path is nil")
+	ErrNilPath                     = errors.New("path is nil")
+	ErrInvalidPathLength           = errors.New("path length doesn't match bytes length, check specified branchFactor")
 	ErrNilRangeProof               = errors.New("range proof is nil")
 	ErrNilChangeProof              = errors.New("change proof is nil")
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
@@ -66,9 +67,9 @@ type ProofNode struct {
 // Assumes [node.Key.KeyPath.length] <= math.MaxUint64.
 func (node *ProofNode) ToProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
-		Key: &pb.SerializedPath{
-			NibbleLength: uint64(node.KeyPath.length),
-			Value:        node.KeyPath.Bytes(),
+		Key: &pb.Path{
+			Length: uint64(node.KeyPath.length),
+			Value:  node.KeyPath.Bytes(),
 		},
 		ValueOrHash: &pb.MaybeBytes{
 			Value:     node.ValueOrHash.Value(),
@@ -94,16 +95,20 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	case pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0:
 		return ErrInvalidMaybe
 	case pbNode.Key == nil:
-		return ErrNilSerializedPath
+		return ErrNilPath
 	}
 	node.KeyPath = EmptyPath(bf)
-	node.KeyPath.length = int(pbNode.Key.NibbleLength)
+	node.KeyPath.length = int(pbNode.Key.Length)
 	node.KeyPath.value = string(pbNode.Key.Value)
+
+	if len(node.KeyPath.value) != node.KeyPath.length/node.KeyPath.tokensPerByte {
+		return ErrInvalidPathLength
+	}
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
 		if childIndex >= uint32(bf) {
-			return ErrInvalidChildIndex
+			return fmt.Errorf(ErrInvalidChildIndex, bf)
 		}
 		childID, err := ids.ToID(childIDBytes)
 		if err != nil {
@@ -126,7 +131,7 @@ type Proof struct {
 	// Must always be non-empty (i.e. have the root node).
 	Path []ProofNode
 	// This is a proof that [key] exists/doesn't exist.
-	Key []byte
+	Key Path
 
 	// Nothing if [Key] isn't in the trie.
 	// Otherwise the value corresponding to [Key].
@@ -141,7 +146,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, NewPath16(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, proof.Key); err != nil {
 		return err
 	}
 
@@ -153,7 +158,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
 	if lastNode.KeyPath.length%2 == 0 &&
-		bytes.Equal(proof.Key, lastNode.KeyPath.Bytes()) &&
+		proof.Key.Equals(lastNode.KeyPath) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
@@ -162,7 +167,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if (lastNode.KeyPath.length%2 == 1 || !bytes.Equal(proof.Key, lastNode.KeyPath.Bytes())) &&
+	if (lastNode.KeyPath.length%2 == 1 || !proof.Key.Equals(lastNode.KeyPath)) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
@@ -199,7 +204,7 @@ func (proof *Proof) ToProto() *pb.Proof {
 	}
 
 	pbProof := &pb.Proof{
-		Key:   proof.Key,
+		Key:   proof.Key.Bytes(),
 		Value: value,
 	}
 
@@ -221,7 +226,7 @@ func (proof *Proof) UnmarshalProto(pbProof *pb.Proof, bf BranchFactor) error {
 		return ErrInvalidMaybe
 	}
 
-	proof.Key = pbProof.Key
+	proof.Key = NewPath(pbProof.Key, bf)
 
 	if !pbProof.Value.IsNothing {
 		proof.Value = maybe.Some(pbProof.Value.Value)
@@ -266,6 +271,8 @@ type RangeProof struct {
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
 	// Sorted by increasing key.
 	KeyValues []KeyValue
+
+	branchFactor BranchFactor
 }
 
 // Returns nil iff all the following hold:
@@ -307,20 +314,24 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenPath] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenPath := maybe.Bind(start, NewPath16)
+	smallestProvenPath := maybe.Bind(start, func(b []byte) Path {
+		return NewPath(b, proof.branchFactor)
+	})
 
-	largestProvenPath := maybe.Bind(end, NewPath16)
+	largestProvenPath := maybe.Bind(end, func(b []byte) Path {
+		return NewPath(b, proof.branchFactor)
+	})
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenPath] to ancestors of the node containing
 		// [largestProvenPath] so that we get the expected root ID.
-		largestProvenPath = maybe.Some(NewPath16(proof.KeyValues[len(proof.KeyValues)-1].Key))
+		largestProvenPath = maybe.Some(NewPath(proof.KeyValues[len(proof.KeyValues)-1].Key, proof.branchFactor))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
 	keyValues := make(map[Path][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[NewPath16(keyValue.Key)] = keyValue.Value
+		keyValues[NewPath(keyValue.Key, proof.branchFactor)] = keyValue.Value
 	}
 
 	// Ensure that the start proof is valid and contains values that
@@ -832,7 +843,7 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := EmptyPath(BranchFactor16)
+		compressedPath := EmptyPath(keyPath.branchFactor)
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath

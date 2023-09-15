@@ -38,7 +38,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	)
 
 	// Put a key-node pair
-	node1Key := NewPath16([]byte{0x01})
+	node1Key := NewPath([]byte{0x01}, BranchFactor16)
 	node1 := newNode(nil, node1Key)
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
@@ -69,7 +69,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	expectedSize := 0
 	added := 0
 	for {
-		key := NewPath16([]byte{byte(added)})
+		key := NewPath([]byte{byte(added)}, BranchFactor16)
 		node := newNode(nil, EmptyPath(BranchFactor16))
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
@@ -89,7 +89,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key := NewPath16([]byte{byte(added)})
+	key := NewPath([]byte{byte(added)}, BranchFactor16)
 	node := newNode(nil, EmptyPath(BranchFactor16))
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
@@ -98,7 +98,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.Equal(1, db.nodeCache.fifo.Len())
 	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(NewPath16([]byte{byte(added)}), gotKey)
+	require.Equal(NewPath([]byte{byte(added)}, BranchFactor16), gotKey)
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache

@@ -169,7 +169,7 @@ func newTrieView(
 			}
 			newVal = maybe.Some(val)
 		}
-		if err := newView.recordValueChange(NewPath16(op.Key), newVal); err != nil {
+		if err := newView.recordValueChange(db.newPath(op.Key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -177,7 +177,7 @@ func newTrieView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(NewPath16([]byte(key)), val); err != nil {
+		if err := newView.recordValueChange(db.newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}
@@ -326,13 +326,10 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	defer span.End()
 
 	proof := &Proof{
-		Key: key,
+		Key: t.db.newPath(key),
 	}
 
-	// Get the node at the given path, or the node closest to it.
-	keyPath := NewPath16(key)
-
-	proofPath, err := t.getPathTo(keyPath)
+	proofPath, err := t.getPathTo(proof.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +342,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	closestNode := proofPath[len(proofPath)-1]
 
-	if closestNode.key.Equals(keyPath) {
+	if closestNode.key.Equals(proof.Key) {
 		// There is a node with the given [key].
 		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
 		return proof, nil
@@ -354,7 +351,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// There is no node with the given [key].
 	// If there is a child at the index where the node would be
 	// if it existed, include that child in the proof.
-	nextIndex := keyPath.Token(closestNode.key.length)
+	nextIndex := proof.Key.Token(closestNode.key.length)
 	child, ok := closestNode.children[nextIndex]
 	if !ok {
 		return proof, nil
@@ -396,7 +393,7 @@ func (t *trieView) GetRangeProof(
 		return nil, err
 	}
 
-	var result RangeProof
+	result := RangeProof{branchFactor: t.db.branchFactor}
 
 	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
 	it := t.NewIteratorWithStart(start.Value())
@@ -553,7 +550,7 @@ func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []er
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValueCopy(NewPath16(key))
+		results[i], valueErrors[i] = t.getValueCopy(t.db.newPath(key))
 	}
 	return results, valueErrors
 }
@@ -564,7 +561,7 @@ func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
 	defer span.End()
 
-	return t.getValueCopy(NewPath16(key))
+	return t.getValueCopy(t.db.newPath(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].

@@ -104,6 +104,7 @@ type Manager struct {
 	// Set to true when StartSyncing is called.
 	syncing   bool
 	closeOnce sync.Once
+	newPath   func(b []byte) merkledb.Path
 }
 
 type ManagerConfig struct {
@@ -112,6 +113,7 @@ type ManagerConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
+	BranchFactor          merkledb.BranchFactor
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
@@ -125,12 +127,17 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
+	newPath := func(b []byte) merkledb.Path { return merkledb.NewPath(b, config.BranchFactor) }
+	if config.BranchFactor == merkledb.BranchFactorUnspecified {
+		newPath = func(b []byte) merkledb.Path { return merkledb.NewPath(b, merkledb.BranchFactorDefault) }
+	}
 
 	m := &Manager{
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
+		newPath:         newPath,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -390,7 +397,7 @@ func (m *Manager) findNextKey(
 		nextKey = append(nextKey, 0)
 		return maybe.Some(nextKey), nil
 	}
-	proofKeyPath := merkledb.NewPath16(lastReceivedKey)
+	proofKeyPath := m.newPath(lastReceivedKey)
 
 	// If the received proof is an exclusion proof, the last node may be for a
 	// key that is after the [lastReceivedKey].

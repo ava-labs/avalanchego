@@ -19,12 +19,13 @@ import (
 
 var _ sync.DB = (*DBClient)(nil)
 
-func NewDBClient(client pb.DBClient) *DBClient {
-	return &DBClient{client: client}
+func NewDBClient(client pb.DBClient, branchFactor merkledb.BranchFactor) *DBClient {
+	return &DBClient{client: client, branchFactor: branchFactor}
 }
 
 type DBClient struct {
-	client pb.DBClient
+	client       pb.DBClient
+	branchFactor merkledb.BranchFactor
 }
 
 func (c *DBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -66,7 +67,7 @@ func (c *DBClient) GetChangeProof(
 	}
 
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(resp.GetChangeProof(), merkledb.BranchFactor16); err != nil {
+	if err := proof.UnmarshalProto(resp.GetChangeProof(), c.branchFactor); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -118,7 +119,7 @@ func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, e
 	}
 
 	var proof merkledb.Proof
-	if err := proof.UnmarshalProto(resp.Proof, merkledb.BranchFactor16); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof, c.branchFactor); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -148,7 +149,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 	}
 
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(resp.Proof, merkledb.BranchFactor16); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof, c.branchFactor); err != nil {
 		return nil, err
 	}
 	return &proof, nil

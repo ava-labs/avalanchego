@@ -62,19 +62,18 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeDBNode(n *dbNode) []byte
+	encodeDBNode(n *dbNode, factor BranchFactor) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeDBNode(bytes []byte, n *dbNode) error
+	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
 }
 
-func newCodec(branchFactor BranchFactor) encoderDecoder {
+func newCodec() encoderDecoder {
 	return &codecImpl{
-		branchFactor: branchFactor,
 		varIntPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, binary.MaxVarintLen64)
@@ -86,11 +85,10 @@ func newCodec(branchFactor BranchFactor) encoderDecoder {
 // Note that bytes.Buffer.Write always returns nil so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
-	branchFactor BranchFactor
-	varIntPool   sync.Pool
+	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
+func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size of [n] to prevent memory allocations
@@ -102,7 +100,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeInt(buf, numChildren)
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < byte(c.branchFactor); index++ {
+	for index := byte(0); index < byte(branchFactor); index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeInt(buf, int(index))
 			path := entry.compressedPath
@@ -125,7 +123,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	c.encodeInt(buf, numChildren)
 
 	// ensure that the order of entries is consistent
-	for index := byte(0); index < byte(c.branchFactor); index++ {
+	for index := byte(0); index < byte(hv.Key.branchFactor); index++ {
 		if entry, ok := hv.Children[index]; ok {
 			c.encodeInt(buf, int(index))
 			_, _ = buf.Write(entry.id[:])
@@ -137,7 +135,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -156,25 +154,25 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		return err
 	case numChildren < 0:
 		return errNegativeNumChildren
-	case numChildren > int(c.branchFactor):
+	case numChildren > int(branchFactor):
 		return errTooManyChildren
 	case numChildren > src.Len()/minChildLen:
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, c.branchFactor)
+	n.children = make(map[byte]child, branchFactor)
 	previousChild := -1
 	for i := 0; i < numChildren; i++ {
 		index, err := c.decodeInt(src)
 		if err != nil {
 			return err
 		}
-		if index <= previousChild || index >= int(c.branchFactor) {
+		if index <= previousChild || index >= int(branchFactor) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
 
-		compressedPath, err := c.decodePath(src)
+		compressedPath, err := c.decodePath(src, branchFactor)
 		if err != nil {
 			return err
 		}
@@ -345,20 +343,20 @@ func (c *codecImpl) encodePath(dst *bytes.Buffer, s Path) {
 	_, _ = dst.Write(s.Bytes())
 }
 
-func (c *codecImpl) decodePath(src *bytes.Reader) (Path, error) {
+func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error) {
 	if minPathLen > src.Len() {
-		return EmptyPath(c.branchFactor), io.ErrUnexpectedEOF
+		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
 	}
 
 	var (
-		result = EmptyPath(c.branchFactor)
+		result = EmptyPath(branchFactor)
 		err    error
 	)
 	if result.length, err = c.decodeInt(src); err != nil {
-		return EmptyPath(c.branchFactor), err
+		return EmptyPath(branchFactor), err
 	}
 	if result.length < 0 {
-		return EmptyPath(c.branchFactor), errNegativeNibbleLength
+		return EmptyPath(branchFactor), errNegativeNibbleLength
 	}
 	pathBytesLen := result.length >> 1
 	hasOddLen := result.length%2 == 1
@@ -366,19 +364,19 @@ func (c *codecImpl) decodePath(src *bytes.Reader) (Path, error) {
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
-		return EmptyPath(c.branchFactor), io.ErrUnexpectedEOF
+		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
 	}
 	buffer := make([]byte, pathBytesLen)
 	if _, err := io.ReadFull(src, buffer); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return EmptyPath(c.branchFactor), err
+		return EmptyPath(branchFactor), err
 	}
 	if hasOddLen {
 		paddedNibble := buffer[pathBytesLen-1] & 0x0F
 		if paddedNibble != 0 {
-			return EmptyPath(c.branchFactor), errNonZeroNibblePadding
+			return EmptyPath(branchFactor), errNonZeroNibblePadding
 		}
 	}
 	result.value = string(buffer)

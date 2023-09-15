@@ -27,15 +27,17 @@ type valueNodeDB struct {
 	nodeCache cache.Cacher[Path, *node]
 	metrics   merkleMetrics
 
-	closed utils.Atomic[bool]
+	closed       utils.Atomic[bool]
+	branchFactor BranchFactor
 }
 
-func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int) *valueNodeDB {
+func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int, branchFactor BranchFactor) *valueNodeDB {
 	return &valueNodeDB{
-		metrics:    metrics,
-		baseDB:     db,
-		bufferPool: bufferPool,
-		nodeCache:  cache.NewSizedLRU(size, cacheEntrySize),
+		metrics:      metrics,
+		baseDB:       db,
+		bufferPool:   bufferPool,
+		nodeCache:    cache.NewSizedLRU(size, cacheEntrySize),
+		branchFactor: branchFactor,
 	}
 }
 
@@ -162,7 +164,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(NewPath16(key), i.nodeIter.Value())
+	n, err := parseNode(NewPath(key, i.db.branchFactor), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

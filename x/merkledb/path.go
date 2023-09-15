@@ -19,10 +19,13 @@ const (
 type BranchFactor int
 
 const (
-	BranchFactor2   BranchFactor = 2
-	BranchFactor4   BranchFactor = 4
-	BranchFactor16  BranchFactor = 16
-	BranchFactor256 BranchFactor = 256
+	BranchFactorUnspecified BranchFactor = 0
+	BranchFactor2           BranchFactor = 2
+	BranchFactor4           BranchFactor = 4
+	BranchFactor16          BranchFactor = 16
+	BranchFactor256         BranchFactor = 256
+
+	BranchFactorDefault = BranchFactor16
 )
 
 type pathConfig struct {
@@ -76,10 +79,6 @@ func NewPath(p []byte, branchFactor BranchFactor) Path {
 	result.value = string(p)
 	result.length = len(p) * result.tokensPerByte
 	return result
-}
-
-func NewPath16(p []byte) Path {
-	return NewPath(p, BranchFactor16)
 }
 
 // Length returns the number of tokens in the current Path

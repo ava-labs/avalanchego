@@ -82,7 +82,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodePath(reader)
+			got, err := codec.decodePath(reader, BranchFactor16)
 			if err != nil {
 				t.SkipNow()
 			}
@@ -109,12 +109,12 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
-			if err := codec.decodeDBNode(b, node); err != nil {
+			if err := codec.decodeDBNode(b, node, BranchFactor16); err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeDBNode(node)
+			buf := codec.encodeDBNode(node, BranchFactor16)
 			require.Equal(b, buf)
 		},
 	)
@@ -155,7 +155,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: NewPath16(childPathBytes),
+					compressedPath: NewPath(childPathBytes, BranchFactor16),
 					id:             childID,
 				}
 			}
@@ -164,13 +164,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes := codec.encodeDBNode(&node)
+			nodeBytes := codec.encodeDBNode(&node, BranchFactor16)
 
 			var gotNode dbNode
-			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
+			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode, BranchFactor16))
 			require.Equal(node, gotNode)
 
-			nodeBytes2 := codec.encodeDBNode(&gotNode)
+			nodeBytes2 := codec.encodeDBNode(&gotNode, BranchFactor16)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
@@ -183,7 +183,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode, BranchFactor16)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
@@ -191,7 +191,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes := codec.encodeDBNode(&proof)
+	nodeBytes := codec.encodeDBNode(&proof, BranchFactor16)
 
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
@@ -199,7 +199,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	// Put num children -1 at end
 	codec.(*codecImpl).encodeInt(proofBytesBuf, -1)
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
 	require.ErrorIs(err, errNegativeNumChildren)
 
 	// Remove num children from end
@@ -209,14 +209,14 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	// Put num children BranchFactor16+1 at end
 	codec.(*codecImpl).encodeInt(proofBytesBuf, int(BranchFactor16)+1)
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
 	require.ErrorIs(err, errTooManyChildren)
 }
 
 // Ensure that encodeHashValues is deterministic
 func FuzzEncodeHashValues(f *testing.F) {
-	codec1 := newCodec(BranchFactor16)
-	codec2 := newCodec(BranchFactor16)
+	codec1 := newCodec()
+	codec2 := newCodec()
 
 	f.Fuzz(
 		func(
@@ -236,7 +236,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 				_, _ = r.Read(compressedPathBytes) // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: NewPath16(compressedPathBytes),
+					compressedPath: NewPath(compressedPathBytes, BranchFactor16),
 					id:             ids.GenerateTestID(),
 					hasValue:       r.Intn(2) == 1, // #nosec G404
 				}
@@ -256,7 +256,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      NewPath16(key),
+				Key:      NewPath(key, BranchFactor16),
 			}
 
 			// Serialize the *hashValues with both codecs

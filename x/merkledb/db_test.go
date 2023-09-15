@@ -61,7 +61,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(NewPath16(keyBytes), true)
+	n, err := db.getNode(NewPath(keyBytes, BranchFactor16), true)
 	require.NoError(err)
 
 	// node's value shouldn't be affected by the edit
@@ -805,13 +805,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
 
-			uncommittedKeyValues[NewPath16(step.key)] = step.value
-			uncommittedDeletes.Remove(NewPath16(step.key))
+			uncommittedKeyValues[NewPath(step.key, BranchFactor16)] = step.value
+			uncommittedDeletes.Remove(NewPath(step.key, BranchFactor16))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
 
-			uncommittedDeletes.Add(NewPath16(step.key))
-			delete(uncommittedKeyValues, NewPath16(step.key))
+			uncommittedDeletes.Add(NewPath(step.key, BranchFactor16))
+			delete(uncommittedKeyValues, NewPath(step.key, BranchFactor16))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -912,7 +912,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			want := values[NewPath16(step.key)]
+			want := values[NewPath(step.key, BranchFactor16)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 
 			trieValue, err := getNodeValue(db, string(step.key))
