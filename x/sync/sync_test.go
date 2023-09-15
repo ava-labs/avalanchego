@@ -648,6 +648,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(localDB.CommitRangeProof(
 			context.Background(),
 			startKey,
+			endKey,
 			remoteProof,
 		))
 
