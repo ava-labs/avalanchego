@@ -119,14 +119,15 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	return parseNode(key, nodeBytes)
 }
 
-// constructDBKey creates a key that can be used in the base db
-// We need to be able to differentiate between two paths of equal byte length but different token length,
-// so it adds a padding that can be used to differentiate.
-// Additionally, it adds the prefix indicating it is part of the intermediateDB
+// constructDBKey returns a key that can be used in [db.baseDB].
+// We need to be able to differentiate between two paths of equal
+// byte length but different token length so we add padding to differentiate.
+// Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key path) []byte {
 	compressedKey := key.Serialize()
 
-	// add one additional byte to store padding when the path has a length that fits into a whole number of bytes
+	// add one additional byte to store padding when the path
+	// has a length that fits into a whole number of bytes
 	remainder := compressedKey.NibbleLength % 2
 	keyLen := len(compressedKey.Value)
 	if remainder == 0 {

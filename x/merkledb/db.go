@@ -109,8 +109,9 @@ type RangeProofer interface {
 	) (*RangeProof, error)
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
-	// [start] is the smallest key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error
+	// [start] is the smallest possible key in the range this [proof] covers.
+	// [end] is the largest possible key in the range this [proof] covers.
+	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
 type MerkleDB interface {
@@ -130,14 +131,14 @@ type Config struct {
 	RootGenConcurrency uint
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
-	EvictionBatchSize int
+	EvictionBatchSize uint
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength int
+	HistoryLength uint
 	// The number of bytes to cache nodes with values.
-	ValueNodeCacheSize int
+	ValueNodeCacheSize uint
 	// The number of bytes to cache nodes without values.
-	IntermediateNodeCacheSize int
+	IntermediateNodeCacheSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -217,9 +218,9 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
-		history:              newTrieHistory(config.HistoryLength),
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
+		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
@@ -242,7 +243,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, config.ValueNodeCacheSize); err != nil {
+			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
 				return nil, err
 			}
 		}
@@ -334,7 +335,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	return view.commitToDB(ctx)
 }
 
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error {
+func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -352,11 +353,11 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 		}
 	}
 
-	var largestKey []byte
+	largestKey := end
 	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
-	keysToDelete, err := db.getKeysNotInSet(start.Value(), largestKey, keys)
+	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return err
 	}
@@ -1128,19 +1129,19 @@ func (db *merkleDB) getHistoricalViewForRange(
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
-// If [start] is nil, then the range has no lower bound.
-// If [end] is nil, then the range has no upper bound.
-func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
+// If [start] is Nothing, then the range has no lower bound.
+// If [end] is Nothing, then the range has no upper bound.
+func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	it := db.NewIteratorWithStart(start)
+	it := db.NewIteratorWithStart(start.Value())
 	defer it.Release()
 
 	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
-		if len(end) != 0 && bytes.Compare(key, end) > 0 {
+		if end.HasValue() && bytes.Compare(key, end.Value()) > 0 {
 			break
 		}
 		if !keySet.Contains(string(key)) {
@@ -1195,6 +1196,8 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	return prefixedKey
 }
 
+// Returns a []byte from [bufferPool] with length exactly [size].
+// The []byte is not guaranteed to be zeroed.
 func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
 	buffer := bufferPool.Get().([]byte)
 	if cap(buffer) >= size {
