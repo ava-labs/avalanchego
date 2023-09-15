@@ -40,7 +40,7 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockSet) Add(arg0 ids.NodeID, arg1 *bls.PublicKey, arg2 ids.ID, arg3 uint64) error {
+func (m *MockSet) Add(arg0 ids.GenericNodeID, arg1 *bls.PublicKey, arg2 ids.ID, arg3 uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Add", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -54,7 +54,7 @@ func (mr *MockSetMockRecorder) Add(arg0, arg1, arg2, arg3 interface{}) *gomock.C
 }
 
 // AddWeight mocks base method.
-func (m *MockSet) AddWeight(arg0 ids.NodeID, arg1 uint64) error {
+func (m *MockSet) AddWeight(arg0 ids.GenericNodeID, arg1 uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddWeight", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -68,7 +68,7 @@ func (mr *MockSetMockRecorder) AddWeight(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // Contains mocks base method.
-func (m *MockSet) Contains(arg0 ids.NodeID) bool {
+func (m *MockSet) Contains(arg0 ids.GenericNodeID) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Contains", arg0)
 	ret0, _ := ret[0].(bool)
@@ -82,7 +82,7 @@ func (mr *MockSetMockRecorder) Contains(arg0 interface{}) *gomock.Call {
 }
 
 // Get mocks base method.
-func (m *MockSet) Get(arg0 ids.NodeID) (*Validator, bool) {
+func (m *MockSet) Get(arg0 ids.GenericNodeID) (*Validator, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
 	ret0, _ := ret[0].(*Validator)
@@ -97,7 +97,7 @@ func (mr *MockSetMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // GetWeight mocks base method.
-func (m *MockSet) GetWeight(arg0 ids.NodeID) uint64 {
+func (m *MockSet) GetWeight(arg0 ids.GenericNodeID) uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetWeight", arg0)
 	ret0, _ := ret[0].(uint64)
@@ -125,10 +125,10 @@ func (mr *MockSetMockRecorder) Len() *gomock.Call {
 }
 
 // Map mocks base method.
-func (m *MockSet) Map() map[ids.NodeID]*GetValidatorOutput {
+func (m *MockSet) Map() map[ids.GenericNodeID]*GetValidatorOutput {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Map")
-	ret0, _ := ret[0].(map[ids.NodeID]*GetValidatorOutput)
+	ret0, _ := ret[0].(map[ids.GenericNodeID]*GetValidatorOutput)
 	return ret0
 }
 
@@ -165,7 +165,7 @@ func (mr *MockSetMockRecorder) RegisterCallbackListener(arg0 interface{}) *gomoc
 }
 
 // RemoveWeight mocks base method.
-func (m *MockSet) RemoveWeight(arg0 ids.NodeID, arg1 uint64) error {
+func (m *MockSet) RemoveWeight(arg0 ids.GenericNodeID, arg1 uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveWeight", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -179,10 +179,10 @@ func (mr *MockSetMockRecorder) RemoveWeight(arg0, arg1 interface{}) *gomock.Call
 }
 
 // Sample mocks base method.
-func (m *MockSet) Sample(arg0 int) ([]ids.NodeID, error) {
+func (m *MockSet) Sample(arg0 int) ([]ids.GenericNodeID, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Sample", arg0)
-	ret0, _ := ret[0].([]ids.NodeID)
+	ret0, _ := ret[0].([]ids.GenericNodeID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -208,7 +208,7 @@ func (mr *MockSetMockRecorder) String() *gomock.Call {
 }
 
 // SubsetWeight mocks base method.
-func (m *MockSet) SubsetWeight(arg0 set.Set[ids.NodeID]) uint64 {
+func (m *MockSet) SubsetWeight(arg0 set.Set[ids.GenericNodeID]) uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubsetWeight", arg0)
 	ret0, _ := ret[0].(uint64)
