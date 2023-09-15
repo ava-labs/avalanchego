@@ -129,8 +129,8 @@ func Test_IntermediateNodeDB(t *testing.T) {
 func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
-		key []byte) {
-
+		key []byte,
+	) {
 		require := require.New(t)
 		cacheSize := 200
 		evictionBatchSize := cacheSize
