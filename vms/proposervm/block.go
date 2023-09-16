@@ -161,6 +161,7 @@ func (p *postForkCommonComponents) Verify(
 			zap.Time("parentTimestamp", parentTimestamp),
 			zap.Duration("minDelay", minDelay),
 			zap.Time("blockTimestamp", childTimestamp),
+			zap.Stringer("proposerID", proposerID),
 		)
 	}
 
@@ -199,9 +200,9 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
+	proposerID := p.vm.ctx.NodeID
 	if delay < proposer.MaxDelay {
 		parentHeight := p.innerBlk.Height()
-		proposerID := p.vm.ctx.NodeID
 		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",
@@ -288,6 +289,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Uint64("height", child.Height()),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
+		zap.Stringer("proposerID", proposerID),
 	)
 	return child, nil
 }
