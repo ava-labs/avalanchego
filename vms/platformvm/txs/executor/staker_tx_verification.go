@@ -40,6 +40,40 @@ var (
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 )
 
+// verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
+// network requirements for [subnetValidator]. An error is returned if they
+// are not fulfilled.
+func verifySubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
+	if err == database.ErrNotFound {
+		return fmt.Errorf(
+			"%s %w of the primary network",
+			subnetValidator.NodeID,
+			ErrNotValidator,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf(
+			"failed to fetch the primary network validator for %s: %w",
+			subnetValidator.NodeID,
+			err,
+		)
+	}
+
+	// Ensure that the period this validator validates the specified subnet
+	// is a subset of the time they validate the primary network.
+	if !txs.BoundedBy(
+		subnetValidator.StartTime(),
+		subnetValidator.EndTime(),
+		primaryNetworkValidator.StartTime,
+		primaryNetworkValidator.EndTime,
+	) {
+		return ErrPeriodMismatch
+	}
+
+	return nil
+}
+
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
 // It returns the tx outputs that should be returned if this validator is not
 // added to the staking set.
@@ -198,31 +232,8 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == database.ErrNotFound {
-		return fmt.Errorf(
-			"%s %w of the primary network",
-			tx.Validator.NodeID,
-			ErrNotValidator,
-		)
-	}
-	if err != nil {
-		return fmt.Errorf(
-			"failed to fetch the primary network validator for %s: %w",
-			tx.Validator.NodeID,
-			err,
-		)
-	}
-
-	// Ensure that the period this validator validates the specified subnet
-	// is a subset of the time they validate the primary network.
-	if !txs.BoundedBy(
-		tx.Validator.StartTime(),
-		tx.Validator.EndTime(),
-		primaryNetworkValidator.StartTime,
-		primaryNetworkValidator.EndTime,
-	) {
-		return ErrPeriodMismatch
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+		return err
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
@@ -524,24 +535,8 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch the primary network validator for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		// Ensure that the period this validator validates the specified subnet
-		// is a subset of the time they validate the primary network.
-		if !txs.BoundedBy(
-			tx.Validator.StartTime(),
-			tx.Validator.EndTime(),
-			primaryNetworkValidator.StartTime,
-			primaryNetworkValidator.EndTime,
-		) {
-			return ErrPeriodMismatch
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+			return err
 		}
 
 		txFee = backend.Config.AddSubnetValidatorFee

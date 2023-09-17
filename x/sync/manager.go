@@ -309,7 +309,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	largestHandledKey := work.end
 	if len(rangeProof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
-		if err := m.config.DB.CommitRangeProof(ctx, work.start, rangeProof); err != nil {
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, rangeProof); err != nil {
 			m.setError(err)
 			return
 		}
@@ -351,13 +351,14 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	largestHandledKey := work.end
-	if len(proof.KeyValues) > 0 {
-		// Add all the key-value pairs we got to the database.
-		if err := m.config.DB.CommitRangeProof(ctx, work.start, proof); err != nil {
-			m.setError(err)
-			return
-		}
 
+	// Replace all the key-value pairs in the DB from start to end with values from the response.
+	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, proof); err != nil {
+		m.setError(err)
+		return
+	}
+
+	if len(proof.KeyValues) > 0 {
 		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 

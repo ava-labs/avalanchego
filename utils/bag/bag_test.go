@@ -9,6 +9,55 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBagOf(t *testing.T) {
+	tests := []struct {
+		name           string
+		elements       []int
+		expectedCounts map[int]int
+	}{
+		{
+			name:           "nil",
+			elements:       nil,
+			expectedCounts: map[int]int{},
+		},
+		{
+			name:           "empty",
+			elements:       []int{},
+			expectedCounts: map[int]int{},
+		},
+		{
+			name:     "unique elements",
+			elements: []int{1, 2, 3},
+			expectedCounts: map[int]int{
+				1: 1,
+				2: 1,
+				3: 1,
+			},
+		},
+		{
+			name:     "duplicate elements",
+			elements: []int{1, 2, 3, 1, 2, 3},
+			expectedCounts: map[int]int{
+				1: 2,
+				2: 2,
+				3: 2,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			b := Of(tt.elements...)
+
+			require.Equal(len(tt.elements), b.Len())
+			for entry, count := range tt.expectedCounts {
+				require.Equal(count, b.Count(entry))
+			}
+		})
+	}
+}
+
 func TestBagAdd(t *testing.T) {
 	require := require.New(t)
 
