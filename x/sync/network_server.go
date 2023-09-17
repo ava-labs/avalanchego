@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -40,7 +42,18 @@ const (
 	endProofSizeBufferAmount = 2 * units.KiB
 )
 
-var ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
+var (
+	ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
+
+	errInvalidBytesLimit    = errors.New("bytes limit must be greater than 0")
+	errInvalidKeyLimit      = errors.New("key limit must be greater than 0")
+	errInvalidStartRootHash = fmt.Errorf("start root hash must have length %d", hashing.HashLen)
+	errInvalidEndRootHash   = fmt.Errorf("end root hash must have length %d", hashing.HashLen)
+	errInvalidStartKey      = errors.New("start key is Nothing but has value")
+	errInvalidEndKey        = errors.New("end key is Nothing but has value")
+	errInvalidBounds        = errors.New("start key is greater than end key")
+	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
+)
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
@@ -57,7 +70,7 @@ func NewNetworkServer(appSender common.AppSender, db DB, log logging.Logger) *Ne
 }
 
 // AppRequest is called by avalanchego -> VM when there is an incoming AppRequest from a peer.
-// Never returns errors as they are considered fatal.
+// Returns a non-nil error iff we fail to send an app message. This is a fatal error.
 // Sends a response back to the sender if length of response returned by the handler > 0.
 func (s *NetworkServer) AppRequest(
 	ctx context.Context,
@@ -120,81 +133,114 @@ func (s *NetworkServer) AppRequest(
 		return nil
 	}
 
-	if err != nil && !isTimeout(err) {
-		// log unexpected errors instead of returning them, since they are fatal.
-		s.log.Warn(
-			"unexpected error handling AppRequest",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Error(err),
-		)
+	if err != nil {
+		if errors.Is(err, errAppSendFailed) {
+			return err
+		}
+
+		if !isTimeout(err) {
+			// log unexpected errors instead of returning them, since they are fatal.
+			s.log.Warn(
+				"unexpected error handling AppRequest",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
+		}
 	}
 	return nil
 }
 
+func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return maybe.Some(mb.Value)
+	}
+	return maybe.Nothing[[]byte]()
+}
+
 // Generates a change proof and sends it to [nodeID].
+// If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 ||
-		req.KeyLimit == 0 ||
-		len(req.StartRootHash) != hashing.HashLen ||
-		len(req.EndRootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+	if err := validateChangeProofRequest(req); err != nil {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("req", req),
+			zap.Error(err),
 		)
 		return nil // dropping request
 	}
 
-	// override limit if it is greater than maxKeyValuesLimit
-	keyLimit := req.KeyLimit
-	if keyLimit > maxKeyValuesLimit {
-		keyLimit = maxKeyValuesLimit
-	}
-	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > maxByteSizeLimit {
-		bytesLimit = maxByteSizeLimit
+	// override limits if they exceed caps
+	var (
+		keyLimit   = math.Min(req.KeyLimit, maxKeyValuesLimit)
+		bytesLimit = math.Min(int(req.BytesLimit), maxByteSizeLimit)
+		start      = maybeBytesToMaybe(req.StartKey)
+		end        = maybeBytesToMaybe(req.EndKey)
+	)
+
+	startRoot, err := ids.ToID(req.StartRootHash)
+	if err != nil {
+		return err
 	}
 
-	// attempt to get a proof within the bytes limit
+	endRoot, err := ids.ToID(req.EndRootHash)
+	if err != nil {
+		return err
+	}
+
 	for keyLimit > 0 {
-		startRoot, err := ids.ToID(req.StartRootHash)
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
-			return err
-		}
-		endRoot, err := ids.ToID(req.EndRootHash)
-		if err != nil {
-			return err
-		}
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
-		if err != nil {
-			// handle expected errors so clients cannot cause servers to spam warning logs.
-			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
-				s.log.Debug(
-					"dropping invalid change proof request",
+			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+				return err
+			}
+
+			// [s.db] doesn't have sufficient history to generate change proof.
+			// Generate a range proof for the end root ID instead.
+			proofBytes, err := getRangeProof(
+				ctx,
+				s.db,
+				&pb.SyncGetRangeProofRequest{
+					RootHash:   req.EndRootHash,
+					StartKey:   req.StartKey,
+					EndKey:     req.EndKey,
+					KeyLimit:   req.KeyLimit,
+					BytesLimit: req.BytesLimit,
+				},
+				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+					return proto.Marshal(&pb.SyncGetChangeProofResponse{
+						Response: &pb.SyncGetChangeProofResponse_RangeProof{
+							RangeProof: rangeProof.ToProto(),
+						},
+					})
+				},
+			)
+			if err != nil {
+				return err
+			}
+
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+				s.log.Fatal(
+					"failed to send app response",
 					zap.Stringer("nodeID", nodeID),
 					zap.Uint32("requestID", requestID),
-					zap.Stringer("req", req),
+					zap.Int("responseLen", len(proofBytes)),
 					zap.Error(err),
 				)
-				return nil // dropping request
+				return fmt.Errorf("%w: %w", errAppSendFailed, err)
 			}
-			return err
+			return nil
 		}
 
+		// We generated a change proof. See if it's small enough.
 		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-			// TODO: Remove [changeProof.HadRootsInHistory] and if
-			// this node is unable to serve a change proof because it has
-			// insufficient history, get a range proof and set [Response]
-			// to that range proof.
-			// When this change is made, the client must be updated accordingly.
 			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 				ChangeProof: changeProof.ToProto(),
 			},
@@ -204,77 +250,121 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		if len(proofBytes) < bytesLimit {
-			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+				s.log.Fatal(
+					"failed to send app response",
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Int("responseLen", len(proofBytes)),
+					zap.Error(err),
+				)
+				return fmt.Errorf("%w: %w", errAppSendFailed, err)
+			}
+			return nil
 		}
-		// the proof size was too large, try to shrink it
+
+		// The proof was too large. Try to shrink it.
 		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
 
 // Generates a range proof and sends it to [nodeID].
-// TODO danlaine how should we handle context cancellation?
+// If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 ||
-		req.KeyLimit == 0 ||
-		len(req.RootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+	if err := validateRangeProofRequest(req); err != nil {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("req", req),
+			zap.Error(err),
 		)
-		return nil // dropping request
+		return nil // drop request
 	}
 
-	// override limit if it is greater than maxKeyValuesLimit
-	keyLimit := req.KeyLimit
-	if keyLimit > maxKeyValuesLimit {
-		keyLimit = maxKeyValuesLimit
+	// override limits if they exceed caps
+	req.KeyLimit = math.Min(req.KeyLimit, maxKeyValuesLimit)
+	req.BytesLimit = math.Min(req.BytesLimit, maxByteSizeLimit)
+
+	proofBytes, err := getRangeProof(
+		ctx,
+		s.db,
+		req,
+		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+			return proto.Marshal(rangeProof.ToProto())
+		},
+	)
+	if err != nil {
+		return err
 	}
-	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > maxByteSizeLimit {
-		bytesLimit = maxByteSizeLimit
+	if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+		s.log.Fatal(
+			"failed to send app response",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Int("responseLen", len(proofBytes)),
+			zap.Error(err),
+		)
+		return fmt.Errorf("%w: %w", errAppSendFailed, err)
 	}
+	return nil
+}
+
+// Get the range proof specified by [req].
+// If the generated proof is too large, the key limit is reduced
+// and the proof is regenerated. This process is repeated until
+// the proof is smaller than [req.BytesLimit].
+// When a sufficiently small proof is generated, returns it.
+// If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
+// TODO improve range proof generation so we don't need to iteratively
+// reduce the key limit.
+func getRangeProof(
+	ctx context.Context,
+	db DB,
+	req *pb.SyncGetRangeProofRequest,
+	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
+) ([]byte, error) {
+	root, err := ids.ToID(req.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	keyLimit := int(req.KeyLimit)
+
 	for keyLimit > 0 {
-		root, err := ids.ToID(req.RootHash)
+		rangeProof, err := db.GetRangeProofAtRoot(
+			ctx,
+			root,
+			maybeBytesToMaybe(req.StartKey),
+			maybeBytesToMaybe(req.EndKey),
+			keyLimit,
+		)
 		if err != nil {
-			return err
-		}
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
-		if err != nil {
-			// handle expected errors so clients cannot cause servers to spam warning logs.
-			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
-				s.log.Debug(
-					"dropping invalid range proof request",
-					zap.Stringer("nodeID", nodeID),
-					zap.Uint32("requestID", requestID),
-					zap.Stringer("req", req),
-					zap.Error(err),
-				)
-				return nil // dropping request
+			if errors.Is(err, merkledb.ErrInsufficientHistory) {
+				return nil, nil // drop request
 			}
-			return err
+			return nil, err
 		}
 
-		proofBytes, err := proto.Marshal(rangeProof.ToProto())
+		proofBytes, err := marshalFunc(rangeProof)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if len(proofBytes) < bytesLimit {
-			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+		if len(proofBytes) < int(req.BytesLimit) {
+			return proofBytes, nil
 		}
-		// the proof size was too large, try to shrink it
-		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
+
+		// The proof was too large. Try to shrink it.
+		keyLimit = len(rangeProof.KeyValues) / 2
 	}
-	return ErrMinProofSizeIsTooLarge
+	return nil, ErrMinProofSizeIsTooLarge
 }
 
 // isTimeout returns true if err is a timeout from a context cancellation
@@ -288,4 +378,48 @@ func isTimeout(err error) bool {
 	}
 	// otherwise, check for context.DeadlineExceeded directly
 	return errors.Is(err, context.DeadlineExceeded)
+}
+
+// Returns nil iff [req] is well-formed.
+func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
+	switch {
+	case req.BytesLimit == 0:
+		return errInvalidBytesLimit
+	case req.KeyLimit == 0:
+		return errInvalidKeyLimit
+	case len(req.StartRootHash) != hashing.HashLen:
+		return errInvalidStartRootHash
+	case len(req.EndRootHash) != hashing.HashLen:
+		return errInvalidEndRootHash
+	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
+		return errInvalidStartKey
+	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
+		return errInvalidEndKey
+	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+		return errInvalidBounds
+	default:
+		return nil
+	}
+}
+
+// Returns nil iff [req] is well-formed.
+func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
+	switch {
+	case req.BytesLimit == 0:
+		return errInvalidBytesLimit
+	case req.KeyLimit == 0:
+		return errInvalidKeyLimit
+	case len(req.RootHash) != ids.IDLen:
+		return errInvalidRootHash
+	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
+		return errInvalidStartKey
+	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
+		return errInvalidEndKey
+	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+		return errInvalidBounds
+	default:
+		return nil
+	}
 }

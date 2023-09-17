@@ -24,12 +24,12 @@ func TestSortSliceSortable(t *testing.T) {
 
 	var s []sortable
 	Sort(s)
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 	require.Empty(s)
 
 	s = []sortable{1}
 	Sort(s)
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 	require.Equal([]sortable{1}, s)
 
 	s = []sortable{1, 1}
@@ -38,12 +38,12 @@ func TestSortSliceSortable(t *testing.T) {
 
 	s = []sortable{1, 2}
 	Sort(s)
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{2, 1}
 	Sort(s)
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{1, 2, 1}
@@ -80,28 +80,28 @@ func TestIsSortedAndUniqueSortable(t *testing.T) {
 	require := require.New(t)
 
 	var s []sortable
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 
 	s = []sortable{}
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 
 	s = []sortable{1}
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 
 	s = []sortable{1, 2}
-	require.True(IsSortedAndUniqueSortable(s))
+	require.True(IsSortedAndUnique(s))
 
 	s = []sortable{1, 1}
-	require.False(IsSortedAndUniqueSortable(s))
+	require.False(IsSortedAndUnique(s))
 
 	s = []sortable{2, 1}
-	require.False(IsSortedAndUniqueSortable(s))
+	require.False(IsSortedAndUnique(s))
 
 	s = []sortable{1, 2, 1}
-	require.False(IsSortedAndUniqueSortable(s))
+	require.False(IsSortedAndUnique(s))
 
 	s = []sortable{1, 2, 0}
-	require.False(IsSortedAndUniqueSortable(s))
+	require.False(IsSortedAndUnique(s))
 }
 
 func TestIsUnique(t *testing.T) {

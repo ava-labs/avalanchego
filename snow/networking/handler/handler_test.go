@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -311,7 +311,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 func TestHandlerDispatchInternal(t *testing.T) {
 	require := require.New(t)
 
-	calledNotify := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
@@ -352,8 +351,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
+
+	wg := &sync.WaitGroup{}
 	engine.NotifyF = func(context.Context, common.Message) error {
-		calledNotify <- struct{}{}
+		wg.Done()
 		return nil
 	}
 
@@ -373,14 +374,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
+	wg.Add(1)
 	handler.Start(context.Background(), false)
 	msgFromVMChan <- 0
-
-	select {
-	case <-time.After(20 * time.Millisecond):
-		require.FailNow("should have called notify")
-	case <-calledNotify:
-	}
+	wg.Wait()
 }
 
 func TestHandlerSubnetConnector(t *testing.T) {
@@ -398,7 +395,6 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	connector := validators.NewMockSubnetConnector(ctrl)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -621,7 +617,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			}
 
 			handler.Start(context.Background(), false)
-			handler.Push(context.TODO(), Message{
+			handler.Push(context.Background(), Message{
 				InboundMessage: message.InboundChits(
 					ids.Empty,
 					uint32(0),

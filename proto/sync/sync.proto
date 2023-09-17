@@ -23,7 +23,7 @@ service DB {
 
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
-  rpc GetChangeProof(GetChangeProofRequest) returns (ChangeProof);
+  rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
 
@@ -54,8 +54,8 @@ message Proof {
 message SyncGetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
-  bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes start_key = 3;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
 }
@@ -70,15 +70,23 @@ message SyncGetChangeProofResponse {
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
-  bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes start_key = 3;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
+}
+
+message GetChangeProofResponse {
+  oneof response {
+    ChangeProof change_proof = 1;
+    // True iff server errored with merkledb.ErrInsufficientHistory.
+    bool root_not_present = 2;
+  }
 }
 
 message VerifyChangeProofRequest {
   ChangeProof proof = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   bytes expected_root_hash = 4;
 }
 
@@ -95,16 +103,16 @@ message CommitChangeProofRequest {
 // the response. GetRangeProof in the DB service doesn't.
 message SyncGetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
 }
 
 message GetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
 }
 
@@ -113,15 +121,15 @@ message GetRangeProofResponse {
 }
 
 message CommitRangeProofRequest {
-  bytes start_key = 1;
-  RangeProof range_proof = 2;
+  MaybeBytes start_key = 1;
+  MaybeBytes end_key = 2;
+  RangeProof range_proof = 3;
 }
 
 message ChangeProof {
-  bool had_roots_in_history = 1; // TODO remove
-  repeated ProofNode start_proof = 2;
-  repeated ProofNode end_proof = 3;
-  repeated KeyChange key_changes = 4;
+  repeated ProofNode start_proof = 1;
+  repeated ProofNode end_proof = 2;
+  repeated KeyChange key_changes = 3;
 }
 
 message RangeProof {

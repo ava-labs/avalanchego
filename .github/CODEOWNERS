@@ -15,10 +15,9 @@
 /snow/engine/snowman/syncer/ @abi87
 /snow/uptime/ @ceyonur
 /utils/logging/ @ceyonur
-/vms/avm/ @coffeeavax @StephenButtolph
 /vms/platformvm/ @abi87 @danlaine @StephenButtolph
 /vms/proposervm/ @abi87 @StephenButtolph
 /vms/rpcchainvm/ @hexfusion @StephenButtolph
 /vms/registry/ @joshua-kim
-/tests/ @abi87 @gyuho
+/tests/ @abi87 @gyuho @marun
 /x/ @danlaine @darioush @dboehm-avalabs

@@ -387,6 +387,14 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 	return vm.chainManager.LastAccepted(), nil
 }
 
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (*VM) VerifyHeightIndex(context.Context) error {
+	return nil
+}
+
 /*
  ******************************************************************************
  *********************************** DAG VM ***********************************

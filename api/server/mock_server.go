@@ -13,7 +13,7 @@ import (
 
 	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockServer is a mock of Server interface.
@@ -117,20 +117,6 @@ func (m *MockServer) Dispatch() error {
 func (mr *MockServerMockRecorder) Dispatch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockServer)(nil).Dispatch))
-}
-
-// DispatchTLS mocks base method.
-func (m *MockServer) DispatchTLS(arg0, arg1 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DispatchTLS", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DispatchTLS indicates an expected call of DispatchTLS.
-func (mr *MockServerMockRecorder) DispatchTLS(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DispatchTLS", reflect.TypeOf((*MockServer)(nil).DispatchTLS), arg0, arg1)
 }
 
 // RegisterChain mocks base method.

@@ -5,10 +5,12 @@ package gdb
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
@@ -43,7 +45,7 @@ func (s *DBServer) GetMerkleRoot(
 func (s *DBServer) GetChangeProof(
 	ctx context.Context,
 	req *pb.GetChangeProofRequest,
-) (*pb.ChangeProof, error) {
+) (*pb.GetChangeProofResponse, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -52,18 +54,39 @@ func (s *DBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
 	changeProof, err := s.db.GetChangeProof(
 		ctx,
 		startRootID,
 		endRootID,
-		req.StartKey,
-		req.EndKey,
+		start,
+		end,
 		int(req.KeyLimit),
 	)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+			return nil, err
+		}
+		return &pb.GetChangeProofResponse{
+			Response: &pb.GetChangeProofResponse_RootNotPresent{
+				RootNotPresent: true,
+			},
+		}, nil
 	}
-	return changeProof.ToProto(), nil
+
+	return &pb.GetChangeProofResponse{
+		Response: &pb.GetChangeProofResponse_ChangeProof{
+			ChangeProof: changeProof.ToProto(),
+		},
+	}, nil
 }
 
 func (s *DBServer) VerifyChangeProof(
@@ -79,10 +102,18 @@ func (s *DBServer) VerifyChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -125,8 +156,15 @@ func (s *DBServer) GetRangeProof(
 	if err != nil {
 		return nil, err
 	}
-
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, req.EndKey, int(req.KeyLimit))
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, start, end, int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +201,16 @@ func (s *DBServer) CommitRangeProof(
 		return nil, err
 	}
 
-	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, end, &proof)
 	return &emptypb.Empty{}, err
 }

@@ -14,7 +14,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	ips "github.com/ava-labs/avalanchego/utils/ips"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockOutboundMsgBuilder is a mock of OutboundMsgBuilder interface.

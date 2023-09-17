@@ -11,9 +11,11 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -49,14 +51,13 @@ const (
 // [localRootID] is the ID of the root of this range in our database.
 // If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
-	start       []byte
-	end         []byte
+	start       maybe.Maybe[[]byte]
+	end         maybe.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for workItems
-func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -144,9 +145,11 @@ func (m *Manager) Start(ctx context.Context) error {
 		return ErrAlreadyStarted
 	}
 
+	m.config.Log.Info("starting sync", zap.Stringer("target root", m.config.TargetRoot))
+
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, nil, lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -190,10 +193,6 @@ func (m *Manager) sync(ctx context.Context) {
 		default:
 			m.processingWorkItems++
 			work := m.unprocessedWork.GetWork()
-			// TODO danlaine: We won't release [m.workLock] until
-			// we've started a goroutine for each available work item.
-			// We can't apply proofs we receive until we release [m.workLock].
-			// Is this OK? Is it possible we end up with too many goroutines?
 			go m.doWork(ctx, work)
 		}
 	}
@@ -258,15 +257,21 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeProof, err := m.config.Client.GetChangeProof(
+	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
 			EndRootHash:   targetRootID[:],
-			StartKey:      work.start,
-			EndKey:        work.end,
-			KeyLimit:      defaultRequestKeyLimit,
-			BytesLimit:    defaultRequestByteSizeLimit,
+			StartKey: &pb.MaybeBytes{
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
+			},
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 		m.config.DB,
 	)
@@ -282,26 +287,36 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	default:
 	}
 
-	// The start or end root IDs are not present in other nodes' history.
-	// Add this range as a fresh uncompleted work item to the work heap.
-	// TODO danlaine send range proof instead of failure notification
-	if !changeProof.HadRootsInHistory {
-		work.localRootID = ids.Empty
-		m.enqueueWork(work)
+	if changeOrRangeProof.ChangeProof != nil {
+		// The server had sufficient history to respond with a change proof.
+		changeProof := changeOrRangeProof.ChangeProof
+		largestHandledKey := work.end
+		// if the proof wasn't empty, apply changes to the sync DB
+		if len(changeProof.KeyChanges) > 0 {
+			if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
+				m.setError(err)
+				return
+			}
+			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
+		}
+
+		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 		return
 	}
 
+	// The server responded with a range proof.
+	rangeProof := changeOrRangeProof.RangeProof
 	largestHandledKey := work.end
-	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeProof.KeyChanges) > 0 {
-		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
+	if len(rangeProof.KeyValues) > 0 {
+		// Add all the key-value pairs we got to the database.
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, rangeProof); err != nil {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
+		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [work].
@@ -310,9 +325,15 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   targetRootID[:],
-			StartKey:   work.start,
-			EndKey:     work.end,
+			RootHash: targetRootID[:],
+			StartKey: &pb.MaybeBytes{
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
+			},
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
@@ -330,43 +351,45 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	largestHandledKey := work.end
-	if len(proof.KeyValues) > 0 {
-		// Add all the key-value pairs we got to the database.
-		if err := m.config.DB.CommitRangeProof(ctx, work.start, proof); err != nil {
-			m.setError(err)
-			return
-		}
 
-		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+	// Replace all the key-value pairs in the DB from start to end with values from the response.
+	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, proof); err != nil {
+		m.setError(err)
+		return
+	}
+
+	if len(proof.KeyValues) > 0 {
+		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
 }
 
-// findNextKey returns the start of the key range that should be fetched next.
-// Returns nil if there are no more keys to fetch  up to [rangeEnd].
-//
-// If the last proof received contained at least one key-value pair, then
-// [lastReceivedKey] is the greatest key in the key-value pairs received.
-// Otherwise it's the end of the range for the last proof received.
+// findNextKey returns the start of the key range that should be fetched next
+// given that we just received a range/change proof that proved a range of
+// key-value pairs ending at [lastReceivedKey].
 //
 // [rangeEnd] is the end of the range that we want to fetch.
 //
+// Returns Nothing if there are no more keys to fetch in [lastReceivedKey, rangeEnd].
+//
 // [endProof] is the end proof of the last proof received.
-// Namely it's an inclusion/exclusion proof for [lastReceivedKey].
 //
 // Invariant: [lastReceivedKey] < [rangeEnd].
+// If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func (m *Manager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
-	rangeEnd []byte,
+	rangeEnd maybe.Maybe[[]byte],
 	endProof []merkledb.ProofNode,
-) ([]byte, error) {
+) (maybe.Maybe[[]byte], error) {
 	if len(endProof) == 0 {
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
 		// Start fetching from the next key after [lastReceivedKey].
-		return append(lastReceivedKey, 0), nil
+		nextKey := lastReceivedKey
+		nextKey = append(nextKey, 0)
+		return maybe.Some(nextKey), nil
 	}
 
 	// We want the first key larger than the [lastReceivedKey].
@@ -393,7 +416,7 @@ func (m *Manager) findNextKey(
 	// get a proof for the same key as the received proof from the local db
 	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
-		return nil, err
+		return maybe.Nothing[[]byte](), err
 	}
 	localProofNodes := localProofOfKey.Path
 
@@ -403,13 +426,13 @@ func (m *Manager) findNextKey(
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
-	var nextKey []byte
+	nextKey := maybe.Nothing[[]byte]()
 
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(endProof) - 1
 
 	// traverse the two proofs from the deepest nodes up to the root until a difference is found
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey == nil {
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := endProof[receivedProofNodeIndex]
 
@@ -469,7 +492,7 @@ func (m *Manager) findNextKey(
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
-			nextKey = deepestNode.KeyPath.AppendNibble(childIndex).Value
+			nextKey = maybe.Some(deepestNode.KeyPath.AppendNibble(childIndex).Value)
 			break
 		}
 	}
@@ -478,15 +501,15 @@ func (m *Manager) findNextKey(
 	// then we couldn't find a better answer than the [lastReceivedKey].
 	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
 	// the open range (lastReceivedKey, rangeEnd).
-	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		nextKey = lastReceivedKey
-		nextKey = append(nextKey, 0)
+	if nextKey.HasValue() && bytes.Compare(nextKey.Value(), lastReceivedKey) <= 0 {
+		nextKeyVal := slices.Clone(lastReceivedKey)
+		nextKeyVal = append(nextKeyVal, 0)
+		nextKey = maybe.Some(nextKeyVal)
 	}
 
-	// If the nextKey is larger than the end of the range,
-	// return nil to signal that there is no next key in range.
-	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
-		return nil, nil
+	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
+	if rangeEnd.HasValue() && bytes.Compare(nextKey.Value(), rangeEnd.Value()) >= 0 {
+		return maybe.Nothing[[]byte](), nil
 	}
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
@@ -519,18 +542,22 @@ func (m *Manager) Wait(ctx context.Context) error {
 
 	root, err := m.config.DB.GetMerkleRoot(ctx)
 	if err != nil {
-		m.config.Log.Info("completed with error", zap.Error(err))
 		return err
 	}
+
 	if targetRootID := m.getTargetRoot(); targetRootID != root {
 		// This should never happen.
 		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
 	}
-	m.config.Log.Info("completed", zap.String("new root", root.String()))
+
+	m.config.Log.Info("completed", zap.Stringer("root", root))
 	return nil
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -540,14 +567,12 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	default:
 	}
 
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
-
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
 		return nil
 	}
 
+	m.config.Log.Debug("updated sync target", zap.Stringer("target", syncTargetRoot))
 	m.config.TargetRoot = syncTargetRoot
 
 	// move all completed ranges into the work heap with high priority
@@ -580,27 +605,43 @@ func (m *Manager) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
-	m.config.Log.Error("syncing failed", zap.Error(err))
+	m.config.Log.Error("sync errored", zap.Error(err))
 	m.fatalError = err
 	// Call in goroutine because we might be holding [m.workLock]
 	// which [m.Close] will try to acquire.
 	go m.Close()
 }
 
-// Mark the range [start, end] as synced up to [rootID].
+// Mark that we've fetched all the key-value pairs in the range
+// [workItem.start, largestHandledKey] for the trie with root [rootID].
+//
+// If [workItem.start] is Nothing, then we've fetched all the key-value
+// pairs up to and including [largestHandledKey].
+//
+// If [largestHandledKey] is Nothing, then we've fetched all the key-value
+// pairs at and after [workItem.start].
+//
+// [proofOfLargestKey] is the end proof for the range/change proof
+// that gave us the range up to and including [largestHandledKey].
+//
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
-	// if the last key is equal to the end, then the full range is completed
-	if !bytes.Equal(largestHandledKey, work.end) {
-		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, work.end, proofOfLargestKey)
+func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+	if !maybe.Equal(largestHandledKey, work.end, bytes.Equal) {
+		// The largest handled key isn't equal to the end of the work item.
+		// Find the start of the next key range to fetch.
+		// Note that [largestHandledKey] can't be Nothing.
+		// Proof: Suppose it is. That means that we got a range/change proof that proved up to the
+		// greatest key-value pair in the database. That means we requested a proof with no upper
+		// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
+		// which means [workItem.end] isn't Nothing. Contradiction.
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
 		}
 
-		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey == nil {
+		// nextStartKey being Nothing indicates that the entire range has been completed
+		if nextStartKey.IsNothing() {
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
@@ -609,20 +650,29 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		}
 	}
 
-	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
-	)
-	if m.getTargetRoot() == rootID {
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	stale := m.config.TargetRoot != rootID
+	if stale {
+		// the root has changed, so reinsert with high priority
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+	} else {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-	} else {
-		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	}
+
+	// completed the range [work.start, lastKey], log and record in the completed work heap
+	m.config.Log.Debug("completed range",
+		zap.Stringer("start", work.start),
+		zap.Stringer("end", largestHandledKey),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
+	)
 }
 
 // Queue the given key range to be fetched and applied.
@@ -646,6 +696,16 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
 
+	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
+		// The range is too small to split.
+		// If we didn't have this check we would add work items
+		// [start, start] and [start, end]. Since start <= end, this would
+		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
+		// that there are no overlapping ranges.
+		m.unprocessedWork.Insert(work)
+		return
+	}
+
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
 	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
@@ -656,19 +716,27 @@ func (m *Manager) enqueueWork(work *workItem) {
 }
 
 // find the midpoint between two keys
-// nil on start is treated as all 0's
-// nil on end is treated as all 255's
-func midPoint(start, end []byte) []byte {
+// start is expected to be less than end
+// Nothing/nil [start] is treated as all 0's
+// Nothing/nil [end] is treated as all 255's
+func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+	start := startMaybe.Value()
+	end := endMaybe.Value()
 	length := len(start)
 	if len(end) > length {
 		length = len(end)
 	}
+
 	if length == 0 {
-		return []byte{127}
+		if endMaybe.IsNothing() {
+			return maybe.Some([]byte{127})
+		} else if len(end) == 0 {
+			return maybe.Nothing[[]byte]()
+		}
 	}
 
-	// This check deals with cases where the end has a 255(or is nil which is treated as all 255s) and the start key ends 255.
-	// For example, midPoint([255], nil) should be [255, 127], not [255].
+	// This check deals with cases where the end has a 255(or is nothing which is treated as all 255s) and the start key ends 255.
+	// For example, midPoint([255], nothing) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
 	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end) == 0 || end[len(end)-1] == 255) {
 		length++
@@ -683,7 +751,7 @@ func midPoint(start, end []byte) []byte {
 		}
 
 		endVal := 0
-		if len(end) == 0 {
+		if endMaybe.IsNothing() {
 			endVal = 255
 		}
 		if i < len(end) {
@@ -718,7 +786,7 @@ func midPoint(start, end []byte) []byte {
 	} else {
 		midpoint = midpoint[0:length]
 	}
-	return midpoint
+	return maybe.Some(midpoint)
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and

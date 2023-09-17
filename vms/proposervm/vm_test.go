@@ -7,16 +7,16 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -36,19 +37,18 @@ import (
 )
 
 var (
-	_ block.ChainVM              = (*fullVM)(nil)
-	_ block.HeightIndexedChainVM = (*fullVM)(nil)
-	_ block.StateSyncableVM      = (*fullVM)(nil)
+	_ block.ChainVM         = (*fullVM)(nil)
+	_ block.StateSyncableVM = (*fullVM)(nil)
 )
 
 type fullVM struct {
 	*block.TestVM
-	*block.TestHeightIndexedVM
 	*block.TestStateSyncableVM
 }
 
 var (
-	pTestCert *tls.Certificate
+	pTestSigner crypto.Signer
+	pTestCert   *staking.Certificate
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
@@ -63,11 +63,12 @@ var (
 )
 
 func init() {
-	var err error
-	pTestCert, err = staking.NewTLSCert()
+	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
 		panic(err)
 	}
+	pTestSigner = tlsCert.PrivateKey.(crypto.Signer)
+	pTestCert = staking.CertificateFromX509(tlsCert.Leaf)
 }
 
 func initTestProposerVM(
@@ -99,9 +100,6 @@ func initTestProposerVM(
 			TestVM: common.TestVM{
 				T: t,
 			},
-		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
@@ -139,8 +137,9 @@ func initTestProposerVM(
 		proBlkStartTime,
 		minPChainHeight,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -175,7 +174,7 @@ func initTestProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = ids.ID{1}
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -214,6 +213,10 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
 
@@ -243,6 +246,9 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -273,6 +279,9 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -304,6 +313,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// add two proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -396,6 +408,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -489,6 +504,9 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
@@ -525,6 +543,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
@@ -593,6 +614,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
@@ -658,6 +682,9 @@ func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// checks
 	blkID, err := proVM.LastAccepted(context.Background())
@@ -674,6 +701,9 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -710,6 +740,9 @@ func TestPreFork_ParseBlock(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -742,6 +775,9 @@ func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -840,8 +876,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -863,7 +900,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -884,6 +921,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		toScheduler = toEngineChan
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	// make sure that DBs are compressed correctly
 	require.NoError(proVM.Initialize(
@@ -897,6 +937,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1003,6 +1046,9 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1146,7 +1192,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1162,6 +1208,9 @@ func TestInnerVMRollback(t *testing.T) {
 	) error {
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -1170,8 +1219,9 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1187,7 +1237,6 @@ func TestInnerVMRollback(t *testing.T) {
 	))
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
-
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	coreBlk := &snowman.TestBlock{
@@ -1237,9 +1286,7 @@ func TestInnerVMRollback(t *testing.T) {
 	require.Equal(choices.Processing, parsedBlock.Status())
 
 	require.NoError(parsedBlock.Verify(context.Background()))
-
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
-
 	require.NoError(parsedBlock.Accept(context.Background()))
 
 	fetchedBlock, err := proVM.GetBlock(context.Background(), parsedBlock.ID())
@@ -1248,16 +1295,20 @@ func TestInnerVMRollback(t *testing.T) {
 	require.Equal(choices.Accepted, fetchedBlock.Status())
 
 	// Restart the node and have the inner VM rollback state.
-
+	require.NoError(proVM.Shutdown(context.Background()))
 	coreBlk.StatusV = choices.Processing
+	coreVM.VerifyHeightIndexF = func(ctx context.Context) error {
+		return nil
+	}
 
 	proVM = New(
 		coreVM,
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1271,6 +1322,9 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1287,6 +1341,9 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -1388,6 +1445,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -1481,6 +1541,9 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1569,6 +1632,9 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
@@ -1641,6 +1707,9 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	innerBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1683,26 +1752,18 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{coreGenBlk.ID()}
 
 	initialState := []byte("genesis state")
-	coreVM := &struct {
-		block.TestVM
-		block.TestHeightIndexedVM
-	}{
-		TestVM: block.TestVM{
-			TestVM: common.TestVM{
-				T: t,
-			},
-		},
-		TestHeightIndexedVM: block.TestHeightIndexedVM{
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
 			T: t,
-			VerifyHeightIndexF: func(context.Context) error {
-				return nil
-			},
-			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
-				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errTooHigh
-				}
-				return coreHeights[height], nil
-			},
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(coreHeights)) {
+				return ids.ID{}, errTooHigh
+			}
+			return coreHeights[height], nil
 		},
 	}
 
@@ -1737,8 +1798,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -1772,7 +1834,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1789,6 +1851,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1891,26 +1956,18 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{coreGenBlk.ID()}
 
 	initialState := []byte("genesis state")
-	coreVM := &struct {
-		block.TestVM
-		block.TestHeightIndexedVM
-	}{
-		TestVM: block.TestVM{
-			TestVM: common.TestVM{
-				T: t,
-			},
-		},
-		TestHeightIndexedVM: block.TestHeightIndexedVM{
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
 			T: t,
-			VerifyHeightIndexF: func(context.Context) error {
-				return nil
-			},
-			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
-				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errTooHigh
-				}
-				return coreHeights[height], nil
-			},
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(coreHeights)) {
+				return ids.ID{}, errTooHigh
+			}
+			return coreHeights[height], nil
 		},
 	}
 
@@ -1945,8 +2002,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -1980,7 +2038,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1997,6 +2055,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -2093,7 +2154,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 func TestVMInnerBlkCache(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
@@ -2102,8 +2162,9 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2121,9 +2182,18 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
+	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2136,6 +2206,10 @@ func TestVMInnerBlkCache(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
 	state := state.NewMockState(ctrl) // mock state
 	vm.State = state
 
@@ -2158,6 +2232,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowman.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
+	mockInnerBlkNearTip.EXPECT().Bytes().Return(blkNearTipInnerBytes).Times(1)
+
 	innerVM.EXPECT().ParseBlock(gomock.Any(), blkNearTipInnerBytes).Return(mockInnerBlkNearTip, nil).Times(2)
 	_, err = vm.ParseBlock(context.Background(), blkNearTip.Bytes())
 	require.NoError(err)
@@ -2188,6 +2264,9 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -2261,6 +2340,9 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create an inner block and wrap it in an postForkBlock.
 	innerBlock := &snowman.TestBlock{
@@ -2305,7 +2387,6 @@ type blockWithVerifyContext struct {
 func TestVM_VerifyBlockWithContext(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
@@ -2314,8 +2395,9 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2333,9 +2415,18 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
+	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	snowCtx := snow.DefaultContextTest()
-	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2348,6 +2439,9 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 
 	{
 		pChainHeight := uint64(0)
@@ -2363,6 +2457,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		).Return(nil)
 		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.MockBlock.EXPECT().Bytes().Return(utils.RandomBytes(1024)).AnyTimes()
 
 		blk := NewMockPostForkBlock(ctrl)
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
@@ -2434,4 +2529,263 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
 		require.NoError(vm.verifyAndRecordInnerBlk(context.Background(), nil, blk))
 	}
+}
+
+func TestHistoricalBlockDeletion(t *testing.T) {
+	require := require.New(t)
+
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     utils.RandomBytes(1024),
+	}
+	acceptedBlocks := []snowman.Block{coreGenBlk}
+	currentHeight := uint64(0)
+
+	initialState := []byte("genesis state")
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(context.Context, *snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+				return nil
+			},
+		},
+		LastAcceptedF: func(context.Context) (ids.ID, error) {
+			return acceptedBlocks[currentHeight].ID(), nil
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			for _, blk := range acceptedBlocks {
+				if blkID == blk.ID() {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+			for _, blk := range acceptedBlocks {
+				if bytes.Equal(b, blk.Bytes()) {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(acceptedBlocks)) {
+				return ids.ID{}, errTooHigh
+			}
+			return acceptedBlocks[height].ID(), nil
+		},
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = &validators.TestState{
+		T: t,
+		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return coreGenBlk.HeightV, nil
+		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return defaultPChainHeight, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return nil, nil
+		},
+	}
+
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	lastAcceptedID, err := proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	issueBlock := func() {
+		lastAcceptedBlock := acceptedBlocks[currentHeight]
+		innerBlock := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV:    lastAcceptedBlock.ID(),
+			HeightV:    lastAcceptedBlock.Height() + 1,
+			TimestampV: lastAcceptedBlock.Timestamp(),
+			BytesV:     utils.RandomBytes(1024),
+		}
+
+		coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+			return innerBlock, nil
+		}
+		proBlock, err := proVM.BuildBlock(context.Background())
+		require.NoError(err)
+
+		require.NoError(proBlock.Verify(context.Background()))
+		require.NoError(proVM.SetPreference(context.Background(), proBlock.ID()))
+		require.NoError(proBlock.Accept(context.Background()))
+
+		acceptedBlocks = append(acceptedBlocks, innerBlock)
+		currentHeight++
+	}
+
+	requireHeights := func(start, end uint64) {
+		for i := start; i <= end; i++ {
+			_, err := proVM.GetBlockIDAtHeight(context.Background(), i)
+			require.NoError(err)
+		}
+	}
+
+	requireMissingHeights := func(start, end uint64) {
+		for i := start; i <= end; i++ {
+			_, err := proVM.GetBlockIDAtHeight(context.Background(), i)
+			require.ErrorIs(err, database.ErrNotFound)
+		}
+	}
+
+	requireNumHeights := func(numIndexed uint64) {
+		requireHeights(0, 0)
+		requireMissingHeights(1, currentHeight-numIndexed-1)
+		requireHeights(currentHeight-numIndexed, currentHeight)
+	}
+
+	// Because block pruning is disabled by default, the heights should be
+	// populated for every accepted block.
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	require.NoError(proVM.Shutdown(context.Background()))
+
+	numHistoricalBlocks := uint64(2)
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		numHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	// Verify that old blocks were pruned during startup
+	requireNumHeights(numHistoricalBlocks)
+
+	// As we issue new blocks, the oldest indexed height should be pruned.
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	require.NoError(proVM.Shutdown(context.Background()))
+
+	newNumHistoricalBlocks := numHistoricalBlocks + 2
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		newNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	// The height index shouldn't be modified at this point
+	requireNumHeights(numHistoricalBlocks)
+
+	// As we issue new blocks, the number of indexed blocks should increase
+	// until we hit our target again.
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks + 1)
+
+	issueBlock()
+	requireNumHeights(newNumHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(newNumHistoricalBlocks)
 }

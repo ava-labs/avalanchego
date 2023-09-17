@@ -90,7 +90,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
 		return errOutputsNotSorted
-	case !utils.IsSortedAndUniqueSortable(tx.Ins):
+	case !utils.IsSortedAndUnique(tx.Ins):
 		return errInputsNotSortedUnique
 	default:
 		return nil

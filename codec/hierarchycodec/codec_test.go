@@ -22,3 +22,8 @@ func TestMultipleTags(t *testing.T) {
 		test(c, t)
 	}
 }
+
+func FuzzStructUnmarshalHierarchyCodec(f *testing.F) {
+	c := NewDefault()
+	codec.FuzzStructUnmarshal(c, f)
+}

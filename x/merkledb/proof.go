@@ -8,17 +8,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const verificationCacheSize = 2_000
+const (
+	verificationEvictionBatchSize = 0
+	verificationCacheSize         = math.MaxInt
+)
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
@@ -46,6 +51,7 @@ var (
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
 	ErrNilProof                    = errors.New("proof is nil")
 	ErrNilValue                    = errors.New("value is nil")
+	ErrUnexpectedEndProof          = errors.New("end proof should be empty")
 )
 
 type ProofNode struct {
@@ -53,7 +59,7 @@ type ProofNode struct {
 	// Nothing if this is an intermediate node.
 	// The value in this node if its length < [HashLen].
 	// The hash of the value in this node otherwise.
-	ValueOrHash Maybe[[]byte]
+	ValueOrHash maybe.Maybe[[]byte]
 	Children    map[byte]ids.ID
 }
 
@@ -64,22 +70,16 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 			NibbleLength: uint64(node.KeyPath.NibbleLength),
 			Value:        node.KeyPath.Value,
 		},
+		ValueOrHash: &pb.MaybeBytes{
+			Value:     node.ValueOrHash.Value(),
+			IsNothing: node.ValueOrHash.IsNothing(),
+		},
 		Children: make(map[uint32][]byte, len(node.Children)),
 	}
 
 	for childIndex, childID := range node.Children {
 		childID := childID
 		pbNode.Children[uint32(childIndex)] = childID[:]
-	}
-
-	if node.ValueOrHash.hasValue {
-		pbNode.ValueOrHash = &pb.MaybeBytes{
-			Value: node.ValueOrHash.value,
-		}
-	} else {
-		pbNode.ValueOrHash = &pb.MaybeBytes{
-			IsNothing: true,
-		}
 	}
 
 	return pbNode
@@ -113,7 +113,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 	}
 
 	if !pbNode.ValueOrHash.IsNothing {
-		node.ValueOrHash = Some(pbNode.ValueOrHash.Value)
+		node.ValueOrHash = maybe.Some(pbNode.ValueOrHash.Value)
 	}
 
 	return nil
@@ -130,7 +130,7 @@ type Proof struct {
 
 	// Nothing if [Key] isn't in the trie.
 	// Otherwise the value corresponding to [Key].
-	Value Maybe[[]byte]
+	Value maybe.Maybe[[]byte]
 }
 
 // Returns nil if the trie given in [proof] has root [expectedRootID].
@@ -163,20 +163,20 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
 	if (lastNode.KeyPath.hasOddLength() || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
-		!proof.Value.IsNothing() {
+		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
+	view, err := getStandaloneTrieView(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	// Insert all of the proof nodes.
+	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
+	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
 
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
@@ -193,11 +193,9 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 }
 
 func (proof *Proof) ToProto() *pb.Proof {
-	value := &pb.MaybeBytes{}
-	if !proof.Value.IsNothing() {
-		value.Value = proof.Value.Value()
-	} else {
-		value.IsNothing = true
+	value := &pb.MaybeBytes{
+		Value:     proof.Value.Value(),
+		IsNothing: proof.Value.IsNothing(),
 	}
 
 	pbProof := &pb.Proof{
@@ -226,7 +224,7 @@ func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
 	proof.Key = pbProof.Key
 
 	if !pbProof.Value.IsNothing {
-		proof.Value = Some(pbProof.Value.Value)
+		proof.Value = maybe.Some(pbProof.Value.Value)
 	}
 
 	proof.Path = make([]ProofNode, len(pbProof.Proof))
@@ -246,6 +244,8 @@ type KeyValue struct {
 
 // A proof that a given set of key-value pairs are in a trie.
 type RangeProof struct {
+	// Invariant: At least one of [StartProof], [EndProof], [KeyValues] is non-empty.
+
 	// A proof that the smallest key in the requested range does/doesn't exist.
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
@@ -269,34 +269,29 @@ type RangeProof struct {
 }
 
 // Returns nil iff all the following hold:
+//   - The invariants of RangeProof hold.
 //   - [start] <= [end].
-//   - [proof] is non-empty.
+//   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
+//     whose root is [expectedRootID].
 //   - All keys in [proof.KeyValues] are in the range [start, end].
-//     If [start] is empty, all keys are considered > [start].
-//     If [end] is empty, all keys are considered < [end].
-//   - [proof.KeyValues] is sorted by increasing key.
-//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-//   - One of the following holds:
-//     [end] and [proof.EndProof] are empty.
-//     [proof.StartProof], [start], [end], and [proof.KeyValues] are empty and
-//     [proof.EndProof] is just the root.
-//     [end] is non-empty and [proof.EndProof] is a valid proof of a key <= [end].
-//   - [expectedRootID] is the root of the trie containing the given key-value
-//     pairs and start/end proofs.
+//     If [start] is Nothing, all keys are considered > [start].
+//     If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	start []byte,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	switch {
-	case len(end) > 0 && bytes.Compare(start, end) > 0:
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	case len(start) == 0 && len(end) == 0 && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
+	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
+		return ErrUnexpectedEndProof
+	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
 		return ErrShouldJustBeRoot
-	case len(proof.EndProof) == 0 && len(end) > 0:
+	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
 		return ErrNoEndProof
 	}
 
@@ -305,12 +300,21 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestKey := end
+	// [proof] allegedly provides and proves all key-value
+	// pairs in [smallestProvenPath, largestProvenPath].
+	// If [smallestProvenPath] is Nothing, [proof] should
+	// provide and prove all keys < [largestProvenPath].
+	// If [largestProvenPath] is Nothing, [proof] should
+	// provide and prove all keys > [smallestProvenPath].
+	// If both are Nothing, [proof] should prove the entire trie.
+	smallestProvenPath := maybe.Bind(start, newPath)
+
+	largestProvenPath := maybe.Bind(end, newPath)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [largestKey] to ancestors of the node containing
-		// [largestKey] so that we get the expected root ID.
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		// greater than [largestProvenPath] to ancestors of the node containing
+		// [largestProvenPath] so that we get the expected root ID.
+		largestProvenPath = maybe.Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -319,67 +323,68 @@ func (proof *RangeProof) Verify(
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start)
-	largestPath := newPath(largestKey)
-
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestProvenPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.StartProof, smallestPath, largestPath, keyValues); err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(
+		proof.StartProof,
+		smallestProvenPath.Value(),
+		largestProvenPath,
+		keyValues,
+	); err != nil {
 		return err
 	}
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestProvenPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath, largestPath, keyValues); err != nil {
-		return err
-	}
-
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
-	if err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(
+		proof.EndProof,
+		smallestProvenPath.Value(),
+		largestProvenPath,
+		keyValues,
+	); err != nil {
 		return err
 	}
 
 	// Insert all key-value pairs into the trie.
-	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
-			return err
+	ops := make([]database.BatchOp, len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
 		}
 	}
 
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := getStandaloneTrieView(ctx, ops)
+	if err != nil {
+		return err
+	}
+
 	// For all the nodes along the edges of the proof, insert children
-	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
+	// < [smallestProvenPath] and > [largestProvenPath]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
-	// > [insertChildrenLessThan] but less than the first key given.
+	// By inserting all children < [smallestProvenPath], we prove that there are no keys
+	// > [smallestProvenPath] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
-	insertChildrenLessThan := Nothing[path]()
-	if len(smallestPath) > 0 {
-		insertChildrenLessThan = Some(smallestPath)
-	}
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		smallestProvenPath,
+		largestProvenPath,
 	); err != nil {
 		return err
 	}
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		smallestProvenPath,
+		largestProvenPath,
 	); err != nil {
 		return err
 	}
@@ -452,7 +457,7 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 
 // Verify that all non-intermediate nodes in [proof] which have keys
 // in [[start], [end]] have the value given for that key in [keysValues].
-func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, keysValues map[path][]byte) error {
+func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start path, end maybe.Maybe[path], keysValues map[path][]byte) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
@@ -461,13 +466,13 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, key
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
+		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
-			if !ok && !node.ValueOrHash.IsNothing() {
+			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
 				return ErrProofNodeHasUnincludedValue
 			}
-			if ok && !valueOrHashMatches(Some(value), node.ValueOrHash) {
+			if ok && !valueOrHashMatches(maybe.Some(value), node.ValueOrHash) {
 				// We got a key-value pair for this key, but the value in the proof
 				// node doesn't match the value we got for this key.
 				return ErrProofValueDoesntMatch
@@ -479,30 +484,68 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, key
 
 type KeyChange struct {
 	Key   []byte
-	Value Maybe[[]byte]
+	Value maybe.Maybe[[]byte]
 }
 
+// A change proof proves that a set of key-value changes occurred
+// between two trie roots, where each key-value pair's key is
+// between some lower and upper bound (inclusive).
 type ChangeProof struct {
-	// If false, the node that created this doesn't have
-	// sufficient history to generate a change proof and
-	// all other fields must be empty.
-	// Otherwise at least one other field is non-empty.
-	HadRootsInHistory bool
+	// Invariant: At least one of [StartProof], [EndProof], or
+	// [KeyChanges] is non-empty.
+
 	// A proof that the smallest key in the requested range does/doesn't
 	// exist in the trie with the requested start root.
 	// Empty if no lower bound on the requested range was given.
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
 	StartProof []ProofNode
-	// A proof that the largest key in [KeyValues] and [DeletedKeys]
-	// does/doesn't exist in the trie with the requested start root.
-	// Empty iff no upper bound on the requested range was given
-	// and [KeyValues] and [DeletedKeys] are empty.
+
+	// If [KeyChanges] is non-empty, this is a proof of the largest key
+	// in [KeyChanges].
+	//
+	// If [KeyChanges] is empty and an upper range bound was given,
+	// this is a proof of the upper range bound.
+	//
+	// If [KeyChanges] is empty and no upper range bound was given,
+	// this is empty.
 	EndProof []ProofNode
-	// A subset of key-values that were added, removed, or had their values modified
-	// between the requested start root (exclusive) and the requested
+
+	// A subset of key-values that were added, removed, or had their values
+	// modified between the requested start root (exclusive) and the requested
 	// end root (inclusive).
-	// Sorted by increasing key.
+	// Each key is in the requested range (inclusive).
+	// The first key-value is the first key-value at/after the range start.
+	// The key-value pairs are consecutive. That is, if keys k1 and k2 are
+	// in [KeyChanges] then there is no k3 that was modified between the start and
+	// end roots such that k1 < k3 < k2.
+	// This is a subset of the requested key-value range, rather than the entire
+	// range, because otherwise the proof may be too large.
+	// Sorted by increasing key and with no duplicate keys.
+	//
+	// Example: Suppose that between the start root and the end root, the following
+	// key-value pairs were added, removed, or modified:
+	//
+	// [kv1, kv2, kv3, kv4, kv5]
+	// where start <= kv1 < ... < kv5 <= end.
+	//
+	// The following are possible values of [KeyChanges]:
+	//
+	// []
+	// [kv1]
+	// [kv1, kv2]
+	// [kv1, kv2, kv3]
+	// [kv1, kv2, kv3, kv4]
+	// [kv1, kv2, kv3, kv4, kv5]
+	//
+	// The following values of [KeyChanges] are always invalid, for example:
+	//
+	// [kv2] (Doesn't include kv1, the first key-value at/after the range start)
+	// [kv1, kv3] (Doesn't include kv2, the key-value between kv1 and kv3)
+	// [kv1, kv3, kv2] (Not sorted by increasing key)
+	// [kv1, kv1] (Duplicate key-value pairs)
+	// [kv0, kv1] (For some kv1 < start)
+	// [kv1, kv2, kv3, kv4, kv5, kv6] (For some kv6 > end)
 	KeyChanges []KeyChange
 }
 
@@ -519,29 +562,19 @@ func (proof *ChangeProof) ToProto() *pb.ChangeProof {
 
 	keyChanges := make([]*pb.KeyChange, len(proof.KeyChanges))
 	for i, kv := range proof.KeyChanges {
-		var value pb.MaybeBytes
-		if kv.Value.hasValue {
-			value = pb.MaybeBytes{
-				Value:     kv.Value.value,
-				IsNothing: false,
-			}
-		} else {
-			value = pb.MaybeBytes{
-				Value:     nil,
-				IsNothing: true,
-			}
-		}
 		keyChanges[i] = &pb.KeyChange{
-			Key:   kv.Key,
-			Value: &value,
+			Key: kv.Key,
+			Value: &pb.MaybeBytes{
+				Value:     kv.Value.Value(),
+				IsNothing: kv.Value.IsNothing(),
+			},
 		}
 	}
 
 	return &pb.ChangeProof{
-		HadRootsInHistory: proof.HadRootsInHistory,
-		StartProof:        startProof,
-		EndProof:          endProof,
-		KeyChanges:        keyChanges,
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyChanges: keyChanges,
 	}
 }
 
@@ -549,8 +582,6 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
 		return ErrNilChangeProof
 	}
-
-	proof.HadRootsInHistory = pbProof.HadRootsInHistory
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
@@ -576,9 +607,9 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 			return ErrInvalidMaybe
 		}
 
-		value := Nothing[[]byte]()
+		value := maybe.Nothing[[]byte]()
 		if !kv.Value.IsNothing {
-			value = Some(kv.Value.Value)
+			value = maybe.Some(kv.Value.Value)
 		}
 		proof.KeyChanges[i] = KeyChange{
 			Key:   kv.Key,
@@ -597,8 +628,8 @@ func verifyAllChangeProofKeyValuesPresent(
 	db MerkleDB,
 	proof []ProofNode,
 	start path,
-	end path,
-	keysValues map[path]Maybe[[]byte],
+	end maybe.Maybe[path],
+	keysValues map[path]maybe.Maybe[[]byte],
 ) error {
 	for i := 0; i < len(proof); i++ {
 		var (
@@ -609,7 +640,7 @@ func verifyAllChangeProofKeyValuesPresent(
 
 		// Check the value of any node with a key that is within the range.
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
+		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -619,10 +650,10 @@ func verifyAllChangeProofKeyValuesPresent(
 						return err
 					}
 					// This key isn't in the database so proof node should have Nothing.
-					value = Nothing[[]byte]()
+					value = maybe.Nothing[[]byte]()
 				} else {
 					// This key is in the database so proof node should have matching value.
-					value = Some(dbValue)
+					value = maybe.Some(dbValue)
 				}
 			}
 			if !valueOrHashMatches(value, node.ValueOrHash) {
@@ -638,13 +669,19 @@ func (proof *ChangeProof) Empty() bool {
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
 }
 
+// Exactly one of [ChangeProof] or [RangeProof] is non-nil.
+type ChangeOrRangeProof struct {
+	ChangeProof *ChangeProof
+	RangeProof  *RangeProof
+}
+
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
-// If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [start] is Nothing, there is no lower bound on acceptable keys.
+// If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
+func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -657,8 +694,8 @@ func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
 	}
 
 	// ensure that the keys are within the range [start, end]
-	if (len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
-		(len(end) > 0 && bytes.Compare(kvs[len(kvs)-1].Key, end) > 0) {
+	if (start.HasValue() && bytes.Compare(kvs[0].Key, start.Value()) < 0) ||
+		(end.HasValue() && bytes.Compare(kvs[len(kvs)-1].Key, end.Value()) > 0) {
 		return ErrStateFromOutsideOfRange
 	}
 
@@ -669,17 +706,17 @@ func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
-	hasLowerBound := len(start) > 0
-	hasUpperBound := len(end) > 0
+func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
+	hasLowerBound := start.HasValue()
+	hasUpperBound := end.HasValue()
 	for i := 0; i < len(kvs); i++ {
 		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start) < 0) ||
-			(hasUpperBound && bytes.Compare(kvs[i].Key, end) > 0) {
+		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.Value()) < 0) ||
+			(hasUpperBound && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
 			return ErrStateFromOutsideOfRange
 		}
 	}
@@ -691,11 +728,14 @@ func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
 //     since all keys with values are written in bytes, so have even nibble length.
 //   - Each key in [proof] is a strict prefix of the following key.
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-//   - If the last element in [proof] is [keyBytes], this is an inclusion proof.
+//   - If the last element in [proof] is [keyPath], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
 func verifyProofPath(proof []ProofNode, keyPath path) error {
-	provenKey := keyPath.Serialize()
+	if len(proof) == 0 {
+		return nil
+	}
 
+	provenKey := keyPath.Serialize()
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].KeyPath
@@ -730,7 +770,7 @@ func verifyProofPath(proof []ProofNode, keyPath path) error {
 
 // Returns true if [value] and [valueDigest] match.
 // [valueOrHash] should be the [ValueOrHash] field of a [ProofNode].
-func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
+func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byte]) bool {
 	var (
 		valueIsNothing  = value.IsNothing()
 		digestIsNothing = valueOrHash.IsNothing()
@@ -743,11 +783,11 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 	case valueIsNothing:
 		// Both are nothing -- match.
 		return true
-	case len(value.value) < HashLength:
-		return bytes.Equal(value.value, valueOrHash.value)
+	case len(value.Value()) < HashLength:
+		return bytes.Equal(value.Value(), valueOrHash.Value())
 	default:
-		valueHash := hashing.ComputeHash256(value.value)
-		return bytes.Equal(valueHash, valueOrHash.value)
+		valueHash := hashing.ComputeHash256(value.Value())
+		return bytes.Equal(valueHash, valueOrHash.Value())
 	}
 }
 
@@ -760,12 +800,12 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	insertChildrenLessThan Maybe[path],
-	insertChildrenGreaterThan Maybe[path],
+	insertChildrenLessThan maybe.Maybe[path],
+	insertChildrenGreaterThan maybe.Maybe[path],
 ) error {
 	var (
-		shouldInsertLeftChildren  = insertChildrenLessThan.hasValue
-		shouldInsertRightChildren = insertChildrenGreaterThan.hasValue
+		shouldInsertLeftChildren  = insertChildrenLessThan.HasValue()
+		shouldInsertRightChildren = insertChildrenGreaterThan.HasValue()
 	)
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
@@ -779,7 +819,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insertIntoTrie(keyPath, Nothing[[]byte]())
+		n, err := t.insert(keyPath, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -801,9 +841,11 @@ func addPathInfo(
 				compressedPath = existingChild.compressedPath
 			}
 			childPath := keyPath.Append(index) + compressedPath
-			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.value) < 0) ||
-				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.value) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
+				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
+				// We don't know if the child had a value or not, but it doesn't matter.
+				// We only need the IDs to be correct so that the calculated hash is correct.
+				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)
 			}
 		}
 	}
@@ -811,18 +853,16 @@ func addPathInfo(
 	return nil
 }
 
-func getEmptyTrieView(ctx context.Context) (*trieView, error) {
-	tracer, err := trace.New(trace.Config{Enabled: false})
-	if err != nil {
-		return nil, err
-	}
+// getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            tracer,
-			NodeCacheSize:     verificationCacheSize,
+			EvictionBatchSize:         verificationEvictionBatchSize,
+			Tracer:                    trace.Noop,
+			ValueNodeCacheSize:        verificationCacheSize,
+			IntermediateNodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
@@ -830,5 +870,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(defaultPreallocationSize)
+	return newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }

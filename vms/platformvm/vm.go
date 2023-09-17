@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	stdjson "encoding/json"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -90,10 +88,9 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
-}
 
-type Config struct {
-	ChecksumsEnabled bool `json:"checksums-enabled"`
+	// TODO: Remove after v1.11.x is activated
+	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -111,15 +108,11 @@ func (vm *VM) Initialize(
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
 
-	platformConfig := Config{}
-	if len(configBytes) > 0 {
-		if err := stdjson.Unmarshal(configBytes, &platformConfig); err != nil {
-			return err
-		}
-		chainCtx.Log.Info("VM config initialized",
-			zap.Reflect("config", platformConfig),
-		)
+	execConfig, err := config.GetExecutionConfig(configBytes)
+	if err != nil {
+		return err
 	}
+	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
 
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
@@ -127,7 +120,6 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -143,16 +135,17 @@ func (vm *VM) Initialize(
 	}
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
+
 	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
 		registerer,
 		&vm.Config,
+		execConfig,
 		vm.ctx,
 		vm.metrics,
 		rewards,
 		&vm.bootstrapped,
-		platformConfig.ChecksumsEnabled,
 	)
 	if err != nil {
 		return err
@@ -221,12 +214,42 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("initializing last accepted",
 		zap.Stringer("blkID", lastAcceptedID),
 	)
-	return vm.SetPreference(ctx, lastAcceptedID)
+	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
+		return err
+	}
+
+	shouldPrune, err := vm.state.ShouldPrune()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
+	}
+	if !shouldPrune {
+		chainCtx.Log.Info("state already pruned and indexed")
+		vm.pruned.Set(true)
+		return nil
+	}
+
+	go func() {
+		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning and height indexing failed",
+				zap.Error(err),
+			)
+		}
+
+		vm.pruned.Set(true)
+	}()
+
+	return nil
 }
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+	if vm.Config.PartialSyncPrimaryNetwork {
+		vm.ctx.Log.Info("skipping primary network chain creation")
+	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -463,4 +486,16 @@ func (vm *VM) Clock() *mockable.Clock {
 
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
+}
+
+func (vm *VM) VerifyHeightIndex(_ context.Context) error {
+	if vm.pruned.Get() {
+		return nil
+	}
+
+	return block.ErrIndexIncomplete
+}
+
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
 }

@@ -17,11 +17,13 @@ var (
 )
 
 type merkleMetrics interface {
-	IOKeyRead()
-	IOKeyWrite()
+	DatabaseNodeRead()
+	DatabaseNodeWrite()
 	HashCalculated()
-	DBNodeCacheHit()
-	DBNodeCacheMiss()
+	ValueNodeCacheHit()
+	ValueNodeCacheMiss()
+	IntermediateNodeCacheHit()
+	IntermediateNodeCacheMiss()
 	ViewNodeCacheHit()
 	ViewNodeCacheMiss()
 	ViewValueCacheHit()
@@ -29,16 +31,18 @@ type merkleMetrics interface {
 }
 
 type mockMetrics struct {
-	lock               sync.Mutex
-	keyReadCount       int64
-	keyWriteCount      int64
-	hashCount          int64
-	dbNodeCacheHit     int64
-	dbNodeCacheMiss    int64
-	viewNodeCacheHit   int64
-	viewNodeCacheMiss  int64
-	viewValueCacheHit  int64
-	viewValueCacheMiss int64
+	lock                      sync.Mutex
+	keyReadCount              int64
+	keyWriteCount             int64
+	hashCount                 int64
+	valueNodeCacheHit         int64
+	valueNodeCacheMiss        int64
+	intermediateNodeCacheHit  int64
+	intermediateNodeCacheMiss int64
+	viewNodeCacheHit          int64
+	viewNodeCacheMiss         int64
+	viewValueCacheHit         int64
+	viewValueCacheMiss        int64
 }
 
 func (m *mockMetrics) HashCalculated() {
@@ -48,14 +52,14 @@ func (m *mockMetrics) HashCalculated() {
 	m.hashCount++
 }
 
-func (m *mockMetrics) IOKeyRead() {
+func (m *mockMetrics) DatabaseNodeRead() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.keyReadCount++
 }
 
-func (m *mockMetrics) IOKeyWrite() {
+func (m *mockMetrics) DatabaseNodeWrite() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -90,30 +94,46 @@ func (m *mockMetrics) ViewValueCacheMiss() {
 	m.viewValueCacheMiss++
 }
 
-func (m *mockMetrics) DBNodeCacheHit() {
+func (m *mockMetrics) ValueNodeCacheHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.dbNodeCacheHit++
+	m.valueNodeCacheHit++
 }
 
-func (m *mockMetrics) DBNodeCacheMiss() {
+func (m *mockMetrics) ValueNodeCacheMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.dbNodeCacheMiss++
+	m.valueNodeCacheMiss++
+}
+
+func (m *mockMetrics) IntermediateNodeCacheHit() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.intermediateNodeCacheHit++
+}
+
+func (m *mockMetrics) IntermediateNodeCacheMiss() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.intermediateNodeCacheMiss++
 }
 
 type metrics struct {
-	ioKeyWrite         prometheus.Counter
-	ioKeyRead          prometheus.Counter
-	hashCount          prometheus.Counter
-	dbNodeCacheHit     prometheus.Counter
-	dbNodeCacheMiss    prometheus.Counter
-	viewNodeCacheHit   prometheus.Counter
-	viewNodeCacheMiss  prometheus.Counter
-	viewValueCacheHit  prometheus.Counter
-	viewValueCacheMiss prometheus.Counter
+	ioKeyWrite                prometheus.Counter
+	ioKeyRead                 prometheus.Counter
+	hashCount                 prometheus.Counter
+	intermediateNodeCacheHit  prometheus.Counter
+	intermediateNodeCacheMiss prometheus.Counter
+	valueNodeCacheHit         prometheus.Counter
+	valueNodeCacheMiss        prometheus.Counter
+	viewNodeCacheHit          prometheus.Counter
+	viewNodeCacheMiss         prometheus.Counter
+	viewValueCacheHit         prometheus.Counter
+	viewValueCacheMiss        prometheus.Counter
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, error) {
@@ -137,15 +157,25 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 			Name:      "hashes_calculated",
 			Help:      "cumulative number of node hashes done",
 		}),
-		dbNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
+		valueNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_node_cache_hit",
-			Help:      "cumulative amount of hits on the db node cache",
+			Name:      "value_node_cache_hit",
+			Help:      "cumulative amount of hits on the value node db cache",
 		}),
-		dbNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
+		valueNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_node_cache_miss",
-			Help:      "cumulative amount of misses on the db node cache",
+			Name:      "value_node_cache_miss",
+			Help:      "cumulative amount of misses on the value node db cache",
+		}),
+		intermediateNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "intermediate_node_cache_hit",
+			Help:      "cumulative amount of hits on the intermediate node db cache",
+		}),
+		intermediateNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "intermediate_node_cache_miss",
+			Help:      "cumulative amount of misses on the intermediate node db cache",
 		}),
 		viewNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -173,8 +203,10 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		reg.Register(m.ioKeyWrite),
 		reg.Register(m.ioKeyRead),
 		reg.Register(m.hashCount),
-		reg.Register(m.dbNodeCacheHit),
-		reg.Register(m.dbNodeCacheMiss),
+		reg.Register(m.valueNodeCacheHit),
+		reg.Register(m.valueNodeCacheMiss),
+		reg.Register(m.intermediateNodeCacheHit),
+		reg.Register(m.intermediateNodeCacheMiss),
 		reg.Register(m.viewNodeCacheHit),
 		reg.Register(m.viewNodeCacheMiss),
 		reg.Register(m.viewValueCacheHit),
@@ -183,11 +215,11 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 	return &m, errs.Err
 }
 
-func (m *metrics) IOKeyRead() {
+func (m *metrics) DatabaseNodeRead() {
 	m.ioKeyRead.Inc()
 }
 
-func (m *metrics) IOKeyWrite() {
+func (m *metrics) DatabaseNodeWrite() {
 	m.ioKeyWrite.Inc()
 }
 
@@ -211,10 +243,18 @@ func (m *metrics) ViewValueCacheMiss() {
 	m.viewValueCacheMiss.Inc()
 }
 
-func (m *metrics) DBNodeCacheHit() {
-	m.dbNodeCacheHit.Inc()
+func (m *metrics) IntermediateNodeCacheHit() {
+	m.intermediateNodeCacheHit.Inc()
 }
 
-func (m *metrics) DBNodeCacheMiss() {
-	m.dbNodeCacheMiss.Inc()
+func (m *metrics) IntermediateNodeCacheMiss() {
+	m.intermediateNodeCacheMiss.Inc()
+}
+
+func (m *metrics) ValueNodeCacheHit() {
+	m.valueNodeCacheHit.Inc()
+}
+
+func (m *metrics) ValueNodeCacheMiss() {
+	m.valueNodeCacheMiss.Inc()
 }

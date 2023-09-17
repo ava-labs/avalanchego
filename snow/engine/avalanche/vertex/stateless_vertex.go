@@ -120,7 +120,7 @@ func (v innerStatelessVertex) verify() error {
 		return errNoOperations
 	case len(v.Txs) > maxTxsPerVtx:
 		return errTooManyTxs
-	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
+	case !utils.IsSortedAndUnique(v.ParentIDs):
 		return errInvalidParents
 	case !utils.IsSortedAndUniqueByHash(v.Txs):
 		return errInvalidTxs
@@ -139,7 +139,7 @@ func (v innerStatelessVertex) verifyStopVertex() error {
 		return errTooManyParentIDs
 	case len(v.Txs) != 0:
 		return errTooManyTxs
-	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
+	case !utils.IsSortedAndUnique(v.ParentIDs):
 		return errInvalidParents
 	default:
 		return nil

@@ -7,13 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
@@ -21,7 +20,6 @@ import (
 func TestGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	var (
 		mockState     = state.NewMockState(ctrl)
@@ -72,7 +70,6 @@ func TestGetState(t *testing.T) {
 func TestBackendGetBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	var (
 		blkID1       = ids.GenerateTestID()
@@ -98,7 +95,7 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map or database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
+		state.EXPECT().GetStatelessBlock(blkID).Return(nil, database.ErrNotFound)
 		_, err := b.GetBlock(blkID)
 		require.Equal(database.ErrNotFound, err)
 	}
@@ -106,7 +103,7 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map and is in database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, choices.Accepted, nil)
+		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, nil)
 		gotBlk, err := b.GetBlock(blkID)
 		require.NoError(err)
 		require.Equal(statelessBlk, gotBlk)
@@ -151,7 +148,6 @@ func TestGetTimestamp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			backend := tt.backendF(ctrl)
 			gotTimestamp := backend.getTimestamp(blkID)

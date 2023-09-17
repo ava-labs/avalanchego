@@ -5,9 +5,11 @@ package merkledb
 
 import (
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -18,28 +20,29 @@ const (
 // the values that go into the node's id
 type hashValues struct {
 	Children map[byte]child
-	Value    Maybe[[]byte]
+	Value    maybe.Maybe[[]byte]
 	Key      SerializedPath
 }
 
 // Representation of a node stored in the database.
 type dbNode struct {
-	value    Maybe[[]byte]
+	value    maybe.Maybe[[]byte]
 	children map[byte]child
 }
 
 type child struct {
 	compressedPath path
 	id             ids.ID
+	hasValue       bool
 }
 
-// node holds additional information on top of the dbNode that makes calulcations easier to do
+// node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
 	id          ids.ID
 	key         path
 	nodeBytes   []byte
-	valueDigest Maybe[[]byte]
+	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
@@ -79,17 +82,12 @@ func (n *node) hasValue() bool {
 }
 
 // Returns the byte representation of this node.
-func (n *node) marshal() ([]byte, error) {
-	if n.nodeBytes != nil {
-		return n.nodeBytes, nil
+func (n *node) bytes() []byte {
+	if n.nodeBytes == nil {
+		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
 
-	nodeBytes, err := codec.encodeDBNode(&n.dbNode)
-	if err != nil {
-		return nil, err
-	}
-	n.nodeBytes = nodeBytes
-	return n.nodeBytes, nil
+	return n.nodeBytes
 }
 
 // clear the cached values that will need to be recalculated whenever the node changes
@@ -100,39 +98,32 @@ func (n *node) onNodeChanged() {
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) error {
+func (n *node) calculateID(metrics merkleMetrics) {
 	if n.id != ids.Empty {
-		return nil
-	}
-
-	hv := &hashValues{
-		Children: n.children,
-		Value:    n.valueDigest,
-		Key:      n.key.Serialize(),
-	}
-
-	bytes, err := codec.encodeHashValues(hv)
-	if err != nil {
-		return err
+		return
 	}
 
 	metrics.HashCalculated()
+	bytes := codec.encodeHashValues(&hashValues{
+		Children: n.children,
+		Value:    n.valueDigest,
+		Key:      n.key.Serialize(),
+	})
 	n.id = hashing.ComputeHash256Array(bytes)
-	return nil
 }
 
 // Set [n]'s value to [val].
-func (n *node) setValue(val Maybe[[]byte]) {
+func (n *node) setValue(val maybe.Maybe[[]byte]) {
 	n.onNodeChanged()
 	n.value = val
 	n.setValueDigest()
 }
 
 func (n *node) setValueDigest() {
-	if n.value.IsNothing() || len(n.value.value) < HashLength {
+	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.valueDigest = Some(hashing.ComputeHash256(n.value.value))
+		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
 	}
 }
 
@@ -144,25 +135,18 @@ func (n *node) addChild(child *node) {
 		child.key[len(n.key)],
 		child.key[len(n.key)+1:],
 		child.id,
+		child.hasValue(),
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID) {
+func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
 		id:             childID,
+		hasValue:       hasValue,
 	}
-}
-
-// Returns the path of the only child of this node.
-// Assumes this node has exactly one child.
-func (n *node) getSingleChildPath() path {
-	for index, entry := range n.children {
-		return n.key + path(index) + entry.compressedPath
-	}
-	return ""
 }
 
 // Removes [child] from [n]'s children.
@@ -172,11 +156,9 @@ func (n *node) removeChild(child *node) {
 }
 
 // clone Returns a copy of [n].
-// nodeBytes is intentionally not included because it can cause a race.
-// nodes being evicted by the cache can write nodeBytes,
-// so reading them during the cloning would be a data race.
 // Note: value isn't cloned because it is never edited, only overwritten
 // if this ever changes, value will need to be copied as well
+// it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
 		id:  n.id,
@@ -186,6 +168,7 @@ func (n *node) clone() *node {
 			children: maps.Clone(n.children),
 		},
 		valueDigest: n.valueDigest,
+		nodeBytes:   n.nodeBytes,
 	}
 }
 
@@ -194,7 +177,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		KeyPath:     n.key.Serialize(),
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: Clone(n.valueDigest),
+		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

@@ -5,7 +5,10 @@ package common
 
 import (
 	"context"
+	"math/big"
 	"time"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -14,6 +17,10 @@ import (
 
 const defaultPollFrequency = 100 * time.Millisecond
 
+// Signature of the function that will be called after a transaction
+// has been issued with the ID of the issued transaction.
+type PostIssuanceFunc func(ids.ID)
+
 type Option func(*Options)
 
 type Options struct {
@@ -21,6 +28,11 @@ type Options struct {
 
 	customAddressesSet bool
 	customAddresses    set.Set[ids.ShortID]
+
+	customEthAddressesSet bool
+	customEthAddresses    set.Set[ethcommon.Address]
+
+	baseFee *big.Int
 
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
@@ -35,6 +47,8 @@ type Options struct {
 
 	pollFrequencySet bool
 	pollFrequency    time.Duration
+
+	postIssuanceFunc PostIssuanceFunc
 }
 
 func NewOptions(ops []Option) *Options {
@@ -71,6 +85,20 @@ func (o *Options) Addresses(defaultAddresses set.Set[ids.ShortID]) set.Set[ids.S
 	return defaultAddresses
 }
 
+func (o *Options) EthAddresses(defaultAddresses set.Set[ethcommon.Address]) set.Set[ethcommon.Address] {
+	if o.customEthAddressesSet {
+		return o.customEthAddresses
+	}
+	return defaultAddresses
+}
+
+func (o *Options) BaseFee(defaultBaseFee *big.Int) *big.Int {
+	if o.baseFee != nil {
+		return o.baseFee
+	}
+	return defaultBaseFee
+}
+
 func (o *Options) MinIssuanceTime() uint64 {
 	if o.minIssuanceTimeSet {
 		return o.minIssuanceTime
@@ -104,6 +132,10 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
+func (o *Options) PostIssuanceFunc() PostIssuanceFunc {
+	return o.postIssuanceFunc
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
@@ -114,6 +146,19 @@ func WithCustomAddresses(addrs set.Set[ids.ShortID]) Option {
 	return func(o *Options) {
 		o.customAddressesSet = true
 		o.customAddresses = addrs
+	}
+}
+
+func WithCustomEthAddresses(addrs set.Set[ethcommon.Address]) Option {
+	return func(o *Options) {
+		o.customEthAddressesSet = true
+		o.customEthAddresses = addrs
+	}
+}
+
+func WithBaseFee(baseFee *big.Int) Option {
+	return func(o *Options) {
+		o.baseFee = baseFee
 	}
 }
 
@@ -152,5 +197,11 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	return func(o *Options) {
 		o.pollFrequencySet = true
 		o.pollFrequency = pollFrequency
+	}
+}
+
+func WithPostIssuanceFunc(f PostIssuanceFunc) Option {
+	return func(o *Options) {
+		o.postIssuanceFunc = f
 	}
 }

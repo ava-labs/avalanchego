@@ -6,12 +6,15 @@ package database
 import (
 	"bytes"
 	"io"
+	"math"
+	"math/rand"
 	"testing"
-
-	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"golang.org/x/sync/errgroup"
@@ -23,6 +26,7 @@ import (
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestOverwriteKeyValue,
 	TestEmptyKey,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
@@ -48,7 +52,9 @@ var Tests = []func(t *testing.T, db Database){
 	TestCompactNoPanic,
 	TestMemorySafetyDatabase,
 	TestMemorySafetyBatch,
+	TestAtomicClear,
 	TestClear,
+	TestAtomicClearPrefix,
 	TestClearPrefix,
 	TestModifyValueAfterPut,
 	TestModifyValueAfterBatchPut,
@@ -56,10 +62,6 @@ var Tests = []func(t *testing.T, db Database){
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
 	TestPutGetEmpty,
-}
-
-var FuzzTests = []func(*testing.F, Database){
-	FuzzKeyValue,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -98,6 +100,22 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.Equal(ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
+}
+
+func TestOverwriteKeyValue(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte("hello")
+	value1 := []byte("world1")
+	value2 := []byte("world2")
+
+	require.NoError(db.Put(key, value1))
+
+	require.NoError(db.Put(key, value2))
+
+	gotValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value2, gotValue)
 }
 
 func TestKeyEmptyValue(t *testing.T, db Database) {
@@ -432,8 +450,6 @@ func TestBatchRewrite(t *testing.T, db Database) {
 // contents.
 func TestBatchReplay(t *testing.T, db Database) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -469,8 +485,6 @@ func TestBatchReplay(t *testing.T, db Database) {
 // propagate any returned error during Replay.
 func TestBatchReplayPropagateError(t *testing.T, db Database) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -925,8 +939,20 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	require.ErrorIs(err, ErrClosed)
 }
 
-// TestClear tests to make sure the deletion helper works as expected.
+func TestAtomicClear(t *testing.T, db Database) {
+	testClear(t, db, func(db Database) error {
+		return AtomicClear(db, db)
+	})
+}
+
 func TestClear(t *testing.T, db Database) {
+	testClear(t, db, func(db Database) error {
+		return Clear(db, math.MaxInt)
+	})
+}
+
+// testClear tests to make sure the deletion helper works as expected.
+func testClear(t *testing.T, db Database, clearF func(Database) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -946,7 +972,7 @@ func TestClear(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(Clear(db, db))
+	require.NoError(clearF(db))
 
 	count, err = Count(db)
 	require.NoError(err)
@@ -955,8 +981,20 @@ func TestClear(t *testing.T, db Database) {
 	require.NoError(db.Close())
 }
 
-// TestClearPrefix tests to make sure prefix deletion works as expected.
+func TestAtomicClearPrefix(t *testing.T, db Database) {
+	testClearPrefix(t, db, func(db Database, prefix []byte) error {
+		return AtomicClearPrefix(db, db, prefix)
+	})
+}
+
 func TestClearPrefix(t *testing.T, db Database) {
+	testClearPrefix(t, db, func(db Database, prefix []byte) error {
+		return ClearPrefix(db, prefix, math.MaxInt)
+	})
+}
+
+// testClearPrefix tests to make sure prefix deletion works as expected.
+func testClearPrefix(t *testing.T, db Database, clearF func(Database, []byte) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -976,7 +1014,7 @@ func TestClearPrefix(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(ClearPrefix(db, db, []byte("hello")))
+	require.NoError(clearF(db, []byte("hello")))
 
 	count, err = Count(db)
 	require.NoError(err)
@@ -1161,5 +1199,68 @@ func FuzzKeyValue(f *testing.F, db Database) {
 
 		_, err = db.Get(key)
 		require.Equal(ErrNotFound, err)
+	})
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
+	const (
+		maxKeyLen   = 32
+		maxValueLen = 32
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+		prefix []byte,
+		numKeyValues uint,
+	) {
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		// Put a bunch of key-values
+		expected := map[string][]byte{}
+		for i := 0; i < int(numKeyValues); i++ {
+			key := make([]byte, r.Intn(maxKeyLen))
+			_, _ = r.Read(key) // #nosec G404
+
+			value := make([]byte, r.Intn(maxValueLen))
+			_, _ = r.Read(value) // #nosec G404
+
+			if len(value) == 0 {
+				// Consistently treat zero length values as nil
+				// so that we can compare [expected] and [got] with
+				// require.Equal, which treats nil and empty byte
+				// as being unequal, whereas the database treats
+				// them as being equal.
+				value = nil
+			}
+
+			if bytes.HasPrefix(key, prefix) {
+				expected[string(key)] = value
+			}
+
+			require.NoError(db.Put(key, value))
+		}
+		expectedList := maps.Keys(expected)
+		slices.Sort(expectedList)
+
+		iter := db.NewIteratorWithPrefix(prefix)
+		defer iter.Release()
+
+		// Assert the iterator returns the expected key-values.
+		numIterElts := 0
+		for iter.Next() {
+			val := iter.Value()
+			if len(val) == 0 {
+				val = nil
+			}
+			require.Equal(expectedList[numIterElts], string(iter.Key()))
+			require.Equal(expected[string(iter.Key())], val)
+			numIterElts++
+		}
+		require.Equal(len(expectedList), numIterElts)
+
+		// Clear the database for the next fuzz iteration.
+		require.NoError(AtomicClear(db, db))
 	})
 }

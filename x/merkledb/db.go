@@ -8,82 +8,86 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	"golang.org/x/sync/semaphore"
 
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	DefaultEvictionBatchSize = 100
-	RootPath                 = EmptyPath
+	RootPath = EmptyPath
+
 	// TODO: name better
-	rebuildViewSizeFractionOfCacheSize = 50
-	minRebuildViewSizePerCommit        = 1000
+	rebuildViewSizeFractionOfCacheSize   = 50
+	minRebuildViewSizePerCommit          = 1000
+	rebuildIntermediateDeletionWriteSize = units.MiB
+	valueNodePrefixLen                   = 1
 )
 
 var (
-	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
-	rootKey                 []byte
-	nodePrefix              = []byte("node")
-	metadataPrefix          = []byte("metadata")
-	cleanShutdownKey        = []byte("cleanShutdown")
+	metadataPrefix         = []byte{0}
+	valueNodePrefix        = []byte{1}
+	intermediateNodePrefix = []byte{2}
+
+	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot = errors.New("start and end root are the same")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
 
 type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
+	// Returns [ErrInsufficientHistory] if this node has insufficient history
+	// to generate the proof.
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
 		endRootID ids.ID,
-		start []byte,
-		end []byte,
+		start maybe.Maybe[[]byte],
+		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*ChangeProof, error)
 
 	// Returns nil iff all of the following hold:
 	//   - [start] <= [end].
-	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
+	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
-	//     If [start] is empty, all keys are considered > [start].
-	//     If [end] is empty, all keys are considered < [end].
+	//     If [start] is nothing, all keys are considered > [start].
+	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
-	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
-	//
-	// Assumes [db.lock] isn't held.
-	// This is defined on Database instead of ChangeProof because it accesses
-	// database internals.
+	//   - When the changes in [proof.KeyChanes] are applied,
+	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
-		start []byte,
-		end []byte,
+		start maybe.Maybe[[]byte],
+		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -94,17 +98,20 @@ type ChangeProofer interface {
 type RangeProofer interface {
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
-		start,
-		end []byte,
+		start maybe.Maybe[[]byte],
+		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*RangeProof, error)
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
-	// [start] is the smallest key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
+	// [start] is the smallest possible key in the range this [proof] covers.
+	// [end] is the largest possible key in the range this [proof] covers.
+	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
 type MerkleDB interface {
@@ -117,18 +124,27 @@ type MerkleDB interface {
 }
 
 type Config struct {
-	// The number of nodes that are evicted from the cache and written to
-	// disk at a time.
-	EvictionBatchSize int
+	// RootGenConcurrency is the number of goroutines to use when
+	// generating a new state root.
+	//
+	// If 0 is specified, [runtime.NumCPU] will be used.
+	RootGenConcurrency uint
+	// The number of bytes to write to disk when intermediate nodes are evicted
+	// from their cache and written to disk.
+	EvictionBatchSize uint
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength int
-	NodeCacheSize int
+	HistoryLength uint
+	// The number of bytes to cache nodes with values.
+	ValueNodeCacheSize uint
+	// The number of bytes to cache nodes without values.
+	IntermediateNodeCacheSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
-	Reg    prometheus.Registerer
-	Tracer trace.Tracer
+	Reg        prometheus.Registerer
+	TraceLevel TraceLevel
+	Tracer     trace.Tracer
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
@@ -142,15 +158,12 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	nodeDB database.Database
+	// Contains all of the key-value pairs stored by this database,
+	// including metadata, intermediate nodes and value nodes.
+	baseDB database.Database
 
-	// Stores data about the database's current state.
-	metadataDB database.Database
-
-	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache         onEvictCache[path, *node]
-	onEvictionErr     utils.Atomic[error]
-	evictionBatchSize int
+	valueNodeDB        *valueNodeDB
+	intermediateNodeDB *intermediateNodeDB
 
 	// Stores change lists. Used to serve change proofs and construct
 	// historical views of the trie.
@@ -161,13 +174,27 @@ type merkleDB struct {
 
 	metrics merkleMetrics
 
-	tracer trace.Tracer
+	debugTracer trace.Tracer
+	infoTracer  trace.Tracer
 
 	// The root of this trie.
 	root *node
 
 	// Valid children of this trie.
 	childViews []*trieView
+
+	// calculateNodeIDsSema controls the number of goroutines inside
+	// [calculateNodeIDsHelper] at any given time.
+	calculateNodeIDsSema *semaphore.Weighted
+}
+
+// New returns a new merkle database.
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
+	metrics, err := newMetrics("merkleDB", config.Reg)
+	if err != nil {
+		return nil, err
+	}
+	return newDatabase(ctx, db, config, metrics)
 }
 
 func newDatabase(
@@ -176,19 +203,29 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	trieDB := &merkleDB{
-		metrics:           metrics,
-		nodeDB:            prefixdb.New(nodePrefix, db),
-		metadataDB:        prefixdb.New(metadataPrefix, db),
-		history:           newTrieHistory(config.HistoryLength),
-		tracer:            config.Tracer,
-		childViews:        make([]*trieView, 0, defaultPreallocationSize),
-		evictionBatchSize: config.EvictionBatchSize,
+	rootGenConcurrency := uint(runtime.NumCPU())
+	if config.RootGenConcurrency != 0 {
+		rootGenConcurrency = config.RootGenConcurrency
 	}
 
-	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
-	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
+	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
+	// to reduce memory allocations.
+	bufferPool := &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, defaultBufferLength)
+		},
+	}
+	trieDB := &merkleDB{
+		metrics:              metrics,
+		baseDB:               db,
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
+		history:              newTrieHistory(int(config.HistoryLength)),
+		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:           make([]*trieView, 0, defaultPreallocationSize),
+		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
+	}
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -198,15 +235,15 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		values: map[path]*change[Maybe[[]byte]]{},
+		values: map[path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[path]*change[*node]{},
 	})
 
-	shutdownType, err := trieDB.metadataDB.Get(cleanShutdownKey)
+	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx); err != nil {
+			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
 				return nil, err
 			}
 		}
@@ -218,76 +255,61 @@ func newDatabase(
 	}
 
 	// mark that the db has not yet been cleanly closed
-	err = trieDB.metadataDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
+	err = trieDB.baseDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
 	return trieDB, err
 }
 
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
-func (db *merkleDB) rebuild(ctx context.Context) error {
+func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = newNode(nil, RootPath)
-	if err := db.nodeDB.Delete(rootKey); err != nil {
+
+	// Delete intermediate nodes.
+	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
 		return err
 	}
-	it := db.nodeDB.NewIterator()
-	defer it.Release()
 
-	currentViewSize := 0
-	viewSizeLimit := math.Max(
-		db.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
+	// Add all key-value pairs back into the database.
+	opsSizeLimit := math.Max(
+		cacheSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-
-	currentView, err := db.newUntrackedView(viewSizeLimit)
-	if err != nil {
-		return err
-	}
-
-	for it.Next() {
-		if currentViewSize >= viewSizeLimit {
-			if err := currentView.commitToDB(ctx); err != nil {
-				return err
-			}
-			currentView, err = db.newUntrackedView(viewSizeLimit)
+	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
+	valueIt := db.NewIterator()
+	defer valueIt.Release()
+	for valueIt.Next() {
+		if len(currentOps) >= opsSizeLimit {
+			view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
 			}
-			currentViewSize = 0
-		}
-
-		key := it.Key()
-		path := path(key)
-		value := it.Value()
-		n, err := parseNode(path, value)
-		if err != nil {
-			return err
-		}
-		if n.hasValue() {
-			serializedPath := path.Serialize()
-			if err := currentView.Insert(ctx, serializedPath.Value, n.value.value); err != nil {
+			if err := view.commitToDB(ctx); err != nil {
 				return err
 			}
-			currentViewSize++
-		} else if err := db.nodeDB.Delete(key); err != nil {
-			return err
+			currentOps = make([]database.BatchOp, 0, opsSizeLimit)
+			// reset the iterator to prevent memory bloat
+			nextValue := valueIt.Key()
+			valueIt.Release()
+			valueIt = db.NewIteratorWithStart(nextValue)
+			continue
 		}
-	}
-	if err := it.Error(); err != nil {
-		return err
-	}
-	if err := currentView.commitToDB(ctx); err != nil {
-		return err
-	}
-	return db.nodeDB.Compact(nil, nil)
-}
 
-// New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
-	if err != nil {
-		return nil, err
+		currentOps = append(currentOps, database.BatchOp{
+			Key:   valueIt.Key(),
+			Value: valueIt.Value(),
+		})
 	}
-	return newDatabase(ctx, db, config, metrics)
+	if err := valueIt.Error(); err != nil {
+		return err
+	}
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
+	if err != nil {
+		return err
+	}
+	if err := view.commitToDB(ctx); err != nil {
+		return err
+	}
+	return db.Compact(nil, nil)
 }
 
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
@@ -297,15 +319,23 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	if db.closed {
 		return database.ErrClosed
 	}
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
+	}
 
-	view, err := db.prepareChangeProofView(proof)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
 }
 
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
+func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -313,15 +343,45 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *R
 		return database.ErrClosed
 	}
 
-	view, err := db.prepareRangeProofView(start, proof)
+	ops := make([]database.BatchOp, len(proof.KeyValues))
+	keys := set.NewSet[string](len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		keys.Add(string(kv.Key))
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	largestKey := end
+	if len(proof.KeyValues) > 0 {
+		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
+	}
+	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return err
 	}
+	for _, keyToDelete := range keysToDelete {
+		ops = append(ops, database.BatchOp{
+			Key:    keyToDelete,
+			Delete: true,
+		})
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
+	if err != nil {
+		return err
+	}
+
 	return view.commitToDB(ctx)
 }
 
 func (db *merkleDB) Compact(start []byte, limit []byte) error {
-	return db.nodeDB.Compact(start, limit)
+	if db.closed {
+		return database.ErrClosed
+	}
+	return db.baseDB.Compact(start, limit)
 }
 
 func (db *merkleDB) Close() error {
@@ -336,34 +396,14 @@ func (db *merkleDB) Close() error {
 	}
 
 	db.closed = true
-
-	defer func() {
-		_ = db.metadataDB.Close()
-		_ = db.nodeDB.Close()
-	}()
-
-	if err := db.onEvictionErr.Get(); err != nil {
-		// If there was an error during cache eviction,
-		// [db.nodeCache] and [db.nodeDB] are in an inconsistent state.
-		// Do not write cached nodes to disk or mark clean shutdown.
-		return nil
-	}
-
-	// Flush [nodeCache] to persist intermediary nodes to disk.
-	if err := db.nodeCache.Flush(); err != nil {
-		// There was an error during cache eviction.
-		// Don't commit to disk.
+	db.valueNodeDB.Close()
+	// Flush intermediary nodes to disk.
+	if err := db.intermediateNodeDB.Flush(); err != nil {
 		return err
 	}
 
 	// Successfully wrote intermediate nodes.
-	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
-}
-
-func (db *merkleDB) Delete(key []byte) error {
-	// this is a duplicate because the database interface doesn't support
-	// contexts, which are used for tracing
-	return db.Remove(context.Background(), key)
+	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
@@ -373,7 +413,7 @@ func (db *merkleDB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
 		attribute.Int("keyCount", len(keys)),
 	))
 	defer span.End()
@@ -385,7 +425,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
+		values[i], errors[i] = db.getValueCopy(newPath(key))
 	}
 	return values, errors
 }
@@ -393,16 +433,20 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 // GetValue returns the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValueCopy(newPath(key), true /*lock*/)
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.getValueCopy(newPath(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
-	val, err := db.getValue(key, lock)
+// Assumes [db.lock] is read locked.
+func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
+	val, err := db.getValueWithoutLock(key)
 	if err != nil {
 		return nil, err
 	}
@@ -411,30 +455,34 @@ func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
 
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-// If [lock], [db.lock]'s read lock is acquired.
-// Otherwise, assumes [db.lock] is already held.
-func (db *merkleDB) getValue(key path, lock bool) ([]byte, error) {
-	if lock {
-		db.lock.RLock()
-		defer db.lock.RUnlock()
-	}
+// Assumes [db.lock] isn't held.
+func (db *merkleDB) getValue(key path) ([]byte, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
+	return db.getValueWithoutLock(key)
+}
+
+// getValueWithoutLock returns the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+// Assumes [db.lock] is read locked.
+func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
 
-	n, err := db.getNode(key)
+	n, err := db.getNode(key, true /* hasValue */)
 	if err != nil {
 		return nil, err
 	}
 	if n.value.IsNothing() {
 		return nil, database.ErrNotFound
 	}
-	return n.value.value, nil
+	return n.value.Value(), nil
 }
 
 func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetMerkleRoot")
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetMerkleRoot")
 	defer span.End()
 
 	db.lock.RLock()
@@ -460,12 +508,13 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 }
 
 // Assumes [db.commitLock] is read locked.
+// Assumes [db.lock] is not held
 func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(defaultPreallocationSize)
+	view, err := newTrieView(db, db, ViewChanges{})
 	if err != nil {
 		return nil, err
 	}
@@ -473,12 +522,10 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-// GetRangeProof returns a proof for the key/value pairs in this trie within the range
-// [start, end].
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
-	start,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -487,13 +534,11 @@ func (db *merkleDB) GetRangeProof(
 	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
 }
 
-// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
-// [start, end] when the root of the trie was [rootID].
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -503,11 +548,12 @@ func (db *merkleDB) GetRangeProofAtRoot(
 }
 
 // Assumes [db.commitLock] is read locked.
+// Assumes [db.lock] is not held
 func (db *merkleDB) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	if db.closed {
@@ -528,11 +574,11 @@ func (db *merkleDB) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
-	start []byte,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if len(end) > 0 && bytes.Compare(start, end) == 1 {
+	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -546,14 +592,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	result := &ChangeProof{
-		HadRootsInHistory: true,
-	}
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
-	if err == ErrRootIDNotPresent {
-		result.HadRootsInHistory = false
-		return result, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -562,12 +601,11 @@ func (db *merkleDB) GetChangeProof(
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
 	changedKeys := maps.Keys(changes.values)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
-		return i.Compare(j) < 0
-	})
+	utils.Sort(changedKeys)
 
-	// TODO: sync.pool these buffers
-	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
+	result := &ChangeProof{
+		KeyChanges: make([]KeyChange, 0, len(changedKeys)),
+	}
 
 	for _, key := range changedKeys {
 		change := changes.values[key]
@@ -576,13 +614,13 @@ func (db *merkleDB) GetChangeProof(
 		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key: serializedKey,
 			// create a copy so edits of the []byte don't affect the db
-			Value: Clone(change.after),
+			Value: maybe.Bind(change.after, slices.Clone[[]byte]),
 		})
 	}
 
 	largestKey := end
 	if len(result.KeyChanges) > 0 {
-		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+		largestKey = maybe.Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
@@ -592,16 +630,16 @@ func (db *merkleDB) GetChangeProof(
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
-		endProof, err := historicalView.getProof(ctx, largestKey)
+	if largestKey.HasValue() {
+		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = endProof.Path
 	}
 
-	if len(start) > 0 {
-		startProof, err := historicalView.getProof(ctx, start)
+	if start.HasValue() {
+		startProof, err := historicalView.getProof(ctx, start.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -628,36 +666,34 @@ func (db *merkleDB) GetChangeProof(
 	return result, nil
 }
 
-// NewView returns a new view on top of this trie.
-// Changes made to the view will only be reflected in the original trie if Commit is called.
-// Assumes [db.lock] isn't held.
-func (db *merkleDB) NewView() (TrieView, error) {
-	return db.NewPreallocatedView(defaultPreallocationSize)
-}
-
-// Returns a new view that isn't tracked in [db.childViews].
-// For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] and/or [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(estimatedSize int) (*trieView, error) {
-	return newTrieView(db, db, db.root.clone(), estimatedSize)
-}
-
-// NewPreallocatedView returns a new view with memory allocated to hold at least [estimatedSize] value changes at a time.
-// If more changes are made, additional memory will be allocated.
-// The returned view is added to [db.childViews].
-// Assumes [db.lock] isn't held.
-func (db *merkleDB) NewPreallocatedView(estimatedSize int) (TrieView, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
+//
+// Changes made to the view will only be reflected in the original trie if
+// Commit is called.
+//
+// Assumes [db.commitLock] and [db.lock] aren't held.
+func (db *merkleDB) NewView(
+	_ context.Context,
+	changes ViewChanges,
+) (TrieView, error) {
+	// ensure the db doesn't change while creating the new view
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	if db.closed {
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, db.root.clone(), estimatedSize)
+	newView, err := newTrieView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
+
+	// ensure access to childViews is protected
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	db.childViews = append(db.childViews, newView)
 	return newView, nil
 }
@@ -670,7 +706,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), false /*lock*/)
+	_, err := db.getValueWithoutLock(newPath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -684,26 +720,7 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
-	return db.nodeDB.HealthCheck(ctx)
-}
-
-func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
-	view, err := db.newUntrackedView(defaultPreallocationSize)
-	if err != nil {
-		return err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-	if err := view.insert(k, v); err != nil {
-		return err
-	}
-	return view.commitToDB(ctx)
+	return db.baseDB.HealthCheck(ctx)
 }
 
 func (db *merkleDB) NewBatch() database.Batch {
@@ -713,100 +730,27 @@ func (db *merkleDB) NewBatch() database.Batch {
 }
 
 func (db *merkleDB) NewIterator() database.Iterator {
-	return &iterator{
-		nodeIter: db.nodeDB.NewIterator(),
-		db:       db,
-	}
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
 func (db *merkleDB) NewIteratorWithStart(start []byte) database.Iterator {
-	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithStart(newPath(start).Bytes()),
-		db:       db,
-	}
+	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
 func (db *merkleDB) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithPrefix(newPath(prefix).Bytes()),
-		db:       db,
-	}
+	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
 func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	startBytes := newPath(start).Bytes()
-	prefixBytes := newPath(prefix).Bytes()
-	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithStartAndPrefix(startBytes, prefixBytes),
-		db:       db,
-	}
+	return db.valueNodeDB.newIteratorWithStartAndPrefix(start, prefix)
 }
 
-// If [node] is an intermediary node, puts it in [nodeDB].
-// Note this is called by [db.nodeCache] with its lock held, so
-// the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
-// As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
-// Non-nil error is fatal -- causes [db] to close.
-func (db *merkleDB) onEviction(n *node) error {
-	// the evicted node isn't an intermediary node, so skip writing.
-	if n == nil || n.hasValue() {
-		return nil
-	}
-
-	batch := db.nodeDB.NewBatch()
-	if err := writeNodeToBatch(batch, n); err != nil {
-		return err
-	}
-
-	// Evict the oldest [evictionBatchSize] nodes from the cache
-	// and write them to disk. We write a batch of them, rather than
-	// just [n], so that we don't immediately evict and write another
-	// node, because each time this method is called we do a disk write.
-	var err error
-	for removedCount := 0; removedCount < db.evictionBatchSize; removedCount++ {
-		_, n, exists := db.nodeCache.removeOldest()
-		if !exists {
-			// The cache is empty.
-			break
-		}
-		if n == nil || n.hasValue() {
-			// only persist intermediary nodes
-			continue
-		}
-		// Note this must be = not := since we check
-		// [err] outside the loop.
-		if err = writeNodeToBatch(batch, n); err != nil {
-			break
-		}
-	}
-	if err == nil {
-		err = batch.Write()
-	}
-	if err != nil {
-		db.onEvictionErr.Set(err)
-		_ = db.nodeDB.Close()
-		go db.Close()
-		return err
-	}
-	return nil
-}
-
-// Writes [n] to [batch]. Assumes [n] is non-nil.
-func writeNodeToBatch(batch database.Batch, n *node) error {
-	nodeBytes, err := n.marshal()
-	if err != nil {
-		return err
-	}
-
-	return batch.Put(n.key.Bytes(), nodeBytes)
-}
-
-// Put upserts the key/value pair into the db.
 func (db *merkleDB) Put(k, v []byte) error {
-	return db.Insert(context.Background(), k, v)
+	return db.PutContext(context.Background(), k, v)
 }
 
-func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
+// Same as [Put] but takes in a context used for tracing.
+func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -814,17 +758,41 @@ func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(defaultPreallocationSize)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
 	if err != nil {
-		return err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-	if err = view.remove(key); err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
 }
 
+func (db *merkleDB) Delete(key []byte) error {
+	return db.DeleteContext(context.Background(), key)
+}
+
+func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	view, err := newTrieView(db, db,
+		ViewChanges{
+			BatchOps: []database.BatchOp{{
+				Key:    key,
+				Delete: true,
+			}},
+			ConsumeBytes: true,
+		})
+	if err != nil {
+		return err
+	}
+	return view.commitToDB(ctx)
+}
+
+// Assumes values inside of [ops] are safe to reference after the function
+// returns. Assumes [db.lock] isn't held.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -833,24 +801,15 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.prepareBatchView(ops)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
 	return view.commitToDB(context.Background())
 }
 
-// CommitToParent is a no-op for the db because it has no parent
-func (*merkleDB) CommitToParent(context.Context) error {
-	return nil
-}
-
-// commitToDB is a no-op for the db because it is the db
-func (*merkleDB) commitToDB(context.Context) error {
-	return nil
-}
-
-// commitChanges commits the changes in trieToCommit to the db
+// commitChanges commits the changes in [trieToCommit] to [db].
+// Assumes [trieToCommit]'s node IDs have been calculated.
 func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -862,10 +821,14 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	case trieToCommit.isInvalid():
 		return ErrInvalid
+	case trieToCommit.committed:
+		return ErrCommitted
+	case trieToCommit.db != trieToCommit.getParentTrie():
+		return ErrParentNotDatabase
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.tracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -886,34 +849,38 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return errNoNewRoot
 	}
 
-	batch := db.nodeDB.NewBatch()
+	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
-	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
+	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
-		if nodeChange.after == nil {
-			db.metrics.IOKeyWrite()
-			if err := batch.Delete(key.Bytes()); err != nil {
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
+
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
 				nodesSpan.End()
 				return err
 			}
-		} else if nodeChange.after.hasValue() || (nodeChange.before != nil && nodeChange.before.hasValue()) {
-			// Note: If [nodeChange.after] is an intermediary node we only
-			// persist [nodeChange] if [nodeChange.before] was a leaf.
-			// This guarantees that the key/value pairs are correctly persisted
-			// on disk, without being polluted by the previous value.
-			// Otherwise, intermediary nodes are persisted on cache eviction or
-			// shutdown.
-			db.metrics.IOKeyWrite()
-			if err := writeNodeToBatch(batch, nodeChange.after); err != nil {
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
 				nodesSpan.End()
 				return err
 			}
 		}
+
+		if shouldAddValue {
+			currentValueNodeBatch.Put(key, nodeChange.after)
+		} else if shouldDeleteValue {
+			currentValueNodeBatch.Delete(key)
+		}
 	}
 	nodesSpan.End()
 
-	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
-	err := batch.Write()
+	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
+	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
 		return err
@@ -922,13 +889,6 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
 	db.root = rootChange.after
-
-	for key, nodeChange := range changes.nodes {
-		if err := db.putNodeInCache(key, nodeChange.after); err != nil {
-			return err
-		}
-	}
-
 	db.history.record(changes)
 	return nil
 }
@@ -952,34 +912,25 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// This is defined on merkleDB instead of ChangeProof
+// because it accesses database internals.
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
-	start []byte,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if len(end) > 0 && bytes.Compare(start, end) > 0 {
-		return ErrStartAfterEnd
-	}
-
-	if !proof.HadRootsInHistory {
-		// The node we requested the proof from didn't have sufficient
-		// history to fulfill this request.
-		if !proof.Empty() {
-			// cannot have any changes if the root was missing
-			return ErrDataInMissingRootProof
-		}
-		return nil
-	}
-
 	switch {
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
+		return ErrStartAfterEnd
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case len(end) > 0 && len(proof.EndProof) == 0:
+	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
-	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
+	case start.HasValue() && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		// We requested a start proof but didn't get one.
 		// Note that we also have to check that [proof.EndProof] is empty
 		// to handle the case that the start proof is empty because all
@@ -992,7 +943,8 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestPath := newPath(start)
+	// Note that if [start] is Nothing, smallestPath is the empty path.
+	smallestPath := newPath(start.Value())
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -1002,28 +954,31 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestKey := end
+	largestPath := maybe.Bind(end, newPath)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
+		largestPath = maybe.Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
-	largestPath := newPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
 		return err
 	}
 
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyChanges))
+	keyValues := make(map[path]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	// want to prevent commit writes to DB, but not prevent db reads
+	// want to prevent commit writes to DB, but not prevent DB reads
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
 
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
@@ -1047,40 +1002,35 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(len(proof.KeyChanges))
-	if err != nil {
-		return err
+	// Insert the key-value pairs into the trie.
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
 	}
 
-	// Insert the key-value pairs into the trie.
-	for _, kv := range proof.KeyChanges {
-		if kv.Value.IsNothing() {
-			if err := view.removeFromTrie(newPath(kv.Key)); err != nil {
-				return err
-			}
-		} else if _, err := view.insertIntoTrie(newPath(kv.Key), kv.Value); err != nil {
-			return err
-		}
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	if err != nil {
+		return err
 	}
 
 	// For all the nodes along the edges of the proof, insert the children whose
 	// keys are less than [insertChildrenLessThan] or whose keys are greater
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
-	insertChildrenLessThan := Nothing[path]()
+	insertChildrenLessThan := maybe.Nothing[path]()
 	if len(smallestPath) > 0 {
-		insertChildrenLessThan = Some(smallestPath)
-	}
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
+		insertChildrenLessThan = maybe.Some(smallestPath)
 	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}
@@ -1088,13 +1038,13 @@ func (db *merkleDB) VerifyChangeProof(
 		view,
 		proof.EndProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}
 
 	// Make sure we get the expected root.
-	calculatedRoot, err := view.getMerkleRoot(ctx)
+	calculatedRoot, err := view.GetMerkleRoot(ctx)
 	if err != nil {
 		return err
 	}
@@ -1124,17 +1074,16 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 }
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// ensure that root exists
-	nodeBytes, err := db.nodeDB.Get(rootKey)
+	// not sure if the root exists or had a value or not
+	// check under both prefixes
+	var err error
+	db.root, err = db.intermediateNodeDB.Get(RootPath)
+	if err == database.ErrNotFound {
+		db.root, err = db.valueNodeDB.Get(RootPath)
+	}
 	if err == nil {
-		// Root already exists, so parse it and set the in-mem copy
-		db.root, err = parseNode(RootPath, nodeBytes)
-		if err != nil {
-			return ids.Empty, err
-		}
-		if err := db.root.calculateID(db.metrics); err != nil {
-			return ids.Empty, err
-		}
+		// Root already exists, so calculate its id
+		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
 	if err != database.ErrNotFound {
@@ -1145,59 +1094,54 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	db.root = newNode(nil, RootPath)
 
 	// update its ID
-	if err := db.root.calculateID(db.metrics); err != nil {
+	db.root.calculateID(db.metrics)
+
+	if err := db.intermediateNodeDB.Put(RootPath, db.root); err != nil {
 		return ids.Empty, err
 	}
 
-	// write the newly constructed root to the DB
-	rootBytes, err := db.root.marshal()
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	batch := db.nodeDB.NewBatch()
-	if err := batch.Put(rootKey, rootBytes); err != nil {
-		return ids.Empty, err
-	}
-
-	return db.root.id, batch.Write()
+	return db.root.id, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
-	start []byte,
-	end []byte,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 ) (*trieView, error) {
 	currentRootID := db.getMerkleRoot()
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(db, db, db.root.clone(), 100)
+		// create an empty trie
+		return newTrieView(db, db, ViewChanges{})
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return newTrieViewWithChanges(db, db, changeHistory, len(changeHistory.nodes))
+	return newHistoricalTrieView(db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
-// If [start] is nil, then the range has no lower bound.
-// If [end] is nil, then the range has no upper bound.
-func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
+// If [start] is Nothing, then the range has no lower bound.
+// If [end] is Nothing, then the range has no upper bound.
+func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	it := db.NewIteratorWithStart(start)
+	it := db.NewIteratorWithStart(start.Value())
 	defer it.Release()
 
 	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
-		if len(end) != 0 && bytes.Compare(key, end) > 0 {
+		if end.HasValue() && bytes.Compare(key, end.Value()) > 0 {
 			break
 		}
 		if !keySet.Contains(string(key)) {
@@ -1208,14 +1152,15 @@ func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 }
 
 // Returns a copy of the node with the given [key].
+// hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key path) (*node, error) {
+func (db *merkleDB) getEditableNode(key path, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	n, err := db.getNode(key)
+	n, err := db.getNode(key, hasValue)
 	if err != nil {
 		return nil, err
 	}
@@ -1223,137 +1168,55 @@ func (db *merkleDB) getEditableNode(key path) (*node, error) {
 }
 
 // Returns the node with the given [key].
+// hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key path) (*node, error) {
-	if db.closed {
+func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
+	switch {
+	case db.closed:
 		return nil, database.ErrClosed
-	}
-	if key == RootPath {
+	case key == RootPath:
 		return db.root, nil
+	case hasValue:
+		return db.valueNodeDB.Get(key)
 	}
-
-	if n, isCached := db.getNodeInCache(key); isCached {
-		db.metrics.DBNodeCacheHit()
-		if n == nil {
-			return nil, database.ErrNotFound
-		}
-		return n, nil
-	}
-
-	db.metrics.DBNodeCacheMiss()
-	db.metrics.IOKeyRead()
-	rawBytes, err := db.nodeDB.Get(key.Bytes())
-	if err != nil {
-		if err == database.ErrNotFound {
-			// Cache the miss.
-			if err := db.putNodeInCache(key, nil); err != nil {
-				return nil, err
-			}
-		}
-		return nil, err
-	}
-
-	node, err := parseNode(key, rawBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.putNodeInCache(key, node)
-	return node, err
+	return db.intermediateNodeDB.Get(key)
 }
 
-// Returns a new view atop [db] with the changes in [ops] applied to it.
-// Assumes [db.commitLock] is read locked.
-func (db *merkleDB) prepareBatchView(ops []database.BatchOp) (*trieView, error) {
-	view, err := db.newUntrackedView(len(ops))
-	if err != nil {
-		return nil, err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-
-	// write into the trie
-	for _, op := range ops {
-		if op.Delete {
-			if err := view.remove(op.Key); err != nil {
-				return nil, err
-			}
-		} else if err := view.insert(op.Key, op.Value); err != nil {
-			return nil, err
-		}
-	}
-
-	return view, nil
+// Returns [key] prefixed by [prefix].
+// The returned []byte is taken from [bufferPool] and
+// should be returned to it when the caller is done with it.
+func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
+	prefixLen := len(prefix)
+	keyLen := prefixLen + len(key)
+	prefixedKey := getBufferFromPool(bufferPool, keyLen)
+	copy(prefixedKey, prefix)
+	copy(prefixedKey[prefixLen:], key)
+	return prefixedKey
 }
 
-// Returns a new view atop [db] with the key/value pairs in [proof.KeyValues]
-// inserted and the key/value pairs in [proof.DeletedKeys] removed.
-// Assumes [db.commitLock] is locked.
-func (db *merkleDB) prepareChangeProofView(proof *ChangeProof) (*trieView, error) {
-	view, err := db.newUntrackedView(len(proof.KeyChanges))
-	if err != nil {
-		return nil, err
+// Returns a []byte from [bufferPool] with length exactly [size].
+// The []byte is not guaranteed to be zeroed.
+func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
+	buffer := bufferPool.Get().([]byte)
+	if cap(buffer) >= size {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		buffer = buffer[:size]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		bufferPool.Put(buffer)
+		buffer = make([]byte, size)
 	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-
-	for _, kv := range proof.KeyChanges {
-		if kv.Value.IsNothing() {
-			if err := view.remove(kv.Key); err != nil {
-				return nil, err
-			}
-		} else if err := view.insert(kv.Key, kv.Value.value); err != nil {
-			return nil, err
-		}
-	}
-	return view, nil
+	return buffer
 }
 
-// Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
-// any existing key-value pairs in the proof's range but not in the proof removed.
-// Assumes [db.commitLock] is locked.
-func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(len(proof.KeyValues))
-	if err != nil {
-		return nil, err
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
+func cacheEntrySize(p path, n *node) int {
+	if n == nil {
+		return len(p)
 	}
-	keys := set.NewSet[string](len(proof.KeyValues))
-	for _, kv := range proof.KeyValues {
-		keys.Add(string(kv.Key))
-		if err := view.insert(kv.Key, kv.Value); err != nil {
-			return nil, err
-		}
-	}
-
-	var largestKey []byte
-	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
-	}
-	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
-	if err != nil {
-		return nil, err
-	}
-	for _, keyToDelete := range keysToDelete {
-		if err := view.remove(keyToDelete); err != nil {
-			return nil, err
-		}
-	}
-	return view, nil
-}
-
-// Non-nil error is fatal -- [db] will close.
-func (db *merkleDB) putNodeInCache(key path, n *node) error {
-	// TODO Cache metrics
-	// Note that this may cause a node to be evicted from the cache,
-	// which will call [OnEviction].
-	return db.nodeCache.Put(key, n)
-}
-
-func (db *merkleDB) getNodeInCache(key path) (*node, bool) {
-	// TODO Cache metrics
-	if node, ok := db.nodeCache.Get(key); ok {
-		return node, true
-	}
-	return nil, false
+	// nodes cache their bytes representation so the total memory consumed is roughly twice that
+	return len(p) + 2*len(n.bytes())
 }

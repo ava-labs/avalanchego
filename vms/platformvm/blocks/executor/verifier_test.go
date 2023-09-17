@@ -8,15 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -33,7 +32,6 @@ import (
 func TestVerifierVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
@@ -120,7 +118,6 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -160,7 +157,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	inputs := set.Set[ids.ID]{ids.GenerateTestID(): struct{}{}}
+	inputs := set.Of(ids.GenerateTestID())
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
@@ -209,7 +206,6 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 func TestVerifierVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -309,7 +305,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 func TestVerifierVisitCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -380,7 +375,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 func TestVerifierVisitAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -452,7 +446,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 func TestVerifyUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -482,7 +475,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Set expectations for dependencies.
 	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
+	s.EXPECT().GetStatelessBlock(parentID).Return(nil, database.ErrNotFound).Times(1)
 
 	// Verify the block.
 	err = blk.Visit(verifier)
@@ -491,7 +484,6 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := defaultGenesisTime.Add(time.Hour)
 
@@ -585,7 +577,6 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 // TODO combine with TestApricotCommitBlockTimestampChecks
 func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := defaultGenesisTime.Add(time.Hour)
 
@@ -679,7 +670,6 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -691,9 +681,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := set.Set[ids.ID]{
-		ids.GenerateTestID(): struct{}{},
-	}
+	atomicInputs := set.Of(ids.GenerateTestID())
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -779,7 +767,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -837,7 +824,6 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -897,7 +883,6 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -940,7 +925,6 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -986,7 +970,6 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -1029,7 +1012,6 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)

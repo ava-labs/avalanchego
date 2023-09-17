@@ -13,11 +13,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -1957,7 +1957,6 @@ func TestImport(t *testing.T) {
 
 func TestServiceGetBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 
@@ -2119,7 +2118,6 @@ func TestServiceGetBlock(t *testing.T) {
 
 func TestServiceGetBlockByHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 	blockHeight := uint64(1337)
@@ -2150,7 +2148,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			name: "block height not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(ids.Empty, database.ErrNotFound)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
 				manager := executor.NewMockManager(ctrl)
 				return &Service{
@@ -2170,7 +2168,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			name: "block not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
@@ -2195,7 +2193,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block.EXPECT().Txs().Return(nil)
 
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2220,7 +2218,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
@@ -2248,7 +2246,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
@@ -2276,7 +2274,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				state := states.NewMockState(ctrl)
-				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)
@@ -2322,7 +2320,6 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 	blockHeight := uint64(1337)

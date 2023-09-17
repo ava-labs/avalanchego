@@ -100,7 +100,7 @@ func (d *diff) AddTx(tx *txs.Tx) {
 	d.addedTxs[tx.ID()] = tx
 }
 
-func (d *diff) GetBlockID(height uint64) (ids.ID, error) {
+func (d *diff) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := d.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
@@ -109,7 +109,7 @@ func (d *diff) GetBlockID(height uint64) (ids.ID, error) {
 	if !ok {
 		return ids.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.GetBlockID(height)
+	return parentState.GetBlockIDAtHeight(height)
 }
 
 func (d *diff) GetBlock(blkID ids.ID) (blocks.Block, error) {

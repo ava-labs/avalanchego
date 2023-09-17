@@ -7,22 +7,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestDiffMissingState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	versions := NewMockVersions(ctrl)
 
@@ -36,7 +36,6 @@ func TestDiffMissingState(t *testing.T) {
 func TestDiffCreation(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(require)
@@ -51,7 +50,6 @@ func TestDiffCreation(t *testing.T) {
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(require)
@@ -79,7 +77,6 @@ func TestDiffCurrentSupply(t *testing.T) {
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
@@ -117,7 +114,6 @@ func TestDiffCurrentValidator(t *testing.T) {
 func TestDiffPendingValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
@@ -155,7 +151,6 @@ func TestDiffPendingValidator(t *testing.T) {
 func TestDiffCurrentDelegator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	currentDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -205,7 +200,6 @@ func TestDiffCurrentDelegator(t *testing.T) {
 func TestDiffPendingDelegator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	pendingDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -255,7 +249,6 @@ func TestDiffPendingDelegator(t *testing.T) {
 func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	// Called in NewDiff
@@ -269,12 +262,20 @@ func TestDiffSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// Put a subnet
-	createSubnetTx := &txs.Tx{}
+	createSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
 	d.AddSubnet(createSubnetTx)
 
 	// Assert that we get the subnet back
 	// [state] returns 1 subnet.
-	parentStateCreateSubnetTx := &txs.Tx{}
+	parentStateCreateSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
 	state.EXPECT().GetSubnets().Return([]*txs.Tx{parentStateCreateSubnetTx}, nil).Times(1)
 	gotSubnets, err := d.GetSubnets()
 	require.NoError(err)
@@ -286,7 +287,6 @@ func TestDiffSubnet(t *testing.T) {
 func TestDiffChain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	// Called in NewDiff
@@ -326,7 +326,6 @@ func TestDiffChain(t *testing.T) {
 func TestDiffTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	// Called in NewDiff
@@ -377,7 +376,6 @@ func TestDiffTx(t *testing.T) {
 func TestDiffRewardUTXO(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	// Called in NewDiff
@@ -423,7 +421,6 @@ func TestDiffRewardUTXO(t *testing.T) {
 func TestDiffUTXO(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	// Called in NewDiff
