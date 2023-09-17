@@ -165,7 +165,7 @@ func TestOfSampleable(t *testing.T) {
 
 			s := OfSampleable(tt.elements...)
 
-			require.Equal(s.Len(), len(tt.expected))
+			require.Equal(len(tt.expected), s.Len())
 			for _, expected := range tt.expected {
 				require.True(s.Contains(expected))
 			}
