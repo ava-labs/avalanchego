@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/network"
@@ -47,8 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/blocks/builder"
-	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
+	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
@@ -84,7 +84,7 @@ type VM struct {
 
 	registerer prometheus.Registerer
 
-	parser blocks.Parser
+	parser block.Parser
 
 	pubsub *pubsub.Server
 
@@ -207,7 +207,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.parser, err = blocks.NewCustomParser(
+	vm.parser, err = block.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
