@@ -1311,6 +1311,7 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 		slices.Sort(expectedList)
 
 		iter := db.NewIteratorWithStartAndPrefix(start, prefix)
+		defer iter.Release()
 
 		// Assert the iterator returns the expected key-values.
 		numIterElts := 0
@@ -1324,8 +1325,6 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 			require.Equal(expected[keyStr], val)
 			numIterElts++
 		}
-
-		iter.Release()
 
 		// Clear the database for the next fuzz iteration.
 		require.NoError(AtomicClear(db, db))
