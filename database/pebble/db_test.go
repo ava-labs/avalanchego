@@ -24,36 +24,30 @@ func newDB(t testing.TB) *Database {
 
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
-		folder := t.TempDir()
-		cfg := DefaultConfig
-		db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
-		require.NoError(t, err)
-
+		db := newDB(t)
 		test(t, db)
-
 		_ = db.Close()
 	}
 }
 
 func FuzzKeyValue(f *testing.F) {
-	database.FuzzKeyValue(f, newDB(f))
+	db := newDB(f)
+	database.FuzzKeyValue(f, db)
+	_ = db.Close()
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	database.FuzzNewIteratorWithPrefix(f, newDB(f))
+	db := newDB(f)
+	database.FuzzNewIteratorWithPrefix(f, db)
+	_ = db.Close()
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
-			folder := b.TempDir()
-			cfg := DefaultConfig
-
-			db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
-			require.NoError(b, err)
+			db := newDB(b)
 			bench(b, db, "pebble", keys, values)
-
 			_ = db.Close()
 		}
 	}
