@@ -64,7 +64,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			malform: func(proof *Proof) {
 				proof.Path[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "last proof node has missing value",
@@ -189,7 +189,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			malform: func(proof *RangeProof) {
 				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "EndProof: last proof node has missing value",
@@ -799,7 +799,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			malform: func(proof *ChangeProof) {
 				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "last proof node has missing value",
@@ -1100,7 +1100,7 @@ func TestVerifyProofPath(t *testing.T) {
 		},
 		{
 			name:        "1 element",
-			path:        []ProofNode{{}},
+			path:        []ProofNode{{KeyPath: NewPath([]byte{1}, BranchFactor16)}},
 			proofKey:    nil,
 			expectedErr: nil,
 		},
@@ -1213,7 +1213,7 @@ func TestVerifyProofPath(t *testing.T) {
 				},
 			},
 			proofKey:    []byte{1, 2, 3},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 	}
 

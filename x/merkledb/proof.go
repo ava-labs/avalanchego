@@ -156,19 +156,19 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 
 	// If the last proof node's key is [proof.Key] (i.e. this is an inclusion proof)
 	// then the value of the last proof node must match [proof.Value].
-	// Note odd length keys can never match the [proof.Key] since it's bytes,
-	// and thus an even number of nibbles.
-	if lastNode.KeyPath.length%2 == 0 &&
+	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
+	// and thus has a whole number of bytes
+	if !lastNode.KeyPath.hasPartialByteLength() &&
 		proof.Key.Equals(lastNode.KeyPath) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
 
-	// If the last proof node has an odd length or a different key than [proof.Key]
+	// If the last proof node has a length not evenly divisible into bytes or a different key than [proof.Key]
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
-	// Note odd length keys can never match the [proof.Key] since it's bytes,
-	// and thus an even number of nibbles.
-	if (lastNode.KeyPath.length%2 == 1 || !proof.Key.Equals(lastNode.KeyPath)) &&
+	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
+	// and thus an exact number of bytes.
+	if (lastNode.KeyPath.hasPartialByteLength() || !proof.Key.Equals(lastNode.KeyPath)) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
@@ -485,8 +485,8 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start Path, end mayb
 			nodePath = node.KeyPath
 		)
 
-		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodePath.length%2 == 0 && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
+		// Skip keys that cannot have a value (enforced by [verifyProofPath]).
+		if !nodePath.hasPartialByteLength() && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -641,7 +641,7 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof, bf BranchFacto
 }
 
 // Verifies that all values present in the [proof]:
-// - Are nothing when deleted, not in the db, or the node has an odd path length.
+// - Are nothing when deleted, not in the db, or the node has path partial byte length
 // - if the node's path is within the key range, that has a value that matches the value passed in the change list or in the db
 func verifyAllChangeProofKeyValuesPresent(
 	ctx context.Context,
@@ -658,8 +658,8 @@ func verifyAllChangeProofKeyValuesPresent(
 		)
 
 		// Check the value of any node with a key that is within the range.
-		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if nodePath.length%2 == 0 && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
+		// Skip keys that cannot have a value (enforced by [verifyProofPath]).
+		if !nodePath.hasPartialByteLength() && !nodePath.Less(start) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -743,8 +743,8 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 }
 
 // Returns nil iff all the following hold:
-//   - Any node with an odd nibble length, should not have a value associated with it
-//     since all keys with values are written in bytes, so have even nibble length.
+//   - Any node with a partial byte length, should not have a value associated with it
+//     since all keys with values are written in complete bytes([]byte).
 //   - Each key in [proof] is a strict prefix of the following key.
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [keyPath], this is an inclusion proof.
@@ -761,9 +761,9 @@ func verifyProofPath(proof []ProofNode, keyPath Path) error {
 			return ErrInconsistentBranchFactor
 		}
 
-		// intermediate nodes (nodes with odd nibble length) should never have a value associated with them
-		if nodeKey.length%2 == 1 && !proof[i].ValueOrHash.IsNothing() {
-			return ErrOddLengthWithValue
+		// keys that should not have an associated value, have one set
+		if nodeKey.hasPartialByteLength() && !proof[i].ValueOrHash.IsNothing() {
+			return ErrPartialByteLengthWithValue
 		}
 
 		// each node should have a key that has the proven key as a prefix
@@ -781,8 +781,8 @@ func verifyProofPath(proof []ProofNode, keyPath Path) error {
 	// check the last node for a value since the above loop doesn't check the last node
 	if len(proof) > 0 {
 		lastNode := proof[len(proof)-1]
-		if lastNode.KeyPath.length%2 == 1 && !lastNode.ValueOrHash.IsNothing() {
-			return ErrOddLengthWithValue
+		if lastNode.KeyPath.hasPartialByteLength() && !lastNode.ValueOrHash.IsNothing() {
+			return ErrPartialByteLengthWithValue
 		}
 	}
 
@@ -833,9 +833,8 @@ func addPathInfo(
 		proofNode := proofPath[i]
 		keyPath := proofNode.KeyPath
 
-		if keyPath.length%keyPath.tokensPerByte != 0 && !proofNode.ValueOrHash.IsNothing() {
-			// a value cannot have an odd number of nibbles in its key
-			return ErrOddLengthWithValue
+		if keyPath.hasPartialByteLength() && !proofNode.ValueOrHash.IsNothing() {
+			return ErrPartialByteLengthWithValue
 		}
 
 		// load the node associated with the key or create a new one

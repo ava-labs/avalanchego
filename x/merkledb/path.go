@@ -87,6 +87,11 @@ func (cp Path) Length() int {
 	return cp.length
 }
 
+// hasPartialByteLength returns true iff the path fits into a non whole number of bytes
+func (cp Path) hasPartialByteLength() bool {
+	return cp.length%cp.tokensPerByte > 0
+}
+
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (cp Path) HasPrefix(prefix Path) bool {
 	prefixValue := prefix.value
@@ -175,7 +180,7 @@ func (cp Path) Extend(path Path) Path {
 	totalLength := cp.length + path.length
 	buffer := make([]byte, cp.bytesNeeded(totalLength))
 	copy(buffer, cp.value)
-	if cp.length%cp.tokensPerByte == 0 {
+	if !cp.hasPartialByteLength() {
 		copy(buffer[len(cp.value):], path.value)
 		return Path{
 			value:      *(*string)(unsafe.Pointer(&buffer)),
@@ -210,12 +215,12 @@ func (cp Path) Skip(tokensToSkip int) Path {
 		return result
 	}
 
+	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
+
 	if tokensToSkip%cp.tokensPerByte == 0 {
-		result.value = cp.value[tokensToSkip/cp.tokensPerByte:]
+		result.value = remainingBytes
 		return result
 	}
-
-	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
 
 	buffer := make([]byte, cp.bytesNeeded(newLength))
 	shiftRight := cp.shift(tokensToSkip - 1)

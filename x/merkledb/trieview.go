@@ -30,10 +30,10 @@ const (
 var (
 	_ TrieView = (*trieView)(nil)
 
-	ErrCommitted          = errors.New("view has been committed")
-	ErrInvalid            = errors.New("the trie this view was based on has changed, rendering this view invalid")
-	ErrOddLengthWithValue = errors.New(
-		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
+	ErrCommitted                  = errors.New("view has been committed")
+	ErrInvalid                    = errors.New("the trie this view was based on has changed, rendering this view invalid")
+	ErrPartialByteLengthWithValue = errors.New(
+		"the underlying db only supports whole number of byte keys, so cannot record changes with partial byte lengths",
 	)
 	ErrGetPathToFailure       = errors.New("GetPathTo failed to return the closest node")
 	ErrStartAfterEnd          = errors.New("start key > end key")

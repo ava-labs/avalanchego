@@ -99,9 +99,6 @@ func FuzzCodecPath(f *testing.F) {
 			if err != nil {
 				t.SkipNow()
 			}
-			if got.length%got.tokensPerByte > 0 && branchFactor == BranchFactor16 {
-				t.FailNow()
-			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
 
