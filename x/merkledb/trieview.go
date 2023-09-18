@@ -393,7 +393,7 @@ func (t *trieView) GetRangeProof(
 		return nil, err
 	}
 
-	result := RangeProof{}
+	var result RangeProof
 
 	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
 	it := t.NewIteratorWithStart(start.Value())
