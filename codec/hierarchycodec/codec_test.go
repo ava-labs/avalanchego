@@ -23,9 +23,7 @@ func TestMultipleTags(t *testing.T) {
 	}
 }
 
-func FuzzVectors(f *testing.F) {
-	for _, test := range codec.FuzzTests {
-		c := NewDefault()
-		test(c, f)
-	}
+func FuzzStructUnmarshalHierarchyCodec(f *testing.F) {
+	c := NewDefault()
+	codec.FuzzStructUnmarshal(c, f)
 }
