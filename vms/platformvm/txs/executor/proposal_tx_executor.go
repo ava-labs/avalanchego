@@ -553,7 +553,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			if vdrStaker.StartTime.After(e.Config.CortinaTime) {
+			if e.Config.IsCortinaActivated(vdrStaker.StartTime) {
 				previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
 					vdrStaker.SubnetID,
 					vdrStaker.NodeID,
