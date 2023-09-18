@@ -692,9 +692,6 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutCurrentValidator(staker *Staker) {
-	if staker.StartTime.Equal(s.cfg.CortinaTime) {
-		panic("max pain")
-	}
 	s.currentStakers.PutValidator(staker)
 }
 
@@ -707,9 +704,6 @@ func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) 
 }
 
 func (s *state) PutCurrentDelegator(staker *Staker) {
-	if staker.StartTime.Equal(s.cfg.CortinaTime) {
-		panic("max pain")
-	}
 	s.currentStakers.PutDelegator(staker)
 }
 
@@ -726,9 +720,6 @@ func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 }
 
 func (s *state) PutPendingValidator(staker *Staker) {
-	if staker.StartTime.Equal(s.cfg.CortinaTime) {
-		panic("max pain")
-	}
 	s.pendingStakers.PutValidator(staker)
 }
 
@@ -741,9 +732,6 @@ func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) 
 }
 
 func (s *state) PutPendingDelegator(staker *Staker) {
-	if staker.StartTime.Equal(s.cfg.CortinaTime) {
-		panic("max pain")
-	}
 	s.pendingStakers.PutDelegator(staker)
 }
 
