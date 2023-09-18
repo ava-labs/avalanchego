@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -219,6 +220,11 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
+	tracer, err := trace.New(trace.Config{})
+	if err != nil {
+		panic(err)
+	}
+
 	genesisBytes := buildGenesisTest(ctx)
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
@@ -231,6 +237,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		tracer,
 	)
 	if err != nil {
 		panic(err)

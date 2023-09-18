@@ -7,7 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
 
@@ -15,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -98,17 +104,21 @@ type State interface {
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
+	acceptLock *sync.RWMutex,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
+	tracer trace.Tracer,
 ) Manager {
 	return &manager{
-		log:     log,
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		log:        log,
+		cfg:        cfg,
+		acceptLock: acceptLock,
+		state:      state,
+		metrics:    metrics,
+		clk:        clk,
+		tracer:     tracer,
+		caches:     make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -123,16 +133,19 @@ func NewManager(
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type manager struct {
-	log     logging.Logger
-	cfg     config.Config
-	state   State
-	metrics metrics.Metrics
-	clk     *mockable.Clock
+	log        logging.Logger
+	cfg        config.Config
+	acceptLock *sync.RWMutex
+	state      State
+	metrics    metrics.Metrics
+	clk        *mockable.Clock
+	tracer     trace.Tracer
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	cachesLock sync.RWMutex
+	caches     map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -156,6 +169,9 @@ type manager struct {
 // described above and we will always return the last accepted block height
 // as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
 	if m.cfg.UseCurrentHeight {
 		return m.getCurrentHeight(ctx)
 	}
@@ -179,11 +195,16 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 }
 
 func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
 	return m.getCurrentHeight(ctx)
 }
 
-// TODO: Pass the context into the state.
-func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
+func (m *manager) getCurrentHeight(ctx context.Context) (uint64, error) {
+	_, span := m.tracer.Start(ctx, "GetCurrentHeight")
+	defer span.End()
+
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
@@ -197,12 +218,18 @@ func (m *manager) GetValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	ctx, span := m.tracer.Start(ctx, "GetValidatorSet", oteltrace.WithAttributes(
+		attribute.Int64("height", int64(targetHeight)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
+
 	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
-	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
-		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
-	}
+	// if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
+	// 	m.metrics.IncValidatorSetsCached()
+	// 	return validatorSet, nil
+	// }
 
 	// get the start time to track metrics
 	startTime := m.clk.Time()
@@ -237,7 +264,17 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
+	m.cachesLock.RLock()
 	validatorSetsCache, exists := m.caches[subnetID]
+	m.cachesLock.RUnlock()
+	if exists {
+		return validatorSetsCache
+	}
+
+	m.cachesLock.Lock()
+	defer m.cachesLock.Unlock()
+
+	validatorSetsCache, exists = m.caches[subnetID]
 	if exists {
 		return validatorSetsCache
 	}
@@ -253,6 +290,11 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	ctx, span := m.tracer.Start(ctx, "makePrimaryNetworkValidatorSet", oteltrace.WithAttributes(
+		attribute.Int64("targetHeight", int64(targetHeight)),
+	))
+	defer span.End()
+
 	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -291,6 +333,9 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
@@ -361,6 +406,9 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
 	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
 		// TODO: Require that the current validator set for all subnets is
@@ -389,6 +437,9 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
 	}
+
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
 
 	chainTx, _, err := m.state.GetTx(chainID)
 	if err != nil {

@@ -6,6 +6,7 @@ package validators
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -110,6 +112,9 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	metrics, err := metrics.New("", prometheus.NewRegistry())
 	require.NoError(err)
 
+	tracer, err := trace.New(trace.Config{})
+	require.NoError(err)
+
 	s, err := state.New(
 		db,
 		genesisBytes,
@@ -131,6 +136,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		new(utils.Atomic[bool]),
+		tracer,
 	)
 	require.NoError(err)
 
@@ -139,9 +145,11 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		config.Config{
 			Validators: vdrs,
 		},
+		new(sync.RWMutex),
 		s,
 		metrics,
 		new(mockable.Clock),
+		tracer,
 	)
 
 	var (

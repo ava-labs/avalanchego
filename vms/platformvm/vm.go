@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -146,12 +147,14 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		rewards,
 		&vm.bootstrapped,
+		vm.Tracer,
 	)
 	if err != nil {
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	var acceptLock sync.RWMutex
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, &acceptLock, vm.state, vm.metrics, &vm.clock, vm.Tracer)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
@@ -189,6 +192,7 @@ func (vm *VM) Initialize(
 	vm.manager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
+		&acceptLock,
 		vm.state,
 		txExecutorBackend,
 		validatorManager,
