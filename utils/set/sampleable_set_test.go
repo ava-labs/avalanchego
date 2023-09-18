@@ -131,3 +131,44 @@ func TestSampleableSetUnmarshalJSON(t *testing.T) {
 		require.True(set1.Equals(set2))
 	}
 }
+
+func TestOfSampleable(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []int
+		expected []int
+	}{
+		{
+			name:     "nil",
+			elements: nil,
+			expected: []int{},
+		},
+		{
+			name:     "empty",
+			elements: []int{},
+			expected: []int{},
+		},
+		{
+			name:     "unique elements",
+			elements: []int{1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "duplicate elements",
+			elements: []int{1, 2, 3, 1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := OfSampleable(tt.elements...)
+
+			require.Equal(len(tt.expected), s.Len())
+			for _, expected := range tt.expected {
+				require.True(s.Contains(expected))
+			}
+		})
+	}
+}
