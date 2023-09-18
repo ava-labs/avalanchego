@@ -102,9 +102,10 @@ type Manager struct {
 	cancelCtx context.CancelFunc
 
 	// Set to true when StartSyncing is called.
-	syncing   bool
-	closeOnce sync.Once
-	newPath   func(b []byte) merkledb.Path
+	syncing      bool
+	closeOnce    sync.Once
+	newPath      func(b []byte) merkledb.Path
+	branchFactor merkledb.BranchFactor
 }
 
 type ManagerConfig struct {
@@ -127,10 +128,11 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-	newPath := func(b []byte) merkledb.Path { return merkledb.NewPath(b, config.BranchFactor) }
+	branchFactor := config.BranchFactor
 	if config.BranchFactor == merkledb.BranchFactorUnspecified {
-		newPath = func(b []byte) merkledb.Path { return merkledb.NewPath(b, merkledb.BranchFactorDefault) }
+		branchFactor = merkledb.BranchFactorDefault
 	}
+	newPath := func(b []byte) merkledb.Path { return merkledb.NewPath(b, branchFactor) }
 
 	m := &Manager{
 		config:          config,
@@ -138,6 +140,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
 		newPath:         newPath,
+		branchFactor:    branchFactor,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -488,7 +491,7 @@ func (m *Manager) findNextKey(
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
+		if childIndex, hasDifference := m.findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
 			nextKey = maybe.Some(deepestNode.KeyPath.Append(childIndex).Bytes())
 			break
 		}
@@ -788,12 +791,12 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
+func (m *Manager) findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < byte(merkledb.BranchFactor16); childIndex++ {
+	for childIndex := startIndex; childIndex < byte(m.branchFactor); childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}

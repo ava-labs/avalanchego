@@ -42,7 +42,7 @@ var (
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrInvalidChildIndex           = "child index must be less than %d"
+	ErrInvalidChildIndex           = errors.New("child index must be less than branch factor")
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilPath                     = errors.New("path is nil")
@@ -53,6 +53,7 @@ var (
 	ErrNilProof                    = errors.New("proof is nil")
 	ErrNilValue                    = errors.New("value is nil")
 	ErrUnexpectedEndProof          = errors.New("end proof should be empty")
+	ErrInconsistentBranchFactor    = errors.New("all keys in proof nodes should have the same branch factor")
 )
 
 type ProofNode struct {
@@ -108,7 +109,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
 		if childIndex >= uint32(bf) {
-			return fmt.Errorf(ErrInvalidChildIndex, bf)
+			return ErrInvalidChildIndex
 		}
 		childID, err := ids.ToID(childIDBytes)
 		if err != nil {
@@ -173,7 +174,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil)
+	view, err := getStandaloneTrieView(ctx, nil, proof.Key.BranchFactor())
 	if err != nil {
 		return err
 	}
@@ -271,18 +272,18 @@ type RangeProof struct {
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
 	// Sorted by increasing key.
 	KeyValues []KeyValue
-
-	branchFactor BranchFactor
 }
 
-// Returns nil iff all the following hold:
+// Verify returns nil iff all the following hold:
 //   - The invariants of RangeProof hold.
 //   - [start] <= [end].
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
 //     whose root is [expectedRootID].
-//   - All keys in [proof.KeyValues] are in the range [start, end].
-//     If [start] is Nothing, all keys are considered > [start].
-//     If [end] is Nothing, all keys are considered < [end].
+//
+// All keys in [proof.KeyValues] are in the range [start, end].
+//
+//	If [start] is Nothing, all keys are considered > [start].
+//	If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
 	start maybe.Maybe[[]byte],
@@ -302,6 +303,15 @@ func (proof *RangeProof) Verify(
 		return ErrNoEndProof
 	}
 
+	// determine branch factor based on proof paths
+	var branchFactor BranchFactor
+	if len(proof.StartProof) > 0 {
+		branchFactor = proof.StartProof[0].KeyPath.BranchFactor()
+	} else {
+		// safe because invariants prevent both start proof and end proof from being empty at the same time
+		branchFactor = proof.EndProof[0].KeyPath.BranchFactor()
+	}
+
 	// Make sure the key-value pairs are sorted and in [start, end].
 	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
 		return err
@@ -315,23 +325,23 @@ func (proof *RangeProof) Verify(
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
 	smallestProvenPath := maybe.Bind(start, func(b []byte) Path {
-		return NewPath(b, proof.branchFactor)
+		return NewPath(b, branchFactor)
 	})
 
 	largestProvenPath := maybe.Bind(end, func(b []byte) Path {
-		return NewPath(b, proof.branchFactor)
+		return NewPath(b, branchFactor)
 	})
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenPath] to ancestors of the node containing
 		// [largestProvenPath] so that we get the expected root ID.
-		largestProvenPath = maybe.Some(NewPath(proof.KeyValues[len(proof.KeyValues)-1].Key, proof.branchFactor))
+		largestProvenPath = maybe.Some(NewPath(proof.KeyValues[len(proof.KeyValues)-1].Key, branchFactor))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
 	keyValues := make(map[Path][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[NewPath(keyValue.Key, proof.branchFactor)] = keyValue.Value
+		keyValues[NewPath(keyValue.Key, branchFactor)] = keyValue.Value
 	}
 
 	// Ensure that the start proof is valid and contains values that
@@ -372,7 +382,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, ops)
+	view, err := getStandaloneTrieView(ctx, ops, branchFactor)
 	if err != nil {
 		return err
 	}
@@ -747,6 +757,9 @@ func verifyProofPath(proof []ProofNode, keyPath Path) error {
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].KeyPath
+		if nodeKey.BranchFactor() != keyPath.BranchFactor() {
+			return ErrInconsistentBranchFactor
+		}
 
 		// intermediate nodes (nodes with odd nibble length) should never have a value associated with them
 		if nodeKey.length%2 == 1 && !proof[i].ValueOrHash.IsNothing() {
@@ -843,7 +856,7 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := EmptyPath(keyPath.branchFactor)
+		compressedPath := EmptyPath(keyPath.BranchFactor())
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
@@ -862,7 +875,7 @@ func addPathInfo(
 }
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, factor BranchFactor) (*trieView, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
@@ -871,6 +884,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,
+			BranchFactor:              factor,
 		},
 		&mockMetrics{},
 	)

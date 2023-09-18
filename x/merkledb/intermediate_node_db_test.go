@@ -139,8 +139,6 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		cacheSize,
 		evictionBatchSize,
 	)
-
-	f.Add([]byte{0xFF}, uint(1), false, false)
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
@@ -167,7 +165,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		}
 		p = p.Take(int(tokenLength))
 		constructedKey := db.constructDBKey(p)
-		baseLength := p.Length()/p.tokensPerByte + len(intermediateNodePrefix)
+		baseLength := len(p.value) + len(intermediateNodePrefix)
 		require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 		if p.Length()%p.tokensPerByte == 0 {
 			// when even, there is an extra padding byte
@@ -175,7 +173,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			require.Equal(append(p.Bytes(), 0b1000_0000), constructedKey[len(intermediateNodePrefix):])
 		} else {
 			require.Len(constructedKey, baseLength)
-			require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+			require.Equal(p.Append(1<<(p.tokenBitSize-1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 		}
 	})
 }

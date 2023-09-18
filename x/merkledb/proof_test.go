@@ -6,7 +6,6 @@ package merkledb
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -354,7 +353,6 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				branchFactor: BranchFactor16,
 				KeyValues: []KeyValue{
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
@@ -368,7 +366,6 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				branchFactor: BranchFactor16,
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
@@ -381,7 +378,6 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
-				branchFactor: BranchFactor16,
 				KeyValues: []KeyValue{
 					{Key: []byte{2}, Value: []byte{0}},
 				},
@@ -394,7 +390,6 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1, 2}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				branchFactor: BranchFactor16,
 				KeyValues: []KeyValue{
 					{Key: []byte{1, 2}, Value: []byte{1}},
 				},
@@ -451,6 +446,30 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 			},
 			expectedErr: ErrProofNodeNotForKey,
+		},
+		{
+			name:  "inconsistent branching factor",
+			start: maybe.Some([]byte{1, 2}),
+			end:   maybe.Some([]byte{1, 2}),
+			proof: &RangeProof{
+				StartProof: []ProofNode{
+					{
+						KeyPath: NewPath([]byte{1}, BranchFactor16),
+					},
+					{
+						KeyPath: NewPath([]byte{1, 2}, BranchFactor16),
+					},
+				},
+				EndProof: []ProofNode{
+					{
+						KeyPath: NewPath([]byte{1}, BranchFactor4),
+					},
+					{
+						KeyPath: NewPath([]byte{1, 2}, BranchFactor4),
+					},
+				},
+			},
+			expectedErr: ErrInconsistentBranchFactor,
 		},
 		{
 			name:  "end proof has node for wrong key",
@@ -1255,7 +1274,7 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 
 	var unmarshaledNode ProofNode
 	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
-	require.ErrorIs(t, err, fmt.Errorf(ErrInvalidChildIndex, BranchFactor16))
+	require.ErrorIs(t, err, ErrInvalidChildIndex)
 }
 
 func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {

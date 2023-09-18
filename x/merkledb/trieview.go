@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(RootPath, false /* hasValue */)
+	root, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -193,7 +193,7 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[RootPath]
+	passedRootChange, ok := changes.nodes[db.rootPath]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
@@ -393,7 +393,7 @@ func (t *trieView) GetRangeProof(
 		return nil, err
 	}
 
-	result := RangeProof{branchFactor: t.db.branchFactor}
+	result := RangeProof{}
 
 	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
 	it := t.NewIteratorWithStart(start.Value())

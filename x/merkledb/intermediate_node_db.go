@@ -129,18 +129,19 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 	// add one additional byte to store padding when the path
 	// has a length that fits into a whole number of bytes
 	remainder := key.Length() % key.tokensPerByte
-	keyLen := len(pathBytes)
+	bufferLen := len(pathBytes)
 	if remainder == 0 {
-		keyLen++
+		bufferLen++
 	}
-	dbKey := getBufferFromPool(db.bufferPool, keyLen)
+	dbKey := getBufferFromPool(db.bufferPool, bufferLen)
 	defer db.bufferPool.Put(dbKey)
 
 	copy(dbKey, pathBytes)
 	if remainder == 0 {
-		dbKey[keyLen-1] = 0b1000_0000
+		// use set here to remove any data still in the array from the bufferPool
+		dbKey[bufferLen-1] = 0b1000_0000
 	} else {
-		dbKey[keyLen-1] |= 0b0000_0001 << (Byte - (byte(remainder) * key.tokenBitSize))
+		dbKey[bufferLen-1] |= 0b0000_0001 << (7 - (byte(remainder) * key.tokenBitSize))
 	}
 
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)

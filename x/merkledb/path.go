@@ -43,6 +43,7 @@ type Path struct {
 
 var (
 	branchFactorToPathConfig = map[BranchFactor]*pathConfig{
+		BranchFactorUnspecified: {},
 		BranchFactor2: {
 			branchFactor:  BranchFactor2,
 			tokenBitSize:  Bit,
@@ -255,6 +256,13 @@ func (cp Path) Take(tokensToTake int) Path {
 		length:     tokensToTake,
 		pathConfig: cp.pathConfig,
 	}
+}
+
+func (cp Path) BranchFactor() BranchFactor {
+	if cp.pathConfig != nil {
+		return cp.branchFactor
+	}
+	return BranchFactorUnspecified
 }
 
 // Bytes returns the raw bytes of the Path

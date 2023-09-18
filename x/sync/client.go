@@ -86,13 +86,17 @@ type ClientConfig struct {
 }
 
 func NewClient(config *ClientConfig) Client {
+	branchFactor := config.BranchFactor
+	if branchFactor == merkledb.BranchFactorUnspecified {
+		branchFactor = merkledb.BranchFactorDefault
+	}
 	return &client{
 		networkClient:       config.NetworkClient,
 		stateSyncNodes:      config.StateSyncNodeIDs,
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-		branchFactor:        config.BranchFactor,
+		branchFactor:        branchFactor,
 	}
 }
 
