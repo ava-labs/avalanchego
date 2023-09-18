@@ -46,6 +46,7 @@ func newDefaultConfig() Config {
 		IntermediateNodeCacheSize: units.MiB,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
+		BranchFactor:              BranchFactor16,
 	}
 }
 

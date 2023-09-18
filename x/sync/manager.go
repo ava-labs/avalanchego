@@ -128,11 +128,11 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-	branchFactor := config.BranchFactor
+
 	if config.BranchFactor == merkledb.BranchFactorUnspecified {
-		branchFactor = merkledb.BranchFactorDefault
+		return nil, merkledb.ErrNoSpecifiedBranchFactor
 	}
-	newPath := func(b []byte) merkledb.Path { return merkledb.NewPath(b, branchFactor) }
+	newPath := func(b []byte) merkledb.Path { return merkledb.NewPath(b, config.BranchFactor) }
 
 	m := &Manager{
 		config:          config,
@@ -140,7 +140,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
 		newPath:         newPath,
-		branchFactor:    branchFactor,
+		branchFactor:    config.BranchFactor,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 

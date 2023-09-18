@@ -85,10 +85,9 @@ type ClientConfig struct {
 	BranchFactor        merkledb.BranchFactor
 }
 
-func NewClient(config *ClientConfig) Client {
-	branchFactor := config.BranchFactor
-	if branchFactor == merkledb.BranchFactorUnspecified {
-		branchFactor = merkledb.BranchFactorDefault
+func NewClient(config *ClientConfig) (Client, error) {
+	if config.BranchFactor == merkledb.BranchFactorUnspecified {
+		return nil, merkledb.ErrNoSpecifiedBranchFactor
 	}
 	return &client{
 		networkClient:       config.NetworkClient,
@@ -96,8 +95,8 @@ func NewClient(config *ClientConfig) Client {
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-		branchFactor:        branchFactor,
-	}
+		branchFactor:        config.BranchFactor,
+	}, nil
 }
 
 // GetChangeProof synchronously retrieves the change proof given by [req].

@@ -24,8 +24,6 @@ const (
 	BranchFactor4           BranchFactor = 4
 	BranchFactor16          BranchFactor = 16
 	BranchFactor256         BranchFactor = 256
-
-	BranchFactorDefault = BranchFactor16
 )
 
 type pathConfig struct {

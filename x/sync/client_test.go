@@ -38,6 +38,7 @@ func newDefaultDBConfig() merkledb.Config {
 		IntermediateNodeCacheSize: defaultRequestKeyLimit,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
+		BranchFactor:              merkledb.BranchFactor16,
 	}
 }
 
@@ -79,20 +80,21 @@ func sendRangeProofRequest(
 
 		serverResponseChan = make(chan []byte, 1)
 
-		// The client fetching a range proof.
-		client = NewClient(&ClientConfig{
-			NetworkClient: networkClient,
-			Metrics:       &mockMetrics{},
-			Log:           logging.NoLog{},
-			BranchFactor:  merkledb.BranchFactor16,
-		})
-
 		// The context used in client.GetRangeProof.
 		// Canceled after the first response is received because
 		// the client will keep sending requests until its context
 		// expires or it succeeds.
 		ctx, cancel = context.WithCancel(context.Background())
 	)
+
+	// The client fetching a range proof.
+	client, err := NewClient(&ClientConfig{
+		NetworkClient: networkClient,
+		Metrics:       &mockMetrics{},
+		Log:           logging.NoLog{},
+		BranchFactor:  merkledb.BranchFactor16,
+	})
+	require.NoError(err)
 
 	defer cancel()
 
@@ -397,20 +399,21 @@ func sendChangeProofRequest(
 
 		serverResponseChan = make(chan []byte, 1)
 
-		// The client fetching a change proof.
-		client = NewClient(&ClientConfig{
-			NetworkClient: networkClient,
-			Metrics:       &mockMetrics{},
-			Log:           logging.NoLog{},
-			BranchFactor:  merkledb.BranchFactor16,
-		})
-
 		// The context used in client.GetChangeProof.
 		// Canceled after the first response is received because
 		// the client will keep sending requests until its context
 		// expires or it succeeds.
 		ctx, cancel = context.WithCancel(context.Background())
 	)
+
+	// The client fetching a change proof.
+	client, err := NewClient(&ClientConfig{
+		NetworkClient: networkClient,
+		Metrics:       &mockMetrics{},
+		Log:           logging.NoLog{},
+		BranchFactor:  merkledb.BranchFactor16,
+	})
+	require.NoError(err)
 
 	defer cancel() // avoid leaking a goroutine
 
@@ -794,7 +797,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 
 	networkClient := NewMockNetworkClient(ctrl)
 
-	client := NewClient(
+	client, err := NewClient(
 		&ClientConfig{
 			NetworkClient: networkClient,
 			Log:           logging.NoLog{},
@@ -802,6 +805,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 			BranchFactor:  merkledb.BranchFactor16,
 		},
 	)
+	require.NoError(err)
 
 	// Mock failure to send app request
 	networkClient.EXPECT().RequestAny(
@@ -810,7 +814,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 	).Return(ids.NodeID{}, nil, errAppSendFailed).Times(2)
 
-	_, err := client.GetChangeProof(
+	_, err = client.GetChangeProof(
 		context.Background(),
 		&pb.SyncGetChangeProofRequest{},
 		nil, // database is unused

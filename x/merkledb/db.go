@@ -54,8 +54,9 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot  = errors.New("start and end root are the same")
-	errNoNewRoot = errors.New("there was no updated root in change list")
+	errSameRoot                = errors.New("start and end root are the same")
+	errNoNewRoot               = errors.New("there was no updated root in change list")
+	ErrNoSpecifiedBranchFactor = errors.New("specifying the branch factor is required")
 )
 
 type ChangeProofer interface {
@@ -216,11 +217,10 @@ func newDatabase(
 		rootGenConcurrency = config.RootGenConcurrency
 	}
 
-	branchFactor := config.BranchFactor
-	if branchFactor == BranchFactorUnspecified {
-		branchFactor = BranchFactorDefault
+	if config.BranchFactor == BranchFactorUnspecified {
+		return nil, ErrNoSpecifiedBranchFactor
 	}
-	newPath := func(b []byte) Path { return NewPath(b, branchFactor) }
+	newPath := func(b []byte) Path { return NewPath(b, config.BranchFactor) }
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
 	// to reduce memory allocations.
@@ -232,7 +232,7 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), branchFactor),
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.BranchFactor),
 		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
 		history:              newTrieHistory(int(config.HistoryLength), newPath),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
@@ -240,7 +240,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		branchFactor:         branchFactor,
+		branchFactor:         config.BranchFactor,
 		rootPath:             newPath(RootKey),
 	}
 
