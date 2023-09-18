@@ -27,9 +27,7 @@ import (
 // This test uses the compiled bin for `hashing.sol` as
 // well as its ABI contained in `hashing_contract.go`.
 
-// This test needs to be run serially to minimize the potential for
-// other tests to affect the gas price
-var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
+var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	// Need a gas limit much larger than the standard 21_000 to enable
