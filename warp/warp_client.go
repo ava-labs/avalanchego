@@ -12,45 +12,43 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-var _ WarpClient = (*warpClient)(nil)
+var _ Client = (*client)(nil)
 
-type WarpClient interface {
+type Client interface {
+	// GetSignature requests the BLS signature associated with a messageID
 	GetSignature(ctx context.Context, messageID ids.ID) ([]byte, error)
+	// GetAggregateSignature requests the aggregate signature associated with messageID
 	GetAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) ([]byte, error)
 }
 
-// warpClient implementation for interacting with EVM [chain]
-type warpClient struct {
+// client implementation for interacting with EVM [chain]
+type client struct {
 	client *rpc.Client
 }
 
-// NewWarpClient returns a WarpClient for interacting with EVM [chain]
-func NewWarpClient(uri, chain string) (WarpClient, error) {
-	client, err := rpc.Dial(fmt.Sprintf("%s/ext/bc/%s/rpc", uri, chain))
+// NewClient returns a Client for interacting with EVM [chain]
+func NewClient(uri, chain string) (Client, error) {
+	innerClient, err := rpc.Dial(fmt.Sprintf("%s/ext/bc/%s/rpc", uri, chain))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial client. err: %w", err)
 	}
-	return &warpClient{
-		client: client,
+	return &client{
+		client: innerClient,
 	}, nil
 }
 
-// GetSignature requests the BLS signature associated with a messageID
-func (c *warpClient) GetSignature(ctx context.Context, messageID ids.ID) ([]byte, error) {
+func (c *client) GetSignature(ctx context.Context, messageID ids.ID) ([]byte, error) {
 	var res hexutil.Bytes
-	err := c.client.CallContext(ctx, &res, "warp_getSignature", messageID)
-	if err != nil {
+	if err := c.client.CallContext(ctx, &res, "warp_getSignature", messageID); err != nil {
 		return nil, fmt.Errorf("call to warp_getSignature failed. err: %w", err)
 	}
-	return res, err
+	return res, nil
 }
 
-// GetAggregateSignature requests the aggregate signature associated with messageID
-func (c *warpClient) GetAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) ([]byte, error) {
+func (c *client) GetAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) ([]byte, error) {
 	var res hexutil.Bytes
-	err := c.client.CallContext(ctx, &res, "warp_getAggregateSignature", messageID, quorumNum)
-	if err != nil {
+	if err := c.client.CallContext(ctx, &res, "warp_getAggregateSignature", messageID, quorumNum); err != nil {
 		return nil, fmt.Errorf("call to warp_getAggregateSignature failed. err: %w", err)
 	}
-	return res, err
+	return res, nil
 }

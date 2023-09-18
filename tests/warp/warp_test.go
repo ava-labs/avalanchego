@@ -273,10 +273,10 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 
 		blsSignatures := make([]*bls.Signature, 0, len(chainAURIs))
 		for i, uri := range chainAURIs {
-			warpClient, err := warpBackend.NewWarpClient(uri, blockchainIDA.String())
+			client, err := warpBackend.NewClient(uri, blockchainIDA.String())
 			gomega.Expect(err).Should(gomega.BeNil())
 			log.Info("Fetching warp signature from node")
-			rawSignatureBytes, err := warpClient.GetSignature(ctx, unsignedWarpMessageID)
+			rawSignatureBytes, err := client.GetSignature(ctx, unsignedWarpMessageID)
 			gomega.Expect(err).Should(gomega.BeNil())
 
 			blsSignature, err := bls.SignatureFromBytes(rawSignatureBytes)
@@ -321,11 +321,11 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		ctx := context.Background()
 
 		// Verify that the signature aggregation matches the results of manually constructing the warp message
-		warpClient, err := warpBackend.NewWarpClient(chainAURIs[0], blockchainIDA.String())
+		client, err := warpBackend.NewClient(chainAURIs[0], blockchainIDA.String())
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		// Specify WarpQuorumDenominator to retrieve signatures from every validator
-		signedWarpMessageBytes, err := warpClient.GetAggregateSignature(ctx, unsignedWarpMessageID, params.WarpQuorumDenominator)
+		signedWarpMessageBytes, err := client.GetAggregateSignature(ctx, unsignedWarpMessageID, params.WarpQuorumDenominator)
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(signedWarpMessageBytes).Should(gomega.Equal(signedWarpMsg.Bytes()))
 	})
