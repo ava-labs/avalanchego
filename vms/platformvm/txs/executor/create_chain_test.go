@@ -130,7 +130,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, errCantFindSubnet)
+	require.ErrorIs(err, state.ErrCantFindSubnet)
 }
 
 // Ensure valid tx passes semanticVerify
