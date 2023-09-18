@@ -358,9 +358,9 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 	if result.length < 0 {
 		return EmptyPath(branchFactor), errNegativeNibbleLength
 	}
-	pathBytesLen := result.length >> 1
-	hasOddLen := result.length%2 == 1
-	if hasOddLen {
+	pathBytesLen := result.length / result.tokensPerByte
+	remainder := result.length % result.tokensPerByte
+	if remainder > 0 {
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
@@ -373,9 +373,9 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		}
 		return EmptyPath(branchFactor), err
 	}
-	if hasOddLen {
-		paddedNibble := buffer[pathBytesLen-1] & 0x0F
-		if paddedNibble != 0 {
+	if remainder > 0 {
+		paddingBits := buffer[pathBytesLen-1] & (0xFF >> (8 - result.shift(result.length-1)))
+		if paddingBits != 0 {
 			return EmptyPath(branchFactor), errNonZeroNibblePadding
 		}
 	}

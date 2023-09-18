@@ -71,20 +71,36 @@ func FuzzCodecInt(f *testing.F) {
 	)
 }
 
-func FuzzCodecSerializedPath(f *testing.F) {
+func FuzzCodecPath(f *testing.F) {
 	f.Fuzz(
 		func(
 			t *testing.T,
 			b []byte,
+			branchFactorBit1 bool,
+			branchFactorBit2 bool,
 		) {
 			require := require.New(t)
+			branchFactor := BranchFactor2
+			switch {
+			case !branchFactorBit1 && !branchFactorBit2:
+				branchFactor = BranchFactor2
+			case !branchFactorBit1 && branchFactorBit2:
+				branchFactor = BranchFactor4
+			case branchFactorBit1 && !branchFactorBit2:
+				branchFactor = BranchFactor16
+			case branchFactorBit1 && branchFactorBit2:
+				branchFactor = BranchFactor256
+			}
 
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodePath(reader, BranchFactor16)
+			got, err := codec.decodePath(reader, branchFactor)
 			if err != nil {
 				t.SkipNow()
+			}
+			if got.length%got.tokensPerByte > 0 && branchFactor == BranchFactor16 {
+				t.FailNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
