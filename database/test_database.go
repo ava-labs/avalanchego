@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"io"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"golang.org/x/sync/errgroup"
@@ -60,10 +62,6 @@ var Tests = []func(t *testing.T, db Database){
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
 	TestPutGetEmpty,
-}
-
-var FuzzTests = []func(*testing.F, Database){
-	FuzzKeyValue,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -1201,5 +1199,68 @@ func FuzzKeyValue(f *testing.F, db Database) {
 
 		_, err = db.Get(key)
 		require.Equal(ErrNotFound, err)
+	})
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
+	const (
+		maxKeyLen   = 32
+		maxValueLen = 32
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+		prefix []byte,
+		numKeyValues uint,
+	) {
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		// Put a bunch of key-values
+		expected := map[string][]byte{}
+		for i := 0; i < int(numKeyValues); i++ {
+			key := make([]byte, r.Intn(maxKeyLen))
+			_, _ = r.Read(key) // #nosec G404
+
+			value := make([]byte, r.Intn(maxValueLen))
+			_, _ = r.Read(value) // #nosec G404
+
+			if len(value) == 0 {
+				// Consistently treat zero length values as nil
+				// so that we can compare [expected] and [got] with
+				// require.Equal, which treats nil and empty byte
+				// as being unequal, whereas the database treats
+				// them as being equal.
+				value = nil
+			}
+
+			if bytes.HasPrefix(key, prefix) {
+				expected[string(key)] = value
+			}
+
+			require.NoError(db.Put(key, value))
+		}
+		expectedList := maps.Keys(expected)
+		slices.Sort(expectedList)
+
+		iter := db.NewIteratorWithPrefix(prefix)
+		defer iter.Release()
+
+		// Assert the iterator returns the expected key-values.
+		numIterElts := 0
+		for iter.Next() {
+			val := iter.Value()
+			if len(val) == 0 {
+				val = nil
+			}
+			require.Equal(expectedList[numIterElts], string(iter.Key()))
+			require.Equal(expected[string(iter.Key())], val)
+			numIterElts++
+		}
+		require.Equal(len(expectedList), numIterElts)
+
+		// Clear the database for the next fuzz iteration.
+		require.NoError(AtomicClear(db, db))
 	})
 }
