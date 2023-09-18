@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ Calculator = (*calculator)(nil)
@@ -70,12 +70,14 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	return finalReward
 }
 
+// [Split] splits [totalAmount] according to [shares] percentage.
+// It returns the absolute amounts corresponding to [shares] and [PercentDenominator-shares].
 func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
 	remainderShares := PercentDenominator - uint64(shares)
 	remainderAmount := remainderShares * (totalAmount / PercentDenominator)
 
 	// Delay rounding as long as possible for small numbers
-	if optimisticReward, err := safemath.Mul64(remainderShares, totalAmount); err == nil {
+	if optimisticReward, err := math.Mul64(remainderShares, totalAmount); err == nil {
 		remainderAmount = optimisticReward / PercentDenominator
 	}
 

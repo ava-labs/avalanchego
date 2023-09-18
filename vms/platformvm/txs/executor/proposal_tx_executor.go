@@ -11,13 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -335,13 +334,13 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentChainTime := e.OnCommitState.GetTimestamp()
-	if !stakerToReward.NextTime.Equal(currentChainTime) {
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"%w: TxID = %s with %s < %s",
 			ErrRemoveStakerTooEarly,
 			tx.TxID,
 			currentChainTime,
-			stakerToReward.NextTime,
+			stakerToReward.EndTime,
 		)
 	}
 
@@ -394,20 +393,15 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if err != nil {
 		return err
 	}
-	newSupply, err := safemath.Sub(currentSupply, stakerToReward.PotentialReward)
+	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
 	if err != nil {
 		return err
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 
 	// handle option preference
-	shouldCommit, err := e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
-	if err != nil {
-		return err
-	}
-
-	e.PrefersCommit = shouldCommit
-	return nil
+	e.PrefersCommit, err = e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
+	return err
 }
 
 func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
@@ -587,56 +581,58 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		utxosOffset++
 	}
 
+	if delegateeReward == 0 {
+		return nil
+	}
+
 	// Reward the delegatee here
-	if delegateeReward > 0 {
-		if validator.StartTime.After(e.Config.CortinaTime) {
-			previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
-				validator.SubnetID,
-				validator.NodeID,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get delegatee reward: %w", err)
-			}
-
-			// Invariant: The rewards calculator can never return a
-			//            [potentialReward] that would overflow the
-			//            accumulated rewards.
-			newDelegateeReward := previousDelegateeReward + delegateeReward
-
-			// For any validators starting after [CortinaTime], we defer rewarding the
-			// [reward] until their staking period is over.
-			err = e.OnCommitState.SetDelegateeReward(
-				validator.SubnetID,
-				validator.NodeID,
-				newDelegateeReward,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to update delegatee reward: %w", err)
-			}
-		} else {
-			// For any validators who started prior to [CortinaTime], we issue the
-			// [delegateeReward] immediately.
-			delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return ErrInvalidState
-			}
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(txID, utxo)
+	if validator.StartTime.After(e.Config.CortinaTime) {
+		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+			validator.SubnetID,
+			validator.NodeID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get delegatee reward: %w", err)
 		}
+
+		// Invariant: The rewards calculator can never return a
+		//            [potentialReward] that would overflow the
+		//            accumulated rewards.
+		newDelegateeReward := previousDelegateeReward + delegateeReward
+
+		// For any validators starting after [CortinaTime], we defer rewarding the
+		// [reward] until their staking period is over.
+		err = e.OnCommitState.SetDelegateeReward(
+			validator.SubnetID,
+			validator.NodeID,
+			newDelegateeReward,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update delegatee reward: %w", err)
+		}
+	} else {
+		// For any validators who started prior to [CortinaTime], we issue the
+		// [delegateeReward] immediately.
+		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
 }
