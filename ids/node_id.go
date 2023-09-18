@@ -28,33 +28,22 @@ var (
 
 type NodeID ShortID
 
+func (id NodeID) String() string {
+	return ShortID(id).PrefixedString(NodeIDPrefix)
+}
+
 // Any modification to Bytes will be lost since id is passed-by-value
 // Directly access NodeID[:] if you need to modify the NodeID
 func (id NodeID) Bytes() []byte {
 	return id[:]
 }
 
-// ToNodeID attempt to convert a byte slice into a node id
-func ToNodeID(bytes []byte) (NodeID, error) {
-	nodeID, err := ToShortID(bytes)
-	return NodeID(nodeID), err
-}
-
-func (id NodeID) String() string {
-	return ShortID(id).PrefixedString(NodeIDPrefix)
-}
-
-// NodeIDFromString is the inverse of NodeID.String()
-func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
-	if err != nil {
-		return NodeID{}, err
-	}
-	return NodeID(asShort), nil
-}
-
 func (id NodeID) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + id.String() + "\""), nil
+}
+
+func (id NodeID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
 }
 
 func (id *NodeID) UnmarshalJSON(b []byte) error {
@@ -75,10 +64,6 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func (id NodeID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
-}
-
 func (id *NodeID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
 }
@@ -87,8 +72,23 @@ func (id NodeID) Less(other NodeID) bool {
 	return bytes.Compare(id[:], other[:]) == -1
 }
 
+// ToNodeID attempt to convert a byte slice into a node id
+func ToNodeID(bytes []byte) (NodeID, error) {
+	nodeID, err := ToShortID(bytes)
+	return NodeID(nodeID), err
+}
+
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	return hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
+}
+
+// NodeIDFromString is the inverse of NodeID.String()
+func NodeIDFromString(nodeIDStr string) (NodeID, error) {
+	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
+	if err != nil {
+		return NodeID{}, err
+	}
+	return NodeID(asShort), nil
 }
