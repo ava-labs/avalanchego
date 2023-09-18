@@ -864,13 +864,23 @@ func (t *trieView) insert(
 	// have the existing path node and the value being inserted as children.
 
 	// generate the new branch node
+	// find how many tokens are common between the existing child's compressed path and
+	// the current key(offset by the closest node's key),
+	// then move all the common tokens into the branch node
+	commonPrefixLength := getLengthOfCommonPrefix(existingChildEntry.compressedPath, key, closestNodeKeyLength+1)
+	branchKeyLength := closestNodeKeyLength + 1 + commonPrefixLength
+
+	// The existing child's key is of length: len(closestNodeKey) + 1 (for the child index) + len(existing child's compressed key)
+	// if that length is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
+	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
+	if closestNodeKeyLength+1+existingChildEntry.compressedPath.length <= branchKeyLength {
+		return nil, ErrGetPathToFailure
+	}
+
 	branchNode := newNode(
 		closestNode,
-		key.Take(closestNodeKeyLength+1+getLengthOfCommonPrefix(existingChildEntry.compressedPath, key, closestNodeKeyLength+1)),
+		key.Take(branchKeyLength),
 	)
-	if err := t.recordNodeChange(closestNode); err != nil {
-		return nil, err
-	}
 	nodeWithValue := branchNode
 
 	if key.length == branchNode.key.length {
@@ -889,18 +899,9 @@ func (t *trieView) insert(
 		nodeWithValue = newNode
 	}
 
-	existingChildKey := key.Take(closestNodeKeyLength + 1).Extend(existingChildEntry.compressedPath)
-
-	// the existing child's key is of length: len(closestNodeKey) + 1 for the child index + len(existing child's compressed key)
-	// if that length is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted
-	// since it matched the key to be inserted, it should have been returned by GetPathTo
-	if existingChildKey.length <= branchNode.key.length {
-		return nil, ErrGetPathToFailure
-	}
-
 	branchNode.addChildWithoutNode(
-		existingChildKey.Token(branchNode.key.length),
-		existingChildKey.Skip(branchNode.key.length+1),
+		existingChildEntry.compressedPath.Token(commonPrefixLength),
+		existingChildEntry.compressedPath.Skip(commonPrefixLength+1),
 		existingChildEntry.id,
 		existingChildEntry.hasValue,
 	)
