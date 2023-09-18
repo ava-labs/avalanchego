@@ -14,11 +14,11 @@ import (
 
 // WarpAPI introduces snowman specific functionality to the evm
 type WarpAPI struct {
-	backend    WarpBackend
+	backend    Backend
 	aggregator *aggregator.Aggregator
 }
 
-func NewWarpAPI(backend WarpBackend, aggregator *aggregator.Aggregator) *WarpAPI {
+func NewWarpAPI(backend Backend, aggregator *aggregator.Aggregator) *WarpAPI {
 	return &WarpAPI{
 		backend:    backend,
 		aggregator: aggregator,

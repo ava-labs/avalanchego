@@ -33,7 +33,7 @@ func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
 	evmTrieDB *trie.Database,
-	warpBackend warp.WarpBackend,
+	warpBackend warp.Backend,
 	networkCodec codec.Manager,
 ) message.RequestHandler {
 	syncStats := syncStats.NewHandlerStats(metrics.Enabled)

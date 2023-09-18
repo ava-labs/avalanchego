@@ -218,7 +218,7 @@ type VM struct {
 
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC
-	warpBackend warp.WarpBackend
+	warpBackend warp.Backend
 }
 
 // Initialize implements the snowman.ChainVM interface
@@ -437,7 +437,7 @@ func (vm *VM) Initialize(
 	vm.client = peer.NewNetworkClient(vm.Network)
 
 	// initialize warp backend
-	vm.warpBackend = warp.NewWarpBackend(vm.ctx, vm.warpDB, warpSignatureCacheSize)
+	vm.warpBackend = warp.NewBackend(vm.ctx, vm.warpDB, warpSignatureCacheSize)
 
 	// clear warpdb on initialization if config enabled
 	if vm.config.PruneWarpDB {

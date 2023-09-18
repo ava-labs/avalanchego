@@ -24,12 +24,12 @@ type SignatureRequestHandler interface {
 
 // signatureRequestHandler implements the SignatureRequestHandler interface
 type signatureRequestHandler struct {
-	backend warp.WarpBackend
+	backend warp.Backend
 	codec   codec.Manager
 	stats   stats.SignatureRequestHandlerStats
 }
 
-func NewSignatureRequestHandler(backend warp.WarpBackend, codec codec.Manager, stats stats.SignatureRequestHandlerStats) SignatureRequestHandler {
+func NewSignatureRequestHandler(backend warp.Backend, codec codec.Manager, stats stats.SignatureRequestHandlerStats) SignatureRequestHandler {
 	return &signatureRequestHandler{
 		backend: backend,
 		codec:   codec,

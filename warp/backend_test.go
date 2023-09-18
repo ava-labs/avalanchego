@@ -28,7 +28,7 @@ func TestClearDB(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	snowCtx.WarpSigner = avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	backend := NewWarpBackend(snowCtx, db, 500)
+	backend := NewBackend(snowCtx, db, 500)
 
 	// use multiple messages to test that all messages get cleared
 	payloads := [][]byte{[]byte("test1"), []byte("test2"), []byte("test3"), []byte("test4"), []byte("test5")}
@@ -64,7 +64,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	snowCtx.WarpSigner = avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	backend := NewWarpBackend(snowCtx, db, 500)
+	backend := NewBackend(snowCtx, db, 500)
 
 	// Create a new unsigned message and add it to the warp backend.
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, payload)
@@ -85,7 +85,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 func TestAddAndGetUnknownMessage(t *testing.T) {
 	db := memdb.New()
 
-	backend := NewWarpBackend(snow.DefaultContextTest(), db, 500)
+	backend := NewBackend(snow.DefaultContextTest(), db, 500)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, payload)
 	require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestZeroSizedCache(t *testing.T) {
 	snowCtx.WarpSigner = avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 
 	// Verify zero sized cache works normally, because the lru cache will be initialized to size 1 for any size parameter <= 0.
-	backend := NewWarpBackend(snowCtx, db, 0)
+	backend := NewBackend(snowCtx, db, 0)
 
 	// Create a new unsigned message and add it to the warp backend.
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, payload)

@@ -26,20 +26,20 @@ func TestSignatureHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	snowCtx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
-	warpBackend := warp.NewWarpBackend(snowCtx, database, 100)
+	backend := warp.NewBackend(snowCtx, database, 100)
 
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, []byte("test"))
 	require.NoError(t, err)
 
 	messageID := msg.ID()
-	require.NoError(t, warpBackend.AddMessage(msg))
-	signature, err := warpBackend.GetSignature(messageID)
+	require.NoError(t, backend.AddMessage(msg))
+	signature, err := backend.GetSignature(messageID)
 	require.NoError(t, err)
 	unknownMessageID := ids.GenerateTestID()
 
 	emptySignature := [bls.SignatureLen]byte{}
 	mockHandlerStats := &stats.MockSignatureRequestHandlerStats{}
-	signatureRequestHandler := NewSignatureRequestHandler(warpBackend, message.Codec, mockHandlerStats)
+	signatureRequestHandler := NewSignatureRequestHandler(backend, message.Codec, mockHandlerStats)
 
 	tests := map[string]struct {
 		setup       func() (request message.SignatureRequest, expectedResponse []byte)
