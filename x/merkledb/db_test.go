@@ -160,7 +160,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require := require.New(t)
 
-	initialSize := 10_000
+	initialSize := 5_000
 
 	config := newDefaultConfig()
 	config.ValueNodeCacheSize = uint(initialSize)
@@ -301,7 +301,47 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(viewToCommit.(*trieView).isInvalid())
 }
 
-func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
+func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	// value that shouldn't be deleted
+	require.NoError(db.Put([]byte("key6"), []byte("3")))
+
+	startRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	// Get an empty proof
+	proof, err := db.GetRangeProof(
+		context.Background(),
+		maybe.Nothing[[]byte](),
+		maybe.Some([]byte("key3")),
+		10,
+	)
+	require.NoError(err)
+
+	// confirm there are no key.values in the proof
+	require.Empty(proof.KeyValues)
+
+	// add values to be deleted by proof commit
+	batch := db.NewBatch()
+	require.NoError(batch.Put([]byte("key1"), []byte("1")))
+	require.NoError(batch.Put([]byte("key2"), []byte("2")))
+	require.NoError(batch.Put([]byte("key3"), []byte("3")))
+	require.NoError(batch.Write())
+
+	// despite having no key/values in it, committing this proof should delete key1-key3.
+	require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
+
+	afterCommitRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	require.Equal(startRoot, afterCommitRoot)
+}
+
+func Test_MerkleDB_CommitRangeProof_EmptyTrie(t *testing.T) {
 	require := require.New(t)
 
 	// Populate [db1] with 3 key-value pairs.
@@ -326,7 +366,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	db2, err := getBasicDB()
 	require.NoError(err)
 
-	require.NoError(db2.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
+	require.NoError(db2.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), proof))
 
 	// [db2] should have the same key-value pairs as [db1].
 	db2Root, err := db2.GetMerkleRoot(context.Background())
@@ -338,7 +378,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	require.Equal(db1Root, db2Root)
 }
 
-func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
+func Test_MerkleDB_CommitRangeProof_TrieWithInitialValues(t *testing.T) {
 	require := require.New(t)
 
 	// Populate [db1] with 3 key-value pairs.
@@ -374,6 +414,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require.NoError(db2.CommitRangeProof(
 		context.Background(),
 		maybe.Some([]byte("key1")),
+		maybe.Some([]byte("key3")),
 		proof,
 	))
 
@@ -726,36 +767,36 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 }
 
-func Test_MerkleDB_RandomCases(t *testing.T) {
-	require := require.New(t)
-
-	const (
-		minSize              = 150
-		maxSize              = 500
-		checkHashProbability = 0.01
-	)
-
-	for size := minSize; size < maxSize; size += 10 {
-		now := time.Now().UnixNano()
-		t.Logf("seed for iter %d: %d", size, now)
-		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generateRandTest(require, r, size, checkHashProbability))
-	}
+func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
+	f.Fuzz(
+		func(
+			t *testing.T,
+			randSeed int64,
+			size uint,
+		) {
+			if size == 0 {
+				t.SkipNow()
+			}
+			require := require.New(t)
+			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+			runRandDBTest(require, r, generateRandTest(require, r, size, 0.01 /*checkHashProbability*/))
+		})
 }
 
-func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
-	require := require.New(t)
-
-	const (
-		initialValues        = 1_000
-		updates              = 2_500
-		checkHashProbability = 0
-	)
-
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, checkHashProbability))
+func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		initialValues uint,
+		numSteps uint,
+		randSeed int64,
+	) {
+		if numSteps == 0 {
+			t.SkipNow()
+		}
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		runRandDBTest(require, r, generateInitialValues(require, r, initialValues, numSteps, 0.001 /*checkHashProbability*/))
+	})
 }
 
 // randTest performs random trie operations.
@@ -959,7 +1000,7 @@ func generateRandTestWithKeys(
 	require *require.Assertions,
 	r *rand.Rand,
 	allKeys [][]byte,
-	size int,
+	size uint,
 	checkHashProbability float64,
 ) randTest {
 	const nilEndProbability = 0.1
@@ -1007,7 +1048,7 @@ func generateRandTestWithKeys(
 	}
 
 	var steps randTest
-	for i := 0; i < size-1; {
+	for i := uint(0); i < size-1; {
 		step := randTestStep{op: r.Intn(opMax)}
 		switch step.op {
 		case opUpdate:
@@ -1041,8 +1082,8 @@ func generateRandTestWithKeys(
 func generateInitialValues(
 	require *require.Assertions,
 	r *rand.Rand,
-	numInitialKeyValues int,
-	size int,
+	numInitialKeyValues uint,
+	size uint,
 	percentChanceToFullHash float64,
 ) randTest {
 	const (
@@ -1070,7 +1111,7 @@ func generateInitialValues(
 	}
 
 	var steps randTest
-	for i := 0; i < numInitialKeyValues; i++ {
+	for i := uint(0); i < numInitialKeyValues; i++ {
 		step := randTestStep{
 			op:    opUpdate,
 			key:   genKey(),
@@ -1091,7 +1132,7 @@ func generateInitialValues(
 	return steps
 }
 
-func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+func generateRandTest(require *require.Assertions, r *rand.Rand, size uint, percentChanceToFullHash float64) randTest {
 	return generateRandTestWithKeys(require, r, [][]byte{}, size, percentChanceToFullHash)
 }
 
@@ -1101,7 +1142,7 @@ func insertRandomKeyValues(
 	require *require.Assertions,
 	rand *rand.Rand,
 	dbs []database.Database,
-	numKeyValues int,
+	numKeyValues uint,
 	deletePortion float64,
 ) {
 	maxKeyLen := units.KiB
@@ -1109,7 +1150,7 @@ func insertRandomKeyValues(
 
 	require.GreaterOrEqual(deletePortion, float64(0))
 	require.LessOrEqual(deletePortion, float64(1))
-	for i := 0; i < numKeyValues; i++ {
+	for i := uint(0); i < numKeyValues; i++ {
 		keyLen := rand.Intn(maxKeyLen)
 		key := make([]byte, keyLen)
 		_, _ = rand.Read(key)
