@@ -144,8 +144,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	require.Equal(1, sm.NumProcessing())
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block.ID())
+	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 
 	require.Zero(sm.NumProcessing())
@@ -425,8 +424,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Add(context.Background(), block))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block.ID())
+	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.False(sm.Finalized())
@@ -476,8 +474,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(firstBlock.ID())
+	votes := bag.Of(firstBlock.ID())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
@@ -532,9 +529,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(firstBlock.ID())
-	votes.Add(secondBlock.ID())
+	votes := bag.Of(firstBlock.ID(), secondBlock.ID())
 
 	// The first poll will accept shared bits
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -573,8 +568,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	}
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(GenesisID)
+	votes := bag.Of(GenesisID)
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.True(sm.Finalized())
 	require.Equal(GenesisID, sm.Preference())
@@ -635,8 +629,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	//     2
 	// Tail = 0
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block0.ID())
+	votes := bag.Of(block0.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 
 	// Current graph structure:
@@ -713,8 +706,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	//    / \
 	//   2   3
 
-	votesFor2 := bag.Bag[ids.ID]{}
-	votesFor2.Add(block2.ID())
+	votesFor2 := bag.Of(block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
 	require.False(sm.Finalized())
 	require.Equal(block2.ID(), sm.Preference())
@@ -728,8 +720,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 	require.Equal(block2.ID(), sm.Preference())
 
-	votesFor3 := bag.Bag[ids.ID]{}
-	votesFor3.Add(block3.ID())
+	votesFor3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.False(sm.Finalized())
 	require.Equal(block2.ID(), sm.Preference())
@@ -773,12 +764,10 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Add(context.Background(), block))
 
-	validVotes := bag.Bag[ids.ID]{}
-	validVotes.Add(block.ID())
+	validVotes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
 
-	invalidVotes := bag.Bag[ids.ID]{}
-	invalidVotes.Add(unknownBlockID)
+	invalidVotes := bag.Of(unknownBlockID)
 	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
 	require.False(sm.Finalized())
@@ -860,12 +849,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	votes0_2_4 := bag.Bag[ids.ID]{}
-	votes0_2_4.Add(
-		block0.ID(),
-		block2.ID(),
-		block4.ID(),
-	)
+	votes0_2_4 := bag.Of(block0.ID(), block2.ID(), block4.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes0_2_4))
 
 	// Current graph structure:
@@ -884,8 +868,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Processing, block3.Status())
 	require.Equal(choices.Processing, block4.Status())
 
-	dep2_2_2 := bag.Bag[ids.ID]{}
-	dep2_2_2.AddCount(block2.ID(), 3)
+	dep2_2_2 := bag.Of(block2.ID(), block2.ID(), block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), dep2_2_2))
 
 	// Current graph structure:
@@ -958,8 +941,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
 	// when the first bit is 1, the following bits have been decided to follow
 	// the 255 remaining bits of [block0].
-	votes0 := bag.Bag[ids.ID]{}
-	votes0.Add(block0.ID())
+	votes0 := bag.Of(block0.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
@@ -994,8 +976,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// [block0]. When [block0] is accepted, [block1] and [block2] are rejected
 	// as conflicting. [block2]'s child, [block3], is then rejected
 	// transitively.
-	votes3 := bag.Bag[ids.ID]{}
-	votes3.Add(block3.ID())
+	votes3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.True(sm.Finalized(), "finalized too late")
@@ -1062,8 +1043,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
 	// the following bits have been decided to follow the 254 remaining bits of
 	// [block0].
-	votes0 := bag.Bag[ids.ID]{}
-	votes0.Add(block0.ID())
+	votes0 := bag.Of(block0.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
@@ -1098,8 +1078,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// dropped. Although the votes for [block3] are still applied, [block3] will
 	// only be marked as accepted after [block2] is marked as accepted; which
 	// will never happen.
-	votes3 := bag.Bag[ids.ID]{}
-	votes3.Add(block3.ID())
+	votes3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.False(sm.Finalized(), "finalized too early")
@@ -1172,9 +1151,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.False(sm.IsPreferred(b1Block))
 	require.False(sm.IsPreferred(b2Block))
 
-	b2Votes := bag.Bag[ids.ID]{}
-	b2Votes.Add(b2Block.ID())
-
+	b2Votes := bag.Of(b2Block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), b2Votes))
 
 	require.Equal(b2Block.ID(), sm.Preference())
@@ -1183,9 +1160,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.True(sm.IsPreferred(b1Block))
 	require.True(sm.IsPreferred(b2Block))
 
-	a1Votes := bag.Bag[ids.ID]{}
-	a1Votes.Add(a1Block.ID())
-
+	a1Votes := bag.Of(a1Block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
 	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
 
@@ -1349,8 +1324,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Add(context.Background(), block))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block.ID())
+	votes := bag.Of(block.ID())
 	err := sm.RecordPoll(context.Background(), votes)
 	require.ErrorIs(err, errTest)
 }
@@ -1395,8 +1369,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block0.ID())
+	votes := bag.Of(block0.ID())
 	err := sm.RecordPoll(context.Background(), votes)
 	require.ErrorIs(err, errTest)
 }
@@ -1450,8 +1423,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), block1))
 	require.NoError(sm.Add(context.Background(), block2))
 
-	votes := bag.Bag[ids.ID]{}
-	votes.Add(block0.ID())
+	votes := bag.Of(block0.ID())
 	err := sm.RecordPoll(context.Background(), votes)
 	require.ErrorIs(err, errTest)
 }
