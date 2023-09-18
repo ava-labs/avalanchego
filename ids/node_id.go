@@ -20,24 +20,8 @@ var (
 
 type NodeID string
 
-func NodeIDFromBytes(bytes []byte) NodeID {
-	return NodeID(string(bytes))
-}
-
-// NodeIDFromShortNodeID attempt to convert a byte slice into a node id
-func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
-	return NodeID(string(nodeID.Bytes()))
-}
-
-// NodeIDFromString is the inverse of NodeID.String()
-func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
-	if err != nil {
-		return EmptyNodeID, err
-	}
-	return NodeID(string(asShort.Bytes())), nil
-}
-
+// Any modification to Bytes will be lost since id is passed-by-value
+// Directly access NodeID[:] if you need to modify the NodeID
 func (nodeID NodeID) Bytes() []byte {
 	return []byte(nodeID)
 }
@@ -88,6 +72,15 @@ func (nodeID NodeID) Equal(other NodeID) bool {
 	return nodeID == other
 }
 
+func NodeIDFromBytes(bytes []byte) NodeID {
+	return NodeID(string(bytes))
+}
+
+// NodeIDFromShortNodeID attempt to convert a byte slice into a node id
+func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
+	return NodeID(string(nodeID.Bytes()))
+}
+
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	bytes := hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
@@ -106,4 +99,13 @@ func (nodeID NodeID) ToSize(newSize int) NodeID {
 	bytes := nodeID.Bytes()
 	bytes = append(bytes, pad...)
 	return NodeIDFromBytes(bytes)
+}
+
+// NodeIDFromString is the inverse of NodeID.String()
+func NodeIDFromString(nodeIDStr string) (NodeID, error) {
+	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
+	if err != nil {
+		return EmptyNodeID, err
+	}
+	return NodeID(string(asShort.Bytes())), nil
 }

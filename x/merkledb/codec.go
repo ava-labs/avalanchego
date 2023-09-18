@@ -106,7 +106,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 			c.encodeInt(buf, int(index))
 			path := entry.compressedPath.Serialize()
 			c.encodeSerializedPath(buf, path)
-			_, _ = buf.Write(ids.Writable(&(entry.id)))
+			_, _ = buf.Write(entry.id[:])
 			c.encodeBool(buf, entry.hasValue)
 		}
 	}
@@ -127,7 +127,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := hv.Children[index]; ok {
 			c.encodeInt(buf, int(index))
-			_, _ = buf.Write(ids.Writable(&(entry.id)))
+			_, _ = buf.Write(entry.id[:])
 		}
 	}
 	c.encodeMaybeByteSlice(buf, hv.Value)
@@ -332,7 +332,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	}
 
 	var id ids.ID
-	_, err := io.ReadFull(src, ids.Writable(&id))
+	_, err := io.ReadFull(src, id[:])
 	if err == io.EOF {
 		err = io.ErrUnexpectedEOF
 	}

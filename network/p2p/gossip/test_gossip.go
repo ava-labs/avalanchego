@@ -27,7 +27,7 @@ func (t *testTx) Marshal() ([]byte, error) {
 
 func (t *testTx) Unmarshal(bytes []byte) error {
 	t.id = ids.ID{}
-	copy(ids.Writable(&(t.id)), bytes)
+	copy(t.id[:], bytes)
 	return nil
 }
 
