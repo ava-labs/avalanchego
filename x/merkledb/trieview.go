@@ -744,30 +744,30 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
 		// all path start at the root
-		currentNode     = t.root
-		matchedKeyIndex = 0
-		nodes           = []*node{t.root}
+		currentNode      = t.root
+		matchedPathIndex = 0
+		nodes            = []*node{t.root}
 	)
 
 	// while the entire path hasn't been matched
-	for matchedKeyIndex < key.length {
+	for matchedPathIndex < key.length {
 		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(matchedKeyIndex)]
+		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathIndex)]
 
-		// the nibble for the child entry has now been handled, so increment the matchedPathIndex
-		matchedKeyIndex += 1
+		// the current token for the child entry has now been handled, so increment the matchedPathIndex
+		matchedPathIndex += 1
 
-		if !hasChild || !key.Skip(matchedKeyIndex).HasPrefix(nextChildEntry.compressedPath) {
+		if !hasChild || !key.Skip(matchedPathIndex).HasPrefix(nextChildEntry.compressedPath) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nodes, nil
 		}
 
 		// the compressed path of the entry there matched the path, so increment the matched index
-		matchedKeyIndex += nextChildEntry.compressedPath.length
+		matchedPathIndex += nextChildEntry.compressedPath.length
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedKeyIndex), nextChildEntry.hasValue)
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}

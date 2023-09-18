@@ -99,8 +99,8 @@ func (cp Path) HasPrefix(prefix Path) bool {
 	if cp.length < prefix.length || len(cp.value) < prefixLength {
 		return false
 	}
-	remainder := prefix.length % cp.tokensPerByte
-	if remainder == 0 {
+	remainderTokens := prefix.length % cp.tokensPerByte
+	if remainderTokens == 0 {
 		return strings.HasPrefix(cp.value, prefixValue)
 	}
 	reducedSize := prefixLength - 1
@@ -109,12 +109,12 @@ func (cp Path) HasPrefix(prefix Path) bool {
 	if reducedSize < 0 {
 		return false
 	}
-	for i := prefix.length - remainder; i < prefix.length; i++ {
+	for i := prefix.length - remainderTokens; i < prefix.length; i++ {
 		if cp.Token(i) != prefix.Token(i) {
 			return false
 		}
 	}
-	// s has prefix if the last nibbles are equal and s has every byte but the last of prefix as a prefix
+	// s has prefix if the partial byte tokens are equal and s has every byte but the remainder tokens of prefix as a prefix
 	return strings.HasPrefix(cp.value, prefixValue[:reducedSize])
 }
 
@@ -165,6 +165,8 @@ func (cp Path) shift(index int) byte {
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
 func (cp Path) bytesNeeded(tokens int) int {
+	// (cp.tokensPerByte - 1) ensures that it rounds up
+	// acts a Ceiling
 	return (tokens + cp.tokensPerByte - 1) / cp.tokensPerByte
 }
 

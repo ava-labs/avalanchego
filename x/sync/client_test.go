@@ -278,7 +278,7 @@ func TestGetRangeProof(t *testing.T) {
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
 			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
+			expectedErr: merkledb.ErrInvalidProof,
 		},
 		"removed last key in response": {
 			db: largeTrieDB,

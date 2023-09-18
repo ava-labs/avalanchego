@@ -960,7 +960,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Note that if [start] is Nothing, smallestPath is the empty path.
-	smallestPath := db.newPath(start.Value())
+	smallestPath := maybe.Bind(start, db.newPath)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -979,7 +979,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
 		return err
 	}
 
@@ -1038,14 +1038,10 @@ func (db *merkleDB) VerifyChangeProof(
 	// keys are less than [insertChildrenLessThan] or whose keys are greater
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
-	insertChildrenLessThan := maybe.Nothing[Path]()
-	if smallestPath.length > 0 {
-		insertChildrenLessThan = maybe.Some(smallestPath)
-	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		insertChildrenLessThan,
+		smallestPath,
 		largestPath,
 	); err != nil {
 		return err
@@ -1053,7 +1049,7 @@ func (db *merkleDB) VerifyChangeProof(
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		insertChildrenLessThan,
+		smallestPath,
 		largestPath,
 	); err != nil {
 		return err

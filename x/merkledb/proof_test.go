@@ -579,7 +579,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
 	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[2].KeyPath, BranchFactor16)
-	// require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
+	require.Equal(NewPath([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[1].KeyPath)
 	require.Equal(NewPath([]byte(""), BranchFactor16), proof.EndProof[0].KeyPath, BranchFactor16)
 
 	require.NoError(proof.Verify(
@@ -1219,7 +1219,7 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, NewPath(tt.proofKey, BranchFactor16))
+			err := verifyProofPath(tt.path, maybe.Some(NewPath(tt.proofKey, BranchFactor16)))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

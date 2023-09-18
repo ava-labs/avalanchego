@@ -41,16 +41,16 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errNegativeNumChildren  = errors.New("number of children is negative")
-	errTooManyChildren      = errors.New("length of children list is larger than branching factor")
-	errChildIndexTooLarge   = errors.New("invalid child index. Must be less than branching factor")
-	errNegativeNibbleLength = errors.New("nibble length is negative")
-	errIntTooLarge          = errors.New("integer too large to be decoded")
-	errLeadingZeroes        = errors.New("varint has leading zeroes")
-	errInvalidBool          = errors.New("decoded bool is neither true nor false")
-	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
-	errExtraSpace           = errors.New("trailing buffer space")
-	errNegativeSliceLength  = errors.New("negative slice length")
+	errNegativeNumChildren = errors.New("number of children is negative")
+	errTooManyChildren     = errors.New("length of children list is larger than branching factor")
+	errChildIndexTooLarge  = errors.New("invalid child index. Must be less than branching factor")
+	errNegativePathLength  = errors.New("path length is negative")
+	errIntTooLarge         = errors.New("integer too large to be decoded")
+	errLeadingZeroes       = errors.New("varint has leading zeroes")
+	errInvalidBool         = errors.New("decoded bool is neither true nor false")
+	errNonZeroPathPadding  = errors.New("all tokens after the path length should be 0")
+	errExtraSpace          = errors.New("trailing buffer space")
+	errNegativeSliceLength = errors.New("negative slice length")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -356,7 +356,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		return EmptyPath(branchFactor), err
 	}
 	if result.length < 0 {
-		return EmptyPath(branchFactor), errNegativeNibbleLength
+		return EmptyPath(branchFactor), errNegativePathLength
 	}
 	pathBytesLen := result.length / result.tokensPerByte
 	partialByteLength := result.hasPartialByteLength()
@@ -376,7 +376,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 	if partialByteLength {
 		paddingBits := buffer[pathBytesLen-1] & (0xFF >> (8 - result.shift(result.length-1)))
 		if paddingBits != 0 {
-			return EmptyPath(branchFactor), errNonZeroNibblePadding
+			return EmptyPath(branchFactor), errNonZeroPathPadding
 		}
 	}
 	result.value = string(buffer)

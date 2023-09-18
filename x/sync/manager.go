@@ -474,24 +474,24 @@ func (m *Manager) findNextKey(
 
 		// We only want to look at the children with keys greater than the proofKey.
 		// The proof key has the deepest node's key as a prefix,
-		// so only the next nibble of the proof key needs to be considered.
+		// so only the next token of the proof key needs to be considered.
 
 		// If the deepest node has the same key as [proofKeyPath],
 		// then all of its children have keys greater than the proof key,
-		// so we can start at the 0 nibble.
-		startingChildNibble := byte(0)
+		// so we can start at the 0 token.
+		startingChildToken := byte(0)
 
 		// If the deepest node has a key shorter than the key being proven,
-		// we can look at the next nibble of the proof key to determine which of that
+		// we can look at the next token index of the proof key to determine which of that
 		// node's children have keys larger than [proofKeyPath].
-		// Any child with a nibble greater than the [proofKeyPath]'s nibble at that
+		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
 		if deepestNode.KeyPath.Length() < proofKeyPath.Length() {
-			startingChildNibble = proofKeyPath.Token(deepestNode.KeyPath.Length()) + 1
+			startingChildToken = proofKeyPath.Token(deepestNode.KeyPath.Length()) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := m.findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
+		if childIndex, hasDifference := m.findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
 			nextKey = maybe.Some(deepestNode.KeyPath.Append(childIndex).Bytes())
 			break
 		}
