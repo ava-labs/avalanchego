@@ -35,17 +35,13 @@ func TestShortIDBytesAndWritableIsolation(t *testing.T) {
 	require.Equal(ShortID{25}, id)
 }
 
-func TestNodeIDBytesAndWritableIsolation(t *testing.T) {
+func TestNodeIDBytesIsolation(t *testing.T) {
 	require := require.New(t)
 
 	id := NodeID{24}
 	idBytes := id.Bytes()
 	idBytes[0] = 25
 	require.Equal(NodeID{24}, id)
-
-	idBytes = WritableNode(&id)
-	idBytes[0] = 25
-	require.Equal(NodeID{25}, id)
 }
 
 func TestNodeIDFromString(t *testing.T) {

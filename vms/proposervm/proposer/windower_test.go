@@ -128,9 +128,9 @@ func TestWindowerChangeByChain(t *testing.T) {
 
 	rand.Seed(0)
 	chainID0 := ids.ID{}
-	_, _ = rand.Read(ids.Writable(&chainID0)) // #nosec G404
+	_, _ = rand.Read(chainID0[:]) // #nosec G404
 	chainID1 := ids.ID{}
-	_, _ = rand.Read(ids.Writable(&chainID1)) // #nosec G404
+	_, _ = rand.Read(chainID1[:]) // #nosec G404
 
 	validatorIDs := make([]ids.NodeID, MaxWindows)
 	for i := range validatorIDs {

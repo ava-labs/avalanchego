@@ -24,17 +24,13 @@ func TestID(t *testing.T) {
 	require.Equal(prefixed, id.Prefix(0))
 }
 
-func TestIDBytesAndWritableIsolation(t *testing.T) {
+func TestIDBytesIsolation(t *testing.T) {
 	require := require.New(t)
 
 	id := ID{24}
 	idBytes := id.Bytes()
 	idBytes[0] = 25
 	require.Equal(ID{24}, id)
-
-	idBytes = Writable(&id)
-	idBytes[0] = 25
-	require.Equal(ID{25}, id)
 }
 
 func TestIDXOR(t *testing.T) {

@@ -28,11 +28,8 @@ var (
 
 type NodeID ShortID
 
-// WritableNode is an helper which helps modifiying NodeID content
-func WritableNode(id *NodeID) []byte {
-	return id[:]
-}
-
+// Any modification to Bytes will be lost since id is passed-by-value
+// Directly access NodeID[:] if you need to modify the NodeID
 func (id NodeID) Bytes() []byte {
 	return id[:]
 }

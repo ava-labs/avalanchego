@@ -152,7 +152,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			children := map[byte]child{}
 			for i := 0; i < numChildren; i++ {
 				var childID ids.ID
-				_, _ = r.Read(ids.Writable(&childID)) // #nosec G404
+				_, _ = r.Read(childID[:]) // #nosec G404
 
 				childPathBytes := make([]byte, r.Intn(32)) // #nosec G404
 				_, _ = r.Read(childPathBytes)              // #nosec G404
