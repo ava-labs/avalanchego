@@ -14,6 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+func newDB(t testing.TB) *Database {
+	folder := t.TempDir()
+	cfg := DefaultConfig
+	db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
+	require.NoError(t, err)
+	return db
+}
+
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
@@ -27,16 +35,12 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		tmpDir := f.TempDir()
-		db, err := New(tmpDir, DefaultConfig, logging.NoLog{}, "", prometheus.NewRegistry())
-		require.NoError(f, err)
+func FuzzKeyValue(f *testing.F) {
+	database.FuzzKeyValue(f, newDB(f))
+}
 
-		test(f, db)
-
-		_ = db.Close()
-	}
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithPrefix(f, newDB(f))
 }
 
 func BenchmarkInterface(b *testing.B) {
