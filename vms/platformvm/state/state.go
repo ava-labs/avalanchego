@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -58,9 +59,11 @@ var (
 	_ State = (*state)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
+	ErrCantFindSubnet               = errors.New("couldn't find subnet")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
+	errIsNotSubnet                  = errors.New("is not a subnet")
 
 	blockIDPrefix                       = []byte("blockID")
 	blockPrefix                         = []byte("block")
@@ -111,6 +114,8 @@ type Chain interface {
 
 	GetSubnets() ([]*txs.Tx, error)
 	AddSubnet(createSubnetTx *txs.Tx)
+
+	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -812,6 +817,25 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
+}
+
+func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	subnetIntf, _, err := s.GetTx(subnetID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w %q: %w",
+			ErrCantFindSubnet,
+			subnetID,
+			err,
+		)
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+	}
+
+	return subnet.Owner, nil
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
