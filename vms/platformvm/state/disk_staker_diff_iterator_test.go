@@ -20,7 +20,7 @@ func FuzzMarshalDiffKey(f *testing.F) {
 		var (
 			subnetID ids.ID
 			height   uint64
-			nodeID   = ids.EmptyNodeID
+			nodeID   ids.NodeID
 		)
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&subnetID, &height, &nodeID)
@@ -40,7 +40,7 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 
 		subnetID, height, nodeID, err := unmarshalDiffKey(key)
 		if err != nil {
-			require.ErrorIs(err, errUnexpectedDiffKeyLength)
+			require.ErrorIs(err, errUnexpectedZeroLenghtNodeID)
 			return
 		}
 

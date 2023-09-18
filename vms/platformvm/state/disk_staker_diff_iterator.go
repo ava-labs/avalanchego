@@ -5,6 +5,7 @@ package state
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,8 +15,6 @@ import (
 const (
 	// startDiffKey = [subnetID] + [inverseHeight]
 	startDiffKeyLength = ids.IDLen + database.Uint64Size
-	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	diffKeyLength = startDiffKeyLength + ids.ShortNodeIDLen
 	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
 	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 
@@ -24,7 +23,7 @@ const (
 )
 
 var (
-	errUnexpectedDiffKeyLength     = fmt.Errorf("expected diff key length %d", diffKeyLength)
+	errUnexpectedZeroLenghtNodeID  = errors.New("nodeID has zero length")
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
@@ -40,7 +39,7 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 }
 
 func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
-	key := make([]byte, diffKeyLength)
+	key := make([]byte, startDiffKeyLength+len(nodeID))
 	copy(key, subnetID.Bytes())
 	packIterableHeight(key[ids.IDLen:], height)
 	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
@@ -48,8 +47,8 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 }
 
 func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
-	if len(key) != diffKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+	if len(key) < startDiffKeyLength {
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedZeroLenghtNodeID
 	}
 	var (
 		subnetID ids.ID
