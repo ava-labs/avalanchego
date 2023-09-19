@@ -219,7 +219,6 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	}
 }
 
-// decodeUint decodes a uvarint from [src] and returns it as an int.
 func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 	// To ensure encoding/decoding is canonical, we need to check for leading
 	// zeroes in the varint.
