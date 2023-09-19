@@ -397,6 +397,13 @@ func (m *Manager) findNextKey(
 		nextKey = append(nextKey, 0)
 		return maybe.Some(nextKey), nil
 	}
+
+	// We want the first key larger than the [lastReceivedKey].
+	// This is done by taking two proofs for the same key
+	// (one that was just received as part of a proof, and one from the local db)
+	// and traversing them from the longest key to the shortest key.
+	// For each node in these proofs, compare if the children of that node exist
+	// or have the same ID in the other proof.
 	proofKeyPath := merkledb.NewPath(lastReceivedKey, m.branchFactor)
 
 	// If the received proof is an exclusion proof, the last node may be for a
