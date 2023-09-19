@@ -25,6 +25,9 @@ type batch struct {
 	inner  database.Batch
 }
 
+// newBatchWithHeight returns a batch struct which implements database.Batch
+//
+// This batch will write keys onto ArchiveDb associating it the current height.
 func newBatchWithHeight(db *archiveDB, height uint64) *batch {
 	return &batch{
 		db:     db,
@@ -35,7 +38,7 @@ func newBatchWithHeight(db *archiveDB, height uint64) *batch {
 	}
 }
 
-// Returns the height for this Batch
+// Height returns the height for this Batch
 func (c *batch) Height() uint64 {
 	return c.height
 }

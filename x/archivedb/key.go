@@ -9,13 +9,14 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	ErrInsufficientLength = errors.New("packer has insufficient length for input")
-	longLen               = 8
-	internalKeySuffixLen  = longLen
-	minInternalKeyLen     = internalKeySuffixLen + 2
+var ErrInsufficientLength = errors.New("packer has insufficient length for input")
+
+const (
+	internalKeySuffixLen = wrappers.LongLen
+	minInternalKeyLen    = internalKeySuffixLen + 2
 )
 
 // dbKey
@@ -47,17 +48,17 @@ var (
 // idea is to make reads even simpler, making it effectively a O(1) operation.
 func newDBKey(key []byte, height uint64) []byte {
 	keyLen := len(key)
-	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + longLen
+	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + wrappers.LongLen
 	rawKey := make([]byte, rawKeyMaxSize)
 	offset := binary.PutUvarint(rawKey, uint64(keyLen))
 	offset += copy(rawKey[offset:], key)
 	binary.BigEndian.PutUint64(rawKey[offset:], ^height)
-	offset += longLen
+	offset += wrappers.LongLen
 
 	return rawKey[0:offset]
 }
 
-// Takes a slice of bytes and returns the inner key and the height
+// parseDBKey takes a slice of bytes and returns the inner key and the height
 func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	rawKeyLen := len(rawKey)
 	if rawKeyLen < minInternalKeyLen {
@@ -82,7 +83,7 @@ func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	// Read th inversed height, it will be converted to height using `^` just
 	// before returning. Read above why the inversed height is used instead of a
 	// normal height
-	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-longLen:])
+	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-wrappers.LongLen:])
 
 	return key, ^inversedHeight, nil
 }

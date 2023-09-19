@@ -79,8 +79,8 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	return value, nil
 }
 
-// Returns the height value where a key has been found. If the last key was not
-// found an error will be thrown
+// GetHeightFromLastFoundKey returns the height value where a key has been
+// found. If the last key was not found an error will be thrown
 func (reader *dbHeightReader) GetHeightFromLastFoundKey() (uint64, error) {
 	if reader.heightLastFoundKey == 0 {
 		return 0, database.ErrNotFound

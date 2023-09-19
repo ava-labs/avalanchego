@@ -82,8 +82,8 @@ func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
 	return db.Get(key, db.currentHeight)
 }
 
-// Returns an object which implements the database.KeyValueReader trait for all
-// keys defined at the given height.
+// GetHeightReader returns an object which implements the
+// database.KeyValueReader trait for all keys defined at the given height.
 func (db *archiveDB) GetHeightReader(height uint64) (dbHeightReader, error) {
 	if height > db.currentHeight || height == 0 {
 		return dbHeightReader{}, ErrUnknownHeight
@@ -113,7 +113,7 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 	return value, reader.heightLastFoundKey, nil
 }
 
-// Creates a new batch to append database changes in a given height
+// NewBatch creates a new batch to append database changes in a given height
 func (db *archiveDB) NewBatch(height uint64) *batch {
 	return newBatchWithHeight(db, height)
 }
