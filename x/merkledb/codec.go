@@ -146,26 +146,24 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	}
 	n.value = value
 
-	numChildren64, err := c.decodeUint(src)
-	numChildren := int(numChildren64)
+	numChildren, err := c.decodeUint(src)
 	switch {
 	case err != nil:
 		return err
 	case numChildren > NodeBranchFactor:
 		return errTooManyChildren
-	case numChildren > src.Len()/minChildLen:
+	case numChildren > uint64(src.Len()/minChildLen):
 		return io.ErrUnexpectedEOF
 	}
 
 	n.children = make(map[byte]child, NodeBranchFactor)
-	previousChild := -1
-	for i := 0; i < numChildren; i++ {
-		index64, err := c.decodeUint(src)
+	var previousChild uint64
+	for i := uint64(0); i < numChildren; i++ {
+		index, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
-		index := int(index64)
-		if index <= previousChild || index >= NodeBranchFactor {
+		if index >= NodeBranchFactor || (i != 0 && index <= previousChild) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
