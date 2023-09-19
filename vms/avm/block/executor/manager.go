@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -36,8 +36,8 @@ type Manager interface {
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
-	GetStatelessBlock(blkID ids.ID) (blocks.Block, error)
-	NewBlock(blocks.Block) snowman.Block
+	GetStatelessBlock(blkID ids.ID) (block.Block, error)
+	NewBlock(block.Block) snowman.Block
 
 	// VerifyTx verifies that the transaction can be issued based on the
 	// currently preferred state.
@@ -92,7 +92,7 @@ type manager struct {
 }
 
 type blockState struct {
-	statelessBlock blocks.Block
+	statelessBlock block.Block
 	onAcceptState  states.Diff
 	importedInputs set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests
@@ -126,7 +126,7 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	return m.NewBlock(blk), nil
 }
 
-func (m *manager) GetStatelessBlock(blkID ids.ID) (blocks.Block, error) {
+func (m *manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
 	// See if the block is in memory.
 	if blkState, ok := m.blkIDToState[blkID]; ok {
 		return blkState.statelessBlock, nil
@@ -135,7 +135,7 @@ func (m *manager) GetStatelessBlock(blkID ids.ID) (blocks.Block, error) {
 	return m.state.GetBlock(blkID)
 }
 
-func (m *manager) NewBlock(blk blocks.Block) snowman.Block {
+func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	return &Block{
 		Block:   blk,
 		manager: m,
