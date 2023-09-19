@@ -54,7 +54,7 @@ func FuzzCodecInt(f *testing.F) {
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeUint64(reader)
+			got, err := codec.decodeUint(reader)
 			if err != nil {
 				t.SkipNow()
 			}
