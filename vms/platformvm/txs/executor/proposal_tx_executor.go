@@ -550,7 +550,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Calculate split of reward between delegator/delegatee
-	delegatorReward, delegateeReward := reward.Split(delegator.PotentialReward, vdrTx.Shares())
+	delegateeReward, delegatorReward := reward.Split(delegator.PotentialReward, vdrTx.Shares())
 
 	utxosOffset := 0
 

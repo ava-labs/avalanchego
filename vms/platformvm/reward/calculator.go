@@ -70,8 +70,10 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	return finalReward
 }
 
-// [Split] splits [totalAmount] according to [shares] percentage.
-// It returns the absolute amounts corresponding to [PercentDenominator-shares] and [shares].
+// [Split] [totalAmount] into [totalAmount * shares percentage] and the
+// remainder.
+//
+// Invariant: [shares] <= [PercentDenominator]
 func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
 	remainderShares := PercentDenominator - uint64(shares)
 	remainderAmount := remainderShares * (totalAmount / PercentDenominator)
@@ -82,5 +84,5 @@ func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
 	}
 
 	amountFromShares := totalAmount - remainderAmount
-	return remainderAmount, amountFromShares
+	return amountFromShares, remainderAmount
 }
