@@ -47,7 +47,6 @@ var (
 	errInvalidBool          = errors.New("decoded bool is neither true nor false")
 	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
 	errExtraSpace           = errors.New("trailing buffer space")
-	errLength               = errors.New("negative slice length")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
