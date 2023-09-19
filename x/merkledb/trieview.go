@@ -361,7 +361,8 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	childNode, err := t.getNodeWithID(
 		child.id,
 		closestNode.key+path(nextIndex)+child.compressedPath,
-		child.hasValue)
+		child.hasValue,
+	)
 	if err != nil {
 		return nil, err
 	}
