@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -44,8 +43,6 @@ var (
 
 	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
 	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
-	errNegativeNibbleLength = errors.New("nibble length is negative")
-	errIntTooLarge          = errors.New("integer too large to be decoded")
 	errLeadingZeroes        = errors.New("varint has leading zeroes")
 	errInvalidBool          = errors.New("decoded bool is neither true nor false")
 	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
@@ -150,7 +147,8 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	}
 	n.value = value
 
-	numChildren, err := c.decodeUint(src)
+	numChildren64, err := c.decodeUint(src)
+	numChildren := int(numChildren64)
 	switch {
 	case err != nil:
 		return err
@@ -163,10 +161,11 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	n.children = make(map[byte]child, NodeBranchFactor)
 	previousChild := -1
 	for i := 0; i < numChildren; i++ {
-		index, err := c.decodeUint(src)
+		index64, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
+		index := int(index64)
 		if index <= previousChild || index >= NodeBranchFactor {
 			return errChildIndexTooLarge
 		}
@@ -221,7 +220,7 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 }
 
 // decodeUint decodes a uvarint from [src] and returns it as an int.
-func (*codecImpl) decodeUint(src *bytes.Reader) (int, error) {
+func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 	// To ensure encoding/decoding is canonical, we need to check for leading
 	// zeroes in the varint.
 	// The last byte of the varint we read is the most significant byte.
@@ -229,13 +228,11 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (int, error) {
 	// canonical encoding.
 	startLen := src.Len()
 	val64, err := binary.ReadUvarint(src)
-	switch {
-	case err == io.EOF:
-		return 0, io.ErrUnexpectedEOF
-	case err != nil:
+	if err != nil {
+		if err == io.EOF {
+			return 0, io.ErrUnexpectedEOF
+		}
 		return 0, err
-	case val64 > math.MaxInt:
-		return 0, errIntTooLarge
 	}
 	endLen := src.Len()
 
@@ -253,7 +250,7 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (int, error) {
 		}
 	}
 
-	return int(val64), nil
+	return val64, nil
 }
 
 func (c *codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
@@ -293,7 +290,8 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	length, err := c.decodeUint(src)
+	length64, err := c.decodeUint(src)
+	length := int(length64)
 	switch {
 	case err == io.EOF:
 		return nil, io.ErrUnexpectedEOF
@@ -345,15 +343,13 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		return SerializedPath{}, io.ErrUnexpectedEOF
 	}
 
-	var (
-		result SerializedPath
-		err    error
-	)
-	if result.NibbleLength, err = c.decodeUint(src); err != nil {
+	nibbleLength64, err := c.decodeUint(src)
+	if err != nil {
 		return SerializedPath{}, err
 	}
-	if result.NibbleLength < 0 {
-		return SerializedPath{}, errNegativeNibbleLength
+
+	result := SerializedPath{
+		NibbleLength: int(nibbleLength64),
 	}
 	pathBytesLen := result.NibbleLength >> 1
 	hasOddLen := result.hasOddLength()
