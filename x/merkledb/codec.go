@@ -339,7 +339,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func (c *codecImpl) encodePath(dst *bytes.Buffer, s Path) {
-	c.encodeInt(dst, s.Length())
+	c.encodeInt(dst, s.length)
 	_, _ = dst.Write(s.Bytes())
 }
 

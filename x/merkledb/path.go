@@ -87,17 +87,17 @@ func (cp Path) Length() int {
 
 // hasPartialByteLength returns true iff the path fits into a non whole number of bytes
 func (cp Path) hasPartialByteLength() bool {
-	return cp.Length()%cp.tokensPerByte > 0
+	return cp.length%cp.tokensPerByte > 0
 }
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (cp Path) HasPrefix(prefix Path) bool {
 	prefixValue := prefix.value
 	prefixLength := len(prefix.value)
-	if cp.Length() < prefix.Length() || len(cp.value) < prefixLength {
+	if cp.length < prefix.length || len(cp.value) < prefixLength {
 		return false
 	}
-	remainderTokens := prefix.Length() % cp.tokensPerByte
+	remainderTokens := prefix.length % cp.tokensPerByte
 	if remainderTokens == 0 {
 		return strings.HasPrefix(cp.value, prefixValue)
 	}
@@ -107,7 +107,7 @@ func (cp Path) HasPrefix(prefix Path) bool {
 	if reducedSize < 0 {
 		return false
 	}
-	for i := prefix.Length() - remainderTokens; i < prefix.Length(); i++ {
+	for i := prefix.length - remainderTokens; i < prefix.length; i++ {
 		if cp.Token(i) != prefix.Token(i) {
 			return false
 		}
@@ -129,29 +129,29 @@ func (cp Path) Token(index int) byte {
 
 // Append returns a new Path that equals the current Path with the passed token appended to the end
 func (cp Path) Append(token byte) Path {
-	buffer := make([]byte, cp.bytesNeeded(cp.Length()+1))
+	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
-	buffer[len(buffer)-1] += token << cp.shift(cp.Length())
+	buffer[len(buffer)-1] += token << cp.shift(cp.length)
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     cp.Length() + 1,
+		length:     cp.length + 1,
 		pathConfig: cp.pathConfig,
 	}
 }
 
 // Greater returns true if current Path is greater than other Path
 func (cp Path) Greater(other Path) bool {
-	return cp.value > other.value || (cp.value == other.value && cp.Length() > other.Length())
+	return cp.value > other.value || (cp.value == other.value && cp.length > other.length)
 }
 
 // Equals returns true if current Path is equal to other Path
 func (cp Path) Equals(other Path) bool {
-	return cp.value == other.value && cp.Length() == other.Length()
+	return cp.value == other.value && cp.length == other.length
 }
 
 // Less returns true if current Path is less than other Path
 func (cp Path) Less(other Path) bool {
-	return cp.value < other.value || (cp.value == other.value && cp.Length() < other.Length())
+	return cp.value < other.value || (cp.value == other.value && cp.length < other.length)
 }
 
 // shift indicates how many bits to shift the token at the index to get the raw token value
@@ -170,14 +170,14 @@ func (cp Path) bytesNeeded(tokens int) int {
 
 // Extend returns a new Path that equals the passed Path appended to the current Path
 func (cp Path) Extend(path Path) Path {
-	if cp.Length() == 0 {
+	if cp.length == 0 {
 		return path
 	}
-	if path.Length() == 0 {
+	if path.length == 0 {
 		return cp
 	}
 
-	totalLength := cp.Length() + path.Length()
+	totalLength := cp.length + path.length
 	buffer := make([]byte, cp.bytesNeeded(totalLength))
 	copy(buffer, cp.value)
 	if !cp.hasPartialByteLength() {
@@ -188,7 +188,7 @@ func (cp Path) Extend(path Path) Path {
 			pathConfig: cp.pathConfig,
 		}
 	}
-	shiftLeft := cp.shift(cp.Length() - 1)
+	shiftLeft := cp.shift(cp.length - 1)
 	shiftRight := Byte - shiftLeft
 	buffer[len(cp.value)-1] += path.value[0] >> shiftRight
 
@@ -199,14 +199,14 @@ func (cp Path) Extend(path Path) Path {
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     cp.Length() + path.Length(),
+		length:     cp.length + path.length,
 		pathConfig: cp.pathConfig,
 	}
 }
 
-// Skip returns a new Path that contains the last cp.Length()-tokensToSkip tokens of the current Path
+// Skip returns a new Path that contains the last cp.length-tokensToSkip tokens of the current Path
 func (cp Path) Skip(tokensToSkip int) Path {
-	newLength := cp.Length() - tokensToSkip
+	newLength := cp.length - tokensToSkip
 	result := Path{
 		length:     newLength,
 		pathConfig: cp.pathConfig,

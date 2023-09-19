@@ -128,7 +128,7 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 
 	// add one additional byte to store padding when the path
 	// has a length that fits into a whole number of bytes
-	remainder := key.Length() % key.tokensPerByte
+	remainder := key.length % key.tokensPerByte
 	bufferLen := len(pathBytes)
 	if remainder == 0 {
 		bufferLen++
