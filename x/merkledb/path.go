@@ -85,8 +85,8 @@ func (cp Path) Length() int {
 	return cp.length
 }
 
-// hasPartialByteLength returns true iff the path fits into a non whole number of bytes
-func (cp Path) hasPartialByteLength() bool {
+// hasPartialByte returns true iff the path fits into a non whole number of bytes
+func (cp Path) hasPartialByte() bool {
 	return cp.length%cp.tokensPerByte > 0
 }
 
@@ -184,7 +184,7 @@ func (cp Path) Extend(path Path) Path {
 
 	// If the existing value fits into a whole number of bytes,
 	// the extension path can be copied directly into the buffer.
-	if !cp.hasPartialByteLength() {
+	if !cp.hasPartialByte() {
 		copy(buffer[len(cp.value):], path.value)
 		return Path{
 			value:      *(*string)(unsafe.Pointer(&buffer)),

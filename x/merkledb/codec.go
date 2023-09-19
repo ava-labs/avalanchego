@@ -369,8 +369,10 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		}
 		return EmptyPath(branchFactor), err
 	}
-	if result.hasPartialByteLength() {
-		paddingBits := buffer[pathBytesLen-1] & (0xFF >> (8 - result.bitsToShift(result.length-1)))
+	if result.hasPartialByte() {
+		// confirm that the padding bits in the partial byte are 0
+		paddingMask := byte(0xFF >> (Byte - result.bitsToShift(result.length-1)))
+		paddingBits := buffer[pathBytesLen-1] & paddingMask
 		if paddingBits != 0 {
 			return EmptyPath(branchFactor), errNonZeroPathPadding
 		}

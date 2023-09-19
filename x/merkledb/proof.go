@@ -158,7 +158,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then the value of the last proof node must match [proof.Value].
 	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
 	// and thus has a whole number of bytes
-	if !lastNode.KeyPath.hasPartialByteLength() &&
+	if !lastNode.KeyPath.hasPartialByte() &&
 		proof.Key.Equals(lastNode.KeyPath) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
@@ -168,7 +168,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
 	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
 	// and thus an exact number of bytes.
-	if (lastNode.KeyPath.hasPartialByteLength() || !proof.Key.Equals(lastNode.KeyPath)) &&
+	if (lastNode.KeyPath.hasPartialByte() || !proof.Key.Equals(lastNode.KeyPath)) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
@@ -486,7 +486,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start maybe.Maybe[Pa
 		)
 
 		// Skip keys that cannot have a value (enforced by [verifyProofPath]).
-		if !nodePath.hasPartialByteLength() && (start.IsNothing() || !nodePath.Less(start.Value())) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
+		if !nodePath.hasPartialByte() && (start.IsNothing() || !nodePath.Less(start.Value())) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -659,7 +659,7 @@ func verifyAllChangeProofKeyValuesPresent(
 
 		// Check the value of any node with a key that is within the range.
 		// Skip keys that cannot have a value (enforced by [verifyProofPath]).
-		if !nodePath.hasPartialByteLength() && (start.IsNothing() || !nodePath.Less(start.Value())) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
+		if !nodePath.hasPartialByte() && (start.IsNothing() || !nodePath.Less(start.Value())) && (end.IsNothing() || !nodePath.Greater(end.Value())) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -762,7 +762,7 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 		}
 
 		// keys that should not have an associated value, have one set
-		if nodeKey.hasPartialByteLength() && !proof[i].ValueOrHash.IsNothing() {
+		if nodeKey.hasPartialByte() && !proof[i].ValueOrHash.IsNothing() {
 			return ErrPartialByteLengthWithValue
 		}
 
@@ -781,7 +781,7 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 	// check the last node for a value since the above loop doesn't check the last node
 	if len(proof) > 0 {
 		lastNode := proof[len(proof)-1]
-		if lastNode.KeyPath.hasPartialByteLength() && !lastNode.ValueOrHash.IsNothing() {
+		if lastNode.KeyPath.hasPartialByte() && !lastNode.ValueOrHash.IsNothing() {
 			return ErrPartialByteLengthWithValue
 		}
 	}
@@ -833,7 +833,7 @@ func addPathInfo(
 		proofNode := proofPath[i]
 		keyPath := proofNode.KeyPath
 
-		if keyPath.hasPartialByteLength() && !proofNode.ValueOrHash.IsNothing() {
+		if keyPath.hasPartialByte() && !proofNode.ValueOrHash.IsNothing() {
 			return ErrPartialByteLengthWithValue
 		}
 
