@@ -9,6 +9,56 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_Path_Has_Prefix(t *testing.T) {
+	require := require.New(t)
+
+	first := Path{value: "FirstKey", pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix := Path{value: "FirstKe", pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.True(first.HasPrefix(prefix))
+	require.True(first.HasStrictPrefix(prefix))
+
+	first = Path{value: "FirstKey", length: 16, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.True(first.HasPrefix(prefix))
+	require.True(first.HasStrictPrefix(prefix))
+
+	first = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.True(first.HasPrefix(prefix))
+	require.False(first.HasStrictPrefix(prefix))
+
+	first = Path{value: string([]byte{247}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix = Path{value: string([]byte{240}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.False(first.HasPrefix(prefix))
+	require.False(first.HasStrictPrefix(prefix))
+
+	first = Path{value: string([]byte{247}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix = Path{value: string([]byte{240}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.True(first.HasPrefix(prefix))
+	require.True(first.HasStrictPrefix(prefix))
+
+	first = Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	prefix = Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.True(first.HasPrefix(prefix))
+	require.False(first.HasStrictPrefix(prefix))
+
+	a := Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	b := Path{value: string([]byte{0x10}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.False(a.HasPrefix(b))
+}
+
+func Test_Path_HasPrefix_BadInput(t *testing.T) {
+	require := require.New(t)
+
+	a := Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	b := Path{length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.False(a.HasPrefix(b))
+
+	a = Path{length: 10, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	b = Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	require.False(a.HasPrefix(b))
+}
+
 func Test_Path_Skip(t *testing.T) {
 	require := require.New(t)
 
