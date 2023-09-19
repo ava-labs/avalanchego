@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/ethdb"
@@ -39,16 +38,16 @@ type Backend interface {
 // backend implements Backend, keeps track of warp messages, and generates message signatures.
 type backend struct {
 	db             database.Database
-	snowCtx        *snow.Context
+	warpSigner     avalancheWarp.Signer
 	signatureCache *cache.LRU[ids.ID, [bls.SignatureLen]byte]
 	messageCache   *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
 }
 
 // NewBackend creates a new Backend, and initializes the signature cache and message tracking database.
-func NewBackend(snowCtx *snow.Context, db database.Database, cacheSize int) Backend {
+func NewBackend(warpSigner avalancheWarp.Signer, db database.Database, cacheSize int) Backend {
 	return &backend{
 		db:             db,
-		snowCtx:        snowCtx,
+		warpSigner:     warpSigner,
 		signatureCache: &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: cacheSize},
 		messageCache:   &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: cacheSize},
 	}
@@ -70,7 +69,7 @@ func (b *backend) AddMessage(unsignedMessage *avalancheWarp.UnsignedMessage) err
 	}
 
 	var signature [bls.SignatureLen]byte
-	sig, err := b.snowCtx.WarpSigner.Sign(unsignedMessage)
+	sig, err := b.warpSigner.Sign(unsignedMessage)
 	if err != nil {
 		return fmt.Errorf("failed to sign warp message: %w", err)
 	}
@@ -93,7 +92,7 @@ func (b *backend) GetSignature(messageID ids.ID) ([bls.SignatureLen]byte, error)
 	}
 
 	var signature [bls.SignatureLen]byte
-	sig, err := b.snowCtx.WarpSigner.Sign(unsignedMessage)
+	sig, err := b.warpSigner.Sign(unsignedMessage)
 	if err != nil {
 		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to sign warp message: %w", err)
 	}

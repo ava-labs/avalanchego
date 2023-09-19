@@ -25,8 +25,8 @@ func TestSignatureHandler(t *testing.T) {
 	blsSecretKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
-	snowCtx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
-	backend := warp.NewBackend(snowCtx, database, 100)
+	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
+	backend := warp.NewBackend(warpSigner, database, 100)
 
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, []byte("test"))
 	require.NoError(t, err)

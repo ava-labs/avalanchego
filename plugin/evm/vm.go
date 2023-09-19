@@ -471,7 +471,7 @@ func (vm *VM) Initialize(
 	vm.client = peer.NewNetworkClient(vm.Network)
 
 	// initialize warp backend
-	vm.warpBackend = warp.NewBackend(vm.ctx, vm.warpDB, warpSignatureCacheSize)
+	vm.warpBackend = warp.NewBackend(vm.ctx.WarpSigner, vm.warpDB, warpSignatureCacheSize)
 
 	// clear warpdb on initialization if config enabled
 	if vm.config.PruneWarpDB {
