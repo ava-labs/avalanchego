@@ -81,6 +81,8 @@ The plugin version is unchanged at `28` and compatible with version `v1.10.9`.
 - Fix P-chain Import by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2035
 - Rename avm/blocks package to avm/block by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1970
 - Merkledb Update rangeproof proto to be consistent with changeproof proto by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2040
+- `merkledb` -- encode lengths as uvarints by @danlaine in https://github.com/ava-labs/avalanchego/pull/2039
+- MerkleDB Remove GetNodeFromParent by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2041
 
 ### New Contributors
 
