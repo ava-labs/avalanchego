@@ -667,6 +667,21 @@ func (pool *TxPool) PendingFrom(addrs []common.Address, enforceTips bool) map[co
 	return pending
 }
 
+// IteratePending iterates over [pool.pending] until [f] returns false.
+// The caller must not modify [tx].
+func (pool *TxPool) IteratePending(f func(tx *types.Transaction) bool) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+
+	for _, list := range pool.pending {
+		for _, tx := range list.txs.items {
+			if !f(tx) {
+				return
+			}
+		}
+	}
+}
+
 // Locals retrieves the accounts currently considered local by the pool.
 func (pool *TxPool) Locals() []common.Address {
 	pool.mu.Lock()
