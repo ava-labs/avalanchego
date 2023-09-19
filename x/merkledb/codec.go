@@ -47,7 +47,7 @@ var (
 	errInvalidBool          = errors.New("decoded bool is neither true nor false")
 	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
 	errExtraSpace           = errors.New("trailing buffer space")
-	errNegativeSliceLength  = errors.New("negative slice length")
+	errLength               = errors.New("negative slice length")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -296,8 +296,6 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	case err != nil:
 		return nil, err
-	case length < 0:
-		return nil, errNegativeSliceLength
 	case length == 0:
 		return nil, nil
 	case length > src.Len():
