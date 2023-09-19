@@ -288,8 +288,7 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	length64, err := c.decodeUint(src)
-	length := int(length64)
+	length, err := c.decodeUint(src)
 	switch {
 	case err == io.EOF:
 		return nil, io.ErrUnexpectedEOF
@@ -297,7 +296,7 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, err
 	case length == 0:
 		return nil, nil
-	case length > src.Len():
+	case length > uint64(src.Len()):
 		return nil, io.ErrUnexpectedEOF
 	}
 
