@@ -222,7 +222,7 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 }
 
 func (c *codecImpl) encodeInt(dst *bytes.Buffer, value int) {
-	c.encodeInt64(dst, int64(value))
+	c.encodeUint64(dst, uint64(value))
 }
 
 func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
@@ -232,7 +232,7 @@ func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
 	// If it's 0, then it's a leading zero, which is considered invalid in the
 	// canonical encoding.
 	startLen := src.Len()
-	val64, err := binary.ReadVarint(src)
+	val64, err := binary.ReadUvarint(src)
 	switch {
 	case err == io.EOF:
 		return 0, io.ErrUnexpectedEOF
@@ -260,9 +260,9 @@ func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
 	return int(val64), nil
 }
 
-func (c *codecImpl) encodeInt64(dst *bytes.Buffer, value int64) {
+func (c *codecImpl) encodeUint64(dst *bytes.Buffer, value uint64) {
 	buf := c.varIntPool.Get().([]byte)
-	size := binary.PutVarint(buf, value)
+	size := binary.PutUvarint(buf, value)
 	_, _ = dst.Write(buf[:size])
 	c.varIntPool.Put(buf)
 }
