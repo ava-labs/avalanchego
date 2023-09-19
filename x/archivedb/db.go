@@ -89,9 +89,8 @@ func (db *archiveDB) GetHeightReader(height uint64) (dbHeightReader, error) {
 		return dbHeightReader{}, ErrUnknownHeight
 	}
 	return dbHeightReader{
-		db:                 db,
-		height:             height,
-		heightLastFoundKey: 0,
+		db:     db,
+		height: height,
 	}, nil
 }
 
@@ -105,12 +104,8 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	value, err := reader.Get(key)
-	if err != nil {
-		return nil, 0, err
-	}
 
-	return value, reader.heightLastFoundKey, nil
+	return reader.getValueAndHeight(key)
 }
 
 // NewBatch creates a new batch to append database changes in a given height

@@ -12,9 +12,8 @@ import (
 var _ database.KeyValueReader = (*dbHeightReader)(nil)
 
 type dbHeightReader struct {
-	db                 *archiveDB
-	height             uint64
-	heightLastFoundKey uint64
+	db     *archiveDB
+	height uint64
 }
 
 // Has retrieves if a key is present in the key-value data store.
@@ -29,6 +28,44 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 	return true, nil
 }
 
+func (reader *dbHeightReader) getValueAndHeight(key []byte) ([]byte, uint64, error) {
+	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
+	defer iterator.Release()
+
+	if !iterator.Next() {
+		if err := iterator.Error(); err != nil {
+			return nil, 0, err
+		}
+
+		// There is no available key with the requested prefix
+		return nil, 0, database.ErrNotFound
+	}
+
+	foundKey, height, err := parseDBKey(iterator.Key())
+	if err != nil {
+		return nil, 0, err
+	}
+	if !bytes.Equal(foundKey, key) {
+		// A key was found, through the iterator, *but* the prefix is not the
+		// same, another key exists, but not the requested one
+		//
+		// This happens because we search for a key at a given height, or the
+		// previous key. In this case the previous key is an unrelated key
+		return nil, 0, database.ErrNotFound
+	}
+	rawValue := iterator.Value()
+	rawValueLen := len(rawValue)
+	if rawValueLen == 0 {
+		// malformed, value should never ever be empty
+		return nil, 0, ErrInvalidValue
+	}
+	if rawValue[rawValueLen-1] == 1 {
+		return nil, 0, database.ErrNotFound
+	}
+	value := rawValue[:rawValueLen-1]
+	return value, height, nil
+}
+
 // Get retrieves the given key if it's present in the key-value data store.
 //
 // This is a public API, so the dbKey is used to retrieve any value. It is
@@ -39,51 +76,13 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 // because dbMetaKey is for internal usage and should be leaked outside of the
 // module
 func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
-	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
-	defer iterator.Release()
-
-	reader.heightLastFoundKey = 0
-
-	if !iterator.Next() {
-		if err := iterator.Error(); err != nil {
-			return nil, err
-		}
-
-		// There is no available key with the requested prefix
-		return nil, database.ErrNotFound
-	}
-
-	foundKey, height, err := parseDBKey(iterator.Key())
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(foundKey, key) {
-		// A key was found, through the iterator, *but* the prefix is not the
-		// same, another key exists, but not the requested one
-		//
-		// This happens because we search for a key at a given height, or the
-		// previous key. In this case the previous key is an unrelated key
-		return nil, database.ErrNotFound
-	}
-	rawValue := iterator.Value()
-	rawValueLen := len(rawValue)
-	if rawValueLen == 0 {
-		// malformed, value should never ever be empty
-		return nil, ErrInvalidValue
-	}
-	if rawValue[rawValueLen-1] == 1 {
-		return nil, database.ErrNotFound
-	}
-	value := rawValue[:rawValueLen-1]
-	reader.heightLastFoundKey = height
-	return value, nil
+	value, _, err := reader.getValueAndHeight(key)
+	return value, err
 }
 
 // GetHeightFromLastFoundKey returns the height value where a key has been
 // found. If the last key was not found an error will be thrown
-func (reader *dbHeightReader) GetHeightFromLastFoundKey() (uint64, error) {
-	if reader.heightLastFoundKey == 0 {
-		return 0, database.ErrNotFound
-	}
-	return reader.heightLastFoundKey, nil
+func (reader *dbHeightReader) GetHeightFromLastFoundKey(key []byte) (uint64, error) {
+	_, height, err := reader.getValueAndHeight(key)
+	return height, err
 }
