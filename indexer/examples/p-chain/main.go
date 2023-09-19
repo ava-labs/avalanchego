@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/indexer"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+
 	platformvmblock "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	proposervmblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 // This example program continuously polls for the next P-Chain block
