@@ -12,10 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 var _ Backend = &backend{}
+
+const batchSize = ethdb.IdealBatchSize
 
 // Backend tracks signature-eligible warp messages and provides an interface to fetch them.
 // The backend is also used to query for warp message signatures by the signature request handler.
@@ -53,7 +56,7 @@ func NewBackend(snowCtx *snow.Context, db database.Database, cacheSize int) Back
 
 func (b *backend) Clear() error {
 	b.signatureCache.Flush()
-	return database.Clear(b.db, b.db)
+	return database.Clear(b.db, batchSize)
 }
 
 func (b *backend) AddMessage(unsignedMessage *avalancheWarp.UnsignedMessage) error {

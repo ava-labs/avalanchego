@@ -220,7 +220,9 @@ func (n *NetworkManager) StartDefaultNetwork(ctx context.Context) (<-chan struct
 // Uses [execPath] as the AvalancheGo binary execution path for any started nodes.
 // Note: this assumes that the default network has already been constructed.
 func (n *NetworkManager) SetupNetwork(ctx context.Context, execPath string, blockchainSpecs []*rpcpb.BlockchainSpec) error {
-	cctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	// timeout according to how many blockchains we're creating
+	timeout := 2 * time.Minute * time.Duration(len(blockchainSpecs))
+	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := n.init(); err != nil {
 		return err

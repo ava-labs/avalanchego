@@ -1,11 +1,11 @@
 module github.com/ava-labs/subnet-evm
 
-go 1.19
+go 1.20
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
 	github.com/ava-labs/avalanche-network-runner v1.7.2-0.20230825150237-723bc7b31724
-	github.com/ava-labs/avalanchego v1.10.9
+	github.com/ava-labs/avalanchego v1.10.10-rc.2
 	github.com/cespare/cp v0.1.0
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811
 	github.com/davecgh/go-spew v1.1.1
