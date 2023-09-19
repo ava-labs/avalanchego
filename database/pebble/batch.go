@@ -64,18 +64,15 @@ func (b *batch) Write() error {
 
 	// pebble doesn't support writing a batch twice so we have to clone
 	// [b] and commit the clone.
-	clone := &batch{
-		db:    b.db,
-		batch: b.db.pebbleDB.NewBatch(),
-	}
+	batchClone := b.db.pebbleDB.NewBatch()
 
 	// Copy the batch.
-	if err := clone.batch.Apply(b.batch, nil); err != nil {
+	if err := batchClone.Apply(b.batch, nil); err != nil {
 		return err
 	}
 
 	// Commit the new batch.
-	return updateError(clone.batch.Commit(pebble.Sync))
+	return updateError(batchClone.Commit(pebble.Sync))
 }
 
 func (b *batch) Reset() {
