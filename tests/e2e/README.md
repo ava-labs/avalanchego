@@ -67,7 +67,7 @@ Configure testnetctl to target this network by default with one of the following
 # Start a new test run using the persistent network
 ginkgo -v ./tests/e2e -- \
     --avalanchego-path=/path/to/avalanchego \
-    --ginkgo-focus-file=[name of file containing test] \
+    --ginkgo.focus-file=[name of file containing test] \
     --use-persistent-network \
     --network-dir=/path/to/network
 
