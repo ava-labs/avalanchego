@@ -129,8 +129,8 @@ func (n *node) setValueDigest() {
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(child *node) {
 	n.addChildWithoutNode(
-		child.key.Token(n.key.length),
-		child.key.Skip(n.key.length+1),
+		child.key.Token(n.key.Length()),
+		child.key.Skip(n.key.Length()+1),
 		child.id,
 		child.hasValue(),
 	)
@@ -149,7 +149,7 @@ func (n *node) addChildWithoutNode(index byte, compressedPath Path, childID ids.
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node) {
 	n.onNodeChanged()
-	delete(n.children, child.key.Token(n.key.length))
+	delete(n.children, child.key.Token(n.key.Length()))
 }
 
 // clone Returns a copy of [n].

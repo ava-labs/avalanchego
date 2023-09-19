@@ -65,11 +65,11 @@ type ProofNode struct {
 	Children    map[byte]ids.ID
 }
 
-// Assumes [node.Key.KeyPath.length] <= math.MaxUint64.
+// Assumes [node.Key.KeyPath.Length()] <= math.MaxUint64.
 func (node *ProofNode) ToProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
 		Key: &pb.Path{
-			Length: uint64(node.KeyPath.length),
+			Length: uint64(node.KeyPath.Length()),
 			Value:  node.KeyPath.Bytes(),
 		},
 		ValueOrHash: &pb.MaybeBytes{
@@ -102,7 +102,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	node.KeyPath.length = int(pbNode.Key.Length)
 	node.KeyPath.value = string(pbNode.Key.Value)
 
-	if len(node.KeyPath.value) != node.KeyPath.bytesNeeded(node.KeyPath.length) {
+	if len(node.KeyPath.value) != node.KeyPath.bytesNeeded(node.KeyPath.Length()) {
 		return ErrInvalidPathLength
 	}
 

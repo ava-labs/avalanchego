@@ -339,7 +339,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func (c *codecImpl) encodePath(dst *bytes.Buffer, s Path) {
-	c.encodeInt(dst, s.length)
+	c.encodeInt(dst, s.Length())
 	_, _ = dst.Write(s.Bytes())
 }
 
@@ -358,11 +358,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 	if result.length < 0 {
 		return EmptyPath(branchFactor), errNegativePathLength
 	}
-	pathBytesLen := result.length / result.tokensPerByte
-	partialByteLength := result.hasPartialByteLength()
-	if partialByteLength {
-		pathBytesLen++
-	}
+	pathBytesLen := result.bytesNeeded(result.length)
 	if pathBytesLen > src.Len() {
 		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
 	}
@@ -373,7 +369,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		}
 		return EmptyPath(branchFactor), err
 	}
-	if partialByteLength {
+	if result.hasPartialByteLength() {
 		paddingBits := buffer[pathBytesLen-1] & (0xFF >> (8 - result.shift(result.length-1)))
 		if paddingBits != 0 {
 			return EmptyPath(branchFactor), errNonZeroPathPadding
