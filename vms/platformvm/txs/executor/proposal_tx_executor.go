@@ -371,7 +371,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		// Handle staker lifecycle.
 		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
 		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
-
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
@@ -466,41 +465,43 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
 	}
 
-	if delegateeReward > 0 {
-		delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
-		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
-		onCommitUtxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-		e.OnCommitState.AddUTXO(onCommitUtxo)
-		e.OnCommitState.AddRewardUTXO(txID, onCommitUtxo)
-
-		// Note: There is no [offset] if the RewardValidatorTx is
-		// aborted, because the validator reward is not awarded.
-		onAbortUtxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(outputs) + len(stake)),
-			},
-			Asset: stakeAsset,
-			Out:   out,
-		}
-		e.OnAbortState.AddUTXO(onAbortUtxo)
-		e.OnAbortState.AddRewardUTXO(txID, onAbortUtxo)
+	if delegateeReward == 0 {
+		return nil
 	}
+
+	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
+	outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+	if err != nil {
+		return fmt.Errorf("failed to create output: %w", err)
+	}
+	out, ok := outIntf.(verify.State)
+	if !ok {
+		return ErrInvalidState
+	}
+
+	onCommitUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.OnCommitState.AddUTXO(onCommitUtxo)
+	e.OnCommitState.AddRewardUTXO(txID, onCommitUtxo)
+
+	// Note: There is no [offset] if the RewardValidatorTx is
+	// aborted, because the validator reward is not awarded.
+	onAbortUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(outputs) + len(stake)),
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.OnAbortState.AddUTXO(onAbortUtxo)
+	e.OnAbortState.AddRewardUTXO(txID, onAbortUtxo)
 	return nil
 }
 
@@ -638,7 +639,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 }
 
 func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
-	var expectedUptimePercentage float64
+	expectedUptimePercentage := e.Config.UptimePercentage
 	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
 		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
 		if err != nil {
@@ -650,8 +651,6 @@ func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkVali
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-	} else {
-		expectedUptimePercentage = e.Config.UptimePercentage
 	}
 
 	// TODO: calculate subnet uptimes
