@@ -26,7 +26,7 @@ github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/mock_user.go
-github.com/ava-labs/avalanchego/vms/avm/blocks=Block=vms/avm/blocks/mock_block.go
+github.com/ava-labs/avalanchego/vms/avm/block=Block=vms/avm/block/mock_block.go
 github.com/ava-labs/avalanchego/vms/avm/metrics=Metrics=vms/avm/metrics/mock_metrics.go
 github.com/ava-labs/avalanchego/vms/avm/states=Chain,State,Diff=vms/avm/states/mock_states.go
 github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mock_mempool.go

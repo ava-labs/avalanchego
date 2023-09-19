@@ -12,12 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 
-	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
@@ -153,7 +153,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, ErrNoTransactions
 	}
 
-	statelessBlk, err := blocks.NewStandardBlock(
+	statelessBlk, err := block.NewStandardBlock(
 		preferredID,
 		nextHeight,
 		nextTimestamp,

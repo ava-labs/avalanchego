@@ -4,7 +4,7 @@
 package x
 
 import (
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -18,11 +18,11 @@ const (
 )
 
 // Parser to support serialization and deserialization
-var Parser blocks.Parser
+var Parser block.Parser
 
 func init() {
 	var err error
-	Parser, err = blocks.NewParser([]fxs.Fx{
+	Parser, err = block.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 		&nftfx.Fx{},
 		&propertyfx.Fx{},
