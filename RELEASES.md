@@ -16,8 +16,8 @@ The plugin version is unchanged at `28` and compatible with version `v1.10.9`.
 
 ### Fixes
 
-- Fixed handling of SIGTERM signals in plugin processes prior to receiving the Shutdown message
-- Fixed range proof commitment for empty proofs
+- Fixed handling of `SIGTERM` signals in plugin processes prior to receiving a `Shutdown` message
+- Fixed range proof commitment of empty proofs
 
 ### What's Changed
 
