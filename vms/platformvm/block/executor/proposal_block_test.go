@@ -95,6 +95,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
+		NextTime:  chainTime,
 		EndTime:   chainTime,
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
@@ -104,6 +105,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
+		NextTime:  chainTime,
 		EndTime:   chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
