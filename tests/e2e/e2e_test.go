@@ -13,6 +13,7 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
+	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
@@ -39,6 +40,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		flagVars,
 		&tmpnet.Network{
 			Owner: "avalanchego-e2e",
+			Subnets: []*tmpnet.Subnet{
+				vms.XSVMSubnetA,
+				vms.XSVMSubnetB,
+			},
 		},
 	).Marshal()
 }, func(envBytes []byte) {

@@ -4,7 +4,7 @@
 package transfer
 
 import (
-	"encoding/json"
+	"context"
 	"log"
 	"time"
 
@@ -32,13 +32,27 @@ func transferFunc(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := c.Context()
-
-	client := api.NewClient(config.URI, config.ChainID.String())
-
-	nonce, err := client.Nonce(ctx, config.PrivateKey.Address())
+	txStatus, err := Transfer(c.Context(), config)
 	if err != nil {
 		return err
+	}
+
+	msg, err := txStatus.GetMessage()
+	if err != nil {
+		return err
+	}
+	log.Print(msg)
+
+	return nil
+}
+
+func Transfer(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
+	client := api.NewClient(config.URI, config.ChainID.String())
+
+	address := config.PrivateKey.Address()
+	nonce, err := client.Nonce(ctx, address)
+	if err != nil {
+		return nil, err
 	}
 
 	utx := &tx.Transfer{
@@ -51,19 +65,23 @@ func transferFunc(c *cobra.Command, args []string) error {
 	}
 	stx, err := tx.Sign(utx, config.PrivateKey)
 	if err != nil {
-		return err
-	}
-
-	txJSON, err := json.MarshalIndent(stx, "", "  ")
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	issueTxStartTime := time.Now()
 	txID, err := client.IssueTx(ctx, stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	log.Printf("issued tx %s in %s\n%s\n", txID, time.Since(issueTxStartTime), string(txJSON))
-	return nil
+
+	err = client.WaitForAcceptance(ctx, address, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tx.TxIssueStatus{
+		Tx:        stx,
+		TxID:      txID,
+		StartTime: issueTxStartTime,
+	}, nil
 }

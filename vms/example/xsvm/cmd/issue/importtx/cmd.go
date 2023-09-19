@@ -4,7 +4,7 @@
 package importtx
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -37,8 +37,21 @@ func importFunc(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := c.Context()
+	txStatus, err := Import(c.Context(), config)
+	if err != nil {
+		return err
+	}
 
+	msg, err := txStatus.GetMessage()
+	if err != nil {
+		return err
+	}
+	log.Print(msg)
+
+	return nil
+}
+
+func Import(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
 	var (
 		// Note: here we assume the unsigned message is correct from the last
 		//       URI in sourceURIs. In practice this shouldn't be done.
@@ -51,15 +64,18 @@ func importFunc(c *cobra.Command, args []string) error {
 		xsClient := api.NewClient(uri, config.SourceChainID)
 
 		fetchStartTime := time.Now()
-		var rawSignature []byte
+		var (
+			rawSignature []byte
+			err          error
+		)
 		unsignedMessage, rawSignature, err = xsClient.Message(ctx, config.TxID)
 		if err != nil {
-			return fmt.Errorf("failed to fetch BLS signature from %s with: %w", uri, err)
+			return nil, fmt.Errorf("failed to fetch BLS signature from %s with: %w", uri, err)
 		}
 
 		sig, err := bls.SignatureFromBytes(rawSignature)
 		if err != nil {
-			return fmt.Errorf("failed to parse BLS signature from %s with: %w", uri, err)
+			return nil, fmt.Errorf("failed to parse BLS signature from %s with: %w", uri, err)
 		}
 
 		// Note: the public key should not be fetched from the node in practice.
@@ -67,12 +83,12 @@ func importFunc(c *cobra.Command, args []string) error {
 		infoClient := info.NewClient(uri)
 		_, nodePOP, err := infoClient.GetNodeID(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to fetch BLS public key from %s with: %w", uri, err)
+			return nil, fmt.Errorf("failed to fetch BLS public key from %s with: %w", uri, err)
 		}
 
 		pk := nodePOP.Key()
 		if !bls.Verify(pk, sig, unsignedMessage.Bytes()) {
-			return fmt.Errorf("failed to verify BLS signature against public key from %s", uri)
+			return nil, fmt.Errorf("failed to verify BLS signature against public key from %s", uri)
 		}
 
 		log.Printf("fetched BLS signature from %s in %s\n", uri, time.Since(fetchStartTime))
@@ -89,7 +105,7 @@ func importFunc(c *cobra.Command, args []string) error {
 
 	aggSignature, err := bls.AggregateSignatures(signatures)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	aggSignatureBytes := bls.SignatureToBytes(aggSignature)
@@ -100,14 +116,15 @@ func importFunc(c *cobra.Command, args []string) error {
 		signature,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	client := api.NewClient(config.URI, config.DestinationChainID)
 
-	nonce, err := client.Nonce(ctx, config.PrivateKey.Address())
+	address := config.PrivateKey.Address()
+	nonce, err := client.Nonce(ctx, address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	utx := &tx.Import{
@@ -117,19 +134,23 @@ func importFunc(c *cobra.Command, args []string) error {
 	}
 	stx, err := tx.Sign(utx, config.PrivateKey)
 	if err != nil {
-		return err
-	}
-
-	txJSON, err := json.MarshalIndent(stx, "", "  ")
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	issueTxStartTime := time.Now()
 	txID, err := client.IssueTx(ctx, stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	log.Printf("issued tx %s in %s\n%s\n", txID, time.Since(issueTxStartTime), string(txJSON))
-	return nil
+
+	err = client.WaitForAcceptance(ctx, address, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tx.TxIssueStatus{
+		Tx:        stx,
+		TxID:      txID,
+		StartTime: issueTxStartTime,
+	}, nil
 }
