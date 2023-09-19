@@ -358,8 +358,9 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return proof, nil
 	}
 
-	childPath := closestNode.key + path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(closestNode, childPath, child.hasValue)
+	childNode, err := t.getNode(
+		closestNode.key+path(nextIndex)+child.compressedPath,
+		child.hasValue)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +689,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNodeFromParent(node, childPath, childEntry.hasValue)
+		nextNode, err := t.getNode(childPath, childEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -768,7 +769,7 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex], nextChildEntry.hasValue)
+		currentNode, err = t.getNode(key[:matchedKeyIndex], nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}
@@ -795,7 +796,7 @@ func (t *trieView) getEditableNode(key path, hadValue bool) (*node, error) {
 	}
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ids.Empty, key, hadValue)
+	n, err := t.getNode(key, hadValue)
 	if err != nil {
 		return nil, err
 	}
@@ -997,25 +998,12 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 	return nil
 }
 
-// Retrieves the node with the given [key], which is a child of [parent], and
-// uses the [parent] node to initialize the child node's ID.
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// Returns database.ErrNotFound if the child doesn't exist.
-func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*node, error) {
-	// confirm the child exists and get its ID before attempting to load it
-	if child, exists := parent.children[key[len(parent.key)]]; exists {
-		return t.getNodeWithID(child.id, key, hasValue)
-	}
-
-	return nil, database.ErrNotFound
-}
-
 // Retrieves a node with the given [key].
 // If the node is fetched from [t.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, error) {
+func (t *trieView) getNode(key path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -1031,11 +1019,6 @@ func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, err
 		return nil, err
 	}
 
-	// only need to initialize the id if it's from the parent trie.
-	// nodes in the current view change list have already been initialized.
-	if id != ids.Empty {
-		parentTrieNode.id = id
-	}
 	return parentTrieNode, nil
 }
 
