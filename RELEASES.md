@@ -1,5 +1,95 @@
 # Release Notes
 
+## [v1.10.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.10)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `28` and compatible with version `v1.10.9`.
+
+### APIs
+
+- Added `height` to the output of `platform.getCurrentSupply`
+
+### Configs
+
+- Added `proposerNumHistoricalBlocks` to subnet configs
+
+### Fixes
+
+- Fixed handling of `SIGTERM` signals in plugin processes prior to receiving a `Shutdown` message
+- Fixed range proof commitment of empty proofs
+
+### What's Changed
+
+- e2e: Save network data for each test run as an uploaded artifact by @marun in https://github.com/ava-labs/avalanchego/pull/1856
+- e2e: Ensure interchain workflow coverage for X-Chain and C-Chain by @marun in https://github.com/ava-labs/avalanchego/pull/1871
+- MerkleDB Adjust New View function(s) by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1927
+- e2e: Migrate duplicate node id test from kurtosis by @marun in https://github.com/ava-labs/avalanchego/pull/1573
+- Add tracing levels to merkledb by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1933
+- [x/merkledb] Add Configuration for `RootGenConcurrency` by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/1936
+- e2e: Ensure testnet network dir is archived on failed test run by @marun in https://github.com/ava-labs/avalanchego/pull/1930
+- Merkle db cleanup view creation by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1934
+- Add async DB deletion helper by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1931
+- Implement SDK handler to drop messages from non-validators by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1917
+- Support proposervm historical block deletion by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1929
+- Remove thread pool by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1940
+- Merkledb split node storage into value and intermediate by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1918
+- `merkledb` -- remove unneeded codec test helper by @danlaine in https://github.com/ava-labs/avalanchego/pull/1943
+- `merkledb` -- add codec test and move helper by @danlaine in https://github.com/ava-labs/avalanchego/pull/1944
+- Add throttler implementation to SDK by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1905
+- Add Throttled Handler implementation to SDK by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1906
+- Change merkledb caches to be size based by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1947
+- Rename `node.marshal` to `node.bytes` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1951
+- e2e: Switch to a default network node count of 2 by @marun in https://github.com/ava-labs/avalanchego/pull/1928
+- MerkleDB Improve Node Size Calculation by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1950
+- `merkledb` -- remove unneeded return values by @danlaine in https://github.com/ava-labs/avalanchego/pull/1959
+- `sync` -- reduce test sizes by @danlaine in https://github.com/ava-labs/avalanchego/pull/1962
+- `merkledb` -- limit number of goroutines calculating node IDs by @danlaine in https://github.com/ava-labs/avalanchego/pull/1960
+- Add gossip package to p2p SDK by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1958
+- Improve state sync logging by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1955
+- Update golang to 1.20.8 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1826
+- Use odd-numbered request ids for SDK by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1975
+- update iterator invariant by @danlaine in https://github.com/ava-labs/avalanchego/pull/1978
+- Document common usage of requestIDs for snow senders by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1981
+- e2e: Diagnose and fix flakes by @marun in https://github.com/ava-labs/avalanchego/pull/1941
+- `merkledb` -- `db_test.go` cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1954
+- `merkledb` -- make config fields uints by @danlaine in https://github.com/ava-labs/avalanchego/pull/1963
+- Only gracefully exit rpcchainvm server after Shutdown by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1988
+- Add contexts to SDK callbacks by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1977
+- Change max response size to target response size by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1995
+- Add sdk gossip handler metrics by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1997
+- Add p2p SDK Router metrics by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2000
+- Merkledb Attempt to reduce test runtime by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1990
+- longer timeout on windows UT by @danlaine in https://github.com/ava-labs/avalanchego/pull/2001
+- `sync` -- log tweaks by @danlaine in https://github.com/ava-labs/avalanchego/pull/2008
+- Add Validator Gossiper by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2015
+- database: comment that Get returns ErrNotFound if key is not present by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2018
+- Return `height` from `GetCurrentSupply` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2022
+- simplify platformvm `GetHeight` function by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2023
+- Merkle db fix range proof commit bug by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2019
+- Add `bag.Of` helper by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2027
+- Cleanup early poll termination logic by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2029
+- fix typo by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2030
+- Merkle db intermediate node key compression by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1987
+- Improve RPC Chain version mismatch error message by @martineckardt in https://github.com/ava-labs/avalanchego/pull/2021
+- Move subnet owner lookup to platformvm state by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2024
+- Fix fuzz tests; add iterator fuzz test by @danlaine in https://github.com/ava-labs/avalanchego/pull/1991
+- Refactor subnet validator primary network requirements by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2014
+- Rename events to event by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1973
+- Add function to initialize SampleableSet by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2017
+- add `IsCortinaActivated` helper by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2013
+- Fix P-chain Import by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2035
+- Rename avm/blocks package to avm/block by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1970
+- Merkledb Update rangeproof proto to be consistent with changeproof proto by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2040
+- `merkledb` -- encode lengths as uvarints by @danlaine in https://github.com/ava-labs/avalanchego/pull/2039
+- MerkleDB Remove GetNodeFromParent by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2041
+
+### New Contributors
+
+- @martineckardt made their first contribution in https://github.com/ava-labs/avalanchego/pull/2021
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.9...v1.10.10
+
 ## [v1.10.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.9)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
