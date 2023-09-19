@@ -87,5 +87,11 @@ We assume that the reader know that, as of Cortina fork, every subnet validator 
 Say P-chain current height is `T` and we want to retrieve Primary network validators at height `H < T`. We proceed as follows:
 
 1. We retrieve the Primary Network validator set at current height `T`. This is the base state on top of which diffs will be applied.
-2. We apply weight diffs first. We iterate W
-3. We apply BLS Public Key diffs to the outstanding validator set
+2. We apply weight diffs first. Specifically:
+   -  We iterate `Weight` diff from the top most height smaller or equal to `T`. Remember that entries heights does not need to be contiguous, so we start from the highest height smaller or equal to `T`, in case `T` has not diff entry.
+   -  Since `Weight` diffs are forward-looking, we apply each diff in reverse. We decrease a validator's weight if `state.ValidatorWeightDiff.Decrease` is `false` and we increse it if it is `true`.
+   - We take care of adding or removing a validator from the base set based on its weight. Whenever a validator weight, following diff application, becomes zero, we drop it; conversely whenever we encounter a diff increasing weight for a currently-non-existing validator, we add the validator in the base set.
+   -  We stop applying diffs at the first height smaller or equal to `H+1`. Note that a `Weight` diff stored at height `K` holds the content to turn validator state at height `K-1` into validator state at height `K`. So to get validator state at height `K` we must apply diff content at height `K+1`.
+3. Once all `Weight` diffs have been applied the resulting validator set will contain all Primary Network validators active at height `H` and only those. However their `BLS Public Keys` may be wrong, missing or different from those registered at height `H`. We solve this by applying `BLS Public Key` diffs to the vallidator set:
+   - Once again we iterate `BLS Public Key` diffs from the top most height smaller or equal to `T` till the first height smaller or equal to `H+1`.
+   - Since `BLS Public Key` diff are *backward-looking*, we simply nil the BLS key when diff is nil and we restore the BLS Key when it is specified in the diff. 
