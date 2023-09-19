@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -135,10 +135,10 @@ type State interface {
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
+	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
 	// Invariant: [block] is an accepted block.
-	AddStatelessBlock(block blocks.Block)
+	AddStatelessBlock(block block.Block)
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
@@ -214,7 +214,7 @@ type State interface {
 
 // TODO: Remove after v1.11.x is activated
 type stateBlk struct {
-	Blk    blocks.Block
+	Blk    block.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 }
@@ -307,8 +307,8 @@ type state struct {
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB                 database.Database
@@ -435,7 +435,7 @@ func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func blockSize(_ ids.ID, blk blocks.Block) int {
+func blockSize(_ ids.ID, blk block.Block) int {
 	if blk == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
@@ -517,10 +517,10 @@ func newState(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, blocks.Block](
+	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, blocks.Block](execCfg.BlockCacheSize, blockSize),
+		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -624,7 +624,7 @@ func newState(
 		blockIDCache:  blockIDCache,
 		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
-		addedBlocks: make(map[ids.ID]blocks.Block),
+		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
@@ -1160,7 +1160,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
+		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
 		if err != nil {
 			return err
 		}
@@ -1177,7 +1177,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			}
 
 			weightDiff := ValidatorWeightDiff{}
-			_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
+			_, err = block.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
 			if err != nil {
 				return err
 			}
@@ -1277,7 +1277,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1390,7 +1390,7 @@ func (s *state) loadMetadata() error {
 	}
 
 	indexedHeights := &heightRange{}
-	_, err = blocks.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights)
+	_, err = block.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights)
 	if err != nil {
 		return err
 	}
@@ -1753,7 +1753,7 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
@@ -1773,7 +1773,7 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
-func (s *state) AddStatelessBlock(block blocks.Block) {
+func (s *state) AddStatelessBlock(block block.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
@@ -1844,7 +1844,7 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
 	}
@@ -1926,7 +1926,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
+		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
 		if err != nil {
 			return fmt.Errorf("failed to create prefix bytes: %w", err)
 		}
@@ -1975,7 +1975,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
+				metadataBytes, err := block.GenesisCodec.Marshal(block.Version, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -2047,7 +2047,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			// TODO: Remove this once we no longer support version rollbacks.
-			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
+			weightDiffBytes, err := block.GenesisCodec.Marshal(block.Version, weightDiff)
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
@@ -2337,7 +2337,7 @@ func (s *state) writeMetadata() error {
 	}
 
 	if s.indexedHeights != nil {
-		indexedHeightsBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, s.indexedHeights)
+		indexedHeightsBytes, err := block.GenesisCodec.Marshal(block.Version, s.indexedHeights)
 		if err != nil {
 			return err
 		}
@@ -2353,20 +2353,20 @@ func (s *state) writeMetadata() error {
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
 // TODO: Remove after v1.11.x is activated
-func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+func parseStoredBlock(blkBytes []byte) (block.Block, choices.Status, bool, error) {
 	// Attempt to parse as blocks.Block
-	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, choices.Accepted, false, nil
 	}
 
 	// Fallback to [stateBlk]
 	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, false, err
 	}
 
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	blkState.Blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
 	if err != nil {
 		return nil, choices.Processing, false, err
 	}
