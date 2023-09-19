@@ -70,8 +70,7 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	return finalReward
 }
 
-// [Split] [totalAmount] into [totalAmount * shares percentage] and the
-// remainder.
+// Split [totalAmount] into [totalAmount * shares percentage] and the remainder.
 //
 // Invariant: [shares] <= [PercentDenominator]
 func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
