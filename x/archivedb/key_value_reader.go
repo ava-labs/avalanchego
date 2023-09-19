@@ -9,69 +9,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var _ database.KeyValueReader = (*dbHeightReader)(nil)
+
 type dbHeightReader struct {
 	db                 *archiveDB
 	height             uint64
 	heightLastFoundKey uint64
 }
 
-// Builds a database.Iterator where the next value is the requested *value*. If
-// the value is not found a database.ErrNotFound is returned.
-//
-// This is a private function which helps Get() and Has() to share the key
-// lookup logic
-func (reader *dbHeightReader) getIteratorToValue(key []byte) (database.Iterator, error) {
-	internalKey := newInternalKey(key, reader.height)
-	iterator := reader.db.rawDB.NewIteratorWithStart(internalKey.Bytes())
-	keyLength := len(key)
-
-	reader.heightLastFoundKey = 0
-
-	for {
-		if !iterator.Next() {
-			// There is no available key with the requested prefix
-			return iterator, database.ErrNotFound
-		}
-		internalKey, err := parseKey(iterator.Key())
-		if err != nil {
-			return iterator, err
-		}
-		if !bytes.Equal(internalKey.key, key) {
-			if keyLength < len(internalKey.key) {
-				// The current key is a longer than the requested key, now check
-				// if they match at the same length as `key`, if that is the
-				// case we should continue to the next key, until the exact
-				// requested key is found or anothe prefix is found and by that
-				// point it would exit
-				if bytes.Equal(internalKey.key[0:keyLength], key) {
-					// Same prefix, read the next key until the prefix is
-					// different or the exact requested key is found
-					continue
-				}
-			}
-			// The previous key that was found does has another prefix, because the
-			// iterator is not aware of prefixes. If this happens it means the
-			// prefix at the requested height does not exists.
-			return iterator, database.ErrNotFound
-		}
-
-		if internalKey.isDeleted {
-			// The database is append only, so when removing a record creates a new
-			// record with an special flag is being created. Before returning the
-			// value we check if the deleted flag is present or not.
-			return iterator, database.ErrNotFound
-		}
-
-		reader.heightLastFoundKey = internalKey.height
-
-		return iterator, nil
-	}
-}
-
 // Has retrieves if a key is present in the key-value data store.
 func (reader *dbHeightReader) Has(key []byte) (bool, error) {
-	iterator, err := reader.getIteratorToValue(key)
-	defer iterator.Release()
+	_, err := reader.Get(key)
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -82,13 +30,53 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 }
 
 // Get retrieves the given key if it's present in the key-value data store.
+//
+// This is a public API, so the dbKey is used to retrieve any value. It is
+// guaranteed to be a O(1), because how the dbKey is structured internally which
+// prevents a longer key to match a shorter key with the same prefix.
+//
+// If the result matches a dbMetaKey it will be consired as a ErrNotFound
+// because dbMetaKey is for internal usage and should be leaked outside of the
+// module
 func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
-	iterator, err := reader.getIteratorToValue(key)
+	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
 	defer iterator.Release()
+
+	reader.heightLastFoundKey = 0
+
+	if !iterator.Next() {
+		if err := iterator.Error(); err != nil {
+			return nil, err
+		}
+
+		// There is no available key with the requested prefix
+		return nil, database.ErrNotFound
+	}
+
+	foundKey, height, err := parseDBKey(iterator.Key())
 	if err != nil {
 		return nil, err
 	}
-	return iterator.Value(), nil
+	if !bytes.Equal(foundKey, key) {
+		// A key was found, through the iterator, *but* the prefix is not the
+		// same, another key exists, but not the requested one
+		//
+		// This happens because we search for a key at a given height, or the
+		// previous key. In this case the previous key is an unrelated key
+		return nil, database.ErrNotFound
+	}
+	rawValue := iterator.Value()
+	rawValueLen := len(rawValue)
+	if rawValueLen == 0 {
+		// malformed, value should never ever be empty
+		return nil, ErrInvalidValue
+	}
+	if rawValue[rawValueLen-1] == 1 {
+		return nil, database.ErrNotFound
+	}
+	value := rawValue[:rawValueLen-1]
+	reader.heightLastFoundKey = height
+	return value, nil
 }
 
 // Returns the height value where a key has been found. If the last key was not

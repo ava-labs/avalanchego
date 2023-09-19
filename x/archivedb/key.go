@@ -4,85 +4,85 @@
 package archivedb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
-	"math"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 var (
 	ErrInsufficientLength = errors.New("packer has insufficient length for input")
 	longLen               = 8
-	boolLen               = 1
-	// This default prefix is used as the internal default prefix for all keys.
-	// By doing so the database can safely accept keys from untrusted sources,
-	// by using a common prefix no matter how the keys are crafted externally
-	// they won't interfere with the database
-	//
-	// Having this common prefix also also allows archivedb to store metadata
-	// that may be needed, without polluting the key space.
-	//
-	// Another side effect is that migrations are possible, by changing the
-	// prefix namespace, pulling the old prefix and migrating to the new one.
-	internalKeyPrefix    = []byte("v1")
-	internalKeyPrefixLen = len(internalKeyPrefix)
-	// The length of the suffix data of the key
-	internalKeySuffixLen = longLen + boolLen
+	internalKeySuffixLen  = longLen
+	minInternalKeyLen     = internalKeySuffixLen + 2
 )
 
-// keyInternal
+// dbKey
 //
 // The keys contains a few extra information alongside the given key. The key is
 // what is known outside of this internal scope as the key, but this struct has
-// more information compacted inside the keyInternal to take advantage of natural
+// more information compacted inside the dbKey to take advantage of natural
 // sorting. The inversed height is stored right after the Prefix, which is
-// MaxUint64 minus the desired Height. An extra byte is also packed inside the
-// key to indicate if the key is a deletion of any previous value (because
-// archivedb is an append only database).
+// MaxUint64 minus the desired Height.
 //
-// Any other property are to not serialized but they are useful when parsing a
-// keyInternal struct from the database
-type keyInternal struct {
-	key       []byte
-	height    uint64
-	isDeleted bool
+// The inverse height is stored, instead of the height, as part of the key. That
+// is because the database interface only provides ascending iterators.
+// Archivedb's main usage is to query a given key at a given height, or the
+// immediate previous height. That is why the heights are being converted from
+// `height` to `MAX_INT64 - height`.
+//
+//	Example (Asumming MAX_INT64 is 10,000):
+//	 |  User given  |  Stored as   |
+//	 |--------------|--------------|
+//	 |    foo:10    |   foo:9910   |
+//	 |    foo:20    |   foo:9080   |
+//
+// The internal sorting will be `foo:9080`, `foo:9910` instead of (`foo:10`,
+// `foo:20`). The new sorting plays well with the descending iterator, having a
+// O(1) operation to fetch the exact match or the previous value at a given
+// height.
+//
+// All keys are prefixed with a VarUint64, which is the length of the keys, the
+// idea is to make reads even simpler, making it effectively a O(1) operation.
+func newDBKey(key []byte, height uint64) []byte {
+	keyLen := len(key)
+	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + longLen
+	rawKey := make([]byte, rawKeyMaxSize)
+	offset := binary.PutUvarint(rawKey, uint64(keyLen))
+	offset += copy(rawKey[offset:], key)
+	binary.BigEndian.PutUint64(rawKey[offset:], ^height)
+	offset += longLen
+
+	return rawKey[0:offset]
 }
 
-// Creates a new Key struct with a given key and its height
-func newInternalKey(key []byte, height uint64) *keyInternal {
-	return &keyInternal{
-		key:       key,
-		isDeleted: false,
-		height:    height,
-	}
-}
-
-func (k *keyInternal) Bytes() []byte {
-	keyLen := len(k.key)
-	bytes := make([]byte, keyLen+internalKeySuffixLen+internalKeyPrefixLen)
-	copy(bytes[0:], internalKeyPrefix)
-	copy(bytes[internalKeyPrefixLen:], k.key)
-	binary.BigEndian.PutUint64(bytes[internalKeyPrefixLen+keyLen:], math.MaxUint64-k.height)
-	if k.isDeleted {
-		bytes[internalKeyPrefixLen+keyLen+longLen] = 1
-	} else {
-		bytes[internalKeyPrefixLen+keyLen+longLen] = 0
-	}
-	return bytes
-}
-
-// Takes a slice of bytes and returns a Key struct
-func parseKey(rawKey []byte) (*keyInternal, error) {
-	var key keyInternal
-	if internalKeySuffixLen+internalKeyPrefixLen >= len(rawKey) {
-		return nil, ErrInsufficientLength
+// Takes a slice of bytes and returns the inner key and the height
+func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
+	rawKeyLen := len(rawKey)
+	if rawKeyLen < minInternalKeyLen {
+		return nil, 0, ErrInsufficientLength
 	}
 
-	keyWithPrefixLen := len(rawKey) - internalKeySuffixLen
+	reader := bytes.NewReader(rawKey)
+	// ReadUvarint cannot fail since the minInternalKeyLen makes sure there are
+	// enough bytes to read a varint
+	keyLen, _ := binary.ReadUvarint(reader)
 
-	key.key = make([]byte, keyWithPrefixLen-internalKeyPrefixLen)
-	key.height = math.MaxUint64 - binary.BigEndian.Uint64(rawKey[keyWithPrefixLen:])
-	key.isDeleted = rawKey[keyWithPrefixLen+longLen] == 1
-	copy(key.key, rawKey[internalKeyPrefixLen:internalKeyPrefixLen+keyWithPrefixLen])
+	key := make([]byte, keyLen)
+	readBytes, err := reader.Read(key)
+	if err != nil {
+		return nil, 0, err
+	}
 
-	return &key, nil
+	if uint64(readBytes) != keyLen {
+		return nil, 0, database.ErrNotFound
+	}
+
+	// Read th inversed height, it will be converted to height using `^` just
+	// before returning. Read above why the inversed height is used instead of a
+	// normal height
+	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-longLen:])
+
+	return key, ^inversedHeight, nil
 }
