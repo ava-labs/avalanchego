@@ -1,14 +1,14 @@
 # Validators versioning
 
-One of the main responsabilities of the P-chain is to register and expose the validators set of any subnet at every height.
+One of the main responsabilities of the P-chain is to register and expose the validator set of any subnet at every height.
 
-This information helps subnets to bootstrap securily, downloading information from active validators only; moreover it supports validated cross-chain communication via Warp. 
+This information helps subnets to bootstrap securely, downloading information from active validators only; moreover it supports validated cross-chain communication via Warp. 
 
-In this brief document we dive into the technicalities of how `platformVM` tracks and versions the validators set of any subnet.
+In this brief document we dive into the technicalities of how `platformVM` tracks and versions the validator set of any subnet.
 
 ## The tracked content
 
-The entry point to retrieve validators information at given height is the `GetValidatorSet` method in `validators` package. Here is its signature:
+The entry point to retrieve validator information at given height is the `GetValidatorSet` method in the `validators` package. Here is its signature:
 ``` golang
 GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error)
 ```
@@ -27,7 +27,7 @@ Every new block accepted by the P-chain can potentially alter the validator set 
 
 Whenever the block at height `H` adds or removes a validator, the P-chain does, among others, the following operations:
 
-1. it updates the current validators set to add the new validator or remove it if expired;
+1. it updates the current validator set to add the new validator or remove it if expired;
 2. it explicitly records the validator set diffs with respect to the validator set at height `H-1`.
 
 These diffs are key to rebuild the validator set at a given past height. In this section we illustrate their content. In next ones, We'll see how the diffs are stored and used.
@@ -109,5 +109,5 @@ Say P-chain current height is `T` and we want to retrieve Primary network valida
 
 1. We retrieve both Subnet and Primary Network validator set at current height `T`.
 2. We apply `Weight` diff on top of the Subnet validator set, exactly as described in the previous section
-3. Before applying `BLS Public Key` diffs, we retrieve `BLS Public Key` from the current Primary Network validators set for each of the current Subnet validators. This ensure that the `BLS Public Key`s are duly initilized before applying the diffs
+3. Before applying `BLS Public Key` diffs, we retrieve `BLS Public Key` from the current Primary Network validator set for each of the current Subnet validators. This ensure that the `BLS Public Key`s are duly initilized before applying the diffs
 4. Finally we apply the `BLS Public Key` diffs exactly as described in the previous section 
