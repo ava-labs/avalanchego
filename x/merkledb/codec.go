@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,6 +48,7 @@ var (
 	errInvalidBool          = errors.New("decoded bool is neither true nor false")
 	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
 	errExtraSpace           = errors.New("trailing buffer space")
+	errIntOverflow          = errors.New("value overflows int")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -340,6 +342,9 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 	nibbleLength, err := c.decodeUint(src)
 	if err != nil {
 		return SerializedPath{}, err
+	}
+	if nibbleLength > math.MaxInt {
+		return SerializedPath{}, errIntOverflow
 	}
 
 	result := SerializedPath{
