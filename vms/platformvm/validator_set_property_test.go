@@ -204,6 +204,19 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					}
 				}
 			}
+
+			// check current validator set
+			tipHeight := snapShotHeights[len(snapShotHeights)-1]
+			for subnetID, validatorsSet := range validatorsSetByHeightAndSubnet[tipHeight] {
+				res, err := vm.GetValidatorSet(context.Background(), tipHeight, subnetID)
+				if err != nil {
+					return fmt.Sprintf("failed GetValidatorSet: %v", err)
+				}
+				if !reflect.DeepEqual(validatorsSet, res) {
+					return "failed validators set comparison"
+				}
+			}
+
 			return ""
 		},
 		gen.SliceOfN(
