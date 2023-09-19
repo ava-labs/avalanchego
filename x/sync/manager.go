@@ -104,7 +104,6 @@ type Manager struct {
 	// Set to true when StartSyncing is called.
 	syncing      bool
 	closeOnce    sync.Once
-	newPath      func(b []byte) merkledb.Path
 	branchFactor merkledb.BranchFactor
 }
 
