@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -180,6 +181,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}
 
 			snapShotHeights := maps.Keys(validatorsSetByHeightAndSubnet)
+			sort.Slice(snapShotHeights, func(i, j int) bool { return snapShotHeights[i] < snapShotHeights[j] })
 			for idx, snapShotHeight := range snapShotHeights {
 				var nextSnapShotHeight uint64
 				if idx == len(snapShotHeights)-1 {
@@ -190,16 +192,14 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 
 				// within [snapShotHeight] and [nextSnapShotHeight] validator set
 				// does not change and must be equal to snapshot at [snapShotHeight]
-				for height := snapShotHeight; height <= nextSnapShotHeight; height++ {
-					for height, subnetSets := range validatorsSetByHeightAndSubnet {
-						for subnetID, validatorsSet := range subnetSets {
-							res, err := vm.GetValidatorSet(context.Background(), height, subnetID)
-							if err != nil {
-								return fmt.Sprintf("failed GetValidatorSet: %v", err)
-							}
-							if !reflect.DeepEqual(validatorsSet, res) {
-								return "failed validators set comparison"
-							}
+				for height := snapShotHeight; height < nextSnapShotHeight; height++ {
+					for subnetID, validatorsSet := range validatorsSetByHeightAndSubnet[snapShotHeight] {
+						res, err := vm.GetValidatorSet(context.Background(), height, subnetID)
+						if err != nil {
+							return fmt.Sprintf("failed GetValidatorSet: %v", err)
+						}
+						if !reflect.DeepEqual(validatorsSet, res) {
+							return "failed validators set comparison"
 						}
 					}
 				}
