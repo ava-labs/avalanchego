@@ -99,3 +99,15 @@ Say P-chain current height is `T` and we want to retrieve Primary network valida
 3. Once all `Weight` diffs have been applied the resulting validator set will contain all Primary Network validators active at height `H` and only those. However their `BLS Public Keys` may be wrong, missing or different from those registered at height `H`. We solve this by applying `BLS Public Key` diffs to the vallidator set:
    - Once again we iterate `BLS Public Key` diffs from the top most height smaller or equal to `T` till the first height smaller or equal to `H+1`.
    - Since `BLS Public Key` diff are *backward-looking*, we simply nil the BLS key when diff is nil and we restore the BLS Key when it is specified in the diff. 
+
+### Subnet validator set rebuild
+
+Let's see first the reason why Subnet validators needs to have handled differently. As of `Cortina` fork, we allow `BLS Public Key` registration only for Primary network validators. A given `NodeID` may be both a Primary Network validator and a subnet validator, but it'll register its `BLS Public Key` only when it registers as Primary Network validator. Despite this, we want to provide a validator `BLS Public Key` when `validators.GetValidatorOutput` is called. So we need to fetch it from the Primary Network validator set.
+
+Say P-chain current height is `T` and we want to retrieve Primary network validators at height `H < T`. We proceed as follows:
+
+
+1. We retrieve both Subnet and Primary Network validator set at current height `T`.
+2. We apply `Weight` diff on top of the Subnet validator set, exactly as described in the previous section
+3. Before applying `BLS Public Key` diffs, we retrieve `BLS Public Key` from the current Primary Network validators set for each of the current Subnet validators. This ensure that the `BLS Public Key`s are duly initilized before applying the diffs
+4. Finally we apply the `BLS Public Key` diffs exactly as described in the previous section 
