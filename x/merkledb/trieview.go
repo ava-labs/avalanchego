@@ -360,7 +360,8 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	childNode, err := t.getNodeWithID(
 		child.id,
 		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
-		child.hasValue)
+		child.hasValue,
+	)
 	if err != nil {
 		return nil, err
 	}

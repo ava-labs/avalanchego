@@ -54,7 +54,7 @@ func FuzzCodecInt(f *testing.F) {
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeInt(reader)
+			got, err := codec.decodeUint(reader)
 			if err != nil {
 				t.SkipNow()
 			}
@@ -63,7 +63,7 @@ func FuzzCodecInt(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeInt(&buf, got)
+			codec.encodeUint(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -205,22 +205,12 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	}
 
 	nodeBytes := codec.encodeDBNode(&proof, BranchFactor16)
-
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
-	// Put num children -1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, -1)
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
-	require.ErrorIs(err, errNegativeNumChildren)
-
-	// Remove num children from end
-	nodeBytes = proofBytesBuf.Bytes()
-	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
-	proofBytesBuf = bytes.NewBuffer(nodeBytes)
-	// Put num children BranchFactor16+1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, int(BranchFactor16)+1)
+	// Put num children NodeBranchFactor+1 at end
+	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(BranchFactor16+1))
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
 	require.ErrorIs(err, errTooManyChildren)

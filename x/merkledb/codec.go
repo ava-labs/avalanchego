@@ -41,16 +41,13 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errNegativeNumChildren = errors.New("number of children is negative")
-	errTooManyChildren     = errors.New("length of children list is larger than branching factor")
-	errChildIndexTooLarge  = errors.New("invalid child index. Must be less than branching factor")
-	errNegativePathLength  = errors.New("path length is negative")
-	errIntTooLarge         = errors.New("integer too large to be decoded")
-	errLeadingZeroes       = errors.New("varint has leading zeroes")
-	errInvalidBool         = errors.New("decoded bool is neither true nor false")
-	errNonZeroPathPadding  = errors.New("all tokens after the path length should be 0")
-	errExtraSpace          = errors.New("trailing buffer space")
-	errNegativeSliceLength = errors.New("negative slice length")
+	errTooManyChildren    = errors.New("length of children list is larger than branching factor")
+	errChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
+	errLeadingZeroes      = errors.New("varint has leading zeroes")
+	errInvalidBool        = errors.New("decoded bool is neither true nor false")
+	errNonZeroPathPadding = errors.New("path partial byte should be padded with 0s")
+	errExtraSpace         = errors.New("trailing buffer space")
+	errIntOverflow        = errors.New("value overflows int")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -85,6 +82,8 @@ func newCodec() encoderDecoder {
 // Note that bytes.Buffer.Write always returns nil so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
+	// Invariant: Every byte slice returned by [varIntPool] has
+	// length [binary.MaxVarintLen64].
 	varIntPool sync.Pool
 }
 
@@ -97,12 +96,12 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	)
 
 	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeInt(buf, numChildren)
+	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	for index := byte(0); index < byte(branchFactor); index++ {
 		if entry, ok := n.children[index]; ok {
-			c.encodeInt(buf, int(index))
+			c.encodeUint(buf, uint64(index))
 			path := entry.compressedPath
 			c.encodePath(buf, path)
 			_, _ = buf.Write(entry.id[:])
@@ -120,12 +119,12 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	)
 
-	c.encodeInt(buf, numChildren)
+	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
 	for index := byte(0); index < byte(hv.Key.branchFactor); index++ {
 		if entry, ok := hv.Children[index]; ok {
-			c.encodeInt(buf, int(index))
+			c.encodeUint(buf, uint64(index))
 			_, _ = buf.Write(entry.id[:])
 		}
 	}
@@ -148,26 +147,24 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	}
 	n.value = value
 
-	numChildren, err := c.decodeInt(src)
+	numChildren, err := c.decodeUint(src)
 	switch {
 	case err != nil:
 		return err
-	case numChildren < 0:
-		return errNegativeNumChildren
-	case numChildren > int(branchFactor):
+	case numChildren > uint64(branchFactor):
 		return errTooManyChildren
-	case numChildren > src.Len()/minChildLen:
+	case numChildren > uint64(src.Len()/minChildLen):
 		return io.ErrUnexpectedEOF
 	}
 
 	n.children = make(map[byte]child, branchFactor)
-	previousChild := -1
-	for i := 0; i < numChildren; i++ {
-		index, err := c.decodeInt(src)
+	var previousChild uint64
+	for i := uint64(0); i < numChildren; i++ {
+		index, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
-		if index <= previousChild || index >= int(branchFactor) {
+		if index >= uint64(branchFactor) || (i != 0 && index <= previousChild) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
@@ -220,25 +217,19 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	}
 }
 
-func (c *codecImpl) encodeInt(dst *bytes.Buffer, value int) {
-	c.encodeInt64(dst, int64(value))
-}
-
-func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
+func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 	// To ensure encoding/decoding is canonical, we need to check for leading
 	// zeroes in the varint.
 	// The last byte of the varint we read is the most significant byte.
 	// If it's 0, then it's a leading zero, which is considered invalid in the
 	// canonical encoding.
 	startLen := src.Len()
-	val64, err := binary.ReadVarint(src)
-	switch {
-	case err == io.EOF:
-		return 0, io.ErrUnexpectedEOF
-	case err != nil:
+	val64, err := binary.ReadUvarint(src)
+	if err != nil {
+		if err == io.EOF {
+			return 0, io.ErrUnexpectedEOF
+		}
 		return 0, err
-	case val64 > math.MaxInt:
-		return 0, errIntTooLarge
 	}
 	endLen := src.Len()
 
@@ -256,12 +247,12 @@ func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
 		}
 	}
 
-	return int(val64), nil
+	return val64, nil
 }
 
-func (c *codecImpl) encodeInt64(dst *bytes.Buffer, value int64) {
+func (c *codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
 	buf := c.varIntPool.Get().([]byte)
-	size := binary.PutVarint(buf, value)
+	size := binary.PutUvarint(buf, value)
 	_, _ = dst.Write(buf[:size])
 	c.varIntPool.Put(buf)
 }
@@ -296,17 +287,15 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	length, err := c.decodeInt(src)
+	length, err := c.decodeUint(src)
 	switch {
 	case err == io.EOF:
 		return nil, io.ErrUnexpectedEOF
 	case err != nil:
 		return nil, err
-	case length < 0:
-		return nil, errNegativeSliceLength
 	case length == 0:
 		return nil, nil
-	case length > src.Len():
+	case length > uint64(src.Len()):
 		return nil, io.ErrUnexpectedEOF
 	}
 
@@ -319,7 +308,7 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 }
 
 func (c *codecImpl) encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	c.encodeInt(dst, len(value))
+	c.encodeUint(dst, uint64(len(value)))
 	if value != nil {
 		_, _ = dst.Write(value)
 	}
@@ -337,9 +326,8 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	}
 	return id, err
 }
-
 func (c *codecImpl) encodePath(dst *bytes.Buffer, s Path) {
-	c.encodeInt(dst, s.length)
+	c.encodeUint(dst, uint64(s.length))
 	_, _ = dst.Write(s.Bytes())
 }
 
@@ -348,16 +336,15 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
 	}
 
-	var (
-		result = EmptyPath(branchFactor)
-		err    error
-	)
-	if result.length, err = c.decodeInt(src); err != nil {
+	length, err := c.decodeUint(src)
+	if err != nil {
 		return EmptyPath(branchFactor), err
 	}
-	if result.length < 0 {
-		return EmptyPath(branchFactor), errNegativePathLength
+	if length > math.MaxInt {
+		return EmptyPath(branchFactor), errIntOverflow
 	}
+	result := EmptyPath(branchFactor)
+	result.length = int(length)
 	pathBytesLen := result.bytesNeeded(result.length)
 	if pathBytesLen > src.Len() {
 		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
