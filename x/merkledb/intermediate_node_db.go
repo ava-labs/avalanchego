@@ -89,13 +89,13 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 }
 
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
-	defer db.bufferPool.Put(prefixedKey)
+	dbKey := db.constructDBKey(key)
+	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
 	if n == nil {
-		return b.Delete(prefixedKey)
+		return b.Delete(dbKey)
 	}
-	return b.Put(prefixedKey, n.bytes())
+	return b.Put(dbKey, n.bytes())
 }
 
 func (db *intermediateNodeDB) Get(key path) (*node, error) {
@@ -108,15 +108,42 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
-	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
+	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(dbKey)
 	if err != nil {
 		return nil, err
 	}
-	db.bufferPool.Put(prefixedKey)
+	db.bufferPool.Put(dbKey)
 
 	return parseNode(key, nodeBytes)
+}
+
+// constructDBKey returns a key that can be used in [db.baseDB].
+// We need to be able to differentiate between two paths of equal
+// byte length but different token length so we add padding to differentiate.
+// Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
+func (db *intermediateNodeDB) constructDBKey(key path) []byte {
+	compressedKey := key.Serialize()
+
+	// add one additional byte to store padding when the path
+	// has a length that fits into a whole number of bytes
+	remainder := compressedKey.NibbleLength % 2
+	keyLen := len(compressedKey.Value)
+	if remainder == 0 {
+		keyLen++
+	}
+	dbKey := getBufferFromPool(db.bufferPool, keyLen)
+	defer db.bufferPool.Put(dbKey)
+
+	copy(dbKey, compressedKey.Value)
+	if remainder == 0 {
+		dbKey[keyLen-1] = 0b1000_0000
+	} else {
+		dbKey[keyLen-1] |= 0b0000_1000
+	}
+
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {

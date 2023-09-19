@@ -39,7 +39,7 @@ var (
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
-// Manager adds the ability to introduce newly acceted blocks IDs to the State
+// Manager adds the ability to introduce newly accepted blocks IDs to the State
 // interface.
 type Manager interface {
 	validators.State

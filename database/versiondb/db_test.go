@@ -19,11 +19,12 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		baseDB := memdb.New()
-		test(f, New(baseDB))
-	}
+func FuzzKeyValue(f *testing.F) {
+	database.FuzzKeyValue(f, New(memdb.New()))
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithPrefix(f, New(memdb.New()))
 }
 
 func TestIterate(t *testing.T) {
