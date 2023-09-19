@@ -337,13 +337,13 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		return SerializedPath{}, io.ErrUnexpectedEOF
 	}
 
-	nibbleLength64, err := c.decodeUint(src)
+	nibbleLength, err := c.decodeUint(src)
 	if err != nil {
 		return SerializedPath{}, err
 	}
 
 	result := SerializedPath{
-		NibbleLength: int(nibbleLength64),
+		NibbleLength: int(nibbleLength),
 	}
 	pathBytesLen := result.NibbleLength >> 1
 	hasOddLen := result.hasOddLength()
