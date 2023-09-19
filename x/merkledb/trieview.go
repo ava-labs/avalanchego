@@ -1028,35 +1028,6 @@ func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, err
 	return parentTrieNode, nil
 }
 
-// Retrieves a node with the given [key].
-// If the node is fetched from [t.parentTrie] and [id] isn't empty,
-// sets the node's ID to [id].
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, error) {
-	// check for the key within the changed nodes
-	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
-		t.db.metrics.ViewNodeCacheHit()
-		if nodeChange.after == nil {
-			return nil, database.ErrNotFound
-		}
-		return nodeChange.after, nil
-	}
-
-	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hasValue)
-	if err != nil {
-		return nil, err
-	}
-
-	// only need to initialize the id if it's from the parent trie.
-	// nodes in the current view change list have already been initialized.
-	if id != ids.Empty {
-		parentTrieNode.id = id
-	}
-	return parentTrieNode, nil
-}
-
 // Get the parent trie of the view
 func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.RLock()
