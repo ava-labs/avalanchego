@@ -92,28 +92,28 @@ func (cp Path) hasPartialByteLength() bool {
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (cp Path) HasPrefix(prefix Path) bool {
-	prefixValue := prefix.value
-	prefixLength := len(prefix.value)
-	if cp.length < prefix.length || len(cp.value) < prefixLength {
+	// if the current path is shorter than the prefix path, then it cannot be a prefix
+	if cp.length < prefix.length || len(cp.value) < len(prefix.value) {
 		return false
 	}
+
 	remainderTokens := prefix.length % cp.tokensPerByte
 	if remainderTokens == 0 {
-		return strings.HasPrefix(cp.value, prefixValue)
+		return strings.HasPrefix(cp.value, prefix.value)
 	}
-	reducedSize := prefixLength - 1
 
-	// the input was invalid so just return false
-	if reducedSize < 0 {
-		return false
-	}
+	// check that the tokens that were in the partially filled prefix byte are equal to the tokens in the current path
 	for i := prefix.length - remainderTokens; i < prefix.length; i++ {
 		if cp.Token(i) != prefix.Token(i) {
 			return false
 		}
 	}
-	// s has prefix if the partial byte tokens are equal and s has every byte but the remainder tokens of prefix as a prefix
-	return strings.HasPrefix(cp.value, prefixValue[:reducedSize])
+
+	// the prefix contains a partially filled byte so grab the length of whole bytes
+	wholeBytesLength := len(prefix.value) - 1
+
+	// the input was valid and the whole bytes of the prefix are a prefix of the current path
+	return wholeBytesLength >= 0 && strings.HasPrefix(cp.value, prefix.value[:wholeBytesLength])
 }
 
 // HasStrictPrefix Returns true iff [prefix] is a prefix of [s] but not equal to it.
@@ -124,14 +124,14 @@ func (cp Path) HasStrictPrefix(prefix Path) bool {
 // Token returns the token at the specified index
 // grabs the token's storage byte, shifts it, then masks out any bits from other tokens stored in the same byte
 func (cp Path) Token(index int) byte {
-	return (cp.value[index/cp.tokensPerByte] >> cp.shift(index)) & cp.mask
+	return (cp.value[index/cp.tokensPerByte] >> cp.bitsToShift(index)) & cp.mask
 }
 
 // Append returns a new Path that equals the current Path with the passed token appended to the end
 func (cp Path) Append(token byte) Path {
 	buffer := make([]byte, cp.bytesNeeded(cp.length+1))
 	copy(buffer, cp.value)
-	buffer[len(buffer)-1] += token << cp.shift(cp.length)
+	buffer[len(buffer)-1] |= token << cp.bitsToShift(cp.length)
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     cp.length + 1,
@@ -154,10 +154,9 @@ func (cp Path) Less(other Path) bool {
 	return cp.value < other.value || (cp.value == other.value && cp.length < other.length)
 }
 
-// shift indicates how many bits to shift the token at the index to get the raw token value
-// varies from (8-[tokenBitSize]) -> (0)
-// when remainder of index varies from (0) -> (cp.tokensPerByte-1)
-func (cp Path) shift(index int) byte {
+// bitsToShift indicates how many bits to shift the token at the index to get the raw token value
+// varies from (8-[tokenBitSize]) -> (0) when remainder of index varies from (0) -> (cp.tokensPerByte-1)
+func (cp Path) bitsToShift(index int) byte {
 	return Byte - (cp.tokenBitSize * byte(index%cp.tokensPerByte+1))
 }
 
@@ -178,8 +177,13 @@ func (cp Path) Extend(path Path) Path {
 	}
 
 	totalLength := cp.length + path.length
+
+	// copy existing value into  the buffer
 	buffer := make([]byte, cp.bytesNeeded(totalLength))
 	copy(buffer, cp.value)
+
+	// If the existing value fits into a whole number of bytes,
+	// the extension path can be copied directly into the buffer.
 	if !cp.hasPartialByteLength() {
 		copy(buffer[len(cp.value):], path.value)
 		return Path{
@@ -188,13 +192,23 @@ func (cp Path) Extend(path Path) Path {
 			pathConfig: cp.pathConfig,
 		}
 	}
-	shiftLeft := cp.shift(cp.length - 1)
+
+	// The existing path doesn't fit into a whole number of bytes,
+	// figure out how much each byte of the extension path needs to be shifted
+	shiftLeft := cp.bitsToShift(cp.length - 1)
 	shiftRight := Byte - shiftLeft
+
+	// the partial byte of the current path needs the first shiftLeft bits of the extension path
 	buffer[len(cp.value)-1] += path.value[0] >> shiftRight
 
+	// Each remaining byte is the combination of:
+	// * last shiftLeft bits of byte i
+	// * first shiftRight bits of byte i+1
 	for i := 0; i < len(path.value)-1; i++ {
 		buffer[len(cp.value)+i] += path.value[i]<<shiftLeft + path.value[i+1]>>shiftRight
 	}
+
+	// the last byte only has values from byte i, as there is no byte i+1
 	buffer[len(buffer)-1] += path.value[len(path.value)-1] << shiftLeft
 
 	return Path{
@@ -215,20 +229,28 @@ func (cp Path) Skip(tokensToSkip int) Path {
 		return result
 	}
 
+	// all bytes after the skipped tokens
 	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
 
+	// if the tokens to skip is a whole number of bytes,
+	// the remaining bytes exactly equals the new path
 	if tokensToSkip%cp.tokensPerByte == 0 {
 		result.value = remainingBytes
 		return result
 	}
 
+	// tokensToSkip does not remove a whole number of bytes
+	// copy the remaining shifted bytes into a new buffer
 	buffer := make([]byte, cp.bytesNeeded(newLength))
-	shiftRight := cp.shift(tokensToSkip - 1)
+	shiftRight := cp.bitsToShift(tokensToSkip - 1)
 	shiftLeft := Byte - shiftRight
 
+	// each byte of the new is the last shiftLeft bits of byte i + the first shiftRight bits of byte i+1
 	for i := 0; i < len(remainingBytes)-1; i++ {
 		buffer[i] += remainingBytes[i]<<shiftLeft + remainingBytes[i+1]>>shiftRight
 	}
+
+	// the last byte only has values from byte i, as there is no byte i+1
 	buffer[len(buffer)-1] += remainingBytes[len(remainingBytes)-1] << shiftLeft
 
 	return Path{
@@ -248,13 +270,12 @@ func (cp Path) Take(tokensToTake int) Path {
 		}
 	}
 
-	// ensure length rounds up
 	buffer := make([]byte, cp.bytesNeeded(tokensToTake))
 	copy(buffer, cp.value)
-	shift := cp.shift(tokensToTake - 1)
 
-	// zero out remainder bits
-	buffer[len(buffer)-1] = (buffer[len(buffer)-1] >> shift) << shift
+	// the shifts zero out any extra bits in the byte
+	bitsToZeroOut := cp.bitsToShift(tokensToTake - 1)
+	buffer[len(buffer)-1] = (buffer[len(buffer)-1] >> bitsToZeroOut) << bitsToZeroOut
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
