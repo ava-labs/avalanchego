@@ -228,7 +228,7 @@ func TestSplit(t *testing.T) {
 			require := require.New(t)
 
 			split, remainder := Split(test.amount, test.shares)
-			require.Equal(test.expectedSplit, split, int(split))
+			require.Equal(test.expectedSplit, split)
 			require.Equal(test.amount-test.expectedSplit, remainder)
 		})
 	}
