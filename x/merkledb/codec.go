@@ -99,12 +99,12 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	)
 
 	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint64(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := n.children[index]; ok {
-			c.encodeUint64(buf, uint64(index))
+			c.encodeUint(buf, uint64(index))
 			path := entry.compressedPath.Serialize()
 			c.encodeSerializedPath(buf, path)
 			_, _ = buf.Write(entry.id[:])
@@ -122,12 +122,12 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	)
 
-	c.encodeUint64(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := hv.Children[index]; ok {
-			c.encodeUint64(buf, uint64(index))
+			c.encodeUint(buf, uint64(index))
 			_, _ = buf.Write(entry.id[:])
 		}
 	}
@@ -256,7 +256,7 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (int, error) {
 	return int(val64), nil
 }
 
-func (c *codecImpl) encodeUint64(dst *bytes.Buffer, value uint64) {
+func (c *codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
 	buf := c.varIntPool.Get().([]byte)
 	size := binary.PutUvarint(buf, value)
 	_, _ = dst.Write(buf[:size])
@@ -316,7 +316,7 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 }
 
 func (c *codecImpl) encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	c.encodeUint64(dst, uint64(len(value)))
+	c.encodeUint(dst, uint64(len(value)))
 	if value != nil {
 		_, _ = dst.Write(value)
 	}
@@ -336,7 +336,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s SerializedPath) {
-	c.encodeUint64(dst, uint64(s.NibbleLength))
+	c.encodeUint(dst, uint64(s.NibbleLength))
 	_, _ = dst.Write(s.Value)
 }
 

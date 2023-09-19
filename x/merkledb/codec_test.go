@@ -63,7 +63,7 @@ func FuzzCodecInt(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeUint64(&buf, uint64(got))
+			codec.encodeUint(&buf, uint64(got))
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -200,7 +200,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
 
 	// Put num children NodeBranchFactor+1 at end
-	codec.(*codecImpl).encodeUint64(proofBytesBuf, NodeBranchFactor+1)
+	codec.(*codecImpl).encodeUint(proofBytesBuf, NodeBranchFactor+1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
