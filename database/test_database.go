@@ -1258,7 +1258,7 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 			require.Equal(expected[string(iter.Key())], val)
 			numIterElts++
 		}
-		require.Equal(len(expectedList), numIterElts)
+		require.Len(expectedList, numIterElts)
 
 		// Clear the database for the next fuzz iteration.
 		require.NoError(AtomicClear(db, db))
