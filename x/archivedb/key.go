@@ -60,15 +60,14 @@ func newDBKey(key []byte, height uint64) []byte {
 // Takes a slice of bytes and returns the inner key and the height
 func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
 	rawKeyLen := len(rawKey)
-	if minInternalKeyLen > rawKeyLen {
+	if rawKeyLen < minInternalKeyLen {
 		return nil, 0, ErrInsufficientLength
 	}
 
 	reader := bytes.NewReader(rawKey)
-	keyLen, err := binary.ReadUvarint(reader)
-	if err != nil {
-		return nil, 0, err
-	}
+	// ReadUvarint cannot fail since the minInternalKeyLen makes sure there are
+	// enough bytes to read a varint
+	keyLen, _ := binary.ReadUvarint(reader)
 
 	key := make([]byte, keyLen)
 	readBytes, err := reader.Read(key)

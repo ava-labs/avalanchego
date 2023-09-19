@@ -3,7 +3,11 @@
 
 package archivedb
 
-import "github.com/ava-labs/avalanchego/database"
+import (
+	"bytes"
+
+	"github.com/ava-labs/avalanchego/database"
+)
 
 var _ database.Batch = (*batch)(nil)
 
@@ -15,7 +19,7 @@ var _ database.Batch = (*batch)(nil)
 // otherwise an error will be thrown
 type batch struct {
 	db     *archiveDB
-	ops    map[string]database.BatchOp
+	ops    []database.BatchOp
 	size   int
 	height uint64
 	inner  database.Batch
@@ -26,7 +30,7 @@ func newBatchWithHeight(db *archiveDB, height uint64) *batch {
 		db:     db,
 		size:   0,
 		height: height,
-		ops:    make(map[string]database.BatchOp),
+		ops:    make([]database.BatchOp, 0),
 		inner:  db.rawDB.NewBatch(),
 	}
 }
@@ -45,14 +49,19 @@ func (c *batch) Write() error {
 		return ErrInvalidBatchHeight
 	}
 
-	if err := c.Replay(c.inner); err != nil {
+	for _, op := range c.ops {
+		if err := c.inner.Put(op.Key, op.Value); err != nil {
+			return err
+		}
+	}
+	if err := database.PutUInt64(c.inner, keyHeight, c.height); err != nil {
 		return err
 	}
+
 	if err := c.inner.Write(); err != nil {
 		return err
 	}
 	c.db.currentHeight = c.height
-	c.Reset() // release memory
 
 	return nil
 }
@@ -60,37 +69,27 @@ func (c *batch) Write() error {
 // Delete any previous state that may be stored in the database
 func (c *batch) Delete(key []byte) error {
 	rawKey := newDBKey(key, c.height)
-	if value, exists := c.ops[string(rawKey)]; exists {
-		// decrese the size if there was any previous key/value
-		c.size -= len(value.Value)
-		c.size -= len(value.Key)
-	}
-	c.ops[string(rawKey)] = database.BatchOp{
+	c.ops = append(c.ops, database.BatchOp{
 		Key:    rawKey,
 		Value:  []byte{1},
 		Delete: true,
-	}
+	})
 	c.size += len(rawKey) + 1
 	return nil
 }
 
 // Queues an insert for a key-value pair
 func (c *batch) Put(key []byte, value []byte) error {
-	valueWithDeleteFlag := make([]byte, len(value)+1)
-	offset := copy(valueWithDeleteFlag, value)
-	valueWithDeleteFlag[offset] = 0 // not deleted element
+	length := len(value)
+	valueWithDeleteFlag := make([]byte, length+1)
+	copy(valueWithDeleteFlag, value)
+	valueWithDeleteFlag[length] = 0 // not deleted element
 
 	rawKey := newDBKey(key, c.height)
-	if value, exists := c.ops[string(rawKey)]; exists {
-		// decrese the size if there was any previous key/value
-		c.size -= len(value.Value)
-		c.size -= len(value.Key)
-	}
-
-	c.ops[string(key)] = database.BatchOp{
+	c.ops = append(c.ops, database.BatchOp{
 		Key:   rawKey,
 		Value: valueWithDeleteFlag,
-	}
+	})
 	c.size += len(rawKey) + len(valueWithDeleteFlag)
 	return nil
 }
@@ -102,7 +101,7 @@ func (c *batch) Size() int {
 
 // Removed all pending writes and deletes to the database
 func (c *batch) Reset() {
-	c.ops = make(map[string]database.BatchOp)
+	c.ops = make([]database.BatchOp, 0)
 	c.size = 0
 }
 
@@ -113,9 +112,16 @@ func (c *batch) Inner() database.Batch {
 
 func (c *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, op := range c.ops {
-		if err := w.Put(op.Key, op.Value); err != nil {
-			return err
+		rawKey, _, _ := parseDBKey(op.Key)
+		if bytes.Equal(op.Value, []byte{1}) {
+			if err := w.Delete(rawKey); err != nil {
+				return err
+			}
+		} else {
+			if err := w.Put(rawKey, op.Value[0:len(op.Value)-1]); err != nil {
+				return err
+			}
 		}
 	}
-	return database.PutUInt64(w, keyHeight, c.height)
+	return nil
 }

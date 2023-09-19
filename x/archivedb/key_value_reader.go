@@ -58,6 +58,11 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	if !bytes.Equal(foundKey, key) {
+		// A key was found, through the iterator, *but* the prefix is not the
+		// same, another key exists, but not the requested one
+		//
+		// This happens because we search for a key at a given height, or the
+		// previous key. In this case the previous key is an unrelated key
 		return nil, database.ErrNotFound
 	}
 	rawValue := iterator.Value()
