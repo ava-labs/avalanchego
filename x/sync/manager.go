@@ -494,7 +494,7 @@ func (m *Manager) findNextKey(
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := m.findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.branchFactor); hasDifference {
 			nextKey = maybe.Some(deepestNode.KeyPath.Append(childIndex).Bytes())
 			break
 		}
@@ -794,12 +794,12 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func (m *Manager) findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte, branchFactor merkledb.BranchFactor) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < byte(m.branchFactor); childIndex++ {
+	for childIndex := startIndex; childIndex < byte(branchFactor); childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}
