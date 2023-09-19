@@ -1,6 +1,6 @@
 # Release Notes
 
-## [v1.10.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.10)
+## [v1.10.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.10)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
 
