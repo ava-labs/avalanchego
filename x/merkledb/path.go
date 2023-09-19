@@ -74,10 +74,12 @@ var (
 )
 
 func NewPath(p []byte, branchFactor BranchFactor) Path {
-	result := EmptyPath(branchFactor)
-	result.value = string(p)
-	result.length = len(p) * result.tokensPerByte
-	return result
+	pConfig := branchFactorToPathConfig[branchFactor]
+	return Path{
+		value:      string(p),
+		pathConfig: pConfig,
+		length:     len(p) * pConfig.tokensPerByte,
+	}
 }
 
 // Length returns the number of tokens in the current Path
