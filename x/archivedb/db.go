@@ -4,7 +4,6 @@
 package archivedb
 
 import (
-	"context"
 	"errors"
 	"sync"
 
@@ -46,8 +45,6 @@ var (
 // `Get(foo, 2000)` it will return an error because `foo` was deleted at height
 // 1000.
 type archiveDB struct {
-	ctx context.Context
-
 	currentHeight uint64
 
 	rawDB database.Database
@@ -58,10 +55,7 @@ type archiveDB struct {
 	lock sync.RWMutex
 }
 
-func NewArchiveDB(
-	ctx context.Context,
-	db database.Database,
-) (*archiveDB, error) {
+func NewArchiveDB(db database.Database) (*archiveDB, error) {
 	height, err := database.GetUInt64(db, keyHeight)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
@@ -71,7 +65,6 @@ func NewArchiveDB(
 	}
 
 	return &archiveDB{
-		ctx:           ctx,
 		currentHeight: height,
 		rawDB:         db,
 	}, nil

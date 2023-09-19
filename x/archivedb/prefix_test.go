@@ -4,7 +4,6 @@
 package archivedb
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,12 +56,7 @@ func TestDBEfficientLookups(t *testing.T) {
 		maliciousKey = newDBKey(key, 2)
 	)
 
-	db, err := NewArchiveDB(
-		context.Background(),
-		&limitIterationDB{
-			Database: memdb.New(),
-		},
-	)
+	db, err := NewArchiveDB(&limitIterationDB{Database: memdb.New()})
 	require.NoError(err)
 
 	writer := db.NewBatch(1)
@@ -76,6 +70,30 @@ func TestDBEfficientLookups(t *testing.T) {
 		require.NoError(writer.Write())
 	}
 
+	val, height, err := db.Get(key, db.currentHeight)
+	require.NoError(err)
+	require.Equal(uint64(1), height)
+	require.Equal(value, val)
+}
+
+func TestDBMoreEfficientLookups(t *testing.T) {
+	require := require.New(t)
+	var (
+		key          = []byte("key")
+		value        = []byte("value")
+		maliciousKey = []byte("key\xff\xff\xff\xff\xff\xff\xff\xfd")
+	)
+	db, err := NewArchiveDB(&limitIterationDB{Database: memdb.New()})
+	require.NoError(err)
+	writer := db.NewBatch(1)
+	require.NoError(writer.Put(key, value))
+	require.Equal(uint64(1), writer.Height())
+	require.NoError(writer.Write())
+	for i := 2; i < 10000; i++ {
+		writer = db.NewBatch(uint64(i))
+		require.NoError(writer.Put(maliciousKey, []byte{byte(i)}))
+		require.NoError(writer.Write())
+	}
 	val, height, err := db.Get(key, db.currentHeight)
 	require.NoError(err)
 	require.Equal(uint64(1), height)
