@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -37,7 +37,7 @@ func TestBaseTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
@@ -142,7 +142,7 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
@@ -285,7 +285,7 @@ func TestOperationTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
