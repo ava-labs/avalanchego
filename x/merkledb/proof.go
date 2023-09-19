@@ -98,9 +98,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	case pbNode.Key == nil:
 		return ErrNilPath
 	}
-	node.KeyPath = EmptyPath(bf)
-	node.KeyPath.length = int(pbNode.Key.Length)
-	node.KeyPath.value = string(pbNode.Key.Value)
+	node.KeyPath = NewPath(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
 
 	if len(node.KeyPath.value) != node.KeyPath.bytesNeeded(node.KeyPath.length) {
 		return ErrInvalidPathLength
