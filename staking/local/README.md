@@ -4,7 +4,7 @@ This folder contains the staking keys referenced by the local network genesis.
 
 **NOTE:** These keys **are** intended to be public. They **must** only be used for local test networks.
 
-Each staker's Base64 encoded keys are included below for ease of use when creating a local network using environment variables.
+Each staker's Base64 encoded keys are included below for ease of use with the `--staking-tls-key-file-content` and `--staking-tls-cert-file-content` flags.
 
 ## Staker1
 
