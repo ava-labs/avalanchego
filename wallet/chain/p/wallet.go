@@ -4,6 +4,7 @@
 package p
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,7 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Wallet = (*wallet)(nil)
+var (
+	errNotCommitted = errors.New("not committed")
+
+	_ Wallet = (*wallet)(nil)
+)
 
 type Wallet interface {
 	Context
@@ -503,7 +508,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if txStatus.Status != status.Committed {
-		return fmt.Errorf("not committed: %s", txStatus.Reason)
+		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
 	}
 	return nil
 }

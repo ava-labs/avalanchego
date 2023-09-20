@@ -5,12 +5,11 @@ package p
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
@@ -33,6 +32,8 @@ import (
 // - Checks the expected value of the funding address
 
 var _ = e2e.DescribePChain("[Workflow]", func() {
+	require := require.New(ginkgo.GinkgoT())
+
 	ginkgo.It("P-chain main operations",
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
@@ -55,7 +56,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			minValStake, minDelStake, err := pChainClient.GetMinStake(ctx, constants.PlatformChainID)
 			cancel()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
@@ -64,7 +65,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			fees, err := infoClient.GetTxFee(ctx)
 			cancel()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			txFees := uint64(fees.TxFee)
 			tests.Outf("{{green}} txFee: %d {{/}}\n", txFees)
 
@@ -77,7 +78,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				pBalances, err := pWallet.Builder().GetBalance()
 				pBalance := pBalances[avaxAssetID]
 				minBalance := minValStake + txFees + minDelStake + txFees + toTransfer + txFees
-				gomega.Expect(pBalance, err).To(gomega.BeNumerically(">=", minBalance))
+				require.NoError(err)
+				require.GreaterOrEqual(pBalance, minBalance)
 			})
 			// create validator data
 			validatorStartTimeDiff := 30 * time.Second
@@ -86,7 +88,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			// Use a random node ID to ensure that repeated test runs
 			// will succeed against a persistent network.
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 
 			vdr := &txs.Validator{
 				NodeID: validatorID,
@@ -109,7 +111,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
@@ -120,17 +122,17 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			// retrieve initial balances
 			pBalances, err := pWallet.Builder().GetBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			pStartBalance := pBalances[avaxAssetID]
 			tests.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
 
 			xBalances, err := xWallet.Builder().GetFTBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			xStartBalance := xBalances[avaxAssetID]
 			tests.Outf("{{blue}} X-chain balance before P->X export: %d {{/}}\n", xStartBalance)
 
@@ -160,22 +162,22 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			// check balances post export
 			pBalances, err = pWallet.Builder().GetBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			pPreImportBalance := pBalances[avaxAssetID]
 			tests.Outf("{{blue}} P-chain balance after P->X export: %d {{/}}\n", pPreImportBalance)
 
 			xBalances, err = xWallet.Builder().GetFTBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			xPreImportBalance := xBalances[avaxAssetID]
 			tests.Outf("{{blue}} X-chain balance after P->X export: %d {{/}}\n", xPreImportBalance)
 
-			gomega.Expect(xPreImportBalance).To(gomega.Equal(xStartBalance)) // import not performed yet
-			gomega.Expect(pPreImportBalance).To(gomega.Equal(pStartBalance - toTransfer - txFees))
+			require.Equal(xPreImportBalance, xStartBalance) // import not performed yet
+			require.Equal(pPreImportBalance, pStartBalance-toTransfer-txFees)
 
 			ginkgo.By("import avax from P into X chain", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
@@ -185,21 +187,21 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil(), "is context.DeadlineExceeded: %v", errors.Is(err, context.DeadlineExceeded))
+				require.NoError(err)
 			})
 
 			// check balances post import
 			pBalances, err = pWallet.Builder().GetBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			pFinalBalance := pBalances[avaxAssetID]
 			tests.Outf("{{blue}} P-chain balance after P->X import: %d {{/}}\n", pFinalBalance)
 
 			xBalances, err = xWallet.Builder().GetFTBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
+			require.NoError(err)
 			xFinalBalance := xBalances[avaxAssetID]
 			tests.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", xFinalBalance)
 
-			gomega.Expect(xFinalBalance).To(gomega.Equal(xPreImportBalance + toTransfer - txFees)) // import not performed yet
-			gomega.Expect(pFinalBalance).To(gomega.Equal(pPreImportBalance))
+			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-txFees) // import not performed yet
+			require.Equal(pFinalBalance, pPreImportBalance)
 		})
 })
