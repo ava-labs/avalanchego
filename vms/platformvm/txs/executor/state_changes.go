@@ -217,13 +217,9 @@ func GetRewardsCalculator(
 		return backend.Rewards, nil
 	}
 
-	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
+	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
 	}
 
 	return reward.NewCalculator(reward.Config{
