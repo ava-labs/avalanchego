@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -20,16 +22,30 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestGossiperShutdown(_ *testing.T) {
-	config := Config{Frequency: time.Second}
-	gossiper := NewGossiper[testTx](config, logging.NoLog{}, nil, nil)
+var (
+	_ p2p.ValidatorSet = (*testValidatorSet)(nil)
+	_ Gossiper         = (*testGossiper)(nil)
+)
+
+func TestGossiperShutdown(t *testing.T) {
+	require := require.New(t)
+
+	metrics := prometheus.NewRegistry()
+	gossiper, err := NewPullGossiper[testTx](
+		Config{},
+		logging.NoLog{},
+		nil,
+		nil,
+		metrics,
+	)
+	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
-		gossiper.Gossip(ctx)
+		Every(ctx, logging.NoLog{}, gossiper, time.Second)
 		wg.Done()
 	}()
 
@@ -40,7 +56,7 @@ func TestGossiperShutdown(_ *testing.T) {
 func TestGossiperGossip(t *testing.T) {
 	tests := []struct {
 		name                   string
-		maxResponseSize        int
+		config                 HandlerConfig
 		requester              []*testTx // what we have
 		responder              []*testTx // what the peer we're requesting gossip from has
 		expectedPossibleValues []*testTx // possible values we can have
@@ -50,41 +66,51 @@ func TestGossiperGossip(t *testing.T) {
 			name: "no gossip - no one knows anything",
 		},
 		{
-			name:                   "no gossip - requester knows more than responder",
-			maxResponseSize:        1024,
+			name: "no gossip - requester knows more than responder",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "no gossip - requester knows everything responder knows",
-			maxResponseSize:        1024,
+			name: "no gossip - requester knows everything responder knows",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "gossip - requester knows nothing",
-			maxResponseSize:        1024,
+			name: "gossip - requester knows nothing",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name:                   "gossip - requester knows less than responder",
-			maxResponseSize:        1024,
+			name: "gossip - requester knows less than responder",
+			config: HandlerConfig{
+				TargetResponseSize: 1024,
+			},
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedLen:            2,
 		},
 		{
-			name:                   "gossip - max response size exceeded",
-			maxResponseSize:        32,
-			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
-			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
-			expectedLen:            1,
+			name: "gossip - target response size exceeded",
+			config: HandlerConfig{
+				TargetResponseSize: 32,
+			},
+			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
+			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
+			expectedLen:            2,
 		},
 	}
 
@@ -94,7 +120,7 @@ func TestGossiperGossip(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			responseSender := common.NewMockSender(ctrl)
-			responseRouter := p2p.NewRouter(logging.NoLog{}, responseSender)
+			responseRouter := p2p.NewRouter(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
 			responseSet := testSet{
@@ -107,12 +133,13 @@ func TestGossiperGossip(t *testing.T) {
 			peers := &p2p.Peers{}
 			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
 
-			handler := NewHandler[*testTx](responseSet, tt.maxResponseSize)
+			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
+			require.NoError(err)
 			_, err = responseRouter.RegisterAppProtocol(0x0, handler, peers)
 			require.NoError(err)
 
 			requestSender := common.NewMockSender(ctrl)
-			requestRouter := p2p.NewRouter(logging.NoLog{}, requestSender)
+			requestRouter := p2p.NewRouter(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
 
 			gossiped := make(chan struct{})
 			requestSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -143,16 +170,22 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 
 			config := Config{
-				Frequency: 500 * time.Millisecond,
-				PollSize:  1,
+				PollSize: 1,
 			}
-			gossiper := NewGossiper[testTx, *testTx](config, logging.NoLog{}, requestSet, requestClient)
+			gossiper, err := NewPullGossiper[testTx, *testTx](
+				config,
+				logging.NoLog{},
+				requestSet,
+				requestClient,
+				prometheus.NewRegistry(),
+			)
+			require.NoError(err)
 			received := set.Set[*testTx]{}
 			requestSet.onAdd = func(tx *testTx) {
 				received.Add(tx)
 			}
 
-			require.NoError(gossiper.gossip(context.Background()))
+			require.NoError(gossiper.Gossip(context.Background()))
 			<-gossiped
 
 			require.Len(requestSet.set, tt.expectedLen)
@@ -165,4 +198,70 @@ func TestGossiperGossip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEvery(*testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	gossiper := &testGossiper{
+		gossipF: func(context.Context) error {
+			if calls >= 10 {
+				cancel()
+				return nil
+			}
+
+			calls++
+			return nil
+		},
+	}
+
+	go Every(ctx, logging.NoLog{}, gossiper, time.Millisecond)
+	<-ctx.Done()
+}
+
+func TestValidatorGossiper(t *testing.T) {
+	require := require.New(t)
+
+	nodeID := ids.GenerateTestNodeID()
+
+	validators := testValidatorSet{
+		validators: set.Of(nodeID),
+	}
+
+	calls := 0
+	gossiper := ValidatorGossiper{
+		Gossiper: &testGossiper{
+			gossipF: func(context.Context) error {
+				calls++
+				return nil
+			},
+		},
+		NodeID:     nodeID,
+		Validators: validators,
+	}
+
+	// we are a validator, so we should request gossip
+	require.NoError(gossiper.Gossip(context.Background()))
+	require.Equal(1, calls)
+
+	// we are not a validator, so we should not request gossip
+	validators.validators = set.Set[ids.NodeID]{}
+	require.NoError(gossiper.Gossip(context.Background()))
+	require.Equal(2, calls)
+}
+
+type testGossiper struct {
+	gossipF func(ctx context.Context) error
+}
+
+func (t *testGossiper) Gossip(ctx context.Context) error {
+	return t.gossipF(ctx)
+}
+
+type testValidatorSet struct {
+	validators set.Set[ids.NodeID]
+}
+
+func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
+	return t.validators.Contains(nodeID)
 }

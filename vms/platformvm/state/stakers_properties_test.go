@@ -1264,7 +1264,7 @@ func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	baseState, err := buildChainState(baseDB, trackedSubnets)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
+		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %w", err)
 	}
 
 	genesisID := baseState.GetLastAccepted()
@@ -1273,7 +1273,7 @@ func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
 	}
 	diff, err := NewDiff(genesisID, versions)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
+		return nil, nil, fmt.Errorf("unexpected error while creating diff, err %w", err)
 	}
 	return diff, baseState, nil
 }
@@ -1295,7 +1295,7 @@ func checkStakersContent(store Stakers, stakers []*Staker, stakersType stakerSta
 		return errors.New("Unhandled stakers status")
 	}
 	if err != nil {
-		return fmt.Errorf("unexpected failure in staker iterator creation, error %v", err)
+		return fmt.Errorf("unexpected failure in staker iterator creation, error %w", err)
 	}
 	defer it.Release()
 

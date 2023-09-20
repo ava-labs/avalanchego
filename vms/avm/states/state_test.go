@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -26,19 +26,19 @@ import (
 const trackChecksums = false
 
 var (
-	parser             blocks.Parser
+	parser             block.Parser
 	populatedUTXO      *avax.UTXO
 	populatedUTXOID    ids.ID
 	populatedTx        *txs.Tx
 	populatedTxID      ids.ID
-	populatedBlk       blocks.Block
+	populatedBlk       block.Block
 	populatedBlkHeight uint64
 	populatedBlkID     ids.ID
 )
 
 func init() {
 	var err error
-	parser, err = blocks.NewParser([]fxs.Fx{
+	parser, err = block.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 	})
 	if err != nil {
@@ -67,7 +67,7 @@ func init() {
 	}
 	populatedTxID = populatedTx.ID()
 
-	populatedBlk, err = blocks.NewStandardBlock(
+	populatedBlk, err = block.NewStandardBlock(
 		ids.GenerateTestID(),
 		1,
 		time.Now(),
@@ -234,7 +234,7 @@ func ChainBlockTest(t *testing.T, c Chain) {
 	require.NoError(err)
 	require.Equal(populatedBlk.ID(), fetchedBlk.ID())
 
-	blk, err := blocks.NewStandardBlock(
+	blk, err := block.NewStandardBlock(
 		ids.GenerateTestID(),
 		10,
 		time.Now(),
@@ -295,7 +295,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.Equal(stopVertexID, genesis.Parent())
 	require.Equal(genesisTimestamp.UnixNano(), genesis.Timestamp().UnixNano())
 
-	childBlock, err := blocks.NewStandardBlock(
+	childBlock, err := block.NewStandardBlock(
 		genesis.ID(),
 		genesis.Height()+1,
 		genesisTimestamp,
