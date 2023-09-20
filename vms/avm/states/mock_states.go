@@ -15,7 +15,7 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
-	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
+	block "github.com/ava-labs/avalanchego/vms/avm/block"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	gomock "go.uber.org/mock/gomock"
@@ -45,7 +45,7 @@ func (m *MockChain) EXPECT() *MockChainMockRecorder {
 }
 
 // AddBlock mocks base method.
-func (m *MockChain) AddBlock(arg0 blocks.Block) {
+func (m *MockChain) AddBlock(arg0 block.Block) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddBlock", arg0)
 }
@@ -93,10 +93,10 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetBlock mocks base method.
-func (m *MockChain) GetBlock(arg0 ids.ID) (blocks.Block, error) {
+func (m *MockChain) GetBlock(arg0 ids.ID) (block.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlock", arg0)
-	ret0, _ := ret[0].(blocks.Block)
+	ret0, _ := ret[0].(block.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -240,7 +240,7 @@ func (mr *MockStateMockRecorder) Abort() *gomock.Call {
 }
 
 // AddBlock mocks base method.
-func (m *MockState) AddBlock(arg0 blocks.Block) {
+func (m *MockState) AddBlock(arg0 block.Block) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddBlock", arg0)
 }
@@ -346,10 +346,10 @@ func (mr *MockStateMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetBlock mocks base method.
-func (m *MockState) GetBlock(arg0 ids.ID) (blocks.Block, error) {
+func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlock", arg0)
-	ret0, _ := ret[0].(blocks.Block)
+	ret0, _ := ret[0].(block.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -553,7 +553,7 @@ func (m *MockDiff) EXPECT() *MockDiffMockRecorder {
 }
 
 // AddBlock mocks base method.
-func (m *MockDiff) AddBlock(arg0 blocks.Block) {
+func (m *MockDiff) AddBlock(arg0 block.Block) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddBlock", arg0)
 }
@@ -613,10 +613,10 @@ func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetBlock mocks base method.
-func (m *MockDiff) GetBlock(arg0 ids.ID) (blocks.Block, error) {
+func (m *MockDiff) GetBlock(arg0 ids.ID) (block.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlock", arg0)
-	ret0, _ := ret[0].(blocks.Block)
+	ret0, _ := ret[0].(block.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -143,7 +143,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
 
-	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
+	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
 	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
 
@@ -556,16 +556,16 @@ func requireEqualPublicKeysValidatorSet(
 func TestParsedStateBlock(t *testing.T) {
 	require := require.New(t)
 
-	var blks []blocks.Block
+	var blks []block.Block
 
 	{
-		blk, err := blocks.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
+		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := blocks.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+		blk, err := block.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
 			Unsigned: &txs.AdvanceTimeTx{
 				Time: 1000,
 			},
@@ -575,13 +575,13 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
+		blk, err := block.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := blocks.NewApricotProposalBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, &txs.Tx{
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
@@ -591,7 +591,7 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := blocks.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{
+		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{
 			{
 				Unsigned: &txs.RewardValidatorTx{
 					TxID: ids.GenerateTestID(),
@@ -603,19 +603,19 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
+		blk, err := block.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
+		blk, err := block.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := blocks.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, &txs.Tx{
+		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, &txs.Tx{
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
@@ -625,7 +625,7 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := blocks.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{
+		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{
 			{
 				Unsigned: &txs.RewardValidatorTx{
 					TxID: ids.GenerateTestID(),
@@ -643,7 +643,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Status: choices.Accepted,
 		}
 
-		stBlkBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.Version, &stBlk)
 		require.NoError(err)
 
 		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
