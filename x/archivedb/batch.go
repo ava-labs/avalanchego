@@ -22,7 +22,6 @@ type batch struct {
 	ops    []database.BatchOp
 	size   int
 	height uint64
-	inner  database.Batch
 }
 
 // newBatchWithHeight returns a batch struct which implements database.Batch
@@ -34,7 +33,6 @@ func newBatchWithHeight(db *archiveDB, height uint64) *batch {
 		size:   0,
 		height: height,
 		ops:    make([]database.BatchOp, 0),
-		inner:  db.rawDB.NewBatch(),
 	}
 }
 
@@ -48,23 +46,32 @@ func (c *batch) Write() error {
 	c.db.lock.Lock()
 	defer c.db.lock.Unlock()
 
-	if c.height == 0 || c.db.currentHeight != c.height && c.db.currentHeight+1 != c.height {
+	if c.db.currentHeight != c.height && c.db.currentHeight+1 != c.height {
+		// This batch can update the current height or add a new height, but
+		// past updates are not allowed
 		return ErrInvalidBatchHeight
 	}
 
+	batch := c.db.inner.NewBatch()
 	for _, op := range c.ops {
-		if err := c.inner.Put(op.Key, op.Value); err != nil {
+		if err := batch.Put(op.Key, op.Value); err != nil {
 			return err
 		}
 	}
-	if err := database.PutUInt64(c.inner, keyHeight, c.height); err != nil {
+
+	if c.height != c.db.currentHeight {
+		if err := database.PutUInt64(batch, keyHeight, c.height); err != nil {
+			return err
+		}
+	}
+
+	if err := batch.Write(); err != nil {
 		return err
 	}
 
-	if err := c.inner.Write(); err != nil {
-		return err
+	if c.height != c.db.currentHeight {
+		c.db.currentHeight = c.height
 	}
-	c.db.currentHeight = c.height
 
 	return nil
 }
@@ -82,7 +89,7 @@ func (c *batch) Delete(key []byte) error {
 }
 
 // Queues an insert for a key-value pair
-func (c *batch) Put(key []byte, value []byte) error {
+func (c *batch) Put(key, value []byte) error {
 	length := len(value)
 	valueWithDeleteFlag := make([]byte, length+1)
 	copy(valueWithDeleteFlag, value)

@@ -29,7 +29,7 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 }
 
 func (reader *dbHeightReader) getValueAndHeight(key []byte) ([]byte, uint64, error) {
-	iterator := reader.db.rawDB.NewIteratorWithStart(newDBKey(key, reader.height))
+	iterator := reader.db.inner.NewIteratorWithStart(newDBKey(key, reader.height))
 	defer iterator.Release()
 
 	if !iterator.Next() {
@@ -80,9 +80,9 @@ func (reader *dbHeightReader) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
-// GetHeightFromLastFoundKey returns the height value where a key has been
+// GetHeight returns the height value where a key has been
 // found. If the last key was not found an error will be thrown
-func (reader *dbHeightReader) GetHeightFromLastFoundKey(key []byte) (uint64, error) {
+func (reader *dbHeightReader) GetHeight(key []byte) (uint64, error) {
 	_, height, err := reader.getValueAndHeight(key)
 	return height, err
 }

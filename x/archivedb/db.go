@@ -4,6 +4,7 @@
 package archivedb
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -12,6 +13,7 @@ import (
 
 var (
 	keyHeight             = []byte("archivedb.height")
+	ErrNotImplemented     = errors.New("feature not implemented")
 	ErrUnknownHeight      = errors.New("unknown height")
 	ErrInvalidBatchHeight = errors.New("invalid batch height")
 	ErrInvalidValue       = errors.New("invalid data value")
@@ -47,7 +49,20 @@ var (
 type archiveDB struct {
 	currentHeight uint64
 
-	rawDB database.Database
+	inner database.Database
+
+	// When using the default iterator the defaultKeyLength is being used.
+	//
+	// The key format is,
+	//
+	//		[key length][raw key][height]
+	//
+	// Because the key length is needed, in order to iterate efficiently, a
+	// default length must be given alongside with a prefix.
+	//
+	// This is currently not implemented, but will be implemented in a following
+	// PR
+	defaultKeyLength uint64
 
 	// Must be held when reading/writing metadata such as the current database
 	// height, because we allow constructing a batch for any height, but we
@@ -61,18 +76,14 @@ func NewArchiveDB(db database.Database) (*archiveDB, error) {
 		if !errors.Is(err, database.ErrNotFound) {
 			return nil, err
 		}
-		height = 0
+		height = 1
 	}
 
 	return &archiveDB{
-		currentHeight: height,
-		rawDB:         db,
+		currentHeight:    height,
+		defaultKeyLength: 1, // currently not used
+		inner:            db,
 	}, nil
-}
-
-// Tiny wrapper on top Get() passing the last stored height
-func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
-	return db.Get(key, db.currentHeight)
 }
 
 // GetHeightReader returns an object which implements the
@@ -87,21 +98,94 @@ func (db *archiveDB) GetHeightReader(height uint64) (dbHeightReader, error) {
 	}, nil
 }
 
-// Fetches the value of a given prefix at a given height.
+// Get searches if a key exists at the the last known height.
 //
-// If the value does not exists or it was actually removed an error is returned.
-// Otherwise a value does exists it will be returned, alongside with the height
-// at which it was updated prior the requested height.
-func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
-	reader, err := db.GetHeightReader(height)
+// Use `GetHeightReader` to query at any specific height
+func (db *archiveDB) Get(key []byte) ([]byte, error) {
+	reader, err := db.GetHeightReader(db.currentHeight)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	return reader.getValueAndHeight(key)
+	value, _, err := reader.getValueAndHeight(key)
+	return value, err
 }
 
-// NewBatch creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch(height uint64) *batch {
+// GetHeight returns the last height where the given key has been updated
+func (db *archiveDB) GetHeight(key []byte) (uint64, error) {
+	reader, err := db.GetHeightReader(db.currentHeight)
+	if err != nil {
+		return 0, err
+	}
+	return reader.GetHeight(key)
+}
+
+// Has checks if a given key exists at the last known height.
+//
+// Use `GetHeightReader` to query at any specific height
+func (db *archiveDB) Has(key []byte) (bool, error) {
+	reader, err := db.GetHeightReader(db.currentHeight)
+	if err != nil {
+		return false, err
+	}
+	return reader.Has(key)
+}
+
+// Deletes a key at the last known height
+func (db *archiveDB) Delete(key []byte) error {
+	batch := db.NewBatch()
+	err := batch.Delete(key)
+	if err != nil {
+		return err
+	}
+	return batch.Write()
+}
+
+func (db *archiveDB) Put(key, value []byte) error {
+	batch := db.NewBatch()
+	err := batch.Put(key, value)
+	if err != nil {
+		return err
+	}
+	return batch.Write()
+}
+
+// NewBatch returns a new Batch that will set or delete keys using the current height.
+//
+// After this batch is being used, the last height is not updated.
+func (db *archiveDB) NewBatch() database.Batch {
+	return newBatchWithHeight(db, db.currentHeight)
+}
+
+// NewBatchAtHeight creates a new batch to append database changes at a given height
+func (db *archiveDB) NewBatchAtHeight(height uint64) *batch {
 	return newBatchWithHeight(db, height)
+}
+
+func (db *archiveDB) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
+
+func (db *archiveDB) NewIteratorWithStart(start []byte) database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(start, nil)
+}
+
+func (db *archiveDB) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, prefix)
+}
+
+func (db *archiveDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+	return placeHolderIterator(db, db.currentHeight, db.defaultKeyLength, start, prefix)
+}
+
+func (db *archiveDB) Compact(start []byte, limit []byte) error {
+	return db.inner.Compact(start, limit)
+}
+
+func (db *archiveDB) HealthCheck(ctx context.Context) (interface{}, error) {
+	return db.inner.HealthCheck(ctx)
+}
+
+func (db *archiveDB) Close() error {
+	return db.inner.Close()
 }

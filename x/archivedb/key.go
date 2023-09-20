@@ -16,7 +16,7 @@ var ErrInsufficientLength = errors.New("packer has insufficient length for input
 
 const (
 	internalKeySuffixLen = wrappers.LongLen
-	minInternalKeyLen    = internalKeySuffixLen + 2
+	minInternalKeyLen    = internalKeySuffixLen + 1
 )
 
 // dbKey
