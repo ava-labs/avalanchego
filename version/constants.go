@@ -60,7 +60,7 @@ var (
 	// by avalanchego, but is useful for downstream libraries.
 	RPCChainVMProtocolCompatibility map[uint][]*Semantic
 
-	DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
@@ -129,14 +129,14 @@ func GetApricotPhase3Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase4Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase4Times[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
@@ -150,35 +150,35 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase5Times[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase6Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetBanffTime(networkID uint32) time.Time {
 	if upgradeTime, exists := BanffTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {
 	if upgradeTime, exists := CortinaTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetDTime(networkID uint32) time.Time {
 	if upgradeTime, exists := DTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
