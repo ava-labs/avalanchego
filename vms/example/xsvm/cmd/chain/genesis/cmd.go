@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/formatting"
 
-	"github.com/ava-labs/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 var errUnknownEncoding = errors.New("unknown encoding")

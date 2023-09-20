@@ -9,7 +9,7 @@ type Import struct {
 	// Nonce provides internal chain replay protection
 	Nonce  uint64 `serialize:"true" json:"nonce"`
 	MaxFee uint64 `serialize:"true" json:"maxFee"`
-	// Message includes the chainIDs to provide cross chain replay protection
+	// Message includes the networkID and source chainID to provide cross chain replay protection
 	Message []byte `serialize:"true" json:"message"`
 }
 

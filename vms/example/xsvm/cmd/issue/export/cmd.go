@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ava-labs/xsvm/api"
-	"github.com/ava-labs/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
 func Command() *cobra.Command {

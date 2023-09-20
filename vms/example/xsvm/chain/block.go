@@ -18,10 +18,10 @@ import (
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/xsvm/execute"
-	"github.com/ava-labs/xsvm/state"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
-	xsblock "github.com/ava-labs/xsvm/block"
+	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
 const maxClockSkew = 10 * time.Second

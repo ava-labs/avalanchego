@@ -25,13 +25,13 @@ import (
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/xsvm/api"
-	"github.com/ava-labs/xsvm/builder"
-	"github.com/ava-labs/xsvm/chain"
-	"github.com/ava-labs/xsvm/execute"
-	"github.com/ava-labs/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 
-	xsblock "github.com/ava-labs/xsvm/block"
+	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
 var (
@@ -205,4 +205,45 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockContext *smblock.Context) (snowman.Block, error) {
 	return vm.builder.BuildBlock(ctx, blockContext)
+}
+
+// VerifyHeightIndex implements the snowman.ChainVM interface
+func (*VM) VerifyHeightIndex(context.Context) error {
+	// TODO(marun) Implement properly
+	return nil
+}
+
+// GetBlockIDAtHeight implements the snowman.ChainVM interface
+// Note: must return database.ErrNotFound if the index at height is unknown.
+//
+// This is called by the VM pre-ProposerVM fork and by the sync server
+// in [GetStateSummary].
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	// TODO(marun) Implement caching
+
+	currentID, err := vm.LastAccepted(ctx)
+	if err != nil {
+		return ids.ID{}, err
+
+	}
+	for {
+		currentBlock, err := vm.GetBlock(ctx, currentID)
+		if err != nil {
+			return ids.ID{}, err
+
+		}
+		currentHeight := currentBlock.Height()
+		if currentHeight == height {
+			return currentID, nil
+
+		}
+		if currentHeight < height {
+			break
+
+		}
+		currentID = currentBlock.ID()
+
+	}
+	return ids.ID{}, database.ErrNotFound
+
 }

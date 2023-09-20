@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 
-	"github.com/ava-labs/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 )
 
 func Command() *cobra.Command {

@@ -4,7 +4,7 @@
 package xsvm
 
 import (
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -12,6 +12,6 @@ var _ vms.Factory = &Factory{}
 
 type Factory struct{}
 
-func (*Factory) New(*snow.Context) (interface{}, error) {
+func (*Factory) New(logging.Logger) (interface{}, error) {
 	return &VM{}, nil
 }

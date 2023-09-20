@@ -3,7 +3,7 @@
 
 package block
 
-import "github.com/ava-labs/xsvm/tx"
+import "github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 
 // Version is the current default codec version
 const Version = tx.Version

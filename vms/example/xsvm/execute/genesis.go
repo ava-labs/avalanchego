@@ -7,9 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 
-	"github.com/ava-labs/xsvm/block"
-	"github.com/ava-labs/xsvm/genesis"
-	"github.com/ava-labs/xsvm/state"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 )
 
 func Genesis(db database.KeyValueReaderWriterDeleter, chainID ids.ID, g *genesis.Genesis) error {

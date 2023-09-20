@@ -16,11 +16,11 @@ import (
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/xsvm/chain"
-	"github.com/ava-labs/xsvm/execute"
-	"github.com/ava-labs/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 
-	xsblock "github.com/ava-labs/xsvm/block"
+	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
 const MaxTxsPerBlock = 10

@@ -3,15 +3,14 @@
 
 package tx
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 var _ Unsigned = (*Export)(nil)
 
 type Export struct {
-	// ChainID provides cross chain replay protection
-	ChainID ids.ID `serialize:"true" json:"chainID"`
+	// NetworkID provides cross chain replay protection
+	NetworkID uint32 `serialize:"true" json:"networkID"`
+	ChainID   ids.ID `serialize:"true" json:"chainID"`
 	// Nonce provides internal chain replay protection
 	Nonce       uint64      `serialize:"true" json:"nonce"`
 	MaxFee      uint64      `serialize:"true" json:"maxFee"`

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 
-	xsgenesis "github.com/ava-labs/xsvm/genesis"
+	xsgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 const (

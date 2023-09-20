@@ -9,9 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 
-	"github.com/ava-labs/xsvm/state"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
-	xsblock "github.com/ava-labs/xsvm/block"
+	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
 var _ Chain = (*chain)(nil)

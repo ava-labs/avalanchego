@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 
-	"github.com/ava-labs/xsvm/state"
-	"github.com/ava-labs/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
 const (
@@ -28,7 +28,7 @@ var (
 	_ tx.Visitor = (*Tx)(nil)
 
 	errFeeTooHigh          = errors.New("fee too high")
-	errWrongChainID        = errors.New("wrong chainID")
+	errWrongNetworkID      = errors.New("wrong networkID")
 	errMissingBlockContext = errors.New("missing block context")
 	errDuplicateImport     = errors.New("duplicate import")
 )
@@ -53,7 +53,7 @@ func (t *Tx) Transfer(tf *tx.Transfer) error {
 		return errFeeTooHigh
 	}
 	if tf.ChainID != t.ChainContext.ChainID {
-		return errWrongChainID
+		return errWrongNetworkID
 	}
 
 	var errs wrappers.Errs
@@ -70,8 +70,8 @@ func (t *Tx) Export(e *tx.Export) error {
 	if e.MaxFee < t.ExportFee {
 		return errFeeTooHigh
 	}
-	if e.ChainID != t.ChainContext.ChainID {
-		return errWrongChainID
+	if e.NetworkID != t.ChainContext.NetworkID {
+		return errWrongNetworkID
 	}
 
 	payload, err := tx.NewPayload(
@@ -86,8 +86,8 @@ func (t *Tx) Export(e *tx.Export) error {
 	}
 
 	message, err := warp.NewUnsignedMessage(
+		e.NetworkID,
 		e.ChainID,
-		e.PeerChainID,
 		payload.Bytes(),
 	)
 	if err != nil {
@@ -130,14 +130,14 @@ func (t *Tx) Import(i *tx.Import) error {
 		return err
 	}
 
-	if message.DestinationChainID != t.ChainContext.ChainID {
-		return errWrongChainID
+	if message.NetworkID != t.ChainContext.NetworkID {
+		return errWrongNetworkID
 	}
 
 	var errs wrappers.Errs
 	errs.Add(
 		state.IncrementNonce(t.Database, t.Sender, i.Nonce),
-		state.DecreaseBalance(t.Database, t.Sender, message.DestinationChainID, t.ImportFee),
+		state.DecreaseBalance(t.Database, t.Sender, t.ChainContext.ChainID, t.ImportFee),
 	)
 
 	payload, err := tx.ParsePayload(message.Payload)
@@ -147,7 +147,7 @@ func (t *Tx) Import(i *tx.Import) error {
 
 	if payload.IsReturn {
 		errs.Add(
-			state.IncreaseBalance(t.Database, payload.To, message.DestinationChainID, payload.Amount),
+			state.IncreaseBalance(t.Database, payload.To, t.ChainContext.ChainID, payload.Amount),
 			state.DecreaseLoan(t.Database, message.SourceChainID, payload.Amount),
 		)
 	} else {
@@ -174,6 +174,7 @@ func (t *Tx) Import(i *tx.Import) error {
 	return message.Signature.Verify(
 		t.Context,
 		&message.UnsignedMessage,
+		t.ChainContext.NetworkID,
 		t.ChainContext.ValidatorState,
 		t.BlockContext.PChainHeight,
 		QuorumNumerator,

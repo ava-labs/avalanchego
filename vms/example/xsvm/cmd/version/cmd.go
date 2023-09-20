@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 )
 
 const format = `%s:
