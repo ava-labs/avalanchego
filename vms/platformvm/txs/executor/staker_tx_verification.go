@@ -6,7 +6,6 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	stdmath "math"
 
@@ -572,50 +571,6 @@ func verifyAddPermissionlessValidatorTx(
 	return nil
 }
 
-type addValidatorRules struct {
-	assetID           ids.ID
-	minValidatorStake uint64
-	maxValidatorStake uint64
-	minStakeDuration  time.Duration
-	maxStakeDuration  time.Duration
-	minDelegationFee  uint32
-}
-
-func getValidatorRules(
-	backend *Backend,
-	chainState state.Chain,
-	subnetID ids.ID,
-) (*addValidatorRules, error) {
-	if subnetID == constants.PrimaryNetworkID {
-		return &addValidatorRules{
-			assetID:           backend.Ctx.AVAXAssetID,
-			minValidatorStake: backend.Config.MinValidatorStake,
-			maxValidatorStake: backend.Config.MaxValidatorStake,
-			minStakeDuration:  backend.Config.MinStakeDuration,
-			maxStakeDuration:  backend.Config.MaxStakeDuration,
-			minDelegationFee:  backend.Config.MinDelegationFee,
-		}, nil
-	}
-
-	transformSubnetIntf, err := chainState.GetSubnetTransformation(subnetID)
-	if err != nil {
-		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
-	}
-
-	return &addValidatorRules{
-		assetID:           transformSubnet.AssetID,
-		minValidatorStake: transformSubnet.MinValidatorStake,
-		maxValidatorStake: transformSubnet.MaxValidatorStake,
-		minStakeDuration:  time.Duration(transformSubnet.MinStakeDuration) * time.Second,
-		maxStakeDuration:  time.Duration(transformSubnet.MaxStakeDuration) * time.Second,
-		minDelegationFee:  transformSubnet.MinDelegationFee,
-	}, nil
-}
-
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
@@ -758,48 +713,4 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	return nil
-}
-
-type addDelegatorRules struct {
-	assetID                  ids.ID
-	minDelegatorStake        uint64
-	maxValidatorStake        uint64
-	minStakeDuration         time.Duration
-	maxStakeDuration         time.Duration
-	maxValidatorWeightFactor byte
-}
-
-func getDelegatorRules(
-	backend *Backend,
-	chainState state.Chain,
-	subnetID ids.ID,
-) (*addDelegatorRules, error) {
-	if subnetID == constants.PrimaryNetworkID {
-		return &addDelegatorRules{
-			assetID:                  backend.Ctx.AVAXAssetID,
-			minDelegatorStake:        backend.Config.MinDelegatorStake,
-			maxValidatorStake:        backend.Config.MaxValidatorStake,
-			minStakeDuration:         backend.Config.MinStakeDuration,
-			maxStakeDuration:         backend.Config.MaxStakeDuration,
-			maxValidatorWeightFactor: MaxValidatorWeightFactor,
-		}, nil
-	}
-
-	transformSubnetIntf, err := chainState.GetSubnetTransformation(subnetID)
-	if err != nil {
-		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
-	}
-
-	return &addDelegatorRules{
-		assetID:                  transformSubnet.AssetID,
-		minDelegatorStake:        transformSubnet.MinDelegatorStake,
-		maxValidatorStake:        transformSubnet.MaxValidatorStake,
-		minStakeDuration:         time.Duration(transformSubnet.MinStakeDuration) * time.Second,
-		maxStakeDuration:         time.Duration(transformSubnet.MaxStakeDuration) * time.Second,
-		maxValidatorWeightFactor: transformSubnet.MaxValidatorWeightFactor,
-	}, nil
 }

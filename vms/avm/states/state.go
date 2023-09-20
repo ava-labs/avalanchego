@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -66,7 +66,7 @@ type ReadOnlyChain interface {
 
 	GetTx(txID ids.ID) (*txs.Tx, error)
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
-	GetBlock(blkID ids.ID) (blocks.Block, error)
+	GetBlock(blkID ids.ID) (block.Block, error)
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
 }
@@ -77,7 +77,7 @@ type Chain interface {
 	avax.UTXODeleter
 
 	AddTx(tx *txs.Tx)
-	AddBlock(block blocks.Block)
+	AddBlock(block block.Block)
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
 }
@@ -146,7 +146,7 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	parser blocks.Parser
+	parser block.Parser
 	db     *versiondb.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
@@ -165,8 +165,8 @@ type state struct {
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	// [lastAccepted] is the most recently accepted block.
@@ -180,7 +180,7 @@ type state struct {
 
 func New(
 	db *versiondb.Database,
-	parser blocks.Parser,
+	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
 ) (State, error) {
@@ -218,10 +218,10 @@ func New(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, blocks.Block](
+	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metrics,
-		&cache.LRU[ids.ID, blocks.Block]{Size: blockCacheSize},
+		&cache.LRU[ids.ID, block.Block]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func New(
 		blockIDCache:  blockIDCache,
 		blockIDDB:     blockIDDB,
 
-		addedBlocks: make(map[ids.ID]blocks.Block),
+		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
 		blockDB:     blockDB,
 
@@ -409,7 +409,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
+func (s *state) GetBlock(blkID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blkID]; exists {
 		return blk, nil
 	}
@@ -439,7 +439,7 @@ func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
 	return blk, nil
 }
 
-func (s *state) AddBlock(block blocks.Block) {
+func (s *state) AddBlock(block block.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
@@ -460,7 +460,7 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 }
 
 func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
-	genesis, err := blocks.NewStandardBlock(
+	genesis, err := block.NewStandardBlock(
 		stopVertexID,
 		0,
 		genesisTimestamp,

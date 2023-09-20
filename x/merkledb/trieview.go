@@ -358,8 +358,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return proof, nil
 	}
 
-	childPath := closestNode.key + path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(closestNode, childPath, child.hasValue)
+	childNode, err := t.getNodeWithID(
+		child.id,
+		closestNode.key+path(nextIndex)+child.compressedPath,
+		child.hasValue,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +691,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNodeFromParent(node, childPath, childEntry.hasValue)
+		nextNode, err := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -995,19 +998,6 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 		after:  value,
 	}
 	return nil
-}
-
-// Retrieves the node with the given [key], which is a child of [parent], and
-// uses the [parent] node to initialize the child node's ID.
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// Returns database.ErrNotFound if the child doesn't exist.
-func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*node, error) {
-	// confirm the child exists and get its ID before attempting to load it
-	if child, exists := parent.children[key[len(parent.key)]]; exists {
-		return t.getNodeWithID(child.id, key, hasValue)
-	}
-
-	return nil, database.ErrNotFound
 }
 
 // Retrieves a node with the given [key].
