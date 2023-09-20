@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -53,7 +53,7 @@ type State interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 
 	GetLastAccepted() ids.ID
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
+	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
