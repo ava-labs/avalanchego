@@ -31,6 +31,8 @@ type Peers interface {
 	ConnectedWeight() uint64
 	// ConnectedPercent returns the currently connected stake percentage [0, 1]
 	ConnectedPercent() float64
+	// TotalValidators returns the total number of validators
+	TotalValidators() int
 	// TotalWeight returns the total validator weight
 	TotalWeight() uint64
 	// PreferredPeers returns the currently connected validators. If there are
@@ -101,6 +103,13 @@ func (p *lockedPeers) ConnectedPercent() float64 {
 	return p.peers.ConnectedPercent()
 }
 
+func (p *lockedPeers) TotalValidators() int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.TotalValidators()
+}
+
 func (p *lockedPeers) TotalWeight() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -119,6 +128,7 @@ type meteredPeers struct {
 	Peers
 
 	percentConnected prometheus.Gauge
+	numValidators    prometheus.Gauge
 	totalWeight      prometheus.Gauge
 }
 
@@ -133,10 +143,16 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 		Name:      "total_weight",
 		Help:      "Total stake",
 	})
+	numValidators := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "num_validators",
+		Help:      "Total number of validators",
+	})
 	errs := wrappers.Errs{}
 	errs.Add(
 		reg.Register(percentConnected),
 		reg.Register(totalWeight),
+		reg.Register(numValidators),
 	)
 	return &lockedPeers{
 		peers: &meteredPeers{
@@ -145,18 +161,21 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 			},
 			percentConnected: percentConnected,
 			totalWeight:      totalWeight,
+			numValidators:    numValidators,
 		},
 	}, errs.Err
 }
 
 func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	p.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
+	p.numValidators.Set(float64(p.Peers.TotalValidators()))
 	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	p.Peers.OnValidatorRemoved(nodeID, weight)
+	p.numValidators.Set(float64(p.Peers.TotalValidators()))
 	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
@@ -248,6 +267,10 @@ func (p *peerData) ConnectedPercent() float64 {
 		return 1
 	}
 	return float64(p.connectedWeight) / float64(p.totalWeight)
+}
+
+func (p *peerData) TotalValidators() int {
+	return len(p.validators)
 }
 
 func (p *peerData) TotalWeight() uint64 {
