@@ -254,7 +254,7 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 	return common.WithBaseFee(baseFee)
 }
 
-// Verifies that the state of the network is compatible with bootstrapping a new node.
+// Verify that a new node can bootstrap into the network.
 func CheckBootstrapIsPossible(network testnet.Network) {
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
