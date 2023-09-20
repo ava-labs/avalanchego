@@ -35,17 +35,18 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			"permissionless-subnets",
 		),
 		func() {
-			keychain := e2e.Env.NewKeychain(1)
-			baseWallet := e2e.Env.NewWallet(keychain)
-
 			nodeURI := e2e.Env.GetRandomNodeURI()
+
+			keychain := e2e.Env.NewKeychain(1)
+			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+
 			pWallet := baseWallet.P()
 			xWallet := baseWallet.X()
 			xChainID := xWallet.BlockchainID()
 
 			var validatorID ids.NodeID
 			ginkgo.By("retrieving the node ID of a primary network validator", func() {
-				pChainClient := platformvm.NewClient(nodeURI)
+				pChainClient := platformvm.NewClient(nodeURI.URI)
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				validatorIDs, err := pChainClient.SampleValidators(ctx, constants.PrimaryNetworkID, 1)
 				cancel()

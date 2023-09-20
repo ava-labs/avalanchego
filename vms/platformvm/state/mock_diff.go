@@ -13,6 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
@@ -335,6 +336,21 @@ func (m *MockDiff) GetRewardUTXOs(arg0 ids.ID) ([]*avax.UTXO, error) {
 func (mr *MockDiffMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockDiff)(nil).GetRewardUTXOs), arg0)
+}
+
+// GetSubnetOwner mocks base method.
+func (m *MockDiff) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetOwner", arg0)
+	ret0, _ := ret[0].(fx.Owner)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetOwner indicates an expected call of GetSubnetOwner.
+func (mr *MockDiffMockRecorder) GetSubnetOwner(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetOwner", reflect.TypeOf((*MockDiff)(nil).GetSubnetOwner), arg0)
 }
 
 // GetSubnetTransformation mocks base method.

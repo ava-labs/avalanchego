@@ -44,12 +44,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 			keychain := e2e.Env.NewKeychain(2)
-			baseWallet := e2e.Env.NewWallet(keychain)
+			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			avaxAssetID := baseWallet.P().AVAXAssetID()
 			xWallet := baseWallet.X()
-			pChainClient := platformvm.NewClient(nodeURI)
+			pChainClient := platformvm.NewClient(nodeURI.URI)
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
@@ -60,7 +60,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
 			tests.Outf("{{blue}} fetching tx fee {{/}}\n")
-			infoClient := info.NewClient(nodeURI)
+			infoClient := info.NewClient(nodeURI.URI)
 			ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			fees, err := infoClient.GetTxFee(ctx)
 			cancel()

@@ -34,10 +34,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -46,7 +45,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
@@ -419,7 +419,7 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	}
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
+	_, ok := commit.Block.(*block.BanffCommitBlock)
 	if !ok {
 		return fmt.Errorf("failed retrieving commit option: %w", err)
 	}
@@ -455,7 +455,7 @@ type validatorInputData struct {
 func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
 	res := make([]*validatorInputData, 0, len(events))
 
-	currentTime = currentTime.Add(executor.SyncBound)
+	currentTime = currentTime.Add(txexecutor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
 		sk, err := bls.NewSecretKey()
@@ -486,7 +486,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	// covers all of its subnet validators
 	currentPrimaryVal := res[0]
 	for i := 1; i < len(events); i++ {
-		currentTime = currentTime.Add(executor.SyncBound)
+		currentTime = currentTime.Add(txexecutor.SyncBound)
 
 		switch currentEvent := events[i]; currentEvent {
 		case startSubnetValidator:
@@ -503,7 +503,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			currentTime = endTime.Add(time.Second)
 
 		case startPrimaryWithBLS:
-			currentTime = currentPrimaryVal.endTime.Add(executor.SyncBound)
+			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
 			sk, err := bls.NewSecretKey()
 			if err != nil {
 				return nil, fmt.Errorf("could not make private key: %w", err)
@@ -521,7 +521,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			currentPrimaryVal = val
 
 		case startPrimaryWithoutBLS:
-			currentTime = currentPrimaryVal.endTime.Add(executor.SyncBound)
+			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
 			endTime := currentTime.Add(defaultMinStakingDuration)
 			val := &validatorInputData{
 				eventType: startPrimaryWithoutBLS,
