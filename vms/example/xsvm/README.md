@@ -54,9 +54,9 @@ Currently there are no fees enforced in the XSVM.
 #### Install
 
 ```bash
-git clone https://github.com/ava-labs/xsvm.git;
-cd xsvm;
-go install -v ./cmd/xsvm;
+git clone https://github.com/ava-labs/avalanchego.git;
+cd avalanchego;
+go install -v ./vms/example/xsvm/cmd/xsvm;
 ```
 
 #### Usage
@@ -82,7 +82,7 @@ Flags:
 Use "xsvm [command] --help" for more information about a command.
 ```
 
-### [Golang SDK](https://github.com/ava-labs/xsvm/blob/master/client/client.go)
+### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/client/client.go)
 
 ```golang
 // Client defines xsvm client operations.
@@ -282,7 +282,7 @@ curl --location --request POST 'http://34.235.54.228:9650/ext/bc/28iioW2fYMBnKv2
 
 ## Running the VM
 
-To build the VM, run `./scripts/build.sh`.
+To build the VM, run `./scripts/build_xsvm.sh`.
 
 ### Deploying Your Own Network
 
