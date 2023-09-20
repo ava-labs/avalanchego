@@ -224,26 +224,20 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	currentID, err := vm.LastAccepted(ctx)
 	if err != nil {
 		return ids.ID{}, err
-
 	}
 	for {
 		currentBlock, err := vm.GetBlock(ctx, currentID)
 		if err != nil {
 			return ids.ID{}, err
-
 		}
 		currentHeight := currentBlock.Height()
 		if currentHeight == height {
 			return currentID, nil
-
 		}
 		if currentHeight < height {
 			break
-
 		}
 		currentID = currentBlock.ID()
-
 	}
 	return ids.ID{}, database.ErrNotFound
-
 }

@@ -4,21 +4,20 @@
 package genesis
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestGenesis(t *testing.T) {
+	require := require.New(t)
+
 	id, err := ids.ShortFromString("6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	id2, err := ids.ShortFromString("LeKrndtsMxcLMzHz3w4uo1XtLDpfi66c")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	genesis := Genesis{
 		Timestamp: 123,
@@ -28,16 +27,9 @@ func TestGenesis(t *testing.T) {
 		},
 	}
 	bytes, err := Codec.Marshal(Version, genesis)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	parsed, err := Parse(bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(genesis, *parsed) {
-		t.Fatalf("expected %v, got %v", genesis, parsed)
-	}
+	require.NoError(err)
+	require.Equal(genesis, *parsed)
 }
