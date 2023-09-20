@@ -100,6 +100,13 @@ var (
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	// TODO: update this before release
+	DTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	}
+	DDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
@@ -170,6 +177,13 @@ func GetCortinaTime(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return CortinaDefaultTime
+}
+
+func GetDTime(networkID uint32) time.Time {
+	if upgradeTime, exists := DTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return DDefaultTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
