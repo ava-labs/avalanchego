@@ -23,7 +23,34 @@ func TestInterfaceX(t *testing.T) {
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
+	var tests = []func(t *testing.T, db database.Database){
+		database.TestSimpleKeyValue,
+		database.TestOverwriteKeyValue,
+		database.TestEmptyKey,
+		database.TestKeyEmptyValue,
+		database.TestSimpleKeyValueClosed,
+		database.TestNewBatchClosed,
+		database.TestBatchPut,
+		database.TestBatchDelete,
+		database.TestBatchReset,
+		database.TestBatchReuse,
+		database.TestBatchRewrite,
+		database.TestBatchReplay,
+		database.TestBatchReplayPropagateError,
+		database.TestBatchInner,
+		database.TestBatchLargeSize,
+		database.TestCompactNoPanic,
+		database.TestMemorySafetyDatabase,
+		database.TestMemorySafetyBatch,
+		database.TestModifyValueAfterPut,
+		database.TestModifyValueAfterBatchPut,
+		database.TestModifyValueAfterBatchPutReplay,
+		database.TestConcurrentBatches,
+		database.TestManySmallConcurrentKVPairBatches,
+		database.TestPutGetEmpty,
+	}
+
+	for _, test := range tests {
 		db, err := getBasicDB()
 		require.NoError(t, err)
 		test(t, db)
