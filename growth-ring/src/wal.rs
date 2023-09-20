@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use async_trait::async_trait;
 use bytemuck::{cast_slice, AnyBitPattern};
 use futures::{

@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use super::{Database as DatabaseService, IntoStatusResultExt, Iter};
 use crate::rpcdb::{
     database_server::Database, CloseRequest, CloseResponse, CompactRequest, CompactResponse,

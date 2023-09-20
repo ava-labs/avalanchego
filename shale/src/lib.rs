@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use disk_address::DiskAddress;
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};

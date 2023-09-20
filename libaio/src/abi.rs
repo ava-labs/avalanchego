@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 // libaio ABI adapted from:
 // https://raw.githubusercontent.com/jsgf/libaio-rust/master/src/aioabi.rs
 #![allow(dead_code)]

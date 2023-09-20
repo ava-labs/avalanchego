@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 //! Disk buffer for staging in memory pages and flushing them to disk.
 use std::fmt::Debug;
 use std::ops::IndexMut;

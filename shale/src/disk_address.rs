@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};

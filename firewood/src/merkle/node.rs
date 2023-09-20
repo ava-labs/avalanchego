@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use enum_as_inner::EnumAsInner;
 use sha3::{Digest, Keccak256};
 use shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable};

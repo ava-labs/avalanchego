@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use firewood::{
     db::{BatchOp, Db as PersistedDb, DbConfig, DbError, WalConfig},
     merkle::TrieHash,
