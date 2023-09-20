@@ -13,6 +13,7 @@ type batch struct {
 	db *merkleDB
 }
 
+// Assumes [b.db.lock] isn't held.
 func (b *batch) Write() error {
 	return b.db.commitBatch(b.Ops)
 }

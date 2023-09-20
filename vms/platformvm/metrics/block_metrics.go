@@ -9,10 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
-var _ blocks.Visitor = (*blockMetrics)(nil)
+var _ block.Visitor = (*blockMetrics)(nil)
 
 type blockMetrics struct {
 	txMetrics *txMetrics
@@ -56,17 +56,17 @@ func newBlockMetric(
 	return blockMetric
 }
 
-func (m *blockMetrics) BanffAbortBlock(*blocks.BanffAbortBlock) error {
+func (m *blockMetrics) BanffAbortBlock(*block.BanffAbortBlock) error {
 	m.numAbortBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) BanffCommitBlock(*blocks.BanffCommitBlock) error {
+func (m *blockMetrics) BanffCommitBlock(*block.BanffCommitBlock) error {
 	m.numCommitBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
+func (m *blockMetrics) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	m.numProposalBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
@@ -76,7 +76,7 @@ func (m *blockMetrics) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
+func (m *blockMetrics) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	m.numStandardBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
@@ -86,22 +86,22 @@ func (m *blockMetrics) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
 	return nil
 }
 
-func (m *blockMetrics) ApricotAbortBlock(*blocks.ApricotAbortBlock) error {
+func (m *blockMetrics) ApricotAbortBlock(*block.ApricotAbortBlock) error {
 	m.numAbortBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) ApricotCommitBlock(*blocks.ApricotCommitBlock) error {
+func (m *blockMetrics) ApricotCommitBlock(*block.ApricotCommitBlock) error {
 	m.numCommitBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+func (m *blockMetrics) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	m.numProposalBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+func (m *blockMetrics) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	m.numStandardBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
@@ -111,7 +111,7 @@ func (m *blockMetrics) ApricotStandardBlock(b *blocks.ApricotStandardBlock) erro
 	return nil
 }
 
-func (m *blockMetrics) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
+func (m *blockMetrics) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	m.numAtomicBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }

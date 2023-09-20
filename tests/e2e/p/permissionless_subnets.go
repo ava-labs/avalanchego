@@ -10,7 +10,7 @@ import (
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
@@ -27,6 +27,8 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
+	require := require.New(ginkgo.GinkgoT())
+
 	ginkgo.It("subnets operations",
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
@@ -35,22 +37,22 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			"permissionless-subnets",
 		),
 		func() {
-			keychain := e2e.Env.NewKeychain(1)
-			baseWallet := e2e.Env.NewWallet(keychain)
-
 			nodeURI := e2e.Env.GetRandomNodeURI()
+
+			keychain := e2e.Env.NewKeychain(1)
+			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+
 			pWallet := baseWallet.P()
 			xWallet := baseWallet.X()
 			xChainID := xWallet.BlockchainID()
 
 			var validatorID ids.NodeID
 			ginkgo.By("retrieving the node ID of a primary network validator", func() {
-				pChainClient := platformvm.NewClient(nodeURI)
+				pChainClient := platformvm.NewClient(nodeURI.URI)
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				validatorIDs, err := pChainClient.SampleValidators(ctx, constants.PrimaryNetworkID, 1)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
-				gomega.Expect(validatorIDs).Should(gomega.HaveLen(1))
+				require.NoError(err)
 				validatorID = validatorIDs[0]
 			})
 
@@ -71,7 +73,8 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				cancel()
 
 				subnetID = subnetTx.ID()
-				gomega.Expect(subnetID, err).Should(gomega.Not(gomega.Equal(constants.PrimaryNetworkID)))
+				require.NoError(err)
+				require.NotEqual(subnetID, constants.PrimaryNetworkID)
 			})
 
 			var subnetAssetID ids.ID
@@ -92,7 +95,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 				subnetAssetID = subnetAssetTx.ID()
 			})
 
@@ -114,7 +117,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			ginkgo.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
@@ -125,7 +128,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			ginkgo.By("make subnet permissionless", func() {
@@ -148,7 +151,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			validatorStartTime := time.Now().Add(time.Minute)
@@ -172,7 +175,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 
 			delegatorStartTime := validatorStartTime
@@ -193,7 +196,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 			})
 		})
 })
