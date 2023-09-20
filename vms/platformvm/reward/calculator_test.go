@@ -170,3 +170,66 @@ func TestRewardsMint(t *testing.T) {
 	)
 	require.Equal(t, maxSupply-initialSupply, rewards)
 }
+
+func TestSplit(t *testing.T) {
+	tests := []struct {
+		amount        uint64
+		shares        uint32
+		expectedSplit uint64
+	}{
+		{
+			amount:        1000,
+			shares:        PercentDenominator / 2,
+			expectedSplit: 500,
+		},
+		{
+			amount:        1,
+			shares:        PercentDenominator,
+			expectedSplit: 1,
+		},
+		{
+			amount:        1,
+			shares:        PercentDenominator - 1,
+			expectedSplit: 1,
+		},
+		{
+			amount:        1,
+			shares:        1,
+			expectedSplit: 1,
+		},
+		{
+			amount:        1,
+			shares:        0,
+			expectedSplit: 0,
+		},
+		{
+			amount:        9223374036974675809,
+			shares:        2,
+			expectedSplit: 18446748749757,
+		},
+		{
+			amount:        9223374036974675809,
+			shares:        PercentDenominator,
+			expectedSplit: 9223374036974675809,
+		},
+		{
+			amount:        9223372036855275808,
+			shares:        PercentDenominator - 2,
+			expectedSplit: 9223353590111202098,
+		},
+		{
+			amount:        9223372036855275808,
+			shares:        2,
+			expectedSplit: 18446744349518,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%d_%d", test.amount, test.shares), func(t *testing.T) {
+			require := require.New(t)
+
+			split, remainder := Split(test.amount, test.shares)
+			require.Equal(test.expectedSplit, split)
+			require.Equal(test.amount-test.expectedSplit, remainder)
+		})
+	}
+}
