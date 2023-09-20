@@ -587,7 +587,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Reward the delegatee here
-	if validator.StartTime.After(e.Config.CortinaTime) {
+	if e.Config.IsCortinaActivated(validator.StartTime) {
 		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
