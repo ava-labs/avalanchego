@@ -133,7 +133,7 @@ func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.CortinaTime)
 }
 
-// TODO: Rename with "D" fork name.
+// TODO: Rename
 func (c *Config) IsDActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DTime)
 }
