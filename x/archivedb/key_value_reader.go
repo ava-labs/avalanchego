@@ -3,11 +3,7 @@
 
 package archivedb
 
-import (
-	"bytes"
-
-	"github.com/ava-labs/avalanchego/database"
-)
+import "github.com/ava-labs/avalanchego/database"
 
 var _ database.KeyValueReader = (*dbHeightReader)(nil)
 
@@ -28,8 +24,13 @@ func (reader *dbHeightReader) Has(key []byte) (bool, error) {
 	return true, nil
 }
 
-func (reader *dbHeightReader) getValueAndHeight(key []byte) ([]byte, uint64, error) {
-	iterator := reader.db.inner.NewIteratorWithStart(newDBKey(key, reader.height))
+func (reader *dbHeightReader) getValueAndHeight(rawKey []byte) ([]byte, uint64, error) {
+	key := newDBKey(rawKey, reader.height)
+	prefix, err := parseDBKeyPrefix(key)
+	if err != nil {
+		return nil, 0, err
+	}
+	iterator := reader.db.inner.NewIteratorWithStartAndPrefix(key, prefix)
 	defer iterator.Release()
 
 	if !iterator.Next() {
@@ -41,17 +42,9 @@ func (reader *dbHeightReader) getValueAndHeight(key []byte) ([]byte, uint64, err
 		return nil, 0, database.ErrNotFound
 	}
 
-	foundKey, height, err := parseDBKey(iterator.Key())
+	_, height, err := parseDBKey(iterator.Key())
 	if err != nil {
 		return nil, 0, err
-	}
-	if !bytes.Equal(foundKey, key) {
-		// A key was found, through the iterator, *but* the prefix is not the
-		// same, another key exists, but not the requested one
-		//
-		// This happens because we search for a key at a given height, or the
-		// previous key. In this case the previous key is an unrelated key
-		return nil, 0, database.ErrNotFound
 	}
 	rawValue := iterator.Value()
 	rawValueLen := len(rawValue)

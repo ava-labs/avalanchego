@@ -59,19 +59,15 @@ func (c *batch) Write() error {
 		}
 	}
 
-	if c.height != c.db.currentHeight {
-		if err := database.PutUInt64(batch, keyHeight, c.height); err != nil {
-			return err
-		}
+	if err := database.PutUInt64(batch, keyHeight, c.height); err != nil {
+		return err
 	}
 
 	if err := batch.Write(); err != nil {
 		return err
 	}
 
-	if c.height != c.db.currentHeight {
-		c.db.currentHeight = c.height
-	}
+	c.db.currentHeight = c.height
 
 	return nil
 }

@@ -16,12 +16,6 @@ func getBasicDB() (*archiveDB, error) {
 	return NewArchiveDB(memdb.New())
 }
 
-func TestInterfaceX(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-	database.TestBatchReuse(t, db)
-}
-
 func TestInterface(t *testing.T) {
 	tests := []func(t *testing.T, db database.Database){
 		database.TestSimpleKeyValue,

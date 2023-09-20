@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	keyHeight             = []byte("archivedb.height")
 	ErrNotImplemented     = errors.New("feature not implemented")
 	ErrUnknownHeight      = errors.New("unknown height")
 	ErrInvalidBatchHeight = errors.New("invalid batch height")

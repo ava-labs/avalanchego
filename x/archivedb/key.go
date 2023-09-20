@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var ErrInsufficientLength = errors.New("packer has insufficient length for input")
+var (
+	ErrInsufficientLength = errors.New("packer has insufficient length for input")
+	keyHeight             = []byte{1}
+)
 
 const (
 	internalKeySuffixLen = wrappers.LongLen
@@ -49,13 +52,24 @@ const (
 func newDBKey(key []byte, height uint64) []byte {
 	keyLen := len(key)
 	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + wrappers.LongLen
-	rawKey := make([]byte, rawKeyMaxSize)
-	offset := binary.PutUvarint(rawKey, uint64(keyLen))
-	offset += copy(rawKey[offset:], key)
-	binary.BigEndian.PutUint64(rawKey[offset:], ^height)
+	dbKey := make([]byte, rawKeyMaxSize)
+	offset := binary.PutUvarint(dbKey, uint64(keyLen))
+	offset += copy(dbKey[offset:], key)
+	binary.BigEndian.PutUint64(dbKey[offset:], ^height)
 	offset += wrappers.LongLen
 
-	return rawKey[0:offset]
+	return dbKey[0:offset]
+}
+
+// parseDBKeyPrefix() extracts the database prefix (to be used with the
+// iterator) from a dbKey. This function does not do any parsing/validation.
+// That checks/parsing is performed at parseDBKey
+func parseDBKeyPrefix(dbKey []byte) ([]byte, error) {
+	rawKeyLen := len(dbKey)
+	if rawKeyLen < minInternalKeyLen {
+		return nil, ErrInsufficientLength
+	}
+	return dbKey[0 : rawKeyLen-wrappers.LongLen], nil
 }
 
 // parseDBKey takes a slice of bytes and returns the inner key and the height
