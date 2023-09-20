@@ -23,7 +23,7 @@ func TestInterfaceX(t *testing.T) {
 }
 
 func TestInterface(t *testing.T) {
-	var tests = []func(t *testing.T, db database.Database){
+	tests := []func(t *testing.T, db database.Database){
 		database.TestSimpleKeyValue,
 		database.TestOverwriteKeyValue,
 		database.TestEmptyKey,
@@ -230,6 +230,7 @@ func TestDBKeySpace(t *testing.T) {
 	require.NoError(err)
 	require.Equal(value1, val)
 	height, err := db.GetHeight(key1)
+	require.NoError(err)
 	require.Equal(uint64(1), height)
 }
 

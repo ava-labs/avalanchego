@@ -21,21 +21,21 @@ func placeHolderIterator(db *archiveDB, height, keyLength uint64, start, end []b
 	}
 }
 
-func (iterator *iterator) Error() error {
+func (*iterator) Error() error {
 	return ErrNotImplemented
 }
 
-func (iteartor *iterator) Key() []byte {
+func (*iterator) Key() []byte {
 	return nil
 }
 
-func (iteartor *iterator) Value() []byte {
+func (*iterator) Value() []byte {
 	return nil
 }
 
-func (iteartor *iterator) Next() bool {
+func (*iterator) Next() bool {
 	return false
 }
 
-func (iteartor *iterator) Release() {
+func (*iterator) Release() {
 }
