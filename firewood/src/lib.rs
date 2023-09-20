@@ -8,12 +8,12 @@
 //! into past state. It does not copy-on-write the state trie to generate an ever
 //! growing forest of tries like other databases, but instead keeps one latest version of the trie index on disk
 //! and apply in-place updates to it. This ensures that the database size is small and stable
-//! during the course of running firewood. Firewood was first conceived to provide a very fast
+//! during the course of running Firewood. Firewood was first conceived to provide a very fast
 //! storage layer for the EVM but could be used on any blockchain that requires authenticated state.
 //!
 //! Firewood is a robust database implemented from the ground up to directly store trie nodes and
 //! user data. Unlike most (if not all) of the solutions in the field, it is not built on top of a
-//! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, firewood directly uses
+//! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, Firewood directly uses
 //! the tree structure as the index on disk. Thus, there is no additional "emulation" of the
 //! logical trie to flatten out the data structure to feed into the underlying DB that is unaware
 //! of the data being stored. It provides generic trie storage for arbitrary keys and values.
@@ -48,7 +48,7 @@
 //!   persisted and available to the blockchain system as that's what matters for most of the time.
 //!   While one can still keep some volatile state versions in memory for mutation and VM
 //!   execution, the final commit to some state works on a singleton so the indexed merkle tries
-//!   may be typically updated in place. It is also possible (e.g., firewood) to allow some
+//!   may be typically updated in place. It is also possible (e.g., Firewood) to allow some
 //!   infrequent access to historical versions with higher cost, and/or allow fast access to
 //!   versions of the store within certain limited recency. This style of storage is useful for
 //!   the blockchain systems where only (or mostly) the latest state is required and data footprint
@@ -56,7 +56,7 @@
 //!   directly participate in the consensus and vote for the blocks, for example, can largely
 //!   benefit from such a design.
 //!
-//! In firewood, we take a closer look at the second regime and have come up with a simple but
+//! In Firewood, we take a closer look at the second regime and have come up with a simple but
 //! robust architecture that fulfills the need for such blockchain storage.
 //!
 //! ## Storage Model
@@ -77,7 +77,7 @@
 //!   objects that are persisted on disk but also made accessible in memory transparently. It is
 //!   built on top of `CachedStore` by defining how "items" of the given type are laid out, allocated
 //!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
-//!   basic implementation in `shale` crate, but one can always define his/her own `ShaleStore`).
+//!   basic implementation in `shale` crate, but one can always define their own `ShaleStore`).
 //!
 //! - Data structure: in Firewood, one trie is maintained by invoking `ShaleStore` (see `src/merkle.rs`).
 //!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
