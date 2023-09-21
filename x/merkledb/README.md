@@ -210,7 +210,7 @@ Once this is encoded, we `sha256` hash the resulting bytes to get the node's ID.
 
 ### Encoding Varints and Bytes
 
-Varints are encoded with `binary.PutVarint` from the standard library's `binary/encoding` package.
+Varints are encoded with `binary.PutUvarint` from the standard library's `binary/encoding` package.
 Bytes are encoded by simply copying them onto the buffer.
 
 ## Design choices

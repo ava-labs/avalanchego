@@ -26,12 +26,16 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		test(f, db)
-	}
+func FuzzKeyValue(f *testing.F) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+	database.FuzzKeyValue(f, db)
+}
+
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.

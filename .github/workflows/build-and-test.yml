@@ -9,6 +9,11 @@ on:
       - dev
   pull_request:
 
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   run_build_unit_tests:
     name: build_unit_test

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -28,23 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
-	// Enough for primary.NewWallet to fetch initial UTXOs.
-	DefaultWalletCreationTimeout = 5 * time.Second
-
-	// Defines default tx confirmation timeout.
-	// Enough for test/custom networks.
-	DefaultConfirmTxTimeout = 20 * time.Second
-
-	// This interval should represent the upper bound of the time
-	// required to start a new node on a local test network.
-	DefaultNodeStartTimeout = 20 * time.Second
-
 	// A long default timeout used to timeout failed operations but
 	// unlikely to induce flaking due to unexpected resource
 	// contention.
@@ -53,6 +44,16 @@ const (
 	// Interval appropriate for network operations that should be
 	// retried periodically but not too often.
 	DefaultPollingInterval = 500 * time.Millisecond
+
+	// Setting this env will disable post-test bootstrap
+	// checks. Useful for speeding up iteration during test
+	// development.
+	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
+
+	// Validator start time must be a minimum of SyncBound from the
+	// current time for validator addition to succeed, and adding 10
+	// seconds provides a buffer in case of any delay in processing.
+	DefaultValidatorStartTimeDiff = executor.SyncBound + 10*time.Second
 )
 
 // Env is used to access shared test fixture. Intended to be
@@ -246,4 +247,15 @@ func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
 func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 	baseFee := SuggestGasPrice(ethClient)
 	return common.WithBaseFee(baseFee)
+}
+
+// Verify that a new node can bootstrap into the network.
+func CheckBootstrapIsPossible(network testnet.Network) {
+	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
+		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
+		return
+	}
+	ginkgo.By("checking if bootstrap is possible with the current network state")
+	node := AddEphemeralNode(network, testnet.FlagsMap{})
+	WaitForHealthy(node)
 }
