@@ -72,6 +72,7 @@ func NewDiff(
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
+		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
 }
 
@@ -310,13 +311,7 @@ func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 }
 
 func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
-	if d.subnetOwners == nil {
-		d.subnetOwners = map[ids.ID]fx.Owner{
-			subnetID: owner,
-		}
-	} else {
-		d.subnetOwners[subnetID] = owner
-	}
+	d.subnetOwners[subnetID] = owner
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
