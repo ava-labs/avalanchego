@@ -642,11 +642,13 @@ func TestDialContext(t *testing.T) {
 
 	dialer := newTestDialer()
 	network.dialer = dialer
-	dynamicIP, listener1 := dialer.NewListener()
+	dynamicIP, listener := dialer.NewListener()
 	trackedIP := &trackedIP{
 		ip: dynamicIP.IPPort(),
 	}
 
+	// Asset that when the context is cancelled, dial returns immediately.
+	// That is, [listener] doesn't accept a connection.
 	network.manuallyTrackedIDs.Add(ids.EmptyNodeID)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -654,7 +656,7 @@ func TestDialContext(t *testing.T) {
 
 	gotConn := make(chan struct{})
 	go func() {
-		_, _ = listener1.Accept()
+		_, _ = listener.Accept()
 		close(gotConn)
 	}()
 	select {
