@@ -876,7 +876,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	if err == nil {
 		var owner fx.Owner
-		if _, err := blocks.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
 
@@ -2360,7 +2360,7 @@ func (s *state) writeSubnetOwners() error {
 		delete(s.subnetOwners, subnetID)
 		s.subnetOwnerCache.Evict(subnetID) // TODO: Should this be Evict?
 
-		ownerBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, owner)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
@@ -2449,11 +2449,11 @@ func (s *state) writeMetadata() error {
 }
 
 // Returns the block, status of the block, and whether it is a [stateBlk].
-// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+// Invariant: blkBytes is safe to parse with block.GenesisCodec
 //
 // TODO: Remove after v1.11.x is activated
 func parseStoredBlock(blkBytes []byte) (block.Block, choices.Status, bool, error) {
-	// Attempt to parse as blocks.Block
+	// Attempt to parse as block.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, choices.Accepted, false, nil
