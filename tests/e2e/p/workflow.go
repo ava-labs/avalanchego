@@ -4,7 +4,6 @@
 package p
 
 import (
-	"context"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 // PChainWorkflow is an integration test for normal P-Chain operations
@@ -53,18 +51,14 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
-			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-			minValStake, minDelStake, err := pChainClient.GetMinStake(ctx, constants.PlatformChainID)
-			cancel()
+			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
 			require.NoError(err)
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
 			tests.Outf("{{blue}} fetching tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-			fees, err := infoClient.GetTxFee(ctx)
-			cancel()
+			fees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
 			txFees := uint64(fees.TxFee)
 			tests.Outf("{{green}} txFee: %d {{/}}\n", txFees)
@@ -103,25 +97,21 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			shares := uint32(20000) // TODO: retrieve programmatically
 
 			ginkgo.By("issue add validator tx", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := pWallet.IssueAddValidatorTx(
 					vdr,
 					rewardOwner,
 					shares,
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
 				require.NoError(err)
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := pWallet.IssueAddDelegatorTx(
 					vdr,
 					rewardOwner,
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
 				require.NoError(err)
 			})
 
@@ -148,7 +138,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			}
 
 			ginkgo.By("export avax from P to X chain", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := pWallet.IssueExportTx(
 					xWallet.BlockchainID(),
 					[]*avax.TransferableOutput{
@@ -159,9 +148,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 							Out: output,
 						},
 					},
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
 				require.NoError(err)
 			})
 
@@ -180,13 +168,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.Equal(pPreImportBalance, pStartBalance-toTransfer-txFees)
 
 			ginkgo.By("import avax from P into X chain", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
 				require.NoError(err)
 			})
 

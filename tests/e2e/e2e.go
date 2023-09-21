@@ -36,17 +36,6 @@ import (
 )
 
 const (
-	// Enough for primary.NewWallet to fetch initial UTXOs.
-	DefaultWalletCreationTimeout = 5 * time.Second
-
-	// Defines default tx confirmation timeout.
-	// Enough for test/custom networks.
-	DefaultConfirmTxTimeout = 20 * time.Second
-
-	// This interval should represent the upper bound of the time
-	// required to start a new node on a local test network.
-	DefaultNodeStartTimeout = 20 * time.Second
-
 	// A long default timeout used to timeout failed operations but
 	// unlikely to induce flaking due to unexpected resource
 	// contention.
