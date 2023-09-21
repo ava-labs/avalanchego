@@ -563,9 +563,9 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 8)
 	require.NoError(err)
-	require.Len(changes.values, 10)
+	require.Len(changes.values, 8)
 }
 
 func TestHistoryRecord(t *testing.T) {

@@ -134,15 +134,11 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 		bufferLen++
 	}
 	dbKey := getBufferFromPool(db.bufferPool, bufferLen)
+	dbKey[len(dbKey)-1] = 0
 	defer db.bufferPool.Put(dbKey)
 
 	copy(dbKey, pathBytes)
-	if remainder == 0 {
-		// use set here to remove any data still in the array from the bufferPool
-		dbKey[bufferLen-1] = 0b1000_0000
-	} else {
-		dbKey[bufferLen-1] |= 0b0000_0001 << (7 - (byte(remainder) * key.tokenBitSize))
-	}
+	dbKey[bufferLen-1] |= 0b0000_0001 << (7 - (byte(remainder) * key.tokenBitSize))
 
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }

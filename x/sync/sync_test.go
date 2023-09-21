@@ -696,9 +696,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Sort in ascending order by key prefix.
 		serializedPathLess := func(i, j keyAndID) bool {
-			return bytes.Compare(i.key.Bytes(), j.key.Bytes()) < 0 ||
-				(bytes.Equal(i.key.Bytes(), j.key.Bytes()) &&
-					i.key.Length() < j.key.Length())
+			return i.key.Less(j.key)
 		}
 		slices.SortFunc(remoteKeyIDs, serializedPathLess)
 		slices.SortFunc(localKeyIDs, serializedPathLess)
