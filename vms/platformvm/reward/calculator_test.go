@@ -29,24 +29,46 @@ var defaultConfig = Config{
 }
 
 func TestLongerDurationBonus(t *testing.T) {
-	c := NewCalculator(defaultConfig)
 	shortDuration := 24 * time.Hour
 	totalDuration := 365 * 24 * time.Hour
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		r := c.Calculate(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+		r := Calculate(
+			defaultConfig.MaxConsumptionRate,
+			defaultConfig.MinConsumptionRate,
+			defaultConfig.MintingPeriod,
+			defaultConfig.SupplyCap,
+			shortDuration,
+			shortBalance,
+			359*units.MegaAvax+shortBalance,
+		)
 		shortBalance += r
 	}
-	reward := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+	reward := Calculate(
+		defaultConfig.MaxConsumptionRate,
+		defaultConfig.MinConsumptionRate,
+		defaultConfig.MintingPeriod,
+		defaultConfig.SupplyCap,
+		totalDuration%shortDuration,
+		shortBalance,
+		359*units.MegaAvax+shortBalance,
+	)
 	shortBalance += reward
 
 	longBalance := units.KiloAvax
-	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
+	longBalance += Calculate(
+		defaultConfig.MaxConsumptionRate,
+		defaultConfig.MinConsumptionRate,
+		defaultConfig.MintingPeriod,
+		defaultConfig.SupplyCap,
+		totalDuration,
+		longBalance,
+		359*units.MegaAvax+longBalance,
+	)
 	require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
 }
 
 func TestRewards(t *testing.T) {
-	c := NewCalculator(defaultConfig)
 	tests := []struct {
 		duration       time.Duration
 		stakeAmount    uint64
@@ -123,7 +145,11 @@ func TestRewards(t *testing.T) {
 			test.expectedReward,
 		)
 		t.Run(name, func(t *testing.T) {
-			reward := c.Calculate(
+			reward := Calculate(
+				defaultConfig.MaxConsumptionRate,
+				defaultConfig.MinConsumptionRate,
+				defaultConfig.MintingPeriod,
+				defaultConfig.SupplyCap,
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
@@ -138,13 +164,11 @@ func TestRewardsOverflow(t *testing.T) {
 		maxSupply     uint64 = math.MaxUint64
 		initialSupply uint64 = 1
 	)
-	c := NewCalculator(Config{
-		MaxConsumptionRate: PercentDenominator,
-		MinConsumptionRate: PercentDenominator,
-		MintingPeriod:      defaultMinStakingDuration,
-		SupplyCap:          maxSupply,
-	})
-	reward := c.Calculate(
+	reward := Calculate(
+		PercentDenominator,
+		PercentDenominator,
+		defaultMinStakingDuration,
+		maxSupply,
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
@@ -157,13 +181,11 @@ func TestRewardsMint(t *testing.T) {
 		maxSupply     uint64 = 1000
 		initialSupply uint64 = 1
 	)
-	c := NewCalculator(Config{
-		MaxConsumptionRate: PercentDenominator,
-		MinConsumptionRate: PercentDenominator,
-		MintingPeriod:      defaultMinStakingDuration,
-		SupplyCap:          maxSupply,
-	})
-	rewards := c.Calculate(
+	rewards := Calculate(
+		PercentDenominator,
+		PercentDenominator,
+		defaultMinStakingDuration,
+		maxSupply,
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,

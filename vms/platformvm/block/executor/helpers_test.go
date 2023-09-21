@@ -140,11 +140,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
-		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.state = defaultState(res.config, res.ctx, res.baseDB)
 		res.uptimes = uptime.NewManager(res.state)
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
@@ -183,7 +182,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -261,12 +259,7 @@ func addSubnet(env *environment) {
 	}
 }
 
-func defaultState(
-	cfg *config.Config,
-	ctx *snow.Context,
-	db database.Database,
-	rewards reward.Calculator,
-) state.State {
+func defaultState(cfg *config.Config, ctx *snow.Context, db database.Database) state.State {
 	genesisBytes := buildGenesisTest(ctx)
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	state, err := state.New(
@@ -277,7 +270,6 @@ func defaultState(
 		execCfg,
 		ctx,
 		metrics.Noop,
-		rewards,
 		&utils.Atomic[bool]{},
 	)
 	if err != nil {

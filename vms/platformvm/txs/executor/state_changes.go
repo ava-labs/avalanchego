@@ -153,16 +153,18 @@ func AdvanceTimeTo(
 			}
 		}
 
-		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
-		if err != nil {
-			return nil, err
-		}
-
-		potentialReward := rewards.Calculate(
+		potentialReward, err := calculateReward(
+			backend.Config.RewardConfig,
+			parentState,
+			stakerToRemove.SubnetID,
 			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 			stakerToRemove.Weight,
 			supply,
 		)
+		if err != nil {
+			return nil, err
+		}
+
 		stakerToAdd.PotentialReward = potentialReward
 
 		// Invariant: [rewards.Calculate] can never return a [potentialReward]
@@ -208,24 +210,38 @@ func AdvanceTimeTo(
 	return changes, nil
 }
 
-func GetRewardsCalculator(
-	backend *Backend,
+func calculateReward(
+	rewardConfig reward.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
-) (reward.Calculator, error) {
+	stakedDuration time.Duration,
+	stakedAmount uint64,
+	currentSupply uint64,
+) (uint64, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+		return reward.Calculate(
+			rewardConfig.MaxConsumptionRate,
+			rewardConfig.MinConsumptionRate,
+			rewardConfig.MintingPeriod,
+			rewardConfig.SupplyCap,
+			stakedDuration,
+			stakedAmount,
+			currentSupply,
+		), nil
 	}
 
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return reward.NewCalculator(reward.Config{
-		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
-		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
-		SupplyCap:          transformSubnet.MaximumSupply,
-	}), nil
+	return reward.Calculate(
+		transformSubnet.MaxConsumptionRate,
+		transformSubnet.MinConsumptionRate,
+		rewardConfig.MintingPeriod,
+		transformSubnet.MaximumSupply,
+		stakedDuration,
+		stakedAmount,
+		currentSupply,
+	), nil
 }

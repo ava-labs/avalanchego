@@ -127,8 +127,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
-	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(&config, ctx, baseDB)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -152,7 +151,6 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{
@@ -217,7 +215,6 @@ func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
-	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
 	execCfg, _ := config.GetExecutionConfig(nil)
@@ -229,7 +226,6 @@ func defaultState(
 		execCfg,
 		ctx,
 		metrics.Noop,
-		rewards,
 		&utils.Atomic[bool]{},
 	)
 	if err != nil {

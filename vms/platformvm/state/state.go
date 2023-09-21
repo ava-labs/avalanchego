@@ -292,7 +292,6 @@ type state struct {
 	cfg          *config.Config
 	ctx          *snow.Context
 	metrics      metrics.Metrics
-	rewards      reward.Calculator
 	bootstrapped *utils.Atomic[bool]
 
 	baseDB *versiondb.Database
@@ -449,7 +448,6 @@ func New(
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
-	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
 	s, err := newState(
@@ -459,7 +457,6 @@ func New(
 		execCfg,
 		ctx,
 		metricsReg,
-		rewards,
 		bootstrapped,
 	)
 	if err != nil {
@@ -504,7 +501,6 @@ func newState(
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
-	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
@@ -615,7 +611,6 @@ func newState(
 		cfg:          cfg,
 		ctx:          ctx,
 		metrics:      metrics,
-		rewards:      rewards,
 		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
 
@@ -1302,7 +1297,11 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 			return err
 		}
 
-		potentialReward := s.rewards.Calculate(
+		potentialReward := reward.Calculate(
+			s.cfg.RewardConfig.MaxConsumptionRate,
+			s.cfg.RewardConfig.MinConsumptionRate,
+			s.cfg.RewardConfig.MintingPeriod,
+			s.cfg.RewardConfig.SupplyCap,
 			stakeDuration,
 			stakeAmount,
 			currentSupply,

@@ -166,16 +166,16 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 		metrics.Noop,
 		&config.Config{
 			Validators: vdrs,
+			RewardConfig: reward.Config{
+				MaxConsumptionRate: .12 * reward.PercentDenominator,
+				MinConsumptionRate: .1 * reward.PercentDenominator,
+				MintingPeriod:      365 * 24 * time.Hour,
+				SupplyCap:          720 * units.MegaAvax,
+			},
 		},
 		execCfg,
 		&snow.Context{},
 		prometheus.NewRegistry(),
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
 		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
