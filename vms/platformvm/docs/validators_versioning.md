@@ -8,57 +8,57 @@ In this brief document we dive into the technicalities of how `platformVM` track
 
 ## The tracked content
 
-The entry point to retrieve validator information at given height is the `GetValidatorSet` method in the `validators` package. Here is its signature:
+The entry point to retrieve validator information at a given height is the `GetValidatorSet` method in the `validators` package. Here is its signature:
 ``` golang
 GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error)
 ```
 
 `GetValidatorSet` lets any VM specify a subnet and a height and returns the data of all subnet validators active at the requested height, and only those.
 
-Validators data are collected in a struct named `validators.GetValidatorOutput`  which holds for each active validator, its `NodeID`, its `Weight` and its `Bls Public Key` if it was registered.
+Validator data are collected in a struct named `validators.GetValidatorOutput` which holds for each active validator, its `NodeID`, its `Weight` and its `BLS Public Key` if it was registered.
 
-Note that a validator `Weight` is not just its stake; its the aggregate value of the validator's own stake and all of its delegators' stakes. A validators `Weight` gauges how relevant its preference should be in consensus or Warp operations.
+Note that a validator `Weight` is not just its stake; its the aggregate value of the validator's own stake and all of its delegators' stake. A validator' s `Weight` gauges how relevant its preference should be in consensus or Warp operations.
 
-We will see in next section how the P-chain keeps track of this information in time, while the validator set changes.
+We will see in the next section how the P-chain keeps track of this information over time as the validator set changes.
 
-## Validators diffs content
+## Validator diffs content
 
-Every new block accepted by the P-chain can potentially alter the validator set of any subnet, including the primary one. New validators may be added; some of them may have reached their end of life and are therefore removed. Moreover a validator can register itself again once its staking time is done, possibly with a `Weight` and a `BLS Public key` different from previous staking period.
+Every new block accepted by the P-chain can potentially alter the validator set of any subnet, including the primary one. New validators may be added; some of them may have reached their end of life and are therefore removed. Moreover a validator can register itself again once its staking time is done, possibly with a `Weight` and a `BLS Public key` different from the previous staking period.
 
 Whenever the block at height `H` adds or removes a validator, the P-chain does, among others, the following operations:
 
 1. it updates the current validator set to add the new validator or remove it if expired;
 2. it explicitly records the validator set diffs with respect to the validator set at height `H-1`.
 
-These diffs are key to rebuild the validator set at a given past height. In this section we illustrate their content. In next ones, We'll see how the diffs are stored and used.
+These diffs are key to rebuilding the validator set at a given past height. In this section we illustrate their content. In next ones, We'll see how the diffs are stored and used.
 
-The validators diffs track changes in a validator's `Weight` and `BLS Public key`. Along with the `NodeID` these are the data exposed by the `GetValidatorSet` method.
+The validators diffs track changes in a validator's `Weight` and `BLS Public key`. Along with the `NodeID` this is the data exposed by the `GetValidatorSet` method.
 
-Note that `Weight` and `BLS Public key` behaves differently through the validator lifetime:
+Note that `Weight` and `BLS Public key` behave differently throughout the validator lifetime:
 
-1. `BLS Public key` cannot change through a validator's lifetime. It can only change when validator is added/re-added and removed.
-2. `Weight` can change through a validator's lifetime, by the creation and removal of its delegators, as well as by validator's own creation and removal.
+1. `BLS Public key` cannot change through a validator's lifetime. It can only change when a validator is added/re-added and removed.
+2. `Weight` can change throughout a validator's lifetime by the creation and removal of its delegators as well as by validator's own creation and removal.
 
 Here is a scheme of what `Weight` and `BLS Public key` diff content we record upon relevant scenarios: 
 
-|                    | Weight Diff (forward looking)                                                                           | Bls Key Diff (backward looking)                                                       |
+|                    | Weight Diff (forward looking)                                                                           | BLS Key Diff (backward looking)                                                       |
 |--------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | Validator creation | record ``` golang state.ValidatorWeightDiff{       Decrease: false,     Weight: validator.Weight, } ``` | record an empty byte slice if validator.BlsKey is specified; otherwise record nothing |
 | Delegator creation | record ``` golang state.ValidatorWeightDiff{      Decrease: false,     Weight: validator.Weight, } ```  | No entry is recorded                                                                  |
 | Delegator removal  | record ``` golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, } ```  | No entry is recorded                                                                  |
 | Validator removal  | record ``` golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, } ```  | record validator.BlsKey if it is specified; otherwise record nothing                  |
 
-Note that `Weight` diffs are encoded `state.ValidatorWeightDiff` and are *forward-looking*. a diff recorded at height `H` stores the change that trasforms validator weight at height `H-1` into validator weight at height `H`.
+Note that `Weight` diffs are encoded `state.ValidatorWeightDiff` and are *forward-looking*. a diff recorded at height `H` stores the change that transforms validator weight at height `H-1` into validator weight at height `H`.
 
-On the contrary, `BLS Public Key` diffs are *backward-looking*: a diff recorded at height `H` stores the change that transforms validator `BLS Public Key` at height `H` into validator `BLS Public key` at height `H-1`.
+In contrast, `BLS Public Key` diffs are *backward-looking*: a diff recorded at height `H` stores the change that transforms validator `BLS Public Key` at height `H` into validator `BLS Public key` at height `H-1`.
 
-Finally, if no changes happen to the validator set, no diff entry is recorded. So technically we should not expect a validator `Weight` or `BLS Public Key` diff stored at every height `H`.
+Finally, if no changes are made to the validator set no diff entry is recorded. This implies that a validator `Weight` or `BLS Public Key` diff may not be stored for every height `H`.
 
-## Validators diffs layout
+## Validator diffs layout
 
-Validators diffs layout is optimized to support iterations. Validator sets are rebuilt by cumulating `Weight` and `BLS Public Key` diffs from the top-most down to the requested height. So validator diffs are stored so that it's fast to iterate them in this order.
+Validator diffs layout is optimized to support iteration. Validator sets are rebuilt by accumulating `Weight` and `BLS Public Key` diffs from the top-most height down to the requested height. So validator diffs are stored so that it's fast to iterate them in this order.
 
-`Weight` diffs are stored as a contiguous block of key, values as follows:
+`Weight` diffs are stored as a contiguous block of key-value pairs as follows:
 
 | Key                                | Value                                |
 |------------------------------------|--------------------------------------|
@@ -66,9 +66,9 @@ Validators diffs layout is optimized to support iterations. Validator sets are r
 
 Note that:
 
-1. `Weight` diffs related to the a subnet are stored contiguously.
-2. Diff height is serialized as `Reverse_Height`. It is stored with big endian format and has its bits flipped too. This ensurses that heighs are store in order (by big endianess) with the top most height always being the first (by bit flipping).
-3. `NodeID` is part of the key and `state.ValidatorWeightDiff` is part of the value stored.
+1. `Weight` diffs related to a subnet are stored contiguously.
+2. Diff height is serialized as `Reverse_Height`. It is stored with big endian format and has its bits flipped too. Big endianess ensures that heights are stored in order, bit flipping ensures that the top most height is always the first.
+3. `NodeID` is part of the key and `state.ValidatorWeightDiff` is part of the value.
 
 `BLS Public` diffs are stored as follows:
 
@@ -78,7 +78,7 @@ Note that:
 
 Note that:
 
-1. `BLS Public Key` diffs have same keys as `Weight` diffs. So same ordering is guaranteed.
+1. `BLS Public Key` diffs have the same keys as `Weight` diffs. This implies that the same ordering is guaranteed.
 2. Value is either validator `BLS Public Key` bytes or an empty byte slice, as illustrated in previous section.
 
 ## Validators diff usage in rebuilding validators state
