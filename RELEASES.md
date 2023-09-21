@@ -2,8 +2,11 @@
 
 ## [v0.12.5](https://github.com/ava-labs/coreth/releases/tag/v0.12.5)
 
+- Add P2P SDK Pull Gossip to mempool
+- Fix hanging requests on shutdown that could cause ungraceful shutdown
+- Increase batch size writing snapshot diff to disk
 - Migrate geth changes from v1.11.4 through v1.12.0
-- Bump AvalancheGo dependency to v1.10.6-rc.4 to use sized LRU for Chain State Cache
+- Bump AvalancheGo dependency to v1.10.10
 
 ## [v0.12.4](https://github.com/ava-labs/coreth/releases/tag/v0.12.4)
 
