@@ -196,13 +196,13 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *sync.WaitGroup) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
 
 	var (
-		networks = make([]Network, len(configs))
+		networks = make([]*network, len(configs))
 
 		globalLock     sync.Mutex
 		numConnected   int
@@ -278,7 +278,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			},
 		)
 		require.NoError(err)
-		networks[i] = net
+		networks[i] = net.(*network)
 	}
 
 	wg := sync.WaitGroup{}
@@ -403,7 +403,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
-	network := networks[0].(*network)
+	network := networks[0]
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
@@ -631,4 +631,34 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		net.StartClose()
 	}
 	wg.Wait()
+}
+
+// Test that cancelling the context passed into dial
+// causes dial to return immediately.
+func TestDialContext(t *testing.T) {
+	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	defer wg.Done()
+	network := networks[0]
+
+	dialer := newTestDialer()
+	network.dialer = dialer
+	ipPort, listener := dialer.NewListener()
+
+	// Set dialer to nil to assert that we are not using it.
+	// That is, we return immediately because the context is canceled.
+	network.dialer = nil
+	network.ManuallyTrack(ids.EmptyNodeID, ipPort.IPPort())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	network.dial(ctx, ids.EmptyNodeID, &trackedIP{
+		ip: ipPort.IPPort(),
+	})
+
+	// When a non-nil context is given, we actually dial the peer.
+	network.dialer = dialer
+	network.dial(ctx, ids.EmptyNodeID, &trackedIP{
+		ip: ipPort.IPPort(),
+	})
+	_, err := listener.Accept()
+	require.NoError(t, err)
 }

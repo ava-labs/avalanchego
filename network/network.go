@@ -1073,6 +1073,9 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			timer := time.NewTimer(ip.getDelay())
 
 			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
 			case <-ip.onStopTracking:
 				timer.Stop()
 				return
