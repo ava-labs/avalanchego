@@ -2357,6 +2357,7 @@ func (s *state) writeSubnets() error {
 func (s *state) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
 		subnetID := subnetID
+		owner := owner
 		delete(s.subnetOwners, subnetID)
 		s.subnetOwnerCache.Evict(subnetID) // TODO: Should this be Evict?
 
