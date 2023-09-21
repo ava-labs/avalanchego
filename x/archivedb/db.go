@@ -12,10 +12,9 @@ import (
 )
 
 var (
-	ErrNotImplemented     = errors.New("feature not implemented")
-	ErrUnknownHeight      = errors.New("unknown height")
-	ErrInvalidBatchHeight = errors.New("invalid batch height")
-	ErrInvalidValue       = errors.New("invalid data value")
+	ErrNotImplemented = errors.New("feature not implemented")
+	ErrUnknownHeight  = errors.New("unknown height")
+	ErrInvalidValue   = errors.New("invalid data value")
 )
 
 // ArchiveDb

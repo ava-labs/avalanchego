@@ -243,8 +243,7 @@ func TestInvalidBatchHeight(t *testing.T) {
 	require.NoError(t, err)
 
 	writer := db.NewBatchAtHeight(0)
-	err = writer.Write()
-	require.ErrorIs(t, err, ErrInvalidBatchHeight)
+	require.NoError(t, writer.Write())
 
 	writer = db.NewBatchAtHeight(1)
 	require.NoError(t, writer.Write())
@@ -256,14 +255,9 @@ func TestInvalidBatchHeight(t *testing.T) {
 
 	newWriter := db.NewBatchAtHeight(2)
 	require.NoError(t, newWriter.Write())
-	// both current_writer and writer are no longer valid because new_writter
-	// moved the databas height to 2
-	err = currentWriter.Write()
-	require.ErrorIs(t, err, ErrInvalidBatchHeight)
-	err = writer.Write()
-	require.ErrorIs(t, err, ErrInvalidBatchHeight)
+	require.NoError(t, currentWriter.Write())
+	require.NoError(t, writer.Write())
 
 	writer = db.NewBatchAtHeight(50)
-	err = writer.Write()
-	require.ErrorIs(t, err, ErrInvalidBatchHeight)
+	require.NoError(t, writer.Write())
 }

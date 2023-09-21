@@ -46,12 +46,6 @@ func (c *batch) Write() error {
 	c.db.lock.Lock()
 	defer c.db.lock.Unlock()
 
-	if c.db.currentHeight != c.height && c.db.currentHeight+1 != c.height {
-		// This batch can update the current height or add a new height, but
-		// past updates are not allowed
-		return ErrInvalidBatchHeight
-	}
-
 	batch := c.db.inner.NewBatch()
 	for _, op := range c.ops {
 		if err := batch.Put(op.Key, op.Value); err != nil {
