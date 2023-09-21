@@ -5,7 +5,6 @@
 package transfer
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -157,7 +156,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
 							Asset: avax.Asset{
@@ -171,9 +169,8 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 								},
 							},
 						}},
-						common.WithContext(ctx),
+						e2e.WithDefaultContext(),
 					)
-					cancel()
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
@@ -200,7 +197,6 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					receiverNewBal,
 				)
 
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
@@ -214,9 +210,8 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 							},
 						},
 					}},
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
 				require.NoError(err)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
@@ -235,18 +230,14 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
+					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
 					require.Equal(status, choices.Accepted)
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
+					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
 					require.Equal(status, choices.Accepted)
 
