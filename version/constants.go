@@ -60,17 +60,17 @@ var (
 	// by avalanchego, but is useful for downstream libraries.
 	RPCChainVMProtocolCompatibility map[uint][]*Semantic
 
+	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	ApricotPhase4Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase4DefaultTime     = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	ApricotPhase4MinPChainHeight = map[uint32]uint64{
 		constants.MainnetID: 793005,
 		constants.FujiID:    47437,
@@ -81,25 +81,27 @@ var (
 		constants.MainnetID: time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	ApricotPhase6Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	BanffTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
 	}
-	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
-	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	// TODO: update this before release
+	DTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	}
 )
 
 func init() {
@@ -127,14 +129,14 @@ func GetApricotPhase3Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
 		return upgradeTime
 	}
-	return ApricotPhase3DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase4Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase4Times[networkID]; exists {
 		return upgradeTime
 	}
-	return ApricotPhase4DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
@@ -148,28 +150,35 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase5Times[networkID]; exists {
 		return upgradeTime
 	}
-	return ApricotPhase5DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase6Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
 		return upgradeTime
 	}
-	return ApricotPhase6DefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetBanffTime(networkID uint32) time.Time {
 	if upgradeTime, exists := BanffTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return BanffDefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {
 	if upgradeTime, exists := CortinaTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return CortinaDefaultTime
+	return DefaultUpgradeTime
+}
+
+func GetDTime(networkID uint32) time.Time {
+	if upgradeTime, exists := DTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
