@@ -4,7 +4,6 @@
 package p
 
 import (
-	"math"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -106,9 +105,11 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
-		delegationPercent := 0.10 // 10%
-		delegationFee := uint32(reward.PercentDenominator * delegationPercent)
-		weight := 2_000 * units.Avax
+		const (
+			delegationPercent = 0.10 // 10%
+			delegationShare   = reward.PercentDenominator * delegationPercent
+			weight            = 2_000 * units.Avax
+		)
 
 		alphaValidatorStartTime := time.Now().Add(validatorStartTimeDiff)
 		alphaValidatorEndTime := alphaValidatorStartTime.Add(validationPeriod)
@@ -132,7 +133,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{alphaDelegationRewardKey.Address()},
 				},
-				delegationFee,
+				delegationShare,
 			)
 			require.NoError(err)
 		})
@@ -159,7 +160,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{betaDelegationRewardKey.Address()},
 				},
-				delegationFee,
+				delegationShare,
 			)
 			require.NoError(err)
 		})
@@ -216,7 +217,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("waiting until the alpha and beta nodes are no longer validators")
 		e2e.Eventually(func() bool {
-			validators, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), ids.Empty, nil)
+			validators, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PrimaryNetworkID, nil)
 			require.NoError(err)
 			for _, validator := range validators {
 				if validator.NodeID == alphaNodeID || validator.NodeID == betaNodeID {
@@ -259,25 +260,24 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		require.NoError(err)
 		calculator := reward.NewCalculator(rewardConfig)
 		expectedValidationReward := calculator.Calculate(validationPeriod, weight, currentSupply)
-		expectedDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
-		expectedDelegationFee := uint64(math.Round(float64(expectedDelegationReward) * delegationPercent))
+		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
+		expectedDelegateeReward, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")
 		expectedRewardBalances := map[ids.ShortID]uint64{
 			alphaValidationRewardKey.Address(): expectedValidationReward,
-			alphaDelegationRewardKey.Address(): expectedDelegationFee,
+			alphaDelegationRewardKey.Address(): expectedDelegateeReward,
 			betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
 			betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
-			gammaDelegationRewardKey.Address(): expectedDelegationReward - expectedDelegationFee,
+			gammaDelegationRewardKey.Address(): expectedDelegatorReward,
 			deltaDelegationRewardKey.Address(): 0, // Validator didn't meet uptime requirement
 		}
 		for address := range expectedRewardBalances {
 			require.Equal(expectedRewardBalances[address], rewardBalances[address])
 		}
 
-		ginkgo.By("stopping alpha and beta nodes to free up resources for a bootstrap check")
+		ginkgo.By("stopping alpha to free up resources for a bootstrap check")
 		require.NoError(alphaNode.Stop())
-		require.NoError(betaNode.Stop())
 
 		e2e.CheckBootstrapIsPossible(network)
 	})
