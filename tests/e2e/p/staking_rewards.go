@@ -117,12 +117,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("adding alpha node as a validator", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: alphaNodeID,
-					Start:  uint64(alphaValidatorStartTime.Unix()),
-					End:    uint64(alphaValidatorEndTime.Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: alphaNodeID,
+						Start:  uint64(alphaValidatorStartTime.Unix()),
+						End:    uint64(alphaValidatorEndTime.Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
 				alphaPOP,
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
@@ -144,12 +147,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("adding beta node as a validator", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: betaNodeID,
-					Start:  uint64(betaValidatorStartTime.Unix()),
-					End:    uint64(betaValidatorEndTime.Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: betaNodeID,
+						Start:  uint64(betaValidatorStartTime.Unix()),
+						End:    uint64(betaValidatorEndTime.Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
 				betaPOP,
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
@@ -170,12 +176,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("adding gamma as delegator to the alpha node", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: alphaNodeID,
-					Start:  uint64(gammaDelegatorStartTime.Unix()),
-					End:    uint64(gammaDelegatorStartTime.Add(delegationPeriod).Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: alphaNodeID,
+						Start:  uint64(gammaDelegatorStartTime.Unix()),
+						End:    uint64(gammaDelegatorStartTime.Add(delegationPeriod).Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -190,12 +199,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("adding delta as delegator to the beta node", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: betaNodeID,
-					Start:  uint64(deltaDelegatorStartTime.Unix()),
-					End:    uint64(deltaDelegatorStartTime.Add(delegationPeriod).Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: betaNodeID,
+						Start:  uint64(deltaDelegatorStartTime.Unix()),
+						End:    uint64(deltaDelegatorStartTime.Add(delegationPeriod).Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
