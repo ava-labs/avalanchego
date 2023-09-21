@@ -163,5 +163,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			require.NoError(err)
 			require.Greater(balances[avaxAssetID], uint64(0))
 		})
+
+		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })
