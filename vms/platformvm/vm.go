@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Invariant: The context lock is never grabbed when holding the state lock.
+	// Invariant: The context lock is never grabbed when holding [stateLock].
 	var stateLock sync.RWMutex
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, stateLock.RLocker(), vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager

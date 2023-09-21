@@ -129,13 +129,13 @@ type Chain interface {
 
 // State manages the full disk state of the P-chain.
 //
-// Invariant: When writing to the state the chain's context write lock must be
-// held.
-// Invariant: When accepting a block, the chain's acceptance write lock must be
-// held in addition to the chain's context write lock.
-// Invariant: When accessing accepted block state such as transactions, blocks,
-// the last accepted block, and validator sets, the chain's acceptance lock must
-// be held.
+// Invariant: The chain's context write lock must be held when writing to
+// the state.
+// Invariant: The chain's acceptance write lock and context write lock
+// must be held when accepting a block.
+// Invariant: The chain's acceptance lock must be held when accessing
+// accepted block state such as transactions, blocks, the last accepted
+// block, and validator sets.
 type State interface {
 	Chain
 	uptime.State
