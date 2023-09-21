@@ -68,7 +68,9 @@ func (nodeID NodeID) Less(other NodeID) bool {
 	return nodeID < other
 }
 
-func NodeIDFromBytes(bytes []byte) NodeID {
+func NodeIDFromBytes(src []byte, length int) NodeID {
+	bytes := make([]byte, length)
+	copy(bytes, src)
 	return NodeID(string(bytes))
 }
 
@@ -82,19 +84,6 @@ func NodeIDFromCert(cert *staking.Certificate) NodeID {
 		hashing.ComputeHash256(cert.Raw),
 	)
 	return NodeID(string(bytes[:]))
-}
-
-func (nodeID NodeID) ToSize(newSize int) NodeID {
-	if len(nodeID) >= newSize {
-		return nodeID // leave unchanged if it's longer than required
-	}
-	pad := make([]byte, newSize-len(nodeID))
-	for idx := range pad {
-		pad[idx] = 0x00
-	}
-	bytes := nodeID.Bytes()
-	bytes = append(bytes, pad...)
-	return NodeIDFromBytes(bytes)
 }
 
 // NodeIDFromString is the inverse of NodeID.String()
