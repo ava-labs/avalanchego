@@ -34,12 +34,8 @@ if [[ -n "${E2E_USE_PERSISTENT_NETWORK}" && -n "${TESTNETCTL_NETWORK_DIR}" ]]; t
   E2E_ARGS="--use-persistent-network"
 else
   AVALANCHEGO_PATH="${AVALANCHEGO_PATH:-./build/avalanchego}"
-  if [[ -z "${AVALANCHEGO_PATH}" ]]; then
-    echo "Empty AVALANCHEGO_PATH env var!"
-    exit 255
-  fi
-  echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
   AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
+  echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
   E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
 fi
 
