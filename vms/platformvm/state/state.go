@@ -700,6 +700,7 @@ func newState(
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
+		subnetOwners:     make(map[ids.ID]fx.Owner),
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
 
@@ -850,10 +851,6 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
-
-	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
-	subnetID := createSubnetTx.ID()
-	s.SetSubnetOwner(subnetID, castTx.Owner)
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
@@ -870,27 +867,25 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	}
 
 	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
-	if err != nil && err != database.ErrNotFound {
-		return nil, err
-	}
-
 	if err == nil {
 		var owner fx.Owner
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
-
 		s.SetSubnetOwner(subnetID, owner)
 		s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
 			owner: owner,
 			size:  len(ownerBytes),
 		})
-
 		return owner, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
 	}
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
+		s.subnetOwnerCache.Put(subnetID, nil)
 		return nil, fmt.Errorf(
 			"%w %q: %w",
 			ErrCantFindSubnet,
@@ -909,13 +904,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 }
 
 func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
-	if s.subnetOwners == nil {
-		s.subnetOwners = map[ids.ID]fx.Owner{
-			subnetID: owner,
-		}
-	} else {
-		s.subnetOwners[subnetID] = owner
-	}
+	s.subnetOwners[subnetID] = owner
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -2359,12 +2348,16 @@ func (s *state) writeSubnetOwners() error {
 		subnetID := subnetID
 		owner := owner
 		delete(s.subnetOwners, subnetID)
-		s.subnetOwnerCache.Evict(subnetID) // TODO: Should this be Evict?
 
 		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
+
+		s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
 
 		if err := s.subnetOwnerDB.Put(subnetID[:], ownerBytes); err != nil {
 			return fmt.Errorf("failed to write subnet owner: %w", err)

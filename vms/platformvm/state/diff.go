@@ -293,10 +293,6 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	if d.cachedSubnets != nil {
 		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
 	}
-
-	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
-	subnetID := createSubnetTx.ID()
-	d.SetSubnetOwner(subnetID, castTx.Owner)
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {

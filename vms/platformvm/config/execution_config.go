@@ -17,7 +17,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
 	BlockIDCacheSize:             8192,
-	FxOwnerCacheSize:             2048,
+	FxOwnerCacheSize:             4 * units.MiB,
 	ChecksumsEnabled:             false,
 }
 
