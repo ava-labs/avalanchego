@@ -358,10 +358,11 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		return EmptyPath(branchFactor), err
 	}
 	if result.hasPartialByte() {
-		// confirm that the padding bits in the partial byte are 0
+		// Confirm that the padding bits in the partial byte are 0
+		// We want to only look at the bits to the right of the last token, which is at index length-1
+		// Generate a mask with (8-bitsToShift) 0's followed by bitsToShift 1's
 		paddingMask := byte(0xFF >> (Byte - result.bitsToShift(result.length-1)))
-		paddingBits := buffer[pathBytesLen-1] & paddingMask
-		if paddingBits != 0 {
+		if buffer[pathBytesLen-1]&paddingMask != 0 {
 			return EmptyPath(branchFactor), errNonZeroPathPadding
 		}
 	}

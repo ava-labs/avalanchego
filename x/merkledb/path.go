@@ -203,9 +203,7 @@ func (cp Path) Extend(path Path) Path {
 	// the partial byte of the current path needs the first shiftLeft bits of the extension path
 	buffer[len(cp.value)-1] += path.value[0] >> shiftRight
 
-	// Each remaining byte is the combination of:
-	// * last shiftLeft bits of byte i
-	// * first shiftRight bits of byte i+1
+	// Each byte of the new Path is the first (8-shiftRight) bits of byte i+1 added to the last (8-shiftLeft) bits of byte i
 	for i := 0; i < len(path.value)-1; i++ {
 		buffer[len(cp.value)+i] += path.value[i]<<shiftLeft + path.value[i+1]>>shiftRight
 	}
@@ -222,68 +220,63 @@ func (cp Path) Extend(path Path) Path {
 
 // Skip returns a new Path that contains the last cp.length-tokensToSkip tokens of the current Path
 func (cp Path) Skip(tokensToSkip int) Path {
-	newLength := cp.length - tokensToSkip
+	if cp.length == tokensToSkip {
+		return EmptyPath(cp.branchFactor)
+	}
 	result := Path{
-		length:     newLength,
+		value:      cp.value[tokensToSkip/cp.tokensPerByte:],
+		length:     cp.length - tokensToSkip,
 		pathConfig: cp.pathConfig,
 	}
-	if newLength == 0 {
-		return result
-	}
-
-	// all bytes after the skipped tokens
-	remainingBytes := cp.value[tokensToSkip/cp.tokensPerByte:]
 
 	// if the tokens to skip is a whole number of bytes,
 	// the remaining bytes exactly equals the new path
 	if tokensToSkip%cp.tokensPerByte == 0 {
-		result.value = remainingBytes
 		return result
 	}
 
 	// tokensToSkip does not remove a whole number of bytes
 	// copy the remaining shifted bytes into a new buffer
-	buffer := make([]byte, cp.bytesNeeded(newLength))
+	buffer := make([]byte, cp.bytesNeeded(result.length))
 	shiftRight := cp.bitsToShift(tokensToSkip - 1)
 	shiftLeft := Byte - shiftRight
 
-	// each byte of the new is the last shiftLeft bits of byte i + the first shiftRight bits of byte i+1
-	for i := 0; i < len(remainingBytes)-1; i++ {
-		buffer[i] += remainingBytes[i]<<shiftLeft + remainingBytes[i+1]>>shiftRight
+	// Each byte of the new Path is the first (8-shiftRight) bits of byte i+1 added to the last (8-shiftLeft) bits of byte i
+	for i := 0; i < len(result.value)-1; i++ {
+		buffer[i] += result.value[i]<<shiftLeft + result.value[i+1]>>shiftRight
 	}
 
 	// the last byte only has values from byte i, as there is no byte i+1
-	buffer[len(buffer)-1] += remainingBytes[len(remainingBytes)-1] << shiftLeft
+	buffer[len(buffer)-1] += result.value[len(result.value)-1] << shiftLeft
 
-	return Path{
-		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     newLength,
-		pathConfig: cp.pathConfig,
-	}
+	result.value = *(*string)(unsafe.Pointer(&buffer))
+	return result
 }
 
 // Take returns a new Path that contains the first tokensToTake tokens of the current Path
 func (cp Path) Take(tokensToTake int) Path {
-	if tokensToTake%cp.tokensPerByte == 0 {
-		return Path{
-			value:      cp.value[:tokensToTake/cp.tokensPerByte],
-			length:     tokensToTake,
-			pathConfig: cp.pathConfig,
-		}
-	}
-
-	buffer := make([]byte, cp.bytesNeeded(tokensToTake))
-	copy(buffer, cp.value)
-
-	// the shifts zero out any extra bits in the byte
-	bitsToZeroOut := cp.bitsToShift(tokensToTake - 1)
-	buffer[len(buffer)-1] = (buffer[len(buffer)-1] >> bitsToZeroOut) << bitsToZeroOut
-
-	return Path{
-		value:      *(*string)(unsafe.Pointer(&buffer)),
+	result := Path{
+		value:      cp.value[:tokensToTake/cp.tokensPerByte],
 		length:     tokensToTake,
 		pathConfig: cp.pathConfig,
 	}
+
+	if !result.hasPartialByte() {
+		return result
+	}
+
+	// We need to zero out some bits of the last byte so a simple slice will not work
+	// Create a new []byte to store the altered value
+	buffer := make([]byte, cp.bytesNeeded(tokensToTake))
+	copy(buffer, cp.value)
+
+	// We want to zero out everything to the right of the last token, which is at index [tokensToTake] - 1
+	// Mask will be (8-bitsToShift) number of 1's followed by (bitsToShift) number of 0's
+	mask := byte(0xFF << cp.bitsToShift(tokensToTake-1))
+	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
+
+	result.value = *(*string)(unsafe.Pointer(&buffer))
+	return result
 }
 
 func (cp Path) BranchFactor() BranchFactor {
