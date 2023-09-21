@@ -108,7 +108,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 
 			const (
 				delegationPercent = 0.10 // 10%
-				delegationFee     = reward.PercentDenominator * delegationPercent
+				delegationShare   = reward.PercentDenominator * delegationPercent
 			)
 
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
@@ -128,7 +128,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
-				delegationFee,
+				delegationShare,
 			)
 			require.NoError(err)
 		})
@@ -144,12 +144,15 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			require.NoError(err)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(startTime.Unix()),
-					End:    uint64(endTime.Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Subnet: constants.PrimaryNetworkID,
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(startTime.Unix()),
+						End:    uint64(endTime.Unix()),
+						Wght:   weight,
+					},
+				},
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
