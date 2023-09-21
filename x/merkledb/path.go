@@ -87,7 +87,7 @@ func (cp Path) Length() int {
 	return cp.length
 }
 
-// hasPartialByte returns true iff the path fits into a non whole number of bytes
+// hasPartialByte returns true iff the path fits into a non-whole number of bytes
 func (cp Path) hasPartialByte() bool {
 	return cp.length%cp.tokensPerByte > 0
 }
