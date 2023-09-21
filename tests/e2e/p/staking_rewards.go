@@ -31,9 +31,8 @@ import (
 )
 
 const (
-	validatorStartTimeDiff = 20 * time.Second
-	delegationPeriod       = 15 * time.Second
-	validationPeriod       = 30 * time.Second
+	delegationPeriod = 15 * time.Second
+	validationPeriod = 30 * time.Second
 )
 
 var _ = ginkgo.Describe("[Staking Rewards]", func() {
@@ -111,7 +110,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			weight            = 2_000 * units.Avax
 		)
 
-		alphaValidatorStartTime := time.Now().Add(validatorStartTimeDiff)
+		alphaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		alphaValidatorEndTime := alphaValidatorStartTime.Add(validationPeriod)
 		tests.Outf("alpha node validation period starting at: %v\n", alphaValidatorStartTime)
 
@@ -141,7 +140,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		betaValidatorStartTime := time.Now().Add(validatorStartTimeDiff)
+		betaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		betaValidatorEndTime := betaValidatorStartTime.Add(validationPeriod)
 		tests.Outf("beta node validation period starting at: %v\n", betaValidatorStartTime)
 
@@ -171,7 +170,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		gammaDelegatorStartTime := time.Now().Add(validatorStartTimeDiff)
+		gammaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		tests.Outf("gamma delegation period starting at: %v\n", gammaDelegatorStartTime)
 
 		ginkgo.By("adding gamma as delegator to the alpha node", func() {
@@ -194,7 +193,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		deltaDelegatorStartTime := time.Now().Add(validatorStartTimeDiff)
+		deltaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		tests.Outf("delta delegation period starting at: %v\n", deltaDelegatorStartTime)
 
 		ginkgo.By("adding delta as delegator to the beta node", func() {
