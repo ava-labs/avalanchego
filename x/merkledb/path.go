@@ -213,7 +213,7 @@ func (cp Path) Extend(path Path) Path {
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     cp.length + path.length,
+		length:     totalLength,
 		pathConfig: cp.pathConfig,
 	}
 }
