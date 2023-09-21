@@ -256,12 +256,12 @@ func (cp Path) Skip(tokensToSkip int) Path {
 // Take returns a new Path that contains the first tokensToTake tokens of the current Path
 func (cp Path) Take(tokensToTake int) Path {
 	result := Path{
-		value:      cp.value[:tokensToTake/cp.tokensPerByte],
 		length:     tokensToTake,
 		pathConfig: cp.pathConfig,
 	}
 
 	if !result.hasPartialByte() {
+		result.value = cp.value[:tokensToTake/cp.tokensPerByte]
 		return result
 	}
 
