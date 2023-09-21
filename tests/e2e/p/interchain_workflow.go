@@ -208,11 +208,9 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		e2e.Eventually(func() bool {
-			balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
-			require.NoError(err)
-			return balance.Cmp(big.NewInt(0)) > 0
-		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see recipient address funded before timeout")
+		balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
+		require.NoError(err)
+		require.Positive(balance.Cmp(big.NewInt(0)))
 
 		ginkgo.By("stopping validator node to free up resources for a bootstrap check")
 		require.NoError(node.Stop())
