@@ -825,7 +825,7 @@ func (s *state) GetSubnets() ([]*txs.Tx, error) {
 	subnetDBIt := s.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
-	txs := []*txs.Tx(nil)
+	subnetTxs := []*txs.Tx(nil)
 	for subnetDBIt.Next() {
 		subnetIDBytes := subnetDBIt.Key()
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -836,14 +836,19 @@ func (s *state) GetSubnets() ([]*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		txs = append(txs, subnetTx)
+		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+		}
+		s.SetSubnetOwner(subnetID, subnet.Owner)
+		subnetTxs = append(subnetTxs, subnetTx)
 	}
 	if err := subnetDBIt.Error(); err != nil {
 		return nil, err
 	}
-	txs = append(txs, s.addedSubnets...)
-	s.cachedSubnets = txs
-	return txs, nil
+	subnetTxs = append(subnetTxs, s.addedSubnets...)
+	s.cachedSubnets = subnetTxs
+	return subnetTxs, nil
 }
 
 func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
@@ -867,40 +872,22 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	}
 
 	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
-	if err == nil {
-		var owner fx.Owner
-		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
-			return nil, err
-		}
-		s.SetSubnetOwner(subnetID, owner)
-		s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
-		return owner, nil
-	}
-	if err != database.ErrNotFound {
+	if err == database.ErrNotFound {
+		s.subnetOwnerCache.Put(subnetID, nil)
+		return nil, database.ErrNotFound
+	} else if err != nil {
 		return nil, err
 	}
 
-	subnetIntf, _, err := s.GetTx(subnetID)
-	if err != nil {
-		s.subnetOwnerCache.Put(subnetID, nil)
-		return nil, fmt.Errorf(
-			"%w %q: %w",
-			ErrCantFindSubnet,
-			subnetID,
-			err,
-		)
+	if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+		return nil, err
 	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
-	}
-
 	s.SetSubnetOwner(subnetID, owner)
-	return subnet.Owner, nil
+	s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
+		owner: owner,
+		size:  len(ownerBytes),
+	})
+	return owner, nil
 }
 
 func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
