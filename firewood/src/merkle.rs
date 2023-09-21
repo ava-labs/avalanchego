@@ -370,7 +370,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut val = Some(val);
 
         // walk down the merkle tree starting from next_node, currently the root
-        for (key_nib_offset, key_nib) in key_nibbles.iter().enumerate() {
+        for (key_nib_offset, key_nib) in key_nibbles.into_iter().enumerate() {
             // special handling for extension nodes
             if nskip > 0 {
                 nskip -= 1;
@@ -393,7 +393,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         // create a new leaf
                         let leaf_ptr = self
                             .new_node(Node::new(NodeType::Leaf(LeafNode(
-                                PartialPath(key_nibbles.iter().skip(key_nib_offset + 1).collect()),
+                                PartialPath(
+                                    key_nibbles.into_iter().skip(key_nib_offset + 1).collect(),
+                                ),
                                 Data(val.take().unwrap()),
                             ))))?
                             .as_ptr();
@@ -412,7 +414,10 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // of the stored key to pass into split
                     let n_path = n.0.to_vec();
                     let n_value = Some(n.1.clone());
-                    let rem_path = key_nibbles.iter().skip(key_nib_offset).collect::<Vec<_>>();
+                    let rem_path = key_nibbles
+                        .into_iter()
+                        .skip(key_nib_offset)
+                        .collect::<Vec<_>>();
                     self.split(
                         node,
                         &mut parents,
@@ -428,7 +433,10 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     let n_path = n.0.to_vec();
                     let n_ptr = n.1;
                     nskip = n_path.len() - 1;
-                    let rem_path = key_nibbles.iter().skip(key_nib_offset).collect::<Vec<_>>();
+                    let rem_path = key_nibbles
+                        .into_iter()
+                        .skip(key_nib_offset)
+                        .collect::<Vec<_>>();
 
                     if let Some(v) = self.split(
                         node,
@@ -1044,7 +1052,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
         let mut nskip = 0;
         let mut nodes: Vec<DiskAddress> = Vec::new();
-        for (i, nib) in key_nibbles.iter().enumerate() {
+        for (i, nib) in key_nibbles.into_iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
                 continue;
@@ -1060,7 +1068,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // the key passed in must match the entire remainder of this
                     // extension node, otherwise we break out
                     let n_path = &*n.0;
-                    let remaining_path = key_nibbles.iter().skip(i);
+                    let remaining_path = key_nibbles.into_iter().skip(i);
                     if remaining_path.size_hint().0 < n_path.len() {
                         // all bytes aren't there
                         break;
@@ -1115,7 +1123,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut u_ref = self.get_node(root)?;
         let mut nskip = 0;
 
-        for (i, nib) in key_nibbles.iter().enumerate() {
+        for (i, nib) in key_nibbles.into_iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
                 continue;
@@ -1126,14 +1134,14 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    if !key_nibbles.iter().skip(i).eq(n.0.iter().cloned()) {
+                    if !key_nibbles.into_iter().skip(i).eq(n.0.iter().cloned()) {
                         return Ok(None);
                     }
                     return Ok(Some(Ref(u_ref)));
                 }
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
-                    let rem_path = key_nibbles.iter().skip(i);
+                    let rem_path = key_nibbles.into_iter().skip(i);
                     if rem_path.size_hint().0 < n_path.len() {
                         return Ok(None);
                     }
@@ -1287,7 +1295,7 @@ mod test {
     #[test]
     fn test_partial_path_encoding() {
         let check = |steps: &[u8], term| {
-            let (d, t) = PartialPath::decode(PartialPath(steps.to_vec()).encode(term));
+            let (d, t) = PartialPath::decode(&PartialPath(steps.to_vec()).encode(term));
             assert_eq!(d.0, steps);
             assert_eq!(t, term);
         };

@@ -7,7 +7,7 @@ static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
 /// Nibbles is a newtype that contains only a reference to a [u8], and produces
 /// nibbles. Nibbles can be indexed using nib\[x\] or you can get an iterator
-/// with iter()
+/// with `into_iter()`
 ///
 /// Nibbles can be constructed with a number of leading zeroes. This is used
 /// in firewood because there is a sentinel node, so we always want the first
@@ -23,21 +23,21 @@ static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 /// # use firewood::nibbles;
 /// # fn main() {
 /// let nib = nibbles::Nibbles::<0>::new(&[0x56, 0x78]);
-/// assert_eq!(nib.iter().collect::<Vec<_>>(), [0x5, 0x6, 0x7, 0x8]);
+/// assert_eq!(nib.into_iter().collect::<Vec<_>>(), [0x5, 0x6, 0x7, 0x8]);
 ///
 /// // nibbles can be efficiently advanced without rendering the
 /// // intermediate values
-/// assert_eq!(nib.iter().skip(3).collect::<Vec<_>>(), [0x8]);
+/// assert_eq!(nib.into_iter().skip(3).collect::<Vec<_>>(), [0x8]);
 ///
 /// // nibbles can also be indexed
 ///
 /// assert_eq!(nib[1], 0x6);
 ///
 /// // or reversed
-/// assert_eq!(nib.iter().rev().next(), Some(0x8));
+/// assert_eq!(nib.into_iter().rev().next(), Some(0x8));
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Nibbles<'a, const LEADING_ZEROES: usize>(&'a [u8]);
 
 impl<'a, const LEADING_ZEROES: usize> Index<usize> for Nibbles<'a, LEADING_ZEROES> {
@@ -54,16 +54,21 @@ impl<'a, const LEADING_ZEROES: usize> Index<usize> for Nibbles<'a, LEADING_ZEROE
     }
 }
 
-impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
+impl<'a, const LEADING_ZEROES: usize> IntoIterator for Nibbles<'a, LEADING_ZEROES> {
+    type Item = u8;
+    type IntoIter = NibblesIterator<'a, LEADING_ZEROES>;
+
     #[must_use]
-    pub fn iter(&self) -> NibblesIterator<'_, LEADING_ZEROES> {
+    fn into_iter(self) -> Self::IntoIter {
         NibblesIterator {
             data: self,
             head: 0,
             tail: self.len(),
         }
     }
+}
 
+impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     #[must_use]
     pub fn len(&self) -> usize {
         LEADING_ZEROES + 2 * self.0.len()
@@ -79,11 +84,11 @@ impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     }
 }
 
-/// An interator returned by [Nibbles::iter]
+/// An interator returned by [Nibbles::into_iter]
 /// See their documentation for details.
 #[derive(Clone, Debug)]
 pub struct NibblesIterator<'a, const LEADING_ZEROES: usize> {
-    data: &'a Nibbles<'a, LEADING_ZEROES>,
+    data: Nibbles<'a, LEADING_ZEROES>,
     head: usize,
     tail: usize,
 }
@@ -161,14 +166,14 @@ mod test {
     fn leading_zero_nibbles_iter() {
         let nib = Nibbles::<1>(&TEST_BYTES);
         let expected: [u8; 9] = [0u8, 0xd, 0xe, 0xa, 0xd, 0xb, 0xe, 0xe, 0xf];
-        expected.into_iter().eq(nib.iter());
+        expected.into_iter().eq(nib.into_iter());
     }
 
     #[test]
     fn skip_skips_zeroes() {
         let nib1 = Nibbles::<1>(&TEST_BYTES);
         let nib0 = Nibbles::<0>(&TEST_BYTES);
-        assert!(nib1.iter().skip(1).eq(nib0.iter()));
+        assert!(nib1.into_iter().skip(1).eq(nib0.into_iter()));
     }
 
     #[test]
@@ -187,7 +192,7 @@ mod test {
     #[test]
     fn size_hint_0() {
         let nib = Nibbles::<0>(&TEST_BYTES);
-        let mut nib_iter = nib.iter();
+        let mut nib_iter = nib.into_iter();
         assert_eq!((8, Some(8)), nib_iter.size_hint());
         let _ = nib_iter.next();
         assert_eq!((7, Some(7)), nib_iter.size_hint());
@@ -196,7 +201,7 @@ mod test {
     #[test]
     fn size_hint_1() {
         let nib = Nibbles::<1>(&TEST_BYTES);
-        let mut nib_iter = nib.iter();
+        let mut nib_iter = nib.into_iter();
         assert_eq!((9, Some(9)), nib_iter.size_hint());
         let _ = nib_iter.next();
         assert_eq!((8, Some(8)), nib_iter.size_hint());
@@ -205,7 +210,7 @@ mod test {
     #[test]
     fn backwards() {
         let nib = Nibbles::<1>(&TEST_BYTES);
-        let nib_iter = nib.iter().rev();
+        let nib_iter = nib.into_iter().rev();
         let expected = [0xf, 0xe, 0xe, 0xb, 0xd, 0xa, 0xe, 0xd, 0x0];
 
         assert!(nib_iter.eq(expected));

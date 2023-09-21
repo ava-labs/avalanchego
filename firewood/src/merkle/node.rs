@@ -526,7 +526,7 @@ impl Storable for Node {
                     .flat_map(to_nibble_array)
                     .collect();
 
-                let (path, _) = PartialPath::decode(nibbles);
+                let (path, _) = PartialPath::decode(&nibbles);
 
                 let mut buff = [0_u8; 1];
                 let rlp_len_raw = mem
@@ -598,7 +598,7 @@ impl Storable for Node {
                     .flat_map(to_nibble_array)
                     .collect();
 
-                let (path, _) = PartialPath::decode(nibbles);
+                let (path, _) = PartialPath::decode(&nibbles);
                 let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
                 Ok(Self::new_from_hash(
                     root_hash,

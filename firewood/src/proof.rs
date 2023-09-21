@@ -11,6 +11,8 @@ use shale::ShaleError;
 use shale::ShaleStore;
 use thiserror::Error;
 
+use crate::nibbles::Nibbles;
+use crate::nibbles::NibblesIterator;
 use crate::{
     db::DbError,
     merkle::{
@@ -114,53 +116,45 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         key: K,
         root_hash: [u8; 32],
     ) -> Result<Option<Vec<u8>>, ProofError> {
-        let mut key_nibbles = Vec::new();
-        key_nibbles.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
+        let mut key_nibbles = Nibbles::<0>::new(key.as_ref()).into_iter();
 
-        let mut remaining_key_nibbles: &[u8] = &key_nibbles;
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
-        let mut index = 0;
 
         loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
-            let (sub_proof, size) =
-                self.locate_subproof(remaining_key_nibbles, cur_proof.as_ref())?;
-            index += size;
+            let (sub_proof, traversed_nibbles) =
+                self.locate_subproof(key_nibbles, cur_proof.as_ref())?;
+            key_nibbles = traversed_nibbles;
 
-            match sub_proof {
+            cur_hash = match sub_proof {
                 // Return when reaching the end of the key.
-                Some(p) if index == key_nibbles.len() => return Ok(Some(p.rlp)),
+                Some(p) if key_nibbles.size_hint().0 == 0 => return Ok(Some(p.rlp)),
                 // The trie doesn't contain the key.
-                Some(SubProof { hash: None, .. }) | None => return Ok(None),
-                Some(p) => {
-                    cur_hash = p.hash.unwrap();
-                    remaining_key_nibbles = &key_nibbles[index..];
-                }
-            }
+                Some(SubProof {
+                    hash: Some(hash), ..
+                }) => hash,
+                _ => return Ok(None),
+            };
         }
     }
 
-    fn locate_subproof(
+    fn locate_subproof<'a>(
         &self,
-        key_nibbles: &[u8],
+        mut key_nibbles: NibblesIterator<'a, 0>,
         rlp_encoded_node: &[u8],
-    ) -> Result<(Option<SubProof>, usize), ProofError> {
+    ) -> Result<(Option<SubProof>, NibblesIterator<'a, 0>), ProofError> {
         let rlp = rlp::Rlp::new(rlp_encoded_node);
 
         match rlp.item_count() {
             Ok(EXT_NODE_SIZE) => {
-                let decoded_key_nibbles: Vec<_> = rlp
-                    .at(0)
-                    .unwrap()
-                    .as_val::<Vec<u8>>()
-                    .unwrap()
-                    .into_iter()
-                    .flat_map(to_nibble_array)
-                    .collect();
-                let (cur_key_path, term) = PartialPath::decode(decoded_key_nibbles);
+                let decoded_key = rlp.at(0).unwrap().as_val::<Vec<u8>>().unwrap();
+                let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);
+
+                let (cur_key_path, term) =
+                    PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
                 let cur_key = cur_key_path.into_inner();
 
                 let rlp = rlp.at(1).unwrap();
@@ -171,30 +165,32 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     rlp.as_raw().to_vec()
                 };
 
-                // Check if the key of current node match with the given key.
-                if key_nibbles.len() < cur_key.len() || key_nibbles[..cur_key.len()] != cur_key {
-                    return Ok((None, 0));
+                // Check if the key of current node match with the given key
+                // and consume the current-key portion of the nibbles-iterator
+                let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
+                    || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
+
+                if does_not_match {
+                    return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
                 }
 
-                if term {
-                    Ok((
-                        Some(SubProof {
-                            rlp: data,
-                            hash: None,
-                        }),
-                        cur_key.len(),
-                    ))
+                let sub_proof = if term {
+                    SubProof {
+                        rlp: data,
+                        hash: None,
+                    }
                 } else {
-                    self.generate_subproof(data)
-                        .map(|subproof| (Some(subproof), cur_key.len()))
-                }
+                    self.generate_subproof(data)?
+                };
+
+                Ok((sub_proof.into(), key_nibbles))
             }
 
-            Ok(BRANCH_NODE_SIZE) if key_nibbles.is_empty() => Err(ProofError::NoSuchNode),
+            Ok(BRANCH_NODE_SIZE) if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
 
             Ok(BRANCH_NODE_SIZE) => {
-                let index = key_nibbles[0];
-                let rlp = rlp.at(index as usize).unwrap();
+                let index = key_nibbles.next().unwrap() as usize;
+                let rlp = rlp.at(index).unwrap();
 
                 let data = if rlp.is_data() {
                     rlp.as_val::<Vec<u8>>().unwrap()
@@ -203,7 +199,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 };
 
                 self.generate_subproof(data)
-                    .map(|subproof| (Some(subproof), 1))
+                    .map(|subproof| (Some(subproof), key_nibbles))
             }
 
             Ok(_) => Err(ProofError::DecodeError(rlp::DecoderError::RlpInvalidLength)),
@@ -557,7 +553,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     .flat_map(to_nibble_array)
                     .collect();
 
-                let (cur_key_path, term) = PartialPath::decode(cur_key_path);
+                let (cur_key_path, term) = PartialPath::decode(&cur_key_path);
                 let cur_key = cur_key_path.into_inner();
 
                 let rlp = rlp.at(1)?;
