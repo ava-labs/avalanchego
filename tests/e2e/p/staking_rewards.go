@@ -261,12 +261,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		calculator := reward.NewCalculator(rewardConfig)
 		expectedValidationReward := calculator.Calculate(validationPeriod, weight, currentSupply)
 		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
-		expectedDelegateeReward, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
+		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")
 		expectedRewardBalances := map[ids.ShortID]uint64{
 			alphaValidationRewardKey.Address(): expectedValidationReward,
-			alphaDelegationRewardKey.Address(): expectedDelegateeReward,
+			alphaDelegationRewardKey.Address(): expectedDelegationFee,
 			betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
 			betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
 			gammaDelegationRewardKey.Address(): expectedDelegatorReward,
