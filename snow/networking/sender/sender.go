@@ -598,7 +598,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
-			s.ctx.NodeID,
+			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -1156,7 +1156,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			requestID,
 			preferredID,
 			acceptedID,
-			s.ctx.NodeID,
+			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -1380,7 +1380,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 			s.ctx.ChainID,
 			requestID,
 			appResponseBytes,
-			s.ctx.NodeID,
+			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return nil
