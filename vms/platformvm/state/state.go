@@ -321,7 +321,6 @@ type state struct {
 	currentSubnetValidatorList   linkeddb.LinkedDB
 	currentSubnetDelegatorBaseDB database.Database
 	currentSubnetDelegatorList   linkeddb.LinkedDB
-	pendingValidatorsDB          database.Database
 	pendingValidatorBaseDB       database.Database
 	pendingValidatorList         linkeddb.LinkedDB
 	pendingDelegatorBaseDB       database.Database
@@ -536,12 +535,6 @@ func newState(
 	currentSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, currentValidatorsDB)
 	currentSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, currentValidatorsDB)
 
-	pendingValidatorsDB := prefixdb.New(pendingPrefix, validatorsDB)
-	pendingValidatorBaseDB := prefixdb.New(validatorPrefix, pendingValidatorsDB)
-	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
-	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
-	pendingSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, pendingValidatorsDB)
-
 	nestedValidatorWeightDiffsDB := prefixdb.New(nestedValidatorWeightDiffsPrefix, validatorsDB)
 	nestedValidatorPublicKeyDiffsDB := prefixdb.New(nestedValidatorPublicKeyDiffsPrefix, validatorsDB)
 	flatValidatorWeightDiffsDB := prefixdb.New(flatValidatorWeightDiffsPrefix, validatorsDB)
@@ -641,15 +634,6 @@ func newState(
 		currentSubnetValidatorList:      linkeddb.NewDefault(currentSubnetValidatorBaseDB),
 		currentSubnetDelegatorBaseDB:    currentSubnetDelegatorBaseDB,
 		currentSubnetDelegatorList:      linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
-		pendingValidatorsDB:             pendingValidatorsDB,
-		pendingValidatorBaseDB:          pendingValidatorBaseDB,
-		pendingValidatorList:            linkeddb.NewDefault(pendingValidatorBaseDB),
-		pendingDelegatorBaseDB:          pendingDelegatorBaseDB,
-		pendingDelegatorList:            linkeddb.NewDefault(pendingDelegatorBaseDB),
-		pendingSubnetValidatorBaseDB:    pendingSubnetValidatorBaseDB,
-		pendingSubnetValidatorList:      linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
-		pendingSubnetDelegatorBaseDB:    pendingSubnetDelegatorBaseDB,
-		pendingSubnetDelegatorList:      linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
 		nestedValidatorWeightDiffsDB:    nestedValidatorWeightDiffsDB,
 		nestedValidatorPublicKeyDiffsDB: nestedValidatorPublicKeyDiffsDB,
 		flatValidatorWeightDiffsDB:      flatValidatorWeightDiffsDB,
@@ -1698,7 +1682,6 @@ func (s *state) Close() error {
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
 		s.pendingValidatorBaseDB.Close(),
-		s.pendingValidatorsDB.Close(),
 		s.currentSubnetValidatorBaseDB.Close(),
 		s.currentSubnetDelegatorBaseDB.Close(),
 		s.currentDelegatorBaseDB.Close(),
