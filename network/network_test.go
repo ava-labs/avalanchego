@@ -642,23 +642,29 @@ func TestDialContext(t *testing.T) {
 
 	dialer := newTestDialer()
 	network.dialer = dialer
-	ipPort, listener := dialer.NewListener()
+	dynamicIP, listener1 := dialer.NewListener()
+	trackedIP := &trackedIP{
+		ip: dynamicIP.IPPort(),
+	}
 
-	// Set dialer to nil to assert that we are not using it.
-	// That is, we return immediately because the context is canceled.
-	network.dialer = nil
-	network.ManuallyTrack(ids.EmptyNodeID, ipPort.IPPort())
+	network.manuallyTrackedIDs.Add(ids.EmptyNodeID)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	network.dial(ctx, ids.EmptyNodeID, &trackedIP{
-		ip: ipPort.IPPort(),
-	})
+	network.dial(ctx, ids.EmptyNodeID, trackedIP)
 
-	// When a non-nil context is given, we actually dial the peer.
-	network.dialer = dialer
-	network.dial(ctx, ids.EmptyNodeID, &trackedIP{
-		ip: ipPort.IPPort(),
-	})
-	_, err := listener.Accept()
-	require.NoError(t, err)
+	gotConn := make(chan struct{})
+	go func() {
+		_, _ = listener1.Accept()
+		close(gotConn)
+	}()
+	select {
+	case <-gotConn:
+		require.FailNow(t, "unexpectedly connected to peer")
+	case <-time.After(1 * time.Second):
+	}
+
+	// Sanity check that when a non-cancelled context is given,
+	// we actually dial the peer.
+	network.dial(context.Background(), ids.EmptyNodeID, trackedIP)
+	<-gotConn
 }
