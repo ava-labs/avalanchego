@@ -38,17 +38,6 @@ versions with no additional cost at all.
 firewood is licensed by the Ecosystem License. For more information, see the
 [LICENSE file](./LICENSE.md).
 
-## Vendored Crates
-The following crates are vendored in this repository to allow for making
-modifications without requiring upstream approval:
-* [`growth-ring`](https://github.com/Determinant/growth-ring)
-* [`libaio-futures`](https://github.com/Determinant/libaio-futures)
-* [`shale`](https://github.com/Determinant/shale)
-
-These crates will either be heavily modified or removed prior to the production
-launch of firewood. If they are retained, all changes made will be shared
-upstream.
-
 ## Termimology
 
 * `Revision` - A historical point-in-time state/version of the trie. This
