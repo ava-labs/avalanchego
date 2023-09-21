@@ -106,8 +106,10 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			rewardKey, err := factory.NewPrivateKey()
 			require.NoError(err)
 
-			delegationPercent := 0.10 // 10%
-			delegationFee := uint32(reward.PercentDenominator * delegationPercent)
+			const (
+				delegationPercent = 0.10 // 10%
+				delegationFee     = reward.PercentDenominator * delegationPercent
+			)
 
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{Validator: txs.Validator{
