@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -59,6 +60,11 @@ const (
 	// checks. Useful for speeding up iteration during test
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
+
+	// Validator start time must be a minimum of SyncBound from the
+	// current time for validator addition to succeed, and adding 5
+	// seconds provides a buffer in case of any delay in processing.
+	DefaultValidatorStartTimeDiff = executor.SyncBound + 5*time.Second
 )
 
 // Env is used to access shared test fixture. Intended to be
