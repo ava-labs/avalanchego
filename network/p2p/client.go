@@ -23,6 +23,7 @@ var (
 // issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
+	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
@@ -32,15 +33,19 @@ type AppResponseCallback func(
 // CrossChainAppResponse for a CrossChainAppRequest issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type CrossChainAppResponseCallback func(
+	ctx context.Context,
 	chainID ids.ID,
 	responseBytes []byte,
 	err error,
 )
 
 type Client struct {
+	handlerID     uint64
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
+	// nodeSampler is used to select nodes to route AppRequestAny to
+	nodeSampler NodeSampler
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -51,15 +56,12 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	c.router.lock.RLock()
-	peers := c.router.peers.Sample(1)
-	c.router.lock.RUnlock()
-
-	if len(peers) != 1 {
+	sampled := c.nodeSampler.Sample(ctx, 1)
+	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of(peers[0])
+	nodeIDs := set.Of(sampled...)
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
@@ -94,8 +96,11 @@ func (c *Client) AppRequest(
 			return err
 		}
 
-		c.router.pendingAppRequests[requestID] = onResponse
-		c.router.requestID++
+		c.router.pendingAppRequests[requestID] = pendingAppRequest{
+			AppResponseCallback: onResponse,
+			metrics:             c.router.handlers[c.handlerID].metrics,
+		}
+		c.router.requestID += 2
 	}
 
 	return nil
@@ -148,14 +153,17 @@ func (c *Client) CrossChainAppRequest(
 	if err := c.sender.SendCrossChainAppRequest(
 		ctx,
 		chainID,
-		c.router.requestID,
+		requestID,
 		c.prefixMessage(appRequestBytes),
 	); err != nil {
 		return err
 	}
 
-	c.router.pendingCrossChainAppRequests[requestID] = onResponse
-	c.router.requestID++
+	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
+		CrossChainAppResponseCallback: onResponse,
+		metrics:                       c.router.handlers[c.handlerID].metrics,
+	}
+	c.router.requestID += 2
 
 	return nil
 }

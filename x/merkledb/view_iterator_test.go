@@ -197,7 +197,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view1, err := db.NewView(context.Background(), ops)
+	view1, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
@@ -205,7 +205,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view2, err := view1.NewView(context.Background(), ops)
+	view2, err := view1.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
@@ -213,7 +213,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view3, err := view2.NewView(context.Background(), ops)
+	view3, err := view2.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	// Might have introduced duplicates, so only expect the latest value.

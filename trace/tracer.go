@@ -57,9 +57,7 @@ func (t *tracer) Close() error {
 
 func New(config Config) (Tracer, error) {
 	if !config.Enabled {
-		return &noOpTracer{
-			t: trace.NewNoopTracerProvider().Tracer(constants.AppName),
-		}, nil
+		return Noop, nil
 	}
 
 	exporter, err := newExporter(config.ExporterConfig)

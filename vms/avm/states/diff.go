@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -33,9 +33,9 @@ type diff struct {
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*avax.UTXO
-	addedTxs      map[ids.ID]*txs.Tx      // map of txID -> tx
-	addedBlockIDs map[uint64]ids.ID       // map of height -> blockID
-	addedBlocks   map[ids.ID]blocks.Block // map of blockID -> block
+	addedTxs      map[ids.ID]*txs.Tx     // map of txID -> tx
+	addedBlockIDs map[uint64]ids.ID      // map of height -> blockID
+	addedBlocks   map[ids.ID]block.Block // map of blockID -> block
 
 	lastAccepted ids.ID
 	timestamp    time.Time
@@ -55,7 +55,7 @@ func NewDiff(
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		addedTxs:      make(map[ids.ID]*txs.Tx),
 		addedBlockIDs: make(map[uint64]ids.ID),
-		addedBlocks:   make(map[ids.ID]blocks.Block),
+		addedBlocks:   make(map[ids.ID]block.Block),
 		lastAccepted:  parentState.GetLastAccepted(),
 		timestamp:     parentState.GetTimestamp(),
 	}, nil
@@ -112,7 +112,7 @@ func (d *diff) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return parentState.GetBlockIDAtHeight(height)
 }
 
-func (d *diff) GetBlock(blkID ids.ID) (blocks.Block, error) {
+func (d *diff) GetBlock(blkID ids.ID) (block.Block, error) {
 	if blk, exists := d.addedBlocks[blkID]; exists {
 		return blk, nil
 	}
@@ -124,7 +124,7 @@ func (d *diff) GetBlock(blkID ids.ID) (blocks.Block, error) {
 	return parentState.GetBlock(blkID)
 }
 
-func (d *diff) AddBlock(blk blocks.Block) {
+func (d *diff) AddBlock(blk block.Block) {
 	blkID := blk.ID()
 	d.addedBlockIDs[blk.Height()] = blkID
 	d.addedBlocks[blkID] = blk

@@ -8,11 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cast"
+
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -28,11 +33,19 @@ import (
 )
 
 const (
-	DefaultNodeCount      = 5
+	DefaultNodeCount      = 2 // Minimum required to ensure connectivity-based health checks will pass
 	DefaultFundedKeyCount = 50
+
+	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
+
+	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
+	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
 )
 
 var (
+	// Arbitrarily large amount of AVAX (10^12) to fund keys on the C-Chain for testing
+	DefaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
+
 	errEmptyValidatorsForGenesis   = errors.New("failed to generate genesis: empty validator IDs")
 	errNoKeysForGenesis            = errors.New("failed to generate genesis: no keys to fund")
 	errInvalidNetworkIDForGenesis  = errors.New("network ID can't be mainnet, testnet or local network ID")
@@ -125,22 +138,29 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 		return errNoKeysForGenesis
 	}
 
-	// Fund the provided keys
-	xChainBalances := []AddrAndBalance{}
+	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
+	xChainBalances := make(XChainBalanceMap, len(c.FundedKeys))
+	cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
 	for _, key := range c.FundedKeys {
-		xChainBalances = append(xChainBalances, AddrAndBalance{
-			key.Address(),
-			30 * units.MegaAvax, // Arbitrary large amount to support testing
-		})
+		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
+		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+			Balance: DefaultFundedKeyCChainAmount,
+		}
 	}
 
-	genesis, err := NewTestGenesis(networkID, xChainBalances, validatorIDs)
+	genesis, err := NewTestGenesis(networkID, xChainBalances, cChainBalances, validatorIDs)
 	if err != nil {
 		return err
 	}
 
 	c.Genesis = genesis
 	return nil
+}
+
+// NodeURI associates a node ID with its API URI.
+type NodeURI struct {
+	NodeID ids.NodeID
+	URI    string
 }
 
 // NodeConfig defines configuration for an AvalancheGo node.
@@ -273,22 +293,22 @@ func (nc *NodeConfig) EnsureNodeID() error {
 	if err != nil {
 		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
-	nc.NodeID = ids.NodeIDFromCert(tlsCert.Leaf)
+	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
+	nc.NodeID = ids.NodeIDFromCert(stakingCert)
 
 	return nil
 }
 
-type AddrAndBalance struct {
-	Addr    ids.ShortID
-	Balance uint64
-}
+// Helper type to simplify configuring X-Chain genesis balances
+type XChainBalanceMap map[ids.ShortID]uint64
 
 // Create a genesis struct valid for bootstrapping a test
 // network. Note that many of the genesis fields (e.g. reward
 // addresses) are randomly generated or hard-coded.
 func NewTestGenesis(
 	networkID uint32,
-	xChainBalances []AddrAndBalance,
+	xChainBalances XChainBalanceMap,
+	cChainBalances core.GenesisAlloc,
 	validatorIDs []ids.NodeID,
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
@@ -299,7 +319,7 @@ func NewTestGenesis(
 	if len(validatorIDs) == 0 {
 		return nil, errMissingValidatorsForGenesis
 	}
-	if len(xChainBalances) == 0 {
+	if len(xChainBalances) == 0 || len(cChainBalances) == 0 {
 		return nil, errMissingBalancesForGenesis
 	}
 
@@ -343,22 +363,21 @@ func NewTestGenesis(
 		InitialStakedFunds:         []string{stakeAddress},
 		InitialStakeDuration:       365 * 24 * 60 * 60, // 1 year
 		InitialStakeDurationOffset: 90 * 60,            // 90 minutes
-		CChainGenesis:              genesis.LocalConfig.CChainGenesis,
 		Message:                    "hello avalanche!",
 	}
 
-	// Set xchain balances
-	for _, addressBalance := range xChainBalances {
-		address, err := address.Format("X", constants.GetHRP(networkID), addressBalance.Addr[:])
+	// Set X-Chain balances
+	for xChainAddress, balance := range xChainBalances {
+		avaxAddr, err := address.Format("X", constants.GetHRP(networkID), xChainAddress[:])
 		if err != nil {
-			return nil, fmt.Errorf("failed to format balance address: %w", err)
+			return nil, fmt.Errorf("failed to format X-Chain address: %w", err)
 		}
 		config.Allocations = append(
 			config.Allocations,
 			genesis.UnparsedAllocation{
 				ETHAddr:       ethAddress,
-				AVAXAddr:      address,
-				InitialAmount: addressBalance.Balance,
+				AVAXAddr:      avaxAddr,
+				InitialAmount: balance,
 				UnlockSchedule: []genesis.LockedAmount{
 					{
 						Amount: 20 * units.MegaAvax,
@@ -371,6 +390,21 @@ func NewTestGenesis(
 			},
 		)
 	}
+
+	// Define C-Chain genesis
+	cChainGenesis := &core.Genesis{
+		Config: &params.ChainConfig{
+			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
+		},
+		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
+		GasLimit:   DefaultGasLimit,
+		Alloc:      cChainBalances,
+	}
+	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
+	}
+	config.CChainGenesis = string(cChainGenesisBytes)
 
 	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
 	// will be easier to perform with nodes other than the initial validators since the timing of

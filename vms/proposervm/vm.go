@@ -6,7 +6,7 @@ package proposervm
 import (
 	"context"
 	"crypto"
-	"crypto/x509"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -45,22 +46,26 @@ const (
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
+	// DefaultNumHistoricalBlocks as 0 results in never deleting any historical
+	// blocks.
+	DefaultNumHistoricalBlocks uint64 = 0
 
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 64 * units.MiB
 )
 
 var (
-	_ block.ChainVM              = (*VM)(nil)
-	_ block.BatchedChainVM       = (*VM)(nil)
-	_ block.HeightIndexedChainVM = (*VM)(nil)
-	_ block.StateSyncableVM      = (*VM)(nil)
+	_ block.ChainVM         = (*VM)(nil)
+	_ block.BatchedChainVM  = (*VM)(nil)
+	_ block.StateSyncableVM = (*VM)(nil)
 
 	// TODO: remove after the X-chain supports height indexing.
 	mainnetXChainID ids.ID
 	fujiXChainID    ids.ID
 
 	dbPrefix = []byte("proposervm")
+
+	errHeightIndexInvalidWhilePruning = errors.New("height index invalid while pruning old blocks")
 )
 
 func init() {
@@ -84,16 +89,16 @@ type VM struct {
 	block.ChainVM
 	blockBuilderVM block.BuildBlockWithContextChainVM
 	batchedVM      block.BatchedChainVM
-	hVM            block.HeightIndexedChainVM
 	ssVM           block.StateSyncableVM
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
 	minBlkDelay         time.Duration
+	numHistoricalBlocks uint64
 	// block signer
 	stakingLeafSigner crypto.Signer
 	// block certificate
-	stakingCertLeaf *x509.Certificate
+	stakingCertLeaf *staking.Certificate
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -137,23 +142,23 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
+	numHistoricalBlocks uint64,
 	stakingLeafSigner crypto.Signer,
-	stakingCertLeaf *x509.Certificate,
+	stakingCertLeaf *staking.Certificate,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
-	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
 		ChainVM:        vm,
 		blockBuilderVM: blockBuilderVM,
 		batchedVM:      batchedVM,
-		hVM:            hVM,
 		ssVM:           ssVM,
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 		minBlkDelay:         minBlkDelay,
+		numHistoricalBlocks: numHistoricalBlocks,
 		stakingLeafSigner:   stakingLeafSigner,
 		stakingCertLeaf:     stakingCertLeaf,
 	}
@@ -249,6 +254,10 @@ func (vm *VM) Initialize(
 	}
 
 	if err := vm.setLastAcceptedMetadata(ctx); err != nil {
+		return err
+	}
+
+	if err := vm.pruneOldBlocks(); err != nil {
 		return err
 	}
 
@@ -394,12 +403,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 // repair makes sure that vm and innerVM chains are in sync.
 // Moreover it fixes vm's height index if defined.
 func (vm *VM) repair(ctx context.Context) error {
-	if vm.hVM == nil {
-		// height index not defined. Just sync vms and innerVM chains.
-		return vm.repairAcceptedChainByIteration(ctx)
-	}
-
-	switch vm.hVM.VerifyHeightIndex(ctx) {
+	switch err := vm.ChainVM.VerifyHeightIndex(ctx); err {
 	case nil:
 		// InnerVM height index is complete. We can immediately verify
 		// and repair this VM height index.
@@ -414,7 +418,12 @@ func (vm *VM) repair(ctx context.Context) error {
 		}
 	case block.ErrIndexIncomplete:
 	default:
-		return nil
+		return err
+	}
+
+	if vm.numHistoricalBlocks != 0 {
+		vm.ctx.Log.Fatal("block height index must be valid when pruning historical blocks")
+		return errHeightIndexInvalidWhilePruning
 	}
 
 	// innerVM height index is incomplete. Sync vm and innerVM chains first.
@@ -431,7 +440,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		for {
 			// The underlying VM expects the lock to be held here.
 			vm.ctx.Lock.Lock()
-			err := vm.hVM.VerifyHeightIndex(ctx)
+			err := vm.ChainVM.VerifyHeightIndex(ctx)
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
@@ -592,14 +601,21 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 
-	// The inner vm must be behind the proposer vm, so we must roll the proposervm back.
+	vm.ctx.Log.Info("repairing accepted chain by height",
+		zap.Uint64("outerHeight", proLastAcceptedHeight),
+		zap.Uint64("innerHeight", innerLastAcceptedHeight),
+	)
+
+	// The inner vm must be behind the proposer vm, so we must roll the
+	// proposervm back.
 	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
 		return err
 	}
 
 	if forkHeight > innerLastAcceptedHeight {
-		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
+		// We are rolling back past the fork, so we should just forget about all
+		// of our proposervm indices.
 		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return err
 		}
@@ -608,7 +624,10 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 	newProLastAcceptedID, err := vm.State.GetBlockIDAtHeight(innerLastAcceptedHeight)
 	if err != nil {
-		return err
+		// This fatal error can happen if NumHistoricalBlocks is set too
+		// aggressively and the inner vm rolled back before the oldest
+		// proposervm block.
+		return fmt.Errorf("proposervm failed to rollback last accepted block to height (%d): %w", innerLastAcceptedHeight, err)
 	}
 
 	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {

@@ -5,10 +5,10 @@ package ids
 
 import (
 	"bytes"
-	"crypto/x509"
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -76,7 +76,7 @@ func ToNodeID(bytes []byte) (NodeID, error) {
 	return NodeID(nodeID), err
 }
 
-func NodeIDFromCert(cert *x509.Certificate) NodeID {
+func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	return hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)

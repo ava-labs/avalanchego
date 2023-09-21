@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -33,9 +32,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 			TestVM: common.TestVM{
 				T: t,
 			},
-		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
@@ -80,12 +76,13 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),

@@ -19,7 +19,7 @@ import (
 func Test_History_Simple(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -86,12 +86,11 @@ func Test_History_Large(t *testing.T) {
 
 	numIters := 250
 
-	for i := 1; i < 10; i++ {
+	for i := 1; i < 5; i++ {
 		config := newDefaultConfig()
 		// History must be large enough to get the change proof
-		// after this loop. Multiply by four because every loop
-		// iteration we do two puts and up to two deletes.
-		config.HistoryLength = 4 * numIters
+		// after this loop.
+		config.HistoryLength = uint(numIters)
 		db, err := New(
 			context.Background(),
 			memdb.New(),
@@ -105,6 +104,7 @@ func Test_History_Large(t *testing.T) {
 		r := rand.New(rand.NewSource(now)) // #nosec G404
 		// make sure they stay in sync
 		for x := 0; x < numIters; x++ {
+			batch := db.NewBatch()
 			addkey := make([]byte, r.Intn(50))
 			_, err := r.Read(addkey)
 			require.NoError(err)
@@ -112,12 +112,12 @@ func Test_History_Large(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			require.NoError(db.Put(addkey, val))
+			require.NoError(batch.Put(addkey, val))
 
 			addNilkey := make([]byte, r.Intn(50))
 			_, err = r.Read(addNilkey)
 			require.NoError(err)
-			require.NoError(db.Put(addNilkey, nil))
+			require.NoError(batch.Put(addNilkey, nil))
 
 			deleteKeyStart := make([]byte, r.Intn(50))
 			_, err = r.Read(deleteKeyStart)
@@ -125,20 +125,24 @@ func Test_History_Large(t *testing.T) {
 
 			it := db.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				require.NoError(db.Delete(it.Key()))
+				require.NoError(batch.Delete(it.Key()))
 			}
 			require.NoError(it.Error())
 			it.Release()
 
+			require.NoError(batch.Write())
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			roots = append(roots, root)
 		}
-		proof, err := db.GetRangeProofAtRoot(context.Background(), roots[0], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
-		require.NoError(err)
-		require.NotNil(proof)
 
-		require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[0]))
+		for i := 0; i < numIters; i += numIters / 10 {
+			proof, err := db.GetRangeProofAtRoot(context.Background(), roots[i], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
+			require.NoError(err)
+			require.NotNil(proof)
+
+			require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[i]))
+		}
 	}
 }
 
@@ -148,7 +152,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	config := newDefaultConfig()
 	config.HistoryLength = 5
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -215,7 +219,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	config := newDefaultConfig()
 	config.HistoryLength = 2
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -269,7 +273,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 
 	config := newDefaultConfig()
 	config.HistoryLength = 4
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -317,7 +321,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 func Test_History_RepeatedRoot(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -361,7 +365,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 func Test_History_ExcessDeletes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -393,7 +397,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 func Test_History_DontIncludeAllNodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -421,7 +425,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 func Test_History_Branching2Nodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -449,7 +453,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 func Test_History_Branching3Nodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -479,7 +483,7 @@ func Test_History_MaxLength(t *testing.T) {
 
 	config := newDefaultConfig()
 	config.HistoryLength = 2
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -509,7 +513,7 @@ func Test_History_MaxLength(t *testing.T) {
 func Test_Change_List(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),

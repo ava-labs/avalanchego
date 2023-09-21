@@ -1,11 +1,10 @@
 # Changes to the minimum golang version must also be replicated in
 # scripts/build_avalanche.sh
-# scripts/local.Dockerfile
 # Dockerfile (here)
 # README.md
 # go.mod
 # ============= Compilation Stage ================
-FROM golang:1.19.12-bullseye AS builder
+FROM golang:1.20.8-bullseye AS builder
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod

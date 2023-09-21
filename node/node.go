@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -805,7 +806,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingCert:                             n.Config.StakingTLSCert,
+		StakingTLSCert:                          n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
@@ -1344,9 +1345,15 @@ func (n *Node) Initialize(
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {
+	tlsCert := config.StakingTLSCert.Leaf
+	stakingCert := staking.CertificateFromX509(tlsCert)
+	if err := staking.ValidateCertificate(stakingCert); err != nil {
+		return fmt.Errorf("invalid staking certificate: %w", err)
+	}
+
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+	n.ID = ids.NodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
@@ -1354,6 +1361,7 @@ func (n *Node) Initialize(
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
+		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
