@@ -125,8 +125,10 @@ func (m *manager) RegisterRequest(
 	timeoutHandler func(),
 ) {
 	newTimeoutHandler := func() {
-		// If this request timed out, tell the benchlist manager
-		m.benchlistMgr.RegisterFailure(chainID, nodeID)
+		if requestID.Op != byte(message.AppResponseOp) {
+			// If this request timed out, tell the benchlist manager
+			m.benchlistMgr.RegisterFailure(chainID, nodeID)
+		}
 		timeoutHandler()
 	}
 	m.tm.Put(requestID, measureLatency, newTimeoutHandler)
