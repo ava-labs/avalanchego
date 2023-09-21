@@ -2360,7 +2360,7 @@ func (s *state) writeSubnetOwners() error {
 		delete(s.subnetOwners, subnetID)
 		s.subnetOwnerCache.Evict(subnetID) // TODO: Should this be Evict?
 
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, owner)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
