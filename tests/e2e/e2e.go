@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -53,6 +54,11 @@ const (
 	// Interval appropriate for network operations that should be
 	// retried periodically but not too often.
 	DefaultPollingInterval = 500 * time.Millisecond
+
+	// Setting this env will disable post-test bootstrap
+	// checks. Useful for speeding up iteration during test
+	// development.
+	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
 )
 
 // Env is used to access shared test fixture. Intended to be
@@ -246,4 +252,15 @@ func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
 func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 	baseFee := SuggestGasPrice(ethClient)
 	return common.WithBaseFee(baseFee)
+}
+
+// Verify that a new node can bootstrap into the network.
+func CheckBootstrapIsPossible(network testnet.Network) {
+	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
+		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
+		return
+	}
+	ginkgo.By("checking if bootstrap is possible with the current network state")
+	node := AddEphemeralNode(network, testnet.FlagsMap{})
+	WaitForHealthy(node)
 }

@@ -57,6 +57,8 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 
 		ginkgo.By("checking that the second new node is connected to its peers")
 		checkConnectedPeers(nodes, node2)
+
+		// A bootstrap check was already performed by the second node.
 	})
 })
 
