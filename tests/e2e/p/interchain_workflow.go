@@ -112,12 +112,15 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			)
 
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(startTime.Unix()),
-					End:    uint64(endTime.Unix()),
-					Wght:   weight,
-				}},
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(startTime.Unix()),
+						End:    uint64(endTime.Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
 				nodePOP,
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
@@ -145,13 +148,13 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
-					Subnet: constants.PrimaryNetworkID,
 					Validator: txs.Validator{
 						NodeID: nodeID,
 						Start:  uint64(startTime.Unix()),
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
+					Subnet: constants.PrimaryNetworkID,
 				},
 				pWallet.AVAXAssetID(),
 				&secp256k1fx.OutputOwners{
