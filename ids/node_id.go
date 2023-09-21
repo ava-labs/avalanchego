@@ -68,10 +68,6 @@ func (nodeID NodeID) Less(other NodeID) bool {
 	return nodeID < other
 }
 
-func (nodeID NodeID) Equal(other NodeID) bool {
-	return nodeID == other
-}
-
 func NodeIDFromBytes(bytes []byte) NodeID {
 	return NodeID(string(bytes))
 }

@@ -178,7 +178,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -321,7 +321,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
@@ -456,7 +456,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
@@ -593,7 +593,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx = utils.Detach(ctx)
 
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAccepted(
 			s.ctx.ChainID,
 			requestID,
@@ -659,7 +659,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	)
 
 	// Sending a GetAncestors to myself always fails.
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -782,7 +782,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	)
 
 	// Sending a Get to myself always fails.
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -1150,7 +1150,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundChits(
 			s.ctx.ChainID,
 			requestID,
@@ -1375,7 +1375,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
-	if nodeID.Equal(s.ctx.NodeID) {
+	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAppResponse(
 			s.ctx.ChainID,
 			requestID,

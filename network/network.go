@@ -1208,7 +1208,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// At this point we have successfully upgraded the connection and will
 	// return a nil error.
 
-	if nodeID.Equal(n.config.MyNodeID) {
+	if nodeID == n.config.MyNodeID {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo("dropping connection to myself")
 		return nil

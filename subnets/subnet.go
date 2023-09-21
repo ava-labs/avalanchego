@@ -98,7 +98,7 @@ func (s *subnet) IsAllowed(nodeID ids.NodeID, isValidator bool) bool {
 	// Case 2: This subnet is not validator-only subnet
 	// Case 3: NodeID is a validator for this chain
 	// Case 4: NodeID is explicitly allowed whether it's subnet validator or not
-	return nodeID.Equal(s.myNodeID) ||
+	return nodeID == s.myNodeID ||
 		!s.config.ValidatorOnly ||
 		isValidator ||
 		s.config.AllowedNodes.Contains(nodeID)
