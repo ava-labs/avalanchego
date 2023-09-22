@@ -59,5 +59,5 @@ type FxOperation interface {
 
 type FxCredential struct {
 	FxID              ids.ID `serialize:"false" json:"fxID"`
-	verify.Verifiable `serialize:"true" json:"credential"`
+	verify.Verifiable `serialize:"true"  json:"credential"`
 }

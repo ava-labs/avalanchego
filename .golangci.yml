@@ -41,6 +41,7 @@ linters:
     - staticcheck
     - stylecheck
     - typecheck
+    - tagalign
     - unconvert
     - unparam
     - unused
@@ -128,3 +129,9 @@ linters-settings:
       - "all"
       - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
       - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+  tagalign:
+    align: true
+    sort: true
+    strict: true
+    order:
+      - serialize
