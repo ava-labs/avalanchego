@@ -59,7 +59,7 @@ func newDBKey(key []byte, height uint64) ([]byte, []byte) {
 }
 
 // parseDBKey takes a database formatted key and returns the user formatted key
-// along with its the height.
+// along with its height.
 //
 // Note: An error should only be returned from this function if the database has
 // been corrupted.
