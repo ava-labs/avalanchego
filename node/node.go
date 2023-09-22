@@ -414,7 +414,7 @@ func (n *Node) writeProcessContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal process context: %w", err)
 	}
-	if err := os.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
+	if err := perms.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write process context: %w", err)
 	}
 	return nil
