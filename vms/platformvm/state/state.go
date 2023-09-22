@@ -1672,10 +1672,16 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
+	weightDiffs, err := s.processCurrentStakers()
+	if err != nil {
+		return err
+	}
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
+		s.writeWeightDiffs(height, weightDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1688,6 +1694,98 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeMetadata(),
 	)
 	return errs.Err
+}
+
+func (s *state) writeWeightDiffs(height uint64, weightDiffs map[weightDiffKey]*ValidatorWeightDiff) error {
+	for k, weightDiff := range weightDiffs {
+		if weightDiff.Amount == 0 {
+			continue
+		}
+
+		err := s.flatValidatorWeightDiffsDB.Put(
+			marshalDiffKey(k.subnetID, height, k.nodeID),
+			marshalWeightDiff(weightDiff),
+		)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Remove this once we no longer support version rollbacks.
+		prefixStruct := heightWithSubnet{
+			Height:   height,
+			SubnetID: k.subnetID,
+		}
+		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
+		if err != nil {
+			return fmt.Errorf("failed to create prefix bytes: %w", err)
+		}
+		rawNestedWeightDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
+		nestedWeightDiffDB := linkeddb.NewDefault(rawNestedWeightDiffDB)
+
+		weightDiffBytes, err := block.GenesisCodec.Marshal(block.Version, weightDiff)
+		if err != nil {
+			return fmt.Errorf("failed to serialize validator weight diff: %w", err)
+		}
+		if err := nestedWeightDiffDB.Put(k.nodeID[:], weightDiffBytes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type weightDiffKey struct {
+	subnetID ids.ID
+	nodeID   ids.NodeID
+}
+
+func (s *state) processCurrentStakers() (map[weightDiffKey]*ValidatorWeightDiff, error) {
+	outputWeights := make(map[weightDiffKey]*ValidatorWeightDiff)
+
+	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
+		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
+		for nodeID, validatorDiff := range subnetValidatorDiffs {
+			weightKey := weightDiffKey{
+				subnetID: subnetID,
+				nodeID:   nodeID,
+			}
+
+			// make sure there is an entry for delegators even in case
+			// there are no validators modified.
+			outputWeights[weightKey] = &ValidatorWeightDiff{
+				Decrease: validatorDiff.validatorStatus == deleted,
+			}
+
+			switch validatorDiff.validatorStatus {
+			case added:
+				weight := validatorDiff.validator.Weight
+				outputWeights[weightKey].Amount = weight
+
+			case deleted:
+				weight := validatorDiff.validator.Weight
+				outputWeights[weightKey].Amount = weight
+
+			default:
+				// nothing to do
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+
+				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
+					return nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+				}
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
+					return nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+				}
+			}
+		}
+	}
+	return outputWeights, nil
 }
 
 func (s *state) Close() error {
@@ -1921,17 +2019,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			delegatorDB = s.currentDelegatorList
 		}
 
-		prefixStruct := heightWithSubnet{
-			Height:   height,
-			SubnetID: subnetID,
-		}
-		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
-		if err != nil {
-			return fmt.Errorf("failed to create prefix bytes: %w", err)
-		}
-		rawNestedWeightDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
-		nestedWeightDiffDB := linkeddb.NewDefault(rawNestedWeightDiffDB)
-
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
@@ -2029,28 +2116,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				validatorDiff,
 			)
 			if err != nil {
-				return err
-			}
-
-			if weightDiff.Amount == 0 {
-				// No weight change to record; go to next validator.
-				continue
-			}
-
-			err = s.flatValidatorWeightDiffsDB.Put(
-				marshalDiffKey(subnetID, height, nodeID),
-				marshalWeightDiff(weightDiff),
-			)
-			if err != nil {
-				return err
-			}
-
-			// TODO: Remove this once we no longer support version rollbacks.
-			weightDiffBytes, err := block.GenesisCodec.Marshal(block.Version, weightDiff)
-			if err != nil {
-				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
-			}
-			if err := nestedWeightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
 				return err
 			}
 
