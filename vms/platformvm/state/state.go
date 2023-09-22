@@ -1672,7 +1672,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	weightDiffs, blsKeyDiffs, err := s.processCurrentStakers()
+	weightDiffs, blsKeyDiffs, valSetDiff, err := s.processCurrentStakers()
 	if err != nil {
 		return err
 	}
@@ -1680,9 +1680,10 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
-		s.writeCurrentStakers(updateValidators),
+		s.writeCurrentStakers(),
 		s.writeWeightDiffs(height, weightDiffs),
 		s.writeBlsKeyDiffs(height, blsKeyDiffs),
+		s.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1764,6 +1765,63 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 	return nil
 }
 
+func (s *state) updateValidatorSet(
+	updateValidators bool,
+	valSetDiff map[subnetNodePair]*diffValidator,
+	weightDiffs map[subnetNodePair]*ValidatorWeightDiff,
+) error {
+	if !updateValidators {
+		return nil
+	}
+
+	for weightKey, weightDiff := range weightDiffs {
+		var (
+			subnetID      = weightKey.subnetID
+			nodeID        = weightKey.nodeID
+			validatorDiff = valSetDiff[weightKey]
+			err           error
+		)
+
+		// We only track the current validator set of tracked subnets.
+		if subnetID != constants.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
+			continue
+		}
+		if weightDiff.Amount == 0 {
+			// No weight change to record; go to next validator.
+			continue
+		}
+
+		if weightDiff.Decrease {
+			err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+		} else {
+			if validatorDiff.validatorStatus == added {
+				staker := validatorDiff.validator
+				err = validators.Add(
+					s.cfg.Validators,
+					subnetID,
+					nodeID,
+					staker.PublicKey,
+					staker.TxID,
+					weightDiff.Amount,
+				)
+			} else {
+				err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to update validator weight: %w", err)
+		}
+	}
+
+	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		return nil
+	}
+	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
+	s.metrics.SetTotalStake(primaryValidators.Weight())
+	return nil
+}
+
 type subnetNodePair struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID
@@ -1772,11 +1830,13 @@ type subnetNodePair struct {
 func (s *state) processCurrentStakers() (
 	map[subnetNodePair]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
+	map[subnetNodePair]*diffValidator,
 	error,
 ) {
 	var (
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
+		outputValSet  = make(map[subnetNodePair]*diffValidator)
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
@@ -1786,6 +1846,7 @@ func (s *state) processCurrentStakers() (
 				subnetID: subnetID,
 				nodeID:   nodeID,
 			}
+			outputValSet[weightKey] = validatorDiff
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
@@ -1832,18 +1893,18 @@ func (s *state) processCurrentStakers() (
 				staker := addedDelegatorIterator.Value()
 
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
-					return nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+					return nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
-					return nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+					return nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return outputWeights, outputBlsKey, nil
+	return outputWeights, outputBlsKey, outputValSet, nil
 }
 
 func (s *state) Close() error {
@@ -2061,7 +2122,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers(updateValidators bool) error {
+func (s *state) writeCurrentStakers() error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		delete(s.currentStakers.validatorDiffs, subnetID)
 
@@ -2129,52 +2190,8 @@ func (s *state) writeCurrentStakers(updateValidators bool) error {
 			if err != nil {
 				return err
 			}
-
-			// TODO: Move the validator set management out of the state package
-			if !updateValidators {
-				continue
-			}
-
-			// We only track the current validator set of tracked subnets.
-			if subnetID != constants.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
-				continue
-			}
-
-			if weightDiff.Decrease {
-				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
-			} else {
-				if validatorDiff.validatorStatus == added {
-					staker := validatorDiff.validator
-					err = validators.Add(
-						s.cfg.Validators,
-						subnetID,
-						nodeID,
-						staker.PublicKey,
-						staker.TxID,
-						weightDiff.Amount,
-					)
-				} else {
-					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
-				}
-			}
-			if err != nil {
-				return fmt.Errorf("failed to update validator weight: %w", err)
-			}
 		}
 	}
-
-	// TODO: Move validator set management out of the state package
-	//
-	// Attempt to update the stake metrics
-	if !updateValidators {
-		return nil
-	}
-	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return nil
-	}
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
-	s.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }
 
