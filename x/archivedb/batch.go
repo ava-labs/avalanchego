@@ -12,7 +12,7 @@ var _ database.Batch = (*batch)(nil)
 // It consumes puts and deletes at a specified height. When committing, an
 // atomic operation is created which registers the modifications at the
 // specified height and updates the last tracked height to be equal to this
-// batches height.
+// batch's height.
 type batch struct {
 	db     *Database
 	height uint64
