@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	RootKey []byte
+	rootKey []byte
 	_       MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
@@ -241,7 +241,7 @@ func newDatabase(
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
 		branchFactor:         config.BranchFactor,
-		rootPath:             newPath(RootKey),
+		rootPath:             newPath(rootKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
