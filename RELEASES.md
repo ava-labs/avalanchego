@@ -4,7 +4,7 @@
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
 
-The plugin version is unchanged at `28` and compatible with versions `v1.10.9-v1.10.10`.
+The plugin version is unchanged at `28` and compatible with versions `v1.10.9 - v1.10.10`.
 
 ### Fixes
 
