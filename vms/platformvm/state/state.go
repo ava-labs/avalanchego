@@ -1672,7 +1672,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	weightDiffs, err := s.processCurrentStakers()
+	weightDiffs, blsKeyDiffs, err := s.processCurrentStakers()
 	if err != nil {
 		return err
 	}
@@ -1680,8 +1680,9 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
-		s.writeCurrentStakers(updateValidators, height),
+		s.writeCurrentStakers(updateValidators),
 		s.writeWeightDiffs(height, weightDiffs),
+		s.writeBlsKeyDiffs(height, blsKeyDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1733,13 +1734,51 @@ func (s *state) writeWeightDiffs(height uint64, weightDiffs map[weightDiffKey]*V
 	return nil
 }
 
+func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.PublicKey) error {
+	for nodeID, blsKey := range blsKeyDiffs {
+		key := marshalDiffKey(constants.PrimaryNetworkID, height, nodeID)
+		blsKeyBytes := []byte{}
+		if blsKey != nil {
+			// Note: We store the uncompressed public key here as it is
+			// significantly more efficient to parse when applying
+			// diffs.
+			blsKeyBytes = blsKey.Serialize()
+		}
+		if err := s.flatValidatorPublicKeyDiffsDB.Put(key, blsKeyBytes); err != nil {
+			return fmt.Errorf("failed to add bls key diffs: %w", err)
+		}
+
+		// TODO: Remove this once we no longer support version
+		// rollbacks.
+		if blsKey != nil {
+			heightBytes := database.PackUInt64(height)
+			rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
+			nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
+
+			// Note: We store the compressed public key here.
+			pkBytes := bls.PublicKeyToBytes(blsKey)
+			if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 type weightDiffKey struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID
 }
 
-func (s *state) processCurrentStakers() (map[weightDiffKey]*ValidatorWeightDiff, error) {
-	outputWeights := make(map[weightDiffKey]*ValidatorWeightDiff)
+func (s *state) processCurrentStakers() (
+	map[weightDiffKey]*ValidatorWeightDiff,
+	map[ids.NodeID]*bls.PublicKey,
+	error,
+) {
+	var (
+		outputWeights = make(map[weightDiffKey]*ValidatorWeightDiff)
+		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
+	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
@@ -1757,12 +1796,32 @@ func (s *state) processCurrentStakers() (map[weightDiffKey]*ValidatorWeightDiff,
 
 			switch validatorDiff.validatorStatus {
 			case added:
-				weight := validatorDiff.validator.Weight
+				var (
+					weight = validatorDiff.validator.Weight
+					blkKey = validatorDiff.validator.PublicKey
+				)
+
 				outputWeights[weightKey].Amount = weight
 
+				if blkKey != nil {
+					// Record that the public key for the validator is being
+					// added. This means the prior value for the public key was
+					// nil.
+					outputBlsKey[nodeID] = nil
+				}
+
 			case deleted:
-				weight := validatorDiff.validator.Weight
+				var (
+					weight = validatorDiff.validator.Weight
+					blkKey = validatorDiff.validator.PublicKey
+				)
 				outputWeights[weightKey].Amount = weight
+				if blkKey != nil {
+					// Record that the public key for the validator is being
+					// removed. This means we must record the prior value of the
+					// public key.
+					outputBlsKey[nodeID] = blkKey
+				}
 
 			default:
 				// nothing to do
@@ -1774,18 +1833,18 @@ func (s *state) processCurrentStakers() (map[weightDiffKey]*ValidatorWeightDiff,
 				staker := addedDelegatorIterator.Value()
 
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
-					return nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+					return nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
-					return nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+					return nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return outputWeights, nil
+	return outputWeights, outputBlsKey, nil
 }
 
 func (s *state) Close() error {
@@ -2003,11 +2062,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
-	heightBytes := database.PackUInt64(height)
-	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
-	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
-
+func (s *state) writeCurrentStakers(updateValidators bool) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		delete(s.currentStakers.validatorDiffs, subnetID)
 
@@ -2031,21 +2086,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			case added:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
-
-				// Invariant: Only the Primary Network contains non-nil public
-				// keys.
-				if staker.PublicKey != nil {
-					// Record that the public key for the validator is being
-					// added. This means the prior value for the public key was
-					// nil.
-					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						nil,
-					)
-					if err != nil {
-						return err
-					}
-				}
 
 				// The validator is being added.
 				//
@@ -2074,34 +2114,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			case deleted:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
-
-				// Invariant: Only the Primary Network contains non-nil public
-				// keys.
-				if staker.PublicKey != nil {
-					// Record that the public key for the validator is being
-					// removed. This means we must record the prior value of the
-					// public key.
-					//
-					// Note: We store the uncompressed public key here as it is
-					// significantly more efficient to parse when applying
-					// diffs.
-					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						staker.PublicKey.Serialize(),
-					)
-					if err != nil {
-						return err
-					}
-
-					// TODO: Remove this once we no longer support version
-					// rollbacks.
-					//
-					// Note: We store the compressed public key here.
-					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
-					if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
-						return err
-					}
-				}
 
 				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
