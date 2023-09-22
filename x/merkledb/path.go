@@ -47,10 +47,6 @@ var (
 			singleTokenMask: 0b1111_1111,
 		},
 	}
-
-	EmptyPath = func(bf BranchFactor) Path {
-		return Path{pathConfig: branchFactorToPathConfig[bf]}
-	}
 )
 
 type BranchFactor int
@@ -67,6 +63,10 @@ func (f BranchFactor) Valid() error {
 		return nil
 	}
 	return fmt.Errorf("%w: %d", errInvalidBranchFactor, f)
+}
+
+func EmptyPath(bf BranchFactor) Path {
+	return Path{pathConfig: branchFactorToPathConfig[bf]}
 }
 
 type pathConfig struct {
