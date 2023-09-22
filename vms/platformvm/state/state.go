@@ -1739,17 +1739,16 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 		key := marshalDiffKey(constants.PrimaryNetworkID, height, nodeID)
 		blsKeyBytes := []byte{}
 		if blsKey != nil {
-			// Note: We store the uncompressed public key here as it is
-			// significantly more efficient to parse when applying
-			// diffs.
+			// Note: in flatValidatorPublicKeyDiffsDB we store the
+			// uncompressed public key here as it is
+			// significantly more efficient to parse when applying diffs.
 			blsKeyBytes = blsKey.Serialize()
 		}
 		if err := s.flatValidatorPublicKeyDiffsDB.Put(key, blsKeyBytes); err != nil {
 			return fmt.Errorf("failed to add bls key diffs: %w", err)
 		}
 
-		// TODO: Remove this once we no longer support version
-		// rollbacks.
+		// TODO: Remove this once we no longer support version rollbacks.
 		if blsKey != nil {
 			heightBytes := database.PackUInt64(height)
 			rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
