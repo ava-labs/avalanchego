@@ -73,7 +73,7 @@ func GetMetricsValue(url string, metrics ...string) (map[string]float64, error) 
 }
 
 func getHTTPLines(url string) ([]string, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
