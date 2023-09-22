@@ -23,8 +23,12 @@ import (
 func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
+	n := newNode(nil, NewPath([]byte{0x00}, BranchFactor16))
+	n.setValue(maybe.Some([]byte{byte(0x02)}))
+	nodeSize := cacheEntrySize(n.key, n)
+
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
-	cacheSize := 198
+	cacheSize := nodeSize * 20
 	evictionBatchSize := cacheSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
