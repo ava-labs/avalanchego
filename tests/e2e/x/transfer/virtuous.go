@@ -38,12 +38,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"x",
-			"virtuous-transfer-tx-avax",
-		),
 		func() {
 			rpcEps := make([]string, len(e2e.Env.URIs))
 			for i, nodeURI := range e2e.Env.URIs {
