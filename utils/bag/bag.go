@@ -24,6 +24,13 @@ type Bag[T comparable] struct {
 	metThreshold set.Set[T]
 }
 
+// Of returns a Bag initialized with [elts]
+func Of[T comparable](elts ...T) Bag[T] {
+	var b Bag[T]
+	b.Add(elts...)
+	return b
+}
+
 func (b *Bag[T]) init() {
 	if b.counts == nil {
 		b.counts = make(map[T]int, minBagSize)

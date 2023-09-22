@@ -20,32 +20,30 @@ func TestInterface(t *testing.T) {
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 		require.NoError(t, err)
 
-		defer db.Close()
-
 		test(t, db)
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
 		_ = db.Close()
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		folder := f.TempDir()
-		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			require.NoError(f, err)
-		}
+func FuzzKeyValue(f *testing.F) {
+	folder := f.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(f, err)
 
-		defer db.Close()
+	defer db.Close()
 
-		test(f, db)
+	database.FuzzKeyValue(f, db)
+}
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
-		_ = db.Close()
-	}
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	folder := f.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(f, err)
+
+	defer db.Close()
+
+	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
 func BenchmarkInterface(b *testing.B) {

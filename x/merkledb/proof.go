@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -19,7 +20,10 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const verificationCacheSize = 2_000
+const (
+	verificationEvictionBatchSize = 0
+	verificationCacheSize         = math.MaxInt
+)
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
@@ -66,22 +70,16 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 			NibbleLength: uint64(node.KeyPath.NibbleLength),
 			Value:        node.KeyPath.Value,
 		},
+		ValueOrHash: &pb.MaybeBytes{
+			Value:     node.ValueOrHash.Value(),
+			IsNothing: node.ValueOrHash.IsNothing(),
+		},
 		Children: make(map[uint32][]byte, len(node.Children)),
 	}
 
 	for childIndex, childID := range node.Children {
 		childID := childID
 		pbNode.Children[uint32(childIndex)] = childID[:]
-	}
-
-	if node.ValueOrHash.HasValue() {
-		pbNode.ValueOrHash = &pb.MaybeBytes{
-			Value: node.ValueOrHash.Value(),
-		}
-	} else {
-		pbNode.ValueOrHash = &pb.MaybeBytes{
-			IsNothing: true,
-		}
 	}
 
 	return pbNode
@@ -421,9 +419,9 @@ func (proof *RangeProof) ToProto() *pb.RangeProof {
 	}
 
 	return &pb.RangeProof{
-		Start:     startProof,
-		End:       endProof,
-		KeyValues: keyValues,
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyValues:  keyValues,
 	}
 }
 
@@ -432,15 +430,15 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 		return ErrNilRangeProof
 	}
 
-	proof.StartProof = make([]ProofNode, len(pbProof.Start))
-	for i, protoNode := range pbProof.Start {
+	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	for i, protoNode := range pbProof.StartProof {
 		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.EndProof = make([]ProofNode, len(pbProof.End))
-	for i, protoNode := range pbProof.End {
+	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	for i, protoNode := range pbProof.EndProof {
 		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
@@ -564,21 +562,12 @@ func (proof *ChangeProof) ToProto() *pb.ChangeProof {
 
 	keyChanges := make([]*pb.KeyChange, len(proof.KeyChanges))
 	for i, kv := range proof.KeyChanges {
-		var value pb.MaybeBytes
-		if kv.Value.HasValue() {
-			value = pb.MaybeBytes{
-				Value:     kv.Value.Value(),
-				IsNothing: false,
-			}
-		} else {
-			value = pb.MaybeBytes{
-				Value:     nil,
-				IsNothing: true,
-			}
-		}
 		keyChanges[i] = &pb.KeyChange{
-			Key:   kv.Key,
-			Value: &value,
+			Key: kv.Key,
+			Value: &pb.MaybeBytes{
+				Value:     kv.Value.Value(),
+				IsNothing: kv.Value.IsNothing(),
+			},
 		}
 	}
 
@@ -854,7 +843,9 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+				// We don't know if the child had a value or not, but it doesn't matter.
+				// We only need the IDs to be correct so that the calculated hash is correct.
+				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)
 			}
 		}
 	}
@@ -868,9 +859,10 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            trace.Noop,
-			NodeCacheSize:     verificationCacheSize,
+			EvictionBatchSize:         verificationEvictionBatchSize,
+			Tracer:                    trace.Noop,
+			ValueNodeCacheSize:        verificationCacheSize,
+			IntermediateNodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)

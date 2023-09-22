@@ -6,6 +6,8 @@ package reward
 import (
 	"math/big"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ Calculator = (*calculator)(nil)
@@ -66,4 +68,20 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	}
 
 	return finalReward
+}
+
+// Split [totalAmount] into [totalAmount * shares percentage] and the remainder.
+//
+// Invariant: [shares] <= [PercentDenominator]
+func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
+	remainderShares := PercentDenominator - uint64(shares)
+	remainderAmount := remainderShares * (totalAmount / PercentDenominator)
+
+	// Delay rounding as long as possible for small numbers
+	if optimisticReward, err := math.Mul64(remainderShares, totalAmount); err == nil {
+		remainderAmount = optimisticReward / PercentDenominator
+	}
+
+	amountFromShares := totalAmount - remainderAmount
+	return amountFromShares, remainderAmount
 }
