@@ -419,9 +419,9 @@ func (proof *RangeProof) ToProto() *pb.RangeProof {
 	}
 
 	return &pb.RangeProof{
-		Start:     startProof,
-		End:       endProof,
-		KeyValues: keyValues,
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyValues:  keyValues,
 	}
 }
 
@@ -430,15 +430,15 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 		return ErrNilRangeProof
 	}
 
-	proof.StartProof = make([]ProofNode, len(pbProof.Start))
-	for i, protoNode := range pbProof.Start {
+	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	for i, protoNode := range pbProof.StartProof {
 		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.EndProof = make([]ProofNode, len(pbProof.End))
-	for i, protoNode := range pbProof.End {
+	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	for i, protoNode := range pbProof.EndProof {
 		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}

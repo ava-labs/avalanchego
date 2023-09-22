@@ -334,8 +334,8 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 		return u // Only happens if the tree is finalized, or it's a leaf node
 	}
 
-	if index, found := ids.FirstDifferenceSubset(
-		u.decidedPrefix, u.commonPrefix, u.preference, newChoice); !found {
+	index, found := ids.FirstDifferenceSubset(u.decidedPrefix, u.commonPrefix, u.preference, newChoice)
+	if !found {
 		// If the first difference doesn't exist, then this node shouldn't be
 		// split
 		if u.child != nil {
@@ -346,69 +346,68 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 		}
 		// if u.child is nil, then we are attempting to add the same choice into
 		// the tree, which should be a noop
-	} else {
-		// The difference was found, so this node must be split
+		return u
+	}
 
-		bit := u.preference.Bit(uint(index)) // The currently preferred bit
-		b := &binaryNode{
-			tree:        u.tree,
-			bit:         index,
-			snowball:    u.snowball.Extend(u.tree.params.BetaRogue, bit),
-			shouldReset: [2]bool{u.shouldReset, u.shouldReset},
+	// The difference was found, so this node must be split
+	bit := u.preference.Bit(uint(index)) // The currently preferred bit
+	b := &binaryNode{
+		tree:        u.tree,
+		bit:         index,
+		snowball:    u.snowball.Extend(u.tree.params.BetaRogue, bit),
+		shouldReset: [2]bool{u.shouldReset, u.shouldReset},
+	}
+	b.preferences[bit] = u.preference
+	b.preferences[1-bit] = newChoice
+
+	newChildSnowball := &unarySnowball{}
+	newChildSnowball.Initialize(u.tree.params.BetaVirtuous)
+	newChild := &unaryNode{
+		tree:          u.tree,
+		preference:    newChoice,
+		decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
+		commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
+		snowball:      newChildSnowball,
+	}
+
+	switch {
+	case u.decidedPrefix == u.commonPrefix-1:
+		// This node was only voting over one bit. (Case 2. from above)
+		b.children[bit] = u.child
+		if u.child != nil {
+			b.children[1-bit] = newChild
 		}
-		b.preferences[bit] = u.preference
-		b.preferences[1-bit] = newChoice
-
-		newChildSnowball := &unarySnowball{}
-		newChildSnowball.Initialize(u.tree.params.BetaVirtuous)
-		newChild := &unaryNode{
+		return b
+	case index == u.decidedPrefix:
+		// This node was split on the first bit. (Case 3. from above)
+		u.decidedPrefix++
+		b.children[bit] = u
+		b.children[1-bit] = newChild
+		return b
+	case index == u.commonPrefix-1:
+		// This node was split on the last bit. (Case 4. from above)
+		u.commonPrefix--
+		b.children[bit] = u.child
+		if u.child != nil {
+			b.children[1-bit] = newChild
+		}
+		u.child = b
+		return u
+	default:
+		// This node was split on an interior bit. (Case 5. from above)
+		originalDecidedPrefix := u.decidedPrefix
+		u.decidedPrefix = index + 1
+		b.children[bit] = u
+		b.children[1-bit] = newChild
+		return &unaryNode{
 			tree:          u.tree,
-			preference:    newChoice,
-			decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
-			commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
-			snowball:      newChildSnowball,
-		}
-
-		switch {
-		case u.decidedPrefix == u.commonPrefix-1:
-			// This node was only voting over one bit. (Case 2. from above)
-			b.children[bit] = u.child
-			if u.child != nil {
-				b.children[1-bit] = newChild
-			}
-			return b
-		case index == u.decidedPrefix:
-			// This node was split on the first bit. (Case 3. from above)
-			u.decidedPrefix++
-			b.children[bit] = u
-			b.children[1-bit] = newChild
-			return b
-		case index == u.commonPrefix-1:
-			// This node was split on the last bit. (Case 4. from above)
-			u.commonPrefix--
-			b.children[bit] = u.child
-			if u.child != nil {
-				b.children[1-bit] = newChild
-			}
-			u.child = b
-			return u
-		default:
-			// This node was split on an interior bit. (Case 5. from above)
-			originalDecidedPrefix := u.decidedPrefix
-			u.decidedPrefix = index + 1
-			b.children[bit] = u
-			b.children[1-bit] = newChild
-			return &unaryNode{
-				tree:          u.tree,
-				preference:    u.preference,
-				decidedPrefix: originalDecidedPrefix,
-				commonPrefix:  index,
-				snowball:      u.snowball.Clone(),
-				child:         b,
-			}
+			preference:    u.preference,
+			decidedPrefix: originalDecidedPrefix,
+			commonPrefix:  index,
+			snowball:      u.snowball.Clone(),
+			child:         b,
 		}
 	}
-	return u // Do nothing, the choice was already rejected
 }
 
 func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {

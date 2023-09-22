@@ -76,3 +76,15 @@ ginkgo -v ./tests/e2e -- \
 ```
 
 See the testnet fixture [README](../fixture/testnet/README.md) for more details.
+
+## Skipping bootstrap checks
+
+By default many tests will attempt to bootstrap a new node with the
+post-test network state. While this is a valuable activity to perform
+in CI, it can add considerable latency to test development. To disable
+these bootstrap checks during development, set the
+`E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
+
+```bash
+E2E_SKIP_BOOTSTRAP_CHECKS=1 ginkgo -v ./tests/e2e ...
+```
