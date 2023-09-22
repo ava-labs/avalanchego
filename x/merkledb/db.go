@@ -191,9 +191,8 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	newPath      func(p []byte) Path
-	branchFactor BranchFactor
-	rootPath     Path
+	newPath  func(p []byte) Path
+	rootPath Path
 }
 
 // New returns a new merkle database.
@@ -242,7 +241,6 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		branchFactor:         config.BranchFactor,
 		rootPath:             newPath(RootKey),
 	}
 
