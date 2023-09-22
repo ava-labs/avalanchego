@@ -51,55 +51,62 @@ func TestDBEfficientLookups(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		key          = []byte("key")
-		value        = []byte("value")
-		maliciousKey = newDBKey(key, 2)
+		key             = []byte("key")
+		maliciousKey, _ = newDBKey(key, 2)
 	)
 
-	db, err := NewArchiveDB(&limitIterationDB{Database: memdb.New()})
-	require.NoError(err)
+	db := New(&limitIterationDB{Database: memdb.New()})
 
-	writer := db.NewBatchAtHeight(1)
-	require.NoError(writer.Put(key, value))
-	require.Equal(uint64(1), writer.Height())
-	require.NoError(writer.Write())
+	batch := db.NewBatch(1)
+	require.NoError(batch.Put(key, []byte("value")))
+	require.NoError(batch.Write())
 
 	for i := 0; i < 10000; i++ {
-		writer = db.NewBatchAtHeight(uint64(i) + 2)
-		require.NoError(writer.Put(maliciousKey, []byte{byte(i)}))
-		require.NoError(writer.Write())
+		batch = db.NewBatch(uint64(i) + 2)
+		require.NoError(batch.Put(maliciousKey, []byte{byte(i)}))
+		require.NoError(batch.Write())
 	}
 
-	val, err := db.Get(key)
+	reader := db.Open(10001)
+	value, err := reader.Get(key)
 	require.NoError(err)
-	require.Equal(value, val)
-	height, err := db.GetHeight(key)
+	require.Equal([]byte("value"), value)
+
+	value, height, found, err := reader.GetEntry(key)
 	require.NoError(err)
+	require.True(found)
 	require.Equal(uint64(1), height)
+	require.Equal([]byte("value"), value)
 }
 
 func TestDBMoreEfficientLookups(t *testing.T) {
 	require := require.New(t)
+
 	var (
 		key          = []byte("key")
-		value        = []byte("value")
 		maliciousKey = []byte("key\xff\xff\xff\xff\xff\xff\xff\xfd")
 	)
-	db, err := NewArchiveDB(&limitIterationDB{Database: memdb.New()})
-	require.NoError(err)
-	writer := db.NewBatchAtHeight(1)
-	require.NoError(writer.Put(key, value))
-	require.Equal(uint64(1), writer.Height())
-	require.NoError(writer.Write())
+
+	db := New(&limitIterationDB{Database: memdb.New()})
+
+	batch := db.NewBatch(1)
+	require.NoError(batch.Put(key, []byte("value")))
+	require.NoError(batch.Write())
+
 	for i := 2; i < 10000; i++ {
-		writer = db.NewBatchAtHeight(uint64(i))
-		require.NoError(writer.Put(maliciousKey, []byte{byte(i)}))
-		require.NoError(writer.Write())
+		batch = db.NewBatch(uint64(i))
+		require.NoError(batch.Put(maliciousKey, []byte{byte(i)}))
+		require.NoError(batch.Write())
 	}
-	val, err := db.Get(key)
+
+	reader := db.Open(10001)
+	value, err := reader.Get(key)
 	require.NoError(err)
-	require.Equal(value, val)
-	height, err := db.GetHeight(key)
+	require.Equal([]byte("value"), value)
+
+	value, height, found, err := reader.GetEntry(key)
 	require.NoError(err)
+	require.True(found)
 	require.Equal(uint64(1), height)
+	require.Equal([]byte("value"), value)
 }

@@ -4,100 +4,70 @@
 package archivedb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	ErrInsufficientLength = errors.New("packer has insufficient length for input")
-	keyHeight             = []byte{1}
+	ErrParsingKeyLength   = errors.New("failed reading key length")
+	ErrIncorrectKeyLength = errors.New("incorrect key length")
+
+	keyHeight = []byte{1}
 )
 
-const (
-	internalKeySuffixLen = wrappers.LongLen
-	minInternalKeyLen    = internalKeySuffixLen + 1
-)
-
-// dbKey
+// newDBKey converts a user formatted key and a height into a database formatted
+// key.
 //
-// The keys contains a few extra information alongside the given key. The key is
-// what is known outside of this internal scope as the key, but this struct has
-// more information compacted inside the dbKey to take advantage of natural
-// sorting. The inversed height is stored right after the Prefix, which is
-// MaxUint64 minus the desired Height.
+// A database key contains additional information alongside the given user key.
 //
-// The inverse height is stored, instead of the height, as part of the key. That
-// is because the database interface only provides ascending iterators.
-// Archivedb's main usage is to query a given key at a given height, or the
-// immediate previous height. That is why the heights are being converted from
-// `height` to `MAX_INT64 - height`.
+// The requirements of a database key are:
 //
-//	Example (Asumming MAX_INT64 is 10,000):
-//	 |  User given  |  Stored as   |
-//	 |--------------|--------------|
-//	 |    foo:10    |   foo:9910   |
-//	 |    foo:20    |   foo:9080   |
+// 1. A given user key must have a unique database key prefix. This guarantees
+// that user keys can not overlap on disk.
+// 2. Inside of a database key prefix, the database keys must be sorted by
+// decreasing height.
 //
-// The internal sorting will be `foo:9080`, `foo:9910` instead of (`foo:10`,
-// `foo:20`). The new sorting plays well with the descending iterator, having a
-// O(1) operation to fetch the exact match or the previous value at a given
-// height.
+// To meet these requirements, a database key prefix is defined by concatinating
+// the length of the user key and the user key. The suffix of the database key
+// is the negation of the big endian encoded height. This suffix guarantees the
+// keys are sorted correctly.
 //
-// All keys are prefixed with a VarUint64, which is the length of the keys, the
-// idea is to make reads even simpler, making it effectively a O(1) operation.
-func newDBKey(key []byte, height uint64) []byte {
+//	Example (Asumming heights are 1 byte):
+//	 |  User given  |  Stored as  |
+//	 |--------------|-------------|
+//	 |    foo:10    |  3:foo:245  |
+//	 |    foo:20    |  3:foo:235  |
+func newDBKey(key []byte, height uint64) ([]byte, []byte) {
 	keyLen := len(key)
-	rawKeyMaxSize := keyLen + binary.MaxVarintLen64 + wrappers.LongLen
-	dbKey := make([]byte, rawKeyMaxSize)
+	dbKeyMaxSize := binary.MaxVarintLen64 + keyLen + wrappers.LongLen
+	dbKey := make([]byte, dbKeyMaxSize)
 	offset := binary.PutUvarint(dbKey, uint64(keyLen))
 	offset += copy(dbKey[offset:], key)
+	prefixOffset := offset
 	binary.BigEndian.PutUint64(dbKey[offset:], ^height)
 	offset += wrappers.LongLen
-
-	return dbKey[0:offset]
+	return dbKey[:offset], dbKey[:prefixOffset]
 }
 
-// parseDBKeyPrefix() extracts the database prefix (to be used with the
-// iterator) from a dbKey. This function does not do any parsing/validation.
-// That checks/parsing is performed at parseDBKey
-func parseDBKeyPrefix(dbKey []byte) ([]byte, error) {
-	rawKeyLen := len(dbKey)
-	if rawKeyLen < minInternalKeyLen {
-		return nil, ErrInsufficientLength
-	}
-	return dbKey[0 : rawKeyLen-wrappers.LongLen], nil
-}
-
-// parseDBKey takes a slice of bytes and returns the inner key and the height
-func parseDBKey(rawKey []byte) ([]byte, uint64, error) {
-	rawKeyLen := len(rawKey)
-	if rawKeyLen < minInternalKeyLen {
-		return nil, 0, ErrInsufficientLength
+// parseDBKey takes a database formatted key and returns the user formatted key
+// along with its the height.
+//
+// Note: An error should only be returned from this function if the database has
+// been corrupted.
+func parseDBKey(dbKey []byte) ([]byte, uint64, error) {
+	keyLen, offset := binary.Uvarint(dbKey)
+	if offset <= 0 {
+		return nil, 0, ErrParsingKeyLength
 	}
 
-	reader := bytes.NewReader(rawKey)
-	// ReadUvarint cannot fail since the minInternalKeyLen makes sure there are
-	// enough bytes to read a varint
-	keyLen, _ := binary.ReadUvarint(reader)
-
-	key := make([]byte, keyLen)
-	readBytes, err := reader.Read(key)
-	if err != nil {
-		return nil, 0, err
+	heightIndex := uint64(offset) + keyLen
+	if uint64(len(dbKey)) != heightIndex+wrappers.LongLen {
+		return nil, 0, ErrIncorrectKeyLength
 	}
 
-	if uint64(readBytes) != keyLen {
-		return nil, 0, database.ErrNotFound
-	}
-
-	// Read th inversed height, it will be converted to height using `^` just
-	// before returning. Read above why the inversed height is used instead of a
-	// normal height
-	inversedHeight := binary.BigEndian.Uint64(rawKey[rawKeyLen-wrappers.LongLen:])
-
-	return key, ^inversedHeight, nil
+	key := dbKey[offset:heightIndex]
+	height := ^binary.BigEndian.Uint64(dbKey[heightIndex:])
+	return key, height, nil
 }
