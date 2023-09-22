@@ -466,7 +466,7 @@ func (m *Manager) findNextKey(
 	receivedProofNodeIndex := len(endProof) - 1
 
 	// traverse the two proofs from the deepest nodes up to the root until a difference is found
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 {
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := endProof[receivedProofNodeIndex]
 
