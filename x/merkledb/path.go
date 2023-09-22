@@ -129,7 +129,7 @@ func (p Path) HasPrefix(prefix Path) bool {
 
 // HasStrictPrefix Returns true iff [prefix] is a prefix of [s] but not equal to it.
 func (p Path) HasStrictPrefix(prefix Path) bool {
-	return p.HasPrefix(prefix) && !p.Equals(prefix)
+	return p.HasPrefix(prefix) && p != prefix
 }
 
 // Token returns the token at the specified index
@@ -153,11 +153,6 @@ func (p Path) Append(token byte) Path {
 // Greater returns true if current Path is greater than other Path
 func (p Path) Greater(other Path) bool {
 	return p.value > other.value || (p.value == other.value && p.length > other.length)
-}
-
-// Equals returns true if current Path is equal to other Path
-func (p Path) Equals(other Path) bool {
-	return p.value == other.value && p.length == other.length
 }
 
 // Less returns true if current Path is less than other Path

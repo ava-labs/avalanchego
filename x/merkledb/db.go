@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	RootKey []byte
+	rootKey []byte
 	_       MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec(BranchFactor16)
@@ -241,7 +241,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		rootPath:             newPath(RootKey),
+		rootPath:             newPath(rootKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -665,7 +665,7 @@ func (db *merkleDB) GetChangeProof(
 		commonNodeIndex := 0
 		for ; commonNodeIndex < len(result.StartProof) &&
 			commonNodeIndex < len(result.EndProof) &&
-			result.StartProof[commonNodeIndex].KeyPath.Equals(result.EndProof[commonNodeIndex].KeyPath); commonNodeIndex++ {
+			result.StartProof[commonNodeIndex].KeyPath == result.EndProof[commonNodeIndex].KeyPath; commonNodeIndex++ {
 		}
 		result.StartProof = result.StartProof[commonNodeIndex:]
 	}

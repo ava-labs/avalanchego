@@ -157,7 +157,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
 	// and thus has a whole number of bytes
 	if !lastNode.KeyPath.hasPartialByte() &&
-		proof.Key.Equals(lastNode.KeyPath) &&
+		proof.Key == lastNode.KeyPath &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
@@ -166,7 +166,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie.
 	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
 	// and thus an exact number of bytes.
-	if (lastNode.KeyPath.hasPartialByte() || !proof.Key.Equals(lastNode.KeyPath)) &&
+	if (lastNode.KeyPath.hasPartialByte() || proof.Key != lastNode.KeyPath) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
