@@ -181,8 +181,7 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, current, expectedResult))
@@ -194,8 +193,7 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, current, expectedResult))
@@ -207,8 +205,7 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{delegator}
-				err := checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, current, expectedResult))
@@ -220,8 +217,7 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, current, expectedResult))
@@ -385,8 +381,7 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, pending, expectedResult))
@@ -398,8 +393,7 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, pending, expectedResult))
@@ -411,8 +405,7 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{delegator}
-				err := checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, pending, expectedResult))
@@ -424,8 +417,7 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				err := checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
-				require.NoError(err)
+				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
 
 				// range query
 				require.NoError(checkStakersContent(store, pending, expectedResult))
