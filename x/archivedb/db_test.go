@@ -216,7 +216,7 @@ func TestSkipHeight(t *testing.T) {
 
 	height, err := db.Height()
 	require.NoError(err)
-	require.Equal(uint64(0), height)
+	require.Zero(height)
 
 	batch = db.NewBatch(10)
 	require.NoError(batch.Write())
