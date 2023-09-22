@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	ErrEmptyKey           = errors.New("empty key")
 	ErrParsingKeyLength   = errors.New("failed reading key length")
 	ErrIncorrectKeyLength = errors.New("incorrect key length")
 
@@ -28,11 +29,12 @@ var (
 // that user keys can not overlap on disk.
 // 2. Inside of a database key prefix, the database keys must be sorted by
 // decreasing height.
+// 3. User keys must never overlap with any metadata keys.
 //
 // To meet these requirements, a database key prefix is defined by concatinating
-// the length of the user key and the user key. The suffix of the database key
-// is the negation of the big endian encoded height. This suffix guarantees the
-// keys are sorted correctly.
+// the zero byte, the length of the user key, and the user key. The suffix of
+// the database key is the negation of the big endian encoded height. This
+// suffix guarantees the keys are sorted correctly.
 //
 //	Example (Asumming heights are 1 byte):
 //	 |  User given  |  Stored as  |
@@ -41,9 +43,10 @@ var (
 //	 |    foo:20    |  3:foo:235  |
 func newDBKey(key []byte, height uint64) ([]byte, []byte) {
 	keyLen := len(key)
-	dbKeyMaxSize := binary.MaxVarintLen64 + keyLen + wrappers.LongLen
+	dbKeyMaxSize := 1 + binary.MaxVarintLen64 + keyLen + wrappers.LongLen
 	dbKey := make([]byte, dbKeyMaxSize)
-	offset := binary.PutUvarint(dbKey, uint64(keyLen))
+	offset := 1
+	offset += binary.PutUvarint(dbKey[offset:], uint64(keyLen))
 	offset += copy(dbKey[offset:], key)
 	prefixOffset := offset
 	binary.BigEndian.PutUint64(dbKey[offset:], ^height)
@@ -57,17 +60,23 @@ func newDBKey(key []byte, height uint64) ([]byte, []byte) {
 // Note: An error should only be returned from this function if the database has
 // been corrupted.
 func parseDBKey(dbKey []byte) ([]byte, uint64, error) {
-	keyLen, offset := binary.Uvarint(dbKey)
+	dbKeyLen := uint64(len(dbKey))
+	if dbKeyLen == 0 {
+		return nil, 0, ErrEmptyKey
+	}
+
+	keyLen, offset := binary.Uvarint(dbKey[1:])
 	if offset <= 0 {
 		return nil, 0, ErrParsingKeyLength
 	}
 
-	heightIndex := uint64(offset) + keyLen
-	if uint64(len(dbKey)) != heightIndex+wrappers.LongLen {
+	keyIndex := 1 + uint64(offset)
+	heightIndex := keyIndex + keyLen
+	if dbKeyLen != heightIndex+wrappers.LongLen {
 		return nil, 0, ErrIncorrectKeyLength
 	}
 
-	key := dbKey[offset:heightIndex]
+	key := dbKey[keyIndex:heightIndex]
 	height := ^binary.BigEndian.Uint64(dbKey[heightIndex:])
 	return key, height, nil
 }
