@@ -81,6 +81,10 @@ func (db *Database) Open(height uint64) *Reader {
 }
 
 // NewBatch creates a write batch to perform changes at a given height.
+//
+// Note: Committing multiple batches at the same height, or at a lower height
+// than the currently committed height will not error. It is left up to the
+// caller to enforce any guarantees they need around height consistency.
 func (db *Database) NewBatch(height uint64) *batch {
 	return &batch{
 		db:     db,
