@@ -1226,7 +1226,6 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 	if !enabled {
 		return trace.Config{
 			Enabled: false,
-			AppName: constants.AppName,
 		}, nil
 	}
 
