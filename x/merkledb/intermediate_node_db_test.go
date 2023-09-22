@@ -171,16 +171,17 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		constructedKey := db.constructDBKey(p)
 		baseLength := len(p.value) + len(intermediateNodePrefix)
 		require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-		if p.hasPartialByte() {
+		switch {
+		case branchFactor == BranchFactor256:
+			// for keys with tokens of size byte, no padding is added
+			require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
+		case p.hasPartialByte():
 			require.Len(constructedKey, baseLength)
 			require.Equal(p.Append(1<<(p.tokenBitSize-1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
-		} else if branchFactor < BranchFactor256 {
+		default:
 			// when a whole number of bytes, there is an extra padding byte
 			require.Len(constructedKey, baseLength+1)
 			require.Equal(append(p.Bytes(), 0b1000_0000), constructedKey[len(intermediateNodePrefix):])
-		} else {
-			// for keys of length byte, no alterations are needed
-			require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
 		}
 	})
 }

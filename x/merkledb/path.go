@@ -281,13 +281,6 @@ func (p Path) Take(tokensToTake int) Path {
 	return result
 }
 
-func (p Path) BranchFactor() BranchFactor {
-	if p.pathConfig != nil {
-		return p.branchFactor
-	}
-	return BranchFactorUnspecified
-}
-
 // Bytes returns the raw bytes of the Path
 // Invariant: The returned value must not be modified.
 func (p Path) Bytes() []byte {

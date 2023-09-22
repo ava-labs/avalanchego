@@ -172,7 +172,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil, proof.Key.BranchFactor())
+	view, err := getStandaloneTrieView(ctx, nil, proof.Key.branchFactor)
 	if err != nil {
 		return err
 	}
@@ -304,10 +304,10 @@ func (proof *RangeProof) Verify(
 	// determine branch factor based on proof paths
 	var branchFactor BranchFactor
 	if len(proof.StartProof) > 0 {
-		branchFactor = proof.StartProof[0].KeyPath.BranchFactor()
+		branchFactor = proof.StartProof[0].KeyPath.branchFactor
 	} else {
 		// safe because invariants prevent both start proof and end proof from being empty at the same time
-		branchFactor = proof.EndProof[0].KeyPath.BranchFactor()
+		branchFactor = proof.EndProof[0].KeyPath.branchFactor
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
@@ -755,7 +755,7 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].KeyPath
-		if keyPath.HasValue() && nodeKey.BranchFactor() != keyPath.Value().BranchFactor() {
+		if keyPath.HasValue() && nodeKey.branchFactor != keyPath.Value().branchFactor {
 			return ErrInconsistentBranchFactor
 		}
 
@@ -772,7 +772,7 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 
 		// each node should have a key that has a matching BranchFactor and is a prefix of the next node's key
 		nextKey := proof[i+1].KeyPath
-		if nextKey.BranchFactor() != nodeKey.BranchFactor() {
+		if nextKey.branchFactor != nodeKey.branchFactor {
 			return ErrInconsistentBranchFactor
 		}
 		if !nextKey.HasStrictPrefix(nodeKey) {
@@ -857,7 +857,7 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := EmptyPath(keyPath.BranchFactor())
+		compressedPath := EmptyPath(keyPath.branchFactor)
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
