@@ -86,8 +86,8 @@ type ClientConfig struct {
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
-	if config.BranchFactor == merkledb.BranchFactorUnspecified {
-		return nil, merkledb.ErrNoSpecifiedBranchFactor
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
 	}
 	return &client{
 		networkClient:       config.NetworkClient,

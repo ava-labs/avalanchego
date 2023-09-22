@@ -54,9 +54,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot                = errors.New("start and end root are the same")
-	errNoNewRoot               = errors.New("there was no updated root in change list")
-	ErrNoSpecifiedBranchFactor = errors.New("specifying the branch factor is required")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
 
 type ChangeProofer interface {
@@ -217,9 +216,10 @@ func newDatabase(
 		rootGenConcurrency = config.RootGenConcurrency
 	}
 
-	if config.BranchFactor == BranchFactorUnspecified {
-		return nil, ErrNoSpecifiedBranchFactor
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
 	}
+
 	newPath := func(b []byte) Path { return NewPath(b, config.BranchFactor) }
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
