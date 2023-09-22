@@ -23,7 +23,8 @@ func Test_Path_Has_Prefix(t *testing.T) {
 		BranchFactor2:   24,
 		BranchFactor4:   12,
 		BranchFactor16:  6,
-		BranchFactor256: 3}
+		BranchFactor256: 3,
+	}
 	tests := []test{
 		{
 			name:           "equal keys",
