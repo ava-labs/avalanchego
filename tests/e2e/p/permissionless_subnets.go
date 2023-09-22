@@ -28,12 +28,6 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("subnets operations",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"xp",
-			"permissionless-subnets",
-		),
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 

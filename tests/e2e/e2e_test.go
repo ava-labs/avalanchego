@@ -77,14 +77,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Load or create a test network
 	var network *local.LocalNetwork
 	if len(persistentNetworkDir) > 0 {
-		tests.Outf("{{yellow}}Using a pre-existing network configured at %s{{/}}\n", persistentNetworkDir)
+		tests.Outf("{{yellow}}Using a persistent network configured at %s{{/}}\n", persistentNetworkDir)
 
 		var err error
 		network, err = local.ReadNetwork(persistentNetworkDir)
 		require.NoError(err)
 	} else {
-		tests.Outf("{{magenta}}Starting network with %q{{/}}\n", avalancheGoExecPath)
-
 		ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
 		defer cancel()
 		var err error
