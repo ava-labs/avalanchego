@@ -133,7 +133,7 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 
 	// add one additional byte to store padding when the path
 	// has a length that fits into a whole number of bytes
-	tokensInLastByte := key.length % key.tokensPerByte
+	tokensInLastByte := key.length % key.tokensPerByte()
 	bufferLen := len(pathBytes)
 	if tokensInLastByte == 0 {
 		bufferLen++
@@ -160,7 +160,7 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 	// |branchFactor16  |1000_0000|xxxx_1000|         |         |         |         |         |         |
 	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
 
-	dbKey[bufferLen-1] |= 0b0000_0001 << (7 - (byte(tokensInLastByte) * key.tokenBitSize))
+	dbKey[bufferLen-1] |= 0b0000_0001 << (7 - byte(tokensInLastByte)*key.tokenBitSize())
 
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
 }

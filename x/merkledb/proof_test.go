@@ -1205,9 +1205,9 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{
 					KeyPath: Path{
-						value:      string([]byte{1, 2, 240}),
-						length:     5,
-						pathConfig: branchFactorToPathConfig[BranchFactor16],
+						value:        string([]byte{1, 2, 240}),
+						length:       5,
+						branchFactor: BranchFactor16,
 					},
 					ValueOrHash: maybe.Some([]byte{1}),
 				},

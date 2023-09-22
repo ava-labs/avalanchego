@@ -77,12 +77,12 @@ func Test_Path_Has_Prefix(t *testing.T) {
 func Test_Path_HasPrefix_BadInput(t *testing.T) {
 	require := require.New(t)
 
-	a := Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	b := Path{length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	a := Path{branchFactor: BranchFactor16}
+	b := Path{length: 1, branchFactor: BranchFactor16}
 	require.False(a.HasPrefix(b))
 
-	a = Path{length: 10, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	b = Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
+	a = Path{length: 10, branchFactor: BranchFactor16}
+	b = Path{value: string([]byte{0x10}), length: 1, branchFactor: BranchFactor16}
 	require.False(a.HasPrefix(b))
 }
 

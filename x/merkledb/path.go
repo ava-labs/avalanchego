@@ -34,9 +34,9 @@ type pathConfig struct {
 }
 
 type Path struct {
-	length int
-	value  string
-	*pathConfig
+	length       int
+	value        string
+	branchFactor BranchFactor
 }
 
 var (
@@ -69,17 +69,29 @@ var (
 	}
 
 	EmptyPath = func(bf BranchFactor) Path {
-		return Path{pathConfig: branchFactorToPathConfig[bf]}
+		return Path{branchFactor: bf}
 	}
 )
 
 func NewPath(p []byte, branchFactor BranchFactor) Path {
-	pConfig := branchFactorToPathConfig[branchFactor]
-	return Path{
-		value:      string(p),
-		pathConfig: pConfig,
-		length:     len(p) * pConfig.tokensPerByte,
+	path := Path{
+		value:        string(p),
+		branchFactor: branchFactor,
 	}
+	path.length = len(p) * path.tokensPerByte()
+	return path
+}
+
+func (p *Path) tokenBitSize() byte {
+	return branchFactorToPathConfig[p.branchFactor].tokenBitSize
+}
+
+func (p *Path) tokensPerByte() int {
+	return branchFactorToPathConfig[p.branchFactor].tokensPerByte
+}
+
+func (p *Path) singleTokenMask() byte {
+	return branchFactorToPathConfig[p.branchFactor].singleTokenMask
 }
 
 // Length returns the number of tokens in the current Path
@@ -89,7 +101,7 @@ func (p Path) Length() int {
 
 // hasPartialByte returns true iff the path fits into a non-whole number of bytes
 func (p Path) hasPartialByte() bool {
-	return p.length%p.tokensPerByte > 0
+	return p.length%p.tokensPerByte() > 0
 }
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
@@ -99,7 +111,7 @@ func (p Path) HasPrefix(prefix Path) bool {
 		return false
 	}
 
-	remainderTokens := prefix.length % p.tokensPerByte
+	remainderTokens := prefix.length % p.tokensPerByte()
 	if remainderTokens == 0 {
 		return strings.HasPrefix(p.value, prefix.value)
 	}
@@ -126,7 +138,7 @@ func (p Path) HasStrictPrefix(prefix Path) bool {
 // Token returns the token at the specified index
 // grabs the token's storage byte, shifts it, then masks out any bits from other tokens stored in the same byte
 func (p Path) Token(index int) byte {
-	return (p.value[index/p.tokensPerByte] >> p.bitsToShift(index)) & p.singleTokenMask
+	return (p.value[index/p.tokensPerByte()] >> p.bitsToShift(index)) & p.singleTokenMask()
 }
 
 // Append returns a new Path that equals the current Path with the passed token appended to the end
@@ -135,9 +147,9 @@ func (p Path) Append(token byte) Path {
 	copy(buffer, p.value)
 	buffer[len(buffer)-1] |= token << p.bitsToShift(p.length)
 	return Path{
-		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     p.length + 1,
-		pathConfig: p.pathConfig,
+		value:        *(*string)(unsafe.Pointer(&buffer)),
+		length:       p.length + 1,
+		branchFactor: p.branchFactor,
 	}
 }
 
@@ -154,14 +166,14 @@ func (p Path) Less(other Path) bool {
 // bitsToShift indicates how many bits to shift the token at the index to get the raw token value
 // varies from (8-[tokenBitSize]) -> (0) when remainder of index varies from (0) -> (p.tokensPerByte-1)
 func (p Path) bitsToShift(index int) byte {
-	return Byte - (p.tokenBitSize * byte(index%p.tokensPerByte+1))
+	return Byte - p.tokenBitSize()*byte(index%p.tokensPerByte()+1)
 }
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
 func (p Path) bytesNeeded(tokens int) int {
 	// (p.tokensPerByte - 1) ensures that it rounds up
 	// acts a Ceiling
-	return (tokens + p.tokensPerByte - 1) / p.tokensPerByte
+	return (tokens + p.tokensPerByte() - 1) / p.tokensPerByte()
 }
 
 // Extend returns a new Path that equals the passed Path appended to the current Path
@@ -184,9 +196,9 @@ func (p Path) Extend(path Path) Path {
 	if !p.hasPartialByte() {
 		copy(buffer[len(p.value):], path.value)
 		return Path{
-			value:      *(*string)(unsafe.Pointer(&buffer)),
-			length:     totalLength,
-			pathConfig: p.pathConfig,
+			value:        *(*string)(unsafe.Pointer(&buffer)),
+			length:       totalLength,
+			branchFactor: p.branchFactor,
 		}
 	}
 
@@ -208,9 +220,9 @@ func (p Path) Extend(path Path) Path {
 	buffer[len(buffer)-1] |= path.value[lastPathIndex] << shiftLeft
 
 	return Path{
-		value:      *(*string)(unsafe.Pointer(&buffer)),
-		length:     totalLength,
-		pathConfig: p.pathConfig,
+		value:        *(*string)(unsafe.Pointer(&buffer)),
+		length:       totalLength,
+		branchFactor: p.branchFactor,
 	}
 }
 
@@ -220,14 +232,14 @@ func (p Path) Skip(tokensToSkip int) Path {
 		return EmptyPath(p.branchFactor)
 	}
 	result := Path{
-		value:      p.value[tokensToSkip/p.tokensPerByte:],
-		length:     p.length - tokensToSkip,
-		pathConfig: p.pathConfig,
+		value:        p.value[tokensToSkip/p.tokensPerByte():],
+		length:       p.length - tokensToSkip,
+		branchFactor: p.branchFactor,
 	}
 
 	// if the tokens to skip is a whole number of bytes,
 	// the remaining bytes exactly equals the new path
-	if tokensToSkip%p.tokensPerByte == 0 {
+	if tokensToSkip%p.tokensPerByte() == 0 {
 		return result
 	}
 
@@ -253,12 +265,12 @@ func (p Path) Skip(tokensToSkip int) Path {
 // Take returns a new Path that contains the first tokensToTake tokens of the current Path
 func (p Path) Take(tokensToTake int) Path {
 	result := Path{
-		length:     tokensToTake,
-		pathConfig: p.pathConfig,
+		length:       tokensToTake,
+		branchFactor: p.branchFactor,
 	}
 
 	if !result.hasPartialByte() {
-		result.value = p.value[:tokensToTake/p.tokensPerByte]
+		result.value = p.value[:tokensToTake/p.tokensPerByte()]
 		return result
 	}
 
