@@ -500,13 +500,15 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return getMerkleRoot(db.root)
 }
 
-func useChildAsRoot(root *node) bool {
+// shouldUseChildAsRoot returns true if the passed in node has no value and only a single child
+func shouldUseChildAsRoot(root *node) bool {
 	return root.valueDigest.IsNothing() && len(root.children) == 1
 }
 
+// getMerkleRoot returns the id of either the passed in root or the id of the node's only child based on [shouldUseChildAsRoot]
 func getMerkleRoot(root *node) ids.ID {
 	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if useChildAsRoot(root) {
+	if shouldUseChildAsRoot(root) {
 		for _, childEntry := range root.children {
 			return childEntry.id
 		}

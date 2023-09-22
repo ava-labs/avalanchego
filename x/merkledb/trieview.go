@@ -342,7 +342,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if len(proofPath) > 0 && useChildAsRoot(proofPath[0]) {
+	if len(proofPath) > 0 && shouldUseChildAsRoot(proofPath[0]) {
 		proof.Path = proof.Path[1:]
 	}
 
