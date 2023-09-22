@@ -161,7 +161,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
-			e2e.SendEthTransaction(ethClient, signedTx)
+			_ = e2e.SendEthTransaction(ethClient, signedTx)
 		})
 
 		e2e.CheckBootstrapIsPossible(privateNetwork)
