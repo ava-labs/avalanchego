@@ -16,6 +16,25 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
 
+### Filtering test execution with labels
+
+In cases where a change can be verified against only a subset of
+tests, it is possible to filter the tests that will be executed by the
+declarative labels that have been applied to them. Available labels
+are defined as constants in [`describe.go`](./describe.go) with names
+of the form `*Label`. The following example runs only those tests that
+primarily target the X-Chain:
+
+
+```bash
+./tests/e2e/e2e.test \
+  --avalanchego-path=./build/avalanchego \
+  --ginkgo.label-filter=x
+```
+
+The ginkgo docs provide further detail on [how to compose label
+queries](https://onsi.github.io/ginkgo/#spec-labels).
+
 ## Adding tests
 
 Define any flags/configurations in [`e2e.go`](./e2e.go).
@@ -67,7 +86,7 @@ Configure testnetctl to target this network by default with one of the following
 # Start a new test run using the persistent network
 ginkgo -v ./tests/e2e -- \
     --avalanchego-path=/path/to/avalanchego \
-    --ginkgo-focus-file=[name of file containing test] \
+    --ginkgo.focus-file=[name of file containing test] \
     --use-persistent-network \
     --network-dir=/path/to/network
 
