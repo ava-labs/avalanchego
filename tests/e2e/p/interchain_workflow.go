@@ -132,6 +132,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
 				delegationShare,
+				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
@@ -161,6 +162,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
+				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
