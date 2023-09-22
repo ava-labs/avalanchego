@@ -1100,7 +1100,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	if err == nil {
 		// Root already exists, so calculate its id
 		db.root.calculateID(db.metrics)
-		return db.root.id, nil
+		return db.getMerkleRoot(), nil
 	}
 	if err != database.ErrNotFound {
 		return ids.Empty, err
