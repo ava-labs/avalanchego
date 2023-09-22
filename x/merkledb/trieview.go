@@ -244,7 +244,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.root.id
+		if t.changes.rootID, err = t.GetMerkleRoot(ctx); err != nil {
+			return
+		}
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -339,6 +341,14 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
 	for i, node := range proofPath {
 		proof.Path[i] = node.asProofNode()
+	}
+
+	// if the nil key root is not required, pretend the trie's root is the nil key node's child
+	if len(proofPath) > 0 {
+		root := proofPath[0]
+		if root.value.IsNothing() && len(root.children) == 1 {
+			proof.Path = proof.Path[1:]
+		}
 	}
 
 	closestNode := proofPath[len(proofPath)-1]
@@ -540,6 +550,11 @@ func (t *trieView) updateParent(newParent TrieView) {
 func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
+	}
+	if t.root.value.IsNothing() && len(t.root.children) == 1 {
+		for _, childEntry := range t.root.children {
+			return childEntry.id, nil
+		}
 	}
 	return t.root.id, nil
 }
