@@ -438,7 +438,8 @@ func (m *Manager) findNextKey(
 				[]merkledb.ProofNode{
 					{
 						Children: map[byte]ids.ID{
-							firstNode.KeyPath.NibbleVal(0): ids.Empty},
+							firstNode.KeyPath.NibbleVal(0): ids.Empty,
+						},
 					},
 				}, localProofNodes...)
 		}
@@ -455,7 +456,8 @@ func (m *Manager) findNextKey(
 				[]merkledb.ProofNode{
 					{
 						Children: map[byte]ids.ID{
-							firstNode.KeyPath.NibbleVal(0): ids.Empty},
+							firstNode.KeyPath.NibbleVal(0): ids.Empty,
+						},
 					},
 				}, endProof...)
 		}
