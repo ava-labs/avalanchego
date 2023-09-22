@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -98,17 +99,19 @@ type State interface {
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
+	stateLock sync.Locker,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
 	return &manager{
-		log:     log,
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		log:       log,
+		cfg:       cfg,
+		stateLock: stateLock,
+		state:     state,
+		metrics:   metrics,
+		clk:       clk,
+		caches:    make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -123,16 +126,18 @@ func NewManager(
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type manager struct {
-	log     logging.Logger
-	cfg     config.Config
-	state   State
-	metrics metrics.Metrics
-	clk     *mockable.Clock
+	log       logging.Logger
+	cfg       config.Config
+	stateLock sync.Locker
+	state     State
+	metrics   metrics.Metrics
+	clk       *mockable.Clock
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	cachesLock sync.RWMutex
+	caches     map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -156,6 +161,9 @@ type manager struct {
 // described above and we will always return the last accepted block height
 // as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
+
 	if m.cfg.UseCurrentHeight {
 		return m.getCurrentHeight(ctx)
 	}
@@ -179,6 +187,9 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 }
 
 func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
+
 	return m.getCurrentHeight(ctx)
 }
 
@@ -237,7 +248,17 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
+	m.cachesLock.RLock()
 	validatorSetsCache, exists := m.caches[subnetID]
+	m.cachesLock.RUnlock()
+	if exists {
+		return validatorSetsCache
+	}
+
+	m.cachesLock.Lock()
+	defer m.cachesLock.Unlock()
+
+	validatorSetsCache, exists = m.caches[subnetID]
 	if exists {
 		return validatorSetsCache
 	}
@@ -291,6 +312,9 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
+
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
@@ -361,6 +385,9 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
+
 	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
 		// TODO: Require that the current validator set for all subnets is
@@ -389,6 +416,9 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
 	}
+
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
 
 	chainTx, _, err := m.state.GetTx(chainID)
 	if err != nil {

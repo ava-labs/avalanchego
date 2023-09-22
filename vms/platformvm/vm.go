@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -151,7 +152,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	// Invariant: The context lock is never grabbed when holding [stateLock].
+	var stateLock sync.RWMutex
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, stateLock.RLocker(), vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
@@ -189,6 +192,7 @@ func (vm *VM) Initialize(
 	vm.manager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
+		&stateLock,
 		vm.state,
 		txExecutorBackend,
 		validatorManager,
@@ -232,7 +236,11 @@ func (vm *VM) Initialize(
 	}
 
 	go func() {
-		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
+		lock := utils.NewMultiLock(
+			&vm.ctx.Lock, // needed when Commit() is called
+			&stateLock,   // needed to avoid race with cache overwrite
+		)
+		err := vm.state.PruneAndIndex(lock, vm.ctx.Log)
 		if err != nil {
 			vm.ctx.Log.Error("state pruning and height indexing failed",
 				zap.Error(err),

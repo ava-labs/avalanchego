@@ -126,6 +126,15 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
+// State manages the full disk state of the P-chain.
+//
+// Invariant: The chain's context write lock must be held when writing to
+// the state.
+// Invariant: The chain's acceptance write lock and context write lock
+// must be held when accepting a block.
+// Invariant: The chain's acceptance lock must be held when accessing
+// accepted block state such as transactions, blocks, the last accepted
+// block, and validator sets.
 type State interface {
 	Chain
 	uptime.State
