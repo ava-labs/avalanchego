@@ -327,9 +327,9 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodePath(dst *bytes.Buffer, s Path) {
-	c.encodeUint(dst, uint64(s.length))
-	_, _ = dst.Write(s.Bytes())
+func (c *codecImpl) encodePath(dst *bytes.Buffer, p Path) {
+	c.encodeUint(dst, uint64(p.length))
+	_, _ = dst.Write(p.Bytes())
 }
 
 func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error) {
