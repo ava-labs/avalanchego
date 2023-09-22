@@ -171,7 +171,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		compressedPath, err := c.decodePath(src, c.branchFactor)
+		compressedPath, err := c.decodePath(src)
 		if err != nil {
 			return err
 		}
@@ -334,7 +334,7 @@ func (c *codecImpl) encodePath(dst *bytes.Buffer, p Path) {
 	_, _ = dst.Write(p.Bytes())
 }
 
-func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error) {
+func (c *codecImpl) decodePath(src *bytes.Reader) (Path, error) {
 	if minPathLen > src.Len() {
 		return Path{}, io.ErrUnexpectedEOF
 	}
@@ -346,7 +346,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 	if length > math.MaxInt {
 		return Path{}, errIntOverflow
 	}
-	result := EmptyPath(branchFactor)
+	result := EmptyPath(c.branchFactor)
 	result.length = int(length)
 	pathBytesLen := result.bytesNeeded(result.length)
 	if pathBytesLen > src.Len() {

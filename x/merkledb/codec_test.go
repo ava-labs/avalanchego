@@ -92,10 +92,10 @@ func FuzzCodecPath(f *testing.F) {
 				branchFactor = BranchFactor256
 			}
 
-			codec := codec.(*codecImpl)
+			codec := newCodec(branchFactor).(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodePath(reader, branchFactor)
+			got, err := codec.decodePath(reader)
 			if err != nil {
 				t.SkipNow()
 			}
