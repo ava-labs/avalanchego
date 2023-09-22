@@ -854,16 +854,15 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
-	owner, exists := s.subnetOwners[subnetID]
-	if exists {
+	if owner, exists := s.subnetOwners[subnetID]; exists {
 		return owner, nil
 	}
 
-	if wrapperOwner, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if wrapperOwner == nil {
+	if wrappedOwner, cached := s.subnetOwnerCache.Get(subnetID); cached {
+		if wrappedOwner == nil {
 			return nil, database.ErrNotFound
 		}
-		return wrapperOwner.owner, nil
+		return wrappedOwner.owner, nil
 	}
 
 	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
@@ -899,7 +898,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
 	}
 
-	s.SetSubnetOwner(subnetID, owner)
+	s.SetSubnetOwner(subnetID, subnet.Owner)
 	return subnet.Owner, nil
 }
 
