@@ -359,6 +359,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 			}
 
 			proof.Path = []ProofNode{alternateRootNode.asProofNode()}
+			return proof, nil
 		}
 	}
 
