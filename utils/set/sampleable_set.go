@@ -28,6 +28,13 @@ type SampleableSet[T comparable] struct {
 	elements []T
 }
 
+// OfSampleable returns a Set initialized with [elts]
+func OfSampleable[T comparable](elts ...T) SampleableSet[T] {
+	s := NewSampleableSet[T](len(elts))
+	s.Add(elts...)
+	return s
+}
+
 // Return a new sampleable set with initial capacity [size].
 // More or less than [size] elements can be added to this set.
 // Using NewSampleableSet() rather than SampleableSet[T]{} is just an

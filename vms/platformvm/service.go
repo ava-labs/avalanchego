@@ -107,16 +107,9 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	)
 
 	ctx := r.Context()
-	lastAcceptedID, err := s.vm.LastAccepted(ctx)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
-	}
-	lastAccepted, err := s.vm.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	response.Height = json.Uint64(lastAccepted.Height())
-	return nil
+	height, err := s.vm.GetCurrentHeight(ctx)
+	response.Height = json.Uint64(height)
+	return err
 }
 
 // ExportKeyArgs are arguments for ExportKey
@@ -609,7 +602,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			continue
 		}
 
-		subnetTx, _, err := s.vm.state.GetTx(subnetID)
+		subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
 		if err == database.ErrNotFound {
 			continue
 		}
@@ -617,13 +610,9 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			return err
 		}
 
-		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
+		owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
-		}
-		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-		if !ok {
-			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
+			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
 		}
 
 		controlAddrs := make([]string, len(owner.Addrs))
@@ -1082,18 +1071,30 @@ type GetCurrentSupplyArgs struct {
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
 	Supply json.Uint64 `json:"supply"`
+	Height json.Uint64 `json:"height"`
 }
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-func (s *Service) GetCurrentSupply(_ *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
+func (s *Service) GetCurrentSupply(r *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getCurrentSupply"),
 	)
 
 	supply, err := s.vm.state.GetCurrentSupply(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("fetching current supply failed: %w", err)
+	}
 	reply.Supply = json.Uint64(supply)
-	return err
+
+	ctx := r.Context()
+	height, err := s.vm.GetCurrentHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching current height failed: %w", err)
+	}
+	reply.Height = json.Uint64(height)
+
+	return nil
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators

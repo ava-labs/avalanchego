@@ -399,23 +399,19 @@ func (h *handler) Authorize(
 	[]*secp256k1.PrivateKey, // Keys that prove ownership
 	error,
 ) {
-	subnetTx, _, err := state.GetTx(subnetID)
+	subnetOwner, err := state.GetSubnetOwner(subnetID)
 	if err != nil {
 		return nil, nil, fmt.Errorf(
-			"failed to fetch subnet %s: %w",
+			"failed to fetch subnet owner for %s: %w",
 			subnetID,
 			err,
 		)
 	}
-	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, nil, fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
-	}
 
 	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
+	owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
 	}
 
 	// Add the keys to a keychain

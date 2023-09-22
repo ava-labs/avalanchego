@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -42,6 +43,8 @@ type diff struct {
 	pendingStakerDiffs       diffStakers
 
 	addedSubnets []*txs.Tx
+	// Subnet ID --> Owner of the subnet
+	subnetOwners map[ids.ID]fx.Owner
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 	cachedSubnets      []*txs.Tx
@@ -290,6 +293,30 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	if d.cachedSubnets != nil {
 		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
 	}
+
+	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
+	subnetID := createSubnetTx.ID()
+	if d.subnetOwners == nil {
+		d.subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: castTx.Owner,
+		}
+	} else {
+		d.subnetOwners[subnetID] = castTx.Owner
+	}
+}
+
+func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	owner, exists := d.subnetOwners[subnetID]
+	if exists {
+		return owner, nil
+	}
+
+	// If the subnet owner was not assigned in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, ErrMissingParentState
+	}
+	return parentState.GetSubnetOwner(subnetID)
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {

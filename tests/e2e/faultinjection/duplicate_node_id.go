@@ -57,6 +57,8 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 
 		ginkgo.By("checking that the second new node is connected to its peers")
 		checkConnectedPeers(nodes, node2)
+
+		// A bootstrap check was already performed by the second node.
 	})
 })
 
@@ -66,7 +68,7 @@ func checkConnectedPeers(existingNodes []testnet.Node, newNode testnet.Node) {
 
 	// Collect the node ids of the new node's peers
 	infoClient := info.NewClient(newNode.GetProcessContext().URI)
-	peers, err := infoClient.Peers(context.Background())
+	peers, err := infoClient.Peers(e2e.DefaultContext())
 	require.NoError(err)
 	peerIDs := set.NewSet[ids.NodeID](len(existingNodes))
 	for _, peer := range peers {
@@ -80,7 +82,7 @@ func checkConnectedPeers(existingNodes []testnet.Node, newNode testnet.Node) {
 
 		// Check that the new node is a peer
 		infoClient := info.NewClient(existingNode.GetProcessContext().URI)
-		peers, err := infoClient.Peers(context.Background())
+		peers, err := infoClient.Peers(e2e.DefaultContext())
 		require.NoError(err)
 		isPeer := false
 		for _, peer := range peers {

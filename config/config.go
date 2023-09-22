@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -950,7 +951,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 	aliasMap := make(map[ids.ID][]string)
 	if err := json.Unmarshal(fileBytes, &aliasMap); err != nil {
-		return nil, fmt.Errorf("%w on %s: %s", errUnmarshalling, name, err)
+		return nil, fmt.Errorf("%w on %s: %w", errUnmarshalling, name, err)
 	}
 	return aliasMap, nil
 }
@@ -1146,7 +1147,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, fmt.Errorf("%w: %s", errUnmarshalling, err)
+			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
 		if err := config.Valid(); err != nil {
@@ -1248,6 +1249,8 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 		},
 		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
+		AppName:         constants.AppName,
+		Version:         version.Current.String(),
 	}, nil
 }
 
