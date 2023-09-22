@@ -30,7 +30,7 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Run e2e tests with persistent network
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.persistent.sh ./build/avalanchego
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.persistent.sh
       - name: Upload testnet network dir
         uses: actions/upload-artifact@v3
         if: always()
