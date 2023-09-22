@@ -341,12 +341,26 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		proof.Path[i] = node.asProofNode()
 	}
 
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if len(proofPath) > 0 && shouldUseChildAsRoot(proofPath[0]) {
-		proof.Path = proof.Path[1:]
-	}
-
 	closestNode := proofPath[len(proofPath)-1]
+
+	// if the nil key root is not required, pretend the trie's root is the nil key node's child
+	root := proofPath[0]
+	if len(proofPath) > 1 && shouldUseChildAsRoot(root) {
+		proof.Path = proof.Path[1:]
+		if len(proof.Path) == 0 {
+			var alternateRootNode *node
+
+			// find the alternateRootNode
+			for index, childEntry := range root.children {
+				alternateRootNode, err = t.getNodeWithID(childEntry.id, path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			proof.Path = []ProofNode{alternateRootNode.asProofNode()}
+		}
+	}
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
@@ -459,7 +473,13 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, RootPath.Bytes())
+		proofKey := RootPath.Bytes()
+		if shouldUseChildAsRoot(t.root) {
+			for index, childEntry := range t.root.children {
+				proofKey = (path([]byte{index}) + childEntry.compressedPath).Serialize().Value
+			}
+		}
+		rootProof, err := t.getProof(ctx, proofKey)
 		if err != nil {
 			return nil, err
 		}
