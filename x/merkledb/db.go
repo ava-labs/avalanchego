@@ -220,7 +220,9 @@ func newDatabase(
 		return nil, err
 	}
 
-	newPath := func(b []byte) Path { return NewPath(b, config.BranchFactor) }
+	newPath := func(b []byte) Path {
+		return NewPath(b, config.BranchFactor)
+	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
 	// to reduce memory allocations.
