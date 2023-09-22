@@ -28,8 +28,8 @@ primarily target the X-Chain:
 
 ```bash
 ./tests/e2e/e2e.test \
---avalanchego-path=./build/avalanchego \
---ginkgo.label-filter=x
+  --avalanchego-path=./build/avalanchego \
+  --ginkgo.label-filter=x
 ```
 
 The ginkgo docs provide further detail on [how to compose label

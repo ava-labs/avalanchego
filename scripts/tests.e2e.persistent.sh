@@ -17,10 +17,9 @@ if ! [[ "$0" =~ scripts/tests.e2e.persistent.sh ]]; then
   exit 255
 fi
 
-AVALANCHEGO_PATH="${AVALANCHEGO_PATH:-./build/avalanchego}"
 # Ensure an absolute path to avoid dependency on the working directory
 # of script execution.
-export AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
+export AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
 
 # Provide visual separation between testing and setup/teardown
 function print_separator {

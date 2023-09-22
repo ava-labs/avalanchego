@@ -4,9 +4,10 @@ set -euo pipefail
 
 # e.g.,
 # ./scripts/tests.e2e.sh
-# ./scripts/tests.e2e.sh --ginkgo.label-filter=x               # All arguments are supplied to ginkgo
-# E2E_SERIAL=1 ./scripts/tests.e2e.sh                          # Run tests serially
-# AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh  # Customization of avalanchego path
+# ./scripts/tests.e2e.sh --ginkgo.label-filter=x                                       # All arguments are supplied to ginkgo
+# E2E_SERIAL=1 ./scripts/tests.e2e.sh                                                  # Run tests serially
+# AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh                          # Customization of avalanchego path
+# E2E_USE_PERSISTENT_NETWORK=1 TESTNETCTL_NETWORK_DIR=/path/to ./scripts/tests.e2e.sh  # Execute against a persistent network
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -27,15 +28,13 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
 #################################
-E2E_USE_PERSISTENT_NETWORK="${E2E_USE_PERSISTENT_NETWORK:-}"
-TESTNETCTL_NETWORK_DIR="${TESTNETCTL_NETWORK_DIR:-}"
-if [[ -n "${E2E_USE_PERSISTENT_NETWORK}" && -n "${TESTNETCTL_NETWORK_DIR}" ]]; then
-  echo "running e2e tests against a persistent network configured at ${TESTNETCTL_NETWORK_DIR}"
+# Since TESTNETCTL_NETWORK_DIR may be persistently set in the environment (e.g. to configure
+# ginkgo or testnetctl), configuring the use of a persistent network with this script
+# requires the extra step of setting E2E_USE_PERSISTENT_NETWORK=1.
+if [[ -n "${E2E_USE_PERSISTENT_NETWORK:-}" && -n "${TESTNETCTL_NETWORK_DIR:-}" ]]; then
   E2E_ARGS="--use-persistent-network"
 else
-  AVALANCHEGO_PATH="${AVALANCHEGO_PATH:-./build/avalanchego}"
-  AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
-  echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
+  AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
   E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
 fi
 
