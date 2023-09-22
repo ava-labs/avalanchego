@@ -60,9 +60,9 @@ type FxOperation interface {
 
 type FxCredential struct {
 	FxID       ids.ID            `serialize:"false" json:"fxID"`
-	Verifiable verify.Verifiable `serialize:"true"  json:"credential"`
+	Credential verify.Verifiable `serialize:"true"  json:"credential"`
 }
 
 func (f *FxCredential) Verify() error {
-	return f.Verifiable.Verify()
+	return f.Credential.Verify()
 }
