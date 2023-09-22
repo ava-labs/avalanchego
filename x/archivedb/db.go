@@ -69,7 +69,7 @@ func New(db database.Database) *Database {
 
 // Height returns the last written height.
 func (db *Database) Height() (uint64, error) {
-	return database.GetUInt64(db.db, keyHeight)
+	return database.GetUInt64(db.db, heightKey)
 }
 
 // Open returns a reader for the state at the given height.

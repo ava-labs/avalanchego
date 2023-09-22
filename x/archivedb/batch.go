@@ -32,7 +32,7 @@ func (c *batch) Write() error {
 		}
 	}
 
-	if err := database.PutUInt64(batch, keyHeight, c.height); err != nil {
+	if err := database.PutUInt64(batch, heightKey, c.height); err != nil {
 		return err
 	}
 

@@ -15,7 +15,7 @@ var (
 	ErrParsingKeyLength   = errors.New("failed reading key length")
 	ErrIncorrectKeyLength = errors.New("incorrect key length")
 
-	keyHeight = []byte{1}
+	heightKey = []byte{1}
 )
 
 // newDBKey converts a user formatted key and a height into a database formatted
@@ -41,6 +41,10 @@ var (
 //	 |--------------|-------------|
 //	 |    foo:10    |  3:foo:245  |
 //	 |    foo:20    |  3:foo:235  |
+//
+// Returns:
+// - The database key
+// - The database key prefix, which is independent of the height
 func newDBKey(key []byte, height uint64) ([]byte, []byte) {
 	keyLen := len(key)
 	dbKeyMaxSize := 1 + binary.MaxVarintLen64 + keyLen + wrappers.LongLen
