@@ -343,8 +343,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	// if the nil key root is not required, pretend the trie's root is the nil key node's child
 	if len(proofPath) > 0 {
-		root := proofPath[0]
-		if root.value.IsNothing() && len(root.children) == 1 {
+		if useChildAsRoot(proofPath[0]) {
 			proof.Path = proof.Path[1:]
 		}
 	}
@@ -553,7 +552,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 }
 
 func (t *trieView) getMerkleRoot() ids.ID {
-	if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
+	if useChildAsRoot(t.root) {
 		for _, childEntry := range t.root.children {
 			return childEntry.id
 		}
