@@ -124,8 +124,8 @@ func (it *viewIterator) Next() bool {
 				it.sortedChanges = it.sortedChanges[1:]
 
 				// If current change is not a deletion, return it.
-				// Otherwise go to next loop iteration.
-				if !memValue.IsNothing() {
+				// Otherwise, go to next loop iteration.
+				if memValue.HasValue() {
 					it.key = memKey
 					it.value = slices.Clone(memValue.Value())
 					return true
@@ -142,7 +142,7 @@ func (it *viewIterator) Next() bool {
 				it.sortedChanges = it.sortedChanges[1:]
 				it.parentIterExhausted = !it.parentIter.Next()
 
-				if !memValue.IsNothing() {
+				if memValue.HasValue() {
 					it.key = memKey
 					it.value = slices.Clone(memValue.Value())
 					return true

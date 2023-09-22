@@ -163,7 +163,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// If the last proof node has a length not evenly divisible into bytes or a different key than [proof.Key]
-	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
+	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie.
 	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
 	// and thus an exact number of bytes.
 	if (lastNode.KeyPath.hasPartialByte() || !proof.Key.Equals(lastNode.KeyPath)) &&
@@ -759,8 +759,9 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 			return ErrInconsistentBranchFactor
 		}
 
-		// keys that should not have an associated value, have one set
-		if nodeKey.hasPartialByte() && !proof[i].ValueOrHash.IsNothing() {
+		// Because the interface only support []byte keys,
+		// a key with a partial byte should store a value
+		if nodeKey.hasPartialByte() && proof[i].ValueOrHash.HasValue() {
 			return ErrPartialByteLengthWithValue
 		}
 
@@ -769,8 +770,11 @@ func verifyProofPath(proof []ProofNode, keyPath maybe.Maybe[Path]) error {
 			return ErrProofNodeNotForKey
 		}
 
-		// each node should have a key that is a prefix of the next node's key
+		// each node should have a key that has a matching BranchFactor and is a prefix of the next node's key
 		nextKey := proof[i+1].KeyPath
+		if nextKey.BranchFactor() != nodeKey.BranchFactor() {
+			return ErrInconsistentBranchFactor
+		}
 		if !nextKey.HasStrictPrefix(nodeKey) {
 			return ErrNonIncreasingProofNodes
 		}

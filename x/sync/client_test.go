@@ -87,6 +87,8 @@ func sendRangeProofRequest(
 		ctx, cancel = context.WithCancel(context.Background())
 	)
 
+	defer cancel()
+
 	// The client fetching a range proof.
 	client, err := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -95,8 +97,6 @@ func sendRangeProofRequest(
 		BranchFactor:  merkledb.BranchFactor16,
 	})
 	require.NoError(err)
-
-	defer cancel()
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx

@@ -10,41 +10,67 @@ import (
 )
 
 func Test_Path_Has_Prefix(t *testing.T) {
-	require := require.New(t)
+	type test struct {
+		name           string
+		pathA          func(bf BranchFactor) Path
+		pathB          func(bf BranchFactor) Path
+		isStrictPrefix bool
+		isPrefix       bool
+	}
 
-	first := Path{value: "FirstKey", pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix := Path{value: "FirstKe", pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
+	key := "Key"
+	keyLength := map[BranchFactor]int{
+		BranchFactor2:   24,
+		BranchFactor4:   12,
+		BranchFactor16:  6,
+		BranchFactor256: 3}
+	tests := []test{
+		{
+			name:           "equal keys",
+			pathA:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf) },
+			pathB:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf) },
+			isPrefix:       true,
+			isStrictPrefix: false,
+		},
+		{
+			name:           "one keys has one less token",
+			pathA:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf) },
+			pathB:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
+			isPrefix:       true,
+			isStrictPrefix: true,
+		},
+		{
+			name:           "equal keys, both have one less token",
+			pathA:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
+			pathB:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
+			isPrefix:       true,
+			isStrictPrefix: false,
+		},
+		{
+			name:           "different keys",
+			pathA:          func(bf BranchFactor) Path { return NewPath([]byte{0xF7}, bf) },
+			pathB:          func(bf BranchFactor) Path { return NewPath([]byte{0xF0}, bf) },
+			isPrefix:       false,
+			isStrictPrefix: false,
+		},
+		{
+			name:           "same bytes, different lengths",
+			pathA:          func(bf BranchFactor) Path { return NewPath([]byte{0x10, 0x00}, bf).Take(1) },
+			pathB:          func(bf BranchFactor) Path { return NewPath([]byte{0x10, 0x00}, bf).Take(2) },
+			isPrefix:       false,
+			isStrictPrefix: false,
+		},
+	}
 
-	first = Path{value: "FirstKey", length: 16, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
-
-	first = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix = Path{value: "FirstKey", length: 15, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.True(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	first = Path{value: string([]byte{247}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix = Path{value: string([]byte{240}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.False(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	first = Path{value: string([]byte{247}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix = Path{value: string([]byte{240}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.True(first.HasPrefix(prefix))
-	require.True(first.HasStrictPrefix(prefix))
-
-	first = Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	prefix = Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.True(first.HasPrefix(prefix))
-	require.False(first.HasStrictPrefix(prefix))
-
-	a := Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	b := Path{value: string([]byte{0x10}), length: 2, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.False(a.HasPrefix(b))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			for _, bf := range []BranchFactor{BranchFactor2, BranchFactor4, BranchFactor16, BranchFactor256} {
+				require.Equal(tt.isPrefix, tt.pathA(bf).HasPrefix(tt.pathB(bf)))
+				require.Equal(tt.isStrictPrefix, tt.pathA(bf).HasStrictPrefix(tt.pathB(bf)))
+			}
+		})
+	}
 }
 
 func Test_Path_HasPrefix_BadInput(t *testing.T) {
@@ -191,6 +217,7 @@ func Test_Path_Extend(t *testing.T) {
 	path2 := NewPath([]byte{0b1000_0000}, BranchFactor2).Take(1)
 	p := NewPath([]byte{0b01010101}, BranchFactor2)
 	extendedP := path2.Extend(p)
+	require.Equal([]byte{0b10101010, 0b1000_0000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(0), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
@@ -203,6 +230,7 @@ func Test_Path_Extend(t *testing.T) {
 
 	p = NewPath([]byte{0b01010101, 0b1000_0000}, BranchFactor2).Take(9)
 	extendedP = path2.Extend(p)
+	require.Equal([]byte{0b10101010, 0b1100_0000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(0), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
@@ -215,8 +243,9 @@ func Test_Path_Extend(t *testing.T) {
 	require.Equal(byte(1), extendedP.Token(9))
 
 	path4 := NewPath([]byte{0b0100_0000}, BranchFactor4).Take(1)
-	p = NewPath([]byte{0b01010101}, BranchFactor4)
+	p = NewPath([]byte{0b0101_0101}, BranchFactor4)
 	extendedP = path4.Extend(p)
+	require.Equal([]byte{0b0101_0101, 0b0100_0000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(1), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
@@ -226,13 +255,24 @@ func Test_Path_Extend(t *testing.T) {
 	path16 := NewPath([]byte{0b0001_0000}, BranchFactor16).Take(1)
 	p = NewPath([]byte{0b0001_0001}, BranchFactor16)
 	extendedP = path16.Extend(p)
+	require.Equal([]byte{0b0001_0001, 0b0001_0000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(1), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
 
+	p = NewPath([]byte{0b0001_0001, 0b0001_0001}, BranchFactor16)
+	extendedP = path16.Extend(p)
+	require.Equal([]byte{0b0001_0001, 0b0001_0001, 0b0001_0000}, extendedP.Bytes())
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(3))
+	require.Equal(byte(1), extendedP.Token(4))
+
 	path256 := NewPath([]byte{0b0000_0001}, BranchFactor256)
-	p = NewPath([]byte{0b0000_0001}, BranchFactor16)
+	p = NewPath([]byte{0b0000_0001}, BranchFactor256)
 	extendedP = path256.Extend(p)
+	require.Equal([]byte{0b0000_0001, 0b0000_0001}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(1), extendedP.Token(1))
 }

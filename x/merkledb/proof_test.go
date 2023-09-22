@@ -1087,7 +1087,7 @@ func TestVerifyProofPath(t *testing.T) {
 	type test struct {
 		name        string
 		path        []ProofNode
-		proofKey    []byte
+		proofKey    maybe.Maybe[Path]
 		expectedErr error
 	}
 
@@ -1095,13 +1095,13 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name:        "empty",
 			path:        nil,
-			proofKey:    nil,
+			proofKey:    maybe.Nothing[Path](),
 			expectedErr: nil,
 		},
 		{
 			name:        "1 element",
 			path:        []ProofNode{{KeyPath: NewPath([]byte{1}, BranchFactor16)}},
-			proofKey:    nil,
+			proofKey:    maybe.Nothing[Path](),
 			expectedErr: nil,
 		},
 		{
@@ -1111,7 +1111,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1122,7 +1122,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2, 4}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1132,7 +1132,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1142,7 +1142,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 3}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 3, 4}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1152,7 +1152,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 4}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
@@ -1162,7 +1162,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
@@ -1173,7 +1173,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1184,7 +1184,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1195,7 +1195,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1212,14 +1212,14 @@ func TestVerifyProofPath(t *testing.T) {
 					ValueOrHash: maybe.Some([]byte{1}),
 				},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, maybe.Some(NewPath(tt.proofKey, BranchFactor16)))
+			err := verifyProofPath(tt.path, tt.proofKey)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
