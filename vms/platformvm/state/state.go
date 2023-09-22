@@ -2139,13 +2139,9 @@ func (s *state) writeCurrentStakers() error {
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
 			nodeID := nodeID
 
-			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorStatus == deleted,
-			}
 			switch validatorDiff.validatorStatus {
 			case added:
 				staker := validatorDiff.validator
-				weightDiff.Amount = staker.Weight
 
 				// The validator is being added.
 				//
@@ -2173,7 +2169,6 @@ func (s *state) writeCurrentStakers() error {
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
 			case deleted:
 				staker := validatorDiff.validator
-				weightDiff.Amount = staker.Weight
 
 				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
@@ -2184,7 +2179,6 @@ func (s *state) writeCurrentStakers() error {
 
 			err := writeCurrentDelegatorDiff(
 				delegatorDB,
-				weightDiff,
 				validatorDiff,
 			)
 			if err != nil {
@@ -2197,28 +2191,18 @@ func (s *state) writeCurrentStakers() error {
 
 func writeCurrentDelegatorDiff(
 	currentDelegatorList linkeddb.LinkedDB,
-	weightDiff *ValidatorWeightDiff,
 	validatorDiff *diffValidator,
 ) error {
 	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()
-
-		if err := weightDiff.Add(false, staker.Weight); err != nil {
-			return fmt.Errorf("failed to increase node weight diff: %w", err)
-		}
-
 		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
 
 	for _, staker := range validatorDiff.deletedDelegators {
-		if err := weightDiff.Add(true, staker.Weight); err != nil {
-			return fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
-
 		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
 			return fmt.Errorf("failed to delete current staker: %w", err)
 		}
