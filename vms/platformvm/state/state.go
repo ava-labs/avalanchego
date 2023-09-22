@@ -434,11 +434,11 @@ type wrappedFxOwner struct {
 	size  int
 }
 
-func wrappedFxOwnerSize(_ ids.ID, wrapperFxOwner *wrappedFxOwner) int {
-	if wrapperFxOwner == nil {
+func wrappedFxOwnerSize(_ ids.ID, w *wrappedFxOwner) int {
+	if w == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + wrapperFxOwner.size + constants.PointerOverhead
+	return ids.IDLen + w.size + constants.PointerOverhead
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
