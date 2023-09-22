@@ -334,28 +334,28 @@ func (c *codecImpl) encodePath(dst *bytes.Buffer, p Path) {
 
 func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error) {
 	if minPathLen > src.Len() {
-		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
+		return Path{}, io.ErrUnexpectedEOF
 	}
 
 	length, err := c.decodeUint(src)
 	if err != nil {
-		return EmptyPath(branchFactor), err
+		return Path{}, err
 	}
 	if length > math.MaxInt {
-		return EmptyPath(branchFactor), errIntOverflow
+		return Path{}, errIntOverflow
 	}
 	result := EmptyPath(branchFactor)
 	result.length = int(length)
 	pathBytesLen := result.bytesNeeded(result.length)
 	if pathBytesLen > src.Len() {
-		return EmptyPath(branchFactor), io.ErrUnexpectedEOF
+		return Path{}, io.ErrUnexpectedEOF
 	}
 	buffer := make([]byte, pathBytesLen)
 	if _, err := io.ReadFull(src, buffer); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return EmptyPath(branchFactor), err
+		return Path{}, err
 	}
 	if result.hasPartialByte() {
 		// Confirm that the padding bits in the partial byte are 0
@@ -363,7 +363,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		// Generate a mask with (8-bitsToShift) 0's followed by bitsToShift 1's
 		paddingMask := byte(0xFF >> (Byte - result.bitsToShift(result.length-1)))
 		if buffer[pathBytesLen-1]&paddingMask != 0 {
-			return EmptyPath(branchFactor), errNonZeroPathPadding
+			return Path{}, errNonZeroPathPadding
 		}
 	}
 	result.value = string(buffer)
