@@ -51,9 +51,9 @@ const (
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
 
 	// Validator start time must be a minimum of SyncBound from the
-	// current time for validator addition to succeed, and adding 10
+	// current time for validator addition to succeed, and adding 20
 	// seconds provides a buffer in case of any delay in processing.
-	DefaultValidatorStartTimeDiff = executor.SyncBound + 10*time.Second
+	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
 )
 
 // Env is used to access shared test fixture. Intended to be

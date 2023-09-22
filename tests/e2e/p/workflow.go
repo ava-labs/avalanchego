@@ -33,13 +33,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("P-chain main operations",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"xp",
-			"workflow",
-		),
-		ginkgo.FlakeAttempts(2),
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 			keychain := e2e.Env.NewKeychain(2)
