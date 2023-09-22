@@ -59,18 +59,19 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeDBNode(n *dbNode, factor BranchFactor) []byte
+	encodeDBNode(n *dbNode) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
+	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
-func newCodec() encoderDecoder {
+func newCodec(branchFactor BranchFactor) encoderDecoder {
 	return &codecImpl{
+		branchFactor: branchFactor,
 		varIntPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, binary.MaxVarintLen64)
@@ -82,12 +83,13 @@ func newCodec() encoderDecoder {
 // Note that bytes.Buffer.Write always returns nil so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
+	branchFactor BranchFactor
 	// Invariant: Every byte slice returned by [varIntPool] has
 	// length [binary.MaxVarintLen64].
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
+func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size of [n] to prevent memory allocations
@@ -99,7 +101,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < byte(branchFactor); index++ {
+	for index := byte(0); index < byte(c.branchFactor); index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeUint(buf, uint64(index))
 			path := entry.compressedPath
@@ -134,7 +136,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -151,25 +153,25 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	switch {
 	case err != nil:
 		return err
-	case numChildren > uint64(branchFactor):
+	case numChildren > uint64(c.branchFactor):
 		return errTooManyChildren
 	case numChildren > uint64(src.Len()/minChildLen):
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, branchFactor)
+	n.children = make(map[byte]child, c.branchFactor)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
-		if index >= uint64(branchFactor) || (i != 0 && index <= previousChild) {
+		if index >= uint64(c.branchFactor) || (i != 0 && index <= previousChild) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
 
-		compressedPath, err := c.decodePath(src, branchFactor)
+		compressedPath, err := c.decodePath(src, c.branchFactor)
 		if err != nil {
 			return err
 		}

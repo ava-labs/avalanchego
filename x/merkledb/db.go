@@ -44,7 +44,7 @@ var (
 	RootKey []byte
 	_       MerkleDB = (*merkleDB)(nil)
 
-	codec = newCodec()
+	codec = newCodec(BranchFactor16)
 
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}

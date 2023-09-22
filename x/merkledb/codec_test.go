@@ -122,12 +122,12 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
-			if err := codec.decodeDBNode(b, node, BranchFactor16); err != nil {
+			if err := codec.decodeDBNode(b, node); err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeDBNode(node, BranchFactor16)
+			buf := codec.encodeDBNode(node)
 			require.Equal(b, buf)
 		},
 	)
@@ -177,13 +177,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes := codec.encodeDBNode(&node, BranchFactor16)
+			nodeBytes := codec.encodeDBNode(&node)
 
 			var gotNode dbNode
-			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode, BranchFactor16))
+			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
 			require.Equal(node, gotNode)
 
-			nodeBytes2 := codec.encodeDBNode(&gotNode, BranchFactor16)
+			nodeBytes2 := codec.encodeDBNode(&gotNode)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
@@ -196,7 +196,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode, BranchFactor16)
+	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
@@ -204,7 +204,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes := codec.encodeDBNode(&proof, BranchFactor16)
+	nodeBytes := codec.encodeDBNode(&proof)
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
@@ -212,14 +212,14 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	// Put num children NodeBranchFactor+1 at end
 	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(BranchFactor16+1))
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
 }
 
 // Ensure that encodeHashValues is deterministic
 func FuzzEncodeHashValues(f *testing.F) {
-	codec1 := newCodec()
-	codec2 := newCodec()
+	codec1 := newCodec(BranchFactor16)
+	codec2 := newCodec(BranchFactor16)
 
 	f.Fuzz(
 		func(
