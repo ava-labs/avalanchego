@@ -244,7 +244,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.root.id
+		t.changes.rootID = t.getMerkleRoot()
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -342,6 +342,26 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	closestNode := proofPath[len(proofPath)-1]
+
+	// if the nil key root is not required, pretend the trie's root is the nil key node's child
+	if shouldUseChildAsRoot(t.root) {
+		// remove the nil key root since we should use its child instead
+		proof.Path = proof.Path[1:]
+
+		// if there are now no nodes, add the "root" as an exclusion proof
+		if len(proof.Path) == 0 {
+			var alternateRootNode *node
+			for index, childEntry := range t.root.children {
+				alternateRootNode, err = t.getNodeWithID(childEntry.id, path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			proof.Path = []ProofNode{alternateRootNode.asProofNode()}
+			return proof, nil
+		}
+	}
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
@@ -454,7 +474,13 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, RootPath.Bytes())
+		proofKey := RootPath.Bytes()
+		if shouldUseChildAsRoot(t.root) {
+			for index, childEntry := range t.root.children {
+				proofKey = (path([]byte{index}) + childEntry.compressedPath).Serialize().Value
+			}
+		}
+		rootProof, err := t.getProof(ctx, proofKey)
 		if err != nil {
 			return nil, err
 		}
@@ -541,7 +567,11 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.root.id, nil
+	return t.getMerkleRoot(), nil
+}
+
+func (t *trieView) getMerkleRoot() ids.ID {
+	return getMerkleRoot(t.root)
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {

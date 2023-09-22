@@ -428,7 +428,29 @@ func (m *Manager) findNextKey(
 
 	nextKey := maybe.Nothing[[]byte]()
 
+	// Add empty key root back into the localProofNodes, if needed.
+	// Required to ensure that a common node exists in both proofs
+	if len(localProofNodes) > 0 && localProofNodes[0].KeyPath.NibbleLength != 0 {
+		localProofNodes = append(
+			[]merkledb.ProofNode{
+				{
+					Children: map[byte]ids.ID{localProofNodes[0].KeyPath.NibbleVal(0): ids.Empty},
+				},
+			}, localProofNodes...)
+	}
 	localProofNodeIndex := len(localProofNodes) - 1
+
+	// Add empty key root back into the endProof, if needed.
+	// Required to ensure that a common node exists in both proofs
+	if len(endProof) > 0 && endProof[0].KeyPath.NibbleLength != 0 {
+		endProof = append(
+			[]merkledb.ProofNode{
+				{
+					Children: map[byte]ids.ID{endProof[0].KeyPath.NibbleVal(0): ids.Empty},
+				},
+			}, endProof...)
+	}
+
 	receivedProofNodeIndex := len(endProof) - 1
 
 	// traverse the two proofs from the deepest nodes up to the root until a difference is found
