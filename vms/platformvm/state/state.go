@@ -1774,11 +1774,11 @@ func (s *state) updateValidatorSet(
 		return nil
 	}
 
-	for weightKey, weightDiff := range weightDiffs {
+	for key, weightDiff := range weightDiffs {
 		var (
-			subnetID      = weightKey.subnetID
-			nodeID        = weightKey.nodeID
-			validatorDiff = valSetDiff[weightKey]
+			subnetID      = key.subnetID
+			nodeID        = key.nodeID
+			validatorDiff = valSetDiff[key]
 			err           error
 		)
 
@@ -1842,15 +1842,15 @@ func (s *state) processCurrentStakers() (
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
-			weightKey := subnetNodePair{
+			key := subnetNodePair{
 				subnetID: subnetID,
 				nodeID:   nodeID,
 			}
-			outputValSet[weightKey] = validatorDiff
+			outputValSet[key] = validatorDiff
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
-			outputWeights[weightKey] = &ValidatorWeightDiff{
+			outputWeights[key] = &ValidatorWeightDiff{
 				Decrease: validatorDiff.validatorStatus == deleted,
 			}
 
@@ -1861,7 +1861,7 @@ func (s *state) processCurrentStakers() (
 					blkKey = validatorDiff.validator.PublicKey
 				)
 
-				outputWeights[weightKey].Amount = weight
+				outputWeights[key].Amount = weight
 
 				if blkKey != nil {
 					// Record that the public key for the validator is being
@@ -1875,7 +1875,7 @@ func (s *state) processCurrentStakers() (
 					weight = validatorDiff.validator.Weight
 					blkKey = validatorDiff.validator.PublicKey
 				)
-				outputWeights[weightKey].Amount = weight
+				outputWeights[key].Amount = weight
 				if blkKey != nil {
 					// Record that the public key for the validator is being
 					// removed. This means we must record the prior value of the
@@ -1892,13 +1892,13 @@ func (s *state) processCurrentStakers() (
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
 
-				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
+				if err := outputWeights[key].Add(false, staker.Weight); err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
+				if err := outputWeights[key].Add(true, staker.Weight); err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
