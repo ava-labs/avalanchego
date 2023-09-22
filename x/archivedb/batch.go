@@ -3,125 +3,42 @@
 
 package archivedb
 
-import (
-	"bytes"
-
-	"github.com/ava-labs/avalanchego/database"
-)
+import "github.com/ava-labs/avalanchego/database"
 
 var _ database.Batch = (*batch)(nil)
 
-// A thin wrapper on top of the database.Batch that also keeps track of the height.
+// batch is how a user performs modifications to the database.
 //
-// It takes any key and wraps it with dbKey. It is possible to construct many
-// batches but at Write() time, the height of the batch to be written to the
-// database must be the following height from the last written to the database,
-// otherwise an error will be thrown
+// It consumes puts and deletes at a specified height. When committing, an
+// atomic operation is created which registers the modifications at the
+// specified height and updates the last tracked height to be equal to this
+// batch's height.
 type batch struct {
-	db     *archiveDB
-	ops    []database.BatchOp
-	size   int
+	db     *Database
 	height uint64
+	database.BatchOps
 }
 
-// newBatchWithHeight returns a batch struct which implements database.Batch
-//
-// This batch will write keys onto ArchiveDb associating it the current height.
-func newBatchWithHeight(db *archiveDB, height uint64) *batch {
-	return &batch{
-		db:     db,
-		size:   0,
-		height: height,
-		ops:    make([]database.BatchOp, 0),
-	}
-}
-
-// Height returns the height for this Batch
-func (c *batch) Height() uint64 {
-	return c.height
-}
-
-// Writes the changes to the database
 func (c *batch) Write() error {
-	c.db.lock.Lock()
-	defer c.db.lock.Unlock()
-
-	batch := c.db.inner.NewBatch()
-	for _, op := range c.ops {
-		if err := batch.Put(op.Key, op.Value); err != nil {
+	batch := c.db.db.NewBatch()
+	for _, op := range c.Ops {
+		key, _ := newDBKey(op.Key, c.height)
+		var value []byte
+		if !op.Delete {
+			value = newDBValue(op.Value)
+		}
+		if err := batch.Put(key, value); err != nil {
 			return err
 		}
 	}
 
-	if err := database.PutUInt64(batch, keyHeight, c.height); err != nil {
+	if err := database.PutUInt64(batch, heightKey, c.height); err != nil {
 		return err
 	}
 
-	if err := batch.Write(); err != nil {
-		return err
-	}
-
-	c.db.currentHeight = c.height
-
-	return nil
+	return batch.Write()
 }
 
-// Delete any previous state that may be stored in the database
-func (c *batch) Delete(key []byte) error {
-	rawKey := newDBKey(key, c.height)
-	c.ops = append(c.ops, database.BatchOp{
-		Key:    rawKey,
-		Value:  []byte{1},
-		Delete: true,
-	})
-	c.size += len(rawKey) + 1
-	return nil
-}
-
-// Queues an insert for a key-value pair
-func (c *batch) Put(key, value []byte) error {
-	length := len(value)
-	valueWithDeleteFlag := make([]byte, length+1)
-	copy(valueWithDeleteFlag, value)
-	valueWithDeleteFlag[length] = 0 // not deleted element
-
-	rawKey := newDBKey(key, c.height)
-	c.ops = append(c.ops, database.BatchOp{
-		Key:   rawKey,
-		Value: valueWithDeleteFlag,
-	})
-	c.size += len(rawKey) + len(valueWithDeleteFlag)
-	return nil
-}
-
-// Returns the sizes to be committed in the database
-func (c *batch) Size() int {
-	return c.size
-}
-
-// Removed all pending writes and deletes to the database
-func (c *batch) Reset() {
-	c.ops = make([]database.BatchOp, 0)
-	c.size = 0
-}
-
-// Returns the inner batch
 func (c *batch) Inner() database.Batch {
 	return c
-}
-
-func (c *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, op := range c.ops {
-		rawKey, _, _ := parseDBKey(op.Key)
-		if bytes.Equal(op.Value, []byte{1}) {
-			if err := w.Delete(rawKey); err != nil {
-				return err
-			}
-		} else {
-			if err := w.Put(rawKey, op.Value[0:len(op.Value)-1]); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
