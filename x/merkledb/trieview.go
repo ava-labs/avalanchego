@@ -550,12 +550,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 }
 
 func (t *trieView) getMerkleRoot() ids.ID {
-	if useChildAsRoot(t.root) {
-		for _, childEntry := range t.root.children {
-			return childEntry.id
-		}
-	}
-	return t.root.id
+	return getMerkleRoot(t.root)
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {

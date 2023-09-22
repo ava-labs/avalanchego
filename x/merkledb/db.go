@@ -497,17 +497,21 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if useChildAsRoot(db.root) {
-		for _, childEntry := range db.root.children {
-			return childEntry.id
-		}
-	}
-	return db.root.id
+	return getMerkleRoot(db.root)
 }
 
 func useChildAsRoot(root *node) bool {
 	return root.valueDigest.IsNothing() && len(root.children) == 1
+}
+
+func getMerkleRoot(root *node) ids.ID {
+	// if the nil key root is not required, pretend the trie's root is the nil key node's child
+	if useChildAsRoot(root) {
+		for _, childEntry := range root.children {
+			return childEntry.id
+		}
+	}
+	return root.id
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
