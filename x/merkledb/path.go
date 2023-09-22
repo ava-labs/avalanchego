@@ -27,10 +27,10 @@ const (
 )
 
 type pathConfig struct {
-	branchFactor  BranchFactor
-	tokensPerByte int
-	tokenBitSize  byte
-	mask          byte
+	branchFactor    BranchFactor
+	tokensPerByte   int
+	tokenBitSize    byte
+	singleTokenMask byte
 }
 
 type Path struct {
@@ -43,28 +43,28 @@ var (
 	branchFactorToPathConfig = map[BranchFactor]*pathConfig{
 		BranchFactorUnspecified: {},
 		BranchFactor2: {
-			branchFactor:  BranchFactor2,
-			tokenBitSize:  Bit,
-			tokensPerByte: 8,
-			mask:          0b0000_0001,
+			branchFactor:    BranchFactor2,
+			tokenBitSize:    Bit,
+			tokensPerByte:   8,
+			singleTokenMask: 0b0000_0001,
 		},
 		BranchFactor4: {
-			branchFactor:  BranchFactor4,
-			tokenBitSize:  Crumb,
-			tokensPerByte: 4,
-			mask:          0b0000_0011,
+			branchFactor:    BranchFactor4,
+			tokenBitSize:    Crumb,
+			tokensPerByte:   4,
+			singleTokenMask: 0b0000_0011,
 		},
 		BranchFactor16: {
-			branchFactor:  BranchFactor16,
-			tokenBitSize:  Nibble,
-			tokensPerByte: 2,
-			mask:          0b0000_1111,
+			branchFactor:    BranchFactor16,
+			tokenBitSize:    Nibble,
+			tokensPerByte:   2,
+			singleTokenMask: 0b0000_1111,
 		},
 		BranchFactor256: {
-			branchFactor:  BranchFactor256,
-			tokenBitSize:  Byte,
-			tokensPerByte: 1,
-			mask:          0b1111_1111,
+			branchFactor:    BranchFactor256,
+			tokenBitSize:    Byte,
+			tokensPerByte:   1,
+			singleTokenMask: 0b1111_1111,
 		},
 	}
 
@@ -126,7 +126,7 @@ func (p Path) HasStrictPrefix(prefix Path) bool {
 // Token returns the token at the specified index
 // grabs the token's storage byte, shifts it, then masks out any bits from other tokens stored in the same byte
 func (p Path) Token(index int) byte {
-	return (p.value[index/p.tokensPerByte] >> p.bitsToShift(index)) & p.mask
+	return (p.value[index/p.tokensPerByte] >> p.bitsToShift(index)) & p.singleTokenMask
 }
 
 // Append returns a new Path that equals the current Path with the passed token appended to the end
