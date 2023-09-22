@@ -40,7 +40,7 @@ type Path struct {
 }
 
 var (
-	branchFactorToPathConfig = map[BranchFactor]*pathConfig{
+	branchFactorToPathConfig = map[BranchFactor]pathConfig{
 		BranchFactorUnspecified: {},
 		BranchFactor2: {
 			branchFactor:    BranchFactor2,
