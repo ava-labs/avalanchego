@@ -1,5 +1,18 @@
 # Release Notes
 
+## [v1.10.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.11)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `28` and compatible with versions `v1.10.9-v1.10.10`.
+
+### Fixes
+
+- Prevented overzelous benching due to dropped AppRequests
+- Populated the process file atomically to avoid racy reads
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.10...v1.10.11
+
 ## [v1.10.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.10)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
