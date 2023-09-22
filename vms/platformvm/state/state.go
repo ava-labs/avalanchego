@@ -1697,7 +1697,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	return errs.Err
 }
 
-func (s *state) writeWeightDiffs(height uint64, weightDiffs map[weightDiffKey]*ValidatorWeightDiff) error {
+func (s *state) writeWeightDiffs(height uint64, weightDiffs map[subnetNodePair]*ValidatorWeightDiff) error {
 	for k, weightDiff := range weightDiffs {
 		if weightDiff.Amount == 0 {
 			continue
@@ -1764,25 +1764,25 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 	return nil
 }
 
-type weightDiffKey struct {
+type subnetNodePair struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID
 }
 
 func (s *state) processCurrentStakers() (
-	map[weightDiffKey]*ValidatorWeightDiff,
+	map[subnetNodePair]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
 	error,
 ) {
 	var (
-		outputWeights = make(map[weightDiffKey]*ValidatorWeightDiff)
+		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
-			weightKey := weightDiffKey{
+			weightKey := subnetNodePair{
 				subnetID: subnetID,
 				nodeID:   nodeID,
 			}
