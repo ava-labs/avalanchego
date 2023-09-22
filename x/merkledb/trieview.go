@@ -244,9 +244,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		if t.changes.rootID, err = t.GetMerkleRoot(ctx); err != nil {
-			return
-		}
+		t.changes.rootID = t.getMerkleRoot()
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -551,12 +549,16 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	if t.root.value.IsNothing() && len(t.root.children) == 1 {
+	return t.getMerkleRoot(), nil
+}
+
+func (t *trieView) getMerkleRoot() ids.ID {
+	if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
 		for _, childEntry := range t.root.children {
-			return childEntry.id, nil
+			return childEntry.id
 		}
 	}
-	return t.root.id, nil
+	return t.root.id
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
