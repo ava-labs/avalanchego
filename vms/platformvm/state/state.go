@@ -1672,19 +1672,21 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	weightDiffs, blsKeyDiffs, valSetDiff, err := s.processCurrentStakers()
+	modifiedCurrentStakers, weightDiffs, blsKeyDiffs, valSetDiff, err := s.processCurrentStakers()
 	if err != nil {
 		return err
 	}
 
+	modifiedPendingStakers := s.processPendingStakers()
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
-		s.writeCurrentStakers(),
+		s.writeCurrentStakers(modifiedCurrentStakers),
 		s.writeWeightDiffs(height, weightDiffs),
 		s.writeBlsKeyDiffs(height, blsKeyDiffs),
 		s.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
-		s.writePendingStakers(),
+		s.writePendingStakers(modifiedPendingStakers),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
@@ -1827,21 +1829,32 @@ type subnetNodePair struct {
 	nodeID   ids.NodeID
 }
 
+type modifiedStakerData struct {
+	status diffValidatorStatus
+	staker *Staker
+}
+
 func (s *state) processCurrentStakers() (
+	[]modifiedStakerData,
 	map[subnetNodePair]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
 	map[subnetNodePair]*diffValidator,
 	error,
 ) {
 	var (
+		outputStakers = make([]modifiedStakerData, 0)
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
 		outputValSet  = make(map[subnetNodePair]*diffValidator)
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
-		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
+		delete(s.currentStakers.validatorDiffs, subnetID)
+
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
+			// Note: validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+
 			weightKey := subnetNodePair{
 				subnetID: subnetID,
 				nodeID:   nodeID,
@@ -1861,6 +1874,11 @@ func (s *state) processCurrentStakers() (
 					blkKey = validatorDiff.validator.PublicKey
 				)
 
+				outputStakers = append(outputStakers, modifiedStakerData{
+					status: added,
+					staker: validatorDiff.validator,
+				})
+
 				outputWeights[weightKey].Amount = weight
 
 				if blkKey != nil {
@@ -1875,6 +1893,12 @@ func (s *state) processCurrentStakers() (
 					weight = validatorDiff.validator.Weight
 					blkKey = validatorDiff.validator.PublicKey
 				)
+
+				outputStakers = append(outputStakers, modifiedStakerData{
+					status: deleted,
+					staker: validatorDiff.validator,
+				})
+
 				outputWeights[weightKey].Amount = weight
 				if blkKey != nil {
 					// Record that the public key for the validator is being
@@ -1890,21 +1914,68 @@ func (s *state) processCurrentStakers() (
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
-				staker := addedDelegatorIterator.Value()
+				delegator := addedDelegatorIterator.Value()
 
-				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+				outputStakers = append(outputStakers, modifiedStakerData{
+					status: added,
+					staker: delegator,
+				})
+
+				if err := outputWeights[weightKey].Add(false, delegator.Weight); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
-			for _, staker := range validatorDiff.deletedDelegators {
-				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+			for _, delegator := range validatorDiff.deletedDelegators {
+				outputStakers = append(outputStakers, modifiedStakerData{
+					status: added,
+					staker: delegator,
+				})
+
+				if err := outputWeights[weightKey].Add(true, delegator.Weight); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return outputWeights, outputBlsKey, outputValSet, nil
+	return outputStakers, outputWeights, outputBlsKey, outputValSet, nil
+}
+
+func (s *state) processPendingStakers() []modifiedStakerData {
+	output := make([]modifiedStakerData, 0)
+	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
+		delete(s.pendingStakers.validatorDiffs, subnetID)
+		for _, validatorDiff := range subnetValidatorDiffs {
+			// validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+			switch {
+			case validatorDiff.validatorStatus == added || validatorDiff.validatorStatus == deleted:
+				output = append(output, modifiedStakerData{
+					status: validatorDiff.validatorStatus,
+					staker: validatorDiff.validator,
+				})
+			default:
+				// nothing to do
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				output = append(output, modifiedStakerData{
+					status: added,
+					staker: addedDelegatorIterator.Value(),
+				})
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				output = append(output, modifiedStakerData{
+					status: deleted,
+					staker: staker,
+				})
+			}
+		}
+	}
+	return output
 }
 
 func (s *state) Close() error {
@@ -2122,27 +2193,22 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers() error {
-	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
-		delete(s.currentStakers.validatorDiffs, subnetID)
+func (s *state) writeCurrentStakers(modifiedStakers []modifiedStakerData) error {
+	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
+	// either added or modified, so they are not nil
+	for _, data := range modifiedStakers {
+		switch {
+		case data.staker.Priority.IsCurrentValidator():
+			staker := data.staker
 
-		// Select db to write to
-		validatorDB := s.currentSubnetValidatorList
-		delegatorDB := s.currentSubnetDelegatorList
-		if subnetID == constants.PrimaryNetworkID {
-			validatorDB = s.currentValidatorList
-			delegatorDB = s.currentDelegatorList
-		}
+			// Select db to write to
+			validatorDB := s.currentSubnetValidatorList
+			if staker.SubnetID == constants.PrimaryNetworkID {
+				validatorDB = s.currentValidatorList
+			}
 
-		// Record the change in weight and/or public key for each validator.
-		for nodeID, validatorDiff := range validatorDiffs {
-			// Copy [nodeID] so it doesn't get overwritten next iteration.
-			nodeID := nodeID
-
-			switch validatorDiff.validatorStatus {
+			switch data.status {
 			case added:
-				staker := validatorDiff.validator
-
 				// The validator is being added.
 				//
 				// Invariant: It's impossible for a delegator to have been
@@ -2166,106 +2232,106 @@ func (s *state) writeCurrentStakers() error {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
-			case deleted:
-				staker := validatorDiff.validator
+				s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 
+			case deleted:
 				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+				s.validatorState.DeleteValidatorMetadata(staker.NodeID, staker.SubnetID)
+
+			default:
+				// should never happen, nothing to do
 			}
 
-			err := writeCurrentDelegatorDiff(
-				delegatorDB,
-				validatorDiff,
-			)
-			if err != nil {
-				return err
+		case data.staker.Priority.IsCurrentDelegator():
+			staker := data.staker
+
+			// Select db to write to
+			delegatorDB := s.currentSubnetDelegatorList
+			if staker.SubnetID == constants.PrimaryNetworkID {
+				delegatorDB = s.currentDelegatorList
 			}
+
+			switch data.status {
+			case added:
+				if err := database.PutUInt64(delegatorDB, staker.TxID[:], staker.PotentialReward); err != nil {
+					return fmt.Errorf("failed to write current delegator to list: %w", err)
+				}
+
+			case deleted:
+				if err := delegatorDB.Delete(staker.TxID[:]); err != nil {
+					return fmt.Errorf("failed to delete current staker: %w", err)
+				}
+
+			default:
+				// should never happen, nothing to do
+			}
+
+		default:
+			// should never happen, we only have either validators or delegators
 		}
 	}
 	return nil
 }
 
-func writeCurrentDelegatorDiff(
-	currentDelegatorList linkeddb.LinkedDB,
-	validatorDiff *diffValidator,
-) error {
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
-			return fmt.Errorf("failed to write current delegator to list: %w", err)
-		}
-	}
+func (s *state) writePendingStakers(modifiedStakers []modifiedStakerData) error {
+	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
+	// either added or modified, so they are not nil
+	for _, data := range modifiedStakers {
+		switch {
+		case data.staker.Priority.IsCurrentValidator():
+			staker := data.staker
 
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete current staker: %w", err)
-		}
-	}
-	return nil
-}
-
-func (s *state) writePendingStakers() error {
-	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
-		delete(s.pendingStakers.validatorDiffs, subnetID)
-
-		validatorDB := s.pendingSubnetValidatorList
-		delegatorDB := s.pendingSubnetDelegatorList
-		if subnetID == constants.PrimaryNetworkID {
-			validatorDB = s.pendingValidatorList
-			delegatorDB = s.pendingDelegatorList
-		}
-
-		for _, validatorDiff := range subnetValidatorDiffs {
-			err := writePendingDiff(
-				validatorDB,
-				delegatorDB,
-				validatorDiff,
-			)
-			if err != nil {
-				return err
+			// Select db to write to
+			validatorDB := s.pendingSubnetValidatorList
+			if staker.SubnetID == constants.PrimaryNetworkID {
+				validatorDB = s.pendingValidatorList
 			}
-		}
-	}
-	return nil
-}
 
-func writePendingDiff(
-	pendingValidatorList linkeddb.LinkedDB,
-	pendingDelegatorList linkeddb.LinkedDB,
-	validatorDiff *diffValidator,
-) error {
-	switch validatorDiff.validatorStatus {
-	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
-		if err != nil {
-			return fmt.Errorf("failed to add pending validator: %w", err)
-		}
-	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
-		if err != nil {
-			return fmt.Errorf("failed to delete pending validator: %w", err)
-		}
-	}
+			switch data.status {
+			case added:
+				err := validatorDB.Put(staker.TxID[:], nil)
+				if err != nil {
+					return fmt.Errorf("failed to add pending validator: %w", err)
+				}
+			case deleted:
+				err := validatorDB.Delete(staker.TxID[:])
+				if err != nil {
+					return fmt.Errorf("failed to delete pending validator: %w", err)
+				}
 
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
+			default:
+				// should never happen, nothing to do
+			}
 
-		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
-			return fmt.Errorf("failed to write pending delegator to list: %w", err)
-		}
-	}
+		case data.staker.Priority.IsCurrentDelegator():
+			staker := data.staker
 
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete pending delegator: %w", err)
+			// Select db to write to
+			delegatorDB := s.currentSubnetDelegatorList
+			if staker.SubnetID == constants.PrimaryNetworkID {
+				delegatorDB = s.currentDelegatorList
+			}
+
+			switch data.status {
+			case added:
+				if err := delegatorDB.Put(staker.TxID[:], nil); err != nil {
+					return fmt.Errorf("failed to write pending delegator to list: %w", err)
+				}
+
+			case deleted:
+				if err := delegatorDB.Delete(staker.TxID[:]); err != nil {
+					return fmt.Errorf("failed to delete pending delegator: %w", err)
+				}
+
+			default:
+				// should never happen, nothing to do
+			}
+
+		default:
+			// should never happen, we only have either validators or delegators
 		}
 	}
 	return nil
