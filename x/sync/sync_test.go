@@ -741,7 +741,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
 
-			if !smaller.key.Equals(bigger.key) || smaller.id != bigger.id {
+			if smaller.key != bigger.key || smaller.id != bigger.id {
 				smallestDiffKey = smaller.key
 				foundDiff = true
 				break
