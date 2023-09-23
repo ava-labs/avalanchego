@@ -1769,7 +1769,7 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 
 func (s *state) updateValidatorSet(
 	updateValidators bool,
-	valSetDiff map[subnetNodePair]*diffValidator,
+	valSetDiff map[subnetNodePair]stakerStatusPair,
 	weightDiffs map[subnetNodePair]*ValidatorWeightDiff,
 ) error {
 	if !updateValidators {
@@ -1778,10 +1778,10 @@ func (s *state) updateValidatorSet(
 
 	for key, weightDiff := range weightDiffs {
 		var (
-			subnetID      = key.subnetID
-			nodeID        = key.nodeID
-			validatorDiff = valSetDiff[key]
-			err           error
+			subnetID = key.subnetID
+			nodeID   = key.nodeID
+			val      = valSetDiff[key]
+			err      error
 		)
 
 		// We only track the current validator set of tracked subnets.
@@ -1796,8 +1796,8 @@ func (s *state) updateValidatorSet(
 		if weightDiff.Decrease {
 			err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 		} else {
-			if validatorDiff.validatorStatus == added {
-				staker := validatorDiff.validator
+			if val.status == added {
+				staker := val.staker
 				err = validators.Add(
 					s.cfg.Validators,
 					subnetID,
@@ -1829,23 +1829,23 @@ type subnetNodePair struct {
 	nodeID   ids.NodeID
 }
 
-type modifiedStakerData struct {
-	status diffValidatorStatus
+type stakerStatusPair struct {
 	staker *Staker
+	status diffValidatorStatus
 }
 
 func (s *state) processCurrentStakers() (
-	[]modifiedStakerData,
+	[]stakerStatusPair,
 	map[subnetNodePair]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
-	map[subnetNodePair]*diffValidator,
+	map[subnetNodePair]stakerStatusPair,
 	error,
 ) {
 	var (
-		outputStakers = make([]modifiedStakerData, 0)
+		outputStakers = make([]stakerStatusPair, 0)
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
-		outputValSet  = make(map[subnetNodePair]*diffValidator)
+		outputValSet  = make(map[subnetNodePair]stakerStatusPair)
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
@@ -1859,7 +1859,10 @@ func (s *state) processCurrentStakers() (
 				subnetID: subnetID,
 				nodeID:   nodeID,
 			}
-			outputValSet[key] = validatorDiff
+			outputValSet[key] = stakerStatusPair{
+				staker: validatorDiff.validator,
+				status: validatorDiff.validatorStatus,
+			}
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
@@ -1874,7 +1877,7 @@ func (s *state) processCurrentStakers() (
 					blkKey = validatorDiff.validator.PublicKey
 				)
 
-				outputStakers = append(outputStakers, modifiedStakerData{
+				outputStakers = append(outputStakers, stakerStatusPair{
 					status: added,
 					staker: validatorDiff.validator,
 				})
@@ -1894,7 +1897,7 @@ func (s *state) processCurrentStakers() (
 					blkKey = validatorDiff.validator.PublicKey
 				)
 
-				outputStakers = append(outputStakers, modifiedStakerData{
+				outputStakers = append(outputStakers, stakerStatusPair{
 					status: deleted,
 					staker: validatorDiff.validator,
 				})
@@ -1916,7 +1919,7 @@ func (s *state) processCurrentStakers() (
 			for addedDelegatorIterator.Next() {
 				delegator := addedDelegatorIterator.Value()
 
-				outputStakers = append(outputStakers, modifiedStakerData{
+				outputStakers = append(outputStakers, stakerStatusPair{
 					status: added,
 					staker: delegator,
 				})
@@ -1927,7 +1930,7 @@ func (s *state) processCurrentStakers() (
 			}
 
 			for _, delegator := range validatorDiff.deletedDelegators {
-				outputStakers = append(outputStakers, modifiedStakerData{
+				outputStakers = append(outputStakers, stakerStatusPair{
 					status: added,
 					staker: delegator,
 				})
@@ -1941,8 +1944,8 @@ func (s *state) processCurrentStakers() (
 	return outputStakers, outputWeights, outputBlsKey, outputValSet, nil
 }
 
-func (s *state) processPendingStakers() []modifiedStakerData {
-	output := make([]modifiedStakerData, 0)
+func (s *state) processPendingStakers() []stakerStatusPair {
+	output := make([]stakerStatusPair, 0)
 	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
 		delete(s.pendingStakers.validatorDiffs, subnetID)
 		for _, validatorDiff := range subnetValidatorDiffs {
@@ -1950,7 +1953,7 @@ func (s *state) processPendingStakers() []modifiedStakerData {
 			// Access it only if validatorDiff.validatorStatus is added or deleted
 			switch {
 			case validatorDiff.validatorStatus == added || validatorDiff.validatorStatus == deleted:
-				output = append(output, modifiedStakerData{
+				output = append(output, stakerStatusPair{
 					status: validatorDiff.validatorStatus,
 					staker: validatorDiff.validator,
 				})
@@ -1961,14 +1964,14 @@ func (s *state) processPendingStakers() []modifiedStakerData {
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
-				output = append(output, modifiedStakerData{
+				output = append(output, stakerStatusPair{
 					status: added,
 					staker: addedDelegatorIterator.Value(),
 				})
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				output = append(output, modifiedStakerData{
+				output = append(output, stakerStatusPair{
 					status: deleted,
 					staker: staker,
 				})
@@ -2193,7 +2196,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers(modifiedStakers []modifiedStakerData) error {
+func (s *state) writeCurrentStakers(modifiedStakers []stakerStatusPair) error {
 	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
 	// either added or modified, so they are not nil
 	for _, data := range modifiedStakers {
@@ -2276,7 +2279,7 @@ func (s *state) writeCurrentStakers(modifiedStakers []modifiedStakerData) error 
 	return nil
 }
 
-func (s *state) writePendingStakers(modifiedStakers []modifiedStakerData) error {
+func (s *state) writePendingStakers(modifiedStakers []stakerStatusPair) error {
 	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
 	// either added or modified, so they are not nil
 	for _, data := range modifiedStakers {
