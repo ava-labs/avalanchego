@@ -18,7 +18,7 @@ var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
 type LRU[K comparable, V any] struct {
 	lock     sync.Mutex
 	elements linkedhashmap.LinkedHashmap[K, V]
-	// If set to < 0, will be set internally to 1.
+	// If set to <= 0, will be set internally to 1.
 	Size int
 }
 

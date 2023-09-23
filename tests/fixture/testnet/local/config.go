@@ -37,6 +37,7 @@ func LocalFlags() testnet.FlagsMap {
 		config.IndexEnabledKey:              true,
 		config.LogDisplayLevelKey:           "INFO",
 		config.LogLevelKey:                  "DEBUG",
+		config.MinStakeDurationKey:          testnet.DefaultMinStakeDuration.String(),
 	}
 }
 
