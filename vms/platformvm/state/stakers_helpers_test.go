@@ -117,6 +117,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         defaultValidateEndTime,
 		CortinaTime:       defaultValidateEndTime,
+		DTime:             defaultValidateEndTime,
 	}
 }
 

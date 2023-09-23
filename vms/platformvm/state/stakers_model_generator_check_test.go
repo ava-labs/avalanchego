@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/prop"
@@ -30,6 +31,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 	maxDelegatorWeight := uint64(2023)
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("AddValidatorTx generator checks", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
@@ -51,7 +53,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return errWrongNodeID.Error()
 			}
 
-			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, uint64(100))
+			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -96,7 +98,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return errWrongNodeID.Error()
 			}
 
-			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, uint64(100))
+			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -155,7 +157,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return "subnet not duly set"
 			}
 
-			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, uint64(100))
+			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -204,7 +206,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return "subnet not duly set"
 			}
 
-			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, uint64(100))
+			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}

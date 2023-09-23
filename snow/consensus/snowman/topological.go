@@ -483,7 +483,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// get the block that we are going to vote on
 		parentBlock, notRejected := ts.blocks[vote.parentID]
 
-		// if the block block we are going to vote on was already rejected, then
+		// if the block we are going to vote on was already rejected, then
 		// we should stop applying the votes
 		if !notRejected {
 			break

@@ -19,7 +19,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := latestForkTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -28,7 +28,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        defaultGenesisTime,
+			time:        latestForkTime,
 			fee:         0,
 			expectedErr: nil,
 		},
@@ -49,7 +49,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+			env := newEnvironment(t, apricotPhase5Fork)
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer func() {

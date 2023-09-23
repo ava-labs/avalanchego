@@ -32,7 +32,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil require_no_error_inline_func"}
 
 function test_golangci_lint {
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
   golangci-lint run --config .golangci.yml
 }
 

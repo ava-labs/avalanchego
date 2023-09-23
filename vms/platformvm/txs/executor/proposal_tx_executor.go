@@ -587,7 +587,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Reward the delegatee here
-	if validator.StartTime.After(e.Config.CortinaTime) {
+	if e.Config.IsCortinaActivated(validator.StartTime) {
 		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
@@ -641,13 +641,9 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
 	expectedUptimePercentage := e.Config.UptimePercentage
 	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
-		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
+		transformSubnet, err := GetTransformSubnetTx(e.OnCommitState, stakerToReward.SubnetID)
 		if err != nil {
 			return false, fmt.Errorf("failed to calculate uptime: %w", err)
-		}
-		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-		if !ok {
-			return false, fmt.Errorf("failed to calculate uptime: %w", ErrIsNotTransformSubnetTx)
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator

@@ -40,6 +40,9 @@ const (
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
 	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
+
+	// A short min stake duration enables testing of staking logic.
+	DefaultMinStakeDuration = time.Second
 )
 
 var (

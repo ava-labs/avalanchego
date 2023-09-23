@@ -7,6 +7,8 @@ on:
       - master
       - dev
   pull_request:
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   run_static_analysis:

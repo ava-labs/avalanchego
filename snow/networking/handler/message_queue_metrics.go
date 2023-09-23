@@ -49,7 +49,7 @@ func (m *messageQueueMetrics) initialize(
 		opMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      fmt.Sprintf("%s_count", opStr),
-			Help:      fmt.Sprintf("Number of of %s messages in the message queue.", opStr),
+			Help:      fmt.Sprintf("Number of %s messages in the message queue.", opStr),
 		})
 		m.ops[op] = opMetric
 		errs.Add(metricsRegisterer.Register(opMetric))

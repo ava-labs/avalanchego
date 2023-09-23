@@ -87,6 +87,7 @@ func TestMaskedIterator(t *testing.T) {
 
 func TestMaskIteratorProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("Mask iterator output must be sorted", prop.ForAll(
 		func(nonInitParentStakerTxs []*txs.Tx, indexes []int, counts []int) string {
@@ -103,7 +104,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -144,7 +145,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -184,7 +185,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}

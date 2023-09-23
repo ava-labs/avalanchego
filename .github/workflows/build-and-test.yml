@@ -8,6 +8,13 @@ on:
       - master
       - dev
   pull_request:
+  merge_group:
+    types: [checks_requested]
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   run_build_unit_tests:

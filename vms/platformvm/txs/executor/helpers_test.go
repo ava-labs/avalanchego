@@ -52,25 +52,39 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type activeFork uint8
+
 const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
+
+	apricotPhase3Fork activeFork = 0
+	apricotPhase5Fork activeFork = 1
+	banffFork         activeFork = 2
+	cortinaFork       activeFork = 3
+	dFork             activeFork = 4
+	latestFork        activeFork = dFork
 )
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
+	latestForkTime            = defaultGenesisTime
+	defaultValidateStartTime  = latestForkTime.Add(time.Second)
 	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
-	lastAcceptedID            = ids.GenerateTestID()
+
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+
+	preFundedKeys  = secp256k1.TestKeys()
+	avaxAssetID    = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee   = uint64(100)
+	xChainID       = ids.Empty.Prefix(0)
+	cChainID       = ids.Empty.Prefix(1)
+	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
@@ -114,12 +128,14 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	// reset latestForkTime to ensure test independence
+	latestForkTime = defaultGenesisTime
+	config := defaultConfig(fork, latestForkTime)
+	clk := defaultClock(latestForkTime)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -128,7 +144,10 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
+
+	// make sure chain time is past selected fork
+	baseState.SetTimestamp(clk.Time())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -136,7 +155,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		&config,
+		config,
 		clk,
 		fx,
 		baseState,
@@ -145,7 +164,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
@@ -157,7 +176,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	env := &environment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
+		config:         config,
 		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -211,6 +230,8 @@ func addSubnet(
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
+	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }
 
 func defaultState(
@@ -277,29 +298,53 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff, postCortina bool) config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+func defaultConfig(fork activeFork, latestForkTime time.Time) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
+	)
+
+	switch fork {
+	case apricotPhase3Fork:
+		apricotPhase3Time = latestForkTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
+	case banffFork:
+		banffTime = latestForkTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
+	case cortinaFork:
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case dFork:
+		dTime = defaultGenesisTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return config.Config{
+	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinValidatorStake:      10 * defaultMinValidatorStake,
+		MaxValidatorStake:      50 * defaultMinValidatorStake,
+		MinDelegatorStake:      defaultMinValidatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -308,19 +353,17 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DTime:             dTime,
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
-	now := defaultGenesisTime
-	if postFork {
-		// 1 second after Banff fork
-		now = defaultValidateEndTime.Add(-2 * time.Second)
-	}
+func defaultClock(latestForkTime time.Time) *mockable.Clock {
+	// make sure local clock is past selected fork
+	now := latestForkTime.Add(time.Second)
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

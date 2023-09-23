@@ -38,7 +38,7 @@ var errTestingDropped = errors.New("testing dropped")
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -69,7 +69,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -80,7 +80,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	require.NoError(env.mempool.Add(tx))
+	require.NoError(env.mempool.Add(tx, env.state.GetTimestamp()))
 	require.True(env.mempool.Has(txID))
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
@@ -94,7 +94,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	env.mempool.Remove([]*txs.Tx{tx})
-	require.NoError(env.mempool.Add(tx))
+	require.NoError(env.mempool.Add(tx, env.state.GetTimestamp()))
 
 	require.True(env.mempool.Has(txID))
 	reason = env.mempool.GetDropReason(txID)
@@ -102,7 +102,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}

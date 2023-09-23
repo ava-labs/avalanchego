@@ -57,7 +57,7 @@ func TestUTXOIDLess(t *testing.T) {
 		id2      UTXOID
 		expected bool
 	}
-	tests := []test{
+	tests := []*test{
 		{
 			name:     "same",
 			id1:      UTXOID{},
@@ -99,7 +99,7 @@ func TestUTXOIDLess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.id1.Less(&tt.id2))
+			require.Equal(t, tt.expected, tt.id1.Less(&tt.id2)) //nolint:gosec
 		})
 	}
 }

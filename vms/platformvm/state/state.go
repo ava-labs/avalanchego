@@ -58,7 +58,6 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
 	ErrCantFindSubnet               = errors.New("couldn't find subnet")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
@@ -1317,7 +1316,9 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		// tx is a genesis transactions, hence it's guaranteed to be
+		// pre Continuous staking fork. It's fine to use tx.StartTime
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1434,7 +1435,10 @@ func (s *state) loadCurrentStakers() error {
 
 		metadataBytes := validatorIt.Value()
 
-		defaultStartTime := stakerTx.StartTime()
+		defaultStartTime := time.Time{}
+		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+			defaultStartTime = preStaker.StartTime()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
@@ -1443,15 +1447,19 @@ func (s *state) loadCurrentStakers() error {
 			// always be present on disk.
 			StakerStartTime: defaultStartTime.Unix(),
 		}
-		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
-			return err
-		}
-
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		err = parseValidatorMetadata(metadataBytes, metadata)
 		if err != nil {
 			return err
 		}
-		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
+
+		staker, err := NewCurrentStaker(
+			txID,
+			stakerTx,
+			time.Unix(metadata.StakerStartTime, 0),
+			metadata.PotentialReward)
+		if err != nil {
+			return err
+		}
 		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
@@ -1482,7 +1490,10 @@ func (s *state) loadCurrentStakers() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := stakerTx.StartTime()
+		defaultStartTime := time.Time{}
+		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+			defaultStartTime = preStaker.StartTime()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
@@ -1494,7 +1505,12 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(
+			txID,
+			stakerTx,
+			time.Unix(metadata.StakerStartTime, 0),
+			metadata.PotentialReward,
+		)
 		if err != nil {
 			return err
 		}
@@ -1533,21 +1549,29 @@ func (s *state) loadCurrentStakers() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
+			defaultStartTime := time.Time{}
+			if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+				defaultStartTime = preStaker.StartTime()
+			}
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
-				StakerStartTime: stakerTx.StartTime().Unix(),
+				StakerStartTime: defaultStartTime.Unix(),
 			}
 			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+			staker, err := NewCurrentStaker(
+				txID,
+				stakerTx,
+				time.Unix(metadata.StakerStartTime, 0),
+				metadata.PotentialReward,
+			)
 			if err != nil {
 				return err
 			}
-			ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 			UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
@@ -1593,7 +1617,7 @@ func (s *state) loadPendingStakers() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1628,7 +1652,7 @@ func (s *state) loadPendingStakers() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}

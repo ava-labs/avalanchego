@@ -15,7 +15,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -34,7 +36,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := NewMempool(&config.Config{}, &noopBlkTimer{}, "mempool", registerer)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -44,13 +46,13 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
-	err = mpool.Add(tx)
+	err = mpool.Add(tx, time.Time{})
 	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
-	err = mpool.Add(tx)
+	err = mpool.Add(tx, time.Time{})
 	require.NoError(err, "should have added tx to mempool")
 }
 
@@ -58,7 +60,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := NewMempool(&config.Config{}, &noopBlkTimer{}, "mempool", registerer)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
@@ -72,7 +74,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, time.Time{}))
 
 		// we can get it
 		require.True(mpool.Has(tx.ID()))
@@ -102,7 +104,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, time.Time{}))
 	}
 }
 
@@ -110,7 +112,9 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := NewMempool(&config.Config{
+		DTime: mockable.MaxTime,
+	}, &noopBlkTimer{}, "mempool", registerer)
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after
@@ -126,7 +130,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, time.Time{}))
 
 		// we can get it
 		require.True(mpool.HasStakerTx())
@@ -167,8 +171,46 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, time.Time{}))
 	}
+}
+
+func TestContinuousStakingForkInMempool(t *testing.T) {
+	require := require.New(t)
+
+	forkTime := time.Now()
+	registerer := prometheus.NewRegistry()
+	mpool, err := NewMempool(&config.Config{
+		DTime: forkTime,
+	}, &noopBlkTimer{}, "mempool", registerer)
+	require.NoError(err)
+
+	txs, err := createTestProposalTxs(1)
+	require.NoError(err)
+	tx := txs[0]
+
+	// insert pre fork
+	preForkTime := forkTime.Add(-1 * time.Second)
+	require.NoError(mpool.Add(tx, preForkTime))
+	require.True(mpool.HasStakerTx())
+	retrievedTx := mpool.PeekStakerTx()
+	require.Equal(tx, retrievedTx)
+
+	// insert post fork
+	postForkTime := forkTime.Add(time.Second)
+	err = mpool.Add(tx, postForkTime)
+	require.ErrorIs(err, errTxAlreadyInMempool)
+	mpool.Remove(txs)
+	require.NoError(mpool.Add(tx, postForkTime))
+	require.False(mpool.HasStakerTx(), "post fork there should not be staker txs anymore")
+	require.True(mpool.HasTxs())
+	retrievedTxs := mpool.PeekTxs(math.MaxInt)
+	require.True(len(retrievedTxs) == 1)
+	require.Equal(retrievedTxs[0], tx)
+
+	// remove post fork
+	mpool.Remove(retrievedTxs)
+	require.False(mpool.HasTxs())
 }
 
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {

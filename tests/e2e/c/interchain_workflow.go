@@ -26,10 +26,7 @@ import (
 var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
-	const (
-		txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
-		gasLimit = uint64(21000)   // Standard gas limit
-	)
+	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
 
 	ginkgo.It("should ensure that funds can be transferred from the C-Chain to the X-Chain and the P-Chain", func() {
 		ginkgo.By("initializing a new eth client")
@@ -56,7 +53,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				acceptedNonce,
 				recipientEthAddress,
 				big.NewInt(int64(txAmount)),
-				gasLimit,
+				e2e.DefaultGasLimit,
 				gasPrice,
 				nil,
 			)
@@ -161,7 +158,9 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				recipientKey.Address(),
 			)))
 			require.NoError(err)
-			require.Greater(balances[avaxAssetID], uint64(0))
+			require.Positive(balances[avaxAssetID])
 		})
+
+		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })

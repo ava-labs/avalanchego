@@ -33,7 +33,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, apricotPhase5Fork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -147,15 +147,15 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{} // activate Banff
+	now := env.config.CortinaTime
+	env.clk.Set(now)
 
 	// create parentBlock. It's a standard one for simplicity
-	parentTime := defaultGenesisTime
+	parentTime := now
 	parentHeight := uint64(2022)
 
 	banffParentBlk, err := block.NewApricotStandardBlock(
@@ -561,12 +561,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
+			env := newEnvironment(t, nil, latestFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-
-			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -598,7 +596,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 			for _, subStaker := range test.subnetStakers {
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-					10, // Weight
+					env.config.MaxValidatorStake, // Weight
 					uint64(subStaker.startTime.Unix()),
 					uint64(subStaker.endTime.Unix()),
 					subStaker.nodeID, // validator ID
@@ -638,9 +636,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// store Staker0 to state
+				addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 				staker0, err := state.NewCurrentStaker(
 					addStaker0.ID(),
-					addStaker0.Unsigned.(*txs.AddValidatorTx),
+					addValTx,
+					addValTx.StartTime(),
 					0,
 				)
 				require.NoError(err)
@@ -649,11 +649,16 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
 
+				currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+				staker := currentStakerIterator.Value()
 				s0RewardTx := &txs.Tx{
 					Unsigned: &txs.RewardValidatorTx{
-						TxID: staker0.TxID,
+						TxID: staker.TxID,
 					},
 				}
+				currentStakerIterator.Release()
 				require.NoError(s0RewardTx.Initialize(txs.Codec))
 
 				// build proposal block moving ahead chain time
@@ -709,11 +714,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -735,9 +739,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -793,9 +799,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -847,11 +855,10 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
+			env := newEnvironment(t, nil, latestFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -905,9 +912,11 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			// store Staker0 to state
+			addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 			staker, err = state.NewCurrentStaker(
 				addStaker0.ID(),
-				addStaker0.Unsigned.(*txs.AddValidatorTx),
+				addValTx,
+				addValTx.StartTime(),
 				0,
 			)
 			require.NoError(err)
@@ -951,11 +960,10 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -990,9 +998,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1083,9 +1093,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1132,11 +1144,10 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1174,9 +1185,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1266,9 +1279,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

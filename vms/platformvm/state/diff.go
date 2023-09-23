@@ -69,6 +69,7 @@ func NewDiff(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
+
 	return &diff{
 		parentID:           parentID,
 		stateVersions:      stateVersions,

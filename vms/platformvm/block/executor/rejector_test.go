@@ -139,8 +139,9 @@ func TestRejectBlock(t *testing.T) {
 
 			// Set expected calls on dependencies.
 			for _, tx := range blk.Txs() {
-				mempool.EXPECT().Add(tx).Return(nil).Times(1)
+				mempool.EXPECT().Add(tx, gomock.Any()).Return(nil).Times(1)
 			}
+			state.EXPECT().GetTimestamp().Return(time.Time{})
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.

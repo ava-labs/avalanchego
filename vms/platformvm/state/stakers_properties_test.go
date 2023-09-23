@@ -67,6 +67,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 	properties := gopter.NewProperties(nil)
 
 	ctx := buildStateCtx()
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
@@ -81,7 +82,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			}
 
 			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -151,7 +152,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			}
 
 			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -225,7 +226,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx))
+			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.PreContinuousStakingStaker))
 			if err != nil {
 				return err.Error()
 			}
@@ -297,7 +298,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -309,7 +310,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), startTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -447,7 +448,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 				stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -538,7 +539,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -550,7 +551,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), startTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -678,6 +679,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 func TestStateStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	ctx := buildStateCtx()
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("cannot update unknown validator", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
@@ -694,7 +696,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -724,7 +726,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -756,7 +758,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -790,7 +792,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -801,7 +803,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx = signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			del, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -825,6 +827,7 @@ func TestStateStakersProperties(t *testing.T) {
 func TestDiffStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	ctx := buildStateCtx()
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("updating unknown validator should not err", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
@@ -839,7 +842,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -867,7 +870,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -897,7 +900,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -925,7 +928,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -950,6 +953,7 @@ func TestDiffStakersProperties(t *testing.T) {
 func TestValidatorSetOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	ctx := buildStateCtx()
+	startTime := time.Now().Truncate(time.Second)
 
 	trackedSubnet := ids.GenerateTestID()
 	properties.Property("validator is added upon staker insertion", prop.ForAll(
@@ -965,7 +969,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1017,7 +1021,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1077,7 +1081,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedMainValTx.Unsigned.(txs.StakerTx)
-			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), stakerTx, uint64(1000))
+			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1088,7 +1092,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx = signedCompanionValTx.Unsigned.(txs.StakerTx)
-			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), stakerTx, uint64(1000))
+			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1138,6 +1142,7 @@ func TestValidatorSetOperations(t *testing.T) {
 func TestValidatorUptimesOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	ctx := buildStateCtx()
+	startTime := time.Now().Truncate(time.Second)
 
 	// // to reproduce a given scenario do something like this:
 	// parameters := gopter.DefaultTestParametersWithSeed(1688585045068172845)
@@ -1156,7 +1161,7 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}

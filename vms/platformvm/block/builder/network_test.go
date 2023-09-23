@@ -36,7 +36,7 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -83,7 +83,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -109,7 +109,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -141,7 +141,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
-	require.NoError(env.Builder.Add(tx))
+	require.NoError(env.Builder.Add(tx, env.state.GetTimestamp()))
 
 	require.Nil(gossipedBytes)
 }

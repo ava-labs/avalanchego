@@ -152,7 +152,7 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response for funded keys: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		if strings.TrimSpace(string(body)) == requestedKeyCountExceedsAvailable {
 			return nil, errRequestedKeyCountExceedsAvailable
 		}

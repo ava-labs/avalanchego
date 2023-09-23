@@ -40,8 +40,9 @@ var (
 	_ commands.Command = (*applyAndCommitBottomDiffCommand)(nil)
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
-	commandsCtx = buildStateCtx()
-	extraWeight = uint64(100)
+	commandsCtx    = buildStateCtx()
+	extraWeight    = uint64(100)
+	dummyStartTime = time.Now().Truncate(time.Second)
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
@@ -63,7 +64,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688718809015601261)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688121928651346121)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -161,7 +162,7 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 	}
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, dummyStartTime, uint64(1000))
 	if err != nil {
 		return sys // state checks later on should spot missing validator
 	}
@@ -175,7 +176,7 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 func (cmd *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	sTx := cmd.sTx
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, dummyStartTime, uint64(1000))
 	if err != nil {
 		return cmdState // state checks later on should spot missing validator
 	}
@@ -208,13 +209,12 @@ func (cmd *putCurrentValidatorCommand) PostCondition(cmdState commands.State, re
 
 func (cmd *putCurrentValidatorCommand) String() string {
 	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.StartTime().Unix(),
-		stakerTx.EndTime().Sub(stakerTx.StartTime()),
+		stakerTx.Duration(),
 	)
 }
 
@@ -829,7 +829,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), dummyStartTime, uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -887,7 +887,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), dummyStartTime, uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -919,13 +919,13 @@ func (cmd *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, re
 
 func (cmd *putCurrentDelegatorCommand) String() string {
 	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.StartTime().Unix(),
-		stakerTx.EndTime().Sub(stakerTx.StartTime()))
+		stakerTx.Duration(),
+	)
 }
 
 var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(commandsCtx, nil, nil, 1000).Map(

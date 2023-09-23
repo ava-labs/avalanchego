@@ -56,12 +56,23 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
+type (
+	activeFork   uint8
+	stakerStatus uint
+)
+
 const (
-	pending stakerStatus = iota
-	current
+	pending stakerStatus = 0
+	current stakerStatus = 1
+
+	apricotPhase3Fork     activeFork = 0
+	apricotPhase5Fork     activeFork = 1
+	banffFork             activeFork = 2
+	cortinaFork           activeFork = 3
+	continuousStakingFork activeFork = 4
+	latestFork            activeFork = continuousStakingFork
 
 	defaultWeight = 10000
-	trackChecksum = false
 )
 
 var (
@@ -70,23 +81,26 @@ var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
+	latestForkTime            = defaultGenesisTime
+	defaultValidateStartTime  = latestForkTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
+
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+
+	preFundedKeys = secp256k1.TestKeys()
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee  = uint64(100)
+	xChainID      = ids.Empty.Prefix(0)
+	cChainID      = ids.Empty.Prefix(1)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
 	errMissing = errors.New("missing")
 )
-
-type stakerStatus uint
 
 type staker struct {
 	nodeID             ids.NodeID
@@ -127,10 +141,17 @@ func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
+func newEnvironment(
+	t *testing.T,
+	ctrl *gomock.Controller,
+	fork activeFork,
+) *environment {
+	// reset latestForkTime to ensure test independence
+	latestForkTime = defaultGenesisTime
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         defaultConfig(fork),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -192,7 +213,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.NewMempool(res.config, res, "mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -259,6 +280,11 @@ func addSubnet(env *environment) {
 	if err := stateDiff.Apply(env.state); err != nil {
 		panic(err)
 	}
+	if err := env.state.Commit(); err != nil {
+		panic(err)
+	}
+
+	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }
 
 func defaultState(
@@ -322,7 +348,40 @@ func defaultCtx(db database.Database) *snow.Context {
 	return ctx
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		DTime             = mockable.MaxTime
+	)
+
+	switch fork {
+	case apricotPhase3Fork:
+		apricotPhase3Time = defaultGenesisTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case banffFork:
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case cortinaFork:
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case continuousStakingFork:
+		DTime = defaultGenesisTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -333,9 +392,9 @@ func defaultConfig() *config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinValidatorStake:      10 * defaultMinValidatorStake,
+		MaxValidatorStake:      50 * defaultMinValidatorStake,
+		MinDelegatorStake:      defaultMinValidatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -344,15 +403,19 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         mockable.MaxTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DTime:             DTime,
 	}
 }
 
 func defaultClock() *mockable.Clock {
+	// make sure local clock is past selected fork
+	now := latestForkTime.Add(time.Second)
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(now)
 	return clk
 }
 

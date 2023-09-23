@@ -14,16 +14,19 @@ type remover struct {
 
 func (r *remover) AddValidatorTx(*txs.AddValidatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
@@ -59,11 +62,13 @@ func (r *remover) TransformSubnetTx(*txs.TransformSubnetTx) error {
 
 func (r *remover) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 

@@ -143,11 +143,6 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 	// Ask each bootstrap validator to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted.
-	//
-	// Create a newAlpha taking using the sampled beacon
-	// Keep the proportion of b.Alpha in the newAlpha
-	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
-
 	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
 
 	failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAcceptedFrontier)

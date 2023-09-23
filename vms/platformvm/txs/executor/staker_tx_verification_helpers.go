@@ -39,13 +39,9 @@ func getValidatorRules(
 		}, nil
 	}
 
-	transformSubnetIntf, err := chainState.GetSubnetTransformation(subnetID)
+	transformSubnet, err := GetTransformSubnetTx(chainState, subnetID)
 	if err != nil {
 		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
 	}
 
 	return &addValidatorRules{
@@ -83,13 +79,9 @@ func getDelegatorRules(
 		}, nil
 	}
 
-	transformSubnetIntf, err := chainState.GetSubnetTransformation(subnetID)
+	transformSubnet, err := GetTransformSubnetTx(chainState, subnetID)
 	if err != nil {
 		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
 	}
 
 	return &addDelegatorRules{
@@ -255,4 +247,18 @@ func GetMaxWeight(
 	// be at the end of the delegation window. Make sure that the max weight is
 	// updated accordingly.
 	return math.Max(currentMax, currentWeight), nil
+}
+
+func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSubnetTx, error) {
+	transformSubnetIntf, err := chain.GetSubnetTransformation(subnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return nil, ErrIsNotTransformSubnetTx
+	}
+
+	return transformSubnet, nil
 }
