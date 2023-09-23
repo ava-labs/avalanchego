@@ -57,7 +57,7 @@ func TestUTXOIDLess(t *testing.T) {
 		id2      UTXOID
 		expected bool
 	}
-	tests := []test{
+	tests := []*test{
 		{
 			name:     "same",
 			id1:      UTXOID{},

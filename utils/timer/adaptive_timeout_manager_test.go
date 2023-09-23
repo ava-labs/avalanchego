@@ -22,7 +22,7 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 		expectedErr error
 	}
 
-	tests := []test{
+	tests := []*test{
 		{
 			config: AdaptiveTimeoutConfig{
 				InitialTimeout:     time.Second,
