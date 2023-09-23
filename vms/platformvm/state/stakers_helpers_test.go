@@ -113,11 +113,11 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      defaultMaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     defaultValidateEndTime,
-		ApricotPhase5Time:     defaultValidateEndTime,
-		BanffTime:             defaultValidateEndTime,
-		CortinaTime:           defaultValidateEndTime,
-		ContinuousStakingTime: defaultValidateEndTime,
+		ApricotPhase3Time: defaultValidateEndTime,
+		ApricotPhase5Time: defaultValidateEndTime,
+		BanffTime:         defaultValidateEndTime,
+		CortinaTime:       defaultValidateEndTime,
+		DTime:             defaultValidateEndTime,
 	}
 }
 

@@ -91,7 +91,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	now := env.config.ContinuousStakingTime
+	now := env.config.DTime
 	env.clk.Set(now)
 
 	// setup and store parent block

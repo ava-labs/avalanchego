@@ -104,8 +104,8 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
-	// Time of the continuous staking network upgrade
-	ContinuousStakingTime time.Time
+	// Time of the D network upgrade
+	DTime time.Time
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
@@ -133,8 +133,9 @@ func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.CortinaTime)
 }
 
-func (c *Config) IsContinuousStakingActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.ContinuousStakingTime)
+// TODO: Rename
+func (c *Config) IsDActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.DTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

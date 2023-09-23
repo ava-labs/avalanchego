@@ -66,7 +66,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(backend *Backend, chainStat
 		stakerStart      = currentChainTime
 		stakerEnd        = stakerStart.Add(subnetValidator.Duration())
 	)
-	if !backend.Config.IsContinuousStakingActivated(currentChainTime) {
+	if !backend.Config.IsDActivated(currentChainTime) {
 		stakerStart = subnetValidator.StartTime()
 		stakerEnd = subnetValidator.EndTime()
 	}
@@ -137,7 +137,7 @@ func verifyAddValidatorTx(
 	var (
 		currentTimestamp              = chainState.GetTimestamp()
 		preContinuousStakingStartTime = tx.StartTime()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+		isContinuousStakingForkActive = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
@@ -226,7 +226,7 @@ func verifyAddSubnetValidatorTx(
 	var (
 		currentTimestamp              = chainState.GetTimestamp()
 		preContinuousStakingStartTime = tx.StartTime()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+		isContinuousStakingForkActive = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
@@ -404,7 +404,7 @@ func verifyAddDelegatorTx(
 	var (
 		currentTimestamp              = chainState.GetTimestamp()
 		preContinuousStakingStartTime = tx.StartTime()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+		isContinuousStakingForkActive = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
@@ -512,7 +512,7 @@ func verifyAddPermissionlessValidatorTx(
 	var (
 		currentTimestamp              = chainState.GetTimestamp()
 		preContinuousStakingStartTime = tx.StartTime()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+		isContinuousStakingForkActive = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
@@ -645,7 +645,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp              = chainState.GetTimestamp()
 		preContinuousStakingStartTime = tx.StartTime()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+		isContinuousStakingForkActive = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {

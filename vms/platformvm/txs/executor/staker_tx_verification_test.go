@@ -100,7 +100,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 				}
 			},
@@ -121,7 +121,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
@@ -145,8 +145,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						CortinaTime:           time.Time{},
-						ContinuousStakingTime: mockable.MaxTime,
+						CortinaTime: time.Time{},
+						DTime:       mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -172,7 +172,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -201,7 +201,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -230,7 +230,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -260,7 +260,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -293,7 +293,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -326,7 +326,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -361,7 +361,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -390,7 +390,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
+						DTime: time.Time{}, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -437,7 +437,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
-						ContinuousStakingTime: time.Time{}, // activate latest fork,
+						DTime:                 time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -484,7 +484,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						CortinaTime:           time.Time{},
-						ContinuousStakingTime: mockable.MaxTime,
+						DTime:                 mockable.MaxTime,
 						AddSubnetValidatorFee: 1,
 					},
 					Ctx:          snow.DefaultContextTest(),
@@ -536,7 +536,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
-						ContinuousStakingTime: time.Time{}, // activate latest fork,
+						DTime:                 time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,

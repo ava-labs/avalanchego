@@ -73,7 +73,6 @@ const (
 	latestFork            activeFork = continuousStakingFork
 
 	defaultWeight = 10000
-	trackChecksum = false
 )
 
 var (
@@ -82,7 +81,8 @@ var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
+	latestForkTime            = defaultGenesisTime
+	defaultValidateStartTime  = latestForkTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	defaultMinDelegatorStake = 1 * units.MilliAvax
@@ -146,6 +146,9 @@ func newEnvironment(
 	ctrl *gomock.Controller,
 	fork activeFork,
 ) *environment {
+	// reset latestForkTime to ensure test independence
+	latestForkTime = defaultGenesisTime
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
@@ -347,11 +350,11 @@ func defaultCtx(db database.Database) *snow.Context {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
-		apricotPhase3Time     = mockable.MaxTime
-		apricotPhase5Time     = mockable.MaxTime
-		banffTime             = mockable.MaxTime
-		cortinaTime           = mockable.MaxTime
-		continuousStakingTime = mockable.MaxTime
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		DTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -370,7 +373,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
 	case continuousStakingFork:
-		continuousStakingTime = defaultGenesisTime
+		DTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -400,16 +403,17 @@ func defaultConfig(fork activeFork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     apricotPhase3Time,
-		ApricotPhase5Time:     apricotPhase5Time,
-		BanffTime:             banffTime,
-		CortinaTime:           cortinaTime,
-		ContinuousStakingTime: continuousStakingTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DTime:             DTime,
 	}
 }
 
 func defaultClock() *mockable.Clock {
-	now := defaultGenesisTime
+	// make sure local clock is past selected fork
+	now := latestForkTime.Add(time.Second)
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

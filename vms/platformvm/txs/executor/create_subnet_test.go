@@ -19,7 +19,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := latestForkTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -28,7 +28,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        defaultGenesisTime,
+			time:        latestForkTime,
 			fee:         0,
 			expectedErr: nil,
 		},

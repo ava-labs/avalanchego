@@ -113,7 +113,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool(&config.Config{
-		ContinuousStakingTime: mockable.MaxTime,
+		DTime: mockable.MaxTime,
 	}, &noopBlkTimer{}, "mempool", registerer)
 	require.NoError(err)
 
@@ -181,7 +181,7 @@ func TestContinuousStakingForkInMempool(t *testing.T) {
 	forkTime := time.Now()
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool(&config.Config{
-		ContinuousStakingTime: forkTime,
+		DTime: forkTime,
 	}, &noopBlkTimer{}, "mempool", registerer)
 	require.NoError(err)
 

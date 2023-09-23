@@ -58,19 +58,20 @@ const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
 
-	apricotPhase3Fork     activeFork = 0
-	apricotPhase5Fork     activeFork = 1
-	banffFork             activeFork = 2
-	cortinaFork           activeFork = 3
-	continuousStakingFork activeFork = 4
-	latestFork            activeFork = continuousStakingFork
+	apricotPhase3Fork activeFork = 0
+	apricotPhase5Fork activeFork = 1
+	banffFork         activeFork = 2
+	cortinaFork       activeFork = 3
+	dFork             activeFork = 4
+	latestFork        activeFork = dFork
 )
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
+	latestForkTime            = defaultGenesisTime
+	defaultValidateStartTime  = latestForkTime.Add(time.Second)
 	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
 
 	defaultMinDelegatorStake = 1 * units.MilliAvax
@@ -131,8 +132,10 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(fork)
-	clk := defaultClock()
+	// reset latestForkTime to ensure test independence
+	latestForkTime = defaultGenesisTime
+	config := defaultConfig(fork, latestForkTime)
+	clk := defaultClock(latestForkTime)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -142,6 +145,9 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
+
+	// make sure chain time is past selected fork
+	baseState.SetTimestamp(clk.Time())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -225,7 +231,6 @@ func addSubnet(
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
 	require.NoError(env.state.Commit())
-
 	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }
 
@@ -293,32 +298,32 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(fork activeFork) *config.Config {
+func defaultConfig(fork activeFork, latestForkTime time.Time) *config.Config {
 	var (
-		apricotPhase3Time     = mockable.MaxTime
-		apricotPhase5Time     = mockable.MaxTime
-		banffTime             = mockable.MaxTime
-		cortinaTime           = mockable.MaxTime
-		continuousStakingTime = mockable.MaxTime
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	switch fork {
 	case apricotPhase3Fork:
-		apricotPhase3Time = defaultGenesisTime
+		apricotPhase3Time = latestForkTime
 	case apricotPhase5Fork:
-		apricotPhase5Time = defaultGenesisTime
-		apricotPhase3Time = defaultGenesisTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
 	case banffFork:
-		banffTime = defaultGenesisTime
-		apricotPhase5Time = defaultGenesisTime
-		apricotPhase3Time = defaultGenesisTime
+		banffTime = latestForkTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
 	case cortinaFork:
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
-	case continuousStakingFork:
-		continuousStakingTime = defaultGenesisTime
+	case dFork:
+		dTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -348,16 +353,17 @@ func defaultConfig(fork activeFork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     apricotPhase3Time,
-		ApricotPhase5Time:     apricotPhase5Time,
-		BanffTime:             banffTime,
-		CortinaTime:           cortinaTime,
-		ContinuousStakingTime: continuousStakingTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DTime:             dTime,
 	}
 }
 
-func defaultClock() *mockable.Clock {
-	now := defaultGenesisTime
+func defaultClock(latestForkTime time.Time) *mockable.Clock {
+	// make sure local clock is past selected fork
+	now := latestForkTime.Add(time.Second)
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

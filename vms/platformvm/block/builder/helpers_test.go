@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -63,12 +62,12 @@ const (
 	defaultWeight = 10000
 	trackChecksum = false
 
-	apricotPhase3Fork     activeFork = 0
-	apricotPhase5Fork     activeFork = 1
-	banffFork             activeFork = 2
-	cortinaFork           activeFork = 3
-	continuousStakingFork activeFork = 4
-	latestFork            activeFork = continuousStakingFork
+	apricotPhase3Fork activeFork = 0
+	apricotPhase5Fork activeFork = 1
+	banffFork         activeFork = 2
+	cortinaFork       activeFork = 3
+	DFork             activeFork = 4
+	latestFork        activeFork = DFork
 )
 
 var (
@@ -77,6 +76,7 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	latestForkTime            = defaultGenesisTime.Add(time.Second)
 
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
@@ -120,8 +120,12 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:golint,unparam
+func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unparam
 	require := require.New(t)
+
+	// always reset latestForkTime (a package level variable)
+	// to ensure test independency
+	latestForkTime = defaultGenesisTime.Add(time.Second)
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
@@ -140,6 +144,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:golin
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state.SetTimestamp(res.clk.Time())
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -299,11 +304,11 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
-		apricotPhase3Time     = mockable.MaxTime
-		apricotPhase5Time     = mockable.MaxTime
-		banffTime             = mockable.MaxTime
-		cortinaTime           = mockable.MaxTime
-		continuousStakingTime = mockable.MaxTime
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -321,8 +326,8 @@ func defaultConfig(fork activeFork) *config.Config {
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
-	case continuousStakingFork:
-		continuousStakingTime = defaultGenesisTime
+	case DFork:
+		dTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -352,16 +357,16 @@ func defaultConfig(fork activeFork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     apricotPhase3Time,
-		ApricotPhase5Time:     apricotPhase5Time,
-		BanffTime:             banffTime,
-		CortinaTime:           cortinaTime,
-		ContinuousStakingTime: continuousStakingTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DTime:             dTime,
 	}
 }
 
 func defaultClock() *mockable.Clock {
-	now := defaultGenesisTime
+	now := latestForkTime
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

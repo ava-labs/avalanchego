@@ -32,7 +32,7 @@ func (*issuer) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+	if i.m.cfg.IsDActivated(i.timestamp) {
 		i.m.addDecisionTx(i.tx)
 	} else {
 		i.m.addStakerTx(i.tx)
@@ -41,7 +41,7 @@ func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
 }
 
 func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+	if i.m.cfg.IsDActivated(i.timestamp) {
 		i.m.addDecisionTx(i.tx)
 	} else {
 		i.m.addStakerTx(i.tx)
@@ -50,7 +50,7 @@ func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 }
 
 func (i *issuer) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+	if i.m.cfg.IsDActivated(i.timestamp) {
 		i.m.addDecisionTx(i.tx)
 	} else {
 		i.m.addStakerTx(i.tx)
@@ -89,7 +89,7 @@ func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+	if i.m.cfg.IsDActivated(i.timestamp) {
 		i.m.addDecisionTx(i.tx)
 	} else {
 		i.m.addStakerTx(i.tx)
@@ -98,7 +98,7 @@ func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx)
 }
 
 func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+	if i.m.cfg.IsDActivated(i.timestamp) {
 		i.m.addDecisionTx(i.tx)
 	} else {
 		i.m.addStakerTx(i.tx)

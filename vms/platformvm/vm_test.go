@@ -103,12 +103,12 @@ var (
 	defaultGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// time that genesis validators start validating
-	defaultValidateStartTime = defaultGenesisTime
+	defaultGenesisStartTime = defaultGenesisTime
 
 	// time that genesis validators stop validating
-	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	defaultValidateEndTime = defaultGenesisStartTime.Add(10 * defaultMinStakingDuration)
 
-	latestForkTime = defaultGenesisTime
+	latestForkTime = defaultGenesisTime.Add(time.Second)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = secp256k1.TestKeys()
@@ -196,7 +196,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				StartTime: json.Uint64(defaultGenesisStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
@@ -265,7 +265,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				StartTime: json.Uint64(defaultGenesisStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
@@ -313,14 +313,16 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	var (
-		apricotPhase3Time     = mockable.MaxTime
-		apricotPhase5Time     = mockable.MaxTime
-		banffTime             = mockable.MaxTime
-		cortinaTime           = mockable.MaxTime
-		continuousStakingTime = mockable.MaxTime
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
-	latestForkTime = defaultGenesisTime
+	// always reset latestForkTime (a package level variable)
+	// to ensure test independency
+	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch fork {
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
@@ -337,13 +339,13 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
 	case continuousStakingFork:
-		continuousStakingTime = latestForkTime
+		dTime = latestForkTime
 		cortinaTime = latestForkTime
 		banffTime = latestForkTime
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
 	default:
-		panic(fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	vm := &VM{Config: config.Config{
@@ -365,7 +367,7 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		ApricotPhase5Time:      apricotPhase5Time,
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
-		ContinuousStakingTime:  continuousStakingTime,
+		DTime:                  dTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -402,6 +404,9 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		nil,
 		appSender,
 	))
+
+	// align chain time and local clock
+	vm.state.SetTimestamp(vm.clock.Time())
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -1370,7 +1375,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -1460,7 +1465,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -1516,7 +1521,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1838,7 +1843,7 @@ func TestUnverifiedParent(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1950,22 +1955,22 @@ func TestMaxStakeAmount(t *testing.T) {
 	}{
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   defaultValidateStartTime,
+			startTime:   defaultGenesisStartTime,
 			endTime:     defaultValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   defaultValidateStartTime.Add(time.Minute),
+			startTime:   defaultGenesisStartTime.Add(time.Minute),
 			endTime:     defaultValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   defaultValidateStartTime,
+			startTime:   defaultGenesisStartTime,
 			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   defaultValidateStartTime.Add(time.Minute),
+			startTime:   defaultGenesisStartTime.Add(time.Minute),
 			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 	}
@@ -2001,7 +2006,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -2044,7 +2049,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -2067,8 +2072,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		nil,
 	))
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.clock.Set(defaultGenesisStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisStartTime.Add(2 * defaultMinStakingDuration))
 
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
@@ -2179,7 +2184,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		ContinuousStakingTime:  latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	ctx := defaultContext(t)
