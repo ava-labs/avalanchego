@@ -124,6 +124,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
+			newValidatorStartTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -153,6 +154,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
+			newValidatorStartTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -490,6 +492,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
 		addValTx,
+		dsStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -627,6 +630,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		addSubnetValTx,
+		defaultValidateStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -782,6 +786,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			addSubnetValTx,
+			defaultValidateStartTime,
 			0,
 		)
 		require.NoError(err)
@@ -806,7 +811,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, cortinaFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -885,6 +890,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
+			startTime,
 			0,
 		)
 		require.NoError(err)
@@ -974,6 +980,52 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
+}
+
+func TestStandardTxExecutorDForkAddValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, dFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var (
+		nodeID            = ids.GenerateTestNodeID()
+		validatorDuration = defaultMinStakingDuration
+		dummyStartTime    = time.Unix(0, 0)
+		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
+	)
+
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(dummyStartTime.Unix()),
+		uint64(dummyEndTime.Unix()),
+		nodeID,
+		ids.ShortEmpty,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addValTx,
+	}
+	require.NoError(addValTx.Unsigned.Visit(&executor))
+
+	// Check that a current validator is added
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	require.Equal(addValTx.ID(), val.TxID)
+	require.Equal(env.state.GetTimestamp(), val.StartTime)
+	require.Equal(val.StartTime.Add(validatorDuration), val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
@@ -1102,6 +1154,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1128,6 +1181,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1154,6 +1208,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1183,6 +1238,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1210,6 +1266,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1236,6 +1293,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1264,6 +1322,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1295,6 +1354,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1451,6 +1511,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1476,6 +1537,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime:   env.latestForkTime,
 							CortinaTime: env.latestForkTime,
+							DTime:       env.latestForkTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1500,9 +1562,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-
+							BanffTime:        env.latestForkTime,
+							CortinaTime:      env.latestForkTime,
+							DTime:            env.latestForkTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
@@ -1533,9 +1595,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-
+							BanffTime:        env.latestForkTime,
+							CortinaTime:      env.latestForkTime,
+							DTime:            env.latestForkTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
@@ -1571,9 +1633,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-
+							BanffTime:        env.latestForkTime,
+							CortinaTime:      env.latestForkTime,
+							DTime:            env.latestForkTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},

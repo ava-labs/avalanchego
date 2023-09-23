@@ -175,13 +175,13 @@ func (vm *VM) Initialize(
 		Fx:           vm.fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
 		Bootstrapped: &vm.bootstrapped,
+		Rewards:      rewards,
 	}
 
 	// Note: There is a circular dependency between the mempool and block
 	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	mempool, err := mempool.NewMempool(&vm.Config, vm, "mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}

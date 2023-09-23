@@ -640,6 +640,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				staker0, err := state.NewCurrentStaker(
 					addStaker0.ID(),
 					addValTx,
+					addValTx.StartTime(),
 					0,
 				)
 				require.NoError(err)
@@ -742,6 +743,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -801,6 +803,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -913,6 +916,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			staker, err = state.NewCurrentStaker(
 				addStaker0.ID(),
 				addValTx,
+				addValTx.StartTime(),
 				0,
 			)
 			require.NoError(err)
@@ -998,6 +1002,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1092,6 +1097,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1183,6 +1189,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1276,6 +1283,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

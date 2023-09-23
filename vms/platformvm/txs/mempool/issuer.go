@@ -5,6 +5,7 @@ package mempool
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -17,8 +18,9 @@ var (
 )
 
 type issuer struct {
-	m  *mempool
-	tx *txs.Tx
+	m         *mempool
+	tx        *txs.Tx
+	timestamp time.Time
 }
 
 func (*issuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -30,17 +32,29 @@ func (*issuer) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsDActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 
 func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsDActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 
 func (i *issuer) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsDActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 
@@ -75,11 +89,19 @@ func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsDActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 
 func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsDActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }

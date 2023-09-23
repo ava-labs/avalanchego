@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	_ StakerTx = (*AddSubnetValidatorTx)(nil)
+	_ StakerTx       = (*AddSubnetValidatorTx)(nil)
+	_ PreDForkStaker = (*AddSubnetValidatorTx)(nil)
 
 	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 )

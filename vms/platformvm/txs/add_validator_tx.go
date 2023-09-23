@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	_ ValidatorTx = (*AddValidatorTx)(nil)
+	_ ValidatorTx    = (*AddValidatorTx)(nil)
+	_ PreDForkStaker = (*AddValidatorTx)(nil)
 
 	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )

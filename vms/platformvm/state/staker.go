@@ -83,19 +83,30 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {
+func (s *Staker) Duration() time.Duration {
+	return s.EndTime.Sub(s.StartTime)
+}
+
+func NewCurrentStaker(
+	txID ids.ID,
+	staker txs.Staker,
+	startTime time.Time,
+	potentialReward uint64,
+) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err
 	}
-	endTime := staker.EndTime()
+
+	stakingDuration := staker.Duration()
+	endTime := startTime.Add(stakingDuration)
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),
 		PublicKey:       publicKey,
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
-		StartTime:       staker.StartTime(),
+		StartTime:       startTime,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
@@ -103,7 +114,7 @@ func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker txs.PreDForkStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

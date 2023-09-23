@@ -56,12 +56,14 @@ type activeFork uint8
 
 const (
 	defaultWeight = 5 * units.MilliAvax
+	trackChecksum = false
 
 	apricotPhase3Fork activeFork = 0
 	apricotPhase5Fork activeFork = 1
 	banffFork         activeFork = 2
 	cortinaFork       activeFork = 3
-	latestFork        activeFork = cortinaFork
+	dFork             activeFork = 4
+	latestFork        activeFork = dFork
 )
 
 var (
@@ -302,6 +304,7 @@ func defaultConfig(fork activeFork, latestForkTime time.Time) *config.Config {
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -315,10 +318,16 @@ func defaultConfig(fork activeFork, latestForkTime time.Time) *config.Config {
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
 	case cortinaFork:
-		cortinaTime = latestForkTime
-		banffTime = latestForkTime
-		apricotPhase5Time = latestForkTime
-		apricotPhase3Time = latestForkTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case dFork:
+		dTime = defaultGenesisTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -348,6 +357,7 @@ func defaultConfig(fork activeFork, latestForkTime time.Time) *config.Config {
 		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DTime:             dTime,
 	}
 }
 

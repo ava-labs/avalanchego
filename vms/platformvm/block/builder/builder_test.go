@@ -80,7 +80,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	require.NoError(env.mempool.Add(tx))
+	require.NoError(env.mempool.Add(tx, env.state.GetTimestamp()))
 	require.True(env.mempool.Has(txID))
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
@@ -94,7 +94,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	env.mempool.Remove([]*txs.Tx{tx})
-	require.NoError(env.mempool.Add(tx))
+	require.NoError(env.mempool.Add(tx, env.state.GetTimestamp()))
 
 	require.True(env.mempool.Has(txID))
 	reason = env.mempool.GetDropReason(txID)

@@ -48,7 +48,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -359,6 +359,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            mockable.MaxTime,
+		DTime:                  mockable.MaxTime,
 	}}
 
 	ctx := defaultContext(t)
@@ -470,7 +471,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -686,7 +687,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1005,7 +1006,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, latestFork, true /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1151,7 +1152,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1235,7 +1236,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1352,7 +1353,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1458,7 +1459,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, true /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1740,7 +1741,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, true /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1900,7 +1901,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, true /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2111,7 +2112,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, true /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))

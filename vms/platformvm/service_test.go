@@ -496,6 +496,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -626,6 +627,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)

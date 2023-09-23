@@ -100,8 +100,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
+				del := *vdr
+				del.End = uint64(time.Unix(int64(vdr.End), 0).Add(-10 * time.Second).Unix())
 				_, err := pWallet.IssueAddDelegatorTx(
-					vdr,
+					&del,
 					rewardOwner,
 					e2e.WithDefaultContext(),
 				)

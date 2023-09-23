@@ -42,7 +42,7 @@ var (
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
 // network requirements for [subnetValidator]. An error is returned if they
 // are not fulfilled.
-func verifySubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, subnetValidator txs.Validator) error {
+func verifySubnetValidatorPrimaryNetworkRequirements(backend *Backend, chainState state.Chain, subnetValidator txs.Validator) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
@@ -61,9 +61,18 @@ func verifySubnetValidatorPrimaryNetworkRequirements(chainState state.Chain, sub
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
+	var (
+		currentChainTime = chainState.GetTimestamp()
+		stakerStart      = currentChainTime
+		stakerEnd        = stakerStart.Add(subnetValidator.Duration())
+	)
+	if !backend.Config.IsDActivated(currentChainTime) {
+		stakerStart = subnetValidator.StartTime()
+		stakerEnd = subnetValidator.EndTime()
+	}
 	if !txs.BoundedBy(
-		subnetValidator.StartTime(),
-		subnetValidator.EndTime(),
+		stakerStart,
+		stakerEnd,
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
@@ -122,16 +131,23 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
+	// Pre DFork activation, start time must be after current chain time.
+	// Post DFork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp  = chainState.GetTimestamp()
+		preDForkStartTime = tx.StartTime()
+		isDForkActive     = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDForkActive {
+		if !currentTimestamp.Before(preDForkStartTime) {
+			return nil, fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				currentTimestamp,
+				preDForkStartTime,
+			)
+		}
 	}
 
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -164,11 +180,13 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
+	if !isDForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if preDForkStartTime.After(maxStartTime) {
+			return nil, ErrFutureStakeTime
+		}
 	}
 
 	return outs, nil
@@ -202,16 +220,23 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
-		return fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			validatorStartTime,
-		)
+	// Pre DFork activation, start time must be after current chain time.
+	// Post DFork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp  = chainState.GetTimestamp()
+		preDForkStartTime = tx.StartTime()
+		isDForkActive     = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDForkActive {
+		if !currentTimestamp.Before(preDForkStartTime) {
+			return fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				currentTimestamp,
+				preDForkStartTime,
+			)
+		}
 	}
 
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
@@ -231,7 +256,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
 		return err
 	}
 
@@ -254,11 +279,13 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if validatorStartTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isDForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if preDForkStartTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil
@@ -371,16 +398,23 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			validatorStartTime,
-		)
+	// Pre DFork activation, start time must be after current chain time.
+	// Post DFork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp  = chainState.GetTimestamp()
+		preDForkStartTime = tx.StartTime()
+		isDForkActive     = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDForkActive {
+		if !currentTimestamp.Before(preDForkStartTime) {
+			return nil, fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				currentTimestamp,
+				preDForkStartTime,
+			)
+		}
 	}
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -402,7 +436,13 @@ func verifyAddDelegatorTx(
 	}
 
 	txID := sTx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	var newStaker *state.Staker
+	if isDForkActive {
+		// potential reward does not matter
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
+	} else {
+		newStaker, err = state.NewPendingStaker(txID, tx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -437,11 +477,13 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if validatorStartTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
+	if !isDForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if preDForkStartTime.After(maxStartTime) {
+			return nil, ErrFutureStakeTime
+		}
 	}
 
 	return outs, nil
@@ -464,16 +506,23 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
+	// Pre DFork activation, start time must be after current chain time.
+	// Post DFork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp  = chainState.GetTimestamp()
+		preDForkStartTime = tx.StartTime()
+		isDForkActive     = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDForkActive {
+		if !currentTimestamp.Before(preDForkStartTime) {
+			return fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				currentTimestamp,
+				preDForkStartTime,
+			)
+		}
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
@@ -534,7 +583,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator); err != nil {
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
 			return err
 		}
 
@@ -561,11 +610,13 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isDForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if preDForkStartTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil
@@ -588,15 +639,22 @@ func verifyAddPermissionlessDelegatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return fmt.Errorf(
-			"chain timestamp (%s) not before validator's start time (%s)",
-			currentTimestamp,
-			startTime,
-		)
+	// Pre DFork activation, start time must be after current chain time.
+	// Post DFork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp  = chainState.GetTimestamp()
+		preDForkStartTime = tx.StartTime()
+		isDForkActive     = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDForkActive {
+		if !currentTimestamp.Before(preDForkStartTime) {
+			return fmt.Errorf(
+				"chain timestamp (%s) not before validator's start time (%s)",
+				currentTimestamp,
+				preDForkStartTime,
+			)
+		}
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, tx.Subnet)
@@ -649,7 +707,13 @@ func verifyAddPermissionlessDelegatorTx(
 	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	txID := sTx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	var newStaker *state.Staker
+	if isDForkActive {
+		// potential reward does not matter
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
+	} else {
+		newStaker, err = state.NewPendingStaker(txID, tx)
+	}
 	if err != nil {
 		return err
 	}
@@ -705,11 +769,13 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isDForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if preDForkStartTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil

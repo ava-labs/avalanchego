@@ -79,7 +79,8 @@ const (
 	apricotPhase5 activeFork = 1
 	banffFork     activeFork = 2
 	cortinaFork   activeFork = 3
-	latestFork    activeFork = cortinaFork
+	DFork         activeFork = 4
+	latestFork    activeFork = DFork
 )
 
 var (
@@ -307,7 +308,6 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
-
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -317,6 +317,7 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
@@ -333,6 +334,12 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
 	case cortinaFork:
+		cortinaTime = latestForkTime
+		banffTime = latestForkTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
+	case DFork:
+		dTime = latestForkTime
 		cortinaTime = latestForkTime
 		banffTime = latestForkTime
 		apricotPhase5Time = latestForkTime
@@ -360,6 +367,7 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		ApricotPhase5Time:      apricotPhase5Time,
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
+		DTime:                  dTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -421,7 +429,6 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		require.NoError(blk.Verify(context.Background()))
 		require.NoError(blk.Accept(context.Background()))
 		require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
 		defaultBalance -= vm.Config.GetCreateBlockchainTxFee(vm.clock.Time())
 	}
 
@@ -526,15 +533,16 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	// Verify that new validator now in current validator set
+	// (DFork is active)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
 
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -588,7 +596,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
+	vm, _, _ := defaultVM(t, cortinaFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -627,7 +635,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -709,7 +717,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.NoError(err)
 }
 
@@ -755,8 +763,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Verify that new validator NOT in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	// Verify that new validator NOT in validator set
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1100,9 +1108,8 @@ func TestCreateChain(t *testing.T) {
 
 // test where we:
 // 1) Create a subnet
-// 2) Add a validator to the subnet's pending validator set
-// 3) Advance timestamp to validator's start time (moving the validator from pending to current)
-// 4) Advance timestamp to validator's end time (removing validator from current)
+// 2) Add a validator to the subnet's current validator set
+// 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork, false /*addSubnet*/)
@@ -1181,25 +1188,13 @@ func TestCreateSubnet(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
-	require.NoError(err)
-
-	// Advance time to when new validator should start validating
-	// Create a block with an advance time tx that moves validator
-	// from pending to current validator set
-	vm.clock.Set(startTime)
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should be advance time tx
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // move validator addValidatorTx from pending to current
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
+	endTime = vm.clock.Time().Add(defaultMinStakingDuration)
 	vm.clock.Set(endTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -1380,6 +1375,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -1469,6 +1465,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -1524,6 +1521,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1845,6 +1843,7 @@ func TestUnverifiedParent(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -2007,6 +2006,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -2049,6 +2049,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -2183,6 +2184,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
+		DTime:                  latestForkTime,
 	}}
 
 	ctx := defaultContext(t)

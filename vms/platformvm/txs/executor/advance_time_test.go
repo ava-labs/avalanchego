@@ -485,6 +485,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -870,12 +871,13 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	now := env.clk.Time()
-	env.config.BanffTime = now.Add(SyncBound)
-	env.config.CortinaTime = now.Add(SyncBound)
+	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
+	env.config.BanffTime = defaultGenesisTime.Add(SyncBound)
+	env.config.CortinaTime = defaultGenesisTime.Add(SyncBound)
+	env.config.DTime = defaultGenesisTime.Add(SyncBound)
 
 	// Proposed advancing timestamp to the banff timestamp
-	tx, err := env.txBuilder.NewAdvanceTimeTx(now.Add(SyncBound))
+	tx, err := env.txBuilder.NewAdvanceTimeTx(env.config.DTime.Add(SyncBound))
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)

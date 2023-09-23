@@ -150,7 +150,13 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if !b.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
-		if err := b.Mempool.Add(tx); err != nil {
+		// Add tx with current chain time to handle
+		// DFork in the mempool
+		preferred, err := b.Preferred()
+		if err != nil {
+			return err
+		}
+		if err := b.Mempool.Add(tx, preferred.Timestamp()); err != nil {
 			return err
 		}
 	}
@@ -251,7 +257,7 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasStakerTx() {
 		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
+		startTime := tx.Unsigned.(txs.PreDForkStaker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.

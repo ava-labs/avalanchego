@@ -28,11 +28,11 @@ func NewByStartTime() TimedHeap {
 }
 
 func (h *byStartTime) Less(i, j int) bool {
-	iTime := h.txs[i].tx.Unsigned.(txs.Staker).StartTime()
-	jTime := h.txs[j].tx.Unsigned.(txs.Staker).StartTime()
+	iTime := h.txs[i].tx.Unsigned.(txs.PreDForkStaker).StartTime()
+	jTime := h.txs[j].tx.Unsigned.(txs.PreDForkStaker).StartTime()
 	return iTime.Before(jTime)
 }
 
 func (h *byStartTime) Timestamp() time.Time {
-	return h.Peek().Unsigned.(txs.Staker).StartTime()
+	return h.Peek().Unsigned.(txs.PreDForkStaker).StartTime()
 }

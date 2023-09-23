@@ -69,7 +69,8 @@ const (
 	apricotPhase5Fork activeFork = 1
 	banffFork         activeFork = 2
 	cortinaFork       activeFork = 3
-	latestFork        activeFork = cortinaFork
+	dFork             activeFork = 4
+	latestFork        activeFork = dFork
 
 	defaultWeight = 10000
 )
@@ -212,7 +213,7 @@ func newEnvironment(
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.NewMempool(res.config, res, "mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -353,6 +354,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
+		DTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -366,6 +368,12 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
 	case cortinaFork:
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case dFork:
+		DTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -399,6 +407,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DTime:             DTime,
 	}
 }
 

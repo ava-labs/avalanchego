@@ -65,7 +65,8 @@ const (
 	apricotPhase5Fork activeFork = 1
 	banffFork         activeFork = 2
 	cortinaFork       activeFork = 3
-	latestFork        activeFork = cortinaFork
+	DFork             activeFork = 4
+	latestFork        activeFork = DFork
 )
 
 var (
@@ -176,7 +177,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unpar
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.NewMempool(res.config, res, "mempool", registerer)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -306,6 +307,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -319,6 +321,12 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
 	case cortinaFork:
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case DFork:
+		dTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -352,6 +360,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DTime:             dTime,
 	}
 }
 

@@ -91,7 +91,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	now := env.config.CortinaTime
+	now := env.config.DTime
 	env.clk.Set(now)
 
 	// setup and store parent block
@@ -615,6 +615,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

@@ -290,12 +290,10 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -321,15 +319,12 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	}
 
 	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -344,15 +339,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -444,12 +436,10 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -478,14 +468,81 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+// addStakerFromStakerTx creates the staker and adds it to state.
+// Post DFork activation it has updates current supply in state
+func (e *StandardTxExecutor) addStakerFromStakerTx(
+	stakerTx txs.Staker,
+	chainTime time.Time,
+) error {
+	// Pre DFork, stakers are added as pending first, then promoted
+	// to current when chainTime reaches their start time.
+	// Post DFork, stakers are immediately marked as current.
+	// Their start time is current chain time.
+
+	var (
+		txID   = e.Tx.ID()
+		staker *state.Staker
+		err    error
+	)
+
+	if !e.Config.IsDActivated(chainTime) {
+		preContinuousStakingStakerTx, ok := stakerTx.(txs.PreDForkStaker)
+		if !ok {
+			return fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", stakerTx)
+		}
+		staker, err = state.NewPendingStaker(txID, preContinuousStakingStakerTx)
+	} else {
+		var (
+			potentialReward = uint64(0)
+			stakeDuration   = stakerTx.Duration()
+		)
+		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
+			subnetID := stakerTx.SubnetID()
+			currentSupply, err := e.State.GetCurrentSupply(subnetID)
+			if err != nil {
+				return err
+			}
+
+			rewards, err := GetRewardsCalculator(e.Backend, e.State, subnetID)
+			if err != nil {
+				return err
+			}
+
+			potentialReward = rewards.Calculate(
+				stakeDuration,
+				stakerTx.Weight(),
+				currentSupply,
+			)
+
+			updatedSupply := currentSupply + potentialReward
+			e.State.SetCurrentSupply(subnetID, updatedSupply)
+		}
+		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
+	switch priority := staker.Priority; {
+	case priority.IsCurrentValidator():
+		e.State.PutCurrentValidator(staker)
+	case priority.IsCurrentDelegator():
+		e.State.PutCurrentDelegator(staker)
+	case priority.IsPendingValidator():
+		e.State.PutPendingValidator(staker)
+	case priority.IsPendingDelegator():
+		e.State.PutPendingDelegator(staker)
+	}
 	return nil
 }

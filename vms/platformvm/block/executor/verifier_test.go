@@ -36,6 +36,7 @@ func TestVerifierVisitApricotProposalBlock(t *testing.T) {
 	config := &config.Config{
 		BanffTime:   mockable.MaxTime, // banff is not activated
 		CortinaTime: mockable.MaxTime, // cortina is not activate
+		DTime:       mockable.MaxTime, // DFork is not activated
 	}
 
 	s := state.NewMockState(ctrl)
@@ -149,6 +150,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 				BanffTime:         mockable.MaxTime, // banff is not activated
 				CortinaTime:       mockable.MaxTime, // cortina is not activate
+				DTime:             mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -214,6 +216,7 @@ func TestVerifierVisitApricotStandardBlock(t *testing.T) {
 	config := &config.Config{
 		BanffTime:   mockable.MaxTime, // banff is not activated
 		CortinaTime: mockable.MaxTime, // cortina is not activate
+		DTime:       mockable.MaxTime, // DFork is not activated
 	}
 
 	// Create mocked dependencies.
@@ -308,7 +311,7 @@ func TestVerifierVisitApricotStandardBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 }
 
-func TestVerifierVisitCommitBlock(t *testing.T) {
+func TestVerifierVisitApricotCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -342,6 +345,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   mockable.MaxTime, // banff is not activated
 				CortinaTime: mockable.MaxTime, // cortina is not activate
+				DTime:       mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -379,7 +383,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 }
 
-func TestVerifierVisitAbortBlock(t *testing.T) {
+func TestVerifierVisitApricotAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -473,6 +477,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   mockable.MaxTime, // banff is not activated
 				CortinaTime: mockable.MaxTime, // cortina is not activate
+				DTime:       mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -529,6 +534,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			config := &config.Config{
 				BanffTime:   time.Time{}, // banff is activated
 				CortinaTime: time.Time{},
+				DTime:       time.Time{},
 			}
 
 			// Create mocked dependencies.
@@ -632,6 +638,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			config := &config.Config{
 				BanffTime:   time.Time{}, // banff is activated
 				CortinaTime: time.Time{},
+				DTime:       time.Time{},
 			}
 			backend := &backend{
 				blkIDToState: make(map[ids.ID]*blockState),
@@ -689,6 +696,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 		ApricotPhase5Time: time.Now().Add(time.Hour),
 		BanffTime:         mockable.MaxTime, // banff is not activated
 		CortinaTime:       mockable.MaxTime, // cortina is not activate
+		DTime:             mockable.MaxTime, // DFork is not activated
 	}
 
 	// Create mocked dependencies.
@@ -815,6 +823,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 			Config: &config.Config{
 				BanffTime:   mockable.MaxTime, // banff is not activated
 				CortinaTime: mockable.MaxTime, // cortina is not activate
+				DTime:       mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -874,6 +883,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   time.Time{}, // banff is activated
 				CortinaTime: time.Time{},
+				DTime:       time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -912,6 +922,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   mockable.MaxTime, // banff is not activated
 				CortinaTime: mockable.MaxTime, // cortina is not activate
+				DTime:       mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -956,6 +967,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   time.Time{}, // banff is activated
 				CortinaTime: time.Time{},
+				DTime:       time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1001,6 +1013,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   mockable.MaxTime, // banff is not activated
 				CortinaTime: mockable.MaxTime, // cortina is not activate
+				DTime:       mockable.MaxTime, // DFork is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1045,6 +1058,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 			Config: &config.Config{
 				BanffTime:   time.Time{}, // banff is activated
 				CortinaTime: time.Time{},
+				DTime:       time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},

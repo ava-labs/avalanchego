@@ -9,6 +9,7 @@ package mempool
 
 import (
 	reflect "reflect"
+time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -39,17 +40,17 @@ func (m *MockMempool) EXPECT() *MockMempoolMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockMempool) Add(arg0 *txs.Tx) error {
+func (m *MockMempool) Add(arg0 *txs.Tx, arg1 time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", arg0)
+	ret := m.ctrl.Call(m, "Add", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockMempoolMockRecorder) Add(arg0 interface{}) *gomock.Call {
+func (mr *MockMempoolMockRecorder) Add(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0, arg1)
 }
 
 // DisableAdding mocks base method.

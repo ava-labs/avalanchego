@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 )
@@ -34,7 +36,8 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errMempoolFull = errors.New("mempool is full")
+	errMempoolFull        = errors.New("mempool is full")
+	errTxAlreadyInMempool = errors.New("tx already in mempool")
 )
 
 type BlockTimer interface {
@@ -50,7 +53,10 @@ type Mempool interface {
 	EnableAdding()
 	DisableAdding()
 
-	Add(tx *txs.Tx) error
+	// Add allows inserting a transaction in mempool.
+	// Timestamp is the chain tip time. It's needed to
+	// handle hard forks
+	Add(tx *txs.Tx, timestamp time.Time) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
@@ -79,6 +85,8 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	cfg *config.Config
+
 	// If true, drop transactions added to the mempool via Add.
 	dropIncoming bool
 
@@ -98,9 +106,10 @@ type mempool struct {
 }
 
 func NewMempool(
+	cfg *config.Config,
+	blkTimer BlockTimer,
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -131,6 +140,7 @@ func NewMempool(
 
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
+		cfg:                  cfg,
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 		unissuedDecisionTxs:  unissuedDecisionTxs,
@@ -150,7 +160,7 @@ func (m *mempool) DisableAdding() {
 	m.dropIncoming = true
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *mempool) Add(tx *txs.Tx, timestamp time.Time) error {
 	if m.dropIncoming {
 		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
 	}
@@ -158,7 +168,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return fmt.Errorf("duplicate tx %s", txID)
+		return fmt.Errorf("%w, txID %s", errTxAlreadyInMempool, txID)
 	}
 
 	txBytes := tx.Bytes()
@@ -180,8 +190,9 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	if err := tx.Unsigned.Visit(&issuer{
-		m:  m,
-		tx: tx,
+		m:         m,
+		tx:        tx,
+		timestamp: timestamp,
 	}); err != nil {
 		return err
 	}
