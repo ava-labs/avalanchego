@@ -59,7 +59,7 @@ func ParseState(genesisBytes []byte) (*State, error) {
 
 	utxos := make([]*avax.UTXO, 0, len(genesis.UTXOs))
 	for _, utxo := range genesis.UTXOs {
-		utxos = append(utxos, &utxo.UTXO)
+		utxos = append(utxos, &utxo.UTXO) //nolint:gosec
 	}
 
 	return &State{
