@@ -430,37 +430,25 @@ func (m *Manager) findNextKey(
 
 	// Add empty key root back into the localProofNodes, if needed.
 	// Required to ensure that a common node exists in both proofs
-	if len(localProofNodes) > 0 {
-		firstNode := localProofNodes[0]
-		if firstNode.KeyPath.NibbleLength != 0 {
-			// first node isn't the empty key, so add it to the front of the localProofNodes
-			localProofNodes = append(
-				[]merkledb.ProofNode{
-					{
-						Children: map[byte]ids.ID{
-							firstNode.KeyPath.NibbleVal(0): ids.Empty,
-						},
-					},
-				}, localProofNodes...)
-		}
+	if len(localProofNodes) > 0 && localProofNodes[0].KeyPath.NibbleLength != 0 {
+		localProofNodes = append(
+			[]merkledb.ProofNode{
+				{
+					Children: map[byte]ids.ID{localProofNodes[0].KeyPath.NibbleVal(0): ids.Empty},
+				},
+			}, localProofNodes...)
 	}
 	localProofNodeIndex := len(localProofNodes) - 1
 
 	// Add empty key root back into the endProof, if needed.
 	// Required to ensure that a common node exists in both proofs
-	if len(endProof) > 0 {
-		firstNode := endProof[0]
-		// first node isn't the empty key, so add it to the front of the endproof
-		if firstNode.KeyPath.NibbleLength != 0 {
-			endProof = append(
-				[]merkledb.ProofNode{
-					{
-						Children: map[byte]ids.ID{
-							firstNode.KeyPath.NibbleVal(0): ids.Empty,
-						},
-					},
-				}, endProof...)
-		}
+	if len(endProof) > 0 && endProof[0].KeyPath.NibbleLength != 0 {
+		endProof = append(
+			[]merkledb.ProofNode{
+				{
+					Children: map[byte]ids.ID{endProof[0].KeyPath.NibbleVal(0): ids.Empty},
+				},
+			}, endProof...)
 	}
 
 	receivedProofNodeIndex := len(endProof) - 1
