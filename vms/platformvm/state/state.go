@@ -1767,7 +1767,7 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 
 func (s *state) updateValidatorSet(
 	updateValidators bool,
-	valSetDiff map[subnetNodePair]*diffValidator,
+	valSetDiff map[subnetNodePair]validatorStatusPair,
 	weightDiffs map[subnetNodePair]*ValidatorWeightDiff,
 ) error {
 	if !updateValidators {
@@ -1776,10 +1776,10 @@ func (s *state) updateValidatorSet(
 
 	for key, weightDiff := range weightDiffs {
 		var (
-			subnetID      = key.subnetID
-			nodeID        = key.nodeID
-			validatorDiff = valSetDiff[key]
-			err           error
+			subnetID = key.subnetID
+			nodeID   = key.nodeID
+			val      = valSetDiff[key]
+			err      error
 		)
 
 		// We only track the current validator set of tracked subnets.
@@ -1794,8 +1794,8 @@ func (s *state) updateValidatorSet(
 		if weightDiff.Decrease {
 			err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 		} else {
-			if validatorDiff.validatorStatus == added {
-				staker := validatorDiff.validator
+			if val.status == added {
+				staker := val.validator
 				err = validators.Add(
 					s.cfg.Validators,
 					subnetID,
@@ -1827,16 +1827,21 @@ type subnetNodePair struct {
 	nodeID   ids.NodeID
 }
 
+type validatorStatusPair struct {
+	validator *Staker
+	status    diffValidatorStatus
+}
+
 func (s *state) processCurrentStakers() (
 	map[subnetNodePair]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
-	map[subnetNodePair]*diffValidator,
+	map[subnetNodePair]validatorStatusPair,
 	error,
 ) {
 	var (
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
-		outputValSet  = make(map[subnetNodePair]*diffValidator)
+		outputValSet  = make(map[subnetNodePair]validatorStatusPair)
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
@@ -1846,7 +1851,10 @@ func (s *state) processCurrentStakers() (
 				subnetID: subnetID,
 				nodeID:   nodeID,
 			}
-			outputValSet[key] = validatorDiff
+			outputValSet[key] = validatorStatusPair{
+				validator: validatorDiff.validator,
+				status:    validatorDiff.validatorStatus,
+			}
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
