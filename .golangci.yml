@@ -18,6 +18,7 @@ linters:
     - asciicheck
     - bodyclose
     - depguard
+    - dupword
     - errcheck
     - errorlint
     - exportloopref
