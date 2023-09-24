@@ -157,7 +157,7 @@ func newTrieView(
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		changes:    newChangeSummary(len(changes.BatchOps)),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -170,14 +170,6 @@ func newTrieView(
 			newVal = maybe.Some(val)
 		}
 		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
-			return nil, err
-		}
-	}
-	for key, val := range changes.MapOps {
-		if !changes.ConsumeBytes {
-			val = maybe.Bind(val, slices.Clone[[]byte])
-		}
-		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}

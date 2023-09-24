@@ -53,7 +53,6 @@ type ReadOnlyTrie interface {
 
 type ViewChanges struct {
 	BatchOps []database.BatchOp
-	MapOps   map[string]maybe.Maybe[[]byte]
 	// ConsumeBytes when set to true will skip copying of bytes and assume
 	// ownership of the provided bytes.
 	ConsumeBytes bool
