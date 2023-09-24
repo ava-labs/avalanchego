@@ -57,6 +57,7 @@ var (
 		RecordPollDivergedVotingTest,
 		RecordPollDivergedVotingWithNoConflictingBitTest,
 		RecordPollChangePreferredChainTest,
+		LastAcceptedTest,
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
 		MetricsRejectedErrorTest,
@@ -65,8 +66,8 @@ var (
 		ErrorOnRejectSiblingTest,
 		ErrorOnTransitiveRejectionTest,
 		RandomizedConsistencyTest,
-		ErrorOnAddDecidedBlock,
-		ErrorOnAddDuplicateBlockID,
+		ErrorOnAddDecidedBlockTest,
+		ErrorOnAddDuplicateBlockIDTest,
 	}
 
 	errTest = errors.New("non-nil error")
@@ -1171,6 +1172,88 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.False(sm.IsPreferred(b2Block))
 }
 
+func LastAcceptedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+	require := require.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	params := snowball.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+
+	block0 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	block1 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: block0.IDV,
+		HeightV: block0.HeightV + 1,
+	}
+	block2 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: block1.IDV,
+		HeightV: block1.HeightV + 1,
+	}
+	block1Conflict := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: block0.IDV,
+		HeightV: block0.HeightV + 1,
+	}
+
+	lastAcceptedID, lastAcceptedHeight := sm.LastAccepted()
+	require.Equal(GenesisID, lastAcceptedID)
+	require.Equal(GenesisHeight, lastAcceptedHeight)
+
+	require.NoError(sm.Add(context.Background(), block0))
+	require.NoError(sm.Add(context.Background(), block1))
+	require.NoError(sm.Add(context.Background(), block1Conflict))
+	require.NoError(sm.Add(context.Background(), block2))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(GenesisID, lastAcceptedID)
+	require.Equal(GenesisHeight, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(block0.IDV, lastAcceptedID)
+	require.Equal(block0.HeightV, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(block1.IDV, lastAcceptedID)
+	require.Equal(block1.HeightV, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block2.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(block2.IDV, lastAcceptedID)
+	require.Equal(block2.HeightV, lastAcceptedHeight)
+}
+
 func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
@@ -1461,7 +1544,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	require.True(n.Agreement())
 }
 
-func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
+func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
@@ -1490,7 +1573,7 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
-func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
+func ErrorOnAddDuplicateBlockIDTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
