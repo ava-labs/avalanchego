@@ -53,7 +53,8 @@ type Consensus interface {
 	Preference() ids.ID
 
 	// Returns the ID of the strongly preferred decision with the provided
-	// height.
+	// height. Only the last accepted decision and processing decisions are
+	// tracked.
 	PreferenceAtHeight(height uint64) (ids.ID, bool)
 
 	// RecordPoll collects the results of a network poll. Assumes all decisions
