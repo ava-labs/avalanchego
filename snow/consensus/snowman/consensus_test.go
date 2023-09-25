@@ -68,6 +68,7 @@ var (
 		RandomizedConsistencyTest,
 		ErrorOnAddDecidedBlockTest,
 		ErrorOnAddDuplicateBlockIDTest,
+		RecordPollWithDefaultParameters,
 	}
 
 	errTest = errors.New("non-nil error")
@@ -1632,4 +1633,50 @@ func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float
 		}
 	}
 	return mss
+}
+
+// You can run this test with "go test -v -run TestTopological/RecordPollWithDefaultParameters"
+func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	sm := factory.New()
+
+	ctx := snow.DefaultConsensusContextTest()
+	params := snowball.DefaultParameters
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+
+	// "blk1" and "blk2" are in conflict
+	blk1 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{1},
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	blk2 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{2},
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	require.NoError(sm.Add(context.Background(), blk1))
+	require.NoError(sm.Add(context.Background(), blk2))
+
+	// as "blk1" and "blk2" are in conflict, we need beta rogue rounds to finalize
+	finalizePolls := 0
+	for i := 0; i < params.BetaRogue; i++ {
+		votes := bag.Bag[ids.ID]{}
+		votes.AddCount(blk1.ID(), params.Alpha)
+		require.NoError(sm.RecordPoll(context.Background(), votes))
+		finalizePolls++
+		if sm.Finalized() {
+			break
+		}
+	}
+	// should not finalize with less than beta rogue rounds
+	require.Equal(finalizePolls, params.BetaRogue)
+	require.True(sm.Finalized())
 }
