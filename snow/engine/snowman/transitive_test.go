@@ -1181,7 +1181,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 func TestEngineRetryFetch(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	vdr, _, sender, vm, te, _ := setupDefaultConfig(t)
 
 	sender.Default(true)
 
@@ -1190,9 +1190,6 @@ func TestEngineRetryFetch(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Unknown,
 		},
-		ParentV: gBlk.ID(),
-		HeightV: 1,
-		BytesV:  []byte{1},
 	}
 
 	vm.CantGetBlock = false

@@ -218,9 +218,6 @@ func TestBenchlistMaxStake(t *testing.T) {
 	require.Equal(b.benchedQueue.Len(), 2)
 	require.Equal(b.benchlistSet.Len(), 2)
 	require.Len(b.failureStreaks, 1)
-	fs := b.failureStreaks[vdrID2]
-	fs.consecutive = threshold
-	fs.firstFailure = now
 	b.lock.Unlock()
 
 	// Register threshold - 1 failures for vdr4
