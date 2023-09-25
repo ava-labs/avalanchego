@@ -6,7 +6,7 @@ import "./interfaces/IWarpMessenger.sol";
 
 contract ExampleWarp {
     address constant WARP_ADDRESS = 0x0200000000000000000000000000000000000005;
-    WarpMessenger warp = WarpMessenger(WARP_ADDRESS);
+    IWarpMessenger warp = IWarpMessenger(WARP_ADDRESS);
 
     // sendWarpMessage sends a warp message to the specified destination chain and address pair containing the payload
     function sendWarpMessage(

@@ -18,7 +18,7 @@ struct WarpBlockHash {
     bytes32 blockHash;
 }
 
-interface WarpMessenger {
+interface IWarpMessenger {
     event SendWarpMessage(
         bytes32 indexed destinationChainID,
         address indexed destinationAddress,
