@@ -224,8 +224,8 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-func (ts *Topological) LastAccepted() ids.ID {
-	return ts.head
+func (ts *Topological) LastAccepted() (ids.ID, uint64) {
+	return ts.head, ts.height
 }
 
 func (ts *Topological) Preference() ids.ID {
@@ -483,7 +483,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// get the block that we are going to vote on
 		parentBlock, notRejected := ts.blocks[vote.parentID]
 
-		// if the block block we are going to vote on was already rejected, then
+		// if the block we are going to vote on was already rejected, then
 		// we should stop applying the votes
 		if !notRejected {
 			break
