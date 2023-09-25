@@ -45,8 +45,8 @@ type Consensus interface {
 	// chain.
 	IsPreferred(Block) bool
 
-	// Returns the ID of the last accepted decision.
-	LastAccepted() ids.ID
+	// Returns the ID and height of the last accepted decision.
+	LastAccepted() (ids.ID, uint64)
 
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.
