@@ -292,7 +292,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	return iter
 }
 
-// Converts a pebble-specific error to to its
+// Converts a pebble-specific error to its
 // Avalanche equivalent, if applicable.
 func updateError(err error) error {
 	switch err {
