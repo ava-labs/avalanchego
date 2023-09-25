@@ -9,7 +9,7 @@ package mempool
 
 import (
 	reflect "reflect"
-time "time"
+	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
