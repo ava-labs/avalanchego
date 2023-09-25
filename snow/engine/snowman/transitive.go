@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/snow/event"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -82,7 +82,7 @@ type Transitive struct {
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
-	blocked events.Blocker
+	blocked event.Blocker
 
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
@@ -435,7 +435,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %v", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %w", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {
@@ -454,7 +454,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 }
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
-	lastAccepted := t.Consensus.LastAccepted()
+	lastAccepted, _ := t.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
@@ -700,8 +700,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
+	vdrBag := bag.Of(vdrIDs...)
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
@@ -730,8 +729,7 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 		return
 	}
 
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
+	vdrBag := bag.Of(vdrIDs...)
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {

@@ -3,8 +3,8 @@
 
 package genesis
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+import "github.com/ava-labs/avalanchego/vms/platformvm/block"
 
-const Version = blocks.Version
+const Version = block.Version
 
-var Codec = blocks.GenesisCodec
+var Codec = block.GenesisCodec

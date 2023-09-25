@@ -8,20 +8,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
-
-	"github.com/ava-labs/avalanchego/utils"
 
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -40,12 +37,9 @@ var (
 	)
 	ErrGetPathToFailure       = errors.New("GetPathTo failed to return the closest node")
 	ErrStartAfterEnd          = errors.New("start key > end key")
-	ErrViewIsNotAChild        = errors.New("passed in view is required to be a child of the current view")
 	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
 	ErrParentNotDatabase      = errors.New("parent trie is not database")
 	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
-
-	numCPU = runtime.NumCPU()
 )
 
 type trieView struct {
@@ -106,10 +100,14 @@ type trieView struct {
 	root *node
 }
 
-// NewView returns a new view on top of this one.
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
 // Adds the new view to [t.childViews].
 // Assumes [t.commitLock] isn't held.
-func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error) {
+func (t *trieView) NewView(
+	ctx context.Context,
+	changes ViewChanges,
+) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -117,14 +115,14 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 	defer t.commitLock.RUnlock()
 
 	if t.committed {
-		return t.getParentTrie().NewView(ctx, batchOps)
+		return t.getParentTrie().NewView(ctx, changes)
 	}
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), batchOps)
+	newView, err := newTrieView(t.db, t, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -141,29 +139,45 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 }
 
 // Creates a new view with the given [parentTrie].
+// Assumes [parentTrie] isn't locked.
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
-	root *node,
-	batchOps []database.BatchOp,
+	changes ViewChanges,
 ) (*trieView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
+	root, err := parentTrie.getEditableNode(RootPath, false /* hasValue */)
+	if err != nil {
+		if err == database.ErrNotFound {
+			return nil, ErrNoValidRoot
+		}
+		return nil, err
 	}
 
 	newView := &trieView{
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(batchOps)),
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
-	for _, op := range batchOps {
+	for _, op := range changes.BatchOps {
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
-			newVal = maybe.Some(slices.Clone(op.Value))
+			val := op.Value
+			if !changes.ConsumeBytes {
+				val = slices.Clone(op.Value)
+			}
+			newVal = maybe.Some(val)
 		}
 		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
+			return nil, err
+		}
+	}
+	for key, val := range changes.MapOps {
+		if !changes.ConsumeBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
+		}
+		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}
@@ -198,6 +212,7 @@ func newHistoricalTrieView(
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
+// Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	var err error
 	t.calculateNodesOnce.Do(func() {
@@ -210,31 +225,25 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
 		// per key modified even though IDs are not re-calculated).
-		ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
+		_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
 		// add all the changed key/values to the nodes of the trie
 		for key, change := range t.changes.values {
 			if change.after.IsNothing() {
+				// Note we're setting [err] defined outside this function.
 				if err = t.remove(key); err != nil {
 					return
 				}
-			} else {
-				if _, err = t.insert(key, change.after); err != nil {
-					return
-				}
+				// Note we're setting [err] defined outside this function.
+			} else if _, err = t.insert(key, change.after); err != nil {
+				return
 			}
 		}
 
-		// [eg] limits the number of goroutines we start.
-		var eg errgroup.Group
-		eg.SetLimit(numCPU)
-		if err = t.calculateNodeIDsHelper(ctx, t.root, &eg); err != nil {
-			return
-		}
-		if err = eg.Wait(); err != nil {
-			return
-		}
+		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+		t.calculateNodeIDsHelper(t.root)
+		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.root.id
 
 		// ensure no ancestor changes occurred during execution
@@ -248,18 +257,14 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) error {
+func (t *trieView) calculateNodeIDsHelper(n *node) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		// Note we can't wait on [eg] because [eg] may have started goroutines
-		// that aren't calculating IDs for descendants of [n].
 		wg              sync.WaitGroup
 		updatedChildren = make(chan *node, len(n.children))
 	)
 
 	for childIndex, child := range n.children {
-		childIndex, child := childIndex, child
-
 		childPath := n.key + path(childIndex) + child.compressedPath
 		childNodeChange, ok := t.changes.nodes[childPath]
 		if !ok {
@@ -268,24 +273,24 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 		}
 
 		wg.Add(1)
-		updateChild := func() error {
+		calculateChildID := func() {
 			defer wg.Done()
 
-			if err := t.calculateNodeIDsHelper(ctx, childNodeChange.after, eg); err != nil {
-				return err
-			}
+			t.calculateNodeIDsHelper(childNodeChange.after)
 
 			// Note that this will never block
 			updatedChildren <- childNodeChange.after
-			return nil
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := eg.TryGo(updateChild); !ok {
+		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
+			go func() {
+				calculateChildID()
+				t.db.calculateNodeIDsSema.Release(1)
+			}()
+		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			if err := updateChild(); err != nil {
-				return err
-			}
+			calculateChildID()
 		}
 	}
 
@@ -298,12 +303,12 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(t.db.metrics)
+	n.calculateID(t.db.metrics)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
 func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetProof")
 	defer span.End()
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
@@ -315,7 +320,7 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getProof")
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
 
 	proof := &Proof{
@@ -353,8 +358,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return proof, nil
 	}
 
-	childPath := closestNode.key + path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(closestNode, childPath)
+	childNode, err := t.getNodeWithID(
+		child.id,
+		closestNode.key+path(nextIndex)+child.compressedPath,
+		child.hasValue,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +382,7 @@ func (t *trieView) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
 	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
@@ -446,7 +454,7 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, rootKey)
+		rootProof, err := t.getProof(ctx, RootPath.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +469,7 @@ func (t *trieView) GetRangeProof(
 
 // CommitToDB commits changes from this trie to the underlying DB.
 func (t *trieView) CommitToDB(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
 	defer span.End()
 
 	t.db.commitLock.Lock()
@@ -477,7 +485,7 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	t.commitLock.Lock()
 	defer t.commitLock.Unlock()
 
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
 		attribute.Int("changeCount", len(t.changes.values)),
 	))
 	defer span.End()
@@ -536,7 +544,12 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return t.root.id, nil
 }
 
-func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
+func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValues", oteltrace.WithAttributes(
+		attribute.Int("keyCount", len(keys)),
+	))
+	defer span.End()
+
 	results := make([][]byte, len(keys))
 	valueErrors := make([]error, len(keys))
 
@@ -548,7 +561,10 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
+func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
+	defer span.End()
+
 	return t.getValueCopy(newPath(key))
 }
 
@@ -663,7 +679,19 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			return err
 		}
 
-		nextNode, err := t.getNodeFromParent(node, node.getSingleChildPath())
+		var (
+			childEntry child
+			childPath  path
+		)
+		// There is only one child, but we don't know the index.
+		// "Cycle" over the key/values to find the only child.
+		// Note this iteration once because len(node.children) == 1.
+		for index, entry := range node.children {
+			childPath = node.key + path(index) + entry.compressedPath
+			childEntry = entry
+		}
+
+		nextNode, err := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -743,7 +771,7 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex])
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex], nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}
@@ -764,13 +792,13 @@ func getLengthOfCommonPrefix(first, second path) int {
 
 // Get a copy of the node matching the passed key from the trie.
 // Used by views to get nodes from their ancestors.
-func (t *trieView) getEditableNode(key path) (*node, error) {
+func (t *trieView) getEditableNode(key path, hadValue bool) (*node, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ids.Empty, key)
+	n, err := t.getNodeWithID(ids.Empty, key, hadValue)
 	if err != nil {
 		return nil, err
 	}
@@ -813,6 +841,7 @@ func (t *trieView) insert(
 	// a node with that exact path already exists so update its value
 	if closestNode.key.Compare(key) == 0 {
 		closestNode.setValue(value)
+		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
 
@@ -824,14 +853,14 @@ func (t *trieView) insert(
 	remainingKey := key[closestNodeKeyLength+1:]
 
 	existingChildEntry, hasChild := closestNode.children[key[closestNodeKeyLength]]
-	// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
 	if !hasChild {
+		// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
 		newNode := newNode(
 			closestNode,
 			key,
 		)
 		newNode.setValue(value)
-		return newNode, t.recordNodeChange(newNode)
+		return newNode, t.recordNewNode(newNode)
 	}
 
 	// if we have reached this point, then the [fullpath] we are trying to insert and
@@ -859,7 +888,7 @@ func (t *trieView) insert(
 			key,
 		)
 		newNode.setValue(value)
-		if err := t.recordNodeChange(newNode); err != nil {
+		if err := t.recordNewNode(newNode); err != nil {
 			return nil, err
 		}
 		nodeWithValue = newNode
@@ -878,15 +907,22 @@ func (t *trieView) insert(
 		existingChildKey[len(branchNode.key)],
 		existingChildKey[len(branchNode.key)+1:],
 		existingChildEntry.id,
+		existingChildEntry.hasValue,
 	)
 
-	return nodeWithValue, t.recordNodeChange(branchNode)
+	return nodeWithValue, t.recordNewNode(branchNode)
 }
 
-// Records that a node has been changed.
+// Records that a node has been created.
+// Must not be called after [calculateNodeIDs] has returned.
+func (t *trieView) recordNewNode(after *node) error {
+	return t.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
+}
+
+// Records that an existing node has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeChange(after *node) error {
-	return t.recordKeyChange(after.key, after)
+	return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
@@ -894,14 +930,15 @@ func (t *trieView) recordNodeChange(after *node) error {
 func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
 	if len(after.key) == 0 {
-		return t.recordKeyChange(after.key, after)
+		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
-	return t.recordKeyChange(after.key, nil)
+	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
+// If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key path, after *node) error {
+func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
@@ -911,14 +948,17 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 		return nil
 	}
 
-	before, err := t.getParentTrie().getEditableNode(key)
-	if err != nil {
-		if err != database.ErrNotFound {
-			return err
+	if newNode {
+		t.changes.nodes[key] = &change[*node]{
+			after: after,
 		}
-		before = nil
+		return nil
 	}
 
+	before, err := t.getParentTrie().getEditableNode(key, hadValue)
+	if err != nil && err != database.ErrNotFound {
+		return err
+	}
 	t.changes.nodes[key] = &change[*node]{
 		before: before,
 		after:  after,
@@ -960,23 +1000,12 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 	return nil
 }
 
-// Retrieves the node with the given [key], which is a child of [parent], and
-// uses the [parent] node to initialize the child node's ID.
-// Returns database.ErrNotFound if the child doesn't exist.
-func (t *trieView) getNodeFromParent(parent *node, key path) (*node, error) {
-	// confirm the child exists and get its ID before attempting to load it
-	if child, exists := parent.children[key[len(parent.key)]]; exists {
-		return t.getNodeWithID(child.id, key)
-	}
-
-	return nil, database.ErrNotFound
-}
-
 // Retrieves a node with the given [key].
 // If the node is fetched from [t.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
+// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
+func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -987,7 +1016,7 @@ func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key)
+	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hasValue)
 	if err != nil {
 		return nil, err
 	}
