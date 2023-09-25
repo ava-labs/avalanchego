@@ -428,7 +428,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
-	require.NotZero(sm.NumProcessing())
+	require.Equal(1, sm.NumProcessing())
 	require.Equal(choices.Processing, block.Status())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -479,7 +479,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.NotZero(sm.NumProcessing())
+	require.Equal(2, sm.NumProcessing())
 	require.Equal(choices.Processing, firstBlock.Status())
 	require.Equal(choices.Processing, secondBlock.Status())
 
@@ -535,7 +535,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	// The first poll will accept shared bits
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.NotZero(sm.NumProcessing())
+	require.Equal(2, sm.NumProcessing())
 
 	metrics := gatherCounterGauge(t, registerer)
 	require.Zero(metrics["polls_failed"])
@@ -544,7 +544,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.NotZero(sm.NumProcessing())
+	require.Equal(2, sm.NumProcessing())
 
 	metrics = gatherCounterGauge(t, registerer)
 	require.Equal(float64(1), metrics["polls_failed"])
@@ -709,21 +709,21 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	votesFor2 := bag.Of(block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	require.NotZero(sm.NumProcessing())
+	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	emptyVotes := bag.Bag[ids.ID]{}
 	require.NoError(sm.RecordPoll(context.Background(), emptyVotes))
-	require.NotZero(sm.NumProcessing())
+	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	require.NotZero(sm.NumProcessing())
+	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	votesFor3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
-	require.NotZero(sm.NumProcessing())
+	require.Equal(2, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
@@ -771,7 +771,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	invalidVotes := bag.Of(unknownBlockID)
 	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
-	require.NotZero(sm.NumProcessing())
+	require.Equal(1, sm.NumProcessing())
 	require.Equal(block.ID(), sm.Preference())
 }
 
@@ -861,7 +861,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	require.NotZero(sm.NumProcessing())
+	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 	require.Equal(choices.Accepted, block0.Status())
 	require.Equal(choices.Processing, block1.Status())
@@ -1082,7 +1082,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	votes3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
-	require.NotZero(sm.NumProcessing())
+	require.Equal(4, sm.NumProcessing())
 	require.Equal(choices.Processing, block0.Status())
 	require.Equal(choices.Processing, block1.Status())
 	require.Equal(choices.Processing, block2.Status())
