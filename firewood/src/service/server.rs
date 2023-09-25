@@ -27,7 +27,11 @@ macro_rules! get_rev {
 pub struct FirewoodService {}
 
 impl FirewoodService {
-    pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DbConfig) -> Self {
+    pub fn new<N: Send>(
+        mut receiver: Receiver<Request<N>>,
+        owned_path: PathBuf,
+        cfg: DbConfig,
+    ) -> Self {
         let db = Db::new(owned_path, &cfg).unwrap();
         let mut revs = HashMap::new();
         let lastid = AtomicU32::new(0);
@@ -62,16 +66,12 @@ impl FirewoodService {
                         let msg = rev.kv_get(key);
                         let _ = respond_to.send(msg.map_or(Err(DbError::KeyNotFound), Ok));
                     }
-                    #[cfg(feature = "proof")]
                     super::RevRequest::Prove {
-                        handle,
-                        key,
-                        respond_to,
+                        handle: _handle,
+                        key: _key,
+                        respond_to: _respond_to,
                     } => {
-                        let msg = revs
-                            .get(&handle)
-                            .map_or(Err(MerkleError::UnsetInternal), |r| r.prove(key));
-                        let _ = respond_to.send(msg);
+                        todo!()
                     }
                     super::RevRequest::RootHash { handle, respond_to } => {
                         let rev = get_rev!(revs, handle, respond_to);

@@ -26,12 +26,10 @@ impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
         todo!()
     }
 
-    #[cfg(feature = "proof")]
     fn prove(&self, key: K) -> Result<crate::proof::Proof, crate::merkle::MerkleError> {
         todo!()
     }
 
-    #[cfg(feature = "proof")]
     fn verify_range_proof(
         &self,
         proof: crate::proof::Proof,

@@ -13,6 +13,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::api::Revision;
 
+use crate::merkle::MerkleError;
+use crate::v2::api::Proof;
 use crate::{
     db::{DbConfig, DbError},
     merkle::TrieHash,
@@ -26,12 +28,12 @@ use super::{Request, RevRequest, RevisionHandle};
 /// The type specified is how you want to refer to your key values; this is
 /// something like `Vec<u8>` or `&[u8]`
 #[derive(Debug)]
-pub struct Connection {
-    sender: Option<mpsc::Sender<Request>>,
+pub struct Connection<N: Send> {
+    sender: Option<mpsc::Sender<Request<N>>>,
     handle: Option<JoinHandle<FirewoodService>>,
 }
 
-impl Drop for Connection {
+impl<N: Send> Drop for Connection<N> {
     fn drop(&mut self) {
         drop(take(&mut self.sender));
         take(&mut self.handle)
@@ -41,13 +43,13 @@ impl Drop for Connection {
     }
 }
 
-impl Connection {
+impl<N: Send + 'static> Connection<N> {
     #[allow(dead_code)]
     fn new<P: AsRef<Path>>(path: P, cfg: DbConfig) -> Self {
         let (sender, receiver) = mpsc::channel(1_000)
             as (
-                tokio::sync::mpsc::Sender<Request>,
-                tokio::sync::mpsc::Receiver<Request>,
+                tokio::sync::mpsc::Sender<Request<N>>,
+                tokio::sync::mpsc::Receiver<Request<N>>,
             );
         let owned_path = path.as_ref().to_path_buf();
         let handle = thread::Builder::new()
@@ -61,7 +63,7 @@ impl Connection {
     }
 }
 
-impl super::RevisionHandle {
+impl<N: Send> super::RevisionHandle<N> {
     pub async fn close(self) {
         let _ = self
             .sender
@@ -71,7 +73,7 @@ impl super::RevisionHandle {
 }
 
 #[async_trait]
-impl Revision for super::RevisionHandle {
+impl<N: Send> Revision<N> for super::RevisionHandle<N> {
     async fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         let (send, recv) = oneshot::channel();
         let msg = Request::RevRequest(RevRequest::RootHash {
@@ -84,7 +86,7 @@ impl Revision for super::RevisionHandle {
 
     async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DbError> {
         let (send, recv) = oneshot::channel();
-        let _ = Request::RevRequest(RevRequest::Get {
+        let _ = Request::RevRequest::<N>(RevRequest::Get {
             handle: self.id,
             key: key.as_ref().to_vec(),
             respond_to: send,
@@ -92,11 +94,7 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("Actor task has been killed")
     }
 
-    #[cfg(feature = "proof")]
-    async fn prove<K: AsRef<[u8]> + Send + Sync>(
-        &self,
-        key: K,
-    ) -> Result<crate::proof::Proof, merkle::MerkleError> {
+    async fn prove<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Proof<N>, MerkleError> {
         let (send, recv) = oneshot::channel();
         let msg = Request::RevRequest(RevRequest::Prove {
             handle: self.id,
@@ -107,10 +105,9 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("channel failed")
     }
 
-    #[cfg(feature = "proof")]
     async fn verify_range_proof<K: AsRef<[u8]> + Send + Sync>(
         &self,
-        _proof: crate::proof::Proof,
+        _proof: Proof<N>,
         _first_key: K,
         _last_key: K,
         _keys: Vec<K>,
@@ -177,11 +174,11 @@ impl Revision for super::RevisionHandle {
 }
 
 #[async_trait]
-impl crate::api::Db<RevisionHandle> for Connection
+impl<N: Send> crate::api::Db<RevisionHandle<N>, N> for Connection<N>
 where
-    tokio::sync::mpsc::Sender<Request>: From<tokio::sync::mpsc::Sender<Request>>,
+    tokio::sync::mpsc::Sender<Request<N>>: From<tokio::sync::mpsc::Sender<Request<N>>>,
 {
-    async fn get_revision(&self, root_hash: TrieHash) -> Option<RevisionHandle> {
+    async fn get_revision(&self, root_hash: TrieHash) -> Option<RevisionHandle<N>> {
         let (send, recv) = oneshot::channel();
         let msg = Request::NewRevision {
             root_hash,
