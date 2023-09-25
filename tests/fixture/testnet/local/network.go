@@ -128,7 +128,7 @@ func StartNetwork(
 	nodeCount int,
 	keyCount int,
 ) (*LocalNetwork, error) {
-	if _, err := fmt.Fprintln(w, "Preparing configuration for new local network..."); err != nil {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new local network with %s\n", network.ExecPath); err != nil {
 		return nil, err
 	}
 
