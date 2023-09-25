@@ -329,6 +329,9 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 		ts.tail = block.sb.Preference()
 		ts.preferredIDs.Add(ts.tail)
 		block = ts.blocks[ts.tail]
+		// Invariant: Because the prior block had an initialized snowball
+		// instance, it must have a processing child. This guarantees that
+		// block.blk is non-nil here.
 		ts.preferredHeights[block.blk.Height()] = ts.tail
 	}
 	return nil
