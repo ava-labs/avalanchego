@@ -5,7 +5,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -82,7 +81,7 @@ func TestCurrentValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -95,7 +94,7 @@ func TestCurrentValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -109,7 +108,7 @@ func TestCurrentValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{validator}
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -122,7 +121,7 @@ func TestCurrentValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 		})
 	}
@@ -181,10 +180,10 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -193,10 +192,10 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -205,10 +204,10 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{delegator}
-				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 
 			{
@@ -217,10 +216,10 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, current, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, current, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, current, expectedResult))
+				checkStakersContent(require, store, current, expectedResult)
 			}
 		})
 	}
@@ -282,7 +281,7 @@ func TestPendingValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -295,7 +294,7 @@ func TestPendingValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -309,7 +308,7 @@ func TestPendingValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{staker}
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -322,7 +321,7 @@ func TestPendingValidatorsCRUD(t *testing.T) {
 
 				// range query
 				expectedResult := []*Staker{}
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 		})
 	}
@@ -381,10 +380,10 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -393,10 +392,10 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -405,10 +404,10 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{delegator}
-				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 
 			{
@@ -417,10 +416,10 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 				// query
 				expectedResult := []*Staker{}
-				require.NoError(checkDelegatorsContent(store, pending, delegator.SubnetID, delegator.NodeID, expectedResult))
+				checkDelegatorsContent(require, store, pending, delegator.SubnetID, delegator.NodeID, expectedResult)
 
 				// range query
-				require.NoError(checkStakersContent(store, pending, expectedResult))
+				checkStakersContent(require, store, pending, expectedResult)
 			}
 		})
 	}
@@ -428,7 +427,7 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 
 // [checkStakersContent] verifies whether store contains exactly the stakers specified in the list.
 // stakers order does not matter. stakers slice gets consumed while checking.
-func checkStakersContent(store Stakers, validatorsType uint8, expectedValidators []*Staker) error {
+func checkStakersContent(r *require.Assertions, store Stakers, validatorsType uint8, expectedValidators []*Staker) {
 	var (
 		it  StakerIterator
 		err error
@@ -440,18 +439,15 @@ func checkStakersContent(store Stakers, validatorsType uint8, expectedValidators
 	case pending:
 		it, err = store.GetPendingStakerIterator()
 	default:
-		return errors.New("Unhandled stakers status")
+		err = errors.New("Unhandled stakers status")
 	}
-	if err != nil {
-		return fmt.Errorf("unexpected failure in staker iterator creation, error %w", err)
-	}
+	r.NoError(err)
+
 	defer it.Release()
 
 	if len(expectedValidators) == 0 {
-		if it.Next() {
-			return fmt.Errorf("expected empty iterator, got at least element %v", it.Value())
-		}
-		return nil
+		r.False(it.Next())
+		return
 	}
 
 	for it.Next() {
@@ -468,20 +464,17 @@ func checkStakersContent(store Stakers, validatorsType uint8, expectedValidators
 				found = true
 			}
 		}
-		if !found {
-			return fmt.Errorf("found extra staker %v", staker)
-		}
-		expectedValidators[retrievedStakerIdx] = expectedValidators[len(expectedValidators)-1] // order does not matter
+		r.True(found)
+
+		// consume expectedValidators to make sure no extra one is stored after looping is done
+		expectedValidators[retrievedStakerIdx] = expectedValidators[len(expectedValidators)-1]
 		expectedValidators = expectedValidators[:len(expectedValidators)-1]
 	}
 
-	if len(expectedValidators) != 0 {
-		return errors.New("missing stakers")
-	}
-	return nil
+	r.True(len(expectedValidators) == 0)
 }
 
-func checkDelegatorsContent(store Stakers, delegatorsType uint8, subnetID ids.ID, nodeID ids.NodeID, expectedDelegators []*Staker) error {
+func checkDelegatorsContent(r *require.Assertions, store Stakers, delegatorsType uint8, subnetID ids.ID, nodeID ids.NodeID, expectedDelegators []*Staker) {
 	var (
 		it  StakerIterator
 		err error
@@ -493,18 +486,14 @@ func checkDelegatorsContent(store Stakers, delegatorsType uint8, subnetID ids.ID
 	case pending:
 		it, err = store.GetPendingDelegatorIterator(subnetID, nodeID)
 	default:
-		return errors.New("Unhandled delegators status")
+		err = errors.New("Unhandled delegators status")
 	}
-	if err != nil {
-		return fmt.Errorf("unexpected failure in delegators iterator creation, error %w", err)
-	}
+	r.NoError(err)
+
 	defer it.Release()
 
 	if len(expectedDelegators) == 0 {
-		if it.Next() {
-			return fmt.Errorf("expected empty iterator, got at least element %v", it.Value())
-		}
-		return nil
+		r.False(it.Next())
 	}
 
 	for it.Next() {
@@ -521,15 +510,12 @@ func checkDelegatorsContent(store Stakers, delegatorsType uint8, subnetID ids.ID
 				found = true
 			}
 		}
-		if !found {
-			return fmt.Errorf("found extra delegator %v", delegator)
-		}
-		expectedDelegators[retrievedStakerIdx] = expectedDelegators[len(expectedDelegators)-1] // order does not matter
+		r.True(found)
+
+		// consume expectedDelegators to make sure no extra one is stored after looping is done
+		expectedDelegators[retrievedStakerIdx] = expectedDelegators[len(expectedDelegators)-1]
 		expectedDelegators = expectedDelegators[:len(expectedDelegators)-1]
 	}
 
-	if len(expectedDelegators) != 0 {
-		return errors.New("missing delegators")
-	}
-	return nil
+	r.True(len(expectedDelegators) == 0)
 }
