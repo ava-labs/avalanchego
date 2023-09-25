@@ -166,7 +166,7 @@ mod test {
     fn leading_zero_nibbles_iter() {
         let nib = Nibbles::<1>(&TEST_BYTES);
         let expected: [u8; 9] = [0u8, 0xd, 0xe, 0xa, 0xd, 0xb, 0xe, 0xe, 0xf];
-        expected.into_iter().eq(nib.into_iter());
+        expected.into_iter().eq(nib);
     }
 
     #[test]

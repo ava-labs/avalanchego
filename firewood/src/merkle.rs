@@ -15,6 +15,7 @@ mod node;
 mod partial_path;
 mod trie_hash;
 
+pub(crate) use node::Encoded;
 pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
 pub use partial_path::PartialPath;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
@@ -1256,9 +1257,10 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shale::cached::PlainMem;
+    use shale::cached::{DynamicMem, PlainMem};
     use shale::{CachedStore, Storable};
     use std::ops::Deref;
+    use std::sync::Arc;
     use test_case::test_case;
 
     #[test_case(vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
@@ -1379,6 +1381,89 @@ mod test {
             ),
         ] {
             check(node);
+        }
+    }
+    #[test]
+    fn test_encode() {
+        const RESERVED: usize = 0x1000;
+
+        let mut dm = shale::cached::DynamicMem::new(0x10000, 0);
+        let compact_header = DiskAddress::null();
+        dm.write(
+            compact_header.into(),
+            &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+                std::num::NonZeroUsize::new(RESERVED).unwrap(),
+                std::num::NonZeroUsize::new(RESERVED).unwrap(),
+            ))
+            .unwrap(),
+        );
+        let compact_header = shale::StoredView::ptr_to_obj(
+            &dm,
+            compact_header,
+            shale::compact::CompactHeader::MSIZE,
+        )
+        .unwrap();
+        let mem_meta = Arc::new(dm);
+        let mem_payload = Arc::new(DynamicMem::new(0x10000, 0x1));
+
+        let cache = shale::ObjCache::new(1);
+        let space =
+            shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
+                .expect("CompactSpace init fail");
+
+        let store = Box::new(space);
+        let merkle = Merkle::new(store);
+
+        {
+            let chd = Node::new(NodeType::Leaf(LeafNode(
+                PartialPath(vec![0x1, 0x2, 0x3]),
+                Data(vec![0x4, 0x5]),
+            )));
+            let chd_ref = merkle.new_node(chd.clone()).unwrap();
+            let chd_rlp = chd_ref.get_eth_rlp(merkle.store.as_ref());
+            let new_chd = Node::new(NodeType::decode(chd_rlp).unwrap());
+            let new_chd_rlp = new_chd.get_eth_rlp(merkle.store.as_ref());
+            assert_eq!(chd_rlp, new_chd_rlp);
+
+            let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+            chd_eth_rlp[0] = Some(chd_rlp.to_vec());
+            let node = Node::new(NodeType::Branch(BranchNode {
+                chd: [None; NBRANCH],
+                value: Some(Data("value1".as_bytes().to_vec())),
+                chd_eth_rlp,
+            }));
+
+            let node_ref = merkle.new_node(node.clone()).unwrap();
+
+            let r = node_ref.get_eth_rlp(merkle.store.as_ref());
+            let new_node = Node::new(NodeType::decode(r).unwrap());
+            let new_rlp = new_node.get_eth_rlp(merkle.store.as_ref());
+            assert_eq!(r, new_rlp);
+        }
+
+        {
+            let chd = Node::new(NodeType::Branch(BranchNode {
+                chd: [None; NBRANCH],
+                value: Some(Data("value1".as_bytes().to_vec())),
+                chd_eth_rlp: Default::default(),
+            }));
+            let chd_ref = merkle.new_node(chd.clone()).unwrap();
+            let chd_rlp = chd_ref.get_eth_rlp(merkle.store.as_ref());
+            let new_chd = Node::new(NodeType::decode(chd_rlp).unwrap());
+            let new_chd_rlp = new_chd.get_eth_rlp(merkle.store.as_ref());
+            assert_eq!(chd_rlp, new_chd_rlp);
+
+            let node = Node::new(NodeType::Extension(ExtNode(
+                PartialPath(vec![0x1, 0x2, 0x3]),
+                DiskAddress::null(),
+                Some(chd_rlp.to_vec()),
+            )));
+            let node_ref = merkle.new_node(node.clone()).unwrap();
+
+            let r = node_ref.get_eth_rlp(merkle.store.as_ref());
+            let new_node = Node::new(NodeType::decode(r).unwrap());
+            let new_rlp = new_node.get_eth_rlp(merkle.store.as_ref());
+            assert_eq!(r, new_rlp);
         }
     }
 }
