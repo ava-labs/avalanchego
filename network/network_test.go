@@ -642,31 +642,51 @@ func TestDialContext(t *testing.T) {
 
 	dialer := newTestDialer()
 	network.dialer = dialer
-	dynamicIP, listener := dialer.NewListener()
-	trackedIP := &trackedIP{
-		ip: dynamicIP.IPPort(),
+	dynamicNeverDialedIP, neverDialedListener := dialer.NewListener()
+	neverDialedIP := &trackedIP{
+		ip: dynamicNeverDialedIP.IPPort(),
 	}
+	neverDialedNodeID := ids.GenerateTestNodeID()
 
 	// Asset that when the context is cancelled, dial returns immediately.
-	// That is, [listener] doesn't accept a connection.
-	network.manuallyTrackedIDs.Add(ids.EmptyNodeID)
+	// That is, [neverDialedListener] doesn't accept a connection.
+	network.manuallyTrackedIDs.Add(neverDialedNodeID)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	network.dial(ctx, ids.EmptyNodeID, trackedIP)
+	network.dial(ctx, ids.EmptyNodeID, neverDialedIP)
 
-	gotConn := make(chan struct{})
+	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
-		_, _ = listener.Accept()
-		close(gotConn)
+		_, _ = neverDialedListener.Accept()
+		close(gotNeverDialedIPConn)
 	}()
+
 	select {
-	case <-gotConn:
+	case <-gotNeverDialedIPConn:
 		require.FailNow(t, "unexpectedly connected to peer")
-	case <-time.After(1 * time.Second):
+	default:
 	}
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
-	network.dial(context.Background(), ids.EmptyNodeID, trackedIP)
-	<-gotConn
+	dialedNodeID := ids.GenerateTestNodeID()
+	network.manuallyTrackedIDs.Add(dialedNodeID)
+	dynamicDialedIP, dialedListener := dialer.NewListener()
+	dialedIP := &trackedIP{
+		ip: dynamicDialedIP.IPPort(),
+	}
+
+	network.dial(context.Background(), dialedNodeID, dialedIP)
+
+	gotDialedIPConn := make(chan struct{})
+	go func() {
+		_, _ = dialedListener.Accept()
+		close(gotDialedIPConn)
+	}()
+
+	select {
+	case <-gotNeverDialedIPConn:
+		require.FailNow(t, "unexpectedly connected to peer")
+	case <-gotDialedIPConn:
+	}
 }
