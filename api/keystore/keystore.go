@@ -103,13 +103,6 @@ type keystore struct {
 	// Used to persist users and their data
 	userDB database.Database
 	bcDB   database.Database
-	//           BaseDB
-	//          /      \
-	//    UserDB        BlockchainDB
-	//                 /      |     \
-	//               Usr     Usr    Usr
-	//             /  |  \
-	//          BID  BID  BID
 }
 
 func New(log logging.Logger, dbManager manager.Manager) Keystore {
