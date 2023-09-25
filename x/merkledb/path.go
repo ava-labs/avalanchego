@@ -4,6 +4,8 @@
 package merkledb
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -16,32 +18,10 @@ const (
 	Byte   byte = 8
 )
 
-type BranchFactor int
-
-const (
-	BranchFactorUnspecified BranchFactor = 0
-	BranchFactor2           BranchFactor = 2
-	BranchFactor4           BranchFactor = 4
-	BranchFactor16          BranchFactor = 16
-	BranchFactor256         BranchFactor = 256
-)
-
-type pathConfig struct {
-	branchFactor    BranchFactor
-	tokensPerByte   int
-	tokenBitSize    byte
-	singleTokenMask byte
-}
-
-type Path struct {
-	length int
-	value  string
-	*pathConfig
-}
-
 var (
+	errInvalidBranchFactor = errors.New("invalid branch factor")
+
 	branchFactorToPathConfig = map[BranchFactor]*pathConfig{
-		BranchFactorUnspecified: {},
 		BranchFactor2: {
 			branchFactor:    BranchFactor2,
 			tokenBitSize:    Bit,
@@ -67,11 +47,40 @@ var (
 			singleTokenMask: 0b1111_1111,
 		},
 	}
-
-	EmptyPath = func(bf BranchFactor) Path {
-		return Path{pathConfig: branchFactorToPathConfig[bf]}
-	}
 )
+
+type BranchFactor int
+
+const (
+	BranchFactor2   BranchFactor = 2
+	BranchFactor4   BranchFactor = 4
+	BranchFactor16  BranchFactor = 16
+	BranchFactor256 BranchFactor = 256
+)
+
+func (f BranchFactor) Valid() error {
+	if _, ok := branchFactorToPathConfig[f]; ok {
+		return nil
+	}
+	return fmt.Errorf("%w: %d", errInvalidBranchFactor, f)
+}
+
+func EmptyPath(bf BranchFactor) Path {
+	return Path{pathConfig: branchFactorToPathConfig[bf]}
+}
+
+type pathConfig struct {
+	branchFactor    BranchFactor
+	tokensPerByte   int
+	tokenBitSize    byte
+	singleTokenMask byte
+}
+
+type Path struct {
+	length int
+	value  string
+	*pathConfig
+}
 
 func NewPath(p []byte, branchFactor BranchFactor) Path {
 	pConfig := branchFactorToPathConfig[branchFactor]

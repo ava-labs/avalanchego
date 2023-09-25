@@ -54,9 +54,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot                = errors.New("start and end root are the same")
-	errNoNewRoot               = errors.New("there was no updated root in change list")
-	ErrNoSpecifiedBranchFactor = errors.New("specifying the branch factor is required")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
 
 type ChangeProofer interface {
@@ -192,9 +191,8 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	newPath      func(p []byte) Path
-	branchFactor BranchFactor
-	rootPath     Path
+	newPath  func(p []byte) Path
+	rootPath Path
 }
 
 // New returns a new merkle database.
@@ -217,10 +215,13 @@ func newDatabase(
 		rootGenConcurrency = config.RootGenConcurrency
 	}
 
-	if config.BranchFactor == BranchFactorUnspecified {
-		return nil, ErrNoSpecifiedBranchFactor
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
 	}
-	newPath := func(b []byte) Path { return NewPath(b, config.BranchFactor) }
+
+	newPath := func(b []byte) Path {
+		return NewPath(b, config.BranchFactor)
+	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
 	// to reduce memory allocations.
@@ -240,7 +241,6 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		branchFactor:         config.BranchFactor,
 		rootPath:             newPath(rootKey),
 	}
 

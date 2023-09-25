@@ -127,10 +127,10 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-
-	if config.BranchFactor == merkledb.BranchFactorUnspecified {
-		return nil, merkledb.ErrNoSpecifiedBranchFactor
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
 	}
+
 	m := &Manager{
 		config:          config,
 		doneChan:        make(chan struct{}),
