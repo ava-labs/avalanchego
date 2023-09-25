@@ -1782,6 +1782,9 @@ func (s *state) processCurrentStakers() (
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
+			// Note: validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+
 			weightKey := subnetNodePair{
 				subnetID: subnetID,
 				nodeID:   nodeID,
