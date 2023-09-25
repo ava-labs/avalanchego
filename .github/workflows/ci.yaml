@@ -1,9 +1,10 @@
 name: ci
 
 on:
+  pull_request:
+    branches: ['*']
   push:
-    branches: 
-      - "*"
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,7 +40,7 @@ jobs:
         run: cargo check --workspace --tests --examples --benches
       - name: Build
         run: cargo build --workspace --tests --examples --benches
-        # Always update the cache 
+        # Always update the cache
       - name: Cleanup
         run: |
           gh extension install actions/gh-actions-cache
