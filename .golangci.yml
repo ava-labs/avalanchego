@@ -1,5 +1,7 @@
 # https://golangci-lint.run/usage/configuration/
 run:
+  timeout: 10m
+
   # Enables skipping of directories:
   # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
   # Default: true
@@ -99,7 +101,6 @@ linters-settings:
     asserts: false
     # Check for plain error comparisons.
     comparison: false
-  # https://golangci-lint.run/usage/linters/#forbidigo
   forbidigo:
     # Forbid the following identifiers (list of regexp).
     forbid:
@@ -108,13 +109,13 @@ linters-settings:
       - 'require\.EqualValues$(# Equal should be used instead)?'
       - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
       - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
+    # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
   goimports:
     local-prefixes: github.com/ava-labs/avalanchego
-  # https://golangci-lint.run/usage/linters#gosec
   gosec:
     excludes:
-      - G107 # https://securego.io/docs/rules/g107.html
+      - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -158,9 +159,8 @@ linters-settings:
       - name: useless-break
         disabled: false
   staticcheck:
-    go: "1.20"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"
-      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
-      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+      - "-SA6002" # Storing non-pointer values in sync.Pool allocates memory
+      - "-SA1019" # Using a deprecated function, variable, constant or field
