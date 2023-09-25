@@ -29,11 +29,6 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can make calls to avm static api",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"static-handlers",
-		),
 		func() {
 			addrMap := map[string]string{}
 			for _, addrStr := range []string{

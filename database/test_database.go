@@ -648,7 +648,7 @@ func TestIterator(t *testing.T, db Database) {
 	require.NoError(iterator.Error())
 }
 
-// TestIteratorStart tests to make sure the the iterator can be configured to
+// TestIteratorStart tests to make sure the iterator can be configured to
 // start mid way through the database.
 func TestIteratorStart(t *testing.T, db Database) {
 	require := require.New(t)
