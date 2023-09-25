@@ -454,7 +454,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 }
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
-	lastAccepted := t.Consensus.LastAccepted()
+	lastAccepted, _ := t.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {

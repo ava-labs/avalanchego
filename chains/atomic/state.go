@@ -137,7 +137,7 @@ func (s *state) SetValue(e *Element) error {
 //
 // This implies that chains interacting with shared memory must be able to
 // generate their chain state without actually performing the read of shared
-// memory. Shared memory should only be used to verify that the the transition
+// memory. Shared memory should only be used to verify that the transition
 // being performed is valid. That ensures that such verification can be skipped
 // during bootstrapping. It is up to the chain to ensure this based on the
 // current engine state.
