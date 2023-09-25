@@ -1847,13 +1847,12 @@ func (s *state) processCurrentStakers() (
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
+			// Note: validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+
 			key := subnetNodePair{
 				subnetID: subnetID,
 				nodeID:   nodeID,
-			}
-			outputValSet[key] = validatorStatusPair{
-				validator: validatorDiff.validator,
-				status:    validatorDiff.validatorStatus,
 			}
 
 			// make sure there is an entry for delegators even in case
@@ -1868,14 +1867,17 @@ func (s *state) processCurrentStakers() (
 					weight = validatorDiff.validator.Weight
 					blkKey = validatorDiff.validator.PublicKey
 				)
-
 				outputWeights[key].Amount = weight
-
 				if blkKey != nil {
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
 					outputBlsKey[nodeID] = nil
+				}
+
+				outputValSet[key] = validatorStatusPair{
+					validator: validatorDiff.validator,
+					status:    validatorDiff.validatorStatus,
 				}
 
 			case deleted:
@@ -1889,6 +1891,11 @@ func (s *state) processCurrentStakers() (
 					// removed. This means we must record the prior value of the
 					// public key.
 					outputBlsKey[nodeID] = blkKey
+				}
+
+				outputValSet[key] = validatorStatusPair{
+					validator: validatorDiff.validator,
+					status:    validatorDiff.validatorStatus,
 				}
 
 			default:
