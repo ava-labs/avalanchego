@@ -79,8 +79,8 @@ const (
 	apricotPhase5 activeFork = 1
 	banffFork     activeFork = 2
 	cortinaFork   activeFork = 3
-	DFork         activeFork = 4
-	latestFork    activeFork = DFork
+	dFork         activeFork = 4
+	latestFork    activeFork = dFork
 )
 
 var (
@@ -338,7 +338,7 @@ func defaultVM(t *testing.T, fork activeFork, addSubnet bool) (*VM, database.Dat
 		banffTime = latestForkTime
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
-	case DFork:
+	case dFork:
 		dTime = latestForkTime
 		cortinaTime = latestForkTime
 		banffTime = latestForkTime

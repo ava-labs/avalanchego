@@ -872,12 +872,13 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
-	env.config.BanffTime = defaultGenesisTime.Add(SyncBound)
-	env.config.CortinaTime = defaultGenesisTime.Add(SyncBound)
-	env.config.DTime = defaultGenesisTime.Add(SyncBound)
+	now := env.clk.Time()
+	env.config.BanffTime = now.Add(SyncBound)
+	env.config.CortinaTime = now.Add(SyncBound)
+	env.config.DTime = now.Add(SyncBound)
 
 	// Proposed advancing timestamp to the banff timestamp
-	tx, err := env.txBuilder.NewAdvanceTimeTx(env.config.DTime.Add(SyncBound))
+	tx, err := env.txBuilder.NewAdvanceTimeTx(now.Add(SyncBound))
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)

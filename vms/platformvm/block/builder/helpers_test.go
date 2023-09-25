@@ -65,8 +65,8 @@ const (
 	apricotPhase5Fork activeFork = 1
 	banffFork         activeFork = 2
 	cortinaFork       activeFork = 3
-	DFork             activeFork = 4
-	latestFork        activeFork = DFork
+	dFork             activeFork = 4
+	latestFork        activeFork = dFork
 )
 
 var (
@@ -325,7 +325,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
-	case DFork:
+	case dFork:
 		dTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
