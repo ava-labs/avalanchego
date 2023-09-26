@@ -16,15 +16,15 @@ import (
 var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 
 type GossipConfig struct {
-	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`
+	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"    yaml:"gossipAcceptedFrontierValidatorSize"`
 	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
-	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize" yaml:"gossipAcceptedFrontierPeerSize"`
-	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize" yaml:"gossipOnAcceptValidatorSize"`
-	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize" yaml:"gossipOnAcceptNonValidatorSize"`
-	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize" yaml:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize" yaml:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize" yaml:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize" yaml:"appGossipPeerSize"`
+	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize"         yaml:"gossipAcceptedFrontierPeerSize"`
+	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize"            yaml:"gossipOnAcceptValidatorSize"`
+	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize"         yaml:"gossipOnAcceptNonValidatorSize"`
+	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize"                 yaml:"gossipOnAcceptPeerSize"`
+	AppGossipValidatorSize           uint `json:"appGossipValidatorSize"                 yaml:"appGossipValidatorSize"`
+	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize"              yaml:"appGossipNonValidatorSize"`
+	AppGossipPeerSize                uint `json:"appGossipPeerSize"                      yaml:"appGossipPeerSize"`
 }
 
 type Config struct {
@@ -37,7 +37,7 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
-	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes" yaml:"allowedNodes"`
+	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
 	ConsensusParameters snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
