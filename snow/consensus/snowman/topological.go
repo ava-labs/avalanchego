@@ -68,8 +68,8 @@ type Topological struct {
 	// preferredIDs stores the set of IDs that are currently preferred.
 	preferredIDs set.Set[ids.ID]
 
-	// preferredHeights maps heights to the set of IDs that are currently
-	// preferred.
+	// preferredHeights maps a height to the currently preferred 
+	// block ID at that height.
 	preferredHeights map[uint64]ids.ID // height -> blockID
 
 	// tail is the preferred block with no children
