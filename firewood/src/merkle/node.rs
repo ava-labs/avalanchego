@@ -61,7 +61,7 @@ impl<T: DeserializeOwned + AsRef<[u8]>> Encoded<T> {
 pub struct BranchNode {
     pub(super) chd: [Option<DiskAddress>; NBRANCH],
     pub(super) value: Option<Data>,
-    pub(super) chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
+    pub(super) chd_encoded: [Option<Vec<u8>>; NBRANCH],
 }
 
 impl Debug for BranchNode {
@@ -72,7 +72,7 @@ impl Debug for BranchNode {
                 write!(f, " ({i:x} {c:?})")?;
             }
         }
-        for (i, c) in self.chd_eth_rlp.iter().enumerate() {
+        for (i, c) in self.chd_encoded.iter().enumerate() {
             if let Some(c) = c {
                 write!(f, " ({i:x} {:?})", c)?;
             }
@@ -113,19 +113,19 @@ impl BranchNode {
         // Extract the value of the branch node and set to None if it's an empty Vec
         let value = Some(data).filter(|data| !data.is_empty());
 
-        // Record rlp values of all children.
-        let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+        // encode all children.
+        let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
 
         // we popped the last element, so their should only be NBRANCH items left
         for (i, chd) in items.into_iter().enumerate() {
             let data = chd.decode()?;
-            chd_eth_rlp[i] = Some(data).filter(|data| !data.is_empty());
+            chd_encoded[i] = Some(data).filter(|data| !data.is_empty());
         }
 
-        Ok(BranchNode::new([None; NBRANCH], value, chd_eth_rlp))
+        Ok(BranchNode::new([None; NBRANCH], value, chd_encoded))
     }
 
-    fn calc_eth_rlp<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
+    fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut list = <[Encoded<Vec<u8>>; NBRANCH + 1]>::default();
 
         for (i, c) in self.chd.iter().enumerate() {
@@ -133,7 +133,7 @@ impl BranchNode {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
 
-                    if c_ref.get_eth_rlp_long::<S>(store) {
+                    if c_ref.is_encoded_big::<S>(store) {
                         list[i] = Encoded::Data(
                             bincode::DefaultOptions::new()
                                 .serialize(&&(*c_ref.get_root_hash::<S>(store))[..])
@@ -146,14 +146,14 @@ impl BranchNode {
                             c_ref.lazy_dirty.store(false, Ordering::Relaxed)
                         }
                     } else {
-                        let c_rlp = &c_ref.get_eth_rlp::<S>(store);
-                        list[i] = Encoded::Raw(c_rlp.to_vec());
+                        let child_encoded = &c_ref.get_encoded::<S>(store);
+                        list[i] = Encoded::Raw(child_encoded.to_vec());
                     }
                 }
                 None => {
-                    // Check if there is already a calculated rlp for the child, which
+                    // Check if there is already a calculated encoded value for the child, which
                     // can happen when manually constructing a trie from proof.
-                    if let Some(v) = &self.chd_eth_rlp[i] {
+                    if let Some(v) = &self.chd_encoded[i] {
                         if v.len() == TRIE_HASH_LEN {
                             list[i] =
                                 Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
@@ -177,12 +177,12 @@ impl BranchNode {
     pub fn new(
         chd: [Option<DiskAddress>; NBRANCH],
         value: Option<Vec<u8>>,
-        chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
+        chd_encoded: [Option<Vec<u8>>; NBRANCH],
     ) -> Self {
         BranchNode {
             chd,
             value: value.map(Data),
-            chd_eth_rlp,
+            chd_encoded,
         }
     }
 
@@ -198,12 +198,12 @@ impl BranchNode {
         &mut self.chd
     }
 
-    pub fn chd_eth_rlp(&self) -> &[Option<Vec<u8>>; NBRANCH] {
-        &self.chd_eth_rlp
+    pub fn chd_encode(&self) -> &[Option<Vec<u8>>; NBRANCH] {
+        &self.chd_encoded
     }
 
-    pub fn chd_eth_rlp_mut(&mut self) -> &mut [Option<Vec<u8>>; NBRANCH] {
-        &mut self.chd_eth_rlp
+    pub fn chd_encoded_mut(&mut self) -> &mut [Option<Vec<u8>>; NBRANCH] {
+        &mut self.chd_encoded
     }
 }
 
@@ -217,7 +217,7 @@ impl Debug for LeafNode {
 }
 
 impl LeafNode {
-    fn calc_eth_rlp(&self) -> Vec<u8> {
+    fn encode(&self) -> Vec<u8> {
         bincode::DefaultOptions::new()
             .serialize(
                 [
@@ -256,7 +256,7 @@ impl Debug for ExtNode {
 }
 
 impl ExtNode {
-    fn calc_eth_rlp<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
+    fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut list = <[Encoded<Vec<u8>>; 2]>::default();
         list[0] = Encoded::Data(
             bincode::DefaultOptions::new()
@@ -267,7 +267,7 @@ impl ExtNode {
         if !self.1.is_null() {
             let mut r = store.get_item(self.1).unwrap();
 
-            if r.get_eth_rlp_long(store) {
+            if r.is_encoded_big(store) {
                 list[1] = Encoded::Data(
                     bincode::DefaultOptions::new()
                         .serialize(&&(*r.get_root_hash(store))[..])
@@ -279,10 +279,10 @@ impl ExtNode {
                     r.lazy_dirty.store(false, Ordering::Relaxed);
                 }
             } else {
-                list[1] = Encoded::Raw(r.get_eth_rlp(store).to_vec());
+                list[1] = Encoded::Raw(r.get_encoded(store).to_vec());
             }
         } else {
-            // Check if there is already a caclucated rlp for the child, which
+            // Check if there is already a caclucated encoded value for the child, which
             // can happen when manually constructing a trie from proof.
             if let Some(v) = &self.2 {
                 if v.len() == TRIE_HASH_LEN {
@@ -298,8 +298,8 @@ impl ExtNode {
             .unwrap()
     }
 
-    pub fn new(path: Vec<u8>, chd: DiskAddress, chd_eth_rlp: Option<Vec<u8>>) -> Self {
-        ExtNode(PartialPath(path), chd, chd_eth_rlp)
+    pub fn new(path: Vec<u8>, chd: DiskAddress, chd_encoded: Option<Vec<u8>>) -> Self {
+        ExtNode(PartialPath(path), chd, chd_encoded)
     }
 
     pub fn path(&self) -> &PartialPath {
@@ -314,7 +314,7 @@ impl ExtNode {
         &mut self.1
     }
 
-    pub fn chd_eth_rlp_mut(&mut self) -> &mut Option<Vec<u8>> {
+    pub fn chd_encoded_mut(&mut self) -> &mut Option<Vec<u8>> {
         &mut self.2
     }
 }
@@ -322,8 +322,8 @@ impl ExtNode {
 #[derive(Debug)]
 pub struct Node {
     pub(super) root_hash: OnceLock<TrieHash>,
-    eth_rlp_long: OnceLock<bool>,
-    eth_rlp: OnceLock<Vec<u8>>,
+    is_encoded_big: OnceLock<bool>,
+    encoded: OnceLock<Vec<u8>>,
     // lazy_dirty is an atomicbool, but only writers ever set it
     // Therefore, we can always use Relaxed ordering. It's atomic
     // just to ensure Sync + Send.
@@ -336,14 +336,14 @@ impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
         let Node {
             root_hash,
-            eth_rlp_long,
-            eth_rlp,
+            is_encoded_big,
+            encoded,
             lazy_dirty,
             inner,
         } = self;
         *root_hash == other.root_hash
-            && *eth_rlp_long == other.eth_rlp_long
-            && *eth_rlp == other.eth_rlp
+            && *is_encoded_big == other.is_encoded_big
+            && *encoded == other.encoded
             && (*lazy_dirty).load(Ordering::Relaxed) == other.lazy_dirty.load(Ordering::Relaxed)
             && *inner == other.inner
     }
@@ -352,8 +352,8 @@ impl Clone for Node {
     fn clone(&self) -> Self {
         Self {
             root_hash: self.root_hash.clone(),
-            eth_rlp_long: self.eth_rlp_long.clone(),
-            eth_rlp: self.eth_rlp.clone(),
+            is_encoded_big: self.is_encoded_big.clone(),
+            encoded: self.encoded.clone(),
             lazy_dirty: AtomicBool::new(self.lazy_dirty.load(Ordering::Relaxed)),
             inner: self.inner.clone(),
         }
@@ -369,11 +369,11 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn calc_eth_rlp<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
+    pub fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         match &self {
-            NodeType::Leaf(n) => n.calc_eth_rlp(),
-            NodeType::Extension(n) => n.calc_eth_rlp(store),
-            NodeType::Branch(n) => n.calc_eth_rlp(store),
+            NodeType::Leaf(n) => n.encode(),
+            NodeType::Extension(n) => n.encode(store),
+            NodeType::Branch(n) => n.encode(store),
         }
     }
 
@@ -420,12 +420,12 @@ impl Node {
         *max_size.get_or_init(|| {
             Self {
                 root_hash: OnceLock::new(),
-                eth_rlp_long: OnceLock::new(),
-                eth_rlp: OnceLock::new(),
+                is_encoded_big: OnceLock::new(),
+                encoded: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
                     chd: [Some(DiskAddress::null()); NBRANCH],
                     value: Some(Data(Vec::new())),
-                    chd_eth_rlp: Default::default(),
+                    chd_encoded: Default::default(),
                 }),
                 lazy_dirty: AtomicBool::new(false),
             }
@@ -433,36 +433,35 @@ impl Node {
         })
     }
 
-    pub(super) fn get_eth_rlp<S: ShaleStore<Node>>(&self, store: &S) -> &[u8] {
-        self.eth_rlp
-            .get_or_init(|| self.inner.calc_eth_rlp::<S>(store))
+    pub(super) fn get_encoded<S: ShaleStore<Node>>(&self, store: &S) -> &[u8] {
+        self.encoded.get_or_init(|| self.inner.encode::<S>(store))
     }
 
     pub(super) fn get_root_hash<S: ShaleStore<Node>>(&self, store: &S) -> &TrieHash {
         self.root_hash.get_or_init(|| {
             self.lazy_dirty.store(true, Ordering::Relaxed);
-            TrieHash(Keccak256::digest(self.get_eth_rlp::<S>(store)).into())
+            TrieHash(Keccak256::digest(self.get_encoded::<S>(store)).into())
         })
     }
 
-    fn get_eth_rlp_long<S: ShaleStore<Node>>(&self, store: &S) -> bool {
-        *self.eth_rlp_long.get_or_init(|| {
+    fn is_encoded_big<S: ShaleStore<Node>>(&self, store: &S) -> bool {
+        *self.is_encoded_big.get_or_init(|| {
             self.lazy_dirty.store(true, Ordering::Relaxed);
-            self.get_eth_rlp(store).len() >= TRIE_HASH_LEN
+            self.get_encoded(store).len() >= TRIE_HASH_LEN
         })
     }
 
     pub(super) fn rehash(&mut self) {
-        self.eth_rlp = OnceLock::new();
-        self.eth_rlp_long = OnceLock::new();
+        self.encoded = OnceLock::new();
+        self.is_encoded_big = OnceLock::new();
         self.root_hash = OnceLock::new();
     }
 
     pub fn new(inner: NodeType) -> Self {
         let mut s = Self {
             root_hash: OnceLock::new(),
-            eth_rlp_long: OnceLock::new(),
-            eth_rlp: OnceLock::new(),
+            is_encoded_big: OnceLock::new(),
+            encoded: OnceLock::new(),
             inner,
             lazy_dirty: AtomicBool::new(false),
         };
@@ -480,7 +479,7 @@ impl Node {
 
     pub(super) fn new_from_hash(
         root_hash: Option<TrieHash>,
-        eth_rlp_long: Option<bool>,
+        encoded_big: Option<bool>,
         inner: NodeType,
     ) -> Self {
         Self {
@@ -488,19 +487,20 @@ impl Node {
                 Some(h) => OnceLock::from(h),
                 None => OnceLock::new(),
             },
-            eth_rlp_long: match eth_rlp_long {
+            is_encoded_big: match encoded_big {
                 Some(b) => OnceLock::from(b),
                 None => OnceLock::new(),
             },
-            eth_rlp: OnceLock::new(),
+            encoded: OnceLock::new(),
             inner,
             lazy_dirty: AtomicBool::new(false),
         }
     }
 
     const ROOT_HASH_VALID_BIT: u8 = 1 << 0;
-    const ETH_RLP_LONG_VALID_BIT: u8 = 1 << 1;
-    const ETH_RLP_LONG_BIT: u8 = 1 << 2;
+    // TODO: why are these different?
+    const IS_ENCODED_BIG_VALID: u8 = 1 << 1;
+    const LONG_BIT: u8 = 1 << 2;
 }
 
 impl Storable for Node {
@@ -522,10 +522,10 @@ impl Storable for Node {
                     .expect("invalid slice"),
             ))
         };
-        let eth_rlp_long = if attrs & Node::ETH_RLP_LONG_VALID_BIT == 0 {
+        let encoded_big = if attrs & Node::IS_ENCODED_BIG_VALID == 0 {
             None
         } else {
-            Some(attrs & Node::ETH_RLP_LONG_BIT != 0)
+            Some(attrs & Node::LONG_BIT != 0)
         };
         match meta_raw.as_deref()[33] {
             Self::BRANCH_NODE => {
@@ -561,45 +561,45 @@ impl Storable for Node {
                             .as_deref(),
                     ))
                 };
-                let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+                let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
                 let offset = if raw_len == u32::MAX as u64 {
                     addr + META_SIZE + branch_header_size as usize
                 } else {
                     addr + META_SIZE + branch_header_size as usize + raw_len as usize
                 };
-                let mut cur_rlp_len = 0;
-                for chd_rlp in chd_eth_rlp.iter_mut() {
+                let mut cur_encoded_len = 0;
+                for chd_encoded in chd_encoded.iter_mut() {
                     let mut buff = [0_u8; 1];
-                    let rlp_len_raw = mem.get_view(offset + cur_rlp_len, 1).ok_or(
+                    let len_raw = mem.get_view(offset + cur_encoded_len, 1).ok_or(
                         ShaleError::InvalidCacheView {
-                            offset: offset + cur_rlp_len,
+                            offset: offset + cur_encoded_len,
                             size: 1,
                         },
                     )?;
-                    cur = Cursor::new(rlp_len_raw.as_deref());
+                    cur = Cursor::new(len_raw.as_deref());
                     cur.read_exact(&mut buff)?;
-                    let rlp_len = buff[0] as u64;
-                    cur_rlp_len += 1;
-                    if rlp_len != 0 {
-                        let rlp_raw = mem.get_view(offset + cur_rlp_len, rlp_len).ok_or(
+                    let len = buff[0] as u64;
+                    cur_encoded_len += 1;
+                    if len != 0 {
+                        let encoded_raw = mem.get_view(offset + cur_encoded_len, len).ok_or(
                             ShaleError::InvalidCacheView {
-                                offset: offset + cur_rlp_len,
-                                size: rlp_len,
+                                offset: offset + cur_encoded_len,
+                                size: len,
                             },
                         )?;
-                        let rlp: Vec<u8> = rlp_raw.as_deref()[0..].to_vec();
-                        *chd_rlp = Some(rlp);
-                        cur_rlp_len += rlp_len as usize
+                        let encoded: Vec<u8> = encoded_raw.as_deref()[0..].to_vec();
+                        *chd_encoded = Some(encoded);
+                        cur_encoded_len += len as usize
                     }
                 }
 
                 Ok(Self::new_from_hash(
                     root_hash,
-                    eth_rlp_long,
+                    encoded_big,
                     NodeType::Branch(BranchNode {
                         chd,
                         value,
-                        chd_eth_rlp,
+                        chd_encoded,
                     }),
                 ))
             }
@@ -632,7 +632,7 @@ impl Storable for Node {
                 let (path, _) = PartialPath::decode(&nibbles);
 
                 let mut buff = [0_u8; 1];
-                let rlp_len_raw = mem
+                let encoded_len_raw = mem
                     .get_view(
                         addr + META_SIZE + ext_header_size as usize + path_len as usize,
                         1,
@@ -641,14 +641,14 @@ impl Storable for Node {
                         offset: addr + META_SIZE + ext_header_size as usize + path_len as usize,
                         size: 1,
                     })?;
-                cur = Cursor::new(rlp_len_raw.as_deref());
+                cur = Cursor::new(encoded_len_raw.as_deref());
                 cur.read_exact(&mut buff)?;
-                let rlp_len = buff[0] as u64;
-                let rlp: Option<Vec<u8>> = if rlp_len != 0 {
-                    let rlp_raw = mem
+                let encoded_len = buff[0] as u64;
+                let encoded: Option<Vec<u8>> = if encoded_len != 0 {
+                    let emcoded_raw = mem
                         .get_view(
                             addr + META_SIZE + ext_header_size as usize + path_len as usize + 1,
-                            rlp_len,
+                            encoded_len,
                         )
                         .ok_or(ShaleError::InvalidCacheView {
                             offset: addr
@@ -656,18 +656,18 @@ impl Storable for Node {
                                 + ext_header_size as usize
                                 + path_len as usize
                                 + 1,
-                            size: rlp_len,
+                            size: encoded_len,
                         })?;
 
-                    Some(rlp_raw.as_deref()[0..].to_vec())
+                    Some(emcoded_raw.as_deref()[0..].to_vec())
                 } else {
                     None
                 };
 
                 Ok(Self::new_from_hash(
                     root_hash,
-                    eth_rlp_long,
-                    NodeType::Extension(ExtNode(path, DiskAddress::from(ptr as usize), rlp)),
+                    encoded_big,
+                    NodeType::Extension(ExtNode(path, DiskAddress::from(ptr as usize), encoded)),
                 ))
             }
             Self::LEAF_NODE => {
@@ -705,7 +705,7 @@ impl Storable for Node {
                 let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
                 Ok(Self::new_from_hash(
                     root_hash,
-                    eth_rlp_long,
+                    encoded_big,
                     NodeType::Leaf(LeafNode(path, value)),
                 ))
             }
@@ -718,9 +718,9 @@ impl Storable for Node {
             + 1
             + match &self.inner {
                 NodeType::Branch(n) => {
-                    let mut rlp_len = 0;
-                    for rlp in n.chd_eth_rlp.iter() {
-                        rlp_len += match rlp {
+                    let mut encoded_len = 0;
+                    for emcoded in n.chd_encoded.iter() {
+                        encoded_len += match emcoded {
                             Some(v) => 1 + v.len() as u64,
                             None => 1,
                         }
@@ -731,7 +731,7 @@ impl Storable for Node {
                             Some(val) => val.len() as u64,
                             None => 0,
                         }
-                        + rlp_len
+                        + encoded_len
                 }
                 NodeType::Extension(n) => {
                     1 + 8
@@ -759,8 +759,8 @@ impl Storable for Node {
                 0
             }
         };
-        attrs |= match self.eth_rlp_long.get() {
-            Some(b) => (if *b { Node::ETH_RLP_LONG_BIT } else { 0 } | Node::ETH_RLP_LONG_VALID_BIT),
+        attrs |= match self.is_encoded_big.get() {
+            Some(b) => (if *b { Node::LONG_BIT } else { 0 } | Node::IS_ENCODED_BIG_VALID),
             None => 0,
         };
         cur.write_all(&[attrs]).unwrap();
@@ -783,10 +783,10 @@ impl Storable for Node {
                         cur.write_all(&u32::MAX.to_le_bytes())?;
                     }
                 }
-                // Since child eth rlp will only be unset after initialization (only used for range proof),
+                // Since child encoding will only be unset after initialization (only used for range proof),
                 // it is fine to encode its value adjacent to other fields. Same for extention node.
-                for rlp in n.chd_eth_rlp.iter() {
-                    match rlp {
+                for encoded in n.chd_encoded.iter() {
+                    match encoded {
                         Some(v) => {
                             cur.write_all(&[v.len() as u8])?;
                             cur.write_all(v)?
@@ -803,9 +803,9 @@ impl Storable for Node {
                 cur.write_all(&n.1.to_le_bytes())?;
                 cur.write_all(&path)?;
                 if n.2.is_some() {
-                    let rlp = n.2.as_ref().unwrap();
-                    cur.write_all(&[rlp.len() as u8])?;
-                    cur.write_all(rlp)?;
+                    let encoded = n.2.as_ref().unwrap();
+                    cur.write_all(&[encoded.len() as u8])?;
+                    cur.write_all(encoded)?;
                 }
                 Ok(())
             }

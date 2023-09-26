@@ -77,7 +77,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 Node::new(NodeType::Branch(BranchNode {
                     chd: [None; NBRANCH],
                     value: None,
-                    chd_eth_rlp: Default::default(),
+                    chd_encoded: Default::default(),
                 })),
                 Node::max_branch_node_size(),
             )
@@ -221,7 +221,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 let t = NodeType::Branch(BranchNode {
                     chd,
                     value: None,
-                    chd_eth_rlp: Default::default(),
+                    chd_encoded: Default::default(),
                 });
                 let branch_ptr = self.new_node(Node::new(t))?.as_ptr();
                 if idx > 0 {
@@ -325,7 +325,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     .new_node(Node::new(NodeType::Branch(BranchNode {
                         chd,
                         value: v,
-                        chd_eth_rlp: Default::default(),
+                        chd_encoded: Default::default(),
                     })))?
                     .as_ptr();
                 if !prefix.is_empty() {
@@ -522,7 +522,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     .new_node(Node::new(NodeType::Branch(BranchNode {
                         chd,
                         value: Some(Data(val.take().unwrap())),
-                        chd_eth_rlp: Default::default(),
+                        chd_encoded: Default::default(),
                     })))?
                     .as_ptr();
                 self.set_parent(branch, &mut parents);
@@ -1103,9 +1103,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         // Get the hashes of the nodes.
         for node in nodes {
             let node = self.get_node(node)?;
-            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<S>(self.store.as_ref()));
-            let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(rlp).into();
-            proofs.insert(hash, rlp.to_vec());
+            let encoded = <&[u8]>::clone(&node.get_encoded::<S>(self.store.as_ref()));
+            let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(encoded).into();
+            proofs.insert(hash, encoded.to_vec());
         }
         Ok(Proof(proofs))
     }
@@ -1330,9 +1330,9 @@ mod test {
         for node in chd1.iter_mut().take(NBRANCH / 2) {
             *node = Some(DiskAddress::from(0xa));
         }
-        let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
-        for rlp in chd_eth_rlp.iter_mut().take(NBRANCH / 2) {
-            *rlp = Some(vec![0x1, 0x2, 0x3]);
+        let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
+        for encoded in chd_encoded.iter_mut().take(NBRANCH / 2) {
+            *encoded = Some(vec![0x1, 0x2, 0x3]);
         }
         for node in [
             Node::new_from_hash(
@@ -1367,7 +1367,7 @@ mod test {
                 NodeType::Branch(BranchNode {
                     chd: chd0,
                     value: Some(Data("hello, world!".as_bytes().to_vec())),
-                    chd_eth_rlp: Default::default(),
+                    chd_encoded: Default::default(),
                 }),
             ),
             Node::new_from_hash(
@@ -1376,7 +1376,7 @@ mod test {
                 NodeType::Branch(BranchNode {
                     chd: chd1,
                     value: None,
-                    chd_eth_rlp,
+                    chd_encoded,
                 }),
             ),
         ] {
@@ -1420,50 +1420,50 @@ mod test {
                 Data(vec![0x4, 0x5]),
             )));
             let chd_ref = merkle.new_node(chd.clone()).unwrap();
-            let chd_rlp = chd_ref.get_eth_rlp(merkle.store.as_ref());
-            let new_chd = Node::new(NodeType::decode(chd_rlp).unwrap());
-            let new_chd_rlp = new_chd.get_eth_rlp(merkle.store.as_ref());
-            assert_eq!(chd_rlp, new_chd_rlp);
+            let chd_encoded = chd_ref.get_encoded(merkle.store.as_ref());
+            let new_chd = Node::new(NodeType::decode(chd_encoded).unwrap());
+            let new_chd_encoded = new_chd.get_encoded(merkle.store.as_ref());
+            assert_eq!(chd_encoded, new_chd_encoded);
 
-            let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
-            chd_eth_rlp[0] = Some(chd_rlp.to_vec());
+            let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
+            chd_encoded[0] = Some(new_chd_encoded.to_vec());
             let node = Node::new(NodeType::Branch(BranchNode {
                 chd: [None; NBRANCH],
                 value: Some(Data("value1".as_bytes().to_vec())),
-                chd_eth_rlp,
+                chd_encoded,
             }));
 
             let node_ref = merkle.new_node(node.clone()).unwrap();
 
-            let r = node_ref.get_eth_rlp(merkle.store.as_ref());
+            let r = node_ref.get_encoded(merkle.store.as_ref());
             let new_node = Node::new(NodeType::decode(r).unwrap());
-            let new_rlp = new_node.get_eth_rlp(merkle.store.as_ref());
-            assert_eq!(r, new_rlp);
+            let new_encoded = new_node.get_encoded(merkle.store.as_ref());
+            assert_eq!(r, new_encoded);
         }
 
         {
             let chd = Node::new(NodeType::Branch(BranchNode {
                 chd: [None; NBRANCH],
                 value: Some(Data("value1".as_bytes().to_vec())),
-                chd_eth_rlp: Default::default(),
+                chd_encoded: Default::default(),
             }));
             let chd_ref = merkle.new_node(chd.clone()).unwrap();
-            let chd_rlp = chd_ref.get_eth_rlp(merkle.store.as_ref());
-            let new_chd = Node::new(NodeType::decode(chd_rlp).unwrap());
-            let new_chd_rlp = new_chd.get_eth_rlp(merkle.store.as_ref());
-            assert_eq!(chd_rlp, new_chd_rlp);
+            let chd_encoded = chd_ref.get_encoded(merkle.store.as_ref());
+            let new_chd = Node::new(NodeType::decode(chd_encoded).unwrap());
+            let new_chd_encoded = new_chd.get_encoded(merkle.store.as_ref());
+            assert_eq!(chd_encoded, new_chd_encoded);
 
             let node = Node::new(NodeType::Extension(ExtNode(
                 PartialPath(vec![0x1, 0x2, 0x3]),
                 DiskAddress::null(),
-                Some(chd_rlp.to_vec()),
+                Some(chd_encoded.to_vec()),
             )));
             let node_ref = merkle.new_node(node.clone()).unwrap();
 
-            let r = node_ref.get_eth_rlp(merkle.store.as_ref());
+            let r = node_ref.get_encoded(merkle.store.as_ref());
             let new_node = Node::new(NodeType::decode(r).unwrap());
-            let new_rlp = new_node.get_eth_rlp(merkle.store.as_ref());
-            assert_eq!(r, new_rlp);
+            let new_encoded = new_node.get_encoded(merkle.store.as_ref());
+            assert_eq!(r, new_encoded);
         }
     }
 }
