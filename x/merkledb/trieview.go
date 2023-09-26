@@ -971,8 +971,9 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
-	if after.key == EmptyPath {
-		return t.recordKeyChange(after.key, after, false, false /* newNode */)
+	// don't delete the root.
+	if len(after.key) == 0 {
+		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
 	return t.recordKeyChange(after.key, nil, false, false /* newNode */)
 }
