@@ -1665,18 +1665,13 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), blk1))
 	require.NoError(sm.Add(context.Background(), blk2))
 
+	votes := bag.Bag[ids.ID]{}
+	votes.AddCount(blk1.ID(), params.Alpha)
 	// as "blk1" and "blk2" are in conflict, we need beta rogue rounds to finalize
-	finalizePolls := 0
 	for i := 0; i < params.BetaRogue; i++ {
-		votes := bag.Bag[ids.ID]{}
-		votes.AddCount(blk1.ID(), params.Alpha)
+		// should not finalize with less than beta rogue rounds
+		require.Equal(2, sm.NumProcessing())
 		require.NoError(sm.RecordPoll(context.Background(), votes))
-		finalizePolls++
-		if sm.Finalized() {
-			break
-		}
 	}
-	// should not finalize with less than beta rogue rounds
-	require.Equal(finalizePolls, params.BetaRogue)
-	require.True(sm.Finalized())
+	require.Zero(sm.NumProcessing())
 }

@@ -24,13 +24,13 @@ type Decidable interface {
 	// Accept this element.
 	//
 	// This element will be accepted by every correct node in the network.
-	// The following Status call on this object must return Accepted.
+	// All subsequent Status calls return Accepted.
 	Accept(context.Context) error
 
 	// Reject this element.
 	//
 	// This element will not be accepted by any correct node in the network.
-	// The following Status call on this object must return Rejected.
+	// All subsequent Status calls return Rejected.
 	Reject(context.Context) error
 
 	// Status returns this element's current status.

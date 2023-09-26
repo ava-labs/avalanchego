@@ -174,6 +174,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	if !ok {
 		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
 			zap.Stringer("blkID", blkID),
+			zap.Stringer("parentID", parentID),
 		)
 
 		// If the ancestor is missing, this means the ancestor must have already
