@@ -220,7 +220,7 @@ fn test_one_element_proof() -> Result<(), DataStoreError> {
 
 #[test]
 fn test_proof() -> Result<(), DataStoreError> {
-    let set = generate_random_data(1);
+    let set = generate_random_data(500);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
