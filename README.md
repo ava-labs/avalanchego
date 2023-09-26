@@ -1,30 +1,30 @@
-# Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
+# Firewood: Compaction-Less Database Optimized for Efficiently Storing Recent Merkleized Blockchain State
 
 ![Github Actions](https://github.com/ava-labs/firewood/actions/workflows/ci.yaml/badge.svg?branch=main)
 [![Ecosystem license](https://img.shields.io/badge/License-Ecosystem-blue.svg)](./LICENSE.md)
 
-> :warning: firewood is alpha-level software and is not ready for production
-> use. Do not use firewood to store production data. See the
-> [license](./LICENSE.md) for more information regarding firewood usage.
+> :warning: Firewood is alpha-level software and is not ready for production
+> use. The Firewood API and on-disk state representation may change with
+> little to no warning.
 
-Firewood is an embedded key-value store, optimized to store blockchain state.
-It prioritizes access to latest state, by providing extremely fast reads, but
-also provides a limited view into past state. It does not copy-on-write the
-state trie to generate an ever growing forest of tries like other databases,
-but instead keeps one latest version of the trie index on disk and apply
-in-place updates to it. This ensures that the database size is small and stable
-during the course of running firewood. Firewood was first conceived to provide
+Firewood is an embedded key-value store, optimized to store recent Merkleized blockchain
+state with minimal overhead. Firewood is implemented from the ground up to directly
+store trie nodes on-disk. Unlike most of state management approaches in the field,
+it is not built on top of a generic KV store such as LevelDB/RocksDB. Firewood, like a
+B+-tree based database, directly uses the trie structure as the index on-disk. Thus,
+there is no additional “emulation” of the logical trie to flatten out the data structure
+to feed into the underlying database that is unaware of the data being stored. The convenient
+byproduct of this approach is that iteration is still fast (for serving state sync queries)
+but compaction is not required to maintain the index. Firewood was first conceived to provide
 a very fast storage layer for the EVM but could be used on any blockchain that
 requires authenticated state.
 
-Firewood is a robust database implemented from the ground up to directly store
-trie nodes and user data. Unlike most (if not all) of the solutions in the field,
-it is not built on top of a generic KV store such as LevelDB/RocksDB. Like a
-B+-tree based store, firewood directly uses the tree structure as the index on
-disk. Thus, there is no additional “emulation” of the logical trie to flatten
-out the data structure to feed into the underlying DB that is unaware of the
-data being stored. It provides generic trie storage for arbitrary keys and
-values.
+Firewood only attempts to store the latest state on-disk and will actively clean up
+unused state when state diffs are committed. To avoid reference counting trie nodes,
+Firewood does not copy-on-write (COW) the state trie and instead keeps
+one latest version of the trie index on disk and applies in-place updates to it.
+Firewood keeps some configurable number of previous states in memory to power
+state sync (which may occur at a few roots behind the current state).
 
 Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL
 guarantees atomicity and durability in the database, but also offers
@@ -34,13 +34,9 @@ store back in memory. While running the store, new changes will also contribute
 to the configured window of changes (at batch granularity) to access any past
 versions with no additional cost at all.
 
-## License
-firewood is licensed by the Ecosystem License. For more information, see the
-[LICENSE file](./LICENSE.md).
-
 ## Architecture Diagram
 
-![architecture diagram](./docs/assets/architecture.svg)<img src="./docs/assets/architecture.svg">
+![architecture diagram](./docs/assets/architecture.svg)
 
 ## Termimology
 
@@ -71,11 +67,10 @@ firewood is licensed by the Ecosystem License. For more information, see the
 * `Batch Operation` - An operation of either `Put` or `Delete`.
 * `Batch` - An ordered set of `Batch Operation`s.
 * `Proposal` - A proposal consists of a base `Root Hash` and a `Batch`, but is not
-  yet committed to the trie. In firewood's most recent API, a `Proposal` is required
+  yet committed to the trie. In Firewood's most recent API, a `Proposal` is required
   to `Commit`.
 * `Commit` - The operation of applying one or more `Proposal`s to the most recent
   `Revision`.
-
 
 ## Roadmap
 
@@ -124,7 +119,7 @@ corresponding range proofs that verify the correctness of the data.
 - [ ] Enforce limits on the size of the range proof as well as keys to make
   synchronization easier for clients.
 - [ ] MerkleDB root hash in parity for seamless transition between MerkleDB
-and firewood.
+and Firewood.
 - [ ] Add metric reporting
 - [ ] Migrate to a fully async interface, consider tokio\_uring, monoio, etc
 - [ ] Refactor `Shale` to be more idiomatic, consider rearchitecting it
@@ -133,7 +128,7 @@ and firewood.
 Firewood currently is Linux-only, as it has a dependency on the asynchronous
 I/O provided by the Linux kernel (see `libaio`). Unfortunately, Docker is not
 able to successfully emulate the syscalls `libaio` relies on, so Linux or a
-Linux VM must be used to run firewood. We intend to migrate to io\_uring which
+Linux VM must be used to run Firewood. We intend to migrate to io\_uring which
 should allow for this emulation.
 
 ## Run
@@ -142,12 +137,16 @@ use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
 ## Release
-See the [release documentation](./RELEASE.md) for detailed information on how to release firewood. 
+See the [release documentation](./RELEASE.md) for detailed information on how to release Firewood.
 
 ## CLI
-Firewood comes with a CLI tool called `fwdctl` that enables one to create and interact with a local instance of a firewood database. For more information, see the [fwdctl README](fwdctl/README.md).
+Firewood comes with a CLI tool called `fwdctl` that enables one to create and interact with a local instance of a Firewood database. For more information, see the [fwdctl README](fwdctl/README.md).
 
 ## Test
 ```
 cargo test --release
 ```
+
+## License
+Firewood is licensed by the Ecosystem License. For more information, see the
+[LICENSE file](./LICENSE.md).

@@ -1,28 +1,33 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-//! # Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
+//! #Firewood: Compaction-Less Database Optimized for Efficiently Storing Recent Merkleized Blockchain State
 //!
-//! Firewood is an embedded key-value store, optimized to store blockchain state. It prioritizes
-//! access to latest state, by providing extremely fast reads, but also provides a limited view
-//! into past state. It does not copy-on-write the state trie to generate an ever
-//! growing forest of tries like other databases, but instead keeps one latest version of the trie index on disk
-//! and apply in-place updates to it. This ensures that the database size is small and stable
-//! during the course of running Firewood. Firewood was first conceived to provide a very fast
-//! storage layer for the EVM but could be used on any blockchain that requires authenticated state.
+//! Firewood is an embedded key-value store, optimized to store recent Merkleized blockchain
+//! state with minimal overhead. Firewood is implemented from the ground up to directly
+//! store trie nodes on-disk. Unlike most of state management approaches in the field,
+//! it is not built on top of a generic KV store such as LevelDB/RocksDB. Firewood, like a
+//! B+-tree based database, directly uses the trie structure as the index on-disk. Thus,
+//! there is no additional “emulation” of the logical trie to flatten out the data structure
+//! to feed into the underlying database that is unaware of the data being stored. The convenient
+//! byproduct of this approach is that iteration is still fast (for serving state sync queries)
+//! but compaction is not required to maintain the index. Firewood was first conceived to provide
+//! a very fast storage layer for the EVM but could be used on any blockchain that
+//! requires authenticated state.
 //!
-//! Firewood is a robust database implemented from the ground up to directly store trie nodes and
-//! user data. Unlike most (if not all) of the solutions in the field, it is not built on top of a
-//! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, Firewood directly uses
-//! the tree structure as the index on disk. Thus, there is no additional "emulation" of the
-//! logical trie to flatten out the data structure to feed into the underlying DB that is unaware
-//! of the data being stored. It provides generic trie storage for arbitrary keys and values.
+//! Firewood only attempts to store the latest state on-disk and will actively clean up
+//! unused state when state diffs are committed. To avoid reference counting trie nodes,
+//! Firewood does not copy-on-write (COW) the state trie and instead keeps
+//! one latest version of the trie index on disk and applies in-place updates to it.
+//! Firewood keeps some configurable number of previous states in memory to power
+//! state sync (which may occur at a few roots behind the current state).
 //!
-//! Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL guarantees
-//! atomicity and durability in the database, but also offers "reversibility": some portion
-//! of the old WAL can be optionally kept around to allow a fast in-memory rollback to recover
-//! some past versions of the entire store back in memory. While running the store, new changes
-//! will also contribute to the configured window of changes (at batch granularity) to access any past
+//! Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL
+//! guarantees atomicity and durability in the database, but also offers
+//! “reversibility”: some portion of the old WAL can be optionally kept around to
+//! allow a fast in-memory rollback to recover some past versions of the entire
+//! store back in memory. While running the store, new changes will also contribute
+//! to the configured window of changes (at batch granularity) to access any past
 //! versions with no additional cost at all.
 //!
 //! # Design Philosophy & Overview
@@ -38,7 +43,7 @@
 //!   well-executed plan for this is to make sure the performance degradation is reasonable or
 //!   well-contained with respect to the ever-increasing size of the index. This design is useful
 //!   for nodes which serve as the backend for some indexing service (e.g., chain explorer) or as a
-//!   query portal to some user agent (e.g., wallet apps). Blockchains with poor finality may also
+//!   query portal to some user agent (e.g., wallet apps). Blockchains with delayed finality may also
 //!   need this because the "canonical" branch of the chain could switch (but not necessarily a
 //!   practical concern nowadays) to a different fork at times.
 //!
@@ -64,11 +69,10 @@
 //! Firewood is built by three layers of abstractions that totally decouple the
 //! layout/representation of the data on disk from the actual logical data structure it retains:
 //!
-//! - Linear, memory-like space: the [shale](https://crates.io/crates/shale) crate from an academic
-//!   project (CedrusDB) code offers a `CachedStore` abstraction for a (64-bit) byte-addressable space
-//!   that abstracts away the intricate method that actually persists the in-memory data on the
-//!   secondary storage medium (e.g., hard drive). The implementor of `CachedStore` will provide the
-//!   functions to give the user of `CachedStore` an illusion that the user is operating upon a
+//! - Linear, memory-like space: the `shale` crate offers a `CachedStore` abstraction for a
+//!   (64-bit) byte-addressable space that abstracts away the intricate method that actually persists
+//!   the in-memory data on the secondary storage medium (e.g., hard drive). The implementor of `CachedStore`
+//!   provides the functions to give the user of `CachedStore` an illusion that the user is operating upon a
 //!   byte-addressable memory space. It is just a "magical" array of bytes one can view and change
 //!   that is mirrored to the disk. In reality, the linear space will be chunked into files under a
 //!   directory, but the user does not have to even know about this.
@@ -83,12 +87,6 @@
 //!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
 //!   persisted on disk. It is as if they're just in memory, which makes it much easier to write
 //!   and maintain the code.
-//!
-//! The three layers are depicted as follows:
-//!
-//! <p align="center">
-//!     <img src="https://ava-labs.github.io/firewood/assets/three-layers.svg" width="80%">
-//! </p>
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
 //! state of the data structure (trie) is what the linear space (`CachedStore`) keeps track of, that is,
@@ -114,10 +112,10 @@
 //! dirty pages induced by this write batch are taken out from the linear space. Although they are
 //! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
 //! become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL
-//! subsystem (supported by [growthring](https://crates.io/crates/growth-ring)). After the
-//! WAL record is written (one record per write batch), the dirty pages are then pushed to the
-//! on-disk linear space to mirror the change by some asynchronous, out-of-order file writes. See
-//! the `BufferCmd::WriteBatch` part of `DiskBuffer::process` for the detailed logic.
+//! subsystem (supported by growthring). After the WAL record is written (one record per write batch),
+//! the dirty pages are then pushed to the on-disk linear space to mirror the change by some
+//! asynchronous, out-of-order file writes. See the `BufferCmd::WriteBatch` part of `DiskBuffer::process`
+//! for the detailed logic.
 //!
 //! In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:
 //!
