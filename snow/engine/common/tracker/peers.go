@@ -31,8 +31,6 @@ type Peers interface {
 	ConnectedWeight() uint64
 	// ConnectedPercent returns the currently connected stake percentage [0, 1]
 	ConnectedPercent() float64
-	// TotalValidators returns the total number of validators
-	TotalValidators() int
 	// TotalWeight returns the total validator weight
 	TotalWeight() uint64
 	// PreferredPeers returns the currently connected validators. If there are
@@ -101,13 +99,6 @@ func (p *lockedPeers) ConnectedPercent() float64 {
 	defer p.lock.RUnlock()
 
 	return p.peers.ConnectedPercent()
-}
-
-func (p *lockedPeers) TotalValidators() int {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	return p.peers.TotalValidators()
 }
 
 func (p *lockedPeers) TotalWeight() uint64 {
@@ -267,10 +258,6 @@ func (p *peerData) ConnectedPercent() float64 {
 		return 1
 	}
 	return float64(p.connectedWeight) / float64(p.totalWeight)
-}
-
-func (p *peerData) TotalValidators() int {
-	return len(p.validators)
 }
 
 func (p *peerData) TotalWeight() uint64 {
