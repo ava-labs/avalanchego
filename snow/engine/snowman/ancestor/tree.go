@@ -10,6 +10,32 @@ import (
 
 var _ Tree = (*tree)(nil)
 
+// Tree manages a, potentially partial, view of a tree.
+//
+// For example, assume this is the full tree:
+//
+//		A
+//	  /	  \
+//	B		D
+//	|		|
+//	C		E
+//
+// A partial view of this tree may be:
+//
+//		A
+//	  /
+//	B		D
+//	|		|
+//	C		E
+//
+// Or:
+//
+//	B		D
+//	|		|
+//	C		E
+//
+// This structure is designed to be able to update and traverse these partial
+// views.
 type Tree interface {
 	// Add a mapping from blkID to parentID.
 	//
