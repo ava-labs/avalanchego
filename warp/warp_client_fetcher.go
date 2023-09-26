@@ -12,17 +12,17 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-type warpAPIFetcher struct {
+type apiFetcher struct {
 	clients map[ids.NodeID]Client
 }
 
-func NewWarpAPIFetcher(clients map[ids.NodeID]Client) *warpAPIFetcher {
-	return &warpAPIFetcher{
+func NewAPIFetcher(clients map[ids.NodeID]Client) *apiFetcher {
+	return &apiFetcher{
 		clients: clients,
 	}
 }
 
-func (f *warpAPIFetcher) FetchWarpSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
+func (f *apiFetcher) FetchWarpSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 	client, ok := f.clients[nodeID]
 	if !ok {
 		return nil, fmt.Errorf("no warp client for nodeID: %s", nodeID)

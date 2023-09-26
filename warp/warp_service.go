@@ -12,22 +12,22 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-// WarpAPI introduces snowman specific functionality to the evm
-type WarpAPI struct {
+// API introduces snowman specific functionality to the evm
+type API struct {
 	backend    Backend
 	aggregator *aggregator.Aggregator
 }
 
-func NewWarpAPI(backend Backend, aggregator *aggregator.Aggregator) *WarpAPI {
-	return &WarpAPI{
+func NewAPI(backend Backend, aggregator *aggregator.Aggregator) *API {
+	return &API{
 		backend:    backend,
 		aggregator: aggregator,
 	}
 }
 
 // GetSignature returns the BLS signature associated with a messageID.
-func (api *WarpAPI) GetSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	signature, err := api.backend.GetSignature(messageID)
+func (a *API) GetSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+	signature, err := a.backend.GetSignature(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for with error %w", err)
 	}
@@ -35,13 +35,13 @@ func (api *WarpAPI) GetSignature(ctx context.Context, messageID ids.ID) (hexutil
 }
 
 // GetAggregateSignature fetches the aggregate signature for the requested [messageID]
-func (api *WarpAPI) GetAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) (signedMessageBytes hexutil.Bytes, err error) {
-	unsignedMessage, err := api.backend.GetMessage(messageID)
+func (a *API) GetAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) (signedMessageBytes hexutil.Bytes, err error) {
+	unsignedMessage, err := a.backend.GetMessage(messageID)
 	if err != nil {
 		return nil, err
 	}
 
-	signatureResult, err := api.aggregator.AggregateSignatures(ctx, unsignedMessage, quorumNum)
+	signatureResult, err := a.aggregator.AggregateSignatures(ctx, unsignedMessage, quorumNum)
 	if err != nil {
 		return nil, err
 	}
