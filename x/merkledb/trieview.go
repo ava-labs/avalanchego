@@ -679,7 +679,7 @@ func (t *trieView) remove(key path) error {
 // * [node] has a value.
 // * [node] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent, node *node) (err error) {
+func (t *trieView) compressNodePath(parent, node *node) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
@@ -688,18 +688,20 @@ func (t *trieView) compressNodePath(parent, node *node) (err error) {
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
 	}
+	var err error
 	// delete all empty nodes with a single child under [node]
 	for len(node.children) == 1 && !node.hasValue() {
 		if err := t.recordNodeDeleted(node); err != nil {
 			return err
 		}
+
 		var (
 			childEntry child
 			childPath  path
 		)
 		// There is only one child, but we don't know the index.
 		// "Cycle" over the key/values to find the only child.
-		// Note this iteration once because len(node.children) == 1.
+		// Note this only iterates once because len(node.children) == 1.
 		for index, entry := range node.children {
 			childPath = node.key + path(index) + entry.compressedPath
 			childEntry = entry
@@ -818,6 +820,7 @@ func (t *trieView) updateRoot() error {
 	}
 	return nil
 }
+
 func getLengthOfCommonPrefix(first, second path) int {
 	commonIndex := 0
 	for len(first) > commonIndex && len(second) > commonIndex && first[commonIndex] == second[commonIndex] {
@@ -977,20 +980,20 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, isNewNode bool) error {
+func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
-	if isNewNode {
-		t.changes.nodes[key] = &change[*node]{
-			after: after,
-		}
+	if existing, ok := t.changes.nodes[key]; ok {
+		existing.after = after
 		return nil
 	}
 
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
+	if newNode {
+		t.changes.nodes[key] = &change[*node]{
+			after: after,
+		}
 		return nil
 	}
 
