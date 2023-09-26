@@ -61,12 +61,6 @@ func (f BranchFactor) Valid() error {
 	return fmt.Errorf("%w: %d", errInvalidBranchFactor, f)
 }
 
-func EmptyPath(bf BranchFactor) Path {
-	return Path{
-		pathConfig: branchFactorToPathConfig[bf],
-	}
-}
-
 type pathConfig struct {
 	branchFactor    BranchFactor
 	tokensPerByte   int
@@ -78,6 +72,12 @@ type Path struct {
 	length int
 	value  string
 	pathConfig
+}
+
+func emptyPath(bf BranchFactor) Path {
+	return Path{
+		pathConfig: branchFactorToPathConfig[bf],
+	}
 }
 
 // Assumes [branchFactor] is valid
@@ -225,7 +225,7 @@ func (p Path) Extend(path Path) Path {
 // Skip returns a new Path that contains the last p.length-tokensToSkip tokens of the current Path
 func (p Path) Skip(tokensToSkip int) Path {
 	if p.length == tokensToSkip {
-		return EmptyPath(p.branchFactor)
+		return emptyPath(p.branchFactor)
 	}
 	result := Path{
 		value:      p.value[tokensToSkip/p.tokensPerByte:],

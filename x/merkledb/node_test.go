@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Node_Marshal(t *testing.T) {
-	root := newNode(nil, EmptyPath(BranchFactor16))
+	root := newNode(nil, emptyPath(BranchFactor16))
 	require.NotNil(t, root)
 
 	fullpath := NewPath([]byte("key"), BranchFactor16)
@@ -37,7 +37,7 @@ func Test_Node_Marshal(t *testing.T) {
 }
 
 func Test_Node_Marshal_Errors(t *testing.T) {
-	root := newNode(nil, EmptyPath(BranchFactor16))
+	root := newNode(nil, emptyPath(BranchFactor16))
 	require.NotNil(t, root)
 
 	fullpath := NewPath([]byte{255}, BranchFactor16)

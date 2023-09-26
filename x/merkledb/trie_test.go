@@ -740,7 +740,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(EmptyPath(BranchFactor16), false)
+	root, err := newTrie.getEditableNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
@@ -757,7 +757,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(EmptyPath(BranchFactor16), false)
+	root, err = newTrie.getEditableNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Empty(root.children)
@@ -822,11 +822,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(EmptyPath(BranchFactor16), false)
+	root, err := trie.getEditableNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	root, err = trie.getEditableNode(EmptyPath(BranchFactor16), false)
+	root, err = trie.getEditableNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
@@ -848,7 +848,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(EmptyPath(BranchFactor16), false)
+	root, err = trie.getEditableNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 

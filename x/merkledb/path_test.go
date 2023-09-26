@@ -89,7 +89,7 @@ func Test_Path_HasPrefix_BadInput(t *testing.T) {
 func Test_Path_Skip(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(NewPath([]byte{0}, BranchFactor2).Skip(8), EmptyPath(BranchFactor2))
+	require.Equal(NewPath([]byte{0}, BranchFactor2).Skip(8), emptyPath(BranchFactor2))
 
 	for i := 0; i < 8; i++ {
 		skip := NewPath([]byte{0b0101_0101}, BranchFactor2).Skip(i)
@@ -135,7 +135,7 @@ func Test_Path_Skip(t *testing.T) {
 func Test_Path_Take(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(NewPath([]byte{0}, BranchFactor2).Take(0), EmptyPath(BranchFactor2))
+	require.Equal(NewPath([]byte{0}, BranchFactor2).Take(0), emptyPath(BranchFactor2))
 
 	for i := 1; i <= 8; i++ {
 		shift := 8 - i

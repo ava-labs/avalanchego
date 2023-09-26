@@ -343,7 +343,7 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 	if length > math.MaxInt {
 		return Path{}, errIntOverflow
 	}
-	result := EmptyPath(branchFactor)
+	result := emptyPath(branchFactor)
 	result.length = int(length)
 	pathBytesLen := result.bytesNeeded(result.length)
 	if pathBytesLen > src.Len() {

@@ -74,7 +74,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	added := 0
 	for {
 		key := NewPath([]byte{byte(added)}, BranchFactor16)
-		node := newNode(nil, EmptyPath(BranchFactor16))
+		node := newNode(nil, emptyPath(BranchFactor16))
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -94,7 +94,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
 	key := NewPath([]byte{byte(added)}, BranchFactor16)
-	node := newNode(nil, EmptyPath(BranchFactor16))
+	node := newNode(nil, emptyPath(BranchFactor16))
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
