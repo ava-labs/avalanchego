@@ -11,12 +11,8 @@ import (
 	"unsafe"
 )
 
-const (
-	Bit    byte = 1
-	Crumb  byte = 2
-	Nibble byte = 4
-	Byte   byte = 8
-)
+// Used in Path bit operations.
+const eight byte = 8
 
 var (
 	errInvalidBranchFactor = errors.New("invalid branch factor")
@@ -24,25 +20,25 @@ var (
 	branchFactorToPathConfig = map[BranchFactor]pathConfig{
 		BranchFactor2: {
 			branchFactor:    BranchFactor2,
-			tokenBitSize:    Bit,
+			tokenBitSize:    1,
 			tokensPerByte:   8,
 			singleTokenMask: 0b0000_0001,
 		},
 		BranchFactor4: {
 			branchFactor:    BranchFactor4,
-			tokenBitSize:    Crumb,
+			tokenBitSize:    2,
 			tokensPerByte:   4,
 			singleTokenMask: 0b0000_0011,
 		},
 		BranchFactor16: {
 			branchFactor:    BranchFactor16,
-			tokenBitSize:    Nibble,
+			tokenBitSize:    4,
 			tokensPerByte:   2,
 			singleTokenMask: 0b0000_1111,
 		},
 		BranchFactor256: {
 			branchFactor:    BranchFactor256,
-			tokenBitSize:    Byte,
+			tokenBitSize:    8,
 			tokensPerByte:   1,
 			singleTokenMask: 0b1111_1111,
 		},
@@ -165,7 +161,7 @@ func (p Path) Less(other Path) bool {
 // bitsToShift indicates how many bits to shift the token at the index to get the raw token value
 // varies from (8-[tokenBitSize]) -> (0) when remainder of index varies from (0) -> (p.tokensPerByte-1)
 func (p Path) bitsToShift(index int) byte {
-	return Byte - (p.tokenBitSize * byte(index%p.tokensPerByte+1))
+	return eight - (p.tokenBitSize * byte(index%p.tokensPerByte+1))
 }
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
@@ -204,7 +200,7 @@ func (p Path) Extend(path Path) Path {
 	// The existing path doesn't fit into a whole number of bytes,
 	// figure out how much each byte of the extension path needs to be shifted
 	shiftLeft := p.bitsToShift(p.length - 1)
-	shiftRight := Byte - shiftLeft
+	shiftRight := eight - shiftLeft
 
 	// the partial byte of the current path needs the first (8-shiftRight) bits of the extension path
 	buffer[len(p.value)-1] |= path.value[0] >> shiftRight
@@ -246,7 +242,7 @@ func (p Path) Skip(tokensToSkip int) Path {
 	// copy the remaining shifted bytes into a new buffer
 	buffer := make([]byte, p.bytesNeeded(result.length))
 	shiftRight := p.bitsToShift(tokensToSkip - 1)
-	shiftLeft := Byte - shiftRight
+	shiftLeft := eight - shiftRight
 
 	// Each byte of the new Path is the first (8-shiftRight) bits of byte i+1 added to the last (8-shiftLeft) bits of byte i
 	lastIndex := len(result.value) - 1
