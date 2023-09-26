@@ -20,7 +20,10 @@ import (
 var _ pb.DBServer = (*DBServer)(nil)
 
 func NewDBServer(db sync.DB, branchFactor merkledb.BranchFactor) *DBServer {
-	return &DBServer{db: db, branchFactor: branchFactor}
+	return &DBServer{
+		db:           db,
+		branchFactor: branchFactor,
+	}
 }
 
 type DBServer struct {
