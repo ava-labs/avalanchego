@@ -80,6 +80,7 @@ type Path struct {
 	pathConfig
 }
 
+// Assumes [branchFactor] is valid
 func NewPath(p []byte, branchFactor BranchFactor) Path {
 	pConfig := branchFactorToPathConfig[branchFactor]
 	return Path{
