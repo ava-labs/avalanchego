@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.12.6](https://github.com/ava-labs/coreth/releases/tag/v0.12.6)
+
 ## [v0.12.5](https://github.com/ava-labs/coreth/releases/tag/v0.12.5)
 
 - Add P2P SDK Pull Gossip to mempool
