@@ -781,14 +781,16 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 		// all paths start at the root
 		currentNode     = t.root
 		matchedKeyIndex = 0
-		nodes           = []*node{t.root}
+		nodes           []*node
 	)
 
 	if !key.HasPrefix(t.root.key) {
-		return []*node{}, nil
+		return nodes, nil
 	}
 
+	nodes = append(nodes, t.root)
 	matchedKeyIndex = len(t.root.key)
+
 	// while the entire path hasn't been matched
 	for matchedKeyIndex < len(key) {
 		// confirm that a child exists and grab its ID before attempting to load it
