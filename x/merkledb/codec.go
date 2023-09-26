@@ -99,8 +99,8 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < byte(branchFactor); index++ {
-		if entry, ok := n.children[index]; ok {
+	for index := 0; BranchFactor(index) < branchFactor; index++ {
+		if entry, ok := n.children[byte(index)]; ok {
 			c.encodeUint(buf, uint64(index))
 			c.encodePath(buf, entry.compressedPath)
 			_, _ = buf.Write(entry.id[:])
@@ -121,8 +121,8 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
-	for index := byte(0); index < byte(hv.Key.branchFactor); index++ {
-		if entry, ok := hv.Children[index]; ok {
+	for index := 0; BranchFactor(index) < hv.Key.branchFactor; index++ {
+		if entry, ok := hv.Children[byte(index)]; ok {
 			c.encodeUint(buf, uint64(index))
 			_, _ = buf.Write(entry.id[:])
 		}

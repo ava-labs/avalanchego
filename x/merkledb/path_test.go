@@ -9,6 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var branchFactors = []BranchFactor{
+	BranchFactor2,
+	BranchFactor4,
+	BranchFactor16,
+	BranchFactor256,
+}
+
 func Test_Path_Has_Prefix(t *testing.T) {
 	type test struct {
 		name           string
@@ -66,7 +73,7 @@ func Test_Path_Has_Prefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			for _, bf := range []BranchFactor{BranchFactor2, BranchFactor4, BranchFactor16, BranchFactor256} {
+			for _, bf := range branchFactors {
 				require.Equal(tt.isPrefix, tt.pathA(bf).HasPrefix(tt.pathB(bf)))
 				require.Equal(tt.isStrictPrefix, tt.pathA(bf).HasStrictPrefix(tt.pathB(bf)))
 			}
@@ -283,28 +290,27 @@ func FuzzPathExtend(f *testing.F) {
 		t *testing.T,
 		first []byte,
 		second []byte,
-		branchFactorBit1 bool,
-		branchFactorBit2 bool,
 		forceFirstOdd bool,
 		forceSecondOdd bool,
 	) {
 		require := require.New(t)
-		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
+		for _, branchFactor := range branchFactors {
 
-		path1 := NewPath(first, branchFactor)
-		if forceFirstOdd && path1.length > 0 {
-			path1 = path1.Take(path1.length - 1)
-		}
-		path2 := NewPath(second, branchFactor)
-		if forceSecondOdd && path2.length > 0 {
-			path2 = path2.Take(path2.length - 1)
-		}
-		extendedP := path1.Extend(path2)
-		for i := 0; i < path1.length; i++ {
-			require.Equal(path1.Token(i), extendedP.Token(i))
-		}
-		for i := 0; i < path2.length; i++ {
-			require.Equal(path2.Token(i), extendedP.Token(i+path1.length))
+			path1 := NewPath(first, branchFactor)
+			if forceFirstOdd && path1.length > 0 {
+				path1 = path1.Take(path1.length - 1)
+			}
+			path2 := NewPath(second, branchFactor)
+			if forceSecondOdd && path2.length > 0 {
+				path2 = path2.Take(path2.length - 1)
+			}
+			extendedP := path1.Extend(path2)
+			for i := 0; i < path1.length; i++ {
+				require.Equal(path1.Token(i), extendedP.Token(i))
+			}
+			for i := 0; i < path2.length; i++ {
+				require.Equal(path2.Token(i), extendedP.Token(i+path1.length))
+			}
 		}
 	})
 }
@@ -314,20 +320,19 @@ func FuzzPathSkip(f *testing.F) {
 		t *testing.T,
 		first []byte,
 		tokensToSkip uint,
-		branchFactorBit1 bool,
-		branchFactorBit2 bool,
 	) {
 		require := require.New(t)
-		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
+		for _, branchFactor := range branchFactors {
 
-		path1 := NewPath(first, branchFactor)
-		if int(tokensToSkip) >= path1.length {
-			t.SkipNow()
-		}
-		path2 := path1.Skip(int(tokensToSkip))
-		require.Equal(path1.length-int(tokensToSkip), path2.length)
-		for i := 0; i < path2.length; i++ {
-			require.Equal(path1.Token(int(tokensToSkip)+i), path2.Token(i))
+			path1 := NewPath(first, branchFactor)
+			if int(tokensToSkip) >= path1.length {
+				t.SkipNow()
+			}
+			path2 := path1.Skip(int(tokensToSkip))
+			require.Equal(path1.length-int(tokensToSkip), path2.length)
+			for i := 0; i < path2.length; i++ {
+				require.Equal(path1.Token(int(tokensToSkip)+i), path2.Token(i))
+			}
 		}
 	})
 }
@@ -337,21 +342,19 @@ func FuzzPathTake(f *testing.F) {
 		t *testing.T,
 		first []byte,
 		tokensToTake uint,
-		branchFactorBit1 bool,
-		branchFactorBit2 bool,
 	) {
 		require := require.New(t)
-		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
+		for _, branchFactor := range branchFactors {
+			path1 := NewPath(first, branchFactor)
+			if int(tokensToTake) >= path1.length {
+				t.SkipNow()
+			}
+			path2 := path1.Take(int(tokensToTake))
+			require.Equal(int(tokensToTake), path2.length)
 
-		path1 := NewPath(first, branchFactor)
-		if int(tokensToTake) >= path1.length {
-			t.SkipNow()
-		}
-		path2 := path1.Take(int(tokensToTake))
-		require.Equal(int(tokensToTake), path2.length)
-
-		for i := 0; i < path2.length; i++ {
-			require.Equal(path1.Token(i), path2.Token(i))
+			for i := 0; i < path2.length; i++ {
+				require.Equal(path1.Token(i), path2.Token(i))
+			}
 		}
 	})
 }
