@@ -295,7 +295,6 @@ func FuzzPathExtend(f *testing.F) {
 	) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
-
 			path1 := NewPath(first, branchFactor)
 			if forceFirstOdd && path1.length > 0 {
 				path1 = path1.Take(path1.length - 1)
@@ -323,7 +322,6 @@ func FuzzPathSkip(f *testing.F) {
 	) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
-
 			path1 := NewPath(first, branchFactor)
 			if int(tokensToSkip) >= path1.length {
 				t.SkipNow()

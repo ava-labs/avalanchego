@@ -150,7 +150,6 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
-
 			p := NewPath(key, branchFactor)
 			if p.length <= int(tokenLength) {
 				t.SkipNow()

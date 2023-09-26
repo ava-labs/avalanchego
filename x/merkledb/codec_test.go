@@ -79,7 +79,6 @@ func FuzzCodecPath(f *testing.F) {
 		) {
 			require := require.New(t)
 			for _, branchFactor := range branchFactors {
-
 				codec := codec.(*codecImpl)
 				reader := bytes.NewReader(b)
 				startLen := reader.Len()
@@ -109,7 +108,6 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 		) {
 			require := require.New(t)
 			for _, branchFactor := range branchFactors {
-
 				codec := codec.(*codecImpl)
 				node := &dbNode{}
 				if err := codec.decodeDBNode(b, node, branchFactor); err != nil {
@@ -134,7 +132,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 		) {
 			require := require.New(t)
 			for _, branchFactor := range branchFactors {
-
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				value := maybe.Nothing[[]byte]()
@@ -220,8 +217,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			randSeed int,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range branchFactors {
-				// Create a random *hashValues
+			for _, branchFactor := range branchFactors { // Create a random *hashValues
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				children := map[byte]child{}
