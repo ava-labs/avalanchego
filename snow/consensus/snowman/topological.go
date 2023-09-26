@@ -165,6 +165,9 @@ func (ts *Topological) NumProcessing() int {
 
 func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	blkID := blk.ID()
+	ts.ctx.Log.Verbo("adding block",
+		zap.Stringer("blkID", blkID),
+	)
 
 	// Make sure a block is not inserted twice. This enforces the invariant that
 	// blocks are always added in topological order. Essentially, a block that
@@ -180,6 +183,11 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
+		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
+			zap.Stringer("blkID", blkID),
+			zap.Stringer("parentID", parentID),
+		)
+
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
@@ -203,6 +211,11 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		ts.preferredIDs.Add(blkID)
 		ts.preferredHeights[blk.Height()] = blkID
 	}
+
+	ts.ctx.Log.Verbo("added block",
+		zap.Stringer("blkID", blkID),
+		zap.Stringer("parentID", parentID),
+	)
 	return nil
 }
 
@@ -335,10 +348,6 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 		ts.preferredHeights[block.blk.Height()] = ts.tail
 	}
 	return nil
-}
-
-func (ts *Topological) Finalized() bool {
-	return len(ts.blocks) == 1
 }
 
 // HealthCheck returns information about the consensus health.
