@@ -31,12 +31,18 @@ type valueNodeDB struct {
 	branchFactor BranchFactor
 }
 
-func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int, branchFactor BranchFactor) *valueNodeDB {
+func newValueNodeDB(
+	db database.Database,
+	bufferPool *sync.Pool,
+	metrics merkleMetrics,
+	cacheSize int,
+	branchFactor BranchFactor,
+) *valueNodeDB {
 	return &valueNodeDB{
 		metrics:      metrics,
 		baseDB:       db,
 		bufferPool:   bufferPool,
-		nodeCache:    cache.NewSizedLRU(size, cacheEntrySize),
+		nodeCache:    cache.NewSizedLRU(cacheSize, cacheEntrySize),
 		branchFactor: branchFactor,
 	}
 }
