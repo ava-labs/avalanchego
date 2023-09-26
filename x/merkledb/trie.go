@@ -37,6 +37,10 @@ type ReadOnlyTrie interface {
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
 	getValue(key path) ([]byte, error)
+	
+	// get an editable copy of the node with the given key path
+	// hasValue indicates which db to look in (value or intermediate)
+	getEditableNode(key path, hasValue bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].
@@ -65,10 +69,6 @@ type Trie interface {
 		ctx context.Context,
 		changes ViewChanges,
 	) (TrieView, error)
-
-	// get an editable copy of the node with the given key path
-	// hasValue indicates which db to look in (value or intermediate)
-	getEditableNode(key path, hasValue bool) (*node, error)
 }
 
 type TrieView interface {
