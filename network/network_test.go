@@ -648,12 +648,11 @@ func TestDialContext(t *testing.T) {
 	}
 	neverDialedNodeID := ids.GenerateTestNodeID()
 
-	// Asset that when the context is cancelled, dial returns immediately.
+	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
 	// That is, [neverDialedListener] doesn't accept a connection.
 	network.manuallyTrackedIDs.Add(neverDialedNodeID)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	network.dial(ctx, ids.EmptyNodeID, neverDialedIP)
+	network.onCloseCtxCancel()
+	network.dial(ids.EmptyNodeID, neverDialedIP)
 
 	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
@@ -676,7 +675,7 @@ func TestDialContext(t *testing.T) {
 		ip: dynamicDialedIP.IPPort(),
 	}
 
-	network.dial(context.Background(), dialedNodeID, dialedIP)
+	network.dial(dialedNodeID, dialedIP)
 
 	gotDialedIPConn := make(chan struct{})
 	go func() {
