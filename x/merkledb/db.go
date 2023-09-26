@@ -495,12 +495,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, database.ErrClosed
 	}
 
-	return db.getMerkleRoot(), nil
-}
-
-// Assumes [db.lock] is read locked.
-func (db *merkleDB) getMerkleRoot() ids.ID {
-	return db.root.id
+	return db.root.id, nil
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -534,7 +529,7 @@ func (db *merkleDB) GetRangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
+	return db.getRangeProofAtRoot(ctx, db.root.id, start, end, maxLength)
 }
 
 func (db *merkleDB) GetRangeProofAtRoot(
@@ -1097,7 +1092,7 @@ func (db *merkleDB) initializeRoot() (ids.ID, error) {
 
 		// Root already exists, so calculate its id
 		db.root.calculateID(db.metrics)
-		return db.getMerkleRoot(), nil
+		return db.root.id, nil
 	}
 	if err != database.ErrNotFound {
 		return ids.Empty, err
@@ -1126,7 +1121,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 ) (*trieView, error) {
-	currentRootID := db.getMerkleRoot()
+	currentRootID := db.root.id
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {

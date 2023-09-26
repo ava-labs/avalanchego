@@ -36,7 +36,7 @@ func Test_History_Simple(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -164,13 +164,13 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key"), []byte("value")))
 	require.NoError(batch.Write())
 
-	toBeDeletedRoot := db.getMerkleRoot()
+	toBeDeletedRoot := db.root.id
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
 	require.NoError(batch.Write())
 
-	startRoot := db.getMerkleRoot()
+	startRoot := db.root.id
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("value0")))
@@ -184,7 +184,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key2"), []byte("value3")))
 	require.NoError(batch.Write())
 
-	endRoot := db.getMerkleRoot()
+	endRoot := db.root.id
 
 	// ensure these start as valid calls
 	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
@@ -230,7 +230,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	batch := db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value")))
 	require.NoError(batch.Write())
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
@@ -290,7 +290,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
 	require.NoError(batch.Write())
 
-	startRoot := db.getMerkleRoot()
+	startRoot := db.root.id
 
 	// write a new value into the db
 	batch = db.NewBatch()
@@ -307,7 +307,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	require.NoError(batch.Put([]byte("key2"), []byte("value3")))
 	require.NoError(batch.Write())
 
-	endRoot := db.getMerkleRoot()
+	endRoot := db.root.id
 
 	// changes should still be collectable even though the history has had to loop due to hitting max size
 	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
@@ -336,7 +336,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -378,7 +378,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -410,7 +410,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -438,7 +438,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -466,7 +466,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.root.id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()

@@ -112,7 +112,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), db.getMerkleRoot())
+			err = proof.Verify(context.Background(), db.root.id)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -150,7 +150,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		context.Background(),
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
-		db.getMerkleRoot(),
+		db.root.id,
 	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
@@ -159,7 +159,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		context.Background(),
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
-		db.getMerkleRoot(),
+		db.root.id,
 	)
 	require.ErrorIs(err, ErrInvalidProof)
 }
@@ -221,7 +221,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.root.id)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -509,7 +509,7 @@ func Test_RangeProof(t *testing.T) {
 		context.Background(),
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{3, 5}),
-		db.getMerkleRoot(),
+		db.root.id,
 	))
 }
 
@@ -560,7 +560,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 		context.Background(),
 		maybe.Nothing[[]byte](),
 		maybe.Some([]byte("key35")),
-		db.getMerkleRoot(),
+		db.root.id,
 	))
 }
 
@@ -593,7 +593,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 		context.Background(),
 		maybe.Some([]byte{1}),
 		maybe.Nothing[[]byte](),
-		db.getMerkleRoot(),
+		db.root.id,
 	))
 }
 
@@ -634,7 +634,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		context.Background(),
 		maybe.Some([]byte("key1")),
 		maybe.Some([]byte("key2")),
-		db.getMerkleRoot(),
+		db.root.id,
 	))
 }
 
@@ -725,14 +725,14 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), db.root.id))
 
 	// low maxLength
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), db.root.id))
 
 	// nil start/end
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
@@ -750,7 +750,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), db.root.id))
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
@@ -814,7 +814,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.root.id)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
