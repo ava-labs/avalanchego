@@ -28,6 +28,10 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(nodePath) == 0 {
+			return nil, database.ErrNotFound
+		}
+
 		closestNode := nodePath[len(nodePath)-1]
 		if closestNode.key.Compare(path) != 0 || closestNode == nil {
 			return nil, database.ErrNotFound
@@ -44,6 +48,9 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		nodePath, err := view.(*trieView).getPathTo(path)
 		if err != nil {
 			return nil, err
+		}
+		if len(nodePath) == 0 {
+			return nil, database.ErrNotFound
 		}
 		closestNode := nodePath[len(nodePath)-1]
 		if closestNode.key.Compare(path) != 0 || closestNode == nil {
@@ -149,9 +156,9 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	require.NoError(err)
 
 	// Root and 1 value
-	require.Len(path, 2)
+	require.Len(path, 1)
 	require.Equal(trie.root, path[0])
-	require.Equal(newPath(key1), path[1].key)
+	require.Equal(newPath(key1), path[0].key)
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
@@ -170,10 +177,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
-	require.Len(path, 3)
+	require.Len(path, 2)
 	require.Equal(trie.root, path[0])
-	require.Equal(newPath(key1), path[1].key)
-	require.Equal(newPath(key2), path[2].key)
+	require.Equal(newPath(key1), path[0].key)
+	require.Equal(newPath(key2), path[1].key)
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
@@ -196,7 +203,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	require.Equal(trie.root, path[0])
 	require.Equal(newPath(key3), path[1].key)
 
-	// Other key paths not affected
+	// Other key paths now has empty key root
 	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
@@ -602,9 +609,9 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	_, err = view2.getEditableNode(newPath(keyPrefix), false)
 	require.NoError(err)
 
-	// only hashes the new branch node, the new child node, and root
+	// only hashes the new branch node and the new child node
 	// shouldn't hash the existing node
-	require.Equal(int64(3), dbTrie.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(2), dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_HashCountOnDelete(t *testing.T) {
@@ -645,8 +652,8 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
-	// the root is the only updated node so only one new hash
-	require.Equal(oldCount+1, dbTrie.metrics.(*mockMetrics).hashCount)
+	// no new hashes since new root is an existing node
+	require.Equal(oldCount, dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_NoExistingResidual(t *testing.T) {
@@ -757,8 +764,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(EmptyPath, false)
+	root, err = newTrie.getEditableNode(newTrie.getRootPath(), false)
 	require.NoError(err)
+	require.Equal(EmptyPath, root.key)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Empty(root.children)
 }
@@ -854,7 +862,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 
 	firstNode, err = trie.getEditableNode(getSingleChildPath(root), true)
 	require.NoError(err)
-	require.Len(firstNode.children, 2)
+	require.Len(firstNode.children, 1)
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {

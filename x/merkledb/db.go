@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
-
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
@@ -188,6 +186,10 @@ type merkleDB struct {
 	calculateNodeIDsSema *semaphore.Weighted
 }
 
+func (db *merkleDB) getRootPath() path {
+	return db.root.key
+}
+
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
 	metrics, err := newMetrics("merkleDB", config.Reg)
@@ -227,16 +229,17 @@ func newDatabase(
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 	}
 
-	root, err := trieDB.initializeRootIfNeeded()
+	root, err := trieDB.initializeRoot()
 	if err != nil {
 		return nil, err
 	}
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootID: root,
-		values: map[path]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[path]*change[*node]{},
+		rootNode: trieDB.root.clone(),
+		rootID:   root,
+		values:   map[path]*change[maybe.Maybe[[]byte]]{},
+		nodes:    map[path]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -262,7 +265,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(nil, RootPath)
+	db.root = newNode(nil, EmptyPath)
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -497,23 +500,12 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return getMerkleRoot(db.root)
+	return db.root.id
 }
 
 // shouldUseChildAsRoot returns true if the passed in node has no value and only a single child
 func shouldUseChildAsRoot(root *node) bool {
 	return root.valueDigest.IsNothing() && len(root.children) == 1
-}
-
-// getMerkleRoot returns the id of either the passed in root or the id of the node's only child based on [shouldUseChildAsRoot]
-func getMerkleRoot(root *node) ids.ID {
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if shouldUseChildAsRoot(root) {
-		for _, childEntry := range root.children {
-			return childEntry.id
-		}
-	}
-	return root.id
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -860,8 +852,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	rootChange, ok := changes.nodes[RootPath]
-	if !ok {
+	if changes.rootNode == nil {
 		return errNoNewRoot
 	}
 
@@ -904,7 +895,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	db.root = rootChange.after
+	db.root = changes.rootNode
 	db.history.record(changes)
 	return nil
 }
@@ -1089,16 +1080,25 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
+func (db *merkleDB) initializeRoot() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(RootPath)
+	db.root, err = db.intermediateNodeDB.Get(EmptyPath)
 	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(RootPath)
+		db.root, err = db.valueNodeDB.Get(EmptyPath)
 	}
 	if err == nil {
 		// Root already exists, so calculate its id
+		if shouldUseChildAsRoot(db.root) {
+			for index, childEntry := range db.root.children {
+				newRoot, err := db.getNode(path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+				if err != nil {
+					return ids.Empty, err
+				}
+				db.root = newRoot
+			}
+		}
 		db.root.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
@@ -1107,12 +1107,12 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 
 	// Root doesn't exist; make a new one.
-	db.root = newNode(nil, RootPath)
+	db.root = newNode(nil, EmptyPath)
 
 	// update its ID
 	db.root.calculateID(db.metrics)
 
-	if err := db.intermediateNodeDB.Put(RootPath, db.root); err != nil {
+	if err := db.intermediateNodeDB.Put(EmptyPath, db.root); err != nil {
 		return ids.Empty, err
 	}
 
@@ -1192,7 +1192,7 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
-	case key == RootPath:
+	case key == db.root.key:
 		return db.root, nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)

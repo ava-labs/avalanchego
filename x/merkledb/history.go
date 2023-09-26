@@ -51,9 +51,10 @@ type changeSummaryAndInsertNumber struct {
 
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
-	rootID ids.ID
-	nodes  map[path]*change[*node]
-	values map[path]*change[maybe.Maybe[[]byte]]
+	rootNode *node
+	rootID   ids.ID
+	nodes    map[path]*change[*node]
+	values   map[path]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
@@ -242,6 +243,9 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		offset                       = int(mostRecentChangeInsertNumber - lastRootChange.insertNumber)
 		lastRootChangeIndex          = mostRecentChangeIndex - offset
 	)
+
+	combinedChanges.rootNode = lastRootChange.rootNode
+	combinedChanges.rootID = lastRootChange.rootID
 
 	// Go backward from the most recent change in the history up to but
 	// not including the last change resulting in [rootID].

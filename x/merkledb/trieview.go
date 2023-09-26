@@ -100,6 +100,10 @@ type trieView struct {
 	root *node
 }
 
+func (t *trieView) getRootPath() path {
+	return t.root.key
+}
+
 // NewView returns a new view on top of this Trie where the passed changes
 // have been applied.
 // Adds the new view to [t.childViews].
@@ -145,7 +149,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(RootPath, false /* hasValue */)
+	root, err := parentTrie.getEditableNode(parentTrie.getRootPath(), false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -181,6 +185,7 @@ func newTrieView(
 			return nil, err
 		}
 	}
+
 	return newView, nil
 }
 
@@ -193,13 +198,12 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[RootPath]
-	if !ok {
+	if changes.rootNode == nil {
 		return nil, ErrNoValidRoot
 	}
 
 	newView := &trieView{
-		root:       passedRootChange.after,
+		root:       changes.rootNode.clone(),
 		db:         db,
 		parentTrie: db,
 		changes:    changes,
@@ -240,11 +244,15 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 				return
 			}
 		}
+		if err = t.updateRoot(); err != nil {
+			return
+		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.getMerkleRoot()
+		t.changes.rootID = t.root.id
+		t.changes.rootNode = t.root
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -341,27 +349,12 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		proof.Path[i] = node.asProofNode()
 	}
 
-	closestNode := proofPath[len(proofPath)-1]
-
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if shouldUseChildAsRoot(t.root) {
-		// remove the nil key root since we should use its child instead
-		proof.Path = proof.Path[1:]
-
-		// if there are now no nodes, add the "root" as an exclusion proof
-		if len(proof.Path) == 0 {
-			var alternateRootNode *node
-			for index, childEntry := range t.root.children {
-				alternateRootNode, err = t.getNodeWithID(childEntry.id, path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			proof.Path = []ProofNode{alternateRootNode.asProofNode()}
-			return proof, nil
-		}
+	if len(proofPath) == 0 {
+		proof.Path = []ProofNode{t.root.asProofNode()}
+		return proof, nil
 	}
+
+	closestNode := proofPath[len(proofPath)-1]
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
@@ -473,14 +466,7 @@ func (t *trieView) GetRangeProof(
 	}
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		proofKey := RootPath.Bytes()
-		if shouldUseChildAsRoot(t.root) {
-			for index, childEntry := range t.root.children {
-				proofKey = (path([]byte{index}) + childEntry.compressedPath).Serialize().Value
-			}
-		}
-		rootProof, err := t.getProof(ctx, proofKey)
+		rootProof, err := t.getProof(ctx, t.root.key.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -567,11 +553,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.getMerkleRoot(), nil
-}
-
-func (t *trieView) getMerkleRoot() ids.ID {
-	return getMerkleRoot(t.root)
+	return t.root.id, nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -647,8 +629,12 @@ func (t *trieView) remove(key path) error {
 		return err
 	}
 
-	nodeToDelete := nodePath[len(nodePath)-1]
+	if len(nodePath) == 0 {
+		// the key wasn't in the trie
+		return nil
+	}
 
+	nodeToDelete := nodePath[len(nodePath)-1]
 	if nodeToDelete.key.Compare(key) != 0 || !nodeToDelete.hasValue() {
 		// the key wasn't in the trie or doesn't have a value so there's nothing to do
 		return nil
@@ -693,7 +679,7 @@ func (t *trieView) remove(key path) error {
 // * [node] has a value.
 // * [node] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent, node *node) error {
+func (t *trieView) compressNodePath(parent, node *node) (err error) {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
@@ -702,13 +688,11 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
 	}
-
 	// delete all empty nodes with a single child under [node]
 	for len(node.children) == 1 && !node.hasValue() {
 		if err := t.recordNodeDeleted(node); err != nil {
 			return err
 		}
-
 		var (
 			childEntry child
 			childPath  path
@@ -721,11 +705,9 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
-		if err != nil {
+		if node, err = t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue); err != nil {
 			return err
 		}
-		node = nextNode
 	}
 
 	// [node] is the first node with multiple children.
@@ -783,6 +765,11 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 		nodes           = []*node{t.root}
 	)
 
+	if !key.HasPrefix(t.root.key) {
+		return []*node{}, nil
+	}
+
+	matchedKeyIndex = len(t.root.key)
 	// while the entire path hasn't been matched
 	for matchedKeyIndex < len(key) {
 		// confirm that a child exists and grab its ID before attempting to load it
@@ -812,6 +799,25 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 	return nodes, nil
 }
 
+func (t *trieView) updateRoot() error {
+	// use valueDigest instead of value because proof verification only sets the digest
+	if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
+		for index, childEntry := range t.root.children {
+			newRoot, err := t.getNodeWithID(childEntry.id, t.root.key+path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+			if err != nil {
+				return err
+			}
+			t.root = newRoot
+			t.recordNodeChange(newRoot)
+		}
+	}
+	if t.root.key != EmptyPath && t.root.valueDigest.IsNothing() && len(t.root.children) == 0 {
+		t.recordNodeDeleted(t.root)
+		t.root = newNode(nil, EmptyPath)
+		t.recordNewNode(t.root)
+	}
+	return nil
+}
 func getLengthOfCommonPrefix(first, second path) int {
 	commonIndex := 0
 	for len(first) > commonIndex && len(second) > commonIndex && first[commonIndex] == second[commonIndex] {
@@ -856,6 +862,13 @@ func (t *trieView) insert(
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(pathToNode) == 0 {
+		newRoot := newNode(nil, EmptyPath)
+		newRoot.addChild(t.root)
+		t.root = newRoot
+		pathToNode = []*node{t.root}
 	}
 
 	// We're inserting a node whose ancestry is [pathToNode]
@@ -958,30 +971,26 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
-	// don't delete the root.
-	if len(after.key) == 0 {
-		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
-	}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode bool) error {
+func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, isNewNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
-		return nil
-	}
-
-	if newNode {
+	if isNewNode {
 		t.changes.nodes[key] = &change[*node]{
 			after: after,
 		}
+		return nil
+	}
+
+	if existing, ok := t.changes.nodes[key]; ok {
+		existing.after = after
 		return nil
 	}
 

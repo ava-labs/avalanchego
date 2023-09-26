@@ -671,7 +671,10 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			name:   "most recent change",
 			rootID: changes[maxHistoryLen-1].rootID,
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Equal(newChangeSummary(defaultPreallocationSize), got)
+				expected := newChangeSummary(defaultPreallocationSize)
+				expected.rootID = changes[maxHistoryLen-1].rootID
+				expected.rootNode = changes[maxHistoryLen-1].rootNode
+				require.Equal(expected, got)
 			},
 		},
 		{
