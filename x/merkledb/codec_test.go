@@ -120,17 +120,20 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 		func(
 			t *testing.T,
 			b []byte,
+			branchFactorBit1 bool,
+			branchFactorBit2 bool,
 		) {
 			require := require.New(t)
+			branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
-			if err := codec.decodeDBNode(b, node, BranchFactor16); err != nil {
+			if err := codec.decodeDBNode(b, node, branchFactor); err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeDBNode(node, BranchFactor16)
+			buf := codec.encodeDBNode(node, branchFactor)
 			require.Equal(b, buf)
 		},
 	)
@@ -143,8 +146,11 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			randSeed int,
 			hasValue bool,
 			valueBytes []byte,
+			branchFactorBit1 bool,
+			branchFactorBit2 bool,
 		) {
 			require := require.New(t)
+			branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
@@ -160,7 +166,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				value = maybe.Some(valueBytes)
 			}
 
-			numChildren := r.Intn(int(BranchFactor16)) // #nosec G404
+			numChildren := r.Intn(int(branchFactor)) // #nosec G404
 
 			children := map[byte]child{}
 			for i := 0; i < numChildren; i++ {
@@ -171,7 +177,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: NewPath(childPathBytes, BranchFactor16),
+					compressedPath: NewPath(childPathBytes, branchFactor),
 					id:             childID,
 				}
 			}
@@ -180,13 +186,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes := codec.encodeDBNode(&node, BranchFactor16)
+			nodeBytes := codec.encodeDBNode(&node, branchFactor)
 
 			var gotNode dbNode
-			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode, BranchFactor16))
+			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode, branchFactor))
 			require.Equal(node, gotNode)
 
-			nodeBytes2 := codec.encodeDBNode(&gotNode, BranchFactor16)
+			nodeBytes2 := codec.encodeDBNode(&gotNode, branchFactor)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
