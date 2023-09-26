@@ -244,8 +244,17 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 				return
 			}
 		}
-		if err = t.updateRoot(); err != nil {
-			return
+
+		// If the root has no value and only a single child, that child can become the root.
+		// Use valueDigest instead of value because proof verification only sets the digest
+		if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
+			for index, childEntry := range t.root.children {
+				t.root, err = t.getNodeWithID(childEntry.id, t.root.key+path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+				if err != nil {
+					return
+				}
+				t.recordNodeChange(t.root)
+			}
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
@@ -807,28 +816,6 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 		nodes = append(nodes, currentNode)
 	}
 	return nodes, nil
-}
-
-func (t *trieView) updateRoot() error {
-	// If the root has no value and only a single child, that child can become the root.
-	// Use valueDigest instead of value because proof verification only sets the digest
-	if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
-		for index, childEntry := range t.root.children {
-			newRoot, err := t.getNodeWithID(childEntry.id, t.root.key+path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
-			if err != nil {
-				return err
-			}
-			t.root = newRoot
-			t.recordNodeChange(newRoot)
-		}
-	}
-	// If the root is not the EmptyPath node, but contains no data, switch the root to the EmptyPath node
-	// This ensures all empty tries have the same root rather than a root with an arbitrary path
-	if t.root.key != EmptyPath && t.root.valueDigest.IsNothing() && len(t.root.children) == 0 {
-		t.recordNodeDeleted(t.root)
-		t.recordNewNode(newNode(nil, EmptyPath))
-	}
-	return nil
 }
 
 func getLengthOfCommonPrefix(first, second path) int {
