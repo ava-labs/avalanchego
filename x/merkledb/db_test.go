@@ -545,11 +545,11 @@ func TestDatabaseCommitChanges(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
-	dbRoot := db.root.id
+	dbRoot := db.getMerkleRoot()
 
 	// Committing a nil view should be a no-op.
 	require.NoError(db.CommitToDB(context.Background()))
-	require.Equal(dbRoot, db.root.id) // Root didn't change
+	require.Equal(dbRoot, db.getMerkleRoot()) // Root didn't change
 
 	// Committing an invalid view should fail.
 	invalidView, err := db.NewView(context.Background(), ViewChanges{})
@@ -612,7 +612,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.Equal(value3, gotValue)
 
 	// Make sure the root is right
-	require.Equal(view1Root, db.root.id)
+	require.Equal(view1Root, db.getMerkleRoot())
 
 	// Make sure view2 is invalid and view1 and view3 is valid.
 	require.False(view1.invalidated)

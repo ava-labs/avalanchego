@@ -164,13 +164,13 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key"), []byte("value")))
 	require.NoError(batch.Write())
 
-	toBeDeletedRoot := db.root.id
+	toBeDeletedRoot := db.getMerkleRoot()
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
 	require.NoError(batch.Write())
 
-	startRoot := db.root.id
+	startRoot := db.getMerkleRoot()
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("value0")))
@@ -184,7 +184,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key2"), []byte("value3")))
 	require.NoError(batch.Write())
 
-	endRoot := db.root.id
+	endRoot := db.getMerkleRoot()
 
 	// ensure these start as valid calls
 	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
@@ -230,7 +230,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	batch := db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value")))
 	require.NoError(batch.Write())
-	origRootID := db.root.id
+	origRootID := db.getMerkleRoot()
 
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
