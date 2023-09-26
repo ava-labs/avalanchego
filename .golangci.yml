@@ -69,6 +69,7 @@ linters:
     - staticcheck
     - stylecheck
     - typecheck
+    - tagalign
     - unconvert
     - unparam
     - unused
@@ -154,3 +155,9 @@ linters-settings:
       - "all"
       - "-SA6002" # Storing non-pointer values in sync.Pool allocates memory
       - "-SA1019" # Using a deprecated function, variable, constant or field
+  tagalign:
+    align: true
+    sort: true
+    strict: true
+    order:
+      - serialize
