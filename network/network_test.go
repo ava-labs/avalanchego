@@ -668,6 +668,8 @@ func TestDialContext(t *testing.T) {
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
+	// Reset the network context.
+	network.onCloseCtx, network.onCloseCtxCancel = context.WithCancel(context.Background())
 	dialedNodeID := ids.GenerateTestNodeID()
 	network.manuallyTrackedIDs.Add(dialedNodeID)
 	dynamicDialedIP, dialedListener := dialer.NewListener()
