@@ -21,7 +21,7 @@ const (
 var (
 	errInvalidBranchFactor = errors.New("invalid branch factor")
 
-	branchFactorToPathConfig = map[BranchFactor]*pathConfig{
+	branchFactorToPathConfig = map[BranchFactor]pathConfig{
 		BranchFactor2: {
 			branchFactor:    BranchFactor2,
 			tokenBitSize:    Bit,
@@ -79,7 +79,7 @@ type pathConfig struct {
 type Path struct {
 	length int
 	value  string
-	*pathConfig
+	pathConfig
 }
 
 func NewPath(p []byte, branchFactor BranchFactor) Path {
