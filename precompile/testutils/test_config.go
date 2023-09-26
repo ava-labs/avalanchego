@@ -6,8 +6,10 @@ package testutils
 import (
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // ConfigVerifyTest is a test case for verifying a config
@@ -30,7 +32,16 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 			t.Helper()
 			require := require.New(t)
 
-			err := test.Config.Verify(test.ChainConfig)
+			chainConfig := test.ChainConfig
+			if chainConfig == nil {
+				ctrl := gomock.NewController(t)
+				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
+				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
+				mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(true)
+				chainConfig = mockChainConfig
+			}
+			err := test.Config.Verify(chainConfig)
 			if test.ExpectedError == "" {
 				require.NoError(err)
 			} else {

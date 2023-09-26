@@ -33,6 +33,15 @@ func TestVerify(t *testing.T) {
 		"valid quorum numerator 1 more than minimum": {
 			Config: NewConfig(utils.NewUint64(3), params.WarpQuorumNumeratorMinimum+1),
 		},
+		"invalid cannot activated before DUpgrade activation": {
+			Config: NewConfig(utils.NewUint64(3), 0),
+			ChainConfig: func() precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false)
+				return config
+			}(),
+			ExpectedError: errWarpCannotBeActivated.Error(),
+		},
 	}
 	testutils.RunVerifyTests(t, tests)
 }
