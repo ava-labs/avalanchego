@@ -289,17 +289,7 @@ func FuzzPathExtend(f *testing.F) {
 		forceSecondOdd bool,
 	) {
 		require := require.New(t)
-		branchFactor := BranchFactor2
-		switch {
-		case !branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor2
-		case !branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor4
-		case branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor16
-		case branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor256
-		}
+		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 		path1 := NewPath(first, branchFactor)
 		if forceFirstOdd && path1.length > 0 {
@@ -328,17 +318,7 @@ func FuzzPathSkip(f *testing.F) {
 		branchFactorBit2 bool,
 	) {
 		require := require.New(t)
-		branchFactor := BranchFactor2
-		switch {
-		case !branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor2
-		case !branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor4
-		case branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor16
-		case branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor256
-		}
+		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 		path1 := NewPath(first, branchFactor)
 		if int(tokensToSkip) >= path1.length {
@@ -361,17 +341,7 @@ func FuzzPathTake(f *testing.F) {
 		branchFactorBit2 bool,
 	) {
 		require := require.New(t)
-		branchFactor := BranchFactor2
-		switch {
-		case !branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor2
-		case !branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor4
-		case branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor16
-		case branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor256
-		}
+		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 		path1 := NewPath(first, branchFactor)
 		if int(tokensToTake) >= path1.length {

@@ -151,17 +151,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		branchFactorBit2 bool,
 	) {
 		require := require.New(t)
-		branchFactor := BranchFactor2
-		switch {
-		case !branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor2
-		case !branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor4
-		case branchFactorBit1 && !branchFactorBit2:
-			branchFactor = BranchFactor16
-		case branchFactorBit1 && branchFactorBit2:
-			branchFactor = BranchFactor256
-		}
+		branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 		p := NewPath(key, branchFactor)
 		if p.length <= int(tokenLength) {

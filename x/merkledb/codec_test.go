@@ -15,6 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
+func branchFactorFromBits(bit1, bit2 bool) BranchFactor {
+	switch {
+	case !bit1 && !bit2:
+		return BranchFactor2
+	case !bit1 && bit2:
+		return BranchFactor4
+	case bit1 && !bit2:
+		return BranchFactor16
+	default: // bit1 && bit2
+		return BranchFactor256
+	}
+}
+
 func FuzzCodecBool(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -80,17 +93,7 @@ func FuzzCodecPath(f *testing.F) {
 			branchFactorBit2 bool,
 		) {
 			require := require.New(t)
-			branchFactor := BranchFactor2
-			switch {
-			case !branchFactorBit1 && !branchFactorBit2:
-				branchFactor = BranchFactor2
-			case !branchFactorBit1 && branchFactorBit2:
-				branchFactor = BranchFactor4
-			case branchFactorBit1 && !branchFactorBit2:
-				branchFactor = BranchFactor16
-			case branchFactorBit1 && branchFactorBit2:
-				branchFactor = BranchFactor256
-			}
+			branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
