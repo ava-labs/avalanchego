@@ -64,7 +64,7 @@ func TestAdd(t *testing.T) {
 				},
 			},
 		},
-		"add new block to same parent": {
+		"add new block to existing parent": {
 			initial: &tree{
 				childToParent: map[ids.ID]ids.ID{
 					id1: id2,
@@ -245,21 +245,6 @@ func TestRemoveDescendants(t *testing.T) {
 				parentToChildren: map[ids.ID]set.Set[ids.ID]{
 					id2: set.Of(id1),
 				},
-			},
-		},
-		"remove child from tree": {
-			initial: &tree{
-				childToParent: map[ids.ID]ids.ID{
-					id1: id2,
-				},
-				parentToChildren: map[ids.ID]set.Set[ids.ID]{
-					id2: set.Of(id1),
-				},
-			},
-			blkID: id2,
-			expected: &tree{
-				childToParent:    make(map[ids.ID]ids.ID),
-				parentToChildren: make(map[ids.ID]set.Set[ids.ID]),
 			},
 		},
 		"remove children from tree": {

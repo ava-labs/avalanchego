@@ -10,7 +10,7 @@ import (
 
 var _ Tree = (*tree)(nil)
 
-// Tree manages a, potentially partial, view of a tree.
+// Tree manages a (potentially partial) view of a tree.
 //
 // For example, assume this is the full tree:
 //
@@ -49,7 +49,7 @@ type Tree interface {
 	// known parentID of blkID, blkID will be returned.
 	GetAncestor(blkID ids.ID) ids.ID
 
-	// Remove blkID from the tree.
+	// Remove the mapping from blkID to its parentID from the tree.
 	Remove(blkID ids.ID)
 
 	// RemoveDescendants removes blkID from the tree along with all of its known
