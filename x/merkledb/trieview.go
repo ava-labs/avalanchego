@@ -975,7 +975,7 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 	if len(after.key) == 0 {
 		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
-	return t.recordKeyChange(after.key, nil, false, false /* newNode */)
+	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
