@@ -1,9 +1,9 @@
 [package]
 name = "libaio"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 keywords = ["libaio", "aio", "async", "futures"]
-license = "MIT"
+license = "../LICENSE.md"
 description = "Straightforward Linux AIO using Futures/async/await."
 
 [features]

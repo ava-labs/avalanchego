@@ -1,10 +1,10 @@
 [package]
 name = "fwdctl"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 
 [dependencies]
-firewood = { version = "0.0.3", path = "../firewood" }
+firewood = { version = "0.0.4", path = "../firewood" }
 clap = { version = "4.0.29", features = ["cargo", "derive"] }
 anyhow = "1.0.66"
 env_logger = "0.10.0"

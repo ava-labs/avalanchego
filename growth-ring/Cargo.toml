@@ -1,9 +1,9 @@
 [package]
 name = "growth-ring"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 keywords = ["wal", "db", "futures"]
-license = "MIT"
+license = "../LICENSE.md"
 description = "Simple and modular write-ahead-logging implementation."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,9 +1,9 @@
 [package]
 name = "shale"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 description = "Useful abstraction and light-weight implemenation for a key-value store."
-license = "MIT"
+license = "../LICENSE.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
