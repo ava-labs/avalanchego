@@ -168,14 +168,14 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 
 func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	p.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
-	p.numValidators.Set(float64(p.Peers.TotalValidators()))
+	p.numValidators.Inc()
 	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	p.Peers.OnValidatorRemoved(nodeID, weight)
-	p.numValidators.Set(float64(p.Peers.TotalValidators()))
+	p.numValidators.Dec()
 	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
