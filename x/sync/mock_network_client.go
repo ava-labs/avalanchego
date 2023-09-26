@@ -36,18 +36,18 @@ func (m *MockNetworkClient) EXPECT() *MockNetworkClientMockRecorder {
 	return m.recorder
 }
 
-// AppRequestFailed mocks base method.
-func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
+// AppError mocks base method.
+func (m *MockNetworkClient) AppError(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AppError", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *MockNetworkClientMockRecorder) AppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
+// AppError indicates an expected call of AppError.
+func (mr *MockNetworkClientMockRecorder) AppError(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockNetworkClient)(nil).AppRequestFailed), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppError", reflect.TypeOf((*MockNetworkClient)(nil).AppError), arg0, arg1, arg2)
 }
 
 // AppResponse mocks base method.

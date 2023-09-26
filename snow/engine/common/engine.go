@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
+var _ error = (*AppError)(nil)
+
 // Engine describes the standard interface of a consensus engine
 type Engine interface {
 	Handler
@@ -432,9 +434,9 @@ type NetworkAppHandler interface {
 	//
 	// It is guaranteed that:
 	// * This engine sent a request to [nodeID] with ID [requestID].
-	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
+	// * AppError([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -443,7 +445,7 @@ type NetworkAppHandler interface {
 	//
 	// It is guaranteed that:
 	// * This engine sent a request to [nodeID] with ID [requestID].
-	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
+	// * AppError([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
 	//
 	// It is not guaranteed that:
@@ -489,7 +491,7 @@ type CrossChainAppHandler interface {
 	// deadline. However, the VM may arbitrarily choose to not send a response
 	// to this request.
 	CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
-	// CrossChainAppRequestFailed notifies this engine that a
+	// CrossChainAppError notifies this engine that a
 	// CrossChainAppRequest message it sent to [chainID] with request ID
 	// [requestID] failed.
 	//
@@ -498,11 +500,11 @@ type CrossChainAppHandler interface {
 	//
 	// It is guaranteed that:
 	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// * CrossChainAppError([chainID], [requestID]) has not already been
 	// called.
 	// * CrossChainAppResponse([chainID], [requestID]) has not already been
 	// called.
-	CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, err error) error
 	// CrossChainAppResponse notifies this engine of a response to the
 	// CrossChainAppRequest message it sent to [chainID] with request ID
 	// [requestID].
@@ -511,7 +513,7 @@ type CrossChainAppHandler interface {
 	//
 	// It is guaranteed that:
 	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// * CrossChainAppError([chainID], [requestID]) has not already been
 	// called.
 	// * CrossChainAppResponse([chainID], [requestID]) has not already been
 	// called.
@@ -562,4 +564,12 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
+}
+
+type AppError struct {
+	Err string
+}
+
+func (a AppError) Error() string {
+	return a.Err
 }

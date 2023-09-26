@@ -47,17 +47,9 @@ func (a *atomic) CrossChainAppRequest(
 	)
 }
 
-func (a *atomic) CrossChainAppRequestFailed(
-	ctx context.Context,
-	chainID ids.ID,
-	requestID uint32,
-) error {
+func (a *atomic) CrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
 	h := a.handler.Get()
-	return h.CrossChainAppRequestFailed(
-		ctx,
-		chainID,
-		requestID,
-	)
+	return h.CrossChainAppError(ctx, chainID, requestID, err)
 }
 
 func (a *atomic) CrossChainAppResponse(
@@ -92,17 +84,9 @@ func (a *atomic) AppRequest(
 	)
 }
 
-func (a *atomic) AppRequestFailed(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	requestID uint32,
-) error {
+func (a *atomic) AppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
 	h := a.handler.Get()
-	return h.AppRequestFailed(
-		ctx,
-		nodeID,
-		requestID,
-	)
+	return h.AppError(ctx, nodeID, requestID, err)
 }
 
 func (a *atomic) AppResponse(

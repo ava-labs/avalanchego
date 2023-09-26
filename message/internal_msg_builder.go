@@ -52,19 +52,15 @@ var (
 	_ requestIDGetter  = (*QueryFailed)(nil)
 	_ engineTypeGetter = (*QueryFailed)(nil)
 
-	_ fmt.Stringer    = (*AppRequestFailed)(nil)
-	_ chainIDGetter   = (*AppRequestFailed)(nil)
-	_ requestIDGetter = (*AppRequestFailed)(nil)
-
 	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequest)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequest)(nil)
 
-	_ fmt.Stringer        = (*CrossChainAppRequestFailed)(nil)
-	_ sourceChainIDGetter = (*CrossChainAppRequestFailed)(nil)
-	_ chainIDGetter       = (*CrossChainAppRequestFailed)(nil)
-	_ requestIDGetter     = (*CrossChainAppRequestFailed)(nil)
+	_ fmt.Stringer        = (*CrossChainAppError)(nil)
+	_ sourceChainIDGetter = (*CrossChainAppError)(nil)
+	_ chainIDGetter       = (*CrossChainAppError)(nil)
+	_ requestIDGetter     = (*CrossChainAppError)(nil)
 
 	_ fmt.Stringer        = (*CrossChainAppResponse)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppResponse)(nil)
@@ -365,42 +361,6 @@ func InternalQueryFailed(
 	}
 }
 
-type AppRequestFailed struct {
-	ChainID   ids.ID `json:"chain_id,omitempty"`
-	RequestID uint32 `json:"request_id,omitempty"`
-}
-
-func (m *AppRequestFailed) String() string {
-	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d",
-		m.ChainID, m.RequestID,
-	)
-}
-
-func (m *AppRequestFailed) GetChainId() []byte {
-	return m.ChainID[:]
-}
-
-func (m *AppRequestFailed) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalAppRequestFailed(
-	nodeID ids.NodeID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppRequestFailedOp,
-		message: &AppRequestFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
 type CrossChainAppRequest struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
@@ -448,44 +408,47 @@ func InternalCrossChainAppRequest(
 	}
 }
 
-type CrossChainAppRequestFailed struct {
+type CrossChainAppError struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
+	Error              string `json:"error,omitempty"`
 }
 
-func (m *CrossChainAppRequestFailed) String() string {
+func (m *CrossChainAppError) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s RequestID: %d",
-		m.SourceChainID, m.DestinationChainID, m.RequestID,
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Error %s",
+		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Error,
 	)
 }
 
-func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
+func (m *CrossChainAppError) GetSourceChainID() ids.ID {
 	return m.SourceChainID
 }
 
-func (m *CrossChainAppRequestFailed) GetChainId() []byte {
+func (m *CrossChainAppError) GetChainId() []byte {
 	return m.DestinationChainID[:]
 }
 
-func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
+func (m *CrossChainAppError) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func InternalCrossChainAppRequestFailed(
+func InternalCrossChainAppError(
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
+	errMsg string,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
-		op:     CrossChainAppRequestFailedOp,
-		message: &CrossChainAppRequestFailed{
+		op:     CrossChainAppErrorOp,
+		message: &CrossChainAppError{
 			SourceChainID:      sourceChainID,
 			DestinationChainID: destinationChainID,
 			RequestID:          requestID,
+			Error:              errMsg,
 		},
 		expiration: mockable.MaxTime,
 	}

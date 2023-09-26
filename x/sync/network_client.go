@@ -64,7 +64,7 @@ type NetworkClient interface {
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	AppRequestFailed(context.Context, ids.NodeID, uint32) error
+	AppError(context.Context, ids.NodeID, uint32) error
 
 	// Adds the given [nodeID] to the peer
 	// list so that it can receive messages.
@@ -147,7 +147,7 @@ func (c *networkClient) AppResponse(
 	return nil
 }
 
-func (c *networkClient) AppRequestFailed(
+func (c *networkClient) AppError(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -156,7 +156,7 @@ func (c *networkClient) AppRequestFailed(
 	defer c.lock.Unlock()
 
 	c.log.Info(
-		"received AppRequestFailed from peer",
+		"received AppError from peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)

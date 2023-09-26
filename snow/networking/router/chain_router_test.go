@@ -41,6 +41,7 @@ import (
 const (
 	engineType         = p2p.EngineType_ENGINE_TYPE_AVALANCHE
 	testThreadPoolSize = 2
+	errFoobar          = "foobar"
 )
 
 func TestShutdown(t *testing.T) {
@@ -364,8 +365,8 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAcceptedFrontierFailed, calledGetAcceptedFailed,
 		calledGetAncestorsFailed,
 		calledGetFailed, calledQueryFailed,
-		calledAppRequestFailed,
-		calledCrossChainAppRequestFailed bool
+		calledAppError,
+		calledCrossChainAppError bool
 
 		wg = sync.WaitGroup{}
 	)
@@ -448,14 +449,14 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed = true
 		return nil
 	}
-	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.AppErrorF = func(context.Context, ids.NodeID, uint32, error) error {
 		defer wg.Done()
-		calledAppRequestFailed = true
+		calledAppError = true
 		return nil
 	}
-	bootstrapper.CrossChainAppRequestFailedF = func(context.Context, ids.ID, uint32) error {
+	bootstrapper.CrossChainAppErrorF = func(context.Context, ids.ID, uint32, error) error {
 		defer wg.Done()
-		calledCrossChainAppRequestFailed = true
+		calledCrossChainAppError = true
 		return nil
 	}
 	ctx.State.Set(snow.EngineState{
@@ -631,10 +632,11 @@ func TestRouterTimeout(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InternalAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				errFoobar,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -650,11 +652,12 @@ func TestRouterTimeout(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.CrossChainAppResponseOp,
-			message.InternalCrossChainAppRequestFailed(
+			message.InternalCrossChainAppError(
 				nodeID,
 				ctx.ChainID,
 				ctx.ChainID,
 				requestID,
+				errFoobar,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -672,8 +675,8 @@ func TestRouterTimeout(t *testing.T) {
 	require.True(calledGetAncestorsFailed)
 	require.True(calledGetFailed)
 	require.True(calledQueryFailed)
-	require.True(calledAppRequestFailed)
-	require.True(calledCrossChainAppRequestFailed)
+	require.True(calledAppError)
+	require.True(calledCrossChainAppError)
 }
 
 func TestRouterHonorsRequestedEngine(t *testing.T) {
@@ -1045,10 +1048,11 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InternalAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				errFoobar,
 			),
 			engineType,
 		)
@@ -1070,11 +1074,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.CrossChainAppResponseOp,
-			message.InternalCrossChainAppRequestFailed(
+			message.InternalCrossChainAppError(
 				nodeID,
 				ctx.ChainID,
 				ctx.ChainID,
 				requestID,
+				errFoobar,
 			),
 			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
@@ -1367,11 +1372,12 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		responder.ChainID,
 		uint32(1),
 		message.CrossChainAppResponseOp,
-		message.InternalCrossChainAppRequestFailed(
+		message.InternalCrossChainAppError(
 			nodeID,
 			responder.ChainID,
 			requester.ChainID,
 			uint32(1),
+			errFoobar,
 		),
 		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	)

@@ -154,7 +154,7 @@ type NetworkAppSender interface {
 	// A nil return value guarantees that for each nodeID in [nodeIDs],
 	// the VM corresponding to this AppSender eventually receives either:
 	// * An AppResponse from nodeID with ID [requestID]
-	// * An AppRequestFailed from nodeID with ID [requestID]
+	// * An AppError from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
 	SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error
@@ -177,7 +177,7 @@ type CrossChainAppSender interface {
 	// A nil return value guarantees that the VM corresponding to this
 	// CrossChainAppSender eventually receives either:
 	// * A CrossChainAppResponse from [chainID] with ID [requestID]
-	// * A CrossChainAppRequestFailed from [chainID] with ID [requestID]
+	// * A CrossChainAppError from [chainID] with ID [requestID]
 	// Exactly one of the above messages will eventually be received from
 	// [chainID].
 	// A non-nil error should be considered fatal.

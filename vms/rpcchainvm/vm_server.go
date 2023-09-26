@@ -574,12 +574,12 @@ func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossCha
 	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(ctx, chainID, msg.RequestId, deadline, msg.Request)
 }
 
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) CrossChainAppError(ctx context.Context, msg *vmpb.CrossChainAppErrorMsg) (*emptypb.Empty, error) {
 	chainID, err := ids.ToID(msg.ChainId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppError(ctx, chainID, msg.RequestId, common.AppError{Err: msg.Error})
 }
 
 func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
@@ -602,12 +602,12 @@ func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*e
 	return &emptypb.Empty{}, vm.vm.AppRequest(ctx, nodeID, req.RequestId, deadline, req.Request)
 }
 
-func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppError(ctx context.Context, req *vmpb.AppErrorMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId)
+	return &emptypb.Empty{}, vm.vm.AppError(ctx, nodeID, req.RequestId, common.AppError{Err: req.Error})
 }
 
 func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {

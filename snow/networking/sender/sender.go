@@ -25,7 +25,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ common.Sender = (*sender)(nil)
+var (
+	_ common.Sender = (*sender)(nil)
+
+	ErrTimeout = common.AppError{
+		Err: "timed out",
+	}
+)
 
 // sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
@@ -1200,11 +1206,12 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	ctx = utils.Detach(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
-	failedMsg := message.InternalCrossChainAppRequestFailed(
+	failedMsg := message.InternalCrossChainAppError(
 		s.ctx.NodeID,
 		chainID,
 		s.ctx.ChainID,
 		requestID,
+		ErrTimeout.Err,
 	)
 	s.router.RegisterRequest(
 		ctx,
@@ -1255,10 +1262,11 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		inMsg := message.InternalAppRequestFailed(
+		inMsg := message.InboundAppError(
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
+			ErrTimeout.Err,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -1301,10 +1309,11 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
-			inMsg := message.InternalAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
+				ErrTimeout.Err,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
@@ -1359,10 +1368,11 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := message.InternalAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
+				ErrTimeout.Err,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}

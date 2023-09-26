@@ -302,3 +302,21 @@ func encodeIDs(ids []ids.ID, result [][]byte) {
 		result[i] = copy[:]
 	}
 }
+
+func InboundAppError(
+	nodeID ids.NodeID,
+	chainID ids.ID,
+	requestID uint32,
+	errMsg string,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     AppErrorOp,
+		message: &p2p.AppError{
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Error:     errMsg,
+		},
+		expiration: mockable.MaxTime,
+	}
+}

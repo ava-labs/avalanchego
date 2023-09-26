@@ -30,13 +30,13 @@ var (
 )
 
 type metrics struct {
-	appRequestTime                 metric.Averager
-	appRequestFailedTime           metric.Averager
-	appResponseTime                metric.Averager
-	appGossipTime                  metric.Averager
-	crossChainAppRequestTime       metric.Averager
-	crossChainAppRequestFailedTime metric.Averager
-	crossChainAppResponseTime      metric.Averager
+	appRequestTime            metric.Averager
+	appErrorTime              metric.Averager
+	appResponseTime           metric.Averager
+	appGossipTime             metric.Averager
+	crossChainAppRequestTime  metric.Averager
+	crossChainAppErrorTime    metric.Averager
+	crossChainAppResponseTime metric.Averager
 }
 
 type pendingAppRequest struct {
@@ -111,9 +111,9 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 		return nil, fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
 	}
 
-	appRequestFailedTime, err := metric.NewAverager(
+	appErrorTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("handler_%d_app_request_failed", handlerID),
+		fmt.Sprintf("handler_%d_app_error", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -151,9 +151,9 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 		return nil, fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
 	}
 
-	crossChainAppRequestFailedTime, err := metric.NewAverager(
+	crossChainAppErrorTime, err := metric.NewAverager(
 		r.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_request_failed", handlerID),
+		fmt.Sprintf("handler_%d_cross_chain_app_error", handlerID),
 		"app request failed time (ns)",
 		r.metrics,
 	)
@@ -179,13 +179,13 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 			sender:    r.sender,
 		},
 		metrics: &metrics{
-			appRequestTime:                 appRequestTime,
-			appRequestFailedTime:           appRequestFailedTime,
-			appResponseTime:                appResponseTime,
-			appGossipTime:                  appGossipTime,
-			crossChainAppRequestTime:       crossChainAppRequestTime,
-			crossChainAppRequestFailedTime: crossChainAppRequestFailedTime,
-			crossChainAppResponseTime:      crossChainAppResponseTime,
+			appRequestTime:            appRequestTime,
+			appErrorTime:              appErrorTime,
+			appResponseTime:           appResponseTime,
+			appGossipTime:             appGossipTime,
+			crossChainAppRequestTime:  crossChainAppRequestTime,
+			crossChainAppErrorTime:    crossChainAppErrorTime,
+			crossChainAppResponseTime: crossChainAppResponseTime,
 		},
 	}
 
@@ -220,15 +220,15 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	return nil
 }
 
-func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (r *Router) AppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.AppResponseCallback(ctx, nodeID, nil, ErrAppRequestFailed)
-	pending.appRequestFailedTime.Observe(float64(time.Since(start)))
+	pending.AppResponseCallback(ctx, nodeID, nil, err)
+	pending.appErrorTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -292,15 +292,15 @@ func (r *Router) CrossChainAppRequest(
 	return nil
 }
 
-func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (r *Router) CrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.CrossChainAppResponseCallback(ctx, chainID, nil, ErrAppRequestFailed)
-	pending.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
+	pending.CrossChainAppResponseCallback(ctx, chainID, nil, err)
+	pending.crossChainAppErrorTime.Observe(float64(time.Since(start)))
 	return nil
 }
 

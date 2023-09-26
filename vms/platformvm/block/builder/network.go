@@ -57,7 +57,7 @@ func NewNetwork(
 	}
 }
 
-func (*network) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
+func (*network) CrossChainAppError(context.Context, ids.ID, uint32, error) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
@@ -75,7 +75,7 @@ func (*network) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) e
 	return nil
 }
 
-func (*network) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
+func (*network) AppError(context.Context, ids.NodeID, uint32, error) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil

@@ -44,6 +44,20 @@ func (m *MockChainVM) EXPECT() *MockChainVMMockRecorder {
 	return m.recorder
 }
 
+// AppError mocks base method.
+func (m *MockChainVM) AppError(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppError", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AppError indicates an expected call of AppError.
+func (mr *MockChainVMMockRecorder) AppError(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppError", reflect.TypeOf((*MockChainVM)(nil).AppError), arg0, arg1, arg2, arg3)
+}
+
 // AppGossip mocks base method.
 func (m *MockChainVM) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
 	m.ctrl.T.Helper()
@@ -70,20 +84,6 @@ func (m *MockChainVM) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 uin
 func (mr *MockChainVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequest", reflect.TypeOf((*MockChainVM)(nil).AppRequest), arg0, arg1, arg2, arg3, arg4)
-}
-
-// AppRequestFailed mocks base method.
-func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *MockChainVMMockRecorder) AppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).AppRequestFailed), arg0, arg1, arg2)
 }
 
 // AppResponse mocks base method.
@@ -159,6 +159,20 @@ func (mr *MockChainVMMockRecorder) CreateStaticHandlers(arg0 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockChainVM)(nil).CreateStaticHandlers), arg0)
 }
 
+// CrossChainAppError mocks base method.
+func (m *MockChainVM) CrossChainAppError(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CrossChainAppError", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CrossChainAppError indicates an expected call of CrossChainAppError.
+func (mr *MockChainVMMockRecorder) CrossChainAppError(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppError", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppError), arg0, arg1, arg2, arg3)
+}
+
 // CrossChainAppRequest mocks base method.
 func (m *MockChainVM) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
 	m.ctrl.T.Helper()
@@ -171,20 +185,6 @@ func (m *MockChainVM) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, ar
 func (mr *MockChainVMMockRecorder) CrossChainAppRequest(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequest", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequest), arg0, arg1, arg2, arg3, arg4)
-}
-
-// CrossChainAppRequestFailed mocks base method.
-func (m *MockChainVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CrossChainAppRequestFailed indicates an expected call of CrossChainAppRequestFailed.
-func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequestFailed), arg0, arg1, arg2)
 }
 
 // CrossChainAppResponse mocks base method.

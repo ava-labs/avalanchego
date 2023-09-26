@@ -100,6 +100,21 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Ancestors(arg0, arg1, arg2 interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ancestors", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Ancestors), arg0, arg1, arg2)
 }
 
+// AppError mocks base method.
+func (m *MockOutboundMsgBuilder) AppError(arg0 ids.ID, arg1 uint32, arg2 error) (OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppError", arg0, arg1, arg2)
+	ret0, _ := ret[0].(OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AppError indicates an expected call of AppError.
+func (mr *MockOutboundMsgBuilderMockRecorder) AppError(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppError", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).AppError), arg0, arg1, arg2)
+}
+
 // AppGossip mocks base method.
 func (m *MockOutboundMsgBuilder) AppGossip(arg0 ids.ID, arg1 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
