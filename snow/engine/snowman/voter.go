@@ -85,7 +85,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	if v.t.Consensus.Finalized() {
+	if v.t.Consensus.NumProcessing() == 0 {
 		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
@@ -102,7 +102,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 	// If [bubbledVote] != [initialVote], it is guaranteed that [bubbledVote] is
 	// in processing. Otherwise, we attempt to iterate through any blocks we
 	// have at our disposal as a best-effort mechanism to find a valid ancestor.
-	bubbledVote := v.t.nonVerifieds.GetRoot(initialVote)
+	bubbledVote := v.t.nonVerifieds.GetAncestor(initialVote)
 	for {
 		blk, err := v.t.GetBlock(ctx, bubbledVote)
 		// If we cannot retrieve the block, drop [vote]

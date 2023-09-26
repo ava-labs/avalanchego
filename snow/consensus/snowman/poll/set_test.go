@@ -6,9 +6,9 @@ package poll
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -31,7 +31,7 @@ var (
 func TestNewSetErrorOnMetrics(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	factory := NewEarlyTermNoTraversalFactory(1)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
@@ -49,13 +49,14 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
+	alpha := 3
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
 	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -84,13 +85,14 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
+	alpha := 3
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
 	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -119,13 +121,14 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
+	alpha := 3
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 
 	// create three polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -162,13 +165,14 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
+	alpha := 2
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	require.Zero(s.Len())
 
@@ -193,13 +197,14 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 func TestCreateAndFinishFailedPoll(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := bag.Of(vdr1, vdr2) // k = 2
+	alpha := 1
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := bag.Of(vdr1, vdr2) // k = 2
 
 	require.Zero(s.Len())
 
@@ -221,13 +226,14 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 func TestSetString(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewNoEarlyTermFactory()
+	vdrs := bag.Of(vdr1) // k = 1
+	alpha := 1
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
-
-	vdrs := bag.Of(vdr1) // k = 1
 
 	expected := `current polls: (Size = 1)
     RequestID 0:

@@ -102,7 +102,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -350,7 +350,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &txs.BaseTx{BaseTx: baseTx},
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -487,7 +487,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -957,7 +957,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1101,7 +1101,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -1444,7 +1444,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1570,7 +1570,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -1842,7 +1842,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1968,7 +1968,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -2252,7 +2252,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
