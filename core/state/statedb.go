@@ -1261,12 +1261,12 @@ func (s *StateDB) GetTxHash() common.Hash {
 // GetPredicateStorageSlots(AddrA, 0) -> Predicate1
 // GetPredicateStorageSlots(AddrB, 0) -> Predicate2
 // GetPredicateStorageSlots(AddrA, 1) -> Predicate3
-func (s *StateDB) GetPredicateStorageSlots(address common.Address, index uint32) ([]byte, bool) {
+func (s *StateDB) GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool) {
 	predicates, exists := s.predicateStorageSlots[address]
 	if !exists {
 		return nil, false
 	}
-	if int(index) >= len(predicates) {
+	if index >= len(predicates) {
 		return nil, false
 	}
 	return predicates[index], true

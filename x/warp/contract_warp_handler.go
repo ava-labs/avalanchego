@@ -46,14 +46,18 @@ type messageHandler interface {
 }
 
 func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, remainingGas uint64, handler messageHandler) ([]byte, uint64, error) {
-	warpIndex, err := UnpackGetVerifiedWarpMessageInput(input)
+	warpIndexInput, err := UnpackGetVerifiedWarpMessageInput(input)
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %s", errInvalidIndexInput, err)
 	}
+	if warpIndexInput > math.MaxInt32 {
+		return nil, remainingGas, fmt.Errorf("%w: larger than MaxInt32", errInvalidIndexInput)
+	}
+	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
 	state := accessibleState.GetStateDB()
 	predicateBytes, exists := state.GetPredicateStorageSlots(ContractAddress, warpIndex)
 	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.GetTxHash(), ContractAddress)
-	valid := exists && set.BitsFromBytes(predicateResults).Contains(int(warpIndex))
+	valid := exists && set.BitsFromBytes(predicateResults).Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), remainingGas, nil
 	}

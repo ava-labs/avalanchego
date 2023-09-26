@@ -402,6 +402,19 @@ func TestGetVerifiedWarpMessage(t *testing.T) {
 			ReadOnly:    false,
 			ExpectedErr: errInvalidIndexInput.Error(),
 		},
+		"get message index invalid int32": {
+			Caller: callerAddr,
+			InputFn: func(t testing.TB) []byte {
+				res, err := PackGetVerifiedWarpMessage(math.MaxInt32 + 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return res
+			},
+			SuppliedGas: GetVerifiedWarpMessageBaseCost,
+			ReadOnly:    false,
+			ExpectedErr: errInvalidIndexInput.Error(),
+		},
 		"get message invalid index input bytes": {
 			Caller: callerAddr,
 			InputFn: func(t testing.TB) []byte {
@@ -645,6 +658,19 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 			Caller: callerAddr,
 			InputFn: func(t testing.TB) []byte {
 				return append(WarpABI.Methods["getVerifiedWarpBlockHash"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...)
+			},
+			SuppliedGas: GetVerifiedWarpMessageBaseCost,
+			ReadOnly:    false,
+			ExpectedErr: errInvalidIndexInput.Error(),
+		},
+		"get message index invalid int32": {
+			Caller: callerAddr,
+			InputFn: func(t testing.TB) []byte {
+				res, err := PackGetVerifiedWarpBlockHash(math.MaxInt32 + 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return res
 			},
 			SuppliedGas: GetVerifiedWarpMessageBaseCost,
 			ReadOnly:    false,
