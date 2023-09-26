@@ -34,8 +34,7 @@ var _ Tree = (*tree)(nil)
 //	|		|
 //	C		E
 //
-// This structure is designed to be able to update and traverse these partial
-// views.
+// This structure is designed to update and traverse these partial views.
 type Tree interface {
 	// Add a mapping from blkID to parentID.
 	//
