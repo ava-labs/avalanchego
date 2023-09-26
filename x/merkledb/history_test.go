@@ -290,7 +290,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
 	require.NoError(batch.Write())
 
-	startRoot := db.root.id
+	startRoot := db.getMerkleRoot()
 
 	// write a new value into the db
 	batch = db.NewBatch()
@@ -307,7 +307,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	require.NoError(batch.Put([]byte("key2"), []byte("value3")))
 	require.NoError(batch.Write())
 
-	endRoot := db.root.id
+	endRoot := db.getMerkleRoot()
 
 	// changes should still be collectable even though the history has had to loop due to hitting max size
 	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)

@@ -203,7 +203,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	require.Equal(trie.root, path[0])
 	require.Equal(newPath(key3), path[1].key)
 
-	// Other key paths now has empty key root
+	// Other key paths now have empty key root
 	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
@@ -856,13 +856,9 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(EmptyPath, false)
+	root, err = trie.getEditableNode(trie.getRootPath(), false)
 	require.NoError(err)
-	require.Len(root.children, 1)
-
-	firstNode, err = trie.getEditableNode(getSingleChildPath(root), true)
-	require.NoError(err)
-	require.Len(firstNode.children, 1)
+	require.Len(root.children, 2)
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {
