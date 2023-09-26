@@ -1199,7 +1199,7 @@ func getSingleChildPath(n *node) Path {
 	for index, entry := range n.children {
 		return n.key.Append(index).Extend(entry.compressedPath)
 	}
-	return EmptyPath(BranchFactor16)
+	return Path{}
 }
 
 func TestTrieCommitToDB(t *testing.T) {
