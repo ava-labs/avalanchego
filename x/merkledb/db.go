@@ -503,11 +503,6 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return db.root.id
 }
 
-// shouldUseChildAsRoot returns true if the passed in node has no value and only a single child
-func shouldUseChildAsRoot(root *node) bool {
-	return root.valueDigest.IsNothing() && len(root.children) == 1
-}
-
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -1089,16 +1084,18 @@ func (db *merkleDB) initializeRoot() (ids.ID, error) {
 		db.root, err = db.valueNodeDB.Get(EmptyPath)
 	}
 	if err == nil {
-		// Root already exists, so calculate its id
-		if shouldUseChildAsRoot(db.root) {
+		// If the root has no value and only a single child,
+		// then it isn't needed to form a valid trie.
+		// Use its child node instead as the root
+		if db.root.value.IsNothing() && len(db.root.children) == 1 {
 			for index, childEntry := range db.root.children {
-				newRoot, err := db.getNode(path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
-				if err != nil {
+				if db.root, err = db.getNode(path([]byte{index})+childEntry.compressedPath, childEntry.hasValue); err != nil {
 					return ids.Empty, err
 				}
-				db.root = newRoot
 			}
 		}
+
+		// Root already exists, so calculate its id
 		db.root.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
