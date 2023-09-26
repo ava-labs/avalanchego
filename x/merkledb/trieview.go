@@ -253,7 +253,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 				if err != nil {
 					return
 				}
-				t.recordNodeChange(t.root)
+				if err = t.recordNodeChange(t.root); err != nil {
+					return
+				}
 			}
 		}
 
@@ -779,9 +781,8 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key path) ([]*node, error) {
 	var (
 		// all paths start at the root
-		currentNode     = t.root
-		matchedKeyIndex = 0
-		nodes           []*node
+		currentNode = t.root
+		nodes       []*node
 	)
 
 	if !key.HasPrefix(t.root.key) {
@@ -789,7 +790,7 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 	}
 
 	nodes = append(nodes, t.root)
-	matchedKeyIndex = len(t.root.key)
+	matchedKeyIndex := len(t.root.key)
 
 	// while the entire path hasn't been matched
 	for matchedKeyIndex < len(key) {

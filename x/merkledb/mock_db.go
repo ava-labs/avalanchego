@@ -388,6 +388,20 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getEditableNode", reflect.TypeOf((*MockMerkleDB)(nil).getEditableNode), arg0, arg1)
 }
 
+// getRootPath mocks base method.
+func (m *MockMerkleDB) getRootPath() path {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getRootPath")
+	ret0, _ := ret[0].(path)
+	return ret0
+}
+
+// getRootPath indicates an expected call of getRootPath.
+func (mr *MockMerkleDBMockRecorder) getRootPath() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getRootPath", reflect.TypeOf((*MockMerkleDB)(nil).getRootPath))
+}
+
 // getValue mocks base method.
 func (m *MockMerkleDB) getValue(arg0 path) ([]byte, error) {
 	m.ctrl.T.Helper()
