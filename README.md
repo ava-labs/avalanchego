@@ -38,6 +38,10 @@ versions with no additional cost at all.
 firewood is licensed by the Ecosystem License. For more information, see the
 [LICENSE file](./LICENSE.md).
 
+## Architecture Diagram
+
+![architecture diagram](./docs/assets/architecture.svg)<img src="./docs/assets/architecture.svg">
+
 ## Termimology
 
 * `Revision` - A historical point-in-time state/version of the trie. This
@@ -74,6 +78,12 @@ firewood is licensed by the Ecosystem License. For more information, see the
 
 
 ## Roadmap
+
+**LEGEND**
+- [ ] Not started
+- [ ] :runner: In progress
+- [x] Complete
+
 ### Green Milestone
 This milestone will focus on additional code cleanup, including supporting
 concurrent access to a specific revision, as well as cleaning up the basic
@@ -99,11 +109,14 @@ propose a batch against any existing proposed revision.
 - [x] Commit a batch that has been proposed will invalidate all other proposals
 that are not children of the committed proposed batch.
 - [x] Be able to quickly commit a batch that has been proposed.
+- [x] Remove RLP encoding
 
 ### Dried milestone
 The focus of this milestone will be to support synchronization to other
 instances to replicate the state. A synchronization library should also
 be developed for this milestone.
+- [ ] :runner: Add support for Ava Labs generic test tool via grpc client
+- [ ] :runner: Pluggable encoding for nodes, for optional compatibilty with merkledb
 - [ ] Support replicating the full state with corresponding range proofs that
 verify the correctness of the data.
 - [ ] Support replicating the delta state from the last sync point with
@@ -113,15 +126,15 @@ corresponding range proofs that verify the correctness of the data.
 - [ ] MerkleDB root hash in parity for seamless transition between MerkleDB
 and firewood.
 - [ ] Add metric reporting
-- [ ] Refactor `Shale` to be more idiomatic
+- [ ] Migrate to a fully async interface, consider tokio\_uring, monoio, etc
+- [ ] Refactor `Shale` to be more idiomatic, consider rearchitecting it
 
 ## Build
 Firewood currently is Linux-only, as it has a dependency on the asynchronous
 I/O provided by the Linux kernel (see `libaio`). Unfortunately, Docker is not
 able to successfully emulate the syscalls `libaio` relies on, so Linux or a
-Linux VM must be used to run firewood. It is encouraged to enhance the project
-with I/O supports for other OSes, such as OSX (where `kqueue` needs to be used
-for async I/O) and Windows. Please contact us if you're interested in such contribution.
+Linux VM must be used to run firewood. We intend to migrate to io\_uring which
+should allow for this emulation.
 
 ## Run
 There are several examples, in the examples directory, that simulate real world
