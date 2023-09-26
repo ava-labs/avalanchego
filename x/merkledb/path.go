@@ -66,7 +66,9 @@ func (f BranchFactor) Valid() error {
 }
 
 func EmptyPath(bf BranchFactor) Path {
-	return Path{pathConfig: branchFactorToPathConfig[bf]}
+	return Path{
+		pathConfig: branchFactorToPathConfig[bf],
+	}
 }
 
 type pathConfig struct {
