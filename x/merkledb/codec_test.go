@@ -218,7 +218,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
 
-	// Put num children NodeBranchFactor+1 at end
+	// Put num children > branch factor
 	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(BranchFactor16+1))
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
@@ -234,21 +234,25 @@ func FuzzEncodeHashValues(f *testing.F) {
 		func(
 			t *testing.T,
 			randSeed int,
+			branchFactorBit1 bool,
+			branchFactorBit2 bool,
 		) {
 			require := require.New(t)
+
+			branchFactor := branchFactorFromBits(branchFactorBit1, branchFactorBit2)
 
 			// Create a random *hashValues
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 			children := map[byte]child{}
-			numChildren := r.Intn(int(BranchFactor16)) // #nosec G404
+			numChildren := r.Intn(int(branchFactor)) // #nosec G404
 			for i := 0; i < numChildren; i++ {
 				compressedPathLen := r.Intn(32) // #nosec G404
 				compressedPathBytes := make([]byte, compressedPathLen)
 				_, _ = r.Read(compressedPathBytes) // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: NewPath(compressedPathBytes, BranchFactor16),
+					compressedPath: NewPath(compressedPathBytes, branchFactor),
 					id:             ids.GenerateTestID(),
 					hasValue:       r.Intn(2) == 1, // #nosec G404
 				}
@@ -268,7 +272,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      NewPath(key, BranchFactor16),
+				Key:      NewPath(key, branchFactor),
 			}
 
 			// Serialize the *hashValues with both codecs

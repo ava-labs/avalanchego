@@ -102,8 +102,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	for index := byte(0); index < byte(branchFactor); index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeUint(buf, uint64(index))
-			path := entry.compressedPath
-			c.encodePath(buf, path)
+			c.encodePath(buf, entry.compressedPath)
 			_, _ = buf.Write(entry.id[:])
 			c.encodeBool(buf, entry.hasValue)
 		}
