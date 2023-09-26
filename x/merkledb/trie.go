@@ -23,6 +23,7 @@ type ProofGetter interface {
 }
 
 type ReadOnlyTrie interface {
+	database.Iteratee
 	MerkleRootGetter
 	ProofGetter
 
@@ -37,7 +38,7 @@ type ReadOnlyTrie interface {
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
 	getValue(key path) ([]byte, error)
-	
+
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
 	getEditableNode(key path, hasValue bool) (*node, error)
@@ -48,8 +49,8 @@ type ReadOnlyTrie interface {
 	// If [end] is Nothing, there's no upper bound on the range.
 	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
+	// getRootPath returns the path of the trie's root
 	getRootPath() path
-	database.Iteratee
 }
 
 type ViewChanges struct {
