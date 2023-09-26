@@ -49,4 +49,4 @@ echo "building avalanchego"
 ./scripts/build.sh -r
 
 echo "running AvalancheGo e2e tests"
-./scripts/tests.e2e.sh ./build/avalanchego
+E2E_SERIAL=1 ./scripts/tests.e2e.sh --ginkgo.label-filter='c || uses-c'
