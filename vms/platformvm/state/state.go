@@ -1672,7 +1672,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	weightDiffs, blsKeyDiffs, valSetDiff, err := s.processCurrentStakers()
+	cr, err := s.processCurrentStakers()
 	if err != nil {
 		return err
 	}
@@ -1681,9 +1681,9 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	errs.Add(
 		s.writeBlocks(),
 		s.writeCurrentStakers(),
-		s.writeWeightDiffs(height, weightDiffs),
-		s.writeBlsKeyDiffs(height, blsKeyDiffs),
-		s.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
+		s.writeWeightDiffs(height, cr.weightDiffs),
+		s.writeBlsKeyDiffs(height, cr.blsKeyDiffs),
+		s.updateValidatorSet(updateValidators, cr.valSetDiff, cr.weightDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1832,12 +1832,13 @@ type validatorStatusPair struct {
 	status    diffValidatorStatus
 }
 
-func (s *state) processCurrentStakers() (
-	map[subnetNodePair]*ValidatorWeightDiff,
-	map[ids.NodeID]*bls.PublicKey,
-	map[subnetNodePair]validatorStatusPair,
-	error,
-) {
+type results struct {
+	weightDiffs map[subnetNodePair]*ValidatorWeightDiff
+	blsKeyDiffs map[ids.NodeID]*bls.PublicKey
+	valSetDiff  map[subnetNodePair]validatorStatusPair
+}
+
+func (s *state) processCurrentStakers() (results, error) {
 	var (
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
@@ -1908,18 +1909,23 @@ func (s *state) processCurrentStakers() (
 				staker := addedDelegatorIterator.Value()
 
 				if err := outputWeights[key].Add(false, staker.Weight); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+					return results{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				if err := outputWeights[key].Add(true, staker.Weight); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+					return results{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return outputWeights, outputBlsKey, outputValSet, nil
+
+	return results{
+		weightDiffs: outputWeights,
+		blsKeyDiffs: outputBlsKey,
+		valSetDiff:  outputValSet,
+	}, nil
 }
 
 func (s *state) Close() error {
