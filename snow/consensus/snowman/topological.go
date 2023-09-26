@@ -154,6 +154,9 @@ func (ts *Topological) NumProcessing() int {
 
 func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	blkID := blk.ID()
+	ts.ctx.Log.Verbo("adding block",
+		zap.Stringer("blkID", blkID),
+	)
 
 	// Make sure a block is not inserted twice. This enforces the invariant that
 	// blocks are always added in topological order. Essentially, a block that
@@ -169,6 +172,11 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
+		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
+			zap.Stringer("blkID", blkID),
+			zap.Stringer("parentID", parentID),
+		)
+
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
@@ -191,6 +199,11 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		ts.tail = blkID
 		ts.preferredIDs.Add(blkID)
 	}
+
+	ts.ctx.Log.Verbo("added block",
+		zap.Stringer("blkID", blkID),
+		zap.Stringer("parentID", parentID),
+	)
 	return nil
 }
 
@@ -224,8 +237,8 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-func (ts *Topological) LastAccepted() ids.ID {
-	return ts.head
+func (ts *Topological) LastAccepted() (ids.ID, uint64) {
+	return ts.head, ts.height
 }
 
 func (ts *Topological) Preference() ids.ID {
@@ -307,10 +320,6 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 		ts.preferredIDs.Add(ts.tail)
 	}
 	return nil
-}
-
-func (ts *Topological) Finalized() bool {
-	return len(ts.blocks) == 1
 }
 
 // HealthCheck returns information about the consensus health.
@@ -483,7 +492,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// get the block that we are going to vote on
 		parentBlock, notRejected := ts.blocks[vote.parentID]
 
-		// if the block block we are going to vote on was already rejected, then
+		// if the block we are going to vote on was already rejected, then
 		// we should stop applying the votes
 		if !notRejected {
 			break
