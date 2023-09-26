@@ -344,10 +344,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	closestNode := proofPath[len(proofPath)-1]
 
 	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if len(proofPath) > 0 && shouldUseChildAsRoot(t.root) {
+	if shouldUseChildAsRoot(t.root) {
+		// remove the nil key root since we should use its child instead
 		proof.Path = proof.Path[1:]
 
-		// if there are now no nodes, add the "root"
+		// if there are now no nodes, add the "root" as an exclusion proof
 		if len(proof.Path) == 0 {
 			var alternateRootNode *node
 			for index, childEntry := range t.root.children {
