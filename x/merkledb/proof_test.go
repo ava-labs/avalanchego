@@ -1700,13 +1700,11 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		// that are in the end proof.
 		endProofKeys := set.Set[Path]{}
 		for _, node := range rangeProof.EndProof {
-			path := node.KeyPath
-			endProofKeys.Add(path)
+			endProofKeys.Add(node.KeyPath)
 		}
 
 		for _, node := range rangeProof.StartProof {
-			path := node.KeyPath
-			require.NotContains(endProofKeys, path)
+			require.NotContains(endProofKeys, node.KeyPath)
 		}
 
 		// Make sure the EndProof invariant is maintained
