@@ -102,7 +102,7 @@ votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
 		// use rootID in case of this is a non-verified block ID
-		rootID := v.t.nonVerifieds.GetRoot(vote)
+		rootID := v.t.nonVerifieds.GetAncestor(vote)
 		v.t.Ctx.Log.Verbo("bubbling vote(s) through unverified blocks",
 			zap.Int("numVotes", count),
 			zap.Stringer("voteID", vote),
