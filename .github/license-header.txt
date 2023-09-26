@@ -1,0 +1,2 @@
+// Copyright (C) %year%, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.

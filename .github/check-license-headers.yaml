@@ -1,0 +1,38 @@
+[
+  {
+    "include": [
+      "**/**/*.rs"
+    ],
+    "exclude": [
+      "target/**",
+      "*/LICENSE*",
+      "LICENSE.md",
+      "RELEASE.md",
+      "rpc/**",
+      "README*",
+      "*/README*",
+      "Cargo.toml",
+      "*/Cargo.toml",
+      "libaio/**",
+      "docs/**",
+      "CODEOWNERS"
+    ],
+    "license": "./.github/license-header.txt"
+  },
+  {
+    "include": [
+      "target/**",
+      "*/LICENSE*",
+      "LICENSE.md",
+      "RELEASE.md",
+      "rpc/**",
+      "README*",
+      "*/README*",
+      "Cargo.toml",
+      "*/Cargo.toml",
+      "libaio/**",
+      "docs/**",
+      "CODEOWNERS"
+    ],
+  }
+]
