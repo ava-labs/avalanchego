@@ -869,8 +869,7 @@ func (t *trieView) insert(
 	if len(pathToNode) == 0 {
 		newRoot := newNode(nil, EmptyPath)
 		newRoot.addChild(t.root)
-		t.root = newRoot
-		pathToNode = []*node{t.root}
+		pathToNode = []*node{newRoot}
 	}
 
 	// We're inserting a node whose ancestry is [pathToNode]
@@ -992,15 +991,15 @@ func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode
 		t.root = after
 	}
 
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
-		return nil
-	}
-
 	if newNode {
 		t.changes.nodes[key] = &change[*node]{
 			after: after,
 		}
+		return nil
+	}
+
+	if existing, ok := t.changes.nodes[key]; ok {
+		existing.after = after
 		return nil
 	}
 
