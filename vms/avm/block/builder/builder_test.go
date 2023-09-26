@@ -588,7 +588,7 @@ func createTxs() []*txs.Tx {
 		}},
 		Creds: []*fxs.FxCredential{
 			{
-				Verifiable: &secp256k1fx.Credential{},
+				Credential: &secp256k1fx.Credential{},
 			},
 		},
 	}}
