@@ -224,8 +224,8 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-func (ts *Topological) LastAccepted() ids.ID {
-	return ts.head
+func (ts *Topological) LastAccepted() (ids.ID, uint64) {
+	return ts.head, ts.height
 }
 
 func (ts *Topological) Preference() ids.ID {
