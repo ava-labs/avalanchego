@@ -1672,7 +1672,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	weightDiffs, blsKeyDiffs, err := s.processCurrentStakers()
+	cr, err := s.processCurrentStakers()
 	if err != nil {
 		return err
 	}
@@ -1681,8 +1681,8 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	errs.Add(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators),
-		s.writeWeightDiffs(height, weightDiffs),
-		s.writeBlsKeyDiffs(height, blsKeyDiffs),
+		s.writeWeightDiffs(height, cr.weightDiffs),
+		s.writeBlsKeyDiffs(height, cr.blsKeyDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1769,11 +1769,12 @@ type subnetNodePair struct {
 	nodeID   ids.NodeID
 }
 
-func (s *state) processCurrentStakers() (
-	map[subnetNodePair]*ValidatorWeightDiff,
-	map[ids.NodeID]*bls.PublicKey,
-	error,
-) {
+type results struct {
+	weightDiffs map[subnetNodePair]*ValidatorWeightDiff
+	blsKeyDiffs map[ids.NodeID]*bls.PublicKey
+}
+
+func (s *state) processCurrentStakers() (results, error) {
 	var (
 		outputWeights = make(map[subnetNodePair]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
@@ -1835,18 +1836,22 @@ func (s *state) processCurrentStakers() (
 				staker := addedDelegatorIterator.Value()
 
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
-					return nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
+					return results{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
-					return nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
+					return results{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return outputWeights, outputBlsKey, nil
+
+	return results{
+		weightDiffs: outputWeights,
+		blsKeyDiffs: outputBlsKey,
+	}, nil
 }
 
 func (s *state) Close() error {
