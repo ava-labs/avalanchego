@@ -273,9 +273,24 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		ginkgo.By("determining expected validation and delegation rewards")
 		currentSupply, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
-		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(validationPeriod, weight, currentSupply)
-		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
+		expectedValidationReward := reward.Calculate(
+			rewardConfig.MaxConsumptionRate,
+			rewardConfig.MinConsumptionRate,
+			rewardConfig.MintingPeriod,
+			rewardConfig.SupplyCap,
+			validationPeriod,
+			weight,
+			currentSupply,
+		)
+		potentialDelegationReward := reward.Calculate(
+			rewardConfig.MaxConsumptionRate,
+			rewardConfig.MinConsumptionRate,
+			rewardConfig.MintingPeriod,
+			rewardConfig.SupplyCap,
+			delegationPeriod,
+			weight,
+			currentSupply,
+		)
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")
