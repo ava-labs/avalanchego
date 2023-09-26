@@ -124,8 +124,7 @@ type MerkleDB interface {
 }
 
 type Config struct {
-	// BranchFactor determines the number of children each node can have
-	// defaults to BranchFactorDefault if unspecified
+	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
 
 	// RootGenConcurrency is the number of goroutines to use when
