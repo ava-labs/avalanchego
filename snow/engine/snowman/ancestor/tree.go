@@ -48,22 +48,22 @@ func NewTree() Tree {
 	}
 }
 
-func (p *tree) Add(blkID ids.ID, parentID ids.ID) {
-	p.childToParent[blkID] = parentID
+func (t *tree) Add(blkID ids.ID, parentID ids.ID) {
+	t.childToParent[blkID] = parentID
 
-	children := p.parentToChildren[parentID]
+	children := t.parentToChildren[parentID]
 	children.Add(blkID)
-	p.parentToChildren[parentID] = children
+	t.parentToChildren[parentID] = children
 }
 
-func (p *tree) Has(blkID ids.ID) bool {
-	_, ok := p.childToParent[blkID]
+func (t *tree) Has(blkID ids.ID) bool {
+	_, ok := t.childToParent[blkID]
 	return ok
 }
 
-func (p *tree) GetAncestor(blkID ids.ID) ids.ID {
+func (t *tree) GetAncestor(blkID ids.ID) ids.ID {
 	for {
-		parentID, ok := p.childToParent[blkID]
+		parentID, ok := t.childToParent[blkID]
 		// this is the furthest parent available, break loop and return blkID
 		if !ok {
 			return blkID
@@ -73,35 +73,35 @@ func (p *tree) GetAncestor(blkID ids.ID) ids.ID {
 	}
 }
 
-func (p *tree) Remove(blkID ids.ID) {
-	parent, ok := p.childToParent[blkID]
+func (t *tree) Remove(blkID ids.ID) {
+	parent, ok := t.childToParent[blkID]
 	if !ok {
 		return
 	}
-	delete(p.childToParent, blkID)
+	delete(t.childToParent, blkID)
 	// remove blkID from children
-	children := p.parentToChildren[parent]
+	children := t.parentToChildren[parent]
 	children.Remove(blkID)
 	// this parent has no more children, remove it from map
 	if children.Len() == 0 {
-		delete(p.parentToChildren, parent)
+		delete(t.parentToChildren, parent)
 	}
 }
 
-func (p *tree) RemoveDescendants(blkID ids.ID) {
+func (t *tree) RemoveDescendants(blkID ids.ID) {
 	childrenList := []ids.ID{blkID}
 	for len(childrenList) > 0 {
 		newChildrenSize := len(childrenList) - 1
 		childID := childrenList[newChildrenSize]
 		childrenList = childrenList[:newChildrenSize]
-		p.Remove(childID)
+		t.Remove(childID)
 		// get children of child
-		for grandChildID := range p.parentToChildren[childID] {
+		for grandChildID := range t.parentToChildren[childID] {
 			childrenList = append(childrenList, grandChildID)
 		}
 	}
 }
 
-func (p *tree) Len() int {
-	return len(p.childToParent)
+func (t *tree) Len() int {
+	return len(t.childToParent)
 }
