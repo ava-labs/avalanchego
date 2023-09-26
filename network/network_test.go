@@ -638,9 +638,9 @@ func TestDialDeletesNonValidators(t *testing.T) {
 func TestDialContext(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 	defer wg.Done()
-	network := networks[0]
 
 	dialer := newTestDialer()
+	network := networks[0]
 	network.dialer = dialer
 
 	var (
