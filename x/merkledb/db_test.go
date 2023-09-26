@@ -1031,7 +1031,7 @@ func generateRandTestWithKeys(
 	genEnd := func(key []byte) []byte {
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
+		got := r.Float64() // #nosec G404
 		if got < nilEndProbability {
 			return nil
 		}
@@ -1119,7 +1119,7 @@ func generateInitialValues(
 		}
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
+		got := r.Float64() // #nosec G404
 		if got < nilValueProbability {
 			step.value = nil
 		} else {

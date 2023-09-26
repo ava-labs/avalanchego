@@ -658,17 +658,13 @@ func (t *trieView) remove(key path) error {
 		return t.deleteEmptyNodes(nodePath)
 	}
 
-	if len(nodePath) == 1 {
-		return nil
+	var parent *node
+	if len(nodePath) > 1 {
+		parent = nodePath[len(nodePath)-2]
 	}
-	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
-	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
-		return err
-	}
-
-	return nil
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Merges together nodes in the inclusive descendants of [node] that
@@ -714,6 +710,9 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
+	if parent == nil {
+		parent = newNode(nil, EmptyPath)
+	}
 	parent.addChild(node)
 	return t.recordNodeChange(parent)
 }
@@ -728,30 +727,39 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	node := nodePath[len(nodePath)-1]
+	currentNode := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
-	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		if err := t.recordNodeDeleted(node); err != nil {
+	for ; nextParentIndex >= -1 && len(currentNode.children) == 0 && !currentNode.hasValue(); nextParentIndex-- {
+		if err := t.recordNodeDeleted(currentNode); err != nil {
 			return err
+		}
+
+		if nextParentIndex < 0 {
+			if currentNode.key != EmptyPath {
+				// deleting the root, so create a new one
+				return t.recordNodeChange(newNode(nil, EmptyPath))
+			}
+			return nil
 		}
 
 		parent := nodePath[nextParentIndex]
 
-		parent.removeChild(node)
+		parent.removeChild(currentNode)
 		if err := t.recordNodeChange(parent); err != nil {
 			return err
 		}
 
-		node = parent
+		currentNode = parent
 	}
-
-	if nextParentIndex < 0 {
+	var parent *node
+	if nextParentIndex >= 0 {
+		parent = nodePath[nextParentIndex]
+	} else if currentNode.key == EmptyPath {
 		return nil
 	}
-	parent := nodePath[nextParentIndex]
 
-	return t.compressNodePath(parent, node)
+	return t.compressNodePath(parent, currentNode)
 }
 
 // Returns the nodes along the path to [key].
@@ -802,7 +810,8 @@ func (t *trieView) getPathTo(key path) ([]*node, error) {
 }
 
 func (t *trieView) updateRoot() error {
-	// use valueDigest instead of value because proof verification only sets the digest
+	// If the root has no value and only a single child, that child can become the root.
+	// Use valueDigest instead of value because proof verification only sets the digest
 	if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
 		for index, childEntry := range t.root.children {
 			newRoot, err := t.getNodeWithID(childEntry.id, t.root.key+path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
@@ -813,10 +822,11 @@ func (t *trieView) updateRoot() error {
 			t.recordNodeChange(newRoot)
 		}
 	}
+	// If the root is not the EmptyPath node, but contains no data, switch the root to the EmptyPath node
+	// This ensures all empty tries have the same root rather than a root with an arbitrary path
 	if t.root.key != EmptyPath && t.root.valueDigest.IsNothing() && len(t.root.children) == 0 {
 		t.recordNodeDeleted(t.root)
-		t.root = newNode(nil, EmptyPath)
-		t.recordNewNode(t.root)
+		t.recordNewNode(newNode(nil, EmptyPath))
 	}
 	return nil
 }
@@ -974,7 +984,10 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
-	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
+	if after.key == EmptyPath {
+		return t.recordKeyChange(after.key, after, false, false /* newNode */)
+	}
+	return t.recordKeyChange(after.key, nil, false, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
@@ -983,6 +996,10 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
+	}
+
+	if after != nil && len(after.key) < len(t.getRootPath()) {
+		t.root = after
 	}
 
 	if existing, ok := t.changes.nodes[key]; ok {
