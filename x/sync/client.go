@@ -198,9 +198,9 @@ func (c *client) GetChangeProof(
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 
-// Parse [rangeProofProto] to a merkledb.RangeProof and verify it's
-// a valid range proof for keys in [start, end] for root [rootBytes].
-// Returns [errTooManyKeys] if the response contains more than [keyLimit] keys.
+// Verify [rangeProof] is a valid range proof for keys in [start, end] for
+// root [rootBytes]. Returns [errTooManyKeys] if the response contains more
+// than [keyLimit] keys.
 func verifyRangeProof(
 	ctx context.Context,
 	rangeProof *merkledb.RangeProof,

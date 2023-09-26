@@ -20,7 +20,10 @@ import (
 var _ sync.DB = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient, branchFactor merkledb.BranchFactor) *DBClient {
-	return &DBClient{client: client, branchFactor: branchFactor}
+	return &DBClient{
+		client:       client,
+		branchFactor: branchFactor,
+	}
 }
 
 type DBClient struct {
