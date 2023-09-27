@@ -84,54 +84,42 @@ func Test_Path_Has_Prefix(t *testing.T) {
 func Test_Path_HasPrefix_BadInput(t *testing.T) {
 	require := require.New(t)
 
-	a := Path{pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	b := Path{length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.False(a.HasPrefix(b))
+	for _, bf := range branchFactors {
+		a := Path{pathConfig: branchFactorToPathConfig[bf]}
+		b := Path{length: 1, pathConfig: branchFactorToPathConfig[bf]}
+		require.False(a.HasPrefix(b))
 
-	a = Path{length: 10, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	b = Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[BranchFactor16]}
-	require.False(a.HasPrefix(b))
+		a = Path{length: 10, pathConfig: branchFactorToPathConfig[bf]}
+		b = Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[bf]}
+		require.False(a.HasPrefix(b))
+	}
 }
 
 func Test_Path_Skip(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(NewPath([]byte{0}, BranchFactor2).Skip(8), emptyPath(BranchFactor2))
+	for _, bf := range branchFactors {
+		empty := emptyPath(bf)
+		require.Equal(NewPath([]byte{0}, bf).Skip(empty.tokensPerByte), empty)
+		if bf == BranchFactor256 {
+			continue
+		}
+		shortPath := NewPath([]byte{0b0101_0101}, bf)
+		longPath := NewPath([]byte{0b0101_0101, 0b0101_0101}, bf)
+		for i := 0; i < shortPath.tokensPerByte; i++ {
+			shift := byte(i) * shortPath.tokenBitSize
+			skipPath := shortPath.Skip(i)
+			require.Equal(byte(0b0101_0101<<shift), skipPath.value[0])
 
-	for i := 0; i < 8; i++ {
-		skip := NewPath([]byte{0b0101_0101}, BranchFactor2).Skip(i)
-		require.Equal(byte(0b0101_0101<<i), skip.value[0])
+			skipPath = longPath.Skip(i)
+			require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skipPath.value[0])
+			require.Equal(byte(0b0101_0101<<shift), skipPath.value[1])
+		}
 	}
-	for i := 0; i < 4; i++ {
-		skip := NewPath([]byte{0b0101_0101}, BranchFactor4).Skip(i)
-		require.Equal(byte(0b0101_0101<<(i*2)), skip.value[0])
-	}
-	for i := 0; i < 2; i++ {
-		skip := NewPath([]byte{0b0101_0101}, BranchFactor16).Skip(i)
-		require.Equal(byte(0b0101_0101<<(i*4)), skip.value[0])
-	}
+
 	skip := NewPath([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Skip(1)
 	require.Len(skip.value, 1)
 	require.Equal(byte(0b1010_1010), skip.value[0])
-
-	for i := 0; i < 8; i++ {
-		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor2).Skip(i)
-		shift := i
-		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
-		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
-	}
-	for i := 0; i < 4; i++ {
-		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor4).Skip(i)
-		shift := i * 2
-		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
-		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
-	}
-	for i := 0; i < 2; i++ {
-		shift := i * 4
-		skip := NewPath([]byte{0b0101_0101, 0b0101_0101}, BranchFactor16).Skip(i)
-		require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skip.value[0])
-		require.Equal(byte(0b0101_0101<<shift), skip.value[1])
-	}
 
 	skip = NewPath([]byte{0b0101_0101, 0b1010_1010, 0b0101_0101}, BranchFactor256).Skip(1)
 	require.Len(skip.value, 2)
@@ -142,23 +130,19 @@ func Test_Path_Skip(t *testing.T) {
 func Test_Path_Take(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(NewPath([]byte{0}, BranchFactor2).Take(0), emptyPath(BranchFactor2))
+	for _, bf := range branchFactors {
+		require.Equal(NewPath([]byte{0}, bf).Take(0), emptyPath(bf))
+		if bf == BranchFactor256 {
+			continue
+		}
+		path := NewPath([]byte{0b0101_0101}, bf)
+		for i := 1; i <= path.tokensPerByte; i++ {
+			shift := 8 - (byte(i) * path.tokenBitSize)
+			take := path.Take(i)
+			require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
+		}
+	}
 
-	for i := 1; i <= 8; i++ {
-		shift := 8 - i
-		take := NewPath([]byte{0b0101_0101}, BranchFactor2).Take(i)
-		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
-	}
-	for i := 1; i <= 4; i++ {
-		shift := 8 - (i * 2)
-		take := NewPath([]byte{0b0101_0101}, BranchFactor4).Take(i)
-		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
-	}
-	for i := 1; i <= 2; i++ {
-		shift := 8 - (i * 4)
-		take := NewPath([]byte{0b0101_0101}, BranchFactor16).Take(i)
-		require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
-	}
 	take := NewPath([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Take(1)
 	require.Len(take.value, 1)
 	require.Equal(byte(0b0101_0101), take.value[0])
@@ -194,28 +178,13 @@ func Test_Path_Token(t *testing.T) {
 func Test_Path_Append(t *testing.T) {
 	require := require.New(t)
 
-	path2 := NewPath([]byte{}, BranchFactor2)
-	for i := 0; i < 2; i++ {
-		require.Equal(byte(i), path2.Append(byte(i)).Token(0))
-		require.Equal(byte(i/2), path2.Append(byte(i)).Append(byte(i/2)).Token(1))
-	}
-
-	path4 := NewPath([]byte{}, BranchFactor4)
-	for i := 0; i < 4; i++ {
-		require.Equal(byte(i), path4.Append(byte(i)).Token(0))
-		require.Equal(byte(i/2), path4.Append(byte(i)).Append(byte(i/2)).Token(1))
-	}
-
-	path16 := NewPath([]byte{}, BranchFactor16)
-	for i := 0; i < 16; i++ {
-		require.Equal(byte(i), path16.Append(byte(i)).Token(0))
-		require.Equal(byte(i/2), path16.Append(byte(i)).Append(byte(i/2)).Token(1))
-	}
-
-	path256 := NewPath([]byte{}, BranchFactor256)
-	for i := 0; i < 256; i++ {
-		require.Equal(byte(i), path256.Append(byte(i)).Token(0))
-		require.Equal(byte(i/2), path256.Append(byte(i)).Append(byte(i/2)).Token(1))
+	for _, bf := range branchFactors {
+		path := NewPath([]byte{}, bf)
+		for i := 0; i < int(path.branchFactor); i++ {
+			appendedPath := path.Append(byte(i)).Append(byte(i / 2))
+			require.Equal(byte(i), appendedPath.Token(0))
+			require.Equal(byte(i/2), appendedPath.Token(1))
+		}
 	}
 }
 
@@ -304,6 +273,7 @@ func FuzzPathExtend(f *testing.F) {
 				path2 = path2.Take(path2.length - 1)
 			}
 			extendedP := path1.Extend(path2)
+			require.Equal(path1.length+path2.length, extendedP.length)
 			for i := 0; i < path1.length; i++ {
 				require.Equal(path1.Token(i), extendedP.Token(i))
 			}

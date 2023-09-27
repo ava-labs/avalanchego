@@ -80,7 +80,8 @@ func emptyPath(bf BranchFactor) Path {
 	}
 }
 
-// Assumes [branchFactor] is valid
+// NewPath creates a new path based on the []bytes and branch factor
+// assumes [branchFactor] is valid
 func NewPath(p []byte, branchFactor BranchFactor) Path {
 	pConfig := branchFactorToPathConfig[branchFactor]
 	return Path{
@@ -201,25 +202,31 @@ func (p Path) Extend(path Path) Path {
 	// The existing path doesn't fit into a whole number of bytes,
 	// figure out how much each byte of the extension path needs to be shifted
 	shiftLeft := p.bitsToShift(p.length - 1)
-	shiftRight := eight - shiftLeft
+	// the partial byte of the current path needs the first shiftLeft bits of the extension path
+	buffer[len(p.value)-1] |= path.value[0] >> (eight - shiftLeft)
 
-	// the partial byte of the current path needs the first (8-shiftRight) bits of the extension path
-	buffer[len(p.value)-1] |= path.value[0] >> shiftRight
-
-	// Each byte of the new Path is the first (8-shiftRight) bits of byte i+1 added to the last (8-shiftLeft) bits of byte i
-	lastPathIndex := len(path.value) - 1
-	for i := 0; i < lastPathIndex; i++ {
-		buffer[len(p.value)+i] = path.value[i]<<shiftLeft + path.value[i+1]>>shiftRight
-	}
-
-	// if the last byte doesn't have a byte i + 1, so only use last (8-shiftLeft) bits of byte i
-	buffer[len(buffer)-1] |= path.value[lastPathIndex] << shiftLeft
+	// copy the rest of the extension path bytes into the buffer, shifted byte shiftLeft bits
+	shiftCopy(buffer[len(p.value):], path.value, shiftLeft)
 
 	return Path{
 		value:      *(*string)(unsafe.Pointer(&buffer)),
 		length:     totalLength,
 		pathConfig: p.pathConfig,
 	}
+}
+
+func shiftCopy(dst []byte, src string, shift byte) {
+	reverseShift := eight - shift
+	i := 0
+	for ; i < len(src)-1; i++ {
+		dst[i] = src[i]<<shift + src[i+1]>>reverseShift
+	}
+
+	if i < len(dst) {
+		// the last byte only has values from byte i, as there is no byte i+1
+		dst[i] = src[i] << shift
+	}
+
 }
 
 // Skip returns a new Path that contains the last p.length-tokensToSkip tokens of the current Path
@@ -242,17 +249,9 @@ func (p Path) Skip(tokensToSkip int) Path {
 	// tokensToSkip does not remove a whole number of bytes
 	// copy the remaining shifted bytes into a new buffer
 	buffer := make([]byte, p.bytesNeeded(result.length))
-	shiftRight := p.bitsToShift(tokensToSkip - 1)
-	shiftLeft := eight - shiftRight
-
-	// Each byte of the new Path is the first (8-shiftRight) bits of byte i+1 added to the last (8-shiftLeft) bits of byte i
-	lastIndex := len(result.value) - 1
-	for i := 0; i < lastIndex; i++ {
-		buffer[i] = result.value[i]<<shiftLeft + result.value[i+1]>>shiftRight
-	}
-
-	// the last byte only has values from byte i, as there is no byte i+1
-	buffer[len(buffer)-1] |= result.value[lastIndex] << shiftLeft
+	bitsSkipped := tokensToSkip * int(p.tokenBitSize)
+	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
+	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
 	result.value = *(*string)(unsafe.Pointer(&buffer))
 	return result

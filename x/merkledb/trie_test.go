@@ -19,11 +19,15 @@ import (
 )
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
+	return getNodeValueWithBranchFactor(t, key, BranchFactor16)
+}
+
+func getNodeValueWithBranchFactor(t ReadOnlyTrie, key string, bf BranchFactor) ([]byte, error) {
 	if asTrieView, ok := t.(*trieView); ok {
 		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
 			return nil, err
 		}
-		path := NewPath([]byte(key), BranchFactor16)
+		path := NewPath([]byte(key), bf)
 		nodePath, err := asTrieView.getPathTo(path)
 		if err != nil {
 			return nil, err
@@ -40,7 +44,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		path := NewPath([]byte(key), BranchFactor16)
+		path := NewPath([]byte(key), bf)
 		nodePath, err := view.(*trieView).getPathTo(path)
 		if err != nil {
 			return nil, err

@@ -25,6 +25,17 @@ func getBasicDB() (*merkleDB, error) {
 	)
 }
 
+func getBasicDBWithBranchFactor(bf BranchFactor) (*merkleDB, error) {
+	config := newDefaultConfig()
+	config.BranchFactor = bf
+	return newDatabase(
+		context.Background(),
+		memdb.New(),
+		config,
+		&mockMetrics{},
+	)
+}
+
 // Writes []byte{i} -> []byte{i} for i in [0, 4]
 func writeBasicBatch(t *testing.T, db *merkleDB) {
 	require := require.New(t)
