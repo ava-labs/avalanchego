@@ -29,11 +29,11 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 }
 
 func (n *Network) AddNode(newConsensusFunc newConsensusFunc) Consensus {
-	consensus := newConsensusFunc(n.params, n.colors[0])
-
 	s := sampler.NewUniform()
 	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
+
+	consensus := newConsensusFunc(n.params, n.colors[int(indices[0])])
 	for _, index := range indices[1:] {
 		consensus.Add(n.colors[int(index)])
 	}
