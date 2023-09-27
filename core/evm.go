@@ -51,20 +51,21 @@ type ChainContext interface {
 
 // NewEVMBlockContext creates a new context for use in the EVM.
 func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address) vm.BlockContext {
-	var (
-		predicateResults *results.PredicateResults
-		err              error
-	)
-	if len(header.Extra) > params.DynamicFeeExtraDataSize {
-		// Prior to the DUpgrade, the VM enforces the extra data is smaller than or equal to this size.
-		// After the DUpgrade, the VM pre-verifies the extra data past the dynamic fee rollup window is
-		// valid.
-		predicateResults, err = results.ParsePredicateResults(header.Extra[params.DynamicFeeExtraDataSize:])
-		if err != nil {
-			log.Error("failed to parse predicate results creating new block context", "err", err, "extra", header.Extra)
-		}
+	if len(header.Extra) <= params.DynamicFeeExtraDataSize {
+		return newEVMBlockContext(header, chain, author, nil)
 	}
 
+	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or
+	// equal to this size. After the DUpgrade, the VM pre-verifies the extra
+	// data past the dynamic fee rollup window is valid.
+	predicateResults, err := results.ParsePredicateResults(header.Extra[params.DynamicFeeExtraDataSize:])
+	if err != nil {
+		log.Error("failed to parse predicate results creating new block context", "err", err, "extra", header.Extra)
+		// As mentioned above, we pre-verify the extra data to ensure this never happens.
+		// If we hit an error, construct a new block context rather than use a potentially half initialized value
+		// as defense in depth.
+		return newEVMBlockContext(header, chain, author, nil)
+	}
 	return newEVMBlockContext(header, chain, author, predicateResults)
 }
 
