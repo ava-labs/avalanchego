@@ -43,7 +43,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
-		return fmt.Errorf("incorrect config %T: %v", config, config)
+		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
 	// configure the RewardManager with the given initial configuration
 	if config.InitialRewardConfig != nil {

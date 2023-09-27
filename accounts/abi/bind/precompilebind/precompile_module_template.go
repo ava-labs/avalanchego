@@ -60,15 +60,20 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 // You can use this function to set up your precompile contract's initial state,
 // by using the [cfg] config and [state] stateDB.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
-	config, ok := cfg.(*Config)
-	if !ok {
-		return fmt.Errorf("incorrect config %T: %v", config, config)
-	}
 	// CUSTOM CODE STARTS HERE
 	{{- if .Contract.AllowList}}
+	config, ok := cfg.(*Config)
+	if !ok {
+		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
+	}
+
 	// AllowList is activated for this precompile. Configuring allowlist addresses here.
 	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 	{{- else}}
+	if _, ok := cfg.(*Config); !ok {
+		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
+	}
+
 	return nil
 	{{- end}}
 }
