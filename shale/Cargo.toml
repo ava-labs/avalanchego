@@ -15,7 +15,7 @@ bytemuck = { version = "1.13.1", features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
-pprof = { version = "0.12.0", features = ["flamegraph"] }
+pprof = { version = "0.13.0", features = ["flamegraph"] }
 sha3 = "0.10.7"
 rand = "0.8.5"
 

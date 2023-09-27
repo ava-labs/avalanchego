@@ -46,7 +46,7 @@ predicates = "3.0.1"
 serial_test = "2.0.0"
 clap = { version = "4.3.1", features = ['derive'] }
 test-case = "3.1.0"
-pprof = { version = "0.12.1", features = ["flamegraph"] }
+pprof = { version = "0.13.0", features = ["flamegraph"] }
 
 [features]
 # proof API
