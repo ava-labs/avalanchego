@@ -37,6 +37,7 @@ func LocalFlags() testnet.FlagsMap {
 		config.IndexEnabledKey:              true,
 		config.LogDisplayLevelKey:           "INFO",
 		config.LogLevelKey:                  "DEBUG",
+		config.MinStakeDurationKey:          testnet.DefaultMinStakeDuration.String(),
 	}
 }
 
@@ -46,6 +47,6 @@ func LocalCChainConfig() testnet.FlagsMap {
 	// values will be used. Available C-Chain configuration options are
 	// defined in the `github.com/ava-labs/coreth/evm` package.
 	return testnet.FlagsMap{
-		"log-level": "debug",
+		"log-level": "trace",
 	}
 }

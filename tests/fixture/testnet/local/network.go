@@ -128,7 +128,7 @@ func StartNetwork(
 	nodeCount int,
 	keyCount int,
 ) (*LocalNetwork, error) {
-	if _, err := fmt.Fprintln(w, "Preparing configuration for new local network..."); err != nil {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new local network with %s\n", network.ExecPath); err != nil {
 		return nil, err
 	}
 
@@ -407,54 +407,35 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// Retrieve API URIs for all nodes in the network. Assumes nodes have
-// been loaded.
-func (ln *LocalNetwork) GetURIs() []string {
-	uris := make([]string, 0, len(ln.Nodes))
+// Retrieve API URIs for all running primary validator nodes. URIs for
+// ephemeral nodes are not returned.
+func (ln *LocalNetwork) GetURIs() []testnet.NodeURI {
+	uris := make([]testnet.NodeURI, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
-			uris = append(uris, node.URI)
+			uris = append(uris, testnet.NodeURI{
+				NodeID: node.NodeID,
+				URI:    node.URI,
+			})
 		}
 	}
 	return uris
 }
 
-type NodeStopError struct {
-	NodeID    ids.NodeID
-	StopError error
-}
-
-func (e *NodeStopError) Error() string {
-	return fmt.Sprintf("failed to stop node %s: %v", e.NodeID, e.StopError)
-}
-
-type NetworkStopError struct {
-	Errors []*NodeStopError
-}
-
-func (e *NetworkStopError) Error() string {
-	return fmt.Sprintf("failed to stop network: %v", e.Errors)
-}
-
 // Stop all nodes in the network.
 func (ln *LocalNetwork) Stop() error {
-	errs := []*NodeStopError{}
+	var errs []error
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range ln.Nodes {
 		if err := node.Stop(); err != nil {
-			errs = append(errs, &NodeStopError{
-				NodeID:    node.NodeID,
-				StopError: err,
-			})
+			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 	if len(errs) > 0 {
-		// TODO(marun) When avalanchego updates to go 1.20, update to
-		// use the new capability to wrap multiple errors.
-		return &NetworkStopError{Errors: errs}
+		return fmt.Errorf("failed to stop network:\n%w", errors.Join(errs...))
 	}
 	return nil
 }

@@ -20,7 +20,7 @@ import (
 // * Deleting a key-node pair from the database
 // * Evicting elements from the cache
 // * Flushing the cache
-func TestIntermediateNodeDB(t *testing.T) {
+func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
@@ -70,7 +70,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	added := 0
 	for {
 		key := newPath([]byte{byte(added)})
-		node := newNode(nil, EmptyPath)
+		node := newNode(nil, key)
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -90,7 +90,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
 	key := newPath([]byte{byte(added)})
-	node := newNode(nil, EmptyPath)
+	node := newNode(nil, key)
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
@@ -124,4 +124,73 @@ func TestIntermediateNodeDB(t *testing.T) {
 	}
 	require.NoError(it.Error())
 	require.Equal(added+1, count)
+}
+
+func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
+	cacheSize := 200
+	evictionBatchSize := cacheSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		evictionBatchSize,
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		key []byte,
+	) {
+		require := require.New(t)
+
+		p := newPath(key)
+		constructedKey := db.constructDBKey(p)
+		baseLength := len(p)/2 + len(intermediateNodePrefix)
+		require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
+		if len(p)%2 == 0 {
+			// when even, there is an extra padding byte
+			require.Len(constructedKey, baseLength+1)
+			require.Equal(append(p.Serialize().Value, 0b1000_0000), constructedKey[len(intermediateNodePrefix):])
+		} else {
+			require.Len(constructedKey, baseLength)
+			require.Equal(p.Append(0b0000_1000).Serialize().Value, constructedKey[len(intermediateNodePrefix):])
+		}
+	})
+}
+
+func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	evictionBatchSize := cacheSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		evictionBatchSize,
+	)
+
+	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
+	constructedKey := db.constructDBKey(newPath([]byte{}))
+	require.Len(constructedKey, 2)
+	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
+	require.Equal(byte(0b1000_0000), constructedKey[len(constructedKey)-1])
+
+	db.bufferPool = &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, defaultBufferLength)
+		},
+	}
+	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
+	p := path(" ")
+	constructedKey = db.constructDBKey(p)
+	require.Len(constructedKey, 2)
+	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
+	require.Equal(p.Append(0b0000_1000).Serialize().Value, constructedKey[len(intermediateNodePrefix):])
 }

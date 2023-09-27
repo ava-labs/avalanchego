@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -45,7 +45,7 @@ import (
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -332,20 +332,20 @@ func TestGetTx(t *testing.T) {
 
 				require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
 
-				block, err := service.vm.BuildBlock(context.Background())
+				blk, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
 
-				require.NoError(block.Verify(context.Background()))
+				require.NoError(blk.Verify(context.Background()))
 
-				require.NoError(block.Accept(context.Background()))
+				require.NoError(blk.Accept(context.Background()))
 
-				if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
+				if blk, ok := blk.(snowman.OracleBlock); ok { // For proposal blocks, commit them
 					options, err := blk.Options(context.Background())
 					if !errors.Is(err, snowman.ErrNotOracle) {
 						require.NoError(err)
 
 						commit := options[0].(*blockexecutor.Block)
-						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+						require.IsType(&block.BanffCommitBlock{}, commit.Block)
 						require.NoError(commit.Verify(context.Background()))
 						require.NoError(commit.Accept(context.Background()))
 					}
@@ -749,7 +749,7 @@ func TestGetBlock(t *testing.T) {
 			preferred, err := service.vm.Builder.Preferred()
 			require.NoError(err)
 
-			statelessBlock, err := blocks.NewBanffStandardBlock(
+			statelessBlock, err := block.NewBanffStandardBlock(
 				preferred.Timestamp(),
 				preferred.ID(),
 				preferred.Height()+1,
@@ -757,13 +757,13 @@ func TestGetBlock(t *testing.T) {
 			)
 			require.NoError(err)
 
-			block := service.vm.manager.NewBlock(statelessBlock)
+			blk := service.vm.manager.NewBlock(statelessBlock)
 
-			require.NoError(block.Verify(context.Background()))
-			require.NoError(block.Accept(context.Background()))
+			require.NoError(blk.Verify(context.Background()))
+			require.NoError(blk.Accept(context.Background()))
 
 			args := api.GetBlockArgs{
-				BlockID:  block.ID(),
+				BlockID:  blk.ID(),
 				Encoding: test.encoding,
 			}
 			response := api.GetBlockResponse{}
@@ -771,15 +771,15 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.IsType((*blocks.BanffStandardBlock)(nil), response.Block)
-				responseBlock := response.Block.(*blocks.BanffStandardBlock)
+				require.IsType((*block.BanffStandardBlock)(nil), response.Block)
+				responseBlock := response.Block.(*block.BanffStandardBlock)
 				require.Equal(statelessBlock.ID(), responseBlock.ID())
 
 				_, err = stdjson.Marshal(response)
 				require.NoError(err)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				require.Equal(block.Bytes(), decoded)
+				require.Equal(blk.Bytes(), decoded)
 			}
 
 			require.Equal(test.encoding, response.Encoding)
@@ -878,7 +878,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "JSON format",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 
 				state := state.NewMockState(ctrl)
@@ -902,7 +902,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hex format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
@@ -930,7 +930,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
@@ -958,7 +958,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexnc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 

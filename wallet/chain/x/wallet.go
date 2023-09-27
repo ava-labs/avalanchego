@@ -305,6 +305,10 @@ func (w *wallet) IssueTx(
 		return err
 	}
 
+	if f := ops.PostIssuanceFunc(); f != nil {
+		f(txID)
+	}
+
 	if ops.AssumeDecided() {
 		return w.Backend.AcceptTx(ctx, tx)
 	}

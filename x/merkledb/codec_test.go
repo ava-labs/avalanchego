@@ -28,7 +28,7 @@ func FuzzCodecBool(f *testing.F) {
 			startLen := reader.Len()
 			got, err := codec.decodeBool(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
@@ -54,16 +54,16 @@ func FuzzCodecInt(f *testing.F) {
 			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeInt(reader)
+			got, err := codec.decodeUint(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeInt(&buf, got)
+			codec.encodeUint(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -84,7 +84,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			startLen := reader.Len()
 			got, err := codec.decodeSerializedPath(reader)
 			if err != nil {
-				return
+				t.SkipNow()
 			}
 			endLen := reader.Len()
 			numRead := startLen - endLen
@@ -113,7 +113,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
 			if err := codec.decodeDBNode(b, node); err != nil {
-				return
+				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
@@ -195,22 +195,12 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	}
 
 	nodeBytes := codec.encodeDBNode(&proof)
-
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
-	// Put num children -1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, -1)
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
-	require.ErrorIs(err, errNegativeNumChildren)
-
-	// Remove num children from end
-	nodeBytes = proofBytesBuf.Bytes()
-	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
-	proofBytesBuf = bytes.NewBuffer(nodeBytes)
 	// Put num children NodeBranchFactor+1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1)
+	codec.(*codecImpl).encodeUint(proofBytesBuf, NodeBranchFactor+1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)

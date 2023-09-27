@@ -171,16 +171,16 @@ func (s *DBServer) GetRangeProof(
 
 	protoProof := &pb.GetRangeProofResponse{
 		Proof: &pb.RangeProof{
-			Start:     make([]*pb.ProofNode, len(proof.StartProof)),
-			End:       make([]*pb.ProofNode, len(proof.EndProof)),
-			KeyValues: make([]*pb.KeyValue, len(proof.KeyValues)),
+			StartProof: make([]*pb.ProofNode, len(proof.StartProof)),
+			EndProof:   make([]*pb.ProofNode, len(proof.EndProof)),
+			KeyValues:  make([]*pb.KeyValue, len(proof.KeyValues)),
 		},
 	}
 	for i, node := range proof.StartProof {
-		protoProof.Proof.Start[i] = node.ToProto()
+		protoProof.Proof.StartProof[i] = node.ToProto()
 	}
 	for i, node := range proof.EndProof {
-		protoProof.Proof.End[i] = node.ToProto()
+		protoProof.Proof.EndProof[i] = node.ToProto()
 	}
 	for i, kv := range proof.KeyValues {
 		protoProof.Proof.KeyValues[i] = &pb.KeyValue{
@@ -206,6 +206,11 @@ func (s *DBServer) CommitRangeProof(
 		start = maybe.Some(req.StartKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, &proof)
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, end, &proof)
 	return &emptypb.Empty{}, err
 }
