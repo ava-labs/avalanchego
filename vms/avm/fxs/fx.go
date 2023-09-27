@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	_ Fx = (*secp256k1fx.Fx)(nil)
-	_ Fx = (*nftfx.Fx)(nil)
-	_ Fx = (*propertyfx.Fx)(nil)
+	_ Fx                = (*secp256k1fx.Fx)(nil)
+	_ Fx                = (*nftfx.Fx)(nil)
+	_ Fx                = (*propertyfx.Fx)(nil)
+	_ verify.Verifiable = (*FxCredential)(nil)
 )
 
 type ParsedFx struct {
@@ -58,6 +59,10 @@ type FxOperation interface {
 }
 
 type FxCredential struct {
-	FxID              ids.ID `serialize:"false" json:"fxID"`
-	verify.Verifiable `serialize:"true" json:"credential"`
+	FxID       ids.ID            `serialize:"false" json:"fxID"`
+	Credential verify.Verifiable `serialize:"true"  json:"credential"`
+}
+
+func (f *FxCredential) Verify() error {
+	return f.Credential.Verify()
 }
