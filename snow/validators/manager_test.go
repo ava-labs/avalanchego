@@ -418,10 +418,10 @@ func TestString(t *testing.T) {
 
 	expected := "Validator Manager: (Size = 2)\n" +
 		"    Subnet[TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES]: Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
-		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
-		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806\n" +
+		"        Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
+		"        Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806\n" +
 		"    Subnet[2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w]: Validator Set: (Size = 1, Weight = 1)\n" +
-		"    Validator[0]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 1"
+		"        Validator[0]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 1"
 	result := m.String()
 	require.Equal(expected, result)
 }

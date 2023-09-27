@@ -298,7 +298,7 @@ func (m *manager) String() string {
 		sb.WriteString(fmt.Sprintf(
 			"\n    Subnet[%s]: %s",
 			subnetID,
-			vdrs.PrefixedString(""),
+			vdrs.PrefixedString("    "),
 		))
 	}
 
