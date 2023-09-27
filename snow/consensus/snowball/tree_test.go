@@ -750,7 +750,7 @@ func TestSnowballConsistent(t *testing.T) {
 	n.Initialize(params, numColors)
 
 	for i := 0; i < numNodes; i++ {
-		n.AddNode(&Tree{})
+		n.AddNode(NewTree)
 	}
 
 	for !n.Finalized() && !n.Disagreement() {
