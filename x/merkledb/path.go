@@ -226,7 +226,6 @@ func shiftCopy(dst []byte, src string, shift byte) {
 		// the last byte only has values from byte i, as there is no byte i+1
 		dst[i] = src[i] << shift
 	}
-
 }
 
 // Skip returns a new Path that contains the last p.length-tokensToSkip tokens of the current Path
