@@ -119,4 +119,10 @@ func TestPredicateResultsAccessors(t *testing.T) {
 	require.Equal(predicateResult, predicateResults.GetPredicateResults(txHash, addr))
 	predicateResults.DeleteTxPredicateResults(txHash)
 	require.Empty(predicateResults.GetPredicateResults(txHash, addr))
+
+	// Ensure setting empty tx predicate results removes the entry
+	predicateResults.SetTxPredicateResults(txHash, txPredicateResults)
+	require.Equal(predicateResult, predicateResults.GetPredicateResults(txHash, addr))
+	predicateResults.SetTxPredicateResults(txHash, map[common.Address][]byte{})
+	require.Empty(predicateResults.GetPredicateResults(txHash, addr))
 }

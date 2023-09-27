@@ -81,8 +81,9 @@ func (p *PredicateResults) GetPredicateResults(txHash common.Hash, address commo
 
 // SetTxPredicateResults sets the predicate results for the given [txHash]. Overrides results if present.
 func (p *PredicateResults) SetTxPredicateResults(txHash common.Hash, txResults TxPredicateResults) {
-	// If there are no tx results, omit them.
+	// If there are no tx results, don't store an entry in the map
 	if len(txResults) == 0 {
+		delete(p.Results, txHash)
 		return
 	}
 	p.Results[txHash] = txResults
