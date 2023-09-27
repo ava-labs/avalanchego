@@ -28,9 +28,7 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 	}
 }
 
-func (n *Network) AddNode(
-	newConsensusFunc newConsensusFunc,
-) Consensus {
+func (n *Network) AddNode(newConsensusFunc newConsensusFunc) Consensus {
 	consensus := newConsensusFunc(n.params, n.colors[0])
 
 	s := sampler.NewUniform()
