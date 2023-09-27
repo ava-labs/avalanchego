@@ -5,7 +5,7 @@ go-metrics
 
 Go port of Coda Hale's Metrics library: <https://github.com/dropwizard/metrics>.
 
-Documentation: <https://godoc.org/github.com/rcrowley/go-metrics>.
+Documentation: <https://pkg.go.dev/github.com/rcrowley/go-metrics>.
 
 Usage
 -----

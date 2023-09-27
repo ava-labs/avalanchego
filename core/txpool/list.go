@@ -520,7 +520,7 @@ type pricedList struct {
 	// Number of stale price points to (re-heap trigger).
 	// This field is accessed atomically, and must be the first field
 	// to ensure it has correct alignment for atomic.AddInt64.
-	// See https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
+	// See https://pkg.go.dev/sync/atomic#pkg-note-BUG.
 	stales int64
 
 	all              *lookup    // Pointer to the map of all transactions
