@@ -24,7 +24,7 @@ func TestSnowballSingleton(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
 	}
-	tree := TreeFactory{}.New(params, Red)
+	tree := NewTree(params, Red)
 
 	require.False(tree.Finalized())
 
@@ -61,7 +61,7 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
-	tree := TreeFactory{}.New(params, Red)
+	tree := NewTree(params, Red)
 
 	require.False(tree.Finalized())
 
@@ -87,7 +87,7 @@ func TestSnowballBinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, Red)
+	tree := NewTree(params, Red)
 	tree.Add(Blue)
 
 	require.Equal(Red, tree.Preference())
@@ -126,7 +126,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 
 	// Should do nothing
@@ -166,7 +166,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 	tree.Add(four)
 
@@ -219,7 +219,7 @@ func TestSnowballNewUnary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 3,
 	}
-	tree := TreeFactory{}.New(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 
 	{
@@ -265,7 +265,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(two)
 	tree.Add(eight)
 
@@ -345,7 +345,7 @@ func TestSnowballTrinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, Green)
+	tree := NewTree(params, Green)
 	tree.Add(Red)
 	tree.Add(Blue)
 
@@ -395,7 +395,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, yellow)
+	tree := NewTree(params, yellow)
 	tree.Add(cyan)
 	tree.Add(magenta)
 
@@ -440,7 +440,7 @@ func TestSnowballAddRejected(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c1000)
 	tree.Add(c0010)
 
@@ -485,7 +485,7 @@ func TestSnowballResetChild(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c0100)
 	tree.Add(c1000)
 
@@ -544,7 +544,7 @@ func TestSnowballResetSibling(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c0100)
 	tree.Add(c1000)
 
@@ -606,14 +606,14 @@ func TestSnowball5Colors(t *testing.T) {
 		colors = append(colors, ids.Empty.Prefix(uint64(i)))
 	}
 
-	tree0 := TreeFactory{}.New(params, colors[4])
+	tree0 := NewTree(params, colors[4])
 
 	tree0.Add(colors[0])
 	tree0.Add(colors[1])
 	tree0.Add(colors[2])
 	tree0.Add(colors[3])
 
-	tree1 := TreeFactory{}.New(params, colors[3])
+	tree1 := NewTree(params, colors[3])
 
 	tree1.Add(colors[0])
 	tree1.Add(colors[1])
@@ -636,7 +636,7 @@ func TestSnowballFineGrained(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, c0000)
+	tree := NewTree(params, c0000)
 
 	require.Equal(initialUnaryDescription, tree.String())
 	require.Equal(c0000, tree.Preference())
@@ -726,7 +726,7 @@ func TestSnowballDoubleAdd(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
-	tree := TreeFactory{}.New(params, Red)
+	tree := NewTree(params, Red)
 	tree.Add(Red)
 
 	require.Equal(initialUnaryDescription, tree.String())
@@ -771,7 +771,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := TreeFactory{}.New(params, c0000)
+	tree := NewTree(params, c0000)
 
 	require.Equal(initialUnaryDescription, tree.String())
 	require.Equal(c0000, tree.Preference())

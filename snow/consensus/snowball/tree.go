@@ -12,16 +12,12 @@ import (
 )
 
 var (
-	_ Factory   = (*TreeFactory)(nil)
 	_ Consensus = (*Tree)(nil)
 	_ node      = (*unaryNode)(nil)
 	_ node      = (*binaryNode)(nil)
 )
 
-// TreeFactory implements Factory by returning a tree struct
-type TreeFactory struct{}
-
-func (TreeFactory) New(params Parameters, choice ids.ID) Consensus {
+func NewTree(params Parameters, choice ids.ID) Consensus {
 	snowball := &unarySnowball{}
 	snowball.Initialize(params.BetaVirtuous)
 

@@ -8,15 +8,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
-var (
-	_ Factory   = (*FlatFactory)(nil)
-	_ Consensus = (*Flat)(nil)
-)
+var _ Consensus = (*Flat)(nil)
 
-// FlatFactory implements Factory by returning a flat struct
-type FlatFactory struct{}
-
-func (FlatFactory) New(params Parameters, choice ids.ID) Consensus {
+func NewFlat(params Parameters, choice ids.ID) Consensus {
 	f := &Flat{
 		params: params,
 	}
