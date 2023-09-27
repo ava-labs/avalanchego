@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
+type newConsensusFunc func(params Parameters, choice ids.ID) Consensus
+
 type Network struct {
 	params         Parameters
 	colors         []ids.ID
@@ -27,7 +29,7 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 }
 
 func (n *Network) AddNode(
-	newConsensusFunc func(params Parameters, choice ids.ID) Consensus,
+	newConsensusFunc newConsensusFunc,
 ) Consensus {
 	consensus := newConsensusFunc(n.params, n.colors[0])
 
@@ -46,11 +48,11 @@ func (n *Network) AddNode(
 	return consensus
 }
 
-// AddNodeSpecificColor adds [sb] to the network which will initially prefer
-// [initialPreference] and additionally adds each of the specified [options] to
-// consensus.
+// AddNodeSpecificColor adds a new consensus instance to the network which will
+// initially prefer [initialPreference] and additionally adds each of the
+// specified [options] to consensus.
 func (n *Network) AddNodeSpecificColor(
-	newConsensusFunc func(params Parameters, choice ids.ID) Consensus,
+	newConsensusFunc newConsensusFunc,
 	initialPreference int,
 	options []int,
 ) Consensus {
