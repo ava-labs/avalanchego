@@ -100,33 +100,36 @@ func (p Path) hasPartialByte() bool {
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (p Path) HasPrefix(prefix Path) bool {
-	// if the current path is shorter than the prefix path, then it cannot be a prefix
+	// [prefix] must be shorter than [p] to be a prefix.
 	if p.tokensLength < prefix.tokensLength {
 		return false
 	}
 
+	// The number of tokens in the last byte of [prefix], or zero
+	// if [prefix] fits into a whole number of bytes.
 	remainderTokens := prefix.tokensLength % p.tokensPerByte
 	if remainderTokens == 0 {
 		return strings.HasPrefix(p.value, prefix.value)
 	}
 
-	// check that the tokens that were in the partially filled prefix byte are equal to the tokens in the current path
+	// check that the tokens in the partially filled final byte of [prefix] are
+	// equal to the tokens in the final byte of [p].
 	for i := prefix.tokensLength - remainderTokens; i < prefix.tokensLength; i++ {
 		if p.Token(i) != prefix.Token(i) {
 			return false
 		}
 	}
 
-	// the prefix contains a partially filled byte so grab the length of whole bytes
-	wholeBytesLength := len(prefix.value) - 1
-
-	// the input was valid and the whole bytes of the prefix are a prefix of the current path
-	return wholeBytesLength >= 0 && strings.HasPrefix(p.value, prefix.value[:wholeBytesLength])
+	// Note that this will never be an index OOB because len(prefix.value) > 0.
+	// If len(prefix.value) == 0 were true, [remainderTokens] would be 0 so we
+	// would have returned above.
+	prefixWithoutPartialByte := prefix.value[:len(prefix.value)-1]
+	return strings.HasPrefix(p.value, prefixWithoutPartialByte)
 }
 
-// HasStrictPrefix Returns true iff [prefix] is a prefix of [s] but not equal to it.
+// HasStrictPrefix returns true iff [prefix] is a prefix of [s] but not equal to it.
 func (p Path) HasStrictPrefix(prefix Path) bool {
-	return p.HasPrefix(prefix) && p != prefix
+	return p != prefix && p.HasPrefix(prefix)
 }
 
 // Token returns the token at the specified index
