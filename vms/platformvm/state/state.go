@@ -1963,14 +1963,11 @@ func (s *state) processPendingStakers() []stakerStatusPair {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// validatorDiff.validator is not guaranteed to be non-nil here.
 			// Access it only if validatorDiff.validatorStatus is added or deleted
-			switch {
-			case validatorDiff.validatorStatus == added || validatorDiff.validatorStatus == deleted:
+			if validatorDiff.validatorStatus == added || validatorDiff.validatorStatus == deleted {
 				output = append(output, stakerStatusPair{
 					status: validatorDiff.validatorStatus,
 					staker: validatorDiff.validator,
 				})
-			default:
-				// nothing to do
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
