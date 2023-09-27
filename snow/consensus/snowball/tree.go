@@ -18,8 +18,7 @@ var (
 )
 
 func NewTree(params Parameters, choice ids.ID) Consensus {
-	snowball := &unarySnowball{}
-	snowball.Initialize(params.BetaVirtuous)
+	snowball := newUnarySnowball(params.BetaVirtuous)
 
 	t := &Tree{
 		params: params,
@@ -28,7 +27,7 @@ func NewTree(params Parameters, choice ids.ID) Consensus {
 		tree:         t,
 		preference:   choice,
 		commonPrefix: ids.NumBits, // The initial state has no conflicts
-		snowball:     snowball,
+		snowball:     &snowball,
 	}
 
 	return t
@@ -174,8 +173,6 @@ func (u *unaryNode) DecidedPrefix() int {
 	return u.decidedPrefix
 }
 
-//nolint:gofmt,gofumpt,goimports // this comment is formatted as intended
-//
 // This is by far the most complicated function in this algorithm.
 // The intuition is that this instance represents a series of consecutive unary
 // snowball instances, and this function's purpose is convert one of these unary
@@ -187,23 +184,23 @@ func (u *unaryNode) DecidedPrefix() int {
 //
 //     For example, attempting to insert the value "00001" in this node:
 //
-//                       +-------------------+ <-- This node will not be split
-//                       |                   |
-//                       |       0 0 0       |
-//                       |                   |
-//                       +-------------------+ <-- Pass the add to the child
-//                                 ^
-//                                 |
+//     +-------------------+ <-- This node will not be split
+//     |                   |
+//     |       0 0 0       |
+//     |                   |
+//     +-------------------+ <-- Pass the add to the child
+//     ^
+//     |
 //
 //     Results in:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |       0 0 0       |
-//                       |                   |
-//                       +-------------------+ <-- With the modified child
-//                                 ^
-//                                 |
+//     +-------------------+
+//     |                   |
+//     |       0 0 0       |
+//     |                   |
+//     +-------------------+ <-- With the modified child
+//     ^
+//     |
 //
 //  2. This instance represents a series of only one unary instance and it must
 //     be split.
@@ -214,19 +211,19 @@ func (u *unaryNode) DecidedPrefix() int {
 //
 //     For example, attempting to insert the value "1" in this tree:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |         0         |
-//                       |                   |
-//                       +-------------------+
+//     +-------------------+
+//     |                   |
+//     |         0         |
+//     |                   |
+//     +-------------------+
 //
 //     Results in:
 //
-//                       +-------------------+
-//                       |         |         |
-//                       |    0    |    1    |
-//                       |         |         |
-//                       +-------------------+
+//     +-------------------+
+//     |         |         |
+//     |    0    |    1    |
+//     |         |         |
+//     +-------------------+
 //
 //  3. This instance must be split on the first bit
 //
@@ -236,26 +233,26 @@ func (u *unaryNode) DecidedPrefix() int {
 //
 //     For example, attempting to insert the value "10" in this tree:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |        0 0        |
-//                       |                   |
-//                       +-------------------+
+//     +-------------------+
+//     |                   |
+//     |        0 0        |
+//     |                   |
+//     +-------------------+
 //
 //     Results in:
 //
-//                       +-------------------+
-//                       |         |         |
-//                       |    0    |    1    |
-//                       |         |         |
-//                       +-------------------+
-//                            ^         ^
-//                           /           \
-//            +-------------------+ +-------------------+
-//            |                   | |                   |
-//            |         0         | |         0         |
-//            |                   | |                   |
-//            +-------------------+ +-------------------+
+//     +-------------------+
+//     |         |         |
+//     |    0    |    1    |
+//     |         |         |
+//     +-------------------+
+//     ^         ^
+//     /           \
+//     +-------------------+ +-------------------+
+//     |                   | |                   |
+//     |         0         | |         0         |
+//     |                   | |                   |
+//     +-------------------+ +-------------------+
 //
 //  4. This instance must be split on the last bit
 //
@@ -266,26 +263,26 @@ func (u *unaryNode) DecidedPrefix() int {
 //
 //     For example, attempting to insert the value "01" in this tree:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |        0 0        |
-//                       |                   |
-//                       +-------------------+
+//     +-------------------+
+//     |                   |
+//     |        0 0        |
+//     |                   |
+//     +-------------------+
 //
 //     Results in:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |         0         |
-//                       |                   |
-//                       +-------------------+
-//                                 ^
-//                                 |
-//                       +-------------------+
-//                       |         |         |
-//                       |    0    |    1    |
-//                       |         |         |
-//                       +-------------------+
+//     +-------------------+
+//     |                   |
+//     |         0         |
+//     |                   |
+//     +-------------------+
+//     ^
+//     |
+//     +-------------------+
+//     |         |         |
+//     |    0    |    1    |
+//     |         |         |
+//     +-------------------+
 //
 //  5. This instance must be split on an interior bit
 //
@@ -297,33 +294,35 @@ func (u *unaryNode) DecidedPrefix() int {
 //
 //     For example, attempting to insert the value "010" in this tree:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |       0 0 0       |
-//                       |                   |
-//                       +-------------------+
+//     +-------------------+
+//     |                   |
+//     |       0 0 0       |
+//     |                   |
+//     +-------------------+
 //
 //     Results in:
 //
-//                       +-------------------+
-//                       |                   |
-//                       |         0         |
-//                       |                   |
-//                       +-------------------+
-//                                 ^
-//                                 |
-//                       +-------------------+
-//                       |         |         |
-//                       |    0    |    1    |
-//                       |         |         |
-//                       +-------------------+
-//                            ^         ^
-//                           /           \
-//            +-------------------+ +-------------------+
-//            |                   | |                   |
-//            |         0         | |         0         |
-//            |                   | |                   |
-//            +-------------------+ +-------------------+
+//     +-------------------+
+//     |                   |
+//     |         0         |
+//     |                   |
+//     +-------------------+
+//     ^
+//     |
+//     +-------------------+
+//     |         |         |
+//     |    0    |    1    |
+//     |         |         |
+//     +-------------------+
+//     ^         ^
+//     /           \
+//     +-------------------+ +-------------------+
+//     |                   | |                   |
+//     |         0         | |         0         |
+//     |                   | |                   |
+//     +-------------------+ +-------------------+
+//
+//nolint:gofmt,gofumpt,goimports // this comment is formatted as intended
 func (u *unaryNode) Add(newChoice ids.ID) node {
 	if u.Finalized() {
 		return u // Only happens if the tree is finalized, or it's a leaf node
@@ -355,14 +354,13 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b.preferences[bit] = u.preference
 	b.preferences[1-bit] = newChoice
 
-	newChildSnowball := &unarySnowball{}
-	newChildSnowball.Initialize(u.tree.params.BetaVirtuous)
+	newChildSnowball := newUnarySnowball(u.tree.params.BetaVirtuous)
 	newChild := &unaryNode{
 		tree:          u.tree,
 		preference:    newChoice,
 		decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
 		commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
-		snowball:      newChildSnowball,
+		snowball:      &newChildSnowball,
 	}
 
 	switch {

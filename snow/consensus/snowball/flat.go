@@ -11,11 +11,10 @@ import (
 var _ Consensus = (*Flat)(nil)
 
 func NewFlat(params Parameters, choice ids.ID) Consensus {
-	f := &Flat{
-		params: params,
+	return &Flat{
+		params:        params,
+		nnarySnowball: newNnarySnowball(params.BetaVirtuous, params.BetaRogue, choice),
 	}
-	f.nnarySnowball.Initialize(params.BetaVirtuous, params.BetaRogue, choice)
-	return f
 }
 
 // Flat is a naive implementation of a multi-choice snowball instance
