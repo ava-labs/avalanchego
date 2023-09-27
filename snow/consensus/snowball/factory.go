@@ -3,7 +3,9 @@
 
 package snowball
 
+import "github.com/ava-labs/avalanchego/ids"
+
 // Factory returns new instances of Consensus
 type Factory interface {
-	New() Consensus
+	New(params Parameters, choice ids.ID) Consensus
 }

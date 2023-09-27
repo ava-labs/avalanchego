@@ -30,7 +30,8 @@ func (n *Network) AddNode(sb Consensus) {
 	s := sampler.NewUniform()
 	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
-	sb.Initialize(n.params, n.colors[int(indices[0])])
+	// TODO fix
+	// sb.Initialize(n.params, n.colors[int(indices[0])])
 	for _, index := range indices[1:] {
 		sb.Add(n.colors[int(index)])
 	}
@@ -45,7 +46,8 @@ func (n *Network) AddNode(sb Consensus) {
 // [initialPreference] and additionally adds each of the specified [options] to
 // consensus.
 func (n *Network) AddNodeSpecificColor(sb Consensus, initialPreference int, options []int) {
-	sb.Initialize(n.params, n.colors[initialPreference])
+	// TODO fix
+	// sb.Initialize(n.params, n.colors[initialPreference])
 	for _, i := range options {
 		sb.Add(n.colors[i])
 	}
