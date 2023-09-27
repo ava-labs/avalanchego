@@ -236,10 +236,10 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 			fxCred = &fxs.FxCredential{}
 			tx.Creds[credIndex] = fxCred
 		}
-		credIntf := fxCred.Verifiable
+		credIntf := fxCred.Credential
 		if credIntf == nil {
 			credIntf = creds[credIndex]
-			fxCred.Verifiable = credIntf
+			fxCred.Credential = credIntf
 		}
 
 		var cred *secp256k1fx.Credential
