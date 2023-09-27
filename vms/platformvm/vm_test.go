@@ -423,7 +423,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	require.Len(genesisState.Validators, vm.Validators.Len(constants.PrimaryNetworkID))
+	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
@@ -1626,7 +1626,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Len(ctx.SubnetID),
+		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
 		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,

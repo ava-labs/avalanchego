@@ -77,7 +77,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
-		SampleK:                        vdrs.Len(ctx.SubnetID),
+		SampleK:                        vdrs.Count(ctx.SubnetID),
 		Alpha:                          totalWeight/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
@@ -1362,7 +1362,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        peers,
-		SampleK:                        peers.Len(ctx.SubnetID),
+		SampleK:                        peers.Count(ctx.SubnetID),
 		Alpha:                          totalWeight/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,

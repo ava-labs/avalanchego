@@ -346,7 +346,7 @@ func (m *manager) getCurrentValidatorSets(
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetManager := m.cfg.Validators
-	if m.cfg.Validators.Len(subnetID) == 0 {
+	if m.cfg.Validators.Count(subnetID) == 0 {
 		// If there are no validators in the subnet, we need to add the current
 		// validators to the subnet validator manager to get map. But we don't want to modify
 		// the existing manager ([m.cfg.Validators]) as it would reapply weights. So we create a new

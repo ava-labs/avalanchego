@@ -60,8 +60,8 @@ func (o *overriddenManager) Contains(_ ids.ID, validatorID ids.NodeID) bool {
 	return o.manager.Contains(o.subnetID, validatorID)
 }
 
-func (o *overriddenManager) Len(_ ids.ID) int {
-	return o.manager.Len(o.subnetID)
+func (o *overriddenManager) Count(_ ids.ID) int {
+	return o.manager.Count(o.subnetID)
 }
 
 func (o *overriddenManager) TotalWeight(_ ids.ID) (uint64, error) {

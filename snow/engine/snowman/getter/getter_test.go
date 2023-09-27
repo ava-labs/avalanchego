@@ -68,7 +68,7 @@ func testSetup(
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        peers,
-		SampleK:                        peers.Len(ctx.SubnetID),
+		SampleK:                        peers.Count(ctx.SubnetID),
 		Alpha:                          totalWeight/2 + 1,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,

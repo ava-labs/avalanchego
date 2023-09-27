@@ -110,7 +110,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          alpha,
 		StartupTracker: startup,
 	}
@@ -159,7 +159,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -203,7 +203,7 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -240,7 +240,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -259,7 +259,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Len(ctx.SubnetID), common.MaxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Count(ctx.SubnetID), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		require.Contains(syncer.pendingSeeders, beaconID)
@@ -285,7 +285,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -362,7 +362,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// other listed vdrs are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == vdrs.Len(ctx.SubnetID))
+			len(contactedFrontiersProviders) == vdrs.Count(ctx.SubnetID))
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
@@ -381,7 +381,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -437,7 +437,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == vdrs.Len(ctx.SubnetID))
+			len(contactedFrontiersProviders) == vdrs.Count(ctx.SubnetID))
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
@@ -456,7 +456,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -505,7 +505,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == vdrs.Len(ctx.SubnetID))
+			len(contactedFrontiersProviders) == vdrs.Count(ctx.SubnetID))
 
 	// mock VM to simulate a valid but late summary is returned
 	fullVM.CantParseStateSummary = true
@@ -545,7 +545,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
-		SampleK:                     vdrs.Len(ctx.SubnetID),
+		SampleK:                     vdrs.Count(ctx.SubnetID),
 		Alpha:                       (totalWeight + 1) / 2,
 		StartupTracker:              startup,
 		RetryBootstrap:              true,
@@ -642,7 +642,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -719,7 +719,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -823,7 +823,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// other listed voters are reached out
 	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == vdrs.Len(ctx.SubnetID))
+			len(contactedVoters) == vdrs.Count(ctx.SubnetID))
 }
 
 func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
@@ -842,7 +842,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -932,7 +932,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// on unknown summary
 	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == vdrs.Len(ctx.SubnetID))
+			len(contactedVoters) == vdrs.Count(ctx.SubnetID))
 }
 
 func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
@@ -951,7 +951,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -1101,7 +1101,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
-		SampleK:                     vdrs.Len(ctx.SubnetID),
+		SampleK:                     vdrs.Count(ctx.SubnetID),
 		Alpha:                       (totalWeight + 1) / 2,
 		StartupTracker:              startup,
 		RetryBootstrap:              true, // this sets RetryStateSyncing too
@@ -1214,7 +1214,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	commonCfg := common.Config{
 		Ctx:            ctx,
 		Beacons:        vdrs,
-		SampleK:        vdrs.Len(ctx.SubnetID),
+		SampleK:        vdrs.Count(ctx.SubnetID),
 		Alpha:          (totalWeight + 1) / 2,
 		StartupTracker: startup,
 	}
@@ -1365,7 +1365,7 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
-		SampleK:                     vdrs.Len(ctx.SubnetID),
+		SampleK:                     vdrs.Count(ctx.SubnetID),
 		Alpha:                       (totalWeight + 1) / 2,
 		StartupTracker:              startup,
 		RetryBootstrap:              true, // this sets RetryStateSyncing too

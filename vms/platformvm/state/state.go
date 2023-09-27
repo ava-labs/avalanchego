@@ -1611,7 +1611,7 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
-	if s.cfg.Validators.Len(constants.PrimaryNetworkID) != 0 {
+	if s.cfg.Validators.Count(constants.PrimaryNetworkID) != 0 {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
@@ -1631,7 +1631,7 @@ func (s *state) initValidatorSets() error {
 	s.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range s.cfg.TrackedSubnets {
-		if s.cfg.Validators.Len(subnetID) != 0 {
+		if s.cfg.Validators.Count(subnetID) != 0 {
 			// Enforce the invariant that the validator set is empty here.
 			return errValidatorSetAlreadyPopulated
 		}

@@ -320,7 +320,7 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 		}
 	}
 
-	numBootstrappers := n.bootstrappers.Len(constants.PrimaryNetworkID)
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {

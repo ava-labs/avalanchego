@@ -77,8 +77,8 @@ type Manager interface {
 	// currently in the subnet.
 	Contains(subnetID ids.ID, validatorID ids.NodeID) bool
 
-	// Len returns the number of validators currently in the subnet.
-	Len(subnetID ids.ID) int
+	// Count returns the number of validators currently in the subnet.
+	Count(subnetID ids.ID) int
 
 	// TotalWeight returns the cumulative weight of all validators in the subnet.
 	// Returns err if total weight overflows uint64.
@@ -212,7 +212,7 @@ func (m *manager) Contains(subnetID ids.ID, validatorID ids.NodeID) bool {
 	return set.Contains(validatorID)
 }
 
-func (m *manager) Len(subnetID ids.ID) int {
+func (m *manager) Count(subnetID ids.ID) int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 

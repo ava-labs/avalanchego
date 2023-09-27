@@ -877,7 +877,7 @@ func (n *network) samplePeers(
 ) []peer.Peer {
 	// If there are fewer validators than [numValidatorsToSample], then only
 	// sample [numValidatorsToSample] validators.
-	subnetValidatorsLen := n.config.Validators.Len(subnetID)
+	subnetValidatorsLen := n.config.Validators.Count(subnetID)
 	if subnetValidatorsLen < numValidatorsToSample {
 		numValidatorsToSample = subnetValidatorsLen
 	}

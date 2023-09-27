@@ -96,7 +96,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
-		SampleK:                        vdrs.Len(constants.PrimaryNetworkID),
+		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
 		Alpha:                          totalWeight/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,

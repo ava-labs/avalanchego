@@ -231,29 +231,29 @@ func TestLen(t *testing.T) {
 	m := NewManager()
 	subnetID := ids.GenerateTestID()
 
-	len := m.Len(subnetID)
+	len := m.Count(subnetID)
 	require.Zero(len)
 
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, ids.Empty, 1))
 
-	len = m.Len(subnetID)
+	len = m.Count(subnetID)
 	require.Equal(1, len)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
 
-	len = m.Len(subnetID)
+	len = m.Count(subnetID)
 	require.Equal(2, len)
 
 	require.NoError(m.RemoveWeight(subnetID, nodeID1, 1))
 
-	len = m.Len(subnetID)
+	len = m.Count(subnetID)
 	require.Equal(1, len)
 
 	require.NoError(m.RemoveWeight(subnetID, nodeID0, 1))
 
-	len = m.Len(subnetID)
+	len = m.Count(subnetID)
 	require.Zero(len)
 }
 

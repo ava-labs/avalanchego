@@ -49,7 +49,7 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	commonConfig := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
 		Beacons:                        vdrs,
-		SampleK:                        vdrs.Len(constants.PrimaryNetworkID),
+		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
 		Alpha:                          totalWeight/2 + 1,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,

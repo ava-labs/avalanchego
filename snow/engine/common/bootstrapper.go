@@ -168,7 +168,7 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 		if b.Config.RetryBootstrap {
 			b.Ctx.Log.Debug("restarting bootstrap",
 				zap.String("reason", "not enough frontiers received"),
-				zap.Int("numBeacons", b.Beacons.Len(b.Ctx.SubnetID)),
+				zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
 				zap.Int("numFailedBootstrappers", b.failedAcceptedFrontier.Len()),
 				zap.Int("numBootstrapAttemps", b.bootstrapAttempts),
 			)
@@ -242,7 +242,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	// if we don't have enough weight for the bootstrap to be accepted then
 	// retry or fail the bootstrap
 	size := len(accepted)
-	if size == 0 && b.Beacons.Len(b.Ctx.SubnetID) > 0 {
+	if size == 0 && b.Beacons.Count(b.Ctx.SubnetID) > 0 {
 		// if we had too many timeouts when asking for validator votes, we
 		// should restart bootstrap hoping for the network problems to go away;
 		// otherwise, we received enough (>= b.Alpha) responses, but no frontier
@@ -260,7 +260,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		if b.Config.RetryBootstrap && votingStakes < b.Alpha {
 			b.Ctx.Log.Debug("restarting bootstrap",
 				zap.String("reason", "not enough votes received"),
-				zap.Int("numBeacons", b.Beacons.Len(b.Ctx.SubnetID)),
+				zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
 				zap.Int("numFailedBootstrappers", b.failedAccepted.Len()),
 				zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
 			)
