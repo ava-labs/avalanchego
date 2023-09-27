@@ -13,9 +13,9 @@ var _ NnarySnowflake = (*nnarySnowflake)(nil)
 
 func newNnarySnowflake(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowflake {
 	return nnarySnowflake{
+		nnarySlush:   newNnarySlush(choice),
 		betaVirtuous: betaVirtuous,
 		betaRogue:    betaRogue,
-		nnarySlush:   newNnarySlush(choice),
 	}
 }
 

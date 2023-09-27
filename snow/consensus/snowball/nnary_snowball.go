@@ -13,9 +13,9 @@ var _ NnarySnowball = (*nnarySnowball)(nil)
 
 func newNnarySnowball(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
+		nnarySnowflake:     newNnarySnowflake(betaVirtuous, betaRogue, choice),
 		preference:         choice,
 		numSuccessfulPolls: make(map[ids.ID]int),
-		nnarySnowflake:     newNnarySnowflake(betaVirtuous, betaRogue, choice),
 	}
 }
 
