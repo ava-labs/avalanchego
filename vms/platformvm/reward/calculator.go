@@ -18,17 +18,14 @@ import (
 // MintingRate = MinMintingRate + MaxSubMinMintingRate * PortionOfStakingDuration
 // Reward = RemainingSupply * PortionOfExistingSupply * MintingRate * PortionOfStakingDuration
 func Calculate(
-	maxConsumptionRate uint64,
-	minConsumptionRate uint64,
-	mintingPeriod time.Duration,
-	supplyCap uint64,
+	config Config,
 	stakedDuration time.Duration,
 	stakedAmount uint64,
 	currentSupply uint64,
 ) uint64 {
-	bigMaxSubMinConsumptionRate := new(big.Int).SetUint64(maxConsumptionRate - minConsumptionRate)
-	bigMinConsumptionRate := new(big.Int).SetUint64(minConsumptionRate)
-	bigMintingPeriod := new(big.Int).SetUint64(uint64(mintingPeriod))
+	bigMaxSubMinConsumptionRate := new(big.Int).SetUint64(config.MaxConsumptionRate - config.MinConsumptionRate)
+	bigMinConsumptionRate := new(big.Int).SetUint64(config.MinConsumptionRate)
+	bigMintingPeriod := new(big.Int).SetUint64(uint64(config.MintingPeriod))
 	bigStakedDuration := new(big.Int).SetUint64(uint64(stakedDuration))
 	bigStakedAmount := new(big.Int).SetUint64(stakedAmount)
 	bigCurrentSupply := new(big.Int).SetUint64(currentSupply)
@@ -38,7 +35,7 @@ func Calculate(
 	adjustedConsumptionRateNumerator.Add(adjustedConsumptionRateNumerator, adjustedMinConsumptionRateNumerator)
 	adjustedConsumptionRateDenominator := new(big.Int).Mul(bigMintingPeriod, consumptionRateDenominator)
 
-	remainingSupply := supplyCap - currentSupply
+	remainingSupply := config.SupplyCap - currentSupply
 	reward := new(big.Int).SetUint64(remainingSupply)
 	reward.Mul(reward, adjustedConsumptionRateNumerator)
 	reward.Mul(reward, bigStakedAmount)

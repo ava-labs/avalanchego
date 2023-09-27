@@ -34,10 +34,7 @@ func TestLongerDurationBonus(t *testing.T) {
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
 		r := Calculate(
-			defaultConfig.MaxConsumptionRate,
-			defaultConfig.MinConsumptionRate,
-			defaultConfig.MintingPeriod,
-			defaultConfig.SupplyCap,
+			defaultConfig,
 			shortDuration,
 			shortBalance,
 			359*units.MegaAvax+shortBalance,
@@ -45,10 +42,7 @@ func TestLongerDurationBonus(t *testing.T) {
 		shortBalance += r
 	}
 	reward := Calculate(
-		defaultConfig.MaxConsumptionRate,
-		defaultConfig.MinConsumptionRate,
-		defaultConfig.MintingPeriod,
-		defaultConfig.SupplyCap,
+		defaultConfig,
 		totalDuration%shortDuration,
 		shortBalance,
 		359*units.MegaAvax+shortBalance,
@@ -57,10 +51,7 @@ func TestLongerDurationBonus(t *testing.T) {
 
 	longBalance := units.KiloAvax
 	longBalance += Calculate(
-		defaultConfig.MaxConsumptionRate,
-		defaultConfig.MinConsumptionRate,
-		defaultConfig.MintingPeriod,
-		defaultConfig.SupplyCap,
+		defaultConfig,
 		totalDuration,
 		longBalance,
 		359*units.MegaAvax+longBalance,
@@ -146,10 +137,7 @@ func TestRewards(t *testing.T) {
 		)
 		t.Run(name, func(t *testing.T) {
 			reward := Calculate(
-				defaultConfig.MaxConsumptionRate,
-				defaultConfig.MinConsumptionRate,
-				defaultConfig.MintingPeriod,
-				defaultConfig.SupplyCap,
+				defaultConfig,
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
@@ -165,10 +153,12 @@ func TestRewardsOverflow(t *testing.T) {
 		initialSupply uint64 = 1
 	)
 	reward := Calculate(
-		PercentDenominator,
-		PercentDenominator,
-		defaultMinStakingDuration,
-		maxSupply,
+		Config{
+			MaxConsumptionRate: PercentDenominator,
+			MinConsumptionRate: PercentDenominator,
+			MintingPeriod:      defaultMinStakingDuration,
+			SupplyCap:          maxSupply,
+		},
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
@@ -182,10 +172,12 @@ func TestRewardsMint(t *testing.T) {
 		initialSupply uint64 = 1
 	)
 	rewards := Calculate(
-		PercentDenominator,
-		PercentDenominator,
-		defaultMinStakingDuration,
-		maxSupply,
+		Config{
+			MaxConsumptionRate: PercentDenominator,
+			MinConsumptionRate: PercentDenominator,
+			MintingPeriod:      defaultMinStakingDuration,
+			SupplyCap:          maxSupply,
+		},
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,

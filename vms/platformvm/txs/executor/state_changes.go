@@ -220,10 +220,7 @@ func calculateReward(
 ) (uint64, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return reward.Calculate(
-			rewardConfig.MaxConsumptionRate,
-			rewardConfig.MinConsumptionRate,
-			rewardConfig.MintingPeriod,
-			rewardConfig.SupplyCap,
+			rewardConfig,
 			stakedDuration,
 			stakedAmount,
 			currentSupply,
@@ -236,10 +233,12 @@ func calculateReward(
 	}
 
 	return reward.Calculate(
-		transformSubnet.MaxConsumptionRate,
-		transformSubnet.MinConsumptionRate,
-		rewardConfig.MintingPeriod,
-		transformSubnet.MaximumSupply,
+		reward.Config{
+			MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+			MinConsumptionRate: transformSubnet.MinConsumptionRate,
+			MintingPeriod:      rewardConfig.MintingPeriod,
+			SupplyCap:          transformSubnet.MaximumSupply,
+		},
 		stakedDuration,
 		stakedAmount,
 		currentSupply,

@@ -1298,10 +1298,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 		}
 
 		potentialReward := reward.Calculate(
-			s.cfg.RewardConfig.MaxConsumptionRate,
-			s.cfg.RewardConfig.MinConsumptionRate,
-			s.cfg.RewardConfig.MintingPeriod,
-			s.cfg.RewardConfig.SupplyCap,
+			s.cfg.RewardConfig,
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
