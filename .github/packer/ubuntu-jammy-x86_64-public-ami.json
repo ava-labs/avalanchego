@@ -23,7 +23,7 @@
         ]
       },
       "ssh_username": "ubuntu",
-      "instance_type": "t2.micro",
+      "instance_type": "c5.large",
       "ami_groups": "all",
       "tags": {
         "Name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{ isotime | clean_resource_name }}",
