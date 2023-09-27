@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-//! #Firewood: Compaction-Less Database Optimized for Efficiently Storing Recent Merkleized Blockchain State
+//! # Firewood: Compaction-Less Database Optimized for Efficiently Storing Recent Merkleized Blockchain State
 //!
 //! Firewood is an embedded key-value store, optimized to store recent Merkleized blockchain
 //! state with minimal overhead. Firewood is implemented from the ground up to directly
