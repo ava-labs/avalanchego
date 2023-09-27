@@ -59,9 +59,7 @@ var (
 	_ State = (*state)(nil)
 
 	ErrCantFindSubnet               = errors.New("couldn't find subnet")
-	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 	errIsNotSubnet                  = errors.New("is not a subnet")
 
 	blockIDPrefix                       = []byte("blockID")
