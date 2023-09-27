@@ -86,11 +86,11 @@ func Test_Path_HasPrefix_BadInput(t *testing.T) {
 
 	for _, bf := range branchFactors {
 		a := Path{pathConfig: branchFactorToPathConfig[bf]}
-		b := Path{length: 1, pathConfig: branchFactorToPathConfig[bf]}
+		b := Path{tokensLength: 1, pathConfig: branchFactorToPathConfig[bf]}
 		require.False(a.HasPrefix(b))
 
-		a = Path{length: 10, pathConfig: branchFactorToPathConfig[bf]}
-		b = Path{value: string([]byte{0x10}), length: 1, pathConfig: branchFactorToPathConfig[bf]}
+		a = Path{tokensLength: 10, pathConfig: branchFactorToPathConfig[bf]}
+		b = Path{value: string([]byte{0x10}), tokensLength: 1, pathConfig: branchFactorToPathConfig[bf]}
 		require.False(a.HasPrefix(b))
 	}
 }
@@ -265,20 +265,20 @@ func FuzzPathExtend(f *testing.F) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
 			path1 := NewPath(first, branchFactor)
-			if forceFirstOdd && path1.length > 0 {
-				path1 = path1.Take(path1.length - 1)
+			if forceFirstOdd && path1.tokensLength > 0 {
+				path1 = path1.Take(path1.tokensLength - 1)
 			}
 			path2 := NewPath(second, branchFactor)
-			if forceSecondOdd && path2.length > 0 {
-				path2 = path2.Take(path2.length - 1)
+			if forceSecondOdd && path2.tokensLength > 0 {
+				path2 = path2.Take(path2.tokensLength - 1)
 			}
 			extendedP := path1.Extend(path2)
-			require.Equal(path1.length+path2.length, extendedP.length)
-			for i := 0; i < path1.length; i++ {
+			require.Equal(path1.tokensLength+path2.tokensLength, extendedP.tokensLength)
+			for i := 0; i < path1.tokensLength; i++ {
 				require.Equal(path1.Token(i), extendedP.Token(i))
 			}
-			for i := 0; i < path2.length; i++ {
-				require.Equal(path2.Token(i), extendedP.Token(i+path1.length))
+			for i := 0; i < path2.tokensLength; i++ {
+				require.Equal(path2.Token(i), extendedP.Token(i+path1.tokensLength))
 			}
 		}
 	})
@@ -293,12 +293,12 @@ func FuzzPathSkip(f *testing.F) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
 			path1 := NewPath(first, branchFactor)
-			if int(tokensToSkip) >= path1.length {
+			if int(tokensToSkip) >= path1.tokensLength {
 				t.SkipNow()
 			}
 			path2 := path1.Skip(int(tokensToSkip))
-			require.Equal(path1.length-int(tokensToSkip), path2.length)
-			for i := 0; i < path2.length; i++ {
+			require.Equal(path1.tokensLength-int(tokensToSkip), path2.tokensLength)
+			for i := 0; i < path2.tokensLength; i++ {
 				require.Equal(path1.Token(int(tokensToSkip)+i), path2.Token(i))
 			}
 		}
@@ -314,13 +314,13 @@ func FuzzPathTake(f *testing.F) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
 			path1 := NewPath(first, branchFactor)
-			if int(tokensToTake) >= path1.length {
+			if int(tokensToTake) >= path1.tokensLength {
 				t.SkipNow()
 			}
 			path2 := path1.Take(int(tokensToTake))
-			require.Equal(int(tokensToTake), path2.length)
+			require.Equal(int(tokensToTake), path2.tokensLength)
 
-			for i := 0; i < path2.length; i++ {
+			for i := 0; i < path2.tokensLength; i++ {
 				require.Equal(path1.Token(i), path2.Token(i))
 			}
 		}

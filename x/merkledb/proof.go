@@ -69,7 +69,7 @@ type ProofNode struct {
 func (node *ProofNode) ToProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
 		Key: &pb.Path{
-			Length: uint64(node.KeyPath.length),
+			Length: uint64(node.KeyPath.tokensLength),
 			Value:  node.KeyPath.Bytes(),
 		},
 		ValueOrHash: &pb.MaybeBytes{
@@ -100,7 +100,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	}
 	node.KeyPath = NewPath(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
 
-	if len(node.KeyPath.value) != node.KeyPath.bytesNeeded(node.KeyPath.length) {
+	if len(node.KeyPath.value) != node.KeyPath.bytesNeeded(node.KeyPath.tokensLength) {
 		return ErrInvalidPathLength
 	}
 

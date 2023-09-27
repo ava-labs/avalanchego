@@ -29,8 +29,8 @@ func Test_Node_Marshal(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
-	rootIndex := getSingleChildPath(root).Token(root.key.length)
-	parsedIndex := getSingleChildPath(rootParsed).Token(rootParsed.key.length)
+	rootIndex := getSingleChildPath(root).Token(root.key.tokensLength)
+	parsedIndex := getSingleChildPath(rootParsed).Token(rootParsed.key.tokensLength)
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
 	require.Equal(t, rootChildEntry.id, parseChildEntry.id)

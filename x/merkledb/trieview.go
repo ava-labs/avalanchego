@@ -298,7 +298,7 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	wg.Wait()
 	close(updatedChildren)
 
-	keyLength := n.key.length
+	keyLength := n.key.tokensLength
 	for child := range updatedChildren {
 		index := child.key.Token(keyLength)
 		n.addChildWithoutNode(index, n.children[index].compressedPath, child.id, child.hasValue())
@@ -351,7 +351,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// There is no node with the given [key].
 	// If there is a child at the index where the node would be
 	// if it existed, include that child in the proof.
-	nextIndex := proof.Key.Token(closestNode.key.length)
+	nextIndex := proof.Key.Token(closestNode.key.tokensLength)
 	child, ok := closestNode.children[nextIndex]
 	if !ok {
 		return proof, nil
@@ -753,7 +753,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	)
 
 	// while the entire path hasn't been matched
-	for matchedPathIndex < key.length {
+	for matchedPathIndex < key.tokensLength {
 		// confirm that a child exists and grab its ID before attempting to load it
 		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathIndex)]
 
@@ -766,7 +766,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 		}
 
 		// the compressed path of the entry there matched the path, so increment the matched index
-		matchedPathIndex += nextChildEntry.compressedPath.length
+		matchedPathIndex += nextChildEntry.compressedPath.tokensLength
 
 		// grab the next node along the path
 		var err error
@@ -783,7 +783,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 func getLengthOfCommonPrefix(first, second Path, secondOffset int) int {
 	commonIndex := 0
-	for first.length > commonIndex && second.length > (commonIndex+secondOffset) && first.Token(commonIndex) == second.Token(commonIndex+secondOffset) {
+	for first.tokensLength > commonIndex && second.tokensLength > (commonIndex+secondOffset) && first.Token(commonIndex) == second.Token(commonIndex+secondOffset) {
 		commonIndex++
 	}
 	return commonIndex
@@ -844,7 +844,7 @@ func (t *trieView) insert(
 		return closestNode, nil
 	}
 
-	closestNodeKeyLength := closestNode.key.length
+	closestNodeKeyLength := closestNode.key.tokensLength
 
 	// A node with the exact key doesn't exist so determine the portion of the
 	// key that hasn't been matched yet
@@ -876,7 +876,7 @@ func (t *trieView) insert(
 	// The existing child's key is of length: len(closestNodeKey) + 1 (for the child index) + len(existing child's compressed key)
 	// if that length is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
 	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
-	if closestNodeKeyLength+1+existingChildEntry.compressedPath.length <= branchKeyLength {
+	if closestNodeKeyLength+1+existingChildEntry.compressedPath.tokensLength <= branchKeyLength {
 		return nil, ErrGetPathToFailure
 	}
 
@@ -886,7 +886,7 @@ func (t *trieView) insert(
 	)
 	nodeWithValue := branchNode
 
-	if key.length == branchNode.key.length {
+	if key.tokensLength == branchNode.key.tokensLength {
 		// there was no residual path for the inserted key, so the value goes directly into the new branch node
 		branchNode.setValue(value)
 	} else {
@@ -928,7 +928,7 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
-	if after.key.length == 0 {
+	if after.key.tokensLength == 0 {
 		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)

@@ -447,7 +447,7 @@ func (m *Manager) findNextKey(
 
 		// select the deepest proof node from the two proofs
 		switch {
-		case receivedProofNode.KeyPath.Length() > localProofNode.KeyPath.Length():
+		case receivedProofNode.KeyPath.TokensLength() > localProofNode.KeyPath.TokensLength():
 			// there was a branch node in the received proof that isn't in the local proof
 			// see if the received proof node has children not present in the local proof
 			deepestNode = &receivedProofNode
@@ -455,7 +455,7 @@ func (m *Manager) findNextKey(
 			// we have dealt with this received node, so move on to the next received node
 			receivedProofNodeIndex--
 
-		case localProofNode.KeyPath.Length() > receivedProofNode.KeyPath.Length():
+		case localProofNode.KeyPath.TokensLength() > receivedProofNode.KeyPath.TokensLength():
 			// there was a branch node in the local proof that isn't in the received proof
 			// see if the local proof node has children not present in the received proof
 			deepestNode = &localProofNode
@@ -489,8 +489,8 @@ func (m *Manager) findNextKey(
 		// node's children have keys larger than [proofKeyPath].
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
-		if deepestNode.KeyPath.Length() < proofKeyPath.Length() {
-			startingChildToken = proofKeyPath.Token(deepestNode.KeyPath.Length()) + 1
+		if deepestNode.KeyPath.TokensLength() < proofKeyPath.TokensLength() {
+			startingChildToken = proofKeyPath.Token(deepestNode.KeyPath.TokensLength()) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs

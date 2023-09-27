@@ -327,7 +327,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func (c *codecImpl) encodePath(dst *bytes.Buffer, p Path) {
-	c.encodeUint(dst, uint64(p.length))
+	c.encodeUint(dst, uint64(p.tokensLength))
 	_, _ = dst.Write(p.Bytes())
 }
 
@@ -344,8 +344,8 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		return Path{}, errIntOverflow
 	}
 	result := emptyPath(branchFactor)
-	result.length = int(length)
-	pathBytesLen := result.bytesNeeded(result.length)
+	result.tokensLength = int(length)
+	pathBytesLen := result.bytesNeeded(result.tokensLength)
 	if pathBytesLen > src.Len() {
 		return Path{}, io.ErrUnexpectedEOF
 	}
@@ -357,10 +357,10 @@ func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Pa
 		return Path{}, err
 	}
 	if result.hasPartialByte() {
-		// Confirm that the padding bits in the partial byte are 0
-		// We want to only look at the bits to the right of the last token, which is at index length-1
-		// Generate a mask with (8-bitsToShift) 0's followed by bitsToShift 1's
-		paddingMask := byte(0xFF >> (eight - result.bitsToShift(result.length-1)))
+		// Confirm that the padding bits in the partial byte are 0.
+		// We want to only look at the bits to the right of the last token, which is at index length-1.
+		// Generate a mask with (8-bitsToShift) 0s followed by bitsToShift 1s.
+		paddingMask := byte(0xFF >> (8 - result.bitsToShift(result.tokensLength-1)))
 		if buffer[pathBytesLen-1]&paddingMask != 0 {
 			return Path{}, errNonZeroPathPadding
 		}
