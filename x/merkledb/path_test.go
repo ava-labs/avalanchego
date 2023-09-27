@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -149,30 +150,92 @@ func Test_Path_Take(t *testing.T) {
 }
 
 func Test_Path_Token(t *testing.T) {
-	require := require.New(t)
+	type test struct {
+		name         string
+		inputBytes   []byte
+		branchFactor BranchFactor
+		assertTokens func(*require.Assertions, Path)
+	}
 
-	path2 := NewPath([]byte{0b0101_0101}, BranchFactor2)
-	require.Equal(byte(0), path2.Token(0))
-	require.Equal(byte(1), path2.Token(1))
-	require.Equal(byte(0), path2.Token(2))
-	require.Equal(byte(1), path2.Token(3))
-	require.Equal(byte(0), path2.Token(4))
-	require.Equal(byte(1), path2.Token(5))
-	require.Equal(byte(0), path2.Token(6))
-	require.Equal(byte(1), path2.Token(7))
+	tests := []test{
+		{
+			name:         "branch factor 2",
+			inputBytes:   []byte{0b0_1_01_0_1_01, 0b1_0_1_0_1_0_1_0},
+			branchFactor: BranchFactor2,
+			assertTokens: func(require *require.Assertions, path Path) {
+				require.Equal(byte(0), path.Token(0))
+				require.Equal(byte(1), path.Token(1))
+				require.Equal(byte(0), path.Token(2))
+				require.Equal(byte(1), path.Token(3))
+				require.Equal(byte(0), path.Token(4))
+				require.Equal(byte(1), path.Token(5))
+				require.Equal(byte(0), path.Token(6))
+				require.Equal(byte(1), path.Token(7)) // end first byte
+				require.Equal(byte(1), path.Token(8))
+				require.Equal(byte(0), path.Token(9))
+				require.Equal(byte(1), path.Token(10))
+				require.Equal(byte(0), path.Token(11))
+				require.Equal(byte(1), path.Token(12))
+				require.Equal(byte(0), path.Token(13))
+				require.Equal(byte(1), path.Token(14))
+				require.Equal(byte(0), path.Token(15)) // end second byte
+			},
+		},
+		{
+			name:         "branch factor 4",
+			inputBytes:   []byte{0b00_01_10_11, 0b11_10_01_00},
+			branchFactor: BranchFactor4,
+			assertTokens: func(require *require.Assertions, path Path) {
+				require.Equal(byte(0), path.Token(0)) // 00
+				require.Equal(byte(1), path.Token(1)) // 01
+				require.Equal(byte(2), path.Token(2)) // 10
+				require.Equal(byte(3), path.Token(3)) // 11 end first byte
+				require.Equal(byte(3), path.Token(4)) // 11
+				require.Equal(byte(2), path.Token(5)) // 10
+				require.Equal(byte(1), path.Token(6)) // 01
+				require.Equal(byte(0), path.Token(7)) // 00 end second byte
+			},
+		},
+		{
+			name: "branch factor 16",
+			inputBytes: []byte{
+				0b0000_0001,
+				0b0010_0011,
+				0b0100_0101,
+				0b0110_0111,
+				0b1000_1001,
+				0b1010_1011,
+				0b1100_1101,
+				0b1110_1111,
+			},
+			branchFactor: BranchFactor16,
+			assertTokens: func(require *require.Assertions, path Path) {
+				for i := 0; i < 16; i++ {
+					require.Equal(byte(i), path.Token(i))
+				}
+			},
+		},
+	}
 
-	path4 := NewPath([]byte{0b0110_0110}, BranchFactor4)
-	require.Equal(byte(1), path4.Token(0))
-	require.Equal(byte(2), path4.Token(1))
-	require.Equal(byte(1), path4.Token(2))
-	require.Equal(byte(2), path4.Token(3))
+	for i := 0; i < 256; i++ {
+		i := i
+		tests = append(tests, test{
+			name:         fmt.Sprintf("branch factor 256, byte %d", i),
+			inputBytes:   []byte{byte(i)},
+			branchFactor: BranchFactor256,
+			assertTokens: func(require *require.Assertions, path Path) {
+				require.Equal(byte(i), path.Token(0))
+			},
+		})
+	}
 
-	path16 := NewPath([]byte{0x12}, BranchFactor16)
-	require.Equal(byte(1), path16.Token(0))
-	require.Equal(byte(2), path16.Token(1))
-
-	path256 := NewPath([]byte{0x12}, BranchFactor256)
-	require.Equal(byte(0x12), path256.Token(0))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			path := NewPath(tt.inputBytes, tt.branchFactor)
+			tt.assertTokens(require, path)
+		})
+	}
 }
 
 func Test_Path_Append(t *testing.T) {
