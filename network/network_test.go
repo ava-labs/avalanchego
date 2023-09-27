@@ -196,13 +196,13 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *sync.WaitGroup) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
 
 	var (
-		networks = make([]Network, len(configs))
+		networks = make([]*network, len(configs))
 
 		globalLock     sync.Mutex
 		numConnected   int
@@ -278,7 +278,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			},
 		)
 		require.NoError(err)
-		networks[i] = net
+		networks[i] = net.(*network)
 	}
 
 	wg := sync.WaitGroup{}
@@ -403,7 +403,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
-	network := networks[0].(*network)
+	network := networks[0]
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
@@ -631,4 +631,61 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		net.StartClose()
 	}
 	wg.Wait()
+}
+
+// Test that cancelling the context passed into dial
+// causes dial to return immediately.
+func TestDialContext(t *testing.T) {
+	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	defer wg.Done()
+
+	dialer := newTestDialer()
+	network := networks[0]
+	network.dialer = dialer
+
+	var (
+		neverDialedNodeID = ids.GenerateTestNodeID()
+		dialedNodeID      = ids.GenerateTestNodeID()
+
+		dynamicNeverDialedIP, neverDialedListener = dialer.NewListener()
+		dynamicDialedIP, dialedListener           = dialer.NewListener()
+
+		neverDialedIP = &trackedIP{
+			ip: dynamicNeverDialedIP.IPPort(),
+		}
+		dialedIP = &trackedIP{
+			ip: dynamicDialedIP.IPPort(),
+		}
+	)
+
+	network.manuallyTrackedIDs.Add(neverDialedNodeID)
+	network.manuallyTrackedIDs.Add(dialedNodeID)
+
+	// Sanity check that when a non-cancelled context is given,
+	// we actually dial the peer.
+	network.dial(dialedNodeID, dialedIP)
+
+	gotDialedIPConn := make(chan struct{})
+	go func() {
+		_, _ = dialedListener.Accept()
+		close(gotDialedIPConn)
+	}()
+	<-gotDialedIPConn
+
+	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
+	// That is, [neverDialedListener] doesn't accept a connection.
+	network.onCloseCtxCancel()
+	network.dial(neverDialedNodeID, neverDialedIP)
+
+	gotNeverDialedIPConn := make(chan struct{})
+	go func() {
+		_, _ = neverDialedListener.Accept()
+		close(gotNeverDialedIPConn)
+	}()
+
+	select {
+	case <-gotNeverDialedIPConn:
+		require.FailNow(t, "unexpectedly connected to peer")
+	default:
+	}
 }
