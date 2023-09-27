@@ -27,12 +27,12 @@ func Test_Path_Has_Prefix(t *testing.T) {
 	}
 
 	key := "Key"
-	keyLength := map[BranchFactor]int{
-		BranchFactor2:   24,
-		BranchFactor4:   12,
-		BranchFactor16:  6,
-		BranchFactor256: 3,
+	keyLength := map[BranchFactor]int{}
+	for _, branchFactor := range branchFactors {
+		config := branchFactorToPathConfig[branchFactor]
+		keyLength[branchFactor] = len(key) * config.tokensPerByte
 	}
+
 	tests := []test{
 		{
 			name:           "equal keys",
@@ -42,14 +42,14 @@ func Test_Path_Has_Prefix(t *testing.T) {
 			isStrictPrefix: false,
 		},
 		{
-			name:           "one keys has one less token",
+			name:           "one key has one fewer token",
 			pathA:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf) },
 			pathB:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
 			isPrefix:       true,
 			isStrictPrefix: true,
 		},
 		{
-			name:           "equal keys, both have one less token",
+			name:           "equal keys, both have one fewer token",
 			pathA:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
 			pathB:          func(bf BranchFactor) Path { return NewPath([]byte(key), bf).Take(keyLength[bf] - 1) },
 			isPrefix:       true,
@@ -72,13 +72,16 @@ func Test_Path_Has_Prefix(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			for _, bf := range branchFactors {
-				require.Equal(tt.isPrefix, tt.pathA(bf).HasPrefix(tt.pathB(bf)))
-				require.Equal(tt.isStrictPrefix, tt.pathA(bf).HasStrictPrefix(tt.pathB(bf)))
-			}
-		})
+		for _, bf := range branchFactors {
+			t.Run(tt.name+" bf "+fmt.Sprint(bf), func(t *testing.T) {
+				require := require.New(t)
+				pathA := tt.pathA(bf)
+				pathB := tt.pathB(bf)
+
+				require.Equal(tt.isPrefix, pathA.HasPrefix(pathB))
+				require.Equal(tt.isStrictPrefix, pathA.HasStrictPrefix(pathB))
+			})
+		}
 	}
 }
 
