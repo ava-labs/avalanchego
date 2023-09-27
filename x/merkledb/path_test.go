@@ -85,20 +85,6 @@ func Test_Path_Has_Prefix(t *testing.T) {
 	}
 }
 
-func Test_Path_HasPrefix_BadInput(t *testing.T) {
-	require := require.New(t)
-
-	for _, bf := range branchFactors {
-		a := Path{pathConfig: branchFactorToPathConfig[bf]}
-		b := Path{tokensLength: 1, pathConfig: branchFactorToPathConfig[bf]}
-		require.False(a.HasPrefix(b))
-
-		a = Path{tokensLength: 10, pathConfig: branchFactorToPathConfig[bf]}
-		b = Path{value: string([]byte{0x10}), tokensLength: 1, pathConfig: branchFactorToPathConfig[bf]}
-		require.False(a.HasPrefix(b))
-	}
-}
-
 func Test_Path_Skip(t *testing.T) {
 	require := require.New(t)
 

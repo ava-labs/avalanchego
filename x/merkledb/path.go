@@ -101,7 +101,7 @@ func (p Path) hasPartialByte() bool {
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (p Path) HasPrefix(prefix Path) bool {
 	// if the current path is shorter than the prefix path, then it cannot be a prefix
-	if p.tokensLength < prefix.tokensLength || len(p.value) < len(prefix.value) {
+	if p.tokensLength < prefix.tokensLength {
 		return false
 	}
 
