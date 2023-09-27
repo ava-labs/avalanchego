@@ -184,10 +184,6 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 }
 
 func (c *Config) verifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) bool {
-	if predicateContext == nil || predicateContext.ProposerVMBlockCtx == nil {
-		return false
-	}
-
 	unpackedPredicateBytes, err := predicateutils.UnpackPredicate(predicateBytes)
 	if err != nil {
 		return false

@@ -230,32 +230,6 @@ func createValidPredicateTest(snowCtx *snow.Context, numKeys uint64, predicateBy
 	}
 }
 
-func TestWarpNilProposerCtx(t *testing.T) {
-	numKeys := 1
-	snowCtx := createSnowCtx([]validatorRange{
-		{
-			start:     0,
-			end:       numKeys,
-			weight:    20,
-			publicKey: true,
-		},
-	})
-	predicateBytes := createPredicate(numKeys)
-	test := testutils.PredicateTest{
-		Config: NewDefaultConfig(subnetEVMUtils.NewUint64(0)),
-		PredicateContext: &precompileconfig.PredicateContext{
-			SnowCtx:            snowCtx,
-			ProposerVMBlockCtx: nil,
-		},
-		StorageSlots: [][]byte{predicateBytes},
-		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
-		GasErr:       nil,
-		PredicateRes: set.NewBits().Bytes(),
-	}
-
-	test.Run(t)
-}
-
 func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
 	require := require.New(t)
 	numKeys := 10
