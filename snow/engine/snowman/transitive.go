@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -208,8 +209,8 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	t.sendChits(ctx, nodeID, requestID)
+func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
+	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -220,8 +221,8 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	t.sendChits(ctx, nodeID, requestID)
+func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte, requestedHeight uint64) error {
+	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -259,30 +260,43 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, acceptedID ids.ID) error {
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
 	t.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID)
 
 	t.Ctx.Log.Verbo("called Chits for the block",
-		zap.Stringer("blkID", blkID),
+		zap.Stringer("preferredID", preferredID),
+		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
+		zap.Stringer("acceptedID", acceptedID),
 		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID))
+		zap.Uint32("requestID", requestID),
+	)
 
-	added, err := t.issueFromByID(ctx, nodeID, blkID)
+	addedPreferred, err := t.issueFromByID(ctx, nodeID, preferredID)
 	if err != nil {
 		return err
 	}
 
-	// Will record chits once [blkID] has been issued into consensus
+	addedPreferredIDAtHeight, err := t.issueFromByID(ctx, nodeID, preferredIDAtHeight)
+	if err != nil {
+		return err
+	}
+
+	// Will record chits once [preferredID] and [preferredIDAtHeight] have been
+	// issued into consensus
 	v := &voter{
 		t:               t,
 		vdr:             nodeID,
 		requestID:       requestID,
-		responseOptions: []ids.ID{blkID},
+		responseOptions: []ids.ID{preferredID, preferredIDAtHeight},
 	}
 
-	// Wait until [blkID] has been issued to consensus before applying this chit.
-	if !added {
-		v.deps.Add(blkID)
+	// Wait until [preferredID] and [preferredIDAtHeight] have been issued to
+	// consensus before applying this chit.
+	if !addedPreferred {
+		v.deps.Add(preferredID)
+	}
+	if !addedPreferredIDAtHeight {
+		v.deps.Add(preferredIDAtHeight)
 	}
 
 	t.blocked.Register(ctx, v)
@@ -293,7 +307,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAccepted, ok := t.acceptedFrontiers.LastAccepted(nodeID)
 	if ok {
-		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
+		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted, lastAccepted)
 	}
 
 	t.blocked.Register(
@@ -454,15 +468,55 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 	return t.VM.GetBlock(ctx, blkID)
 }
 
-func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
-	lastAccepted, _ := t.Consensus.LastAccepted()
+func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, requestedHeight uint64) {
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
-		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
-	} else {
-		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)
+		acceptedAtHeight, err := t.VM.GetBlockIDAtHeight(ctx, requestedHeight)
+		if err != nil {
+			acceptedAtHeight = lastAcceptedID
+		}
+		t.Sender.SendChits(ctx, nodeID, requestID, lastAcceptedID, acceptedAtHeight, lastAcceptedID)
+		return
 	}
+
+	var (
+		preference         = t.Consensus.Preference()
+		preferenceAtHeight ids.ID
+	)
+	if requestedHeight < lastAcceptedHeight {
+		var err error
+		preferenceAtHeight, err = t.VM.GetBlockIDAtHeight(ctx, requestedHeight)
+		if err != nil {
+			// If this chain is pruning historical blocks, it's expected for a
+			// node to be unable to fetch some block IDs. In this case, we fall
+			// back to returning the last accepted ID.
+			//
+			// Because it is possible for a byzantine node to spam requests at
+			// old heights on a pruning network, we log this as debug. However,
+			// this case is unexpected to be hit by correct peers.
+			t.Ctx.Log.Debug("failed fetching accepted block",
+				zap.Uint64("requestedHeight", requestedHeight),
+				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Error(err),
+			)
+			preferenceAtHeight = lastAcceptedID
+		}
+	} else {
+		var ok bool
+		preferenceAtHeight, ok = t.Consensus.PreferenceAtHeight(requestedHeight)
+		if !ok {
+			t.Ctx.Log.Debug("failed fetching processing block",
+				zap.Uint64("requestedHeight", requestedHeight),
+				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			)
+			// If the requested height is higher than our preferred tip, we
+			// don't prefer anything at the requested height yet.
+			preferenceAtHeight = preference
+		}
+	}
+	t.Sender.SendChits(ctx, nodeID, requestID, preference, preferenceAtHeight, lastAcceptedID)
 }
 
 // Build blocks if they have been requested and the number of processing blocks
@@ -526,7 +580,7 @@ func (t *Transitive) repoll(ctx context.Context) {
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullQuery(ctx, prefID)
+		t.sendQuery(ctx, prefID, nil, false)
 	}
 }
 
@@ -686,12 +740,19 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
-// send a pull query for this block ID
-func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
+// Send a query for this block. If push is set to true, blkBytes will be used to
+// send a PushQuery. Otherwise, blkBytes will be ignored and a PullQuery will be
+// sent.
+func (t *Transitive) sendQuery(
+	ctx context.Context,
+	blkID ids.ID,
+	blkBytes []byte,
+	push bool,
+) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
-	// The validators we will query
+
 	vdrIDs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
@@ -701,48 +762,28 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := bag.Of(vdrIDs...)
-
-	t.RequestID++
-	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrList := vdrBag.List()
-		vdrSet := set.Of(vdrList...)
-		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
-	}
-}
-
-// Send a query for this block. Some validators will be sent
-// a Push Query and some will be sent a Pull Query.
-// If [push] is true, a push query will be used. Otherwise, a pull query will be
-// used.
-func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool) {
-	t.Ctx.Log.Verbo("sampling from validators",
-		zap.Stringer("validators", t.Validators),
-	)
-
-	blkID := blk.ID()
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
+	_, lastAcceptedHeight := t.Consensus.LastAccepted()
+	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
-			zap.String("reason", "insufficient number of validators"),
+			zap.String("reason", "block height overflow"),
 			zap.Stringer("blkID", blkID),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 		)
 		return
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
-
 	t.RequestID++
-	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrs := vdrBag.List()
-		sendTo := set.Of(vdrs...)
+	if !t.polls.Add(t.RequestID, vdrBag) {
+		return
+	}
 
-		if push {
-			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())
-			return
-		}
-
-		t.Sender.SendPullQuery(ctx, sendTo, t.RequestID, blk.ID())
+	vdrSet := set.Of(vdrIDs...)
+	if push {
+		t.Sender.SendPushQuery(ctx, vdrSet, t.RequestID, blkBytes, nextHeightToAccept)
+	} else {
+		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID, nextHeightToAccept)
 	}
 }
 
@@ -819,16 +860,16 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendQuery(ctx, blk, push)
+		t.sendQuery(ctx, blkID, blk.Bytes(), push)
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
+		blkID := blk.ID()
 		if t.Consensus.IsPreferred(blk) {
-			t.sendQuery(ctx, blk, push)
+			t.sendQuery(ctx, blkID, blk.Bytes(), push)
 		}
 
-		blkID := blk.ID()
 		t.removeFromPending(blk)
 		t.blocked.Fulfill(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)

@@ -344,16 +344,18 @@ type QueryHandler interface {
 	// this message is utilizing a unique requestID. However, the validatorID is
 	// assumed to be authenticated.
 	//
-	// If the container or its ancestry is incomplete, this engine is expected
-	// to request the missing containers from the validator. Once the ancestry
-	// is complete, this engine should send this validator the current
+	// This engine should immediately send this validator the current
 	// preferences in a Chits message. The Chits message should have the same
 	// requestID that was passed in here.
+	//
+	// If the container or its ancestry is incomplete, this engine is expected
+	// to request the missing containers from the validator.
 	PullQuery(
 		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
+		requestedHeight uint64,
 	) error
 
 	// Notify this engine of a request for our preferences.
@@ -365,16 +367,18 @@ type QueryHandler interface {
 	// container is optimistically provided to potentially remove the need for
 	// a series of Get/Put messages.
 	//
+	// This engine should immediately send this validator the current
+	// preferences in a Chits message. The Chits message should have the same
+	// requestID that was passed in here.
+	//
 	// If the ancestry of the container is incomplete, this engine is expected
-	// to request the ancestry from the validator. Once the ancestry is
-	// complete, this engine should send this validator the current preferences
-	// in a Chits message. The Chits message should have the same requestID that
-	// was passed in here.
+	// to request the ancestry from the validator.
 	PushQuery(
 		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		container []byte,
+		requestedHeight uint64,
 	) error
 }
 
@@ -391,6 +395,7 @@ type ChitsHandler interface {
 		validatorID ids.NodeID,
 		requestID uint32,
 		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 	) error
 

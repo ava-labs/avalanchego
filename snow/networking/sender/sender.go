@@ -894,7 +894,13 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 // The PushQuery message signifies that this consensus engine would like each
 // node to send their preferred frontier given the existence of the specified
 // container.
-func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+func (s *sender) SendPushQuery(
+	ctx context.Context,
+	nodeIDs set.Set[ids.NodeID],
+	requestID uint32,
+	container []byte,
+	requestedHeight uint64,
+) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -934,6 +940,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			deadline,
 			container,
+			requestedHeight,
 			s.ctx.NodeID,
 			s.engineType,
 		)
@@ -967,6 +974,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		requestID,
 		deadline,
 		container,
+		requestedHeight,
 		s.engineType,
 	)
 
@@ -986,6 +994,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Binary("container", container),
+			zap.Uint64("requestedHeight", requestedHeight),
 			zap.Error(err),
 		)
 	}
@@ -999,6 +1008,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 					zap.Stringer("chainID", s.ctx.ChainID),
 					zap.Uint32("requestID", requestID),
 					zap.Binary("container", container),
+					zap.Uint64("requestedHeight", requestedHeight),
 				)
 			} else {
 				s.ctx.Log.Debug("failed to send message",
@@ -1006,6 +1016,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("chainID", s.ctx.ChainID),
 					zap.Uint32("requestID", requestID),
+					zap.Uint64("requestedHeight", requestedHeight),
 				)
 			}
 
@@ -1026,7 +1037,13 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 // the specified chains on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each
 // node to send their preferred frontier.
-func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(
+	ctx context.Context,
+	nodeIDs set.Set[ids.NodeID],
+	requestID uint32,
+	containerID ids.ID,
+	requestedHeight uint64,
+) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -1066,6 +1083,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			deadline,
 			containerID,
+			requestedHeight,
 			s.ctx.NodeID,
 			s.engineType,
 		)
@@ -1098,6 +1116,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		requestID,
 		deadline,
 		containerID,
+		requestedHeight,
 		s.engineType,
 	)
 
@@ -1117,6 +1136,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			zap.Uint32("requestID", requestID),
 			zap.Duration("deadline", deadline),
 			zap.Stringer("containerID", containerID),
+			zap.Uint64("requestedHeight", requestedHeight),
 			zap.Error(err),
 		)
 	}
@@ -1129,6 +1149,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
 				zap.Stringer("containerID", containerID),
+				zap.Uint64("requestedHeight", requestedHeight),
 			)
 
 			// Register failures for nodes we didn't send a request to.
@@ -1145,7 +1166,14 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) {
+func (s *sender) SendChits(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	preferredID ids.ID,
+	preferredIDAtHeight ids.ID,
+	acceptedID ids.ID,
+) {
 	ctx = utils.Detach(ctx)
 
 	// If [nodeID] is myself, send this message directly
@@ -1155,6 +1183,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			s.ctx.ChainID,
 			requestID,
 			preferredID,
+			preferredIDAtHeight,
 			acceptedID,
 			nodeID,
 		)
@@ -1163,13 +1192,14 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, acceptedID)
+	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, preferredIDAtHeight, acceptedID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.ChitsOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 			zap.Stringer("acceptedID", acceptedID),
 			zap.Error(err),
 		)
@@ -1191,6 +1221,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 			zap.Stringer("acceptedID", acceptedID),
 		)
 	}
