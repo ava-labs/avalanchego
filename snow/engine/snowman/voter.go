@@ -47,7 +47,7 @@ func (v *voter) Update(ctx context.Context) {
 		shouldVote bool
 	)
 	for _, voteOption := range v.responseOptions {
-		// To prevent any potential deadlocks with un-disclosed dependencies,
+		// To prevent any potential deadlocks with undisclosed dependencies,
 		// votes must be bubbled to the nearest valid block
 		vote, shouldVote = v.getProcessingAncestor(ctx, voteOption)
 		if shouldVote {
