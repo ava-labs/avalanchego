@@ -34,7 +34,7 @@ func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
 	for i, in := range tx.Ins {
 		// Note: Verification of the length of [t.tx.Creds] happens during
 		// syntactic verification, which happens before semantic verification.
-		cred := v.Tx.Creds[i].Verifiable
+		cred := v.Tx.Creds[i].Credential
 		if err := v.verifyTransfer(tx, in, cred); err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 	for i, op := range tx.Ops {
 		// Note: Verification of the length of [t.tx.Creds] happens during
 		// syntactic verification, which happens before semantic verification.
-		cred := v.Tx.Creds[i+offset].Verifiable
+		cred := v.Tx.Creds[i+offset].Credential
 		if err := v.verifyOperation(tx, op, cred); err != nil {
 			return err
 		}
@@ -113,7 +113,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 
 		// Note: Verification of the length of [t.tx.Creds] happens during
 		// syntactic verification, which happens before semantic verification.
-		cred := v.Tx.Creds[i+offset].Verifiable
+		cred := v.Tx.Creds[i+offset].Credential
 		if err := v.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
 			return err
 		}

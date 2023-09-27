@@ -933,11 +933,11 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 }
 
 type MultipleVersionsStruct struct {
-	BothTags    string `tag1:"true" tag2:"true"`
+	BothTags    string `tag1:"true"  tag2:"true"`
 	SingleTag1  string `tag1:"true"`
-	SingleTag2  string `tag2:"true"`
+	SingleTag2  string `             tag2:"true"`
 	EitherTags1 string `tag1:"false" tag2:"true"`
-	EitherTags2 string `tag1:"true" tag2:"false"`
+	EitherTags2 string `tag1:"true"  tag2:"false"`
 	NoTags      string `tag1:"false" tag2:"false"`
 }
 

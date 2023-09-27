@@ -33,7 +33,6 @@ var (
 type ID [IDLen]byte
 
 // Any modification to Bytes will be lost since id is passed-by-value
-// Use Writable(ID) is you need to modify the ID
 func (id ID) Bytes() []byte {
 	return id[:]
 }

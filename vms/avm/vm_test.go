@@ -218,7 +218,9 @@ func TestIssueNFT(t *testing.T) {
 			}},
 		},
 		Creds: []*fxs.FxCredential{
-			{Verifiable: &nftfx.Credential{}},
+			{
+				Credential: &nftfx.Credential{},
+			},
 		},
 	}
 	require.NoError(env.vm.parser.InitializeTx(transferNFTTx))
