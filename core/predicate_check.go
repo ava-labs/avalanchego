@@ -31,16 +31,9 @@ func CheckPredicates(rules params.Rules, predicateContext *precompileconfig.Pred
 	if len(rules.Predicates) == 0 {
 		return predicateResults, nil
 	}
-	predicateArguments := make(map[common.Address][][]byte)
-	for _, accessTuple := range tx.AccessList() {
-		address := accessTuple.Address
-		_, ok := rules.Predicates[address]
-		if !ok {
-			continue
-		}
 
-		predicateArguments[address] = append(predicateArguments[address], predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
-	}
+	// Prepare the predicate storage slots from the transaction's access list
+	predicateArguments := predicateutils.PreparePredicateStorageSlots(rules, tx.AccessList())
 
 	for address, predicates := range predicateArguments {
 		// Since [address] is only added to [predicateArguments] when there's a valid predicate in the ruleset

@@ -1190,24 +1190,10 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 			al.AddAddress(coinbase)
 		}
 
-		s.preparePredicateStorageSlots(rules, list)
+		s.predicateStorageSlots = predicateutils.PreparePredicateStorageSlots(rules, list)
 	}
 	// Reset transient storage at the beginning of transaction execution
 	s.transientStorage = newTransientStorage()
-}
-
-// preparePredicateStorageSlots populates the predicateStorageSlots field from the transaction's access list
-// Note: if an address is specified multiple times in the access list, each storage slot for that address is
-// appended to a slice of byte slices. Each byte slice represents a predicate, making it a slice of predicates
-// for each access list address, and every predicate in the slice goes through verification.
-func (s *StateDB) preparePredicateStorageSlots(rules params.Rules, list types.AccessList) {
-	s.predicateStorageSlots = make(map[common.Address][][]byte)
-	for _, el := range list {
-		if !rules.PredicateExists(el.Address) {
-			continue
-		}
-		s.predicateStorageSlots[el.Address] = append(s.predicateStorageSlots[el.Address], predicateutils.HashSliceToBytes(el.StorageKeys))
-	}
 }
 
 // AddAddressToAccessList adds the given address to the access list
