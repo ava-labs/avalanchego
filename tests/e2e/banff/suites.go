@@ -23,12 +23,6 @@ var _ = ginkgo.Describe("[Banff]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can send custom assets X->P and P->X",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"xp",
-			"banff",
-		),
 		func() {
 			keychain := e2e.Env.NewKeychain(1)
 			wallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
@@ -60,6 +54,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
+					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
 				assetID = assetTx.ID()
@@ -81,6 +76,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
+					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
 
@@ -88,7 +84,11 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			})
 
 			ginkgo.By("import new asset from X-chain on the P-chain", func() {
-				tx, err := pWallet.IssueImportTx(xChainID, owner)
+				tx, err := pWallet.IssueImportTx(
+					xChainID,
+					owner,
+					e2e.WithDefaultContext(),
+				)
 				require.NoError(err)
 
 				tests.Outf("{{green}}issued P-chain import{{/}}: %s\n", tx.ID())
@@ -108,6 +108,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
+					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
 
@@ -115,7 +116,11 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			})
 
 			ginkgo.By("import asset from P-chain on the X-chain", func() {
-				tx, err := xWallet.IssueImportTx(constants.PlatformChainID, owner)
+				tx, err := xWallet.IssueImportTx(
+					constants.PlatformChainID,
+					owner,
+					e2e.WithDefaultContext(),
+				)
 				require.NoError(err)
 
 				tests.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())

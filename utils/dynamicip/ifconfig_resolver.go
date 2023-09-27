@@ -20,7 +20,7 @@ type ifConfigResolver struct {
 }
 
 func (r *ifConfigResolver) Resolve(ctx context.Context) (net.IP, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", r.url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.url, nil)
 	if err != nil {
 		return nil, err
 	}
