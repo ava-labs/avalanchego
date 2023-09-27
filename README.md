@@ -63,7 +63,7 @@ versions with no additional cost at all.
 * `Put` - An operation for a `Key`/`Value` pair. A put means "create if it doesn't
   exist, or update it if it does. A put operation is how you add a `Value` for a
   specific `Key`.
-* `Delete` - A operation indicating that a `Key` that should be removed from the trie.
+* `Delete` - An operation indicating that a `Key` that should be removed from the trie.
 * `Batch Operation` - An operation of either `Put` or `Delete`.
 * `Batch` - An ordered set of `Batch Operation`s.
 * `Proposal` - A proposal consists of a base `Root Hash` and a `Batch`, but is not
