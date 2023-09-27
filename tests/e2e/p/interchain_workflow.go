@@ -95,6 +95,8 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		infoClient := info.NewClient(node.GetProcessContext().URI)
 		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+		require.NoError(err)
 
 		ginkgo.By("adding the new node as a validator", func() {
 			startTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
@@ -114,7 +116,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: nodeID,
+						NodeID: shortNodeID,
 						Start:  uint64(startTime.Unix()),
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -150,7 +152,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: nodeID,
+						NodeID: shortNodeID,
 						Start:  uint64(startTime.Unix()),
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
