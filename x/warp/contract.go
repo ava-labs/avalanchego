@@ -146,11 +146,7 @@ func UnpackGetVerifiedWarpBlockHashOutput(output []byte) (GetVerifiedWarpBlockHa
 }
 
 func getVerifiedWarpBlockHash(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	remainingGas, err = contract.DeductGas(suppliedGas, GetVerifiedWarpMessageBaseCost)
-	if err != nil {
-		return nil, remainingGas, err
-	}
-	return handleWarpMessage(accessibleState, input, remainingGas, blockHashHandler{})
+	return handleWarpMessage(accessibleState, input, suppliedGas, blockHashHandler{})
 }
 
 // UnpackGetVerifiedWarpMessageInput attempts to unpack [input] into the uint32 type argument
@@ -192,11 +188,7 @@ func UnpackGetVerifiedWarpMessageOutput(output []byte) (GetVerifiedWarpMessageOu
 // getVerifiedWarpMessage retrieves the pre-verified warp message from the predicate storage slots and returns
 // the expected ABI encoding of the message to the caller.
 func getVerifiedWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	remainingGas, err = contract.DeductGas(suppliedGas, GetVerifiedWarpMessageBaseCost)
-	if err != nil {
-		return nil, remainingGas, err
-	}
-	return handleWarpMessage(accessibleState, input, remainingGas, addressedPayloadHandler{})
+	return handleWarpMessage(accessibleState, input, suppliedGas, addressedPayloadHandler{})
 }
 
 // UnpackSendWarpMessageInput attempts to unpack [input] as SendWarpMessageInput
