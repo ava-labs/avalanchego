@@ -79,7 +79,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	if v.t.Consensus.Finalized() {
+	if v.t.Consensus.NumProcessing() == 0 {
 		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
@@ -102,7 +102,7 @@ votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
 		// use rootID in case of this is a non-verified block ID
-		rootID := v.t.nonVerifieds.GetRoot(vote)
+		rootID := v.t.nonVerifieds.GetAncestor(vote)
 		v.t.Ctx.Log.Verbo("bubbling vote(s) through unverified blocks",
 			zap.Int("numVotes", count),
 			zap.Stringer("voteID", vote),
