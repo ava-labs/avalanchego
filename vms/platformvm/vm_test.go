@@ -53,6 +53,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -68,12 +69,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-const defaultWeight uint64 = 10000
-
 var (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
-
 	defaultRewardConfig = reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .10 * reward.PercentDenominator,
@@ -81,42 +77,18 @@ var (
 		SupplyCap:          720 * units.MegaAvax,
 	}
 
-	// AVAX asset ID in tests
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-
 	defaultTxFee = uint64(100)
 
-	// chain timestamp at genesis
-	defaultGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	banffForkTime = genesis.TestValidateEndTime.Add(-5 * genesis.TestMinStakingDuration)
 
-	// time that genesis validators start validating
-	defaultValidateStartTime = defaultGenesisTime
-
-	// time that genesis validators stop validating
-	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-
-	banffForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
-
-	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys = secp256k1.TestKeys()
-
-	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
-	// amount all genesis validators have in defaultVM
-	defaultBalance = 100 * defaultMinValidatorStake
-
 	// subnet that exists at genesis in defaultVM
-	// Its controlKeys are keys[0], keys[1], keys[2]
+	// Its controlKeys are genesis.TestKeys[0], genesis.TestKeys[1], genesis.TestKeys[2]
 	// Its threshold is 2
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = keys[0:3]
+	testSubnet1ControlKeys = genesis.TestKeys[0:3]
 
-	xChainID = ids.Empty.Prefix(0)
-	cChainID = ids.Empty.Prefix(1)
-
-	// Used to create and use keys.
 	testKeyFactory secp256k1.Factory
 
 	errMissing = errors.New("missing")
@@ -131,17 +103,17 @@ func defaultContext(t *testing.T) *snow.Context {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
+	ctx.XChainID = genesis.TestXChainID
+	ctx.CChainID = genesis.TestCChainID
+	ctx.AVAXAssetID = genesis.TestAvaxAssetID
 	aliaser := ids.NewAliaser()
 
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
 	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	require.NoError(aliaser.Alias(xChainID, "X"))
-	require.NoError(aliaser.Alias(xChainID, xChainID.String()))
-	require.NoError(aliaser.Alias(cChainID, "C"))
-	require.NoError(aliaser.Alias(cChainID, cChainID.String()))
+	require.NoError(aliaser.Alias(genesis.TestXChainID, "X"))
+	require.NoError(aliaser.Alias(genesis.TestXChainID, genesis.TestXChainID.String()))
+	require.NoError(aliaser.Alias(genesis.TestCChainID, "C"))
+	require.NoError(aliaser.Alias(genesis.TestCChainID, genesis.TestCChainID.String()))
 
 	ctx.BCLookup = aliaser
 
@@ -149,8 +121,8 @@ func defaultContext(t *testing.T) *snow.Context {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
+				genesis.TestXChainID:      constants.PrimaryNetworkID,
+				genesis.TestCChainID:      constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -167,26 +139,26 @@ func defaultContext(t *testing.T) *snow.Context {
 func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
-	genesisUTXOs := make([]api.UTXO, len(keys))
-	for i, key := range keys {
+	genesisUTXOs := make([]api.UTXO, len(genesis.TestKeys))
+	for i, key := range genesis.TestKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
+			Amount:  json.Uint64(genesis.TestBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
-	for i, key := range keys {
+	genesisValidators := make([]api.PermissionlessValidator, len(genesis.TestKeys))
+	for i, key := range genesis.TestKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				StartTime: json.Uint64(genesis.TestValidateStartTime.Unix()),
+				EndTime:   json.Uint64(genesis.TestValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{
@@ -194,7 +166,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
+				Amount:  json.Uint64(genesis.TestWeight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
@@ -204,11 +176,11 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
+		AvaxAssetID:   genesis.TestAvaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(genesis.TestGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
@@ -234,28 +206,28 @@ func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 // 2) The byte representation of the default genesis for tests
 func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
-	genesisUTXOs := make([]api.UTXO, len(keys))
-	for i, key := range keys {
+	genesisUTXOs := make([]api.UTXO, len(genesis.TestKeys))
+	for i, key := range genesis.TestKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
+			Amount:  json.Uint64(genesis.TestBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
-	for i, key := range keys {
+	genesisValidators := make([]api.PermissionlessValidator, len(genesis.TestKeys))
+	for i, key := range genesis.TestKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				StartTime: json.Uint64(genesis.TestValidateStartTime.Unix()),
+				EndTime:   json.Uint64(genesis.TestValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{
@@ -263,7 +235,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
+				Amount:  json.Uint64(genesis.TestWeight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
@@ -272,11 +244,11 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
+		AvaxAssetID:   genesis.TestAvaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(genesis.TestGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}
@@ -310,14 +282,14 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinValidatorStake:      genesis.TestMinValidatorStake,
+		MaxValidatorStake:      genesis.TestMaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      defaultValidateEndTime,
-		ApricotPhase5Time:      defaultValidateEndTime,
+		ApricotPhase3Time:      genesis.TestValidateEndTime,
+		ApricotPhase5Time:      genesis.TestValidateEndTime,
 		BanffTime:              banffForkTime,
 	}}
 
@@ -363,11 +335,11 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	// chain time ahead
 	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		// control keys are keys[0], keys[1], keys[2]
-		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
-		keys[0].PublicKey().Address(),    // change addr
+		2, // threshold; 2 sigs from genesis.TestKeys[0], genesis.TestKeys[1], genesis.TestKeys[2] needed to add validator to this subnet
+		// control genesis.TestKeys are genesis.TestKeys[0], genesis.TestKeys[1], genesis.TestKeys[2]
+		[]ids.ShortID{genesis.TestKeys[0].PublicKey().Address(), genesis.TestKeys[1].PublicKey().Address(), genesis.TestKeys[2].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]}, // pays tx fee
+		genesis.TestKeys[0].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 	require.NoError(vm.Builder.AddUnverifiedTx(testSubnet1))
@@ -415,7 +387,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := keys[0].PublicKey().Address()
+			id := genesis.TestKeys[0].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -429,7 +401,7 @@ func TestGenesis(t *testing.T) {
 	require.True(ok)
 	require.Len(genesisState.Validators, vdrSet.Len())
 
-	for _, key := range keys {
+	for _, key := range genesis.TestKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		require.True(vdrSet.Contains(nodeID))
 	}
@@ -450,7 +422,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 
@@ -462,7 +434,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -495,8 +467,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
+	startTime := genesis.TestGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
 	key, _ := testKeyFactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
@@ -508,7 +480,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		nodeID,
 		ids.ShortID(nodeID),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -550,7 +522,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}()
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 
@@ -562,7 +534,7 @@ func TestAddValidatorReject(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -594,10 +566,10 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	repeatNodeID := ids.NodeID(genesis.TestKeys[0].PublicKey().Address())
 
 	startTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -607,7 +579,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		repeatNodeID,
 		ids.ShortID(repeatNodeID),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -628,14 +600,14 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}()
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
+	nodeID := ids.NodeID(genesis.TestKeys[0].PublicKey().Address())
 
 	// create valid tx
-	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
+	// note that [startTime, endTime] is a subset of time that genesis.TestKeys[0]
+	// validates primary network ([genesis.TestValidateStartTime, genesis.TestValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
+		genesis.TestWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
@@ -674,14 +646,14 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}()
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
+	nodeID := ids.NodeID(genesis.TestKeys[0].PublicKey().Address())
 
 	// create valid tx
-	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
+	// note that [startTime, endTime] is a subset of time that genesis.TestKeys[0]
+	// validates primary network ([genesis.TestValidateStartTime, genesis.TestValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
+		genesis.TestWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
@@ -719,9 +691,9 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}()
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(defaultValidateEndTime)
+	vm.clock.Set(genesis.TestValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock(context.Background()) // should advance time
+	blk, err := vm.Builder.BuildBlock(context.Background()) // should contain proposal to reward genesis validator
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
@@ -733,6 +705,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	commit := options[0].(*blockexecutor.Block)
 	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+
 	abort := options[1].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
@@ -740,7 +713,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 
-	txID := oracleBlk.(block.Block).Txs()[0].ID()
+	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.manager.GetState(abort.ID())
 		require.True(ok)
@@ -750,56 +723,32 @@ func TestRewardValidatorAccept(t *testing.T) {
 		require.Equal(status.Aborted, txStatus)
 	}
 
-	require.NoError(commit.Accept(context.Background())) // advance the timestamp
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
-	require.NoError(err)
-	require.NoError(vm.SetPreference(context.Background(), lastAcceptedID))
-
-	_, txStatus, err := vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
+	require.NoError(commit.Accept(context.Background()))
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
+	require.Equal(genesis.TestValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should contain proposal to reward genesis validator
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-
-	// Assert preferences are correct
-	oracleBlk = blk.(smcon.OracleBlock)
-	options, err = oracleBlk.Options(context.Background())
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort = options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
-	require.NoError(oracleBlk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-
-	txID = blk.(block.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept(context.Background())) // reward the genesis validator
-
-	_, txStatus, err = vm.state.GetTx(txID)
+	// Verify that rewarded validator has been removed.
+	// Note that test genesis has multiple validators
+	// terminating at the same time. The rewarded validator
+	// will the first by txID. To make the test more stable
+	// (txID changes every time we change any parameter
+	// of the tx creating the validator), we explicitly
+	//  check that rewarded validator is removed from staker set.
+	tx, txStatus, err := vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	require.True(ok)
+
+	tx, _, err = vm.state.GetTx(rewardTx.TxID)
+	require.NoError(err)
+	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -814,13 +763,14 @@ func TestRewardValidatorReject(t *testing.T) {
 	}()
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(defaultValidateEndTime)
+	vm.clock.Set(genesis.TestValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock(context.Background()) // should advance time
+	// should contain proposal to reward genesis validator
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+
 	require.NoError(blk.Verify(context.Background()))
 
-	// Assert preferences are correct
 	oracleBlk := blk.(smcon.OracleBlock)
 	options, err := oracleBlk.Options(context.Background())
 	require.NoError(err)
@@ -831,49 +781,10 @@ func TestRewardValidatorReject(t *testing.T) {
 	abort := options[1].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
-	require.NoError(oracleBlk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-
-	txID := blk.(block.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept(context.Background())) // advance the timestamp
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, txStatus, err := vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
-
-	timestamp := vm.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
-
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should contain proposal to reward genesis validator
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-
-	oracleBlk = blk.(smcon.OracleBlock)
-	options, err = oracleBlk.Options(context.Background())
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort = options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
 
-	txID = blk.(block.Block).Txs()[0].ID()
+	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.manager.GetState(commit.ID())
 		require.True(ok)
@@ -886,11 +797,30 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(abort.Verify(context.Background()))
 	require.NoError(abort.Accept(context.Background())) // do not reward the genesis validator
 
-	_, txStatus, err = vm.state.GetTx(txID)
+	// Verify that chain's timestamp has advanced
+	timestamp := vm.state.GetTimestamp()
+	require.Equal(genesis.TestValidateEndTime.Unix(), timestamp.Unix())
+
+	// Verify that aborted validator has been removed.
+	// Note that test genesis has multiple validators
+	// terminating at the same time. The rewarded validator
+	// will the first by txID. To make the test more stable
+	// (txID changes every time we change any parameter
+	// of the tx creating the validator), we explicitly
+	//  check that rewarded validator is removed from staker set.
+	tx, txStatus, err := vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	require.True(ok)
+
+	tx, _, err = vm.state.GetTx(rewardTx.TxID)
+	require.NoError(err)
+	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -905,13 +835,14 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	}()
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(defaultValidateEndTime)
+	vm.clock.Set(genesis.TestValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock(context.Background()) // should advance time
+	// should contain proposal to reward genesis validator
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+
 	require.NoError(blk.Verify(context.Background()))
 
-	// Assert preferences are correct
 	oracleBlk := blk.(smcon.OracleBlock)
 	options, err := oracleBlk.Options(context.Background())
 	require.NoError(err)
@@ -922,50 +853,10 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	abort := options[1].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
-	require.NoError(oracleBlk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-
-	txID := blk.(block.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept(context.Background())) // advance the timestamp
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, txStatus, err := vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
-
-	timestamp := vm.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
-
-	// should contain proposal to reward genesis validator
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-
-	oracleBlk = blk.(smcon.OracleBlock)
-	options, err = oracleBlk.Options(context.Background())
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort = options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
 
-	txID = blk.(block.Block).Txs()[0].ID()
+	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.manager.GetState(commit.ID())
 		require.True(ok)
@@ -978,11 +869,29 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(abort.Verify(context.Background()))
 	require.NoError(abort.Accept(context.Background())) // do not reward the genesis validator
 
-	_, txStatus, err = vm.state.GetTx(txID)
+	timestamp := vm.state.GetTimestamp()
+	require.Equal(genesis.TestValidateEndTime.Unix(), timestamp.Unix())
+
+	// Verify that aborted validator has been removed.
+	// Note that test genesis has multiple validators
+	// terminating at the same time. The rewarded validator
+	// will the first by txID. To make the test more stable
+	// (txID changes every time we change any parameter
+	// of the tx creating the validator), we explicitly
+	//  check that rewarded validator is removed from staker set.
+	tx, txStatus, err := vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	require.True(ok)
+
+	tx, _, err = vm.state.GetTx(rewardTx.TxID)
+	require.NoError(err)
+	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1060,16 +969,16 @@ func TestCreateSubnet(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeID(genesis.TestKeys[0].PublicKey().Address())
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
-		[]ids.ShortID{ // control keys
-			keys[0].PublicKey().Address(),
-			keys[1].PublicKey().Address(),
+		[]ids.ShortID{ // control genesis.TestKeys
+			genesis.TestKeys[0].PublicKey().Address(),
+			genesis.TestKeys[1].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{keys[0]}, // payer
-		keys[0].PublicKey().Address(),    // change addr
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]}, // payer
+		genesis.TestKeys[0].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 
@@ -1101,15 +1010,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
-	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
+	endTime := startTime.Add(genesis.TestMinStakingDuration)
+	// [startTime, endTime] is subset of time genesis.TestKeys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
+		genesis.TestWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -1176,7 +1085,7 @@ func TestAtomicImport(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(50000)
-	recipientKey := keys[1]
+	recipientKey := genesis.TestKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
@@ -1186,7 +1095,7 @@ func TestAtomicImport(t *testing.T) {
 	_, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.ErrorIs(err, txbuilder.ErrNoFunds)
@@ -1195,7 +1104,7 @@ func TestAtomicImport(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: genesis.TestAvaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1323,8 +1232,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 		Chains:                 chains.TestManager,
 		Validators:             firstVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
 	}}
@@ -1411,8 +1320,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 		Chains:                 chains.TestManager,
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
 	}}
@@ -1465,8 +1374,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
 	}}
@@ -1785,8 +1694,8 @@ func TestUnverifiedParent(t *testing.T) {
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
 	}}
@@ -1891,7 +1800,7 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeID(genesis.TestKeys[0].PublicKey().Address())
 
 	tests := []struct {
 		description string
@@ -1900,23 +1809,23 @@ func TestMaxStakeAmount(t *testing.T) {
 	}{
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   defaultValidateStartTime,
-			endTime:     defaultValidateEndTime,
+			startTime:   genesis.TestValidateStartTime,
+			endTime:     genesis.TestValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   defaultValidateStartTime.Add(time.Minute),
-			endTime:     defaultValidateEndTime,
+			startTime:   genesis.TestValidateStartTime.Add(time.Minute),
+			endTime:     genesis.TestValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   defaultValidateStartTime,
-			endTime:     defaultValidateEndTime.Add(-time.Minute),
+			startTime:   genesis.TestValidateStartTime,
+			endTime:     genesis.TestValidateEndTime.Add(-time.Minute),
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   defaultValidateStartTime.Add(time.Minute),
-			endTime:     defaultValidateEndTime.Add(-time.Minute),
+			startTime:   genesis.TestValidateStartTime.Add(time.Minute),
+			endTime:     genesis.TestValidateEndTime.Add(-time.Minute),
 		},
 	}
 
@@ -1928,7 +1837,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			require.NoError(err)
-			require.Equal(defaultWeight, amount)
+			require.Equal(genesis.TestWeight, amount)
 		})
 	}
 }
@@ -1975,7 +1884,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(genesis.TestValidateEndTime)
 
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
@@ -2012,16 +1921,17 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		nil,
 	))
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.clock.Set(genesis.TestValidateStartTime.Add(2 * genesis.TestMinStakingDuration))
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(genesis.TestValidateStartTime.Add(2 * genesis.TestMinStakingDuration))
 
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
 
-	secondVM.clock.Set(defaultValidateEndTime)
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	secondVM.clock.Set(genesis.TestValidateEndTime)
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(genesis.TestValidateEndTime)
 
-	blk, err := secondVM.Builder.BuildBlock(context.Background()) // should advance time
+	// should contain proposal to reward genesis validator
+	blk, err := secondVM.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
@@ -2037,52 +1947,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	abort := options[1].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
-	require.NoError(oracleBlk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
-
-	proposalTx := blk.(block.Block).Txs()[0]
-	{
-		onAccept, ok := secondVM.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(proposalTx.ID())
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept(context.Background())) // advance the timestamp
-	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
-
-	_, txStatus, err := secondVM.state.GetTx(proposalTx.ID())
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
-
-	// Verify that chain's timestamp has advanced
-	timestamp := secondVM.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
-
-	blk, err = secondVM.Builder.BuildBlock(context.Background()) // should contain proposal to reward genesis validator
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-
-	oracleBlk = blk.(smcon.OracleBlock)
-	options, err = oracleBlk.Options(context.Background())
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort = options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
-	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
+	require.NoError(abort.Verify(context.Background()))
 
-	proposalTx = blk.(block.Block).Txs()[0]
+	proposalTx := blk.(block.Block).Txs()[0]
 	{
 		onAccept, ok := secondVM.manager.GetState(commit.ID())
 		require.True(ok)
@@ -2092,18 +1961,30 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		require.Equal(status.Committed, txStatus)
 	}
 
-	require.NoError(abort.Verify(context.Background()))
-	require.NoError(abort.Accept(context.Background())) // do not reward the genesis validator
+	// do not reward the genesis validator
+	require.NoError(abort.Accept(context.Background()))
 	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
 
-	_, txStatus, err = secondVM.state.GetTx(proposalTx.ID())
+	// Verify that rewarded validator has been removed.
+	// Note that test genesis has multiple validators
+	// terminating at the same time. The rewarded validator
+	// will the first by txID. To make the test more stable
+	// (txID changes every time we change any parameter
+	// of the tx creating the validator), we explicitly
+	//  check that rewarded validator is removed from staker set.
+	tx, txStatus, err := secondVM.state.GetTx(proposalTx.TxID)
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	_, err = secondVM.state.GetCurrentValidator(
-		constants.PrimaryNetworkID,
-		ids.NodeID(keys[1].PublicKey().Address()),
-	)
+	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	require.True(ok)
+
+	tx, _, err = secondVM.state.GetTx(rewardTx.TxID)
+	require.NoError(err)
+	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+
+	_, err = secondVM.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -2154,15 +2035,15 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(defaultValidateEndTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	vm.clock.Set(genesis.TestValidateEndTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(genesis.TestValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock(context.Background()) // should advance time
+	// should contain proposal to reward genesis validator
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
 
-	// first the time will be advanced.
 	oracleBlk := blk.(smcon.OracleBlock)
 	options, err := oracleBlk.Options(context.Background())
 	require.NoError(err)
@@ -2173,42 +2054,37 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	abort := options[1].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
-	require.NoError(oracleBlk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-	require.NoError(commit.Accept(context.Background())) // advance the timestamp
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	// Verify that chain's timestamp has advanced
-	timestamp := vm.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
-
-	// should contain proposal to reward genesis validator
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-
-	oracleBlk = blk.(smcon.OracleBlock)
-	options, err = oracleBlk.Options(context.Background())
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort = options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
-
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 	require.NoError(abort.Accept(context.Background())) // do not reward the genesis validator
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(
-		constants.PrimaryNetworkID,
-		ids.NodeID(keys[1].PublicKey().Address()),
-	)
+	// Verify that chain's timestamp has advanced
+	timestamp := vm.state.GetTimestamp()
+	require.Equal(genesis.TestValidateEndTime.Unix(), timestamp.Unix())
+
+	// Verify that rewarded validator has been removed.
+	// Note that test genesis has multiple validators
+	// terminating at the same time. The rewarded validator
+	// will the first by txID. To make the test more stable
+	// (txID changes every time we change any parameter
+	// of the tx creating the validator), we explicitly
+	//  check that rewarded validator is removed from staker set.
+	proposalTx := blk.(block.Block).Txs()[0]
+	tx, txStatus, err := vm.state.GetTx(proposalTx.TxID)
+	require.NoError(err)
+	require.Equal(status.Aborted, txStatus)
+
+	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	require.True(ok)
+
+	tx, _, err = vm.state.GetTx(rewardTx.TxID)
+	require.NoError(err)
+	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -2233,14 +2109,14 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	id := key.PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		defaultMaxValidatorStake,
+		genesis.TestMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.NodeID(id),
 		id,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
+		genesis.TestKeys[0].Address(),
 	)
 	require.NoError(err)
 
@@ -2256,8 +2132,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1,
 		[]ids.ShortID{id},
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
+		genesis.TestKeys[0].Address(),
 	)
 	require.NoError(err)
 
@@ -2271,21 +2147,21 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
+		genesis.TestMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.NodeID(id),
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, keys[1]},
-		keys[1].Address(),
+		[]*secp256k1.PrivateKey{key, genesis.TestKeys[1]},
+		genesis.TestKeys[1].Address(),
 	)
 	require.NoError(err)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
 		ids.NodeID(id),
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, keys[2]},
-		keys[2].Address(),
+		[]*secp256k1.PrivateKey{key, genesis.TestKeys[2]},
+		genesis.TestKeys[2].Address(),
 	)
 	require.NoError(err)
 

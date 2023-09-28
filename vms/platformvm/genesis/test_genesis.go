@@ -19,23 +19,36 @@ import (
 )
 
 var (
-	TestKeys               = secp256k1.TestKeys()
-	TestGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	// each key controls an address that has [TestBalance] AVAX at genesis
+	TestKeys = secp256k1.TestKeys()
+
+	// chain timestamp at genesis
+	TestGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// time that genesis validators start validating
 	TestValidateStartTime  = TestGenesisTime
 	TestMinStakingDuration = 24 * time.Hour
 	TestMaxStakingDuration = 365 * 24 * time.Hour
-	TestValidateEndTime    = TestValidateStartTime.Add(20 * TestMinStakingDuration)
 
-	TestNetworkID   = constants.UnitTestID
+	// time that genesis validators stop validating
+	TestValidateEndTime = TestValidateStartTime.Add(20 * TestMinStakingDuration)
+
+	TestNetworkID = constants.UnitTestID
+
+	// AVAX asset ID in tests
 	TestAvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 	TestXChainID    = ids.Empty.Prefix(0)
 	TestCChainID    = ids.Empty.Prefix(1)
 
 	TestMinValidatorStake = 5 * units.MilliAvax
-	TestBalance           = 100 * TestMinValidatorStake
-	TestWeight            = TestMinValidatorStake
+	TestMaxValidatorStake = 500 * units.MilliAvax
+
+	// amount all genesis validators have in defaultVM
+	TestBalance = 100 * TestMinValidatorStake
+	TestWeight  = TestMinValidatorStake
 )
 
+// [BuildTestGenesis] is a good default to build genesis for platformVM unit tests
 func BuildTestGenesis() (*State, error) {
 	genesisUtxos := make([]*avax.UTXO, len(TestKeys))
 	for i, key := range TestKeys {
