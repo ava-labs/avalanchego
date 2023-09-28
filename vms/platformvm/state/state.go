@@ -358,7 +358,7 @@ type state struct {
 
 	// Subnet ID --> Owner of the subnet
 	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, *wrappedFxOwner] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwnerCache cache.Cacher[ids.ID, *fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -429,16 +429,16 @@ type txAndStatus struct {
 	status status.Status
 }
 
-type wrappedFxOwner struct {
+type fxOwnerAndSize struct {
 	owner fx.Owner
 	size  int
 }
 
-func wrappedFxOwnerSize(_ ids.ID, w *wrappedFxOwner) int {
-	if w == nil {
+func fxOwnerAndSizeSize(_ ids.ID, f *fxOwnerAndSize) int {
+	if f == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + w.size + constants.PointerOverhead
+	return ids.IDLen + f.size + constants.PointerOverhead
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -595,10 +595,10 @@ func newState(
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
 	subnetOwnerDB := prefixdb.New(subnetOwnerPrefix, baseDB)
-	subnetOwnerCache, err := metercacher.New[ids.ID, *wrappedFxOwner](
+	subnetOwnerCache, err := metercacher.New[ids.ID, *fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *wrappedFxOwner](execCfg.FxOwnerCacheSize, wrappedFxOwnerSize),
+		cache.NewSizedLRU[ids.ID, *fxOwnerAndSize](execCfg.FxOwnerCacheSize, fxOwnerAndSizeSize),
 	)
 	if err != nil {
 		return nil, err
@@ -872,7 +872,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 			return nil, err
 		}
 		s.SetSubnetOwner(subnetID, owner)
-		s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
+		s.subnetOwnerCache.Put(subnetID, &fxOwnerAndSize{
 			owner: owner,
 			size:  len(ownerBytes),
 		})
@@ -2353,7 +2353,7 @@ func (s *state) writeSubnetOwners() error {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
 
-		s.subnetOwnerCache.Put(subnetID, &wrappedFxOwner{
+		s.subnetOwnerCache.Put(subnetID, &fxOwnerAndSize{
 			owner: owner,
 			size:  len(ownerBytes),
 		})
@@ -2442,11 +2442,11 @@ func (s *state) writeMetadata() error {
 }
 
 // Returns the block, status of the block, and whether it is a [stateBlk].
-// Invariant: blkBytes is safe to parse with block.GenesisCodec
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
 // TODO: Remove after v1.11.x is activated
 func parseStoredBlock(blkBytes []byte) (block.Block, choices.Status, bool, error) {
-	// Attempt to parse as block.Block
+	// Attempt to parse as blocks.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, choices.Accepted, false, nil
