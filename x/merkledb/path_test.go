@@ -306,6 +306,123 @@ func Test_Path_Extend(t *testing.T) {
 	require.Equal(byte(1), extendedP.Token(1))
 }
 
+func TestPathBytesNeeded(t *testing.T) {
+	type test struct {
+		BranchFactor
+		tokensLength int
+		bytesNeeded  int
+	}
+
+	tests := []test{
+		{
+			BranchFactor: BranchFactor2,
+			tokensLength: 7,
+			bytesNeeded:  1,
+		},
+		{
+			BranchFactor: BranchFactor2,
+			tokensLength: 8,
+			bytesNeeded:  1,
+		},
+		{
+			BranchFactor: BranchFactor2,
+			tokensLength: 9,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor2,
+			tokensLength: 16,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor2,
+			tokensLength: 17,
+			bytesNeeded:  3,
+		},
+		{
+			BranchFactor: BranchFactor4,
+			tokensLength: 3,
+			bytesNeeded:  1,
+		},
+		{
+			BranchFactor: BranchFactor4,
+			tokensLength: 4,
+			bytesNeeded:  1,
+		},
+		{
+			BranchFactor: BranchFactor4,
+			tokensLength: 5,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor4,
+			tokensLength: 8,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor4,
+			tokensLength: 9,
+			bytesNeeded:  3,
+		},
+		{
+			BranchFactor: BranchFactor16,
+			tokensLength: 2,
+			bytesNeeded:  1,
+		},
+		{
+			BranchFactor: BranchFactor16,
+			tokensLength: 3,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor16,
+			tokensLength: 4,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor16,
+			tokensLength: 5,
+			bytesNeeded:  3,
+		},
+		{
+			BranchFactor: BranchFactor256,
+			tokensLength: 2,
+			bytesNeeded:  2,
+		},
+		{
+			BranchFactor: BranchFactor256,
+			tokensLength: 3,
+			bytesNeeded:  3,
+		},
+		{
+			BranchFactor: BranchFactor256,
+			tokensLength: 4,
+			bytesNeeded:  4,
+		},
+	}
+
+	for _, branchFactor := range branchFactors {
+		tests = append(tests, test{
+			BranchFactor: branchFactor,
+			tokensLength: 0,
+			bytesNeeded:  0,
+		})
+		tests = append(tests, test{
+			BranchFactor: branchFactor,
+			tokensLength: 1,
+			bytesNeeded:  1,
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("branch factor %d, tokens length %d", tt.BranchFactor, tt.tokensLength), func(t *testing.T) {
+			require := require.New(t)
+			path := emptyPath(tt.BranchFactor)
+			require.Equal(tt.bytesNeeded, path.bytesNeeded(tt.tokensLength))
+		})
+	}
+}
+
 func FuzzPathExtend(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
