@@ -72,7 +72,7 @@ type GetStateSummaryFrontierHandler interface {
 }
 
 type StateSummaryFrontierHandler interface {
-	// Notify this engine of a response to a previously sent
+	// Notify this engine of the response to a previously sent
 	// GetStateSummaryFrontier message with the same requestID.
 	//
 	// It is not guaranteed that the summary bytes are from a valid state
@@ -113,7 +113,7 @@ type GetAcceptedStateSummaryHandler interface {
 }
 
 type AcceptedStateSummaryHandler interface {
-	// Notify this engine of a response to a previously sent
+	// Notify this engine of the response to a previously sent
 	// GetAcceptedStateSummary message with the same requestID.
 	//
 	// It is not guaranteed that the summaryIDs have heights corresponding to
@@ -151,8 +151,8 @@ type GetAcceptedFrontierHandler interface {
 }
 
 type AcceptedFrontierHandler interface {
-	// Notify this engine of a response to a previously sent GetAcceptedFrontier
-	// message with the same requestID.
+	// Notify this engine of the response to a previously sent
+	// GetAcceptedFrontier message with the same requestID.
 	AcceptedFrontier(
 		ctx context.Context,
 		nodeID ids.NodeID,
@@ -187,8 +187,8 @@ type GetAcceptedHandler interface {
 }
 
 type AcceptedHandler interface {
-	// Notify this engine of a response to a previously sent GetAccepted message
-	// with the same requestID.
+	// Notify this engine of the response to a previously sent GetAccepted
+	// message with the same requestID.
 	//
 	// It is not guaranteed that the containerIDs are a subset of the
 	// containerIDs provided in the request.
@@ -225,7 +225,7 @@ type GetAncestorsHandler interface {
 }
 
 type AncestorsHandler interface {
-	// Notify this engine of a response to a previously sent GetAncestors
+	// Notify this engine of the response to a previously sent GetAncestors
 	// message with the same requestID.
 	//
 	// It is expected, but not guaranteed, that the first element in containers
@@ -264,9 +264,9 @@ type GetHandler interface {
 }
 
 type PutHandler interface {
-	// Notify this engine of either a response to a previously sent Get message
-	// with the same requestID or an unsolicited container if the requestID
-	// is MaxUint32.
+	// Notify this engine of either the response to a previously sent Get
+	// message with the same requestID or an unsolicited container if the
+	// requestID is MaxUint32.
 	//
 	// It is not guaranteed that container can be parsed or issued.
 	Put(
@@ -320,7 +320,7 @@ type QueryHandler interface {
 }
 
 type ChitsHandler interface {
-	// Notify this engine of a response to a previously sent PullQuery or
+	// Notify this engine of the response to a previously sent PullQuery or
 	// PushQuery message with the same requestID.
 	//
 	// It is expected, but not guaranteed, that preferredID transitively
@@ -371,23 +371,12 @@ type AppRequestHandler interface {
 }
 
 type AppResponseHandler interface {
-	// Notify this engine of a response to the AppRequest message it sent to
-	// [nodeID] with request ID [requestID].
+	// Notify this engine of the response to a previously sent AppRequest with
+	// the same requestID.
 	//
-	// The meaning of [response] is application (VM) specifc.
+	// The meaning of response is application (VM) specifc.
 	//
-	// It is guaranteed that:
-	// * This engine sent a request to [nodeID] with ID [requestID].
-	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
-	// * AppResponse([nodeID], [requestID]) has not already been called.
-	//
-	// It is not guaranteed that:
-	// * [response] contains the expected response
-	// * [response] is well-formed/valid.
-	//
-	// If [response] is invalid or not the expected response, the VM chooses how
-	// to react. For example, the VM may send another AppRequest, or it may give
-	// up trying to get the requested information.
+	// It is not guaranteed that response is well-formed or valid.
 	AppResponse(
 		ctx context.Context,
 		nodeID ids.NodeID,
@@ -448,27 +437,15 @@ type CrossChainAppRequestHandler interface {
 }
 
 type CrossChainAppResponseHandler interface {
-	// CrossChainAppResponse notifies this engine of a response to the
-	// CrossChainAppRequest message it sent to [chainID] with request ID
-	// [requestID].
+	// Notify this engine of the response to a previously sent
+	// CrossChainAppRequest with the same requestID.
 	//
-	// The meaning of [response] is application (VM) specific.
-	//
-	// It is guaranteed that:
-	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
-	// called.
-	// * CrossChainAppResponse([chainID], [requestID]) has not already been
-	// called.
+	// The meaning of response is application (VM) specifc.
 	//
 	// Guarantees surrounding the response are specific to the implementation of
 	// the responding VM. For example, the response may or may not be guaranteed
 	// to be well-formed/valid depending on the implementation of the requesting
 	// VM.
-	//
-	// If [response] is invalid or not the expected response, the VM chooses how
-	// to react. For example, the VM may send another CrossChainAppRequest, or
-	// it may give up trying to get the requested information.
 	CrossChainAppResponse(
 		ctx context.Context,
 		chainID ids.ID,
