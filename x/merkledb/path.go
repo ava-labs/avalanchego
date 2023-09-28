@@ -160,10 +160,21 @@ func (p Path) Less(other Path) bool {
 	return p.value < other.value || (p.value == other.value && p.tokensLength < other.tokensLength)
 }
 
-// bitsToShift indicates how many bits to shift the token at the index to get the raw token value.
-// varies from (8-[tokenBitSize]) -> (0) when remainder of index varies from (0) -> (p.tokensPerByte-1)
+// bitsToShift indicates how many bits to right shift the byte containing
+// the token at the given [index] to get the raw token value.
 func (p Path) bitsToShift(index int) byte {
-	return 8 - (p.tokenBitSize * byte(index%p.tokensPerByte+1))
+	// [tokenIndex] is the index of the token in the byte.
+	// For example, if the branch factor is 16, then each byte contains 2 tokens.
+	// The first is at index 0, and the second is at index 1, by this definition.
+	tokenIndex := index % p.tokensPerByte
+	// The bit within the byte that the token starts at.
+	startBitIndex := p.tokenBitSize * byte(tokenIndex)
+	// The bit within the byte that the token ends at.
+	endBitIndex := startBitIndex + p.tokenBitSize - 1
+	// We want to right shift until [endBitIndex] is at the last index, so return
+	// the distance from the end of the byte to the end of the token.
+	// Note that 7 is the index of the last bit in a byte.
+	return 7 - endBitIndex
 }
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
