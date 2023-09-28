@@ -15,8 +15,7 @@ func TestNnarySnowflake(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sf := nnarySnowflake{}
-	sf.Initialize(betaVirtuous, betaRogue, Red)
+	sf := newNnarySnowflake(betaVirtuous, betaRogue, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -46,8 +45,7 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 3
 
-	sb := nnarySnowflake{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowflake(betaVirtuous, betaRogue, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -66,8 +64,7 @@ func TestRogueNnarySnowflake(t *testing.T) {
 	betaVirtuous := 1
 	betaRogue := 2
 
-	sb := nnarySnowflake{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowflake(betaVirtuous, betaRogue, Red)
 	require.False(sb.rogue)
 
 	sb.Add(Red)
