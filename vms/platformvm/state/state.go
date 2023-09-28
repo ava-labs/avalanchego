@@ -855,7 +855,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
 		if ownerAndSize.size == 0 {
-
 			return nil, database.ErrNotFound
 		}
 		return ownerAndSize.owner, nil
