@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -149,7 +150,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 			TxID: txID,
 		},
 		Asset: avax.Asset{
-			ID: avaxAssetID,
+			ID: genesis.AvaxAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: env.config.CreateSubnetTxFee,
@@ -306,8 +307,8 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	pendingValidatorStartTime := genesis.DefaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesis.DefaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	addPendingValidatorTx, err := addPendingValidator(
@@ -316,7 +317,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0]},
 	)
 	require.NoError(err)
 
@@ -366,14 +367,14 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	staker1 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
-		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		startTime:     genesis.DefaultGenesisTime.Add(1 * time.Minute),
+		endTime:       genesis.DefaultGenesisTime.Add(10 * genesis.DefaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		endTime:       staker1.startTime.Add(1 * time.Minute).Add(genesis.DefaultMinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
@@ -397,7 +398,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
+		endTime:       staker2.endTime.Add(genesis.DefaultMinStakingDuration),
 	}
 
 	tests := []test{
@@ -507,7 +508,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 					staker.endTime,
 					staker.nodeID,
 					staker.rewardAddress,
-					[]*secp256k1.PrivateKey{preFundedKeys[0]},
+					[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0]},
 				)
 				require.NoError(err)
 			}
@@ -519,7 +520,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 					uint64(staker.endTime.Unix()),
 					staker.nodeID, // validator ID
 					subnetID,      // Subnet ID
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0], genesis.PreFundedTestKeys[1]},
 					ids.ShortEmpty,
 				)
 				require.NoError(err)
@@ -600,17 +601,17 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
+	subnetValidatorNodeID := ids.NodeID(genesis.PreFundedTestKeys[0].PublicKey().Address())
 	// Starts after the corre
-	subnetVdr1StartTime := defaultValidateStartTime
-	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	subnetVdr1StartTime := genesis.DefaultValidateStartTime
+	subnetVdr1EndTime := genesis.DefaultValidateStartTime.Add(genesis.DefaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
 		subnetValidatorNodeID,              // Node ID
 		subnetID,                           // Subnet ID
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0], genesis.PreFundedTestKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -629,14 +630,14 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
+	subnetVdr2NodeID := ids.NodeID(genesis.PreFundedTestKeys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                        // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(genesis.DefaultMinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0], genesis.PreFundedTestKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -699,17 +700,17 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
+			subnetValidatorNodeID := ids.NodeID(genesis.PreFundedTestKeys[0].PublicKey().Address())
 
-			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1StartTime := genesis.DefaultGenesisTime.Add(1 * time.Minute)
+			subnetVdr1EndTime := genesis.DefaultGenesisTime.Add(10 * genesis.DefaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
 				subnetValidatorNodeID,              // Node ID
 				subnetID,                           // Subnet ID
-				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0], genesis.PreFundedTestKeys[1]},
 				ids.ShortEmpty,
 			)
 			require.NoError(err)
@@ -758,8 +759,8 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
+	pendingValidatorStartTime := genesis.DefaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesis.DefaultMaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	_, err := addPendingValidator(
@@ -768,7 +769,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0]},
 	)
 	require.NoError(err)
 
@@ -803,11 +804,11 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		preFundedKeys[0].PublicKey().Address(),
+		genesis.PreFundedTestKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
+			genesis.PreFundedTestKeys[0],
+			genesis.PreFundedTestKeys[1],
+			genesis.PreFundedTestKeys[4],
 		},
 		ids.ShortEmpty,
 	)

@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -45,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -55,27 +53,11 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const (
-	defaultWeight = 10000
-	trackChecksum = false
-)
-
 var (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
-
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = preFundedKeys[0:3]
+	testSubnet1ControlKeys = genesis.PreFundedTestKeys[0:3]
+
+	defaultTxFee = uint64(100)
 
 	errMissing = errors.New("missing")
 )
@@ -193,12 +175,12 @@ func addSubnet(t *testing.T, env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+			genesis.PreFundedTestKeys[0].PublicKey().Address(),
+			genesis.PreFundedTestKeys[1].PublicKey().Address(),
+			genesis.PreFundedTestKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0]},
+		genesis.PreFundedTestKeys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -228,7 +210,8 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	genesisState := buildGenesisTest(t, ctx)
+	genesisState, err := genesis.BuildTestGenesis(ctx.NetworkID)
+	require.NoError(err)
 	state, err := state.New(
 		db,
 		genesisState,
@@ -251,9 +234,9 @@ func defaultState(
 func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
+	ctx.XChainID = genesis.XChainID
+	ctx.CChainID = genesis.CChainID
+	ctx.AVAXAssetID = genesis.AvaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -267,8 +250,8 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
+				genesis.XChainID:          constants.PrimaryNetworkID,
+				genesis.CChainID:          constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -294,16 +277,16 @@ func defaultConfig() *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.DefaultMinStakingDuration,
+		MaxStakeDuration:       genesis.DefaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time: genesis.DefaultValidateEndTime,
+		ApricotPhase5Time: genesis.DefaultValidateEndTime,
 		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 	}
 }
@@ -311,7 +294,7 @@ func defaultConfig() *config.Config {
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(genesis.DefaultGenesisTime)
 	return clk
 }
 
@@ -347,82 +330,6 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 		require.NoError(res.Bootstrapped())
 	}
 	return res
-}
-
-func buildGenesisTest(t *testing.T, ctx *snow.Context) *genesis.State {
-	require := require.New(t)
-
-	genesisUtxos := make([]*avax.UTXO, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		addr := key.PublicKey().Address()
-		genesisUtxos[i] = &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty,
-				OutputIndex: uint32(i),
-			},
-			Asset: avax.Asset{ID: ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: defaultBalance,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-			},
-		}
-	}
-
-	vdrs := txheap.NewByEndTime()
-	for _, key := range preFundedKeys {
-		addr := key.PublicKey().Address()
-		nodeID := ids.NodeID(key.PublicKey().Address())
-
-		utxo := &avax.TransferableOutput{
-			Asset: avax.Asset{ID: ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: defaultWeight,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-			},
-		}
-
-		owner := &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}
-
-		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    ctx.NetworkID,
-				BlockchainID: constants.PlatformChainID,
-			}},
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				Start:  uint64(defaultValidateStartTime.Unix()),
-				End:    uint64(defaultValidateEndTime.Unix()),
-				Wght:   utxo.Output().Amount(),
-			},
-			StakeOuts:        []*avax.TransferableOutput{utxo},
-			RewardsOwner:     owner,
-			DelegationShares: reward.PercentDenominator,
-		}}
-		require.NoError(tx.Initialize(txs.GenesisCodec))
-
-		vdrs.Add(tx)
-	}
-
-	return &genesis.State{
-		GenesisBlkID:  hashing.ComputeHash256Array(ids.Empty[:]),
-		UTXOs:         genesisUtxos,
-		Validators:    vdrs.List(),
-		Chains:        nil,
-		Timestamp:     uint64(defaultGenesisTime.Unix()),
-		InitialSupply: 360 * units.MegaAvax,
-	}
 }
 
 func shutdownEnvironment(env *environment) error {

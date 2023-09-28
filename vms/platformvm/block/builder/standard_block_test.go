@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -33,7 +34,7 @@ func TestAtomicTxImports(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(70000)
-	recipientKey := preFundedKeys[1]
+	recipientKey := genesis.PreFundedTestKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
@@ -41,7 +42,7 @@ func TestAtomicTxImports(t *testing.T) {
 	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: genesis.AvaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
