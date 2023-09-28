@@ -11,6 +11,14 @@ import (
 
 var _ NnarySnowball = (*nnarySnowball)(nil)
 
+func newNnarySnowball(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowball {
+	return nnarySnowball{
+		nnarySnowflake:     newNnarySnowflake(betaVirtuous, betaRogue, choice),
+		preference:         choice,
+		numSuccessfulPolls: make(map[ids.ID]int),
+	}
+}
+
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {
 	// wrap the n-nary snowflake logic
@@ -27,12 +35,6 @@ type nnarySnowball struct {
 	// numSuccessfulPolls tracks the total number of successful network polls of
 	// the choices
 	numSuccessfulPolls map[ids.ID]int
-}
-
-func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
-	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
-	sb.preference = choice
-	sb.numSuccessfulPolls = make(map[ids.ID]int)
 }
 
 func (sb *nnarySnowball) Preference() ids.ID {
