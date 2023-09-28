@@ -17,10 +17,10 @@ well as our review and merge procedures quick and simple.
 Please make sure your contributions adhere to our coding guidelines:
 
  * Code must adhere to the official Go 
-[formatting](https://golang.org/doc/effective_go.html#formatting) guidelines 
-(i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
+[formatting](https://go.dev/doc/effective_go#formatting) guidelines 
+(i.e. uses [gofmt](https://pkg.go.dev/cmd/gofmt)).
  * Code must be documented adhering to the official Go 
-[commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
+[commentary](https://go.dev/doc/effective_go#commentary) guidelines.
  * Pull requests need to be based on and opened against the `master` branch.
  * Pull reuqests should include a detailed description
  * Commits are required to be signed. See [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
