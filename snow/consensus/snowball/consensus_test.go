@@ -16,14 +16,16 @@ var (
 	_ Consensus = (*Byzantine)(nil)
 )
 
+func NewByzantine(_ Parameters, choice ids.ID) Consensus {
+	return &Byzantine{
+		preference: choice,
+	}
+}
+
 // Byzantine is a naive implementation of a multi-choice snowball instance
 type Byzantine struct {
 	// Hardcode the preference
 	preference ids.ID
-}
-
-func (b *Byzantine) Initialize(_ Parameters, choice ids.ID) {
-	b.preference = choice
 }
 
 func (*Byzantine) Add(ids.ID) {}
