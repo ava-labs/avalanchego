@@ -26,7 +26,9 @@ func TestClearDB(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	backend := NewBackend(warpSigner, db, 500)
+	backendIntf := NewBackend(warpSigner, db, 500)
+	backend, ok := backendIntf.(*backend)
+	require.True(t, ok)
 
 	// use multiple messages to test that all messages get cleared
 	payloads := [][]byte{[]byte("test1"), []byte("test2"), []byte("test3"), []byte("test4"), []byte("test5")}
@@ -47,6 +49,11 @@ func TestClearDB(t *testing.T) {
 
 	err = backend.Clear()
 	require.NoError(t, err)
+	require.Zero(t, backend.messageCache.Len())
+	require.Zero(t, backend.signatureCache.Len())
+	it := db.NewIterator()
+	defer it.Release()
+	require.False(t, it.Next())
 
 	// ensure all messages have been deleted
 	for _, messageID := range messageIDs {

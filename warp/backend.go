@@ -55,6 +55,7 @@ func NewBackend(warpSigner avalancheWarp.Signer, db database.Database, cacheSize
 
 func (b *backend) Clear() error {
 	b.signatureCache.Flush()
+	b.messageCache.Flush()
 	return database.Clear(b.db, batchSize)
 }
 
