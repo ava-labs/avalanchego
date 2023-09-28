@@ -574,7 +574,7 @@ func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossCha
 	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(ctx, chainID, msg.RequestId, deadline, msg.Request)
 }
 
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) CrossChainAppError(ctx context.Context, msg *vmpb.CrossChainAppErrorMsg) (*emptypb.Empty, error) {
 	chainID, err := ids.ToID(msg.ChainId)
 	if err != nil {
 		return nil, err
@@ -602,7 +602,7 @@ func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*e
 	return &emptypb.Empty{}, vm.vm.AppRequest(ctx, nodeID, req.RequestId, deadline, req.Request)
 }
 
-func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppError(ctx context.Context, req *vmpb.AppErrorMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
