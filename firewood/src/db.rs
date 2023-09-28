@@ -697,7 +697,7 @@ impl Db {
             &self.cfg,
         )?;
 
-        // Flip the reset flag after reseting the store headers.
+        // Flip the reset flag after resetting the store headers.
         if reset_store_headers {
             inner.reset_store_headers = false;
         }

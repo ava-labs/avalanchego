@@ -109,7 +109,7 @@ impl Notifiers {
 }
 
 /// Responsible for processing [`BufferCmd`]s from the [`DiskBufferRequester`]
-/// and managing the persistance of pages.
+/// and managing the persistence of pages.
 pub struct DiskBuffer {
     inbound: mpsc::Receiver<BufferCmd>,
     aiomgr: AioManager,
@@ -262,7 +262,7 @@ fn schedule_write(
 
                         false
                     } else {
-                        // if `staging` is not empty, move all semaphors to `writing` and recurse
+                        // if `staging` is not empty, move all semaphores to `writing` and recurse
                         // to schedule the new writes.
                         slot.notifiers.staging_to_writing();
 
@@ -432,7 +432,7 @@ async fn run_wal_queue(
                 .await
                 .peel(ring_ids, max.revisions)
                 .await
-                .map_err(|_| "Wal errore while pruning")
+                .map_err(|_| "Wal errored while pruning")
                 .unwrap()
         };
 
@@ -880,14 +880,14 @@ mod tests {
         let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), hash);
 
-        // get RO view of the buffer from the second hash. Only the new store shoulde see the value.
+        // get RO view of the buffer from the second hash. Only the new store should see the value.
         let view = another_store.get_view(32, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), another_hash);
         let empty: [u8; HASH_SIZE] = [0; HASH_SIZE];
         let view = store.get_view(32, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), empty);
 
-        // Overwrite the value from the beginning in the new store.  Only the new store shoulde see the change.
+        // Overwrite the value from the beginning in the new store.  Only the new store should see the change.
         another_store.write(0, &another_hash);
         let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), another_hash);

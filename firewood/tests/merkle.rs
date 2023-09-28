@@ -1025,7 +1025,7 @@ fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
 
 #[test]
 // Tests a malicious proof, where the proof is more or less the
-// whole trie. This is to match correpsonding test in geth.
+// whole trie. This is to match corresponding test in geth.
 fn test_bloadted_range_proof() -> Result<(), ProofError> {
     // Use a small trie
     let mut items = Vec::new();

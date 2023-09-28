@@ -378,7 +378,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
-            // TODO(Hao): (Optimization) If a node is alreay decode we don't need to decode again.
+            // TODO(Hao): (Optimization) If a node is already decode we don't need to decode again.
             let (mut chd_ptr, sub_proof, size) =
                 self.decode_node(merkle, cur_key, cur_proof.as_ref(), false)?;
 
@@ -673,7 +673,7 @@ fn build_branch_ptr<S: ShaleStore<Node> + Send + Sync>(
 // It should be called after a trie is constructed with two edge paths. Also
 // the given boundary keys must be the one used to construct the edge paths.
 //
-// It's the key step for range proof. The precalucated encoded value of all internal
+// It's the key step for range proof. The precalculated encoded value of all internal
 // nodes should be removed. But if the proof is valid,
 // the missing children will be filled, otherwise it will be thrown anyway.
 //

@@ -310,7 +310,7 @@ fn db_proposal() -> Result<(), DbError> {
         });
     });
 
-    // Recusrive commit
+    // Recursive commit
 
     let batch = vec![BatchOp::Put {
         key: b"k3",

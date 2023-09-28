@@ -225,7 +225,7 @@ impl StoreDelta {
             let ep = (w.offset + w.data.len() as u64 - 1) >> PAGE_SIZE_NBIT;
             let wp = w.offset >> PAGE_SIZE_NBIT;
             if wp > tail {
-                // all following writes won't go back past w.offset, so the previous continous
+                // all following writes won't go back past w.offset, so the previous continuous
                 // write area is determined
                 create_dirty_pages!(head, tail);
                 head = wp;
@@ -430,7 +430,7 @@ struct StoreRevMutDelta {
 }
 
 #[derive(Clone, Debug)]
-/// A mutable revision of the store. The view is constucted by applying the `deltas` to the
+/// A mutable revision of the store. The view is constructed by applying the `deltas` to the
 /// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
 /// the changes. `StoreRevMut` supports basing on top of another `StoreRevMut`, by chaining
 /// `prev_deltas` (from based `StoreRevMut`) with current `deltas` from itself . In this way,

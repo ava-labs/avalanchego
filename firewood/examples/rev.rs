@@ -153,7 +153,7 @@ impl RevisionTracker {
 
     fn with_new_db(self, path: impl AsRef<Path>, cfg: &DbConfig) -> Self {
         let hashes = {
-            // must name db variable to explictly drop
+            // must name db variable to explicitly drop
             let Self { hashes, db: _db } = self;
             hashes
         };
