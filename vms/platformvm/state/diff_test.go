@@ -543,7 +543,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 
 	// Create subnet on base state
 	owner, err := state.GetSubnetOwner(subnetID)
-	require.ErrorIs(err, ErrCantFindSubnet)
+	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(owner)
 
 	state.AddSubnet(createSubnetTx)

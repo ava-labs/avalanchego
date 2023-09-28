@@ -58,7 +58,6 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	ErrCantFindSubnet               = errors.New("couldn't find subnet")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
@@ -879,13 +878,10 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
-		return nil, fmt.Errorf(
-			"%w %q: %w",
-			ErrCantFindSubnet,
-			subnetID,
-			err,
-		)
+		if err == database.ErrNotFound {
+			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
+		}
+		return nil, err
 	}
 
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)

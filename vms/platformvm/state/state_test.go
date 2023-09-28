@@ -682,7 +682,7 @@ func TestStateSubnetOwner(t *testing.T) {
 	)
 
 	owner, err := state.GetSubnetOwner(subnetID)
-	require.ErrorIs(err, ErrCantFindSubnet)
+	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(owner)
 
 	state.AddSubnet(createSubnetTx)
