@@ -29,7 +29,7 @@ var (
 // key.
 //
 // To meet the requirements of a database key, the prefix is defined by
-// concatinating the length of the user key and the user key. The suffix of the
+// concatenating the length of the user key and the user key. The suffix of the
 // database key is the negation of the big endian encoded height. This suffix
 // guarantees the keys are sorted correctly.
 //
