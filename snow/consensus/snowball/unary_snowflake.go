@@ -7,6 +7,12 @@ import "fmt"
 
 var _ UnarySnowflake = (*unarySnowflake)(nil)
 
+func newUnarySnowflake(beta int) unarySnowflake {
+	return unarySnowflake{
+		beta: beta,
+	}
+}
+
 // unarySnowflake is the implementation of a unary snowflake instance
 type unarySnowflake struct {
 	// beta is the number of consecutive successful queries required for
@@ -20,10 +26,6 @@ type unarySnowflake struct {
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
 	finalized bool
-}
-
-func (sf *unarySnowflake) Initialize(beta int) {
-	sf.beta = beta
 }
 
 func (sf *unarySnowflake) RecordSuccessfulPoll() {

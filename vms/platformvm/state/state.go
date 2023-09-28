@@ -1335,7 +1335,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1344,7 +1344,8 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
-		s.AddUTXO(utxo)
+		avaxUTXO := utxo.UTXO
+		s.AddUTXO(&avaxUTXO)
 	}
 
 	// Persist primary network validator set at genesis
@@ -1817,11 +1818,11 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	genesisState, err := genesis.ParseState(genesisBytes)
+	genesis, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}
-	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
+	if err := s.syncGenesis(genesisBlock, genesis); err != nil {
 		return err
 	}
 
