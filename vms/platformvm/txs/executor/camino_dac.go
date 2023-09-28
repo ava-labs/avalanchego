@@ -16,6 +16,7 @@ var (
 	_ dac.VerifierVisitor = (*proposalVerifier)(nil)
 	_ dac.ExecutorVisitor = (*proposalExecutor)(nil)
 
+	errConsortiumMember             = errors.New("address is consortium member")
 	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
 	errAlreadyActiveProposal        = errors.New("there is already active proposal of this type")
 )
@@ -86,9 +87,56 @@ func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
 	return nil
 }
 
-// should never error
 func (e *proposalExecutor) BaseFeeProposal(proposal *dac.BaseFeeProposalState) error {
 	_, mostVotedOptionIndex, _ := proposal.GetMostVoted()
 	e.state.SetBaseFee(proposal.Options[mostVotedOptionIndex].Value)
+	return nil
+}
+
+// AddMemberProposal
+
+func (e *proposalVerifier) AddMemberProposal(proposal *dac.AddMemberProposal) error {
+	// verify that address isn't consortium member
+	applicantAddress, err := e.state.GetAddressStates(proposal.ApplicantAddress)
+	if err != nil {
+		return err
+	}
+
+	if applicantAddress.Is(txs.AddressStateConsortiumMember) {
+		return errConsortiumMember
+	}
+
+	// verify that there is no existing add member proposal for this address
+	proposalsIterator, err := e.state.GetProposalIterator()
+	if err != nil {
+		return err
+	}
+	defer proposalsIterator.Release()
+	for proposalsIterator.Next() {
+		existingProposal, err := proposalsIterator.Value()
+		if err != nil {
+			return err
+		}
+		addMemberProposal, ok := existingProposal.(*dac.AddMemberProposalState)
+		if ok && addMemberProposal.ApplicantAddress == proposal.ApplicantAddress {
+			return errAlreadyActiveProposal
+		}
+	}
+
+	if err := proposalsIterator.Error(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *proposalExecutor) AddMemberProposal(proposal *dac.AddMemberProposalState) error {
+	if accepted, _, _ := proposal.Result(); accepted {
+		addrState, err := e.state.GetAddressStates(proposal.ApplicantAddress)
+		if err != nil {
+			return err
+		}
+		e.state.SetAddressStates(proposal.ApplicantAddress, addrState|txs.AddressStateConsortiumMember)
+	}
 	return nil
 }
