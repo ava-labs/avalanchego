@@ -58,8 +58,10 @@ func TestParseDBKey(t *testing.T) {
 }
 
 func FuzzMetadataKeyInvariant(f *testing.F) {
-	f.Fuzz(func(t *testing.T, userKey []byte, userHeight uint64, metadataKey []byte) {
-		_, dbKeyPrefix := newDBKeyFromUser(userKey, userHeight)
+	f.Fuzz(func(t *testing.T, userKey []byte, metadataKey []byte) {
+		// The prefix is independent of the height, so its value doesn't matter
+		// for this test.
+		_, dbKeyPrefix := newDBKeyFromUser(userKey, 0)
 		dbKey := newDBKeyFromMetadata(metadataKey)
 		require.False(t, bytes.HasPrefix(dbKey, dbKeyPrefix))
 	})
