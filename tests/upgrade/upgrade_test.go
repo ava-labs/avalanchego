@@ -62,7 +62,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			// chances of a successful start.
 			//
 			// TODO(marun) Refactor node start to do this automatically
-			bootstrapIPs, bootstrapIDs, err := network.GetBootstrapIPsAndIds()
+			bootstrapIPs, bootstrapIDs, err := network.GetBootstrapIPsAndIDs()
 			require.NoError(err)
 			require.NotEmpty(bootstrapIDs)
 			node.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")

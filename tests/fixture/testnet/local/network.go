@@ -658,7 +658,7 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		return nil, err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := ln.GetBootstrapIPsAndIds()
+	bootstrapIPs, bootstrapIDs, err := ln.GetBootstrapIPsAndIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +676,7 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 	return node, node.Start(w, ln.ExecPath)
 }
 
-func (ln *LocalNetwork) GetBootstrapIPsAndIds() ([]string, []string, error) {
+func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	// Collect staking addresses of running nodes for use in bootstrapping a node
 	if err := ln.ReadNodes(); err != nil {
 		return nil, nil, fmt.Errorf("failed to read local network nodes: %w", err)
