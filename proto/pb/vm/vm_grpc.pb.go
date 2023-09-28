@@ -34,12 +34,12 @@ const (
 	VM_Health_FullMethodName                     = "/vm.VM/Health"
 	VM_Version_FullMethodName                    = "/vm.VM/Version"
 	VM_AppRequest_FullMethodName                 = "/vm.VM/AppRequest"
-	VM_AppRequestFailed_FullMethodName           = "/vm.VM/AppRequestFailed"
+	VM_AppError_FullMethodName                   = "/vm.VM/AppError"
 	VM_AppResponse_FullMethodName                = "/vm.VM/AppResponse"
 	VM_AppGossip_FullMethodName                  = "/vm.VM/AppGossip"
 	VM_Gather_FullMethodName                     = "/vm.VM/Gather"
 	VM_CrossChainAppRequest_FullMethodName       = "/vm.VM/CrossChainAppRequest"
-	VM_CrossChainAppRequestFailed_FullMethodName = "/vm.VM/CrossChainAppRequestFailed"
+	VM_CrossChainAppError_FullMethodName         = "/vm.VM/CrossChainAppError"
 	VM_CrossChainAppResponse_FullMethodName      = "/vm.VM/CrossChainAppResponse"
 	VM_GetAncestors_FullMethodName               = "/vm.VM/GetAncestors"
 	VM_BatchedParseBlock_FullMethodName          = "/vm.VM/BatchedParseBlock"
@@ -95,7 +95,7 @@ type VMClient interface {
 	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
-	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	AppError(ctx context.Context, in *AppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -104,7 +104,7 @@ type VMClient interface {
 	// Attempts to gather metrics from a VM.
 	Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error)
 	CrossChainAppRequest(ctx context.Context, in *CrossChainAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	CrossChainAppRequestFailed(ctx context.Context, in *CrossChainAppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CrossChainAppError(ctx context.Context, in *CrossChainAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CrossChainAppResponse(ctx context.Context, in *CrossChainAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// BatchedChainVM
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
@@ -267,9 +267,9 @@ func (c *vMClient) AppRequest(ctx context.Context, in *AppRequestMsg, opts ...gr
 	return out, nil
 }
 
-func (c *vMClient) AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *vMClient) AppError(ctx context.Context, in *AppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, VM_AppRequestFailed_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, VM_AppError_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -312,9 +312,9 @@ func (c *vMClient) CrossChainAppRequest(ctx context.Context, in *CrossChainAppRe
 	return out, nil
 }
 
-func (c *vMClient) CrossChainAppRequestFailed(ctx context.Context, in *CrossChainAppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *vMClient) CrossChainAppError(ctx context.Context, in *CrossChainAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, VM_CrossChainAppRequestFailed_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, VM_CrossChainAppError_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +486,7 @@ type VMServer interface {
 	AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error)
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
-	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
+	AppError(context.Context, *AppErrorMsg) (*emptypb.Empty, error)
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
 	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
@@ -495,7 +495,7 @@ type VMServer interface {
 	// Attempts to gather metrics from a VM.
 	Gather(context.Context, *emptypb.Empty) (*GatherResponse, error)
 	CrossChainAppRequest(context.Context, *CrossChainAppRequestMsg) (*emptypb.Empty, error)
-	CrossChainAppRequestFailed(context.Context, *CrossChainAppRequestFailedMsg) (*emptypb.Empty, error)
+	CrossChainAppError(context.Context, *CrossChainAppErrorMsg) (*emptypb.Empty, error)
 	CrossChainAppResponse(context.Context, *CrossChainAppResponseMsg) (*emptypb.Empty, error)
 	// BatchedChainVM
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
@@ -571,8 +571,8 @@ func (UnimplementedVMServer) Version(context.Context, *emptypb.Empty) (*VersionR
 func (UnimplementedVMServer) AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppRequest not implemented")
 }
-func (UnimplementedVMServer) AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AppRequestFailed not implemented")
+func (UnimplementedVMServer) AppError(context.Context, *AppErrorMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppError not implemented")
 }
 func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppResponse not implemented")
@@ -586,8 +586,8 @@ func (UnimplementedVMServer) Gather(context.Context, *emptypb.Empty) (*GatherRes
 func (UnimplementedVMServer) CrossChainAppRequest(context.Context, *CrossChainAppRequestMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppRequest not implemented")
 }
-func (UnimplementedVMServer) CrossChainAppRequestFailed(context.Context, *CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppRequestFailed not implemented")
+func (UnimplementedVMServer) CrossChainAppError(context.Context, *CrossChainAppErrorMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppError not implemented")
 }
 func (UnimplementedVMServer) CrossChainAppResponse(context.Context, *CrossChainAppResponseMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppResponse not implemented")
@@ -896,20 +896,20 @@ func _VM_AppRequest_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_AppRequestFailed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AppRequestFailedMsg)
+func _VM_AppError_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppErrorMsg)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).AppRequestFailed(ctx, in)
+		return srv.(VMServer).AppError(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: VM_AppRequestFailed_FullMethodName,
+		FullMethod: VM_AppError_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).AppRequestFailed(ctx, req.(*AppRequestFailedMsg))
+		return srv.(VMServer).AppError(ctx, req.(*AppErrorMsg))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -986,20 +986,20 @@ func _VM_CrossChainAppRequest_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_CrossChainAppRequestFailed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CrossChainAppRequestFailedMsg)
+func _VM_CrossChainAppError_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrossChainAppErrorMsg)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).CrossChainAppRequestFailed(ctx, in)
+		return srv.(VMServer).CrossChainAppError(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: VM_CrossChainAppRequestFailed_FullMethodName,
+		FullMethod: VM_CrossChainAppError_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).CrossChainAppRequestFailed(ctx, req.(*CrossChainAppRequestFailedMsg))
+		return srv.(VMServer).CrossChainAppError(ctx, req.(*CrossChainAppErrorMsg))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1320,8 +1320,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_AppRequest_Handler,
 		},
 		{
-			MethodName: "AppRequestFailed",
-			Handler:    _VM_AppRequestFailed_Handler,
+			MethodName: "AppError",
+			Handler:    _VM_AppError_Handler,
 		},
 		{
 			MethodName: "AppResponse",
@@ -1340,8 +1340,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_CrossChainAppRequest_Handler,
 		},
 		{
-			MethodName: "CrossChainAppRequestFailed",
-			Handler:    _VM_CrossChainAppRequestFailed_Handler,
+			MethodName: "CrossChainAppError",
+			Handler:    _VM_CrossChainAppError_Handler,
 		},
 		{
 			MethodName: "CrossChainAppResponse",

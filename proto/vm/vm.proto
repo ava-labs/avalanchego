@@ -46,7 +46,7 @@ service VM {
   rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
   // Notify this engine that an AppRequest message it sent to [nodeID] with
   // request ID [requestID] failed.
-  rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+  rpc AppError(AppErrorMsg) returns (google.protobuf.Empty);
   // Notify this engine of a response to the AppRequest message it sent to
   // [nodeID] with request ID [requestID].
   rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
@@ -55,7 +55,7 @@ service VM {
   // Attempts to gather metrics from a VM.
   rpc Gather(google.protobuf.Empty) returns (GatherResponse);
   rpc CrossChainAppRequest(CrossChainAppRequestMsg) returns (google.protobuf.Empty);
-  rpc CrossChainAppRequestFailed(CrossChainAppRequestFailedMsg) returns (google.protobuf.Empty);
+  rpc CrossChainAppError(CrossChainAppErrorMsg) returns (google.protobuf.Empty);
   rpc CrossChainAppResponse(CrossChainAppResponseMsg) returns (google.protobuf.Empty);
 
   // BatchedChainVM
@@ -262,11 +262,13 @@ message AppRequestMsg {
   bytes request = 4;
 }
 
-message AppRequestFailedMsg {
+message AppErrorMsg {
   // The node that we failed to get a response from
   bytes node_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
+  // error is an application-defined error message
+  string error = 3;
 }
 
 message AppResponseMsg {
@@ -296,11 +298,13 @@ message CrossChainAppRequestMsg {
   bytes request = 4;
 }
 
-message CrossChainAppRequestFailedMsg {
+message CrossChainAppErrorMsg {
   // The chain that we failed to get a response from
   bytes chain_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
+  // error is an application-defined error message
+  string error = 3;
 }
 
 message CrossChainAppResponseMsg {
