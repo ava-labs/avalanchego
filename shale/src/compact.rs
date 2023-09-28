@@ -1,12 +1,13 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::ObjCache;
+
 use super::disk_address::DiskAddress;
 use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
-use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
@@ -295,16 +296,15 @@ impl std::ops::DerefMut for U64Field {
 }
 
 #[derive(Debug)]
-struct CompactSpaceInner<T: Send + Sync, M> {
+struct CompactSpaceInner<M> {
     meta_space: Arc<M>,
     compact_space: Arc<M>,
     header: CompactSpaceHeaderSliced,
-    obj_cache: super::ObjCache<T>,
     alloc_max_walk: u64,
     regn_nbit: u64,
 }
 
-impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
+impl<M: CachedStore> CompactSpaceInner<M> {
     fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<CompactDescriptor>, ShaleError> {
         StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
     }
@@ -576,7 +576,8 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
 
 #[derive(Debug)]
 pub struct CompactSpace<T: Send + Sync, M> {
-    inner: RwLock<CompactSpaceInner<T, M>>,
+    inner: RwLock<CompactSpaceInner<M>>,
+    obj_cache: ObjCache<T>,
 }
 
 impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
@@ -593,10 +594,10 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
                 meta_space,
                 compact_space,
                 header: CompactSpaceHeader::into_fields(header)?,
-                obj_cache,
                 alloc_max_walk,
                 regn_nbit,
             }),
+            obj_cache,
         };
         Ok(cs)
     }
@@ -609,40 +610,40 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
         let size = item.dehydrated_len() + extra;
         let addr = self.inner.write().unwrap().alloc(size)?;
 
-        let mut u = {
+        let obj = {
             let inner = self.inner.read().unwrap();
             let compact_space = inner.compact_space.as_ref();
             let view =
                 StoredView::item_to_obj(compact_space, addr.try_into().unwrap(), size, item)?;
 
-            inner.obj_cache.put(view)
+            self.obj_cache.put(view)
         };
 
-        // should this use a `?` instead of `unwrap`?
-        u.write(|_| {}).unwrap();
+        let cache = &self.obj_cache;
 
-        Ok(u)
+        let mut obj_ref = ObjRef::new(Some(obj), cache);
+
+        // should this use a `?` instead of `unwrap`?
+        obj_ref.write(|_| {}).unwrap();
+
+        Ok(obj_ref)
     }
 
     fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
         let mut inner = self.inner.write().unwrap();
-        inner.obj_cache.pop(ptr);
+        self.obj_cache.pop(ptr);
         inner.free(ptr.unwrap().get() as u64)
     }
 
     fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
-        let inner = {
-            let inner = self.inner.read().unwrap();
-            let obj_ref = inner
-                .obj_cache
-                .get(inner.obj_cache.lock().deref_mut(), ptr)?;
+        let obj = self.obj_cache.get(ptr)?;
 
-            if let Some(obj_ref) = obj_ref {
-                return Ok(obj_ref);
-            }
+        let inner = self.inner.read().unwrap();
+        let cache = &self.obj_cache;
 
-            inner
-        };
+        if let Some(obj) = obj {
+            return Ok(ObjRef::new(Some(obj), cache));
+        }
 
         if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
             return Err(ShaleError::InvalidAddressLength {
@@ -654,14 +655,17 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
         let payload_size = inner
             .get_header(ptr - CompactHeader::MSIZE as usize)?
             .payload_size;
+        let obj = self.obj_cache.put(inner.get_data_ref(ptr, payload_size)?);
+        let cache = &self.obj_cache;
 
-        Ok(inner.obj_cache.put(inner.get_data_ref(ptr, payload_size)?))
+        Ok(ObjRef::new(Some(obj), cache))
     }
 
     fn flush_dirty(&self) -> Option<()> {
         let mut inner = self.inner.write().unwrap();
         inner.header.flush_dirty();
-        inner.obj_cache.flush_dirty()
+        // hold the write lock to ensure that both cache and header are flushed in-sync
+        self.obj_cache.flush_dirty()
     }
 }
 

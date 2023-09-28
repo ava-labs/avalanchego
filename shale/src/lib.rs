@@ -5,7 +5,6 @@ use disk_address::DiskAddress;
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
-use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
@@ -190,17 +189,12 @@ impl<T: ?Sized + Send + Sync> Deref for Obj<T> {
 /// User handle that offers read & write access to the stored [ShaleStore] item.
 pub struct ObjRef<'a, T: Send + Sync> {
     inner: Option<Obj<T>>,
-    cache: ObjCache<T>,
-    _life: PhantomData<&'a mut ()>,
+    cache: &'a ObjCache<T>,
 }
 
 impl<'a, T: Send + Sync> ObjRef<'a, T> {
-    pub fn to_longlive(mut self) -> ObjRef<'static, T> {
-        ObjRef {
-            inner: self.inner.take(),
-            cache: ObjCache(self.cache.0.clone()),
-            _life: PhantomData,
-        }
+    fn new(inner: Option<Obj<T>>, cache: &'a ObjCache<T>) -> Self {
+        Self { inner, cache }
     }
 
     #[inline]
@@ -455,12 +449,10 @@ impl<T: Send + Sync> ObjCache<T> {
     }
 
     #[inline(always)]
-    pub fn get<'a>(
-        &self,
-        inner: &mut ObjCacheInner<T>,
-        ptr: DiskAddress,
-    ) -> Result<Option<ObjRef<'a, T>>, ShaleError> {
-        if let Some(r) = inner.cached.pop(&ptr) {
+    fn get(&self, ptr: DiskAddress) -> Result<Option<Obj<T>>, ShaleError> {
+        let mut inner = self.0.write().unwrap();
+
+        let obj_ref = inner.cached.pop(&ptr).map(|r| {
             // insert and set to `false` if you can
             // When using `get` in parallel, one should not `write` to the same address
             inner
@@ -469,6 +461,8 @@ impl<T: Send + Sync> ObjCache<T> {
                 .and_modify(|is_pinned| *is_pinned = false)
                 .or_insert(false);
 
+            // if we need to re-enable this code, it has to return from the outer function
+            //
             // return if inner.pinned.insert(ptr, false).is_some() {
             //     Err(ShaleError::InvalidObj {
             //         addr: ptr.addr(),
@@ -484,25 +478,17 @@ impl<T: Send + Sync> ObjCache<T> {
             // };
 
             // always return instead of the code above
-            return Ok(Some(ObjRef {
-                inner: Some(r),
-                cache: Self(self.0.clone()),
-                _life: PhantomData,
-            }));
-        }
+            r
+        });
 
-        Ok(None)
+        Ok(obj_ref)
     }
 
     #[inline(always)]
-    pub fn put<'a>(&self, inner: Obj<T>) -> ObjRef<'a, T> {
+    fn put(&self, inner: Obj<T>) -> Obj<T> {
         let ptr = inner.as_ptr();
         self.lock().pinned.insert(ptr, false);
-        ObjRef {
-            inner: Some(inner),
-            cache: Self(self.0.clone()),
-            _life: PhantomData,
-        }
+        inner
     }
 
     #[inline(always)]
