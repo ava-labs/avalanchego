@@ -418,49 +418,46 @@ impl Db {
             disk_buffer.run()
         }));
 
-        let root_hash_cache = Arc::new(
-            CachedSpace::new(
-                &StoreConfig::builder()
-                    .ncached_pages(cfg.root_hash_ncached_pages)
-                    .ncached_files(cfg.root_hash_ncached_files)
-                    .space_id(ROOT_HASH_SPACE)
-                    .file_nbit(params.root_hash_file_nbit)
-                    .rootdir(root_hash_path)
-                    .build(),
-                disk_requester.clone(),
-            )
-            .unwrap(),
-        );
+        let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
+            &StoreConfig::builder()
+                .ncached_pages(cfg.root_hash_ncached_pages)
+                .ncached_files(cfg.root_hash_ncached_files)
+                .space_id(ROOT_HASH_SPACE)
+                .file_nbit(params.root_hash_file_nbit)
+                .rootdir(root_hash_path)
+                .build(),
+            disk_requester.clone(),
+        )
+        .unwrap()
+        .into();
 
         // setup disk buffer
         let data_cache = Universe {
-            merkle: SubUniverse::new(
-                Arc::new(
-                    CachedSpace::new(
-                        &StoreConfig::builder()
-                            .ncached_pages(cfg.meta_ncached_pages)
-                            .ncached_files(cfg.meta_ncached_files)
-                            .space_id(MERKLE_META_SPACE)
-                            .file_nbit(params.meta_file_nbit)
-                            .rootdir(merkle_meta_path)
-                            .build(),
-                        disk_requester.clone(),
-                    )
-                    .unwrap(),
-                ),
-                Arc::new(
-                    CachedSpace::new(
-                        &StoreConfig::builder()
-                            .ncached_pages(cfg.payload_ncached_pages)
-                            .ncached_files(cfg.payload_ncached_files)
-                            .space_id(MERKLE_PAYLOAD_SPACE)
-                            .file_nbit(params.payload_file_nbit)
-                            .rootdir(merkle_payload_path)
-                            .build(),
-                        disk_requester.clone(),
-                    )
-                    .unwrap(),
-                ),
+            merkle: SubUniverse::<Arc<CachedSpace>>::new(
+                CachedSpace::new(
+                    &StoreConfig::builder()
+                        .ncached_pages(cfg.meta_ncached_pages)
+                        .ncached_files(cfg.meta_ncached_files)
+                        .space_id(MERKLE_META_SPACE)
+                        .file_nbit(params.meta_file_nbit)
+                        .rootdir(merkle_meta_path)
+                        .build(),
+                    disk_requester.clone(),
+                )
+                .unwrap()
+                .into(),
+                CachedSpace::new(
+                    &StoreConfig::builder()
+                        .ncached_pages(cfg.payload_ncached_pages)
+                        .ncached_files(cfg.payload_ncached_files)
+                        .space_id(MERKLE_PAYLOAD_SPACE)
+                        .file_nbit(params.payload_file_nbit)
+                        .rootdir(merkle_payload_path)
+                        .build(),
+                    disk_requester.clone(),
+                )
+                .unwrap()
+                .into(),
             ),
         };
 
