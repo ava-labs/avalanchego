@@ -434,13 +434,6 @@ type fxOwnerAndSize struct {
 	size  int
 }
 
-func fxOwnerAndSizeSize(_ ids.ID, f *fxOwnerAndSize) int {
-	if f == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + f.size + constants.PointerOverhead
-}
-
 func txSize(_ ids.ID, tx *txs.Tx) int {
 	if tx == nil {
 		return ids.IDLen + constants.PointerOverhead
