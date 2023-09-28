@@ -75,7 +75,7 @@ func parseDBKeyFromUser(dbKey []byte) ([]byte, uint64, error) {
 	return key, height, nil
 }
 
-// newDBKeyFromMetadata converts a metadata keyinto a database formatted key.
+// newDBKeyFromMetadata converts a metadata key into a database formatted key.
 //
 // To meet the requirements of a database key, the key is defined by
 // concatinating the length of the metadata key + 1 and the metadata key.
