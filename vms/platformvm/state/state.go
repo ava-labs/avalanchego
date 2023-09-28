@@ -58,7 +58,6 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	ErrCantFindSubnet               = errors.New("couldn't find subnet")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
@@ -81,6 +80,7 @@ var (
 	rewardUTXOsPrefix                   = []byte("rewardUTXOs")
 	utxoPrefix                          = []byte("utxo")
 	subnetPrefix                        = []byte("subnet")
+	subnetOwnerPrefix                   = []byte("subnetOwner")
 	transformedSubnetPrefix             = []byte("transformedSubnet")
 	supplyPrefix                        = []byte("supply")
 	chainPrefix                         = []byte("chain")
@@ -115,6 +115,7 @@ type Chain interface {
 	AddSubnet(createSubnetTx *txs.Tx)
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
+	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -274,6 +275,8 @@ type stateBlk struct {
  * |-. subnets
  * | '-. list
  * |   '-- txID -> nil
+ * |-. subnetOwners
+ * | '-. subnetID -> owner
  * |-. chains
  * | '-. subnetID
  * |   '-. list
@@ -352,6 +355,11 @@ type state struct {
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
+	// Subnet ID --> Owner of the subnet
+	subnetOwners     map[ids.ID]fx.Owner
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwnerDB    database.Database
+
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
@@ -418,6 +426,11 @@ type txBytesAndStatus struct {
 type txAndStatus struct {
 	tx     *txs.Tx
 	status status.Status
+}
+
+type fxOwnerAndSize struct {
+	owner fx.Owner
+	size  int
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -573,6 +586,18 @@ func newState(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
+	subnetOwnerDB := prefixdb.New(subnetOwnerPrefix, baseDB)
+	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
+		"subnet_owner_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+			return ids.IDLen + f.size
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -668,6 +693,10 @@ func newState(
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
+
+		subnetOwners:     make(map[ids.ID]fx.Owner),
+		subnetOwnerDB:    subnetOwnerDB,
+		subnetOwnerCache: subnetOwnerCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -819,14 +848,39 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	if owner, exists := s.subnetOwners[subnetID]; exists {
+		return owner, nil
+	}
+
+	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
+		if ownerAndSize.owner == nil {
+			return nil, database.ErrNotFound
+		}
+		return ownerAndSize.owner, nil
+	}
+
+	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
+	if err == nil {
+		var owner fx.Owner
+		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+			return nil, err
+		}
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+		return owner, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"%w %q: %w",
-			ErrCantFindSubnet,
-			subnetID,
-			err,
-		)
+		if err == database.ErrNotFound {
+			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
+		}
+		return nil, err
 	}
 
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
@@ -834,7 +888,12 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
 	}
 
+	s.SetSubnetOwner(subnetID, subnet.Owner)
 	return subnet.Owner, nil
+}
+
+func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	s.subnetOwners[subnetID] = owner
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -1683,6 +1742,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
 		s.writeSubnets(),
+		s.writeSubnetOwners(),
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
@@ -2270,6 +2330,29 @@ func (s *state) writeSubnets() error {
 		}
 	}
 	s.addedSubnets = nil
+	return nil
+}
+
+func (s *state) writeSubnetOwners() error {
+	for subnetID, owner := range s.subnetOwners {
+		subnetID := subnetID
+		owner := owner
+		delete(s.subnetOwners, subnetID)
+
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+
+		if err := s.subnetOwnerDB.Put(subnetID[:], ownerBytes); err != nil {
+			return fmt.Errorf("failed to write subnet owner: %w", err)
+		}
+	}
 	return nil
 }
 

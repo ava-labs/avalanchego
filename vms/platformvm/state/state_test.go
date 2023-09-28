@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -659,4 +662,41 @@ func TestParsedStateBlock(t *testing.T) {
 		require.False(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
 	}
+}
+
+func TestStateSubnetOwner(t *testing.T) {
+	require := require.New(t)
+
+	state, _ := newInitializedState(require)
+	ctrl := gomock.NewController(t)
+
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
+
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
+
+		subnetID = createSubnetTx.ID()
+	)
+
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	state.SetSubnetOwner(subnetID, owner2)
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
 }
