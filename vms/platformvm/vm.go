@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -134,8 +133,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	rewards := reward.NewCalculator(vm.RewardConfig)
-
 	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
@@ -144,7 +141,6 @@ func (vm *VM) Initialize(
 		execConfig,
 		vm.ctx,
 		vm.metrics,
-		rewards,
 		&vm.bootstrapped,
 	)
 	if err != nil {
@@ -175,7 +171,6 @@ func (vm *VM) Initialize(
 		Fx:           vm.fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
 		Bootstrapped: &vm.bootstrapped,
 	}
 

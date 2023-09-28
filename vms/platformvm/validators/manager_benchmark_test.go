@@ -124,12 +124,6 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 			Log:       logging.NoLog{},
 		},
 		metrics,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
 		new(utils.Atomic[bool]),
 	)
 	require.NoError(err)

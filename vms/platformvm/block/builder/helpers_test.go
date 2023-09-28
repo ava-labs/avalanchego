@@ -125,8 +125,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(t, res.config, res.ctx, res.baseDB)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -151,7 +150,6 @@ func newEnvironment(t *testing.T) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -224,7 +222,6 @@ func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
-	rewards reward.Calculator,
 ) state.State {
 	require := require.New(t)
 
@@ -238,7 +235,6 @@ func defaultState(
 		execCfg,
 		ctx,
 		metrics.Noop,
-		rewards,
 		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
