@@ -7,6 +7,13 @@ import "fmt"
 
 var _ BinarySnowball = (*binarySnowball)(nil)
 
+func newBinarySnowball(beta, choice int) binarySnowball {
+	return binarySnowball{
+		binarySnowflake: newBinarySnowflake(beta, choice),
+		preference:      choice,
+	}
+}
+
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {
 	// wrap the binary snowflake logic
@@ -19,11 +26,6 @@ type binarySnowball struct {
 	// numSuccessfulPolls tracks the total number of successful network polls of
 	// the 0 and 1 choices
 	numSuccessfulPolls [2]int
-}
-
-func (sb *binarySnowball) Initialize(beta, choice int) {
-	sb.binarySnowflake.Initialize(beta, choice)
-	sb.preference = choice
 }
 
 func (sb *binarySnowball) Preference() int {
