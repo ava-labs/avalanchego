@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -443,7 +442,7 @@ func blockSize(_ ids.ID, blk block.Block) int {
 
 func New(
 	db database.Database,
-	genesisBytes []byte,
+	genesisState *genesis.State,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
@@ -466,7 +465,7 @@ func New(
 		return nil, err
 	}
 
-	if err := s.sync(genesisBytes); err != nil {
+	if err := s.sync(genesisState); err != nil {
 		// Drop any errors on close to return the first error
 		_ = s.Close()
 
@@ -1718,7 +1717,7 @@ func (s *state) Close() error {
 	return errs.Err
 }
 
-func (s *state) sync(genesis []byte) error {
+func (s *state) sync(genesisState *genesis.State) error {
 	shouldInit, err := s.shouldInit()
 	if err != nil {
 		return fmt.Errorf(
@@ -1730,7 +1729,7 @@ func (s *state) sync(genesis []byte) error {
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := s.init(genesis); err != nil {
+		if err := s.init(genesisState); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
@@ -1747,20 +1746,15 @@ func (s *state) sync(genesis []byte) error {
 	return nil
 }
 
-func (s *state) init(genesisBytes []byte) error {
+func (s *state) init(genesisState *genesis.State) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
-	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	genesisBlock, err := block.NewApricotCommitBlock(genesisState.GenesisBlkID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
 
-	genesisState, err := genesis.ParseState(genesisBytes)
-	if err != nil {
-		return err
-	}
 	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
 		return err
 	}

@@ -4,6 +4,8 @@
 package genesis
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -44,6 +46,7 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 
 // State represents the genesis state of the platform chain
 type State struct {
+	GenesisBlkID  ids.ID
 	UTXOs         []*avax.UTXO
 	Validators    []*txs.Tx
 	Chains        []*txs.Tx
@@ -63,6 +66,7 @@ func ParseState(genesisBytes []byte) (*State, error) {
 	}
 
 	return &State{
+		GenesisBlkID:  hashing.ComputeHash256Array(genesisBytes),
 		UTXOs:         utxos,
 		Validators:    genesis.Validators,
 		Chains:        genesis.Chains,
