@@ -163,7 +163,6 @@ func (p Path) Less(other Path) bool {
 // bitsToShift indicates how many bits to shift the token at the index to get the raw token value.
 // varies from (8-[tokenBitSize]) -> (0) when remainder of index varies from (0) -> (p.tokensPerByte-1)
 func (p Path) bitsToShift(index int) byte {
-
 	return 8 - (p.tokenBitSize * byte(index%p.tokensPerByte+1))
 }
 
