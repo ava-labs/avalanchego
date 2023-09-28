@@ -40,6 +40,9 @@ func CheckPredicates(rules params.Rules, predicateContext *precompileconfig.Pred
 
 	// If there are no predicates to verify, return early and skip requiring the proposervm block
 	// context to be populated.
+	if len(predicateArguments) == 0 {
+		return predicateResults, nil
+	}
 
 	if predicateContext == nil || predicateContext.ProposerVMBlockCtx == nil {
 		return nil, ErrMissingPredicateContext
