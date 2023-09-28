@@ -358,7 +358,7 @@ type state struct {
 
 	// Subnet ID --> Owner of the subnet
 	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, *fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -595,10 +595,12 @@ func newState(
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
 	subnetOwnerDB := prefixdb.New(subnetOwnerPrefix, baseDB)
-	subnetOwnerCache, err := metercacher.New[ids.ID, *fxOwnerAndSize](
+	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *fxOwnerAndSize](execCfg.FxOwnerCacheSize, fxOwnerAndSizeSize),
+		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(id ids.ID, f fxOwnerAndSize) int {
+			return ids.IDLen + f.size
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -858,11 +860,12 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return owner, nil
 	}
 
-	if wrappedOwner, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if wrappedOwner == nil {
+	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
+		if ownerAndSize.size == 0 {
+
 			return nil, database.ErrNotFound
 		}
-		return wrappedOwner.owner, nil
+		return ownerAndSize.owner, nil
 	}
 
 	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
@@ -872,7 +875,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 			return nil, err
 		}
 		s.SetSubnetOwner(subnetID, owner)
-		s.subnetOwnerCache.Put(subnetID, &fxOwnerAndSize{
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
 			owner: owner,
 			size:  len(ownerBytes),
 		})
@@ -884,7 +887,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		s.subnetOwnerCache.Put(subnetID, nil)
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
 		return nil, fmt.Errorf(
 			"%w %q: %w",
 			ErrCantFindSubnet,
