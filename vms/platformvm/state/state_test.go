@@ -120,17 +120,20 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	require.NoError(initialChainTx.Initialize(txs.Codec))
 
 	genesisBlkID := ids.GenerateTestID()
-	genesisState := &genesis.State{
-		UTXOs: []*avax.UTXO{
+	genesisState := &genesis.Genesis{
+		UTXOs: []*genesis.UTXO{
 			{
-				UTXOID: avax.UTXOID{
-					TxID:        initialTxID,
-					OutputIndex: 0,
+				UTXO: avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        initialTxID,
+						OutputIndex: 0,
+					},
+					Asset: avax.Asset{ID: initialTxID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: units.Schmeckle,
+					},
 				},
-				Asset: avax.Asset{ID: initialTxID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: units.Schmeckle,
-				},
+				Message: nil,
 			},
 		},
 		Validators: []*txs.Tx{
