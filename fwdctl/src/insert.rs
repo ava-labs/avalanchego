@@ -38,12 +38,12 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    let batch = vec![BatchOp::Put {
-        key: &opts.key,
+    let batch: Vec<BatchOp<Vec<u8>, Vec<u8>>> = vec![BatchOp::Put {
+        key: opts.key.clone().into(),
         value: opts.value.bytes().collect(),
     }];
     let proposal = db.new_proposal(batch).map_err(Error::msg)?;
-    proposal.commit().map_err(Error::msg)?;
+    proposal.commit_sync().map_err(Error::msg)?;
 
     println!("{}", opts.key);
     Ok(())

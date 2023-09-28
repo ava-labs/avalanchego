@@ -121,10 +121,10 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         }
     }
 
-    async fn single_key_proof<K: KeyType, V: ValueType>(
+    async fn single_key_proof<K: KeyType>(
         &self,
         _key: K,
-    ) -> Result<Option<api::Proof<V>>, api::Error> {
+    ) -> Result<Option<api::Proof<Vec<u8>>>, api::Error> {
         todo!()
     }
 

@@ -7,7 +7,10 @@ use tokio::sync::Mutex;
 
 use async_trait::async_trait;
 
-use crate::v2::api::{self, Batch, KeyType, ValueType};
+use crate::{
+    db::DbError,
+    v2::api::{self, Batch, KeyType, ValueType},
+};
 
 use super::propose;
 
@@ -24,6 +27,20 @@ use super::propose;
 #[derive(Debug, Default)]
 pub struct Db<T> {
     latest_cache: Mutex<Option<Arc<T>>>,
+}
+
+impl From<DbError> for api::Error {
+    fn from(value: DbError) -> Self {
+        match value {
+            DbError::InvalidParams => api::Error::InternalError(value.into()),
+            DbError::Merkle(e) => api::Error::InternalError(e.into()),
+            DbError::System(e) => api::Error::IO(e.into()),
+            DbError::KeyNotFound | DbError::CreateError => api::Error::InternalError(value.into()),
+            DbError::Shale(e) => api::Error::InternalError(e.into()),
+            DbError::IO(e) => api::Error::IO(e),
+            DbError::InvalidProposal => api::Error::InvalidProposal,
+        }
+    }
 }
 
 #[async_trait]
@@ -79,10 +96,10 @@ impl api::DbView for DbView {
         todo!()
     }
 
-    async fn single_key_proof<K: KeyType, V: ValueType>(
+    async fn single_key_proof<K: KeyType>(
         &self,
         _key: K,
-    ) -> Result<Option<api::Proof<V>>, api::Error> {
+    ) -> Result<Option<api::Proof<Vec<u8>>>, api::Error> {
         todo!()
     }
 

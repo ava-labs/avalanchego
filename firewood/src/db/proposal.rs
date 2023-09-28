@@ -9,22 +9,14 @@ use super::{
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
     storage::{buffer::BufferWrite, AshRecord, StoreRevMut},
+    v2::api::{self, KeyType, ValueType},
 };
+use async_trait::async_trait;
 use parking_lot::{Mutex, RwLock};
 use shale::CachedStore;
-use std::sync::Arc;
+use std::{io::ErrorKind, sync::Arc};
 
-/// A key/value pair operation. Only put (upsert) and delete are
-/// supported
-#[derive(Debug)]
-pub enum BatchOp<K> {
-    Put { key: K, value: Vec<u8> },
-    Delete { key: K },
-}
-
-/// A list of operations to consist of a batch that
-/// can be proposed
-pub type Batch<K> = Vec<BatchOp<K>>;
+pub use crate::v2::api::{Batch, BatchOp};
 
 /// An atomic batch of changes proposed against the latest committed revision,
 /// or any existing [Proposal]. Multiple proposals can be created against the
@@ -50,10 +42,29 @@ pub enum ProposalBase {
     View(Arc<DbRev<SharedStore>>),
 }
 
+#[async_trait]
+impl<T: crate::v2::api::DbView> crate::v2::api::Proposal<T> for Proposal {
+    type Proposal = Proposal;
+
+    async fn commit(self: Arc<Self>) -> Result<Arc<T>, api::Error> {
+        todo!()
+    }
+
+    async fn propose<K: api::KeyType, V: api::ValueType>(
+        self: Arc<Self>,
+        data: api::Batch<K, V>,
+    ) -> Result<Self::Proposal, api::Error> {
+        self.propose_sync(data).map_err(Into::into)
+    }
+}
+
 impl Proposal {
     // Propose a new proposal from this proposal. The new proposal will be
     // the child of it.
-    pub fn propose<K: AsRef<[u8]>>(self: Arc<Self>, data: Batch<K>) -> Result<Proposal, DbError> {
+    pub fn propose_sync<K: KeyType, V: ValueType>(
+        self: Arc<Self>,
+        data: Batch<K, V>,
+    ) -> Result<Proposal, DbError> {
         let store = self.store.new_from_other();
 
         let m = Arc::clone(&self.m);
@@ -81,7 +92,7 @@ impl Proposal {
                 BatchOp::Put { key, value } => {
                     let (header, merkle) = rev.borrow_split();
                     merkle
-                        .insert(key, value, header.kv_root)
+                        .insert(key, value.as_ref().to_vec(), header.kv_root)
                         .map_err(DbError::Merkle)?;
                     Ok(())
                 }
@@ -111,14 +122,14 @@ impl Proposal {
 
     /// Persist all changes to the DB. The atomicity of the [Proposal] guarantees all changes are
     /// either retained on disk or lost together during a crash.
-    pub fn commit(&self) -> Result<(), DbError> {
+    pub fn commit_sync(&self) -> Result<(), DbError> {
         let mut committed = self.committed.lock();
         if *committed {
             return Ok(());
         }
 
         if let ProposalBase::Proposal(p) = &self.parent {
-            p.commit()?;
+            p.commit_sync()?;
         };
 
         // Check for if it can be committed
@@ -254,6 +265,45 @@ impl Proposal {
 impl Proposal {
     pub fn get_revision(&self) -> &DbRev<Store> {
         &self.rev
+    }
+}
+
+#[async_trait]
+impl api::DbView for Proposal {
+    async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
+        self.get_revision()
+            .kv_root_hash()
+            .map(|hash| hash.0)
+            .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
+    }
+    async fn val<K>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error>
+    where
+        K: api::KeyType,
+    {
+        // TODO: pass back errors from kv_get
+        Ok(self.get_revision().kv_get(key))
+    }
+
+    async fn single_key_proof<K>(&self, key: K) -> Result<Option<api::Proof<Vec<u8>>>, api::Error>
+    where
+        K: api::KeyType,
+    {
+        self.get_revision()
+            .prove(key)
+            .map(Some)
+            .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
+    }
+
+    async fn range_proof<K, V, N>(
+        &self,
+        _first_key: Option<K>,
+        _last_key: Option<K>,
+        _limit: usize,
+    ) -> Result<Option<api::RangeProof<K, V, N>>, api::Error>
+    where
+        K: api::KeyType,
+    {
+        todo!()
     }
 }
 

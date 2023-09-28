@@ -160,7 +160,7 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
                 },
                 |(db, batch_ops)| {
                     let proposal = db.new_proposal(batch_ops).unwrap();
-                    proposal.commit().unwrap();
+                    proposal.commit_sync().unwrap();
                 },
                 BatchSize::SmallInput,
             );

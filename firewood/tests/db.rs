@@ -118,7 +118,7 @@ fn test_revisions() {
                     batch.push(write);
                 }
                 let proposal = db.new_proposal(batch).unwrap();
-                proposal.commit().unwrap();
+                proposal.commit_sync().unwrap();
             }
             while dumped.len() > 10 {
                 dumped.pop_back();
@@ -192,7 +192,7 @@ fn create_db_issue_proof() {
         batch.push(write);
     }
     let proposal = db.new_proposal(batch).unwrap();
-    proposal.commit().unwrap();
+    proposal.commit_sync().unwrap();
 
     let root_hash = db.kv_root_hash().unwrap();
 
@@ -206,7 +206,7 @@ fn create_db_issue_proof() {
         batch.push(write);
     }
     let proposal = db.new_proposal(batch).unwrap();
-    proposal.commit().unwrap();
+    proposal.commit_sync().unwrap();
 
     let rev = db.get_revision(&root_hash).unwrap();
     let key = "doe".as_bytes();
@@ -274,13 +274,13 @@ fn db_proposal() -> Result<(), DbError> {
         key: b"k2",
         value: "v2".as_bytes().to_vec(),
     }];
-    let proposal_2 = proposal.clone().propose(batch_2)?;
+    let proposal_2 = proposal.clone().propose_sync(batch_2)?;
     let rev = proposal_2.get_revision();
     assert_val!(rev, "k", "v");
     assert_val!(rev, "k2", "v2");
 
-    proposal.commit()?;
-    proposal_2.commit()?;
+    proposal.commit_sync()?;
+    proposal_2.commit_sync()?;
 
     std::thread::scope(|scope| {
         scope.spawn(|| -> Result<(), DbError> {
@@ -288,12 +288,12 @@ fn db_proposal() -> Result<(), DbError> {
                 key: b"another_k",
                 value: "another_v".as_bytes().to_vec(),
             }];
-            let another_proposal = proposal.clone().propose(another_batch)?;
+            let another_proposal = proposal.clone().propose_sync(another_batch)?;
             let rev = another_proposal.get_revision();
             assert_val!(rev, "k", "v");
             assert_val!(rev, "another_k", "another_v");
             // The proposal is invalid and cannot be committed
-            assert!(another_proposal.commit().is_err());
+            assert!(another_proposal.commit_sync().is_err());
             Ok(())
         });
 
@@ -302,7 +302,7 @@ fn db_proposal() -> Result<(), DbError> {
                 key: b"another_k_1",
                 value: "another_v_1".as_bytes().to_vec(),
             }];
-            let another_proposal = proposal.clone().propose(another_batch)?;
+            let another_proposal = proposal.clone().propose_sync(another_batch)?;
             let rev = another_proposal.get_revision();
             assert_val!(rev, "k", "v");
             assert_val!(rev, "another_k_1", "another_v_1");
@@ -326,13 +326,13 @@ fn db_proposal() -> Result<(), DbError> {
         key: b"k4",
         value: "v4".as_bytes().to_vec(),
     }];
-    let proposal_2 = proposal.clone().propose(batch_2)?;
+    let proposal_2 = proposal.clone().propose_sync(batch_2)?;
     let rev = proposal_2.get_revision();
     assert_val!(rev, "k", "v");
     assert_val!(rev, "k2", "v2");
     assert_val!(rev, "k3", "v3");
     assert_val!(rev, "k4", "v4");
 
-    proposal_2.commit()?;
+    proposal_2.commit_sync()?;
     Ok(())
 }

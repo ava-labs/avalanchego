@@ -69,6 +69,9 @@ pub enum Error {
 
     #[error("Invalid proposal")]
     InvalidProposal,
+
+    #[error("Internal error")]
+    InternalError(Box<dyn std::error::Error>),
 }
 
 /// A range proof, consisting of a proof of the first key and the last key,
@@ -139,10 +142,7 @@ pub trait DbView {
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType, V: ValueType>(
-        &self,
-        key: K,
-    ) -> Result<Option<Proof<V>>, Error>;
+    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<Option<Proof<Vec<u8>>>, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
