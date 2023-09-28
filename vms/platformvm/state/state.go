@@ -2348,7 +2348,7 @@ func (s *state) writeSubnetOwners() error {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
 
-		s.subnetOwnerCache.Put(subnetID, &fxOwnerAndSize{
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
 			owner: owner,
 			size:  len(ownerBytes),
 		})
