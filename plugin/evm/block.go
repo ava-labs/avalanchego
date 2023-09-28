@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/results"
+	"github.com/ava-labs/subnet-evm/utils/predicate"
 	"github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 
@@ -289,10 +290,10 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
-	if len(extraData) < params.DynamicFeeExtraDataSize {
-		return fmt.Errorf("header extra data too short for predicate verification found: %d, required: %d", len(extraData), params.DynamicFeeExtraDataSize)
+	headerPredicateResultsBytes, err := predicate.GetPredicateResultBytes(extraData)
+	if err != nil {
+		return err
 	}
-	headerPredicateResultsBytes := extraData[params.DynamicFeeExtraDataSize:]
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
 	}

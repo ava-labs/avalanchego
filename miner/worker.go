@@ -352,8 +352,6 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
 func (w *worker) commit(env *environment) (*types.Block, error) {
-	// Deep copy receipts here to avoid interaction between different tasks.
-	receipts := copyReceipts(env.receipts)
 	if env.rules.IsDUpgrade {
 		predicateResultsBytes, err := env.predicateResults.Bytes()
 		if err != nil {
@@ -361,6 +359,8 @@ func (w *worker) commit(env *environment) (*types.Block, error) {
 		}
 		env.header.Extra = append(env.header.Extra, predicateResultsBytes...)
 	}
+	// Deep copy receipts here to avoid interaction between different tasks.
+	receipts := copyReceipts(env.receipts)
 	block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.parent, env.state, env.txs, nil, receipts)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@ package predicate
 import (
 	"fmt"
 
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -15,6 +16,13 @@ import (
 // For messages with a length that does not comply to that, this delimiter is used to
 // append/remove padding.
 var PredicateEndByte = byte(0xff)
+
+var (
+	ErrInvalidAllZeroBytes = fmt.Errorf("predicate specified invalid all zero bytes")
+	ErrInvalidPadding      = fmt.Errorf("predicate specified invalid padding")
+	ErrInvalidEndDelimiter = fmt.Errorf("invalid end delimiter")
+	ErrorInvalidExtraData  = fmt.Errorf("header extra data too short for predicate verification")
+)
 
 // PackPredicate packs [predicate] by delimiting the actual message with [PredicateEndByte]
 // and zero padding to reach a length that is a multiple of 32.
@@ -29,15 +37,15 @@ func PackPredicate(predicate []byte) []byte {
 func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 	trimmedPredicateBytes := common.TrimRightZeroes(paddedPredicate)
 	if len(trimmedPredicateBytes) == 0 {
-		return nil, fmt.Errorf("predicate specified invalid all zero bytes: 0x%x", paddedPredicate)
+		return nil, fmt.Errorf("%w: 0x%x", ErrInvalidAllZeroBytes, paddedPredicate)
 	}
 
 	if expectedPaddedLength := (len(trimmedPredicateBytes) + 31) / 32 * 32; expectedPaddedLength != len(paddedPredicate) {
-		return nil, fmt.Errorf("predicate specified invalid padding with length (%d), expected length (%d)", len(paddedPredicate), expectedPaddedLength)
+		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", ErrInvalidPadding, len(paddedPredicate), expectedPaddedLength)
 	}
 
 	if trimmedPredicateBytes[len(trimmedPredicateBytes)-1] != PredicateEndByte {
-		return nil, fmt.Errorf("invalid end delimiter")
+		return nil, ErrInvalidEndDelimiter
 	}
 
 	return trimmedPredicateBytes[:len(trimmedPredicateBytes)-1], nil
@@ -65,4 +73,16 @@ func BytesToHashSlice(b []byte) []common.Hash {
 		copy(hashes[i][:], b[start:])
 	}
 	return hashes
+}
+
+// GetPredicateResultBytes returns the predicate result bytes from the extra data.
+// If the extra data does not contain predicate result bytes, an error is returned.
+func GetPredicateResultBytes(extraData []byte) ([]byte, error) {
+	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or equal to this size.
+	// After the DUpgrade, the VM pre-verifies the extra data past the dynamic fee rollup window is
+	// valid.
+	if len(extraData) < params.DynamicFeeExtraDataSize {
+		return nil, fmt.Errorf("%w: got: %d, required: %d", ErrorInvalidExtraData, len(extraData), params.DynamicFeeExtraDataSize)
+	}
+	return extraData[params.DynamicFeeExtraDataSize:], nil
 }
