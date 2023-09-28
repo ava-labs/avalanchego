@@ -210,12 +210,12 @@ func addSubnet(env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			genesis.PreFundedTestKeys[0].PublicKey().Address(),
-			genesis.PreFundedTestKeys[1].PublicKey().Address(),
-			genesis.PreFundedTestKeys[2].PublicKey().Address(),
+			genesis.TestKeys[0].PublicKey().Address(),
+			genesis.TestKeys[1].PublicKey().Address(),
+			genesis.TestKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesis.PreFundedTestKeys[0]},
-		genesis.PreFundedTestKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
+		genesis.TestKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -283,9 +283,9 @@ func defaultState(
 func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
-	ctx.XChainID = genesis.XChainID
-	ctx.CChainID = genesis.CChainID
-	ctx.AVAXAssetID = genesis.AvaxAssetID
+	ctx.XChainID = genesis.TestXChainID
+	ctx.CChainID = genesis.TestCChainID
+	ctx.AVAXAssetID = genesis.TestAvaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -296,8 +296,8 @@ func defaultCtx(db database.Database) *snow.Context {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				genesis.XChainID:          constants.PrimaryNetworkID,
-				genesis.CChainID:          constants.PrimaryNetworkID,
+				genesis.TestXChainID:      constants.PrimaryNetworkID,
+				genesis.TestCChainID:      constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -323,23 +323,23 @@ func defaultConfig() *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       genesis.DefaultMinStakingDuration,
-		MaxStakeDuration:       genesis.DefaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: genesis.DefaultValidateEndTime,
-		ApricotPhase5Time: genesis.DefaultValidateEndTime,
+		ApricotPhase3Time: genesis.TestValidateEndTime,
+		ApricotPhase5Time: genesis.TestValidateEndTime,
 		BanffTime:         mockable.MaxTime,
 	}
 }
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(genesis.DefaultGenesisTime)
+	clk.Set(genesis.TestGenesisTime)
 	return clk
 }
 

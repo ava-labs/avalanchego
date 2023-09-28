@@ -108,18 +108,18 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	)
 	for i := 0; i < 50; i++ {
 		currentHeight++
-		nodeID, err := addPrimaryValidator(s, genesis.DefaultGenesisTime, genesis.DefaultValidateEndTime, currentHeight)
+		nodeID, err := addPrimaryValidator(s, genesis.TestGenesisTime, genesis.TestValidateEndTime, currentHeight)
 		require.NoError(err)
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 	subnetID := ids.GenerateTestID()
 	for _, nodeID := range nodeIDs {
 		currentHeight++
-		require.NoError(addSubnetValidator(s, subnetID, genesis.DefaultGenesisTime, genesis.DefaultValidateEndTime, nodeID, currentHeight))
+		require.NoError(addSubnetValidator(s, subnetID, genesis.TestGenesisTime, genesis.TestValidateEndTime, nodeID, currentHeight))
 	}
 	for i := 0; i < 9900; i++ {
 		currentHeight++
-		require.NoError(addSubnetDelegator(s, subnetID, genesis.DefaultGenesisTime, genesis.DefaultValidateEndTime, nodeIDs, currentHeight))
+		require.NoError(addSubnetDelegator(s, subnetID, genesis.TestGenesisTime, genesis.TestValidateEndTime, nodeIDs, currentHeight))
 	}
 
 	ctx := context.Background()

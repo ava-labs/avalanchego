@@ -34,7 +34,7 @@ func TestAtomicTxImports(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(70000)
-	recipientKey := genesis.PreFundedTestKeys[1]
+	recipientKey := genesis.TestKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
@@ -42,7 +42,7 @@ func TestAtomicTxImports(t *testing.T) {
 	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: genesis.AvaxAssetID},
+		Asset:  avax.Asset{ID: genesis.TestAvaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{

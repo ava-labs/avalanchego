@@ -19,34 +19,34 @@ import (
 )
 
 var (
-	PreFundedTestKeys         = secp256k1.TestKeys()
-	DefaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	DefaultValidateStartTime  = DefaultGenesisTime
-	DefaultMinStakingDuration = 24 * time.Hour
-	DefaultMaxStakingDuration = 365 * 24 * time.Hour
-	DefaultValidateEndTime    = DefaultValidateStartTime.Add(10 * DefaultMinStakingDuration)
+	TestKeys               = secp256k1.TestKeys()
+	TestGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	TestValidateStartTime  = TestGenesisTime
+	TestMinStakingDuration = 24 * time.Hour
+	TestMaxStakingDuration = 365 * 24 * time.Hour
+	TestValidateEndTime    = TestValidateStartTime.Add(10 * TestMinStakingDuration)
 
-	AvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-	XChainID    = ids.Empty.Prefix(0)
-	CChainID    = ids.Empty.Prefix(1)
+	TestAvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
+	TestXChainID    = ids.Empty.Prefix(0)
+	TestCChainID    = ids.Empty.Prefix(1)
 
-	DefaultMinValidatorStake = 5 * units.MilliAvax
-	DefaultBalance           = 100 * DefaultMinValidatorStake
-	DefaultWeight            = 10 * units.KiloAvax
+	TestMinValidatorStake = 5 * units.MilliAvax
+	TestBalance           = 100 * TestMinValidatorStake
+	TestWeight            = 10 * units.KiloAvax
 )
 
 func BuildTestGenesis(networkID uint32) (*State, error) {
-	genesisUtxos := make([]*avax.UTXO, len(PreFundedTestKeys))
-	for i, key := range PreFundedTestKeys {
+	genesisUtxos := make([]*avax.UTXO, len(TestKeys))
+	for i, key := range TestKeys {
 		addr := key.PublicKey().Address()
 		genesisUtxos[i] = &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: uint32(i),
 			},
-			Asset: avax.Asset{ID: AvaxAssetID},
+			Asset: avax.Asset{ID: TestAvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: DefaultBalance,
+				Amt: TestBalance,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -57,14 +57,14 @@ func BuildTestGenesis(networkID uint32) (*State, error) {
 	}
 
 	vdrs := txheap.NewByEndTime()
-	for _, key := range PreFundedTestKeys {
+	for _, key := range TestKeys {
 		addr := key.PublicKey().Address()
 		nodeID := ids.NodeID(key.PublicKey().Address())
 
 		utxo := &avax.TransferableOutput{
-			Asset: avax.Asset{ID: AvaxAssetID},
+			Asset: avax.Asset{ID: TestAvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: DefaultWeight,
+				Amt: TestWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -86,8 +86,8 @@ func BuildTestGenesis(networkID uint32) (*State, error) {
 			}},
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(DefaultValidateStartTime.Unix()),
-				End:    uint64(DefaultValidateEndTime.Unix()),
+				Start:  uint64(TestValidateStartTime.Unix()),
+				End:    uint64(TestValidateEndTime.Unix()),
 				Wght:   utxo.Output().Amount(),
 			},
 			StakeOuts:        []*avax.TransferableOutput{utxo},
@@ -106,7 +106,7 @@ func BuildTestGenesis(networkID uint32) (*State, error) {
 		UTXOs:         genesisUtxos,
 		Validators:    vdrs.List(),
 		Chains:        nil,
-		Timestamp:     uint64(DefaultGenesisTime.Unix()),
+		Timestamp:     uint64(TestGenesisTime.Unix()),
 		InitialSupply: 360 * units.MegaAvax,
 	}, nil
 }
