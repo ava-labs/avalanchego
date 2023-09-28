@@ -175,8 +175,8 @@ func (vm *VM) Initialize(
 		Fx:           vm.fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      vm.uptimeManager,
-		Bootstrapped: &vm.bootstrapped,
 		Rewards:      rewards,
+		Bootstrapped: &vm.bootstrapped,
 	}
 
 	// Note: There is a circular dependency between the mempool and block

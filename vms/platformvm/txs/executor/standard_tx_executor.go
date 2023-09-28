@@ -479,7 +479,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 }
 
 // addStakerFromStakerTx creates the staker and adds it to state.
-// Post DFork activation it has updates current supply in state
+// Post DFork activation it updates current supply in state
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
 	chainTime time.Time,

@@ -354,7 +354,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
-		DTime             = mockable.MaxTime
+		dTime             = mockable.MaxTime
 	)
 
 	switch fork {
@@ -373,7 +373,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		apricotPhase5Time = defaultGenesisTime
 		apricotPhase3Time = defaultGenesisTime
 	case dFork:
-		DTime = defaultGenesisTime
+		dTime = defaultGenesisTime
 		cortinaTime = defaultGenesisTime
 		banffTime = defaultGenesisTime
 		apricotPhase5Time = defaultGenesisTime
@@ -407,7 +407,7 @@ func defaultConfig(fork activeFork) *config.Config {
 		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DTime:             DTime,
+		DTime:             dTime,
 	}
 }
 
