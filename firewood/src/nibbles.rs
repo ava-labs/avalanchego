@@ -84,7 +84,7 @@ impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     }
 }
 
-/// An interator returned by [Nibbles::into_iter]
+/// An iterator returned by [Nibbles::into_iter]
 /// See their documentation for details.
 #[derive(Clone, Debug)]
 pub struct NibblesIterator<'a, const LEADING_ZEROES: usize> {
@@ -107,14 +107,14 @@ impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_Z
         result
     }
 
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.head += std::cmp::min(n, self.tail - self.head);
-        self.next()
-    }
-
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.tail - self.head;
         (remaining, Some(remaining))
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.head += std::cmp::min(n, self.tail - self.head);
+        self.next()
     }
 }
 
@@ -155,7 +155,7 @@ mod test {
     }
 
     #[test]
-    fn leadingzero_nibbles_index() {
+    fn leading_zero_nibbles_index() {
         let nib = Nibbles::<1>(&TEST_BYTES);
         let expected = [0u8, 0xd, 0xe, 0xa, 0xd, 0xb, 0xe, 0xe, 0xf];
         for v in expected.into_iter().enumerate() {
