@@ -258,6 +258,10 @@ func (p Path) Skip(tokensToSkip int) Path {
 
 // Take returns a new Path that contains the first tokensToTake tokens of the current Path
 func (p Path) Take(tokensToTake int) Path {
+	if p.tokensLength == tokensToTake {
+		return p
+	}
+
 	result := Path{
 		tokensLength: tokensToTake,
 		pathConfig:   p.pathConfig,

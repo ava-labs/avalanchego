@@ -127,23 +127,21 @@ func (n *node) setValueDigest() {
 // Adds [child] as a child of [n].
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(child *node) {
-	n.addChildWithoutNode(
-		child.key.Token(n.key.tokensLength),
-		child.key.Skip(n.key.tokensLength+1),
-		child.id,
-		child.hasValue(),
+func (n *node) addChild(childNode *node) {
+	n.setChildEntry(
+		childNode.key.Token(n.key.tokensLength),
+		child{
+			compressedPath: childNode.key.Skip(n.key.tokensLength + 1),
+			id:             childNode.id,
+			hasValue:       childNode.hasValue(),
+		},
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath Path, childID ids.ID, hasValue bool) {
+func (n *node) setChildEntry(index byte, childEntry child) {
 	n.onNodeChanged()
-	n.children[index] = child{
-		compressedPath: compressedPath,
-		id:             childID,
-		hasValue:       hasValue,
-	}
+	n.children[index] = childEntry
 }
 
 // Removes [child] from [n]'s children.

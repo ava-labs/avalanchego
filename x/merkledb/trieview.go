@@ -299,9 +299,13 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	close(updatedChildren)
 
 	keyLength := n.key.tokensLength
-	for child := range updatedChildren {
-		index := child.key.Token(keyLength)
-		n.addChildWithoutNode(index, n.children[index].compressedPath, child.id, child.hasValue())
+	for updatedChild := range updatedChildren {
+		index := updatedChild.key.Token(keyLength)
+		n.setChildEntry(index, child{
+			compressedPath: n.children[index].compressedPath,
+			id:             updatedChild.id,
+			hasValue:       updatedChild.hasValue(),
+		})
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
@@ -871,26 +875,25 @@ func (t *trieView) insert(
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
 	commonPrefixLength := getLengthOfCommonPrefix(existingChildEntry.compressedPath, key, closestNodeKeyLength+1)
-	branchKeyLength := closestNodeKeyLength + 1 + commonPrefixLength
 
-	// The existing child's key is of length: len(closestNodeKey) + 1 (for the child index) + len(existing child's compressed key)
-	// if that length is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
+	// If the length of the existing child's compressed path is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
 	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
-	if closestNodeKeyLength+1+existingChildEntry.compressedPath.tokensLength <= branchKeyLength {
+	if existingChildEntry.compressedPath.tokensLength <= commonPrefixLength {
 		return nil, ErrGetPathToFailure
 	}
 
 	branchNode := newNode(
 		closestNode,
-		key.Take(branchKeyLength),
+		key.Take(closestNodeKeyLength+1+commonPrefixLength),
 	)
 	nodeWithValue := branchNode
 
 	if key.tokensLength == branchNode.key.tokensLength {
-		// there was no residual path for the inserted key, so the value goes directly into the new branch node
+		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
 		branchNode.setValue(value)
 	} else {
-		// generate a new node and add it as a child of the branch node
+		// the key to be inserted is a child of the branch node
+		// create a new node and add the value to it
 		newNode := newNode(
 			branchNode,
 			key,
@@ -902,12 +905,14 @@ func (t *trieView) insert(
 		nodeWithValue = newNode
 	}
 
-	branchNode.addChildWithoutNode(
+	// add the existing child onto the branch node
+	branchNode.setChildEntry(
 		existingChildEntry.compressedPath.Token(commonPrefixLength),
-		existingChildEntry.compressedPath.Skip(commonPrefixLength+1),
-		existingChildEntry.id,
-		existingChildEntry.hasValue,
-	)
+		child{
+			compressedPath: existingChildEntry.compressedPath.Skip(commonPrefixLength + 1),
+			id:             existingChildEntry.id,
+			hasValue:       existingChildEntry.hasValue,
+		})
 
 	return nodeWithValue, t.recordNewNode(branchNode)
 }
