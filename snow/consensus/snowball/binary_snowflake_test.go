@@ -17,8 +17,7 @@ func TestBinarySnowflake(t *testing.T) {
 
 	beta := 2
 
-	sf := binarySnowflake{}
-	sf.Initialize(beta, red)
+	sf := newBinarySnowflake(beta, red)
 
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())
