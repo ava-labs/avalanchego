@@ -246,7 +246,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -260,7 +260,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // Change address
 	)
 	require.NoError(err)
@@ -370,7 +370,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		vdrNodeID,
 		vdrRewardAddress,
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
 	)
 	require.NoError(err)
@@ -384,7 +384,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
 	)
 	require.NoError(err)
@@ -590,7 +590,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -604,7 +604,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty, // Change address
 	)
 	require.NoError(err)
@@ -753,7 +753,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -766,7 +766,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)

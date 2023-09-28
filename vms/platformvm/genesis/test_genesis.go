@@ -24,7 +24,7 @@ var (
 	TestValidateStartTime  = TestGenesisTime
 	TestMinStakingDuration = 24 * time.Hour
 	TestMaxStakingDuration = 365 * 24 * time.Hour
-	TestValidateEndTime    = TestValidateStartTime.Add(10 * TestMinStakingDuration)
+	TestValidateEndTime    = TestValidateStartTime.Add(20 * TestMinStakingDuration)
 
 	TestNetworkID   = constants.UnitTestID
 	TestAvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
@@ -33,7 +33,7 @@ var (
 
 	TestMinValidatorStake = 5 * units.MilliAvax
 	TestBalance           = 100 * TestMinValidatorStake
-	TestWeight            = 10 * units.KiloAvax
+	TestWeight            = TestMinValidatorStake
 )
 
 func BuildTestGenesis() (*State, error) {

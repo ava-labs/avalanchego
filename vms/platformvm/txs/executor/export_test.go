@@ -29,18 +29,18 @@ func TestNewExportTx(t *testing.T) {
 		timestamp          time.Time
 	}
 
-	sourceKey := preFundedKeys[0]
+	sourceKey := genesis.TestKeys[0]
 
 	tests := []test{
 		{
 			description:        "P->X export",
-			destinationChainID: xChainID,
+			destinationChainID: genesis.TestXChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          genesis.TestValidateStartTime,
 		},
 		{
 			description:        "P->C export",
-			destinationChainID: cChainID,
+			destinationChainID: genesis.TestCChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.ApricotPhase5Time,
 		},
@@ -52,7 +52,7 @@ func TestNewExportTx(t *testing.T) {
 			require := require.New(t)
 
 			tx, err := env.txBuilder.NewExportTx(
-				defaultBalance-defaultTxFee, // Amount of tokens to export
+				genesis.TestBalance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,
