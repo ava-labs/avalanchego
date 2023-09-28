@@ -25,7 +25,7 @@ var (
 // decreasing height.
 // 3. User keys must never overlap with any metadata keys.
 
-// newDBKeyFromUser converts a user key and a height into a database formatted
+// newDBKeyFromUser converts a user key and height into a database formatted
 // key.
 //
 // To meet the requirements of a database key, the prefix is defined by
