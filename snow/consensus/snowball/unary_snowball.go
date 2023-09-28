@@ -7,6 +7,12 @@ import "fmt"
 
 var _ UnarySnowball = (*unarySnowball)(nil)
 
+func newUnarySnowball(beta int) unarySnowball {
+	return unarySnowball{
+		unarySnowflake: newUnarySnowflake(beta),
+	}
+}
+
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {
 	// wrap the unary snowflake logic
