@@ -28,7 +28,7 @@ var (
 	_ tx.Visitor = (*Tx)(nil)
 
 	errFeeTooHigh          = errors.New("fee too high")
-	errWrongNetworkID      = errors.New("wrong networkID")
+	errWrongChainID        = errors.New("wrong chainID")
 	errMissingBlockContext = errors.New("missing block context")
 	errDuplicateImport     = errors.New("duplicate import")
 )
@@ -53,7 +53,7 @@ func (t *Tx) Transfer(tf *tx.Transfer) error {
 		return errFeeTooHigh
 	}
 	if tf.ChainID != t.ChainContext.ChainID {
-		return errWrongNetworkID
+		return errWrongChainID
 	}
 
 	var errs wrappers.Errs
@@ -70,8 +70,8 @@ func (t *Tx) Export(e *tx.Export) error {
 	if e.MaxFee < t.ExportFee {
 		return errFeeTooHigh
 	}
-	if e.NetworkID != t.ChainContext.NetworkID {
-		return errWrongNetworkID
+	if e.ChainID != t.ChainContext.ChainID {
+		return errWrongChainID
 	}
 
 	payload, err := tx.NewPayload(
@@ -86,7 +86,7 @@ func (t *Tx) Export(e *tx.Export) error {
 	}
 
 	message, err := warp.NewUnsignedMessage(
-		e.NetworkID,
+		t.ChainContext.NetworkID,
 		e.ChainID,
 		payload.Bytes(),
 	)
@@ -128,10 +128,6 @@ func (t *Tx) Import(i *tx.Import) error {
 	message, err := warp.ParseMessage(i.Message)
 	if err != nil {
 		return err
-	}
-
-	if message.NetworkID != t.ChainContext.NetworkID {
-		return errWrongNetworkID
 	}
 
 	var errs wrappers.Errs
