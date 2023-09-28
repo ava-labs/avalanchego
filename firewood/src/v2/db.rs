@@ -75,7 +75,7 @@ impl api::DbView for DbView {
         todo!()
     }
 
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<&[u8]>, api::Error> {
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, api::Error> {
         todo!()
     }
 

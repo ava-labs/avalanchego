@@ -58,7 +58,7 @@ impl DbView for HistoricalImpl {
         Ok(ROOT_HASH)
     }
 
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<&[u8]>, Error> {
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
 

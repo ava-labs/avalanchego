@@ -14,8 +14,9 @@ use crate::{
         CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
         ZeroStore, PAGE_SIZE_NBIT,
     },
-    v2::api::Proof,
+    v2::api::{self, Proof},
 };
+use async_trait::async_trait;
 use bytemuck::{cast_slice, AnyBitPattern};
 use metered::{metered, HitCount};
 use parking_lot::{Mutex, RwLock};
@@ -28,7 +29,7 @@ use std::{
     collections::VecDeque,
     error::Error,
     fmt,
-    io::{Cursor, Write},
+    io::{Cursor, ErrorKind, Write},
     mem::size_of,
     num::NonZeroUsize,
     os::fd::{AsFd, BorrowedFd},
@@ -270,6 +271,43 @@ impl<T: MemStoreR + 'static> Universe<Arc<T>> {
 pub struct DbRev<S> {
     header: shale::Obj<DbHeader>,
     merkle: Merkle<S>,
+}
+
+#[async_trait]
+impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
+    async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
+        self.merkle
+            .root_hash(self.header.kv_root)
+            .map(|h| *h)
+            .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
+    }
+
+    async fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error> {
+        let obj_ref = self.merkle.get(key, self.header.kv_root);
+        match obj_ref {
+            Err(e) => Err(api::Error::IO(std::io::Error::new(ErrorKind::Other, e))),
+            Ok(obj) => match obj {
+                None => Ok(None),
+                Some(inner) => Ok(Some(inner.as_ref().to_owned())),
+            },
+        }
+    }
+
+    async fn single_key_proof<K: api::KeyType, N: AsRef<[u8]> + Send>(
+        &self,
+        _key: K,
+    ) -> Result<Option<Proof<N>>, api::Error> {
+        todo!()
+    }
+
+    async fn range_proof<K: api::KeyType, V, N>(
+        &self,
+        _first_key: Option<K>,
+        _last_key: Option<K>,
+        _limit: usize,
+    ) -> Result<Option<api::RangeProof<K, V, N>>, api::Error> {
+        todo!()
+    }
 }
 
 impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
