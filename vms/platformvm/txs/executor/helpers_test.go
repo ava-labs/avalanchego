@@ -56,19 +56,15 @@ const (
 )
 
 var (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
-	lastAcceptedID            = ids.GenerateTestID()
+	defaultValidateEndTime   = genesis.TestValidateStartTime.Add(20 * genesis.TestMinStakingDuration)
+	defaultMinValidatorStake = 5 * units.MilliAvax
+	defaultBalance           = 100 * defaultMinValidatorStake
+	preFundedKeys            = secp256k1.TestKeys()
+	avaxAssetID              = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee             = uint64(100)
+	xChainID                 = ids.Empty.Prefix(0)
+	cChainID                 = ids.Empty.Prefix(1)
+	lastAcceptedID           = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
@@ -245,9 +241,9 @@ func defaultState(
 
 func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
+	ctx.NetworkID = genesis.TestNetworkID
+	ctx.XChainID = genesis.TestXChainID
+	ctx.CChainID = genesis.TestCChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -282,7 +278,7 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 	}
 	cortinaTime := mockable.MaxTime
 	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		cortinaTime = genesis.TestValidateStartTime.Add(-2 * time.Second)
 	}
 
 	vdrs := validators.NewManager()
@@ -298,8 +294,8 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       genesis.TestMinStakingDuration,
+		MaxStakeDuration:       genesis.TestMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
@@ -314,7 +310,7 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 }
 
 func defaultClock(postFork bool) *mockable.Clock {
-	now := defaultGenesisTime
+	now := genesis.TestGenesisTime
 	if postFork {
 		// 1 second after Banff fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
@@ -411,7 +407,7 @@ func buildGenesisTest(ctx *snow.Context) *genesis.State {
 			}},
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(defaultValidateStartTime.Unix()),
+				Start:  uint64(genesis.TestValidateStartTime.Unix()),
 				End:    uint64(defaultValidateEndTime.Unix()),
 				Wght:   utxo.Output().Amount(),
 			},
@@ -431,7 +427,7 @@ func buildGenesisTest(ctx *snow.Context) *genesis.State {
 		UTXOs:         genesisUtxos,
 		Validators:    vdrs.List(),
 		Chains:        nil,
-		Timestamp:     uint64(defaultGenesisTime.Unix()),
+		Timestamp:     uint64(genesis.TestGenesisTime.Unix()),
 		InitialSupply: 360 * units.MegaAvax,
 	}
 }

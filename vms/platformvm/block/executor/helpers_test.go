@@ -250,7 +250,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisState, err := genesis.BuildTestGenesis(ctx.NetworkID)
+	genesisState, err := genesis.BuildTestGenesis()
 	if err != nil {
 		panic(err)
 	}
@@ -282,7 +282,7 @@ func defaultState(
 
 func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
+	ctx.NetworkID = genesis.TestNetworkID
 	ctx.XChainID = genesis.TestXChainID
 	ctx.CChainID = genesis.TestCChainID
 	ctx.AVAXAssetID = genesis.TestAvaxAssetID

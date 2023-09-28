@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -35,7 +36,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->X export",
 			destinationChainID: xChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          defaultValidateStartTime,
+			timestamp:          genesis.TestValidateStartTime,
 		},
 		{
 			description:        "P->C export",

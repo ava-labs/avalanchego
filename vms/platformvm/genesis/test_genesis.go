@@ -26,6 +26,7 @@ var (
 	TestMaxStakingDuration = 365 * 24 * time.Hour
 	TestValidateEndTime    = TestValidateStartTime.Add(10 * TestMinStakingDuration)
 
+	TestNetworkID   = constants.UnitTestID
 	TestAvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 	TestXChainID    = ids.Empty.Prefix(0)
 	TestCChainID    = ids.Empty.Prefix(1)
@@ -35,7 +36,7 @@ var (
 	TestWeight            = 10 * units.KiloAvax
 )
 
-func BuildTestGenesis(networkID uint32) (*State, error) {
+func BuildTestGenesis() (*State, error) {
 	genesisUtxos := make([]*avax.UTXO, len(TestKeys))
 	for i, key := range TestKeys {
 		addr := key.PublicKey().Address()
@@ -81,7 +82,7 @@ func BuildTestGenesis(networkID uint32) (*State, error) {
 
 		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
+				NetworkID:    TestNetworkID,
 				BlockchainID: constants.PlatformChainID,
 			}},
 			Validator: txs.Validator{

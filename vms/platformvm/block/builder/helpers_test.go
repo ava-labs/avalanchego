@@ -210,7 +210,7 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	genesisState, err := genesis.BuildTestGenesis(ctx.NetworkID)
+	genesisState, err := genesis.BuildTestGenesis()
 	require.NoError(err)
 	state, err := state.New(
 		db,

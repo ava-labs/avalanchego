@@ -56,7 +56,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	genesisState, err := genesis.BuildTestGenesis(uint32(10))
+	genesisState, err := genesis.BuildTestGenesis()
 	require.NoError(err)
 
 	vdrs := validators.NewManager()

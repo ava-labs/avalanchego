@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -28,7 +29,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	nodeID := ids.NodeID(rewardAddress)
 
 	newValidatorID := ids.GenerateTestNodeID()
-	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
+	newValidatorStartTime := uint64(genesis.TestValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
 	// [addMinStakeValidator] adds a new validator to the primary network's
@@ -107,37 +108,37 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		{
 			description:   "validator stops validating earlier than delegator",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()) + 1,
+			startTime:     uint64(genesis.TestValidateStartTime.Unix()) + 1,
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
 			stakeAmount:   dummyH.config.MinDelegatorStake,
 			startTime:     uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
+			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + genesis.TestMinStakingDuration + time.Second).Unix()),
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrFutureStakeTime,
 		},
 		{
 			description:   "validator not in the current or pending validator sets",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
+			startTime:     uint64(genesis.TestValidateStartTime.Add(5 * time.Second).Unix()),
 			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   database.ErrNotFound,
 		},
 		{
@@ -149,7 +150,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrPeriodMismatch,
 		},
 		{
@@ -161,7 +162,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrPeriodMismatch,
 		},
 		{
@@ -173,7 +174,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   nil,
 		},
 		{
@@ -185,17 +186,17 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			rewardAddress: rewardAddress,                             // Reward Address
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
 			setup:         nil,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrTimestampNotBeforeStartTime,
 		},
 		{
 			description:   "tx fee paying key has no funds",
-			stakeAmount:   dummyH.config.MinDelegatorStake,             // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()) + 1, // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),       // end time
-			nodeID:        nodeID,                                      // node ID
-			rewardAddress: rewardAddress,                               // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},   // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,                  // weight
+			startTime:     uint64(genesis.TestValidateStartTime.Unix()) + 1, // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),            // end time
+			nodeID:        nodeID,                                           // node ID
+			rewardAddress: rewardAddress,                                    // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},        // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
@@ -209,7 +210,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				target.state.SetHeight(dummyHeight)
 				require.NoError(t, target.state.Commit())
 			},
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesis.TestGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
@@ -233,7 +234,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMaxStakeValidator,
-			AP3Time:       defaultGenesisTime,
+			AP3Time:       genesis.TestGenesisTime,
 			expectedErr:   ErrOverDelegated,
 		},
 	}
@@ -296,7 +297,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(defaultValidateStartTime.Unix())+1,
+			uint64(genesis.TestValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix())+1,
 			ids.NodeID(nodeID),
 			testSubnet1.ID(),
@@ -328,7 +329,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(defaultValidateStartTime.Unix())+1,
+			uint64(genesis.TestValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
 			ids.NodeID(nodeID),
 			testSubnet1.ID(),
@@ -358,8 +359,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
 
 	// starts validating primary network 10 seconds after genesis
-	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
-	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
+	dsStartTime := genesis.TestGenesisTime.Add(10 * time.Second)
+	dsEndTime := dsStartTime.Add(5 * genesis.TestMinStakingDuration)
 
 	addDSTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stake amount
@@ -508,14 +509,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	// Case: Proposed validator start validating at/before current timestamp
 	// First, advance the timestamp
-	newTimestamp := defaultGenesisTime.Add(2 * time.Second)
+	newTimestamp := genesis.TestGenesisTime.Add(2 * time.Second)
 	env.state.SetTimestamp(newTimestamp)
 
 	{
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,               // weight
 			uint64(newTimestamp.Unix()), // start time
-			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
+			uint64(newTimestamp.Add(genesis.TestMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -540,16 +541,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}
 
 	// reset the timestamp
-	env.state.SetTimestamp(defaultGenesisTime)
+	env.state.SetTimestamp(genesis.TestGenesisTime)
 
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
 	subnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,                           // weight
-		uint64(defaultValidateStartTime.Unix()), // start time
-		uint64(defaultValidateEndTime.Unix()),   // end time
-		ids.NodeID(nodeID),                      // node ID
-		testSubnet1.ID(),                        // subnet ID
+		defaultWeight, // weight
+		uint64(genesis.TestValidateStartTime.Unix()), // start time
+		uint64(defaultValidateEndTime.Unix()),        // end time
+		ids.NodeID(nodeID),                           // node ID
+		testSubnet1.ID(),                             // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -571,10 +572,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight, // weight
-			uint64(defaultValidateStartTime.Unix())+1, // start time
-			uint64(defaultValidateEndTime.Unix()),     // end time
-			ids.NodeID(nodeID),                        // node ID
-			testSubnet1.ID(),                          // subnet ID
+			uint64(genesis.TestValidateStartTime.Unix())+1, // start time
+			uint64(defaultValidateEndTime.Unix()),          // end time
+			ids.NodeID(nodeID),                             // node ID
+			testSubnet1.ID(),                               // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -603,9 +604,9 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Too few signatures
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                       // weight
-			uint64(defaultGenesisTime.Unix())+1, // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
+			defaultWeight, // weight
+			uint64(genesis.TestGenesisTime.Unix())+1,                                     // start time
+			uint64(genesis.TestGenesisTime.Add(genesis.TestMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
@@ -639,9 +640,9 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                       // weight
-			uint64(defaultGenesisTime.Unix())+1, // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
+			defaultWeight, // weight
+			uint64(genesis.TestGenesisTime.Unix())+1,                                     // start time
+			uint64(genesis.TestGenesisTime.Add(genesis.TestMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
@@ -674,9 +675,9 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                       // weight
-			uint64(defaultGenesisTime.Unix())+1, // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
+			defaultWeight, // weight
+			uint64(genesis.TestGenesisTime.Unix())+1,                                     // start time
+			uint64(genesis.TestGenesisTime.Add(genesis.TestMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -727,7 +728,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator's start time too early
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix()),
+			uint64(genesis.TestValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,
 			ids.ShortEmpty,
@@ -757,8 +758,8 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator's start time too far in the future
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
+			uint64(genesis.TestValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
+			uint64(genesis.TestValidateStartTime.Add(MaxFutureStartTime).Add(genesis.TestMinStakingDuration).Unix()+1),
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
@@ -787,7 +788,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator already validating primary network
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix())+1,
+			uint64(genesis.TestValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
 			ids.NodeID(preFundedKeys[0].Address()),
 			ids.ShortEmpty,
@@ -815,11 +816,11 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator in pending validator set of primary network
-		startTime := defaultGenesisTime.Add(1 * time.Second)
+		startTime := genesis.TestGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,                            // stake amount
-			uint64(startTime.Unix()),                                // start time
-			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
+			env.config.MinValidatorStake,                                 // stake amount
+			uint64(startTime.Unix()),                                     // start time
+			uint64(startTime.Add(genesis.TestMinStakingDuration).Unix()), // end time
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
@@ -860,7 +861,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator doesn't have enough tokens to cover stake amount
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix())+1,
+			uint64(genesis.TestValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
 			ids.GenerateTestNodeID(),
 			ids.ShortEmpty,
