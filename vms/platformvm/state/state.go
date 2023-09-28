@@ -590,7 +590,7 @@ func newState(
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(id ids.ID, f fxOwnerAndSize) int {
+		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
 			return ids.IDLen + f.size
 		}),
 	)
@@ -853,7 +853,7 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	}
 
 	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if ownerAndSize.size == 0 {
+		if ownerAndSize.owner == nil {
 			return nil, database.ErrNotFound
 		}
 		return ownerAndSize.owner, nil
@@ -865,7 +865,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
-		s.SetSubnetOwner(subnetID, owner)
 		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
 			owner: owner,
 			size:  len(ownerBytes),
