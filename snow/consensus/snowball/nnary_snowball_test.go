@@ -15,8 +15,7 @@ func TestNnarySnowball(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 	sb.Add(Green)
 
@@ -46,8 +45,7 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 	betaVirtuous := 1
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
@@ -63,8 +61,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
@@ -103,8 +100,7 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
