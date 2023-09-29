@@ -149,7 +149,7 @@ func (p Path) Append(token byte) Path {
 	copy(buffer, p.value)
 	buffer[len(buffer)-1] |= token << p.bitsToShift(p.tokensLength)
 	return Path{
-		value:        byteSlice2String(buffer),
+		value:        byteSliceToString(buffer),
 		tokensLength: p.tokensLength + 1,
 		pathConfig:   p.pathConfig,
 	}
@@ -226,7 +226,7 @@ func (p Path) Extend(path Path) Path {
 	if !p.hasPartialByte() {
 		copy(buffer[len(p.value):], path.value)
 		return Path{
-			value:        byteSlice2String(buffer),
+			value:        byteSliceToString(buffer),
 			tokensLength: totalLength,
 			pathConfig:   p.pathConfig,
 		}
@@ -242,7 +242,7 @@ func (p Path) Extend(path Path) Path {
 	shiftCopy(buffer[len(p.value):], path.value, shiftLeft)
 
 	return Path{
-		value:        byteSlice2String(buffer),
+		value:        byteSliceToString(buffer),
 		tokensLength: totalLength,
 		pathConfig:   p.pathConfig,
 	}
@@ -284,7 +284,7 @@ func (p Path) Skip(tokensToSkip int) Path {
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
-	result.value = byteSlice2String(buffer)
+	result.value = byteSliceToString(buffer)
 	return result
 }
 
@@ -314,7 +314,7 @@ func (p Path) Take(tokensToTake int) Path {
 	mask := byte(0xFF << p.bitsToShift(tokensToTake-1))
 	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
 
-	result.value = byteSlice2String(buffer)
+	result.value = byteSliceToString(buffer)
 	return result
 }
 
@@ -326,6 +326,6 @@ func (p Path) Bytes() []byte {
 	return unsafe.Slice(unsafe.StringData(p.value), len(p.value))
 }
 
-func byteSlice2String(bs []byte) string {
+func byteSliceToString(bs []byte) string {
 	return unsafe.String(unsafe.SliceData(bs), len(bs))
 }
