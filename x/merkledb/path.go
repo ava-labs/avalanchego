@@ -240,7 +240,7 @@ func (p Path) Extend(path Path) Path {
 	// The existing path doesn't fit into a whole number of bytes,
 	// figure out how much each byte of the extension path needs to be shifted
 	shiftLeft := p.bitsToShift(p.tokensLength - 1)
-	// the partial byte of the current path needs the first shiftLeft bits of the extension path
+	// the partial byte of the current path is filled with the first shiftLeft bits of the extension path
 	buffer[len(p.value)-1] |= path.value[0] >> (8 - shiftLeft)
 
 	// copy the rest of the extension path bytes into the buffer, shifted byte shiftLeft bits
@@ -254,10 +254,9 @@ func (p Path) Extend(path Path) Path {
 }
 
 func shiftCopy(dst []byte, src string, shift byte) {
-	reverseShift := 8 - shift
 	i := 0
 	for ; i < len(src)-1; i++ {
-		dst[i] = src[i]<<shift + src[i+1]>>reverseShift
+		dst[i] = src[i]<<shift + src[i+1]>>(8-shift)
 	}
 
 	if i < len(dst) {
