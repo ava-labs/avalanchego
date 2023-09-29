@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -56,7 +56,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	genesisState, err := genesis.BuildTestGenesis()
+	genesisState, err := test.BuildGenesis()
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
@@ -108,18 +108,18 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	)
 	for i := 0; i < 50; i++ {
 		currentHeight++
-		nodeID, err := addPrimaryValidator(s, genesis.TestGenesisTime, genesis.TestValidateEndTime, currentHeight)
+		nodeID, err := addPrimaryValidator(s, test.GenesisTime, test.ValidateEndTime, currentHeight)
 		require.NoError(err)
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 	subnetID := ids.GenerateTestID()
 	for _, nodeID := range nodeIDs {
 		currentHeight++
-		require.NoError(addSubnetValidator(s, subnetID, genesis.TestGenesisTime, genesis.TestValidateEndTime, nodeID, currentHeight))
+		require.NoError(addSubnetValidator(s, subnetID, test.GenesisTime, test.ValidateEndTime, nodeID, currentHeight))
 	}
 	for i := 0; i < 9900; i++ {
 		currentHeight++
-		require.NoError(addSubnetDelegator(s, subnetID, genesis.TestGenesisTime, genesis.TestValidateEndTime, nodeIDs, currentHeight))
+		require.NoError(addSubnetDelegator(s, subnetID, test.GenesisTime, test.ValidateEndTime, nodeIDs, currentHeight))
 	}
 
 	ctx := context.Background()

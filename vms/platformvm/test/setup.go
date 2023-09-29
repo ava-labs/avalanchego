@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package genesis
+package test
 
 import (
 	"time"
@@ -12,56 +12,59 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Shared Unit test setup utilities for a platform vm packages
+
 var (
-	// each key controls an address that has [TestBalance] AVAX at genesis
-	TestKeys = secp256k1.TestKeys()
+	// each key controls an address that has [Balance] AVAX at genesis
+	Keys = secp256k1.TestKeys()
 
 	// chain timestamp at genesis
-	TestGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	GenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// time that genesis validators start validating
-	TestValidateStartTime  = TestGenesisTime
-	TestMinStakingDuration = 24 * time.Hour
-	TestMaxStakingDuration = 365 * 24 * time.Hour
+	ValidateStartTime  = GenesisTime
+	MinStakingDuration = 24 * time.Hour
+	MaxStakingDuration = 365 * 24 * time.Hour
 
 	// time that genesis validators stop validating
-	TestValidateEndTime = TestValidateStartTime.Add(20 * TestMinStakingDuration)
+	ValidateEndTime = ValidateStartTime.Add(20 * MinStakingDuration)
 
-	TestNetworkID = constants.UnitTestID
+	NetworkID = constants.UnitTestID
 
 	// AVAX asset ID in tests
-	TestAvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-	TestXChainID    = ids.Empty.Prefix(0)
-	TestCChainID    = ids.Empty.Prefix(1)
+	AvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
+	XChainID    = ids.Empty.Prefix(0)
+	CChainID    = ids.Empty.Prefix(1)
 
-	TestMinValidatorStake = 5 * units.MilliAvax
-	TestMaxValidatorStake = 500 * units.MilliAvax
+	MinValidatorStake = 5 * units.MilliAvax
+	MaxValidatorStake = 500 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	TestBalance = 100 * TestMinValidatorStake
-	TestWeight  = TestMinValidatorStake
+	Balance = 100 * MinValidatorStake
+	Weight  = MinValidatorStake
 )
 
-// [BuildTestGenesis] is a good default to build genesis for platformVM unit tests
-func BuildTestGenesis() (*Genesis, error) {
-	genesisUtxos := make([]*UTXO, len(TestKeys))
-	for i, key := range TestKeys {
+// [BuildGenesis] is a good default to build genesis for platformVM unit tests
+func BuildGenesis() (*genesis.Genesis, error) {
+	genesisUtxos := make([]*genesis.UTXO, len(Keys))
+	for i, key := range Keys {
 		addr := key.PublicKey().Address()
-		genesisUtxos[i] = &UTXO{
+		genesisUtxos[i] = &genesis.UTXO{
 			UTXO: avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: avax.Asset{ID: TestAvaxAssetID},
+				Asset: avax.Asset{ID: AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: TestBalance,
+					Amt: Balance,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -74,14 +77,14 @@ func BuildTestGenesis() (*Genesis, error) {
 	}
 
 	vdrs := txheap.NewByEndTime()
-	for _, key := range TestKeys {
+	for _, key := range Keys {
 		addr := key.PublicKey().Address()
 		nodeID := ids.NodeID(key.PublicKey().Address())
 
 		utxo := &avax.TransferableOutput{
-			Asset: avax.Asset{ID: TestAvaxAssetID},
+			Asset: avax.Asset{ID: AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: TestWeight,
+				Amt: Weight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -98,13 +101,13 @@ func BuildTestGenesis() (*Genesis, error) {
 
 		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    TestNetworkID,
+				NetworkID:    NetworkID,
 				BlockchainID: constants.PlatformChainID,
 			}},
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(TestValidateStartTime.Unix()),
-				End:    uint64(TestValidateEndTime.Unix()),
+				Start:  uint64(ValidateStartTime.Unix()),
+				End:    uint64(ValidateEndTime.Unix()),
 				Wght:   utxo.Output().Amount(),
 			},
 			StakeOuts:        []*avax.TransferableOutput{utxo},
@@ -118,12 +121,12 @@ func BuildTestGenesis() (*Genesis, error) {
 		vdrs.Add(tx)
 	}
 
-	return &Genesis{
+	return &genesis.Genesis{
 		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
 		UTXOs:         genesisUtxos,
 		Validators:    vdrs.List(),
 		Chains:        nil,
-		Timestamp:     uint64(TestGenesisTime.Unix()),
+		Timestamp:     uint64(GenesisTime.Unix()),
 		InitialSupply: 360 * units.MegaAvax,
 	}, nil
 }

@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -28,7 +28,7 @@ func TestNewImportTx(t *testing.T) {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
 
-	type test struct {
+	type tst struct {
 		description   string
 		sourceChainID ids.ID
 		sharedMemory  atomic.SharedMemory
@@ -93,7 +93,7 @@ func TestNewImportTx(t *testing.T) {
 
 	customAssetID := ids.GenerateTestID()
 
-	tests := []test{
+	tests := []tst{
 		{
 			description:   "can't pay fee",
 			sourceChainID: env.ctx.XChainID,
@@ -120,9 +120,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: genesis.TestCChainID,
+			sourceChainID: test.CChainID,
 			sharedMemory: fundedSharedMemory(
-				genesis.TestCChainID,
+				test.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},

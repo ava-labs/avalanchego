@@ -37,11 +37,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -53,7 +53,7 @@ var (
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = genesis.TestKeys[0:3]
+	testSubnet1ControlKeys = test.Keys[0:3]
 
 	// Used to create and use keys.
 	testKeyfactory secp256k1.Factory
@@ -169,12 +169,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			genesis.TestKeys[0].PublicKey().Address(),
-			genesis.TestKeys[1].PublicKey().Address(),
-			genesis.TestKeys[2].PublicKey().Address(),
+			test.Keys[0].PublicKey().Address(),
+			test.Keys[1].PublicKey().Address(),
+			test.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesis.TestKeys[0]},
-		genesis.TestKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{test.Keys[0]},
+		test.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -199,7 +199,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisState, err := genesis.BuildTestGenesis()
+	genesisState, err := test.BuildGenesis()
 	if err != nil {
 		panic(err)
 	}
@@ -231,10 +231,10 @@ func defaultState(
 
 func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = genesis.TestNetworkID
-	ctx.XChainID = genesis.TestXChainID
-	ctx.CChainID = genesis.TestCChainID
-	ctx.AVAXAssetID = genesis.TestAvaxAssetID
+	ctx.NetworkID = test.NetworkID
+	ctx.XChainID = test.XChainID
+	ctx.CChainID = test.CChainID
+	ctx.AVAXAssetID = test.AvaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -248,8 +248,8 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				genesis.TestXChainID:      constants.PrimaryNetworkID,
-				genesis.TestCChainID:      constants.PrimaryNetworkID,
+				test.XChainID:             constants.PrimaryNetworkID,
+				test.CChainID:             constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -264,11 +264,11 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 func defaultConfig(postBanff, postCortina bool) config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
-		banffTime = genesis.TestValidateEndTime.Add(-2 * time.Second)
+		banffTime = test.ValidateEndTime.Add(-2 * time.Second)
 	}
 	cortinaTime := mockable.MaxTime
 	if postCortina {
-		cortinaTime = genesis.TestValidateStartTime.Add(-2 * time.Second)
+		cortinaTime = test.ValidateStartTime.Add(-2 * time.Second)
 	}
 
 	vdrs := validators.NewManager()
@@ -284,26 +284,26 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       genesis.TestMinStakingDuration,
-		MaxStakeDuration:       genesis.TestMaxStakingDuration,
+		MinStakeDuration:       test.MinStakingDuration,
+		MaxStakeDuration:       test.MaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: genesis.TestValidateEndTime,
-		ApricotPhase5Time: genesis.TestValidateEndTime,
+		ApricotPhase3Time: test.ValidateEndTime,
+		ApricotPhase5Time: test.ValidateEndTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 	}
 }
 
 func defaultClock(postFork bool) *mockable.Clock {
-	now := genesis.TestGenesisTime
+	now := test.GenesisTime
 	if postFork {
 		// 1 second after Banff fork
-		now = genesis.TestValidateEndTime.Add(-2 * time.Second)
+		now = test.ValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
 	clk.Set(now)

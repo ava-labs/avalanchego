@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -38,7 +38,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{genesis.TestKeys[0], genesis.TestKeys[1]},
+		[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -167,7 +167,7 @@ func TestCreateChainTxValid(t *testing.T) {
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
-	ap3Time := genesis.TestGenesisTime.Add(time.Hour)
+	ap3Time := test.GenesisTime.Add(time.Hour)
 	tests := []struct {
 		name          string
 		time          time.Time
@@ -176,7 +176,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:          "pre-fork - correctly priced",
-			time:          genesis.TestGenesisTime,
+			time:          test.GenesisTime,
 			fee:           0,
 			expectedError: nil,
 		},
@@ -193,8 +193,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			expectedError: nil,
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tst := range tests {
+		t.Run(tst.name, func(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
@@ -203,10 +203,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, genesis.TestKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, test.Keys, 0, tst.fee, ids.ShortEmpty)
 			require.NoError(err)
 
-			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), genesis.TestKeys)
+			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), test.Keys)
 			require.NoError(err)
 
 			signers = append(signers, subnetSigners)
@@ -230,7 +230,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			stateDiff.SetTimestamp(test.time)
+			stateDiff.SetTimestamp(tst.time)
 
 			executor := StandardTxExecutor{
 				Backend: &env.backend,
@@ -238,7 +238,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			require.ErrorIs(err, test.expectedError)
+			require.ErrorIs(err, tst.expectedError)
 		})
 	}
 }
