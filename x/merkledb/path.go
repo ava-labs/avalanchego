@@ -98,7 +98,7 @@ func (p Path) hasPartialByte() bool {
 	return p.tokensLength%p.tokensPerByte > 0
 }
 
-// HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
+// HasPrefix returns true iff [prefix] is a prefix of [p] or equal to it.
 func (p Path) HasPrefix(prefix Path) bool {
 	// [prefix] must be shorter than [p] to be a prefix.
 	if p.tokensLength < prefix.tokensLength {
@@ -127,15 +127,21 @@ func (p Path) HasPrefix(prefix Path) bool {
 	return strings.HasPrefix(p.value, prefixWithoutPartialByte)
 }
 
-// HasStrictPrefix returns true iff [prefix] is a prefix of [s] but not equal to it.
+// HasStrictPrefix returns true iff [prefix] is a prefix of [p]
+// but is not equal to it.
 func (p Path) HasStrictPrefix(prefix Path) bool {
 	return p != prefix && p.HasPrefix(prefix)
 }
 
-// Token returns the token at the specified index
-// grabs the token's storage byte, shifts it, then masks out any bits from other tokens stored in the same byte
+// Token returns the token at the specified index,
 func (p Path) Token(index int) byte {
-	return (p.value[index/p.tokensPerByte] >> p.bitsToShift(index)) & p.singleTokenMask
+	// Find the index in [p.value] of the byte containing the token at [index].
+	storageByteIndex := index / p.tokensPerByte
+	storageByte := p.value[storageByteIndex]
+	// Shift the byte right to get the token to the rightmost position.
+	storageByte >>= p.bitsToShift(index)
+	// Apply a mask to remove any other tokens in the byte.
+	return storageByte & p.singleTokenMask
 }
 
 // Append returns a new Path that equals the current Path with the passed token appended to the end
