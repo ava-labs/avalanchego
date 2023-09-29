@@ -21,17 +21,16 @@ func TestUnarySnowflake(t *testing.T) {
 
 	beta := 2
 
-	sf := &unarySnowflake{}
-	sf.Initialize(beta)
+	sf := newUnarySnowflake(beta)
 
 	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, false)
+	UnarySnowflakeStateTest(t, &sf, 1, false)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 0, false)
+	UnarySnowflakeStateTest(t, &sf, 0, false)
 
 	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, false)
+	UnarySnowflakeStateTest(t, &sf, 1, false)
 
 	sfCloneIntf := sf.Clone()
 	require.IsType(&unarySnowflake{}, sfCloneIntf)
@@ -53,11 +52,11 @@ func TestUnarySnowflake(t *testing.T) {
 	require.True(binarySnowflake.Finalized())
 
 	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 2, true)
+	UnarySnowflakeStateTest(t, &sf, 2, true)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 0, true)
+	UnarySnowflakeStateTest(t, &sf, 0, true)
 
 	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, true)
+	UnarySnowflakeStateTest(t, &sf, 1, true)
 }
