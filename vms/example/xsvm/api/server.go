@@ -9,14 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // Server defines the xsvm API server.

@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 

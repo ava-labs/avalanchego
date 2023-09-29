@@ -22,6 +22,7 @@ var (
  * |-- initializedKey -> nil
  * |-. blocks
  * | |-- lastAcceptedKey -> blockID
+ * | |-- height -> blockID
  * | '-- blockID -> block bytes
  * |-. addresses
  * | '-- addressID -> nonce
@@ -53,14 +54,23 @@ func SetLastAccepted(db database.KeyValueWriter, blkID ids.ID) error {
 	return database.PutID(db, blockPrefix, blkID)
 }
 
+func GetBlockIDByHeight(db database.KeyValueReader, height uint64) (ids.ID, error) {
+	key := Flatten(blockPrefix, database.PackUInt64(height))
+	return database.GetID(db, key)
+}
+
 func GetBlock(db database.KeyValueReader, blkID ids.ID) ([]byte, error) {
 	key := Flatten(blockPrefix, blkID[:])
 	return db.Get(key)
 }
 
-func AddBlock(db database.KeyValueWriter, blkID ids.ID, blk []byte) error {
-	key := Flatten(blockPrefix, blkID[:])
-	return db.Put(key, blk)
+func AddBlock(db database.KeyValueWriter, height uint64, blkID ids.ID, blk []byte) error {
+	heightToIDKey := Flatten(blockPrefix, database.PackUInt64(height))
+	if err := database.PutID(db, heightToIDKey, blkID); err != nil {
+		return err
+	}
+	idToBlockKey := Flatten(blockPrefix, blkID[:])
+	return db.Put(idToBlockKey, blk)
 }
 
 // Address state

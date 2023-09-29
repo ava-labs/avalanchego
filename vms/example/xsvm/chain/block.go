@@ -15,12 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 

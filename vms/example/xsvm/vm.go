@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -22,15 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/version"
-
-	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
@@ -40,6 +38,8 @@ var (
 )
 
 type VM struct {
+	common.AppHandler
+
 	chainContext *snow.Context
 	db           database.Database
 	genesis      *genesis.Genesis
@@ -60,6 +60,8 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	_ common.AppSender,
 ) error {
+	vm.AppHandler = common.NewNoOpAppHandler(chainContext.Log)
+
 	chainContext.Log.Info("initializing xsvm",
 		zap.Stringer("version", Version),
 	)
@@ -138,34 +140,6 @@ func (vm *VM) CreateHandlers(_ context.Context) (map[string]*common.HTTPHandler,
 	}, nil
 }
 
-func (*VM) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-func (*VM) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
-	return nil
-}
-
-func (*VM) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
-	return nil
-}
-
-func (*VM) AppGossip(context.Context, ids.NodeID, []byte) error {
-	return nil
-}
-
-func (*VM) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-func (*VM) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
-	return nil
-}
-
-func (*VM) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
-	return nil
-}
-
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
 	return http.StatusOK, nil
 }
@@ -207,37 +181,10 @@ func (vm *VM) BuildBlockWithContext(ctx context.Context, blockContext *smblock.C
 	return vm.builder.BuildBlock(ctx, blockContext)
 }
 
-// VerifyHeightIndex implements the snowman.ChainVM interface
 func (*VM) VerifyHeightIndex(context.Context) error {
-	// TODO(marun) Implement properly
 	return nil
 }
 
-// GetBlockIDAtHeight implements the snowman.ChainVM interface
-// Note: must return database.ErrNotFound if the index at height is unknown.
-//
-// This is called by the VM pre-ProposerVM fork and by the sync server
-// in [GetStateSummary].
 func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	// TODO(marun) Implement caching
-
-	currentID, err := vm.LastAccepted(ctx)
-	if err != nil {
-		return ids.ID{}, err
-	}
-	for {
-		currentBlock, err := vm.GetBlock(ctx, currentID)
-		if err != nil {
-			return ids.ID{}, err
-		}
-		currentHeight := currentBlock.Height()
-		if currentHeight == height {
-			return currentID, nil
-		}
-		if currentHeight < height {
-			break
-		}
-		currentID = currentBlock.ID()
-	}
-	return ids.ID{}, database.ErrNotFound
+	return state.GetBlockIDByHeight(vm.db, height)
 }

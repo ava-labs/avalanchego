@@ -13,10 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 const (

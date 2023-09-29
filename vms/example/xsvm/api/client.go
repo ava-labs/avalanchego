@@ -10,11 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // Client defines the xsvm API client.

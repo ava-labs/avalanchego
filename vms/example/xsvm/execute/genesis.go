@@ -6,7 +6,6 @@ package execute
 import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
@@ -42,7 +41,7 @@ func Genesis(db database.KeyValueReaderWriterDeleter, chainID ids.ID, g *genesis
 		return err
 	}
 
-	if err := state.AddBlock(db, blkID, blkBytes); err != nil {
+	if err := state.AddBlock(db, blk.Height, blkID, blkBytes); err != nil {
 		return err
 	}
 	if err := state.SetLastAccepted(db, blkID); err != nil {

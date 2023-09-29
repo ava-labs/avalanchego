@@ -9,11 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-
-	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
@@ -69,5 +67,5 @@ func Block(
 		return err
 	}
 
-	return state.AddBlock(db, blkID, blkBytes)
+	return state.AddBlock(db, blk.Height, blkID, blkBytes)
 }

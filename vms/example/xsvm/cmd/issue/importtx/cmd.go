@@ -14,10 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 func Command() *cobra.Command {
