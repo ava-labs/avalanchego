@@ -22,7 +22,7 @@ type batch struct {
 func (c *batch) Write() error {
 	batch := c.db.db.NewBatch()
 	for _, op := range c.Ops {
-		key, _ := newDBKey(op.Key, c.height)
+		key, _ := newDBKeyFromUser(op.Key, c.height)
 		var value []byte
 		if !op.Delete {
 			value = newDBValue(op.Value)

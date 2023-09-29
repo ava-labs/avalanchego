@@ -121,6 +121,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	avax.Produce(e.State, txID, tx.Outs)
 	// Add the new subnet to the database
 	e.State.AddSubnet(e.Tx)
+	e.State.SetSubnetOwner(txID, tx.Owner)
 	return nil
 }
 
@@ -154,7 +155,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		for index, input := range tx.Ins {
 			utxo, err := e.State.GetUTXO(input.InputID())
 			if err != nil {
-				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
+				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err) //nolint:gosec
 			}
 			utxos[index] = utxo
 		}
