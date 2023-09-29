@@ -326,8 +326,10 @@ func (p Path) Bytes() []byte {
 	return unsafe.Slice(unsafe.StringData(p.value), len(p.value))
 }
 
-// byteSliceToString converts the []byte to a string without a memcopy
-// this is safe because we never edit the []byte after creation
+// byteSliceToString converts the []byte to a string
+// Invariant: The input []byte must not be modified.
 func byteSliceToString(bs []byte) string {
+	// avoid copying during the conversion
+	// "safe" because we never edit the []byte and it is never returned by any functions except Bytes()
 	return unsafe.String(unsafe.SliceData(bs), len(bs))
 }
