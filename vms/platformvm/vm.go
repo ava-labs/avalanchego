@@ -137,13 +137,13 @@ func (vm *VM) Initialize(
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
-	genesisState, err := genesis.ParseState(genesisBytes)
+	g, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}
 	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
-		genesisState,
+		g,
 		registerer,
 		&vm.Config,
 		execConfig,

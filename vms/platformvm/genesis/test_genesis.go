@@ -49,24 +49,27 @@ var (
 )
 
 // [BuildTestGenesis] is a good default to build genesis for platformVM unit tests
-func BuildTestGenesis() (*State, error) {
-	genesisUtxos := make([]*avax.UTXO, len(TestKeys))
+func BuildTestGenesis() (*Genesis, error) {
+	genesisUtxos := make([]*UTXO, len(TestKeys))
 	for i, key := range TestKeys {
 		addr := key.PublicKey().Address()
-		genesisUtxos[i] = &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty,
-				OutputIndex: uint32(i),
-			},
-			Asset: avax.Asset{ID: TestAvaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: TestBalance,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
+		genesisUtxos[i] = &UTXO{
+			UTXO: avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: uint32(i),
+				},
+				Asset: avax.Asset{ID: TestAvaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: TestBalance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
 				},
 			},
+			Message: nil,
 		}
 	}
 
@@ -115,8 +118,8 @@ func BuildTestGenesis() (*State, error) {
 		vdrs.Add(tx)
 	}
 
-	return &State{
-		GenesisBlkID:  hashing.ComputeHash256Array(ids.Empty[:]),
+	return &Genesis{
+		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
 		UTXOs:         genesisUtxos,
 		Validators:    vdrs.List(),
 		Chains:        nil,

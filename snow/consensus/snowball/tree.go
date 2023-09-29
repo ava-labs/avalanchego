@@ -18,8 +18,7 @@ var (
 )
 
 func NewTree(params Parameters, choice ids.ID) Consensus {
-	snowball := &unarySnowball{}
-	snowball.Initialize(params.BetaVirtuous)
+	snowball := newUnarySnowball(params.BetaVirtuous)
 
 	t := &Tree{
 		params: params,
@@ -28,7 +27,7 @@ func NewTree(params Parameters, choice ids.ID) Consensus {
 		tree:         t,
 		preference:   choice,
 		commonPrefix: ids.NumBits, // The initial state has no conflicts
-		snowball:     snowball,
+		snowball:     &snowball,
 	}
 
 	return t
@@ -355,14 +354,13 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b.preferences[bit] = u.preference
 	b.preferences[1-bit] = newChoice
 
-	newChildSnowball := &unarySnowball{}
-	newChildSnowball.Initialize(u.tree.params.BetaVirtuous)
+	newChildSnowball := newUnarySnowball(u.tree.params.BetaVirtuous)
 	newChild := &unaryNode{
 		tree:          u.tree,
 		preference:    newChoice,
 		decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
 		commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
-		snowball:      newChildSnowball,
+		snowball:      &newChildSnowball,
 	}
 
 	switch {
