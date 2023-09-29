@@ -274,10 +274,10 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
-		t:         t,
-		vdr:       nodeID,
-		requestID: requestID,
-		response:  blkID,
+		t:               t,
+		vdr:             nodeID,
+		requestID:       requestID,
+		responseOptions: []ids.ID{blkID},
 	}
 
 	// Wait until [blkID] has been issued to consensus before applying this chit.
