@@ -6,7 +6,6 @@ package merkledb
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"unsafe"
 )
@@ -150,7 +149,7 @@ func (p Path) Append(token byte) Path {
 	copy(buffer, p.value)
 	buffer[len(buffer)-1] |= token << p.bitsToShift(p.tokensLength)
 	return Path{
-		value:        *(*string)(unsafe.Pointer(&buffer)),
+		value:        byteSlice2String(buffer),
 		tokensLength: p.tokensLength + 1,
 		pathConfig:   p.pathConfig,
 	}
@@ -227,7 +226,7 @@ func (p Path) Extend(path Path) Path {
 	if !p.hasPartialByte() {
 		copy(buffer[len(p.value):], path.value)
 		return Path{
-			value:        *(*string)(unsafe.Pointer(&buffer)),
+			value:        byteSlice2String(buffer),
 			tokensLength: totalLength,
 			pathConfig:   p.pathConfig,
 		}
@@ -243,7 +242,7 @@ func (p Path) Extend(path Path) Path {
 	shiftCopy(buffer[len(p.value):], path.value, shiftLeft)
 
 	return Path{
-		value:        *(*string)(unsafe.Pointer(&buffer)),
+		value:        byteSlice2String(buffer),
 		tokensLength: totalLength,
 		pathConfig:   p.pathConfig,
 	}
@@ -285,7 +284,7 @@ func (p Path) Skip(tokensToSkip int) Path {
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
-	result.value = *(*string)(unsafe.Pointer(&buffer))
+	result.value = byteSlice2String(buffer)
 	return result
 }
 
@@ -315,7 +314,7 @@ func (p Path) Take(tokensToTake int) Path {
 	mask := byte(0xFF << p.bitsToShift(tokensToTake-1))
 	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
 
-	result.value = *(*string)(unsafe.Pointer(&buffer))
+	result.value = byteSlice2String(buffer)
 	return result
 }
 
@@ -324,7 +323,9 @@ func (p Path) Take(tokensToTake int) Path {
 func (p Path) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
-	buf := *(*[]byte)(unsafe.Pointer(&p.value))
-	(*reflect.SliceHeader)(unsafe.Pointer(&buf)).Cap = len(p.value)
-	return buf
+	return unsafe.Slice(unsafe.StringData(p.value), len(p.value))
+}
+
+func byteSlice2String(bs []byte) string {
+	return unsafe.String(unsafe.SliceData(bs), len(bs))
 }
