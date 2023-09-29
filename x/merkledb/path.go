@@ -144,10 +144,14 @@ func (p Path) Token(index int) byte {
 	return storageByte & p.singleTokenMask
 }
 
-// Append returns a new Path that equals the current Path with the passed token appended to the end
+// Append returns a new Path that equals the current
+// Path with [token] appended to the end.
 func (p Path) Append(token byte) Path {
 	buffer := make([]byte, p.bytesNeeded(p.tokensLength+1))
 	copy(buffer, p.value)
+	// Shift [token] to the left such that it's at the correct
+	// index within its storage byte, then OR it with its storage
+	// byte to write the token into the byte.
 	buffer[len(buffer)-1] |= token << p.bitsToShift(p.tokensLength)
 	return Path{
 		value:        *(*string)(unsafe.Pointer(&buffer)),
