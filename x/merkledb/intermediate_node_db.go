@@ -129,40 +129,7 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	pathBytes := key.Bytes()
-
-	// add one additional byte to store padding when the path
-	// has a length that fits into a whole number of bytes
-	tokensInLastByte := key.tokensLength % key.tokensPerByte
-	bufferLen := len(pathBytes)
-	if tokensInLastByte == 0 {
-		bufferLen++
-	}
-	dbKey := getBufferFromPool(db.bufferPool, bufferLen)
-	defer db.bufferPool.Put(dbKey)
-
-	// []byte from buffer might still have data, clear the last byte
-	// the other bytes will be overwritten by the copy
-	dbKey[len(dbKey)-1] = 0
-	copy(dbKey, pathBytes)
-
-	// [tokensInLastByte] determines how many bits in the last byte already represent tokens
-	// Set the first bit after the used bits to 1
-	// Below table showing which bit gets set to 1 for a given branch factor and [tokensInLastByte]
-	// x's represent the bits already in use by the [tokensInLastByte]
-	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
-	// |tokensInLastByte|    0    |    1    |    2    |    3    |    4    |    5    |    6    |    7    |
-	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
-	// |branchFactor2   |1000_0000|x100_0000|xx10_0000|xxx1_0000|xxxx_1000|xxxx_x100|xxxx_xx10|xxxx_xxx1|
-	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
-	// |branchFactor4   |1000_0000|xx10_0000|xxxx_1000|xxxx_xx10|         |         |         |         |
-	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
-	// |branchFactor16  |1000_0000|xxxx_1000|         |         |         |         |         |         |
-	// +----------------+---------+---------+---------+---------+---------+---------+---------+---------+
-
-	dbKey[bufferLen-1] |= 0b0000_0001 << (7 - (byte(tokensInLastByte) * key.tokenBitSize))
-
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(1).Bytes())
 }
 
 func (db *intermediateNodeDB) Put(key Path, n *node) error {

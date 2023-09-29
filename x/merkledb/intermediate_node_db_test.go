@@ -164,11 +164,11 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
 				require.Len(constructedKey, baseLength)
-				require.Equal(p.Append(1<<(p.tokenBitSize-1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
 				require.Len(constructedKey, baseLength+1)
-				require.Equal(append(p.Bytes(), 0b1000_0000), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			}
 		}
 	})
@@ -193,7 +193,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	constructedKey := db.constructDBKey(NewPath([]byte{}, BranchFactor16))
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(byte(0b1000_0000), constructedKey[len(constructedKey)-1])
+	require.Equal(byte(16), constructedKey[len(constructedKey)-1])
 
 	db.bufferPool = &sync.Pool{
 		New: func() interface{} {
@@ -205,5 +205,5 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(p.Append(0b0000_1000).Bytes(), constructedKey[len(intermediateNodePrefix):])
+	require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
 }
