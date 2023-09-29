@@ -123,7 +123,6 @@ func TestStopTrackingDecreasesUptime(t *testing.T) {
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	up = NewManager(s, &clk).(*manager)
-	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
@@ -158,7 +157,6 @@ func TestStopTrackingIncreasesUptime(t *testing.T) {
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	up = NewManager(s, &clk).(*manager)
-	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
