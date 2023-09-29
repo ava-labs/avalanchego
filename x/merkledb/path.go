@@ -330,6 +330,6 @@ func (p Path) Bytes() []byte {
 // Invariant: The input []byte must not be modified.
 func byteSliceToString(bs []byte) string {
 	// avoid copying during the conversion
-	// "safe" because we never edit the []byte and it is never returned by any functions except Bytes()
+	// "safe" because we never edit the []byte, and it is never returned by any functions except Bytes()
 	return unsafe.String(unsafe.SliceData(bs), len(bs))
 }
