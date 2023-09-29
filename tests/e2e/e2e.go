@@ -228,9 +228,7 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 
 // Wait for the given node to report healthy.
 func WaitForHealthy(node testnet.Node) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
+	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(DefaultContext(), node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
