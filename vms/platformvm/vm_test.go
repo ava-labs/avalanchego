@@ -1838,7 +1838,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	initialClkTime := defaultValidateStartTime
 	firstVM.clock.Set(initialClkTime)
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
@@ -1846,7 +1845,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
 	durationForReward := defaultValidateEndTime.Sub(defaultValidateStartTime) * time.Duration(firstUptimePercentage) / 100
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(durationForReward))
+	firstVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
 
 	// Shutdown VM to stop all genesis validator uptime.
 	// At this point they have been validating for the 20% uptime needed to be rewarded
@@ -1890,7 +1889,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// set clock to the time we switched firstVM off
 	secondVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(durationForReward))
+	secondVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
@@ -1898,7 +1897,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// after restart and change of uptime required for reward, push validators to their end of life
 	secondVM.clock.Set(defaultValidateEndTime)
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	// evaluate a genesis validator for reward
 	blk, err := secondVM.Builder.BuildBlock(context.Background())
@@ -1990,7 +1988,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	initialClkTime := defaultValidateStartTime
 	vm.clock.Set(initialClkTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1998,7 +1995,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	// evaluate a genesis validator for reward
 	blk, err := vm.Builder.BuildBlock(context.Background())
