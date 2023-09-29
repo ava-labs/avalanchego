@@ -5302,7 +5302,6 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 
 	ownerKey, ownerAddr, owner := generateKeyAndOwner(t)
 	msigKeys, msigAlias, msigAliasOwners, msigOwner := generateMsigAliasAndKeys(t, 2, 2, true)
-	_, newMsigAlias, _, _ := generateMsigAliasAndKeys(t, 2, 2, true)
 
 	ownerUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, owner, ids.Empty, ids.Empty)
 	msigUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, *msigOwner, ids.Empty, ids.Empty)
@@ -5318,9 +5317,36 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
+		"Add nested alias": {
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetMultisigAlias(msigAliasOwners.Addrs[0]).Return(&multisig.AliasWithNonce{}, nil)
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(ownerUTXO, []uint32{0})},
+					},
+				},
+				MultisigAlias: multisig.Alias{
+					ID:     ids.ShortID{},
+					Memo:   msigAlias.Memo,
+					Owners: msigAlias.Owners,
+				},
+				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{ownerKey},
+			},
+			expectedErr: errNestedMsigAlias,
+		},
 		"Updating alias which does not exist": {
 			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(nil, database.ErrNotFound)
 				return s
 			},
@@ -5344,6 +5370,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		"Updating existing alias with less signatures than threshold": {
 			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5371,6 +5398,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		"OK, update existing alias": {
 			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5404,6 +5432,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		"OK, add new alias": {
 			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
 				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
 					Alias: multisig.Alias{
@@ -5439,6 +5468,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		"OK, add new alias with multisig sender": {
 			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{msigUTXO}, []ids.ShortID{
 					msigAlias.ID,
 					msigAliasOwners.Addrs[0],
@@ -5447,8 +5477,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
 					Alias: multisig.Alias{
 						ID:     multisig.ComputeAliasID(txID),
-						Memo:   newMsigAlias.Memo,
-						Owners: newMsigAlias.Owners,
+						Memo:   msigAlias.Memo,
+						Owners: msigAlias.Owners,
 					},
 					Nonce: 0,
 				})
@@ -5466,8 +5496,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				},
 				MultisigAlias: multisig.Alias{
 					ID:     ids.ShortID{},
-					Memo:   newMsigAlias.Memo,
-					Owners: newMsigAlias.Owners,
+					Memo:   msigAlias.Memo,
+					Owners: msigAlias.Owners,
 				},
 				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
 			},

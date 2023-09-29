@@ -75,6 +75,29 @@ func (fx *CaminoFx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{
 	return fx.Fx.VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf)
 }
 
+func (*Fx) IsNestedMultisig(ownerIntf interface{}, msigIntf interface{}) (bool, error) {
+	owner, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return false, ErrWrongOwnerType
+	}
+	msig, ok := msigIntf.(AliasGetter)
+	if !ok {
+		return false, ErrNotAliasGetter
+	}
+
+	for _, addr := range owner.Addrs {
+		_, err := msig.GetMultisigAlias(addr)
+		switch {
+		case err == nil:
+			return true, nil
+		case err != database.ErrNotFound:
+			return false, err
+		}
+	}
+
+	return false, nil
+}
+
 func (fx *Fx) RecoverAddresses(msg []byte, verifies []verify.Verifiable) (RecoverMap, error) {
 	ret := make(RecoverMap, len(verifies))
 	visited := make(map[[secp256k1.SignatureLen]byte]bool)

@@ -210,6 +210,21 @@ func (mr *MockFxMockRecorder) VerifyTransfer(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTransfer", reflect.TypeOf((*MockFx)(nil).VerifyTransfer), arg0, arg1, arg2, arg3)
 }
 
+// IsNestedMultisig mocks base method.
+func (m *MockFx) IsNestedMultisig(arg0, arg1 interface{}) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsNestedMultisig", arg0, arg1)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsNestedMultisig indicates an expected call of IsNestedMultisig.
+func (mr *MockFxMockRecorder) IsNestedMultisig(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsNestedMultisig", reflect.TypeOf((*MockFx)(nil).IsNestedMultisig), arg0, arg1)
+}
+
 // MockOwner is a mock of Owner interface.
 type MockOwner struct {
 	ctrl     *gomock.Controller

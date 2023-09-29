@@ -361,7 +361,13 @@ func (h *handler) Lock(
 			if toOwnerID != nil {
 				lockedOwnerID = OwnerID{to, toOwnerID}
 			}
-			if changeOwnerID != nil && !h.isMultisigTransferOutput(utxoDB, innerOut) {
+
+			isNestedMsig, err := h.fx.IsNestedMultisig(&innerOut.OutputOwners, utxoDB)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+
+			if changeOwnerID != nil && !isNestedMsig {
 				remainingOwnerID = OwnerID{change, changeOwnerID}
 			}
 		}
@@ -1245,29 +1251,6 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	}
 
 	return nil
-}
-
-func (*handler) isMultisigTransferOutput(utxoDB avax.UTXOReader, out verify.State) bool {
-	secpOut, ok := out.(*secp256k1fx.TransferOutput)
-	if !ok {
-		// Conversion should succeed, otherwise it will be handled by the caller
-		return false
-	}
-
-	// ! because currently there is no support for adding new msig aliases after genesis,
-	// ! we assume that state diffs won't contain any changes to msig aliases state
-	// ! that must be changed later
-	state, ok := utxoDB.(state.CaminoDiff)
-	if !ok {
-		return false
-	}
-
-	for _, addr := range secpOut.Addrs {
-		if _, err := state.GetMultisigAlias(addr); err == nil {
-			return true
-		}
-	}
-	return false
 }
 
 type innerSortUTXOs struct {

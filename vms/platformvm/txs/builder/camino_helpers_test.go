@@ -617,7 +617,7 @@ func expectLock(s *state.MockState, allUTXOs map[ids.ShortID][]*avax.UTXO) {
 		s.EXPECT().UTXOIDs(addr.Bytes(), ids.Empty, math.MaxInt).Return(utxoids, nil)
 		for _, utxo := range utxos {
 			s.EXPECT().GetUTXO(utxo.InputID()).Return(utxo, nil)
-			s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound)
+			s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound).Times(2)
 		}
 	}
 }

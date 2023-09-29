@@ -31,4 +31,7 @@ type CaminoFx interface {
 
 	// CollectMultisigAliases returns an array of OutputOwners part of the owner
 	CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error)
+
+	// Checks if [ownerIntf] contains msig alias
+	IsNestedMultisig(ownerIntf interface{}, msigIntf interface{}) (bool, error)
 }
