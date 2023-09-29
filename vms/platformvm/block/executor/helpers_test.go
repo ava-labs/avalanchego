@@ -145,7 +145,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
-		res.uptimes = uptime.NewManager(res.state)
+		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
@@ -159,7 +159,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	} else {
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
-		res.uptimes = uptime.NewManager(res.mockedState)
+		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
