@@ -102,7 +102,7 @@ const BRANCH_NODE_SIZE: usize = 17;
 /// to a single proof step. If reaches an end step during proof verification,
 /// the hash value will be none, and the encoded value will be the value of the
 /// node.
-pub struct SubProof {
+struct SubProof {
     encoded: Vec<u8>,
     hash: Option<[u8; 32]>,
 }
@@ -128,7 +128,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
             let node = NodeType::decode(cur_proof.as_ref())?;
-            let (sub_proof, traversed_nibbles) = self.locate_subproof(key_nibbles, node)?;
+            let (sub_proof, traversed_nibbles) = locate_subproof(key_nibbles, node)?;
             key_nibbles = traversed_nibbles;
 
             cur_hash = match sub_proof {
@@ -140,87 +140,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 }) => hash,
                 _ => return Ok(None),
             };
-        }
-    }
-
-    fn locate_subproof<'a>(
-        &self,
-        mut key_nibbles: NibblesIterator<'a, 0>,
-        node: NodeType,
-    ) -> Result<(Option<SubProof>, NibblesIterator<'a, 0>), ProofError> {
-        match node {
-            NodeType::Leaf(n) => {
-                let cur_key = &n.path().0;
-                // Check if the key of current node match with the given key
-                // and consume the current-key portion of the nibbles-iterator
-                let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
-                    || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
-
-                if does_not_match {
-                    return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
-                }
-
-                let encoded = n.data().to_vec();
-
-                let sub_proof = SubProof {
-                    encoded,
-                    hash: None,
-                };
-
-                Ok((sub_proof.into(), key_nibbles))
-            }
-            NodeType::Extension(n) => {
-                let cur_key = &n.path().0;
-                // Check if the key of current node match with the given key
-                // and consume the current-key portion of the nibbles-iterator
-                let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
-                    || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
-
-                if does_not_match {
-                    return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
-                }
-                let data = n.chd_encoded().ok_or(ProofError::InvalidData)?.to_vec();
-                let sub_proof = self.generate_subproof(data)?;
-
-                Ok((sub_proof.into(), key_nibbles))
-            }
-            NodeType::Branch(_) if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
-            NodeType::Branch(n) => {
-                let index = key_nibbles.next().unwrap() as usize;
-                // consume items returning the item at index
-                let data = n.chd_encode()[index]
-                    .as_ref()
-                    .ok_or(ProofError::InvalidData)?
-                    .to_vec();
-                self.generate_subproof(data)
-                    .map(|subproof| (Some(subproof), key_nibbles))
-            }
-        }
-    }
-
-    fn generate_subproof(&self, data: Vec<u8>) -> Result<SubProof, ProofError> {
-        match data.len() {
-            0..=31 => {
-                let sub_hash = sha3::Keccak256::digest(&data).into();
-                Ok(SubProof {
-                    encoded: data,
-                    hash: Some(sub_hash),
-                })
-            }
-
-            32 => {
-                let sub_hash: &[u8] = &data;
-                let sub_hash = sub_hash.try_into().unwrap();
-
-                Ok(SubProof {
-                    encoded: data,
-                    hash: Some(sub_hash),
-                })
-            }
-
-            len => Err(ProofError::DecodeError(Box::new(
-                bincode::ErrorKind::Custom(format!("invalid proof length: {len}")),
-            ))),
         }
     }
 
@@ -569,7 +488,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         hash: None,
                     })
                 } else {
-                    self.generate_subproof(data.clone()).map(Some)?
+                    generate_subproof(data.clone()).map(Some)?
                 };
 
                 let cur_key_len = cur_key.len();
@@ -615,7 +534,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 };
 
                 let branch_ptr = build_branch_ptr(merkle, value, chd_encoded)?;
-                let subproof = self.generate_subproof(data)?;
+                let subproof = generate_subproof(data)?;
 
                 Ok((branch_ptr, Some(subproof), 1))
             }
@@ -624,6 +543,85 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 bincode::ErrorKind::Custom(String::from("")),
             ))),
         }
+    }
+}
+
+fn locate_subproof(
+    mut key_nibbles: NibblesIterator<'_, 0>,
+    node: NodeType,
+) -> Result<(Option<SubProof>, NibblesIterator<'_, 0>), ProofError> {
+    match node {
+        NodeType::Leaf(n) => {
+            let cur_key = &n.path().0;
+            // Check if the key of current node match with the given key
+            // and consume the current-key portion of the nibbles-iterator
+            let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
+                || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
+
+            if does_not_match {
+                return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
+            }
+
+            let encoded = n.data().to_vec();
+
+            let sub_proof = SubProof {
+                encoded,
+                hash: None,
+            };
+
+            Ok((sub_proof.into(), key_nibbles))
+        }
+        NodeType::Extension(n) => {
+            let cur_key = &n.path().0;
+            // Check if the key of current node match with the given key
+            // and consume the current-key portion of the nibbles-iterator
+            let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
+                || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
+
+            if does_not_match {
+                return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
+            }
+            let data = n.chd_encoded().ok_or(ProofError::InvalidData)?.to_vec();
+            let sub_proof = generate_subproof(data)?;
+
+            Ok((sub_proof.into(), key_nibbles))
+        }
+        NodeType::Branch(_) if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
+        NodeType::Branch(n) => {
+            let index = key_nibbles.next().unwrap() as usize;
+            // consume items returning the item at index
+            let data = n.chd_encode()[index]
+                .as_ref()
+                .ok_or(ProofError::InvalidData)?
+                .to_vec();
+            generate_subproof(data).map(|subproof| (Some(subproof), key_nibbles))
+        }
+    }
+}
+
+fn generate_subproof(data: Vec<u8>) -> Result<SubProof, ProofError> {
+    match data.len() {
+        0..=31 => {
+            let sub_hash = sha3::Keccak256::digest(&data).into();
+            Ok(SubProof {
+                encoded: data,
+                hash: Some(sub_hash),
+            })
+        }
+
+        32 => {
+            let sub_hash: &[u8] = &data;
+            let sub_hash = sub_hash.try_into().unwrap();
+
+            Ok(SubProof {
+                encoded: data,
+                hash: Some(sub_hash),
+            })
+        }
+
+        len => Err(ProofError::DecodeError(Box::new(
+            bincode::ErrorKind::Custom(format!("invalid proof length: {len}")),
+        ))),
     }
 }
 
