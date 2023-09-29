@@ -7,16 +7,18 @@ import "fmt"
 
 var _ BinarySlush = (*binarySlush)(nil)
 
+func newBinarySlush(choice int) binarySlush {
+	return binarySlush{
+		preference: choice,
+	}
+}
+
 // binarySlush is the implementation of a binary slush instance
 type binarySlush struct {
 	// preference is the choice that last had a successful poll. Unless there
 	// hasn't been a successful poll, in which case it is the initially provided
 	// choice.
 	preference int
-}
-
-func (sl *binarySlush) Initialize(choice int) {
-	sl.preference = choice
 }
 
 func (sl *binarySlush) Preference() int {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -130,7 +131,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, state.ErrCantFindSubnet)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // Ensure valid tx passes semanticVerify
