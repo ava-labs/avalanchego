@@ -1892,14 +1892,16 @@ func (s *state) processCurrentStakers() (results, error) {
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			defer addedDelegatorIterator.Release()
+			// We don't defer iterator.Release here to avoid pinning every iterator in
+			// memory till the outer loop is done.
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
-
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
+					addedDelegatorIterator.Release()
 					return results{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
+			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
