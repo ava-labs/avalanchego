@@ -28,12 +28,12 @@ func TestSnowballOptimized(t *testing.T) {
 
 	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
-		nBitwise.AddNode(&Tree{})
+		nBitwise.AddNode(NewTree)
 	}
 
 	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
-		nNaive.AddNode(&Flat{})
+		nNaive.AddNode(NewFlat)
 	}
 
 	numRounds := 0

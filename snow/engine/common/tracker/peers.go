@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -30,6 +31,8 @@ type Peers interface {
 	ConnectedWeight() uint64
 	// ConnectedPercent returns the currently connected stake percentage [0, 1]
 	ConnectedPercent() float64
+	// TotalWeight returns the total validator weight
+	TotalWeight() uint64
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
@@ -98,6 +101,13 @@ func (p *lockedPeers) ConnectedPercent() float64 {
 	return p.peers.ConnectedPercent()
 }
 
+func (p *lockedPeers) TotalWeight() uint64 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.TotalWeight()
+}
+
 func (p *lockedPeers) PreferredPeers() set.Set[ids.NodeID] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -109,6 +119,8 @@ type meteredPeers struct {
 	Peers
 
 	percentConnected prometheus.Gauge
+	numValidators    prometheus.Gauge
+	totalWeight      prometheus.Gauge
 }
 
 func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error) {
@@ -117,28 +129,51 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
+	totalWeight := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "total_weight",
+		Help:      "Total stake",
+	})
+	numValidators := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "num_validators",
+		Help:      "Total number of validators",
+	})
+	errs := wrappers.Errs{}
+	errs.Add(
+		reg.Register(percentConnected),
+		reg.Register(totalWeight),
+		reg.Register(numValidators),
+	)
 	return &lockedPeers{
 		peers: &meteredPeers{
 			Peers: &peerData{
 				validators: make(map[ids.NodeID]uint64),
 			},
 			percentConnected: percentConnected,
+			totalWeight:      totalWeight,
+			numValidators:    numValidators,
 		},
-	}, reg.Register(percentConnected)
+	}, errs.Err
 }
 
 func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	p.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
+	p.numValidators.Inc()
+	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	p.Peers.OnValidatorRemoved(nodeID, weight)
+	p.numValidators.Dec()
+	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
 	p.Peers.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
+	p.totalWeight.Set(float64(p.Peers.TotalWeight()))
 	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
@@ -223,6 +258,10 @@ func (p *peerData) ConnectedPercent() float64 {
 		return 1
 	}
 	return float64(p.connectedWeight) / float64(p.totalWeight)
+}
+
+func (p *peerData) TotalWeight() uint64 {
+	return p.totalWeight
 }
 
 func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {

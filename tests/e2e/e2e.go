@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,23 +30,14 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
-	// Enough for primary.NewWallet to fetch initial UTXOs.
-	DefaultWalletCreationTimeout = 5 * time.Second
-
-	// Defines default tx confirmation timeout.
-	// Enough for test/custom networks.
-	DefaultConfirmTxTimeout = 20 * time.Second
-
-	// This interval should represent the upper bound of the time
-	// required to start a new node on a local test network.
-	DefaultNodeStartTimeout = 20 * time.Second
-
 	// A long default timeout used to timeout failed operations but
 	// unlikely to induce flaking due to unexpected resource
 	// contention.
@@ -59,6 +51,21 @@ const (
 	// checks. Useful for speeding up iteration during test
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
+
+	// Validator start time must be a minimum of SyncBound from the
+	// current time for validator addition to succeed, and adding 20
+	// seconds provides a buffer in case of any delay in processing.
+	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
+
+	DefaultGasLimit = uint64(21000) // Standard gas limit
+
+	// An empty string prompts the use of the default path which ensures a
+	// predictable target for github's upload-artifact action.
+	DefaultNetworkDir = ""
+
+	// Directory used to store private networks (specific to a single test)
+	// under the shared network dir.
+	PrivateNetworksDirName = "private_networks"
 )
 
 // Env is used to access shared test fixture. Intended to be
@@ -121,6 +128,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new wallet for the provided keychain against the specified node URI.
+// TODO(marun) Make this a regular function.
 func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
@@ -140,6 +148,7 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 }
 
 // Create a new eth client targeting the specified node URI.
+// TODO(marun) Make this a regular function.
 func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
 	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
@@ -147,6 +156,20 @@ func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Clien
 	client, err := ethclient.Dial(uri)
 	te.require.NoError(err)
 	return client
+}
+
+// Create a new private network that is not shared with other tests.
+func (te *TestEnvironment) NewPrivateNetwork() testnet.Network {
+	// Load the shared network to retrieve its path and exec path
+	sharedNetwork, err := local.ReadNetwork(te.NetworkDir)
+	te.require.NoError(err)
+
+	// The private networks dir is under the shared network dir to ensure it
+	// will be included in the artifact uploaded in CI.
+	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
+	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
+
+	return StartLocalNetwork(sharedNetwork.ExecPath, privateNetworksDir)
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
@@ -205,9 +228,7 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 
 // Wait for the given node to report healthy.
 func WaitForHealthy(node testnet.Node) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
+	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(DefaultContext(), node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -263,4 +284,31 @@ func CheckBootstrapIsPossible(network testnet.Network) {
 	ginkgo.By("checking if bootstrap is possible with the current network state")
 	node := AddEphemeralNode(network, testnet.FlagsMap{})
 	WaitForHealthy(node)
+}
+
+// Start a local test-managed network with the provided avalanchego binary.
+func StartLocalNetwork(avalancheGoExecPath string, networkDir string) *local.LocalNetwork {
+	require := require.New(ginkgo.GinkgoT())
+
+	network, err := local.StartNetwork(
+		DefaultContext(),
+		ginkgo.GinkgoWriter,
+		networkDir,
+		&local.LocalNetwork{
+			LocalConfig: local.LocalConfig{
+				ExecPath: avalancheGoExecPath,
+			},
+		},
+		testnet.DefaultNodeCount,
+		testnet.DefaultFundedKeyCount,
+	)
+	require.NoError(err)
+	ginkgo.DeferCleanup(func() {
+		tests.Outf("Shutting down network\n")
+		require.NoError(network.Stop())
+	})
+
+	tests.Outf("{{green}}Successfully started network{{/}}\n")
+
+	return network
 }
