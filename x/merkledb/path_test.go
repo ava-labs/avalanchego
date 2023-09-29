@@ -17,6 +17,41 @@ var branchFactors = []BranchFactor{
 	BranchFactor256,
 }
 
+func TestHasPartialByte(t *testing.T) {
+	for _, branchFactor := range branchFactors {
+		t.Run(fmt.Sprint(branchFactor), func(t *testing.T) {
+			require := require.New(t)
+
+			path := emptyPath(branchFactor)
+			require.False(path.hasPartialByte())
+
+			if branchFactor == BranchFactor256 {
+				// Tokens are an entire byte so
+				// there is never a partial byte.
+				path = path.Append(0)
+				require.False(path.hasPartialByte())
+				path = path.Append(0)
+				require.False(path.hasPartialByte())
+				return
+			}
+
+			// Fill all but the last token of the first byte.
+			for i := 0; i < path.tokensPerByte-1; i++ {
+				path = path.Append(0)
+				require.True(path.hasPartialByte())
+			}
+
+			// Fill the last token of the first byte.
+			path = path.Append(0)
+			require.False(path.hasPartialByte())
+
+			// Fill the first token of the second byte.
+			path = path.Append(0)
+			require.True(path.hasPartialByte())
+		})
+	}
+}
+
 func Test_Path_Has_Prefix(t *testing.T) {
 	type test struct {
 		name           string
