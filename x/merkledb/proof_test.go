@@ -272,9 +272,9 @@ func Test_Proof(t *testing.T) {
 
 	require.Len(proof.Path, 3)
 
-	require.Equal(NewPath([]byte("key"), BranchFactor16).Bytes(), proof.Path[0].KeyPath)
+	require.Equal(NewPath([]byte("key"), BranchFactor16), proof.Path[0].KeyPath)
 	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
-	require.Equal(NewPath([]byte("key1"), BranchFactor16).Bytes(), proof.Path[2].KeyPath)
+	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.Path[2].KeyPath)
 	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())

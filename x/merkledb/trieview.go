@@ -363,7 +363,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		if len(proof.Path) == 0 {
 			var alternateRootNode *node
 			for index, childEntry := range t.root.children {
-				alternateRootNode, err = t.getNodeWithID(childEntry.id, t.db.newPath([]byte{index}).Extend(childEntry.compressedPath), childEntry.hasValue)
+				alternateRootNode, err = t.getNodeWithID(childEntry.id, t.root.key.Append(index).Extend(childEntry.compressedPath), childEntry.hasValue)
 				if err != nil {
 					return nil, err
 				}
@@ -488,7 +488,7 @@ func (t *trieView) GetRangeProof(
 		proofKey := rootKey
 		if shouldUseChildAsRoot(t.root) {
 			for index, childEntry := range t.root.children {
-				proofKey = t.db.newPath([]byte{index}).Extend(childEntry.compressedPath).Bytes()
+				proofKey = t.root.key.Append(index).Extend(childEntry.compressedPath).Bytes()
 			}
 		}
 		rootProof, err := t.getProof(ctx, proofKey)
