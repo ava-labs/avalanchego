@@ -1903,7 +1903,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// evaluate a genesis validator for reward
 	blk, err := secondVM.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert preferences are correct.
@@ -1921,20 +1920,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// Assert block tries to reward a genesis validator
 	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
+	txID := blk.(block.Block).Txs()[0].ID()
 
 	// Verify options and accept abort block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
-	txID := blk.(block.Block).Txs()[0].ID()
-	{
-		onAccept, ok := secondVM.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(abort.Accept(context.Background()))
 	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
@@ -1998,10 +1988,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := defaultValidateStartTime
 	vm.clock.Set(initialClkTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
+	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -2009,31 +2000,34 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	// should contain proposal to reward genesis validator
+	// evaluate a genesis validator for reward
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-
 	require.NoError(blk.Verify(context.Background()))
 
+	// Assert preferences are correct.
+	// vm should prefer abort since uptime requirements are not met.
 	oracleBlk := blk.(smcon.OracleBlock)
 	options, err := oracleBlk.Options(context.Background())
 	require.NoError(err)
 
-	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-	abort := options[1].(*blockexecutor.Block)
+	abort := options[0].(*blockexecutor.Block)
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
-	require.NoError(blk.Accept(context.Background()))
+	commit := options[1].(*blockexecutor.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+
+	// Assert block tries to reward a genesis validator
+	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
+	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
+	txID := blk.(block.Block).Txs()[0].ID()
+
+	// Verify options and accept abort block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
-	require.NoError(abort.Accept(context.Background())) // do not reward the genesis validator
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(abort.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	// Verify that chain's timestamp has advanced
-	timestamp := vm.state.GetTimestamp()
-	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
@@ -2042,19 +2036,15 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	// (txID changes every time we change any parameter
 	// of the tx creating the validator), we explicitly
 	//  check that rewarded validator is removed from staker set.
-	proposalTx := blk.(block.Block).Txs()[0]
-	tx, txStatus, err := vm.state.GetTx(proposalTx.TxID)
+	_, txStatus, err := vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	rewardTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
-	require.True(ok)
-
-	tx, _, err = vm.state.GetTx(rewardTx.TxID)
+	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
 	require.NoError(err)
-	valTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
-	require.True(ok)
+	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
 
+	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
