@@ -58,7 +58,6 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errIsNotSubnet                  = errors.New("is not a subnet")
 

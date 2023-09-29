@@ -323,7 +323,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		// summaries), so there is no point in retrying state sync; we should move ahead to bootstrapping
 		beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
 		if err != nil {
-			return fmt.Errorf("failed to get total weight of state sync beacons for for subnet %s: %w", ss.Ctx.SubnetID, err)
+			return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconsTotalWeight - failedVotersWeight
 		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
