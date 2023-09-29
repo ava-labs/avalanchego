@@ -312,10 +312,10 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	// changes should still be collectable even though the history has had to loop due to hitting max size
 	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
-	require.Contains(changes.values, newPath([]byte("key1")))
-	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.Value())
-	require.Contains(changes.values, newPath([]byte("key2")))
-	require.Equal([]byte("value3"), changes.values[newPath([]byte("key2"))].after.Value())
+	require.Contains(changes.values, NewPath([]byte("key1"), BranchFactor16))
+	require.Equal([]byte("value1"), changes.values[NewPath([]byte("key1"), BranchFactor16)].after.Value())
+	require.Contains(changes.values, NewPath([]byte("key2"), BranchFactor16))
+	require.Equal([]byte("value3"), changes.values[NewPath([]byte("key2"), BranchFactor16)].after.Value())
 }
 
 func Test_History_RepeatedRoot(t *testing.T) {
@@ -519,6 +519,10 @@ func Test_Change_List(t *testing.T) {
 		newDefaultConfig(),
 	)
 	require.NoError(err)
+
+	emptyRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
 	batch := db.NewBatch()
 	require.NoError(batch.Put([]byte("key20"), []byte("value20")))
 	require.NoError(batch.Put([]byte("key21"), []byte("value21")))
@@ -529,6 +533,10 @@ func Test_Change_List(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
+	changes, err := db.history.getValueChanges(emptyRoot, startRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	require.NoError(err)
+	require.Len(changes.values, 5)
+
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key25"), []byte("value25")))
 	require.NoError(batch.Put([]byte("key26"), []byte("value26")))
@@ -536,6 +544,13 @@ func Test_Change_List(t *testing.T) {
 	require.NoError(batch.Put([]byte("key28"), []byte("value28")))
 	require.NoError(batch.Put([]byte("key29"), []byte("value29")))
 	require.NoError(batch.Write())
+
+	endRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	require.NoError(err)
+	require.Len(changes.values, 5)
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key30"), []byte("value30")))
@@ -545,10 +560,10 @@ func Test_Change_List(t *testing.T) {
 	require.NoError(batch.Delete([]byte("key22")))
 	require.NoError(batch.Write())
 
-	endRoot, err := db.GetMerkleRoot(context.Background())
+	endRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 8)
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 8)
 	require.NoError(err)
 	require.Len(changes.values, 8)
 }
@@ -557,7 +572,9 @@ func TestHistoryRecord(t *testing.T) {
 	require := require.New(t)
 
 	maxHistoryLen := 3
-	th := newTrieHistory(maxHistoryLen)
+	th := newTrieHistory(maxHistoryLen, func(bytes []byte) Path {
+		return NewPath(bytes, BranchFactor16)
+	})
 
 	changes := []*changeSummary{}
 	for i := 0; i < maxHistoryLen; i++ { // Fill the history
@@ -630,20 +647,22 @@ func TestHistoryRecord(t *testing.T) {
 
 func TestHistoryGetChangesToRoot(t *testing.T) {
 	maxHistoryLen := 3
-	history := newTrieHistory(maxHistoryLen)
+	history := newTrieHistory(maxHistoryLen, func(bytes []byte) Path {
+		return NewPath(bytes, BranchFactor16)
+	})
 
 	changes := []*changeSummary{}
 	for i := 0; i < maxHistoryLen; i++ { // Fill the history
 		changes = append(changes, &changeSummary{
 			rootID: ids.GenerateTestID(),
-			nodes: map[path]*change[*node]{
-				newPath([]byte{byte(i)}): {
+			nodes: map[Path]*change[*node]{
+				history.newPath([]byte{byte(i)}): {
 					before: &node{id: ids.GenerateTestID()},
 					after:  &node{id: ids.GenerateTestID()},
 				},
 			},
-			values: map[path]*change[maybe.Maybe[[]byte]]{
-				newPath([]byte{byte(i)}): {
+			values: map[Path]*change[maybe.Maybe[[]byte]]{
+				history.newPath([]byte{byte(i)}): {
 					before: maybe.Some([]byte{byte(i)}),
 					after:  maybe.Some([]byte{byte(i + 1)}),
 				},
@@ -682,7 +701,7 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 				require.Len(got.nodes, 1)
 				require.Len(got.values, 1)
 				reversedChanges := changes[maxHistoryLen-1]
-				removedKey := newPath([]byte{byte(maxHistoryLen - 1)})
+				removedKey := history.newPath([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges.nodes[removedKey].before, got.nodes[removedKey].after)
 				require.Equal(reversedChanges.values[removedKey].before, got.values[removedKey].after)
 				require.Equal(reversedChanges.values[removedKey].after, got.values[removedKey].before)
@@ -695,12 +714,12 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 				require.Len(got.nodes, 2)
 				require.Len(got.values, 2)
 				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := newPath([]byte{byte(maxHistoryLen - 1)})
+				removedKey1 := history.newPath([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
 				require.Equal(reversedChanges1.values[removedKey1].before, got.values[removedKey1].after)
 				require.Equal(reversedChanges1.values[removedKey1].after, got.values[removedKey1].before)
 				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := newPath([]byte{byte(maxHistoryLen - 2)})
+				removedKey2 := history.newPath([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
 				require.Equal(reversedChanges2.values[removedKey2].before, got.values[removedKey2].after)
 				require.Equal(reversedChanges2.values[removedKey2].after, got.values[removedKey2].before)
@@ -714,12 +733,12 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 				require.Len(got.nodes, 2)
 				require.Len(got.values, 1)
 				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := newPath([]byte{byte(maxHistoryLen - 1)})
+				removedKey1 := history.newPath([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
 				require.Equal(reversedChanges1.values[removedKey1].before, got.values[removedKey1].after)
 				require.Equal(reversedChanges1.values[removedKey1].after, got.values[removedKey1].before)
 				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := newPath([]byte{byte(maxHistoryLen - 2)})
+				removedKey2 := history.newPath([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
 			},
 		},
@@ -731,10 +750,10 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 				require.Len(got.nodes, 2)
 				require.Len(got.values, 1)
 				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := newPath([]byte{byte(maxHistoryLen - 1)})
+				removedKey1 := history.newPath([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
 				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := newPath([]byte{byte(maxHistoryLen - 2)})
+				removedKey2 := history.newPath([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
 				require.Equal(reversedChanges2.values[removedKey2].before, got.values[removedKey2].after)
 				require.Equal(reversedChanges2.values[removedKey2].after, got.values[removedKey2].before)
