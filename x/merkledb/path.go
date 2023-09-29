@@ -6,7 +6,6 @@ package merkledb
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"unsafe"
 )
@@ -82,7 +81,7 @@ func emptyPath(bf BranchFactor) Path {
 func NewPath(p []byte, branchFactor BranchFactor) Path {
 	pConfig := branchFactorToPathConfig[branchFactor]
 	return Path{
-		value:        string(p),
+		value:        byteSliceToString(p),
 		pathConfig:   pConfig,
 		tokensLength: len(p) * pConfig.tokensPerByte,
 	}
@@ -154,7 +153,7 @@ func (p Path) Append(token byte) Path {
 	// byte to write the token into the byte.
 	buffer[len(buffer)-1] |= token << p.bitsToShift(p.tokensLength)
 	return Path{
-		value:        *(*string)(unsafe.Pointer(&buffer)),
+		value:        byteSliceToString(buffer),
 		tokensLength: p.tokensLength + 1,
 		pathConfig:   p.pathConfig,
 	}
@@ -231,7 +230,7 @@ func (p Path) Extend(path Path) Path {
 	if !p.hasPartialByte() {
 		copy(buffer[len(p.value):], path.value)
 		return Path{
-			value:        *(*string)(unsafe.Pointer(&buffer)),
+			value:        byteSliceToString(buffer),
 			tokensLength: totalLength,
 			pathConfig:   p.pathConfig,
 		}
@@ -247,7 +246,7 @@ func (p Path) Extend(path Path) Path {
 	shiftCopy(buffer[len(p.value):], path.value, shiftLeft)
 
 	return Path{
-		value:        *(*string)(unsafe.Pointer(&buffer)),
+		value:        byteSliceToString(buffer),
 		tokensLength: totalLength,
 		pathConfig:   p.pathConfig,
 	}
@@ -289,7 +288,7 @@ func (p Path) Skip(tokensToSkip int) Path {
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
-	result.value = *(*string)(unsafe.Pointer(&buffer))
+	result.value = byteSliceToString(buffer)
 	return result
 }
 
@@ -319,7 +318,7 @@ func (p Path) Take(tokensToTake int) Path {
 	mask := byte(0xFF << p.bitsToShift(tokensToTake-1))
 	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
 
-	result.value = *(*string)(unsafe.Pointer(&buffer))
+	result.value = byteSliceToString(buffer)
 	return result
 }
 
@@ -328,7 +327,21 @@ func (p Path) Take(tokensToTake int) Path {
 func (p Path) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
-	buf := *(*[]byte)(unsafe.Pointer(&p.value))
-	(*reflect.SliceHeader)(unsafe.Pointer(&buf)).Cap = len(p.value)
-	return buf
+	return stringToByteSlice(p.value)
+}
+
+// byteSliceToString converts the []byte to a string
+// Invariant: The input []byte must not be modified.
+func byteSliceToString(bs []byte) string {
+	// avoid copying during the conversion
+	// "safe" because we never edit the []byte, and it is never returned by any functions except Bytes()
+	return unsafe.String(unsafe.SliceData(bs), len(bs))
+}
+
+// stringToByteSlice converts the string to a []byte
+// Invariant: The output []byte must not be modified.
+func stringToByteSlice(value string) []byte {
+	// avoid copying during the conversion
+	// "safe" because we never edit the []byte
+	return unsafe.Slice(unsafe.StringData(value), len(value))
 }

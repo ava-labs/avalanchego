@@ -162,6 +162,7 @@ func newTrieView(
 
 	for _, op := range changes.BatchOps {
 		newVal := maybe.Nothing[[]byte]()
+		key := op.Key
 		if !op.Delete {
 			val := op.Value
 			if !changes.ConsumeBytes {
@@ -169,15 +170,22 @@ func newTrieView(
 			}
 			newVal = maybe.Some(val)
 		}
-		if err := newView.recordValueChange(db.newPath(op.Key), newVal); err != nil {
+		if !changes.ConsumeBytes {
+			key = slices.Clone(op.Key)
+		}
+		if err := newView.recordValueChange(db.newPath(key), newVal); err != nil {
 			return nil, err
 		}
 	}
 	for key, val := range changes.MapOps {
+		bytesKey := stringToByteSlice(key)
+		if !changes.ConsumeBytes {
+			bytesKey = slices.Clone(bytesKey)
+		}
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(db.newPath([]byte(key)), val); err != nil {
+		if err := newView.recordValueChange(db.newPath(bytesKey), val); err != nil {
 			return nil, err
 		}
 	}
