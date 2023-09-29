@@ -95,8 +95,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
-			validatorsSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
-			if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+			validatorSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+			if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 				return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 			}
 
@@ -114,7 +114,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					}
 					currentSubnetValidator = nil
 
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 				}
@@ -125,7 +125,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if err != nil {
 						return fmt.Sprintf("could not add subnet validator: %s", err.Error())
 					}
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
@@ -140,7 +140,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						// no need to nil current primary validator, we'll
 						// reassign immediately
 
-						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 						}
 					}
@@ -148,7 +148,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if err != nil {
 						return fmt.Sprintf("could not add primary validator without BLS key: %s", err.Error())
 					}
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
@@ -163,7 +163,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						// no need to nil current primary validator, we'll
 						// reassign immediately
 
-						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 						}
 					}
@@ -171,7 +171,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if err != nil {
 						return fmt.Sprintf("could not add primary validator with BLS key: %s", err.Error())
 					}
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
@@ -180,20 +180,18 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				}
 			}
 
-			snapShotHeights := maps.Keys(validatorsSetByHeightAndSubnet)
-			sort.Slice(snapShotHeights, func(i, j int) bool { return snapShotHeights[i] < snapShotHeights[j] })
-			for idx, snapShotHeight := range snapShotHeights {
-				var nextSnapShotHeight uint64
-				if idx == len(snapShotHeights)-1 {
-					nextSnapShotHeight = snapShotHeight
-				} else {
-					nextSnapShotHeight = snapShotHeights[idx+1]
+			snapshotHeights := maps.Keys(validatorSetByHeightAndSubnet)
+			sort.Slice(snapshotHeights, func(i, j int) bool { return snapshotHeights[i] < snapshotHeights[j] })
+			for idx, snapShotHeight := range snapshotHeights {
+				if idx == len(snapshotHeights)-1 {
+					continue
 				}
+				nextSnapShotHeight := snapshotHeights[idx+1]
 
 				// within [snapShotHeight] and [nextSnapShotHeight] validator set
 				// does not change and must be equal to snapshot at [snapShotHeight]
 				for height := snapShotHeight; height < nextSnapShotHeight; height++ {
-					for subnetID, validatorsSet := range validatorsSetByHeightAndSubnet[snapShotHeight] {
+					for subnetID, validatorsSet := range validatorSetByHeightAndSubnet[snapShotHeight] {
 						res, err := vm.GetValidatorSet(context.Background(), height, subnetID)
 						if err != nil {
 							return fmt.Sprintf("failed GetValidatorSet: %v", err)
@@ -206,8 +204,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}
 
 			// check current validator set
-			tipHeight := snapShotHeights[len(snapShotHeights)-1]
-			for subnetID, validatorsSet := range validatorsSetByHeightAndSubnet[tipHeight] {
+			tipHeight := snapshotHeights[len(snapshotHeights)-1]
+			for subnetID, validatorsSet := range validatorSetByHeightAndSubnet[tipHeight] {
 				res, err := vm.GetValidatorSet(context.Background(), tipHeight, subnetID)
 				if err != nil {
 					return fmt.Sprintf("failed GetValidatorSet: %v", err)
@@ -256,6 +254,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	if err != nil {
 		return err
 	}
+	defer stakerIt.Release()
 	for stakerIt.Next() {
 		v := stakerIt.Value()
 		validatorsSet, ok := validatorsSetBySubnet[v.SubnetID]
