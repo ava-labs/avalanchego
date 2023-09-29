@@ -12,17 +12,25 @@ import (
 )
 
 var (
-	_ Factory   = (*TreeFactory)(nil)
 	_ Consensus = (*Tree)(nil)
 	_ node      = (*unaryNode)(nil)
 	_ node      = (*binaryNode)(nil)
 )
 
-// TreeFactory implements Factory by returning a tree struct
-type TreeFactory struct{}
+func NewTree(params Parameters, choice ids.ID) Consensus {
+	snowball := newUnarySnowball(params.BetaVirtuous)
 
-func (TreeFactory) New() Consensus {
-	return &Tree{}
+	t := &Tree{
+		params: params,
+	}
+	t.node = &unaryNode{
+		tree:         t,
+		preference:   choice,
+		commonPrefix: ids.NumBits, // The initial state has no conflicts
+		snowball:     &snowball,
+	}
+
+	return t
 }
 
 // Tree implements the snowball interface by using a modified patricia tree.
@@ -44,20 +52,6 @@ type Tree struct {
 	// that any later traversal into this sub-tree should call
 	// RecordUnsuccessfulPoll before performing any other action.
 	shouldReset bool
-}
-
-func (t *Tree) Initialize(params Parameters, choice ids.ID) {
-	t.params = params
-
-	snowball := &unarySnowball{}
-	snowball.Initialize(params.BetaVirtuous)
-
-	t.node = &unaryNode{
-		tree:         t,
-		preference:   choice,
-		commonPrefix: ids.NumBits, // The initial state has no conflicts
-		snowball:     snowball,
-	}
 }
 
 func (t *Tree) Add(choice ids.ID) {
@@ -360,14 +354,13 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b.preferences[bit] = u.preference
 	b.preferences[1-bit] = newChoice
 
-	newChildSnowball := &unarySnowball{}
-	newChildSnowball.Initialize(u.tree.params.BetaVirtuous)
+	newChildSnowball := newUnarySnowball(u.tree.params.BetaVirtuous)
 	newChild := &unaryNode{
 		tree:          u.tree,
 		preference:    newChoice,
 		decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
 		commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
-		snowball:      newChildSnowball,
+		snowball:      &newChildSnowball,
 	}
 
 	switch {

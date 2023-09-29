@@ -516,3 +516,65 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 		}
 	}
 }
+
+func TestDiffSubnetOwner(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
+
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
+
+		subnetID = createSubnetTx.ID()
+	)
+
+	// Create subnet on base state
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Create diff and verify that subnet owner returns correctly
+	d, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	owner, err = d.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Transferring subnet ownership on diff should be reflected on diff not state
+	d.SetSubnetOwner(subnetID, owner2)
+	owner, err = d.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// State should reflect new subnet owner after diff is applied.
+	require.NoError(d.Apply(state))
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+}

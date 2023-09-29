@@ -17,8 +17,7 @@ func TestBinarySnowball(t *testing.T) {
 
 	beta := 2
 
-	sb := binarySnowball{}
-	sb.Initialize(beta, red)
+	sb := newBinarySnowball(beta, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -47,8 +46,7 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	beta := 2
 
-	sb := binarySnowball{}
-	sb.Initialize(beta, red)
+	sb := newBinarySnowball(beta, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -78,8 +76,7 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 
 	beta := 2
 
-	sb := binarySnowball{}
-	sb.Initialize(beta, red)
+	sb := newBinarySnowball(beta, red)
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
@@ -119,8 +116,7 @@ func TestBinarySnowballLockColor(t *testing.T) {
 
 	beta := 1
 
-	sb := binarySnowball{}
-	sb.Initialize(beta, red)
+	sb := newBinarySnowball(beta, red)
 
 	sb.RecordSuccessfulPoll(red)
 
