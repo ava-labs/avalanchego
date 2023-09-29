@@ -236,14 +236,15 @@ func (p Path) Extend(path Path) Path {
 		}
 	}
 
-	// The existing path doesn't fit into a whole number of bytes,
-	// figure out how much each byte of the extension path needs to be shifted
-	shiftLeft := p.bitsToShift(p.tokensLength - 1)
-	// the partial byte of the current path is filled with the first shiftLeft bits of the extension path
-	buffer[len(p.value)-1] |= path.value[0] >> (8 - shiftLeft)
+	// The existing path doesn't fit into a whole number of bytes.
+	// Figure out how many bits to shift.
+	shift := p.bitsToShift(p.tokensLength - 1)
+	// Fill the partial byte with the first [shift] bits of the extension path
+	buffer[len(p.value)-1] |= path.value[0] >> (8 - shift)
 
-	// copy the rest of the extension path bytes into the buffer, shifted byte shiftLeft bits
-	shiftCopy(buffer[len(p.value):], path.value, shiftLeft)
+	// copy the rest of the extension path bytes into the buffer,
+	// shifted byte shift bits
+	shiftCopy(buffer[len(p.value):], path.value, shift)
 
 	return Path{
 		value:        byteSliceToString(buffer),
@@ -252,6 +253,12 @@ func (p Path) Extend(path Path) Path {
 	}
 }
 
+// Treats [src] as a bit array and copies it into [dst] shifted by [shift] bits.
+// For example, if [src] is [0b0000_0001, 0b0000_0010] and [shift] is 4,
+// we copy [0b0001_0000, 0b0010_0000] into [dst].
+// Assumes len(dst) >= len(src)-1.
+// If len(dst) == len(src)-1 the last byte of [src] is only partially copied
+// (i.e. the rightmost bits are not copied).
 func shiftCopy(dst []byte, src string, shift byte) {
 	i := 0
 	for ; i < len(src)-1; i++ {
@@ -264,7 +271,8 @@ func shiftCopy(dst []byte, src string, shift byte) {
 	}
 }
 
-// Skip returns a new Path that contains the last p.length-tokensToSkip tokens of the current Path
+// Skip returns a new Path that contains the last
+// p.length-tokensToSkip tokens of [p].
 func (p Path) Skip(tokensToSkip int) Path {
 	if p.tokensLength == tokensToSkip {
 		return emptyPath(p.branchFactor)
@@ -276,13 +284,13 @@ func (p Path) Skip(tokensToSkip int) Path {
 	}
 
 	// if the tokens to skip is a whole number of bytes,
-	// the remaining bytes exactly equals the new path
+	// the remaining bytes exactly equals the new path.
 	if tokensToSkip%p.tokensPerByte == 0 {
 		return result
 	}
 
-	// tokensToSkip does not remove a whole number of bytes
-	// copy the remaining shifted bytes into a new buffer
+	// tokensToSkip does not remove a whole number of bytes.
+	// copy the remaining shifted bytes into a new buffer.
 	buffer := make([]byte, p.bytesNeeded(result.tokensLength))
 	bitsSkipped := tokensToSkip * int(p.tokenBitSize)
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)

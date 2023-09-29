@@ -530,3 +530,94 @@ func FuzzPathTake(f *testing.F) {
 		}
 	})
 }
+
+func TestShiftCopy(t *testing.T) {
+	type test struct {
+		dst      []byte
+		src      []byte
+		expected []byte
+		shift    byte
+	}
+
+	tests := []test{
+		{
+			dst:      []byte{},
+			src:      []byte{},
+			expected: []byte{},
+			shift:    0,
+		},
+		{
+			dst:      []byte{},
+			src:      []byte{},
+			expected: []byte{},
+			shift:    1,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001},
+			expected: []byte{0b0000_0010},
+			shift:    1,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001},
+			expected: []byte{0b0000_0100},
+			shift:    2,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001},
+			expected: []byte{0b1000_0000},
+			shift:    7,
+		},
+		{
+			dst:      make([]byte, 2),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b0000_0011, 0b0000_0010},
+			shift:    1,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b0000_0011},
+			shift:    1,
+		},
+		{
+			dst:      make([]byte, 2),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b1100_0000, 0b1000_0000},
+			shift:    7,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b1100_0000},
+			shift:    7,
+		},
+		{
+			dst:      make([]byte, 2),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b1000_0001, 0b0000_0000},
+			shift:    8,
+		},
+		{
+			dst:      make([]byte, 1),
+			src:      []byte{0b0000_0001, 0b1000_0001},
+			expected: []byte{0b1000_0001},
+			shift:    8,
+		},
+		{
+			dst:      make([]byte, 2),
+			src:      []byte{0b0000_0001, 0b1000_0001, 0b1111_0101},
+			expected: []byte{0b0000_0110, 0b000_0111},
+			shift:    2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("dst: %v, src: %v", tt.dst, tt.src), func(t *testing.T) {
+			shiftCopy(tt.dst, string(tt.src), tt.shift)
+			require.Equal(t, tt.expected, tt.dst)
+		})
+	}
+}
