@@ -19,7 +19,7 @@ const (
 	retryBackoffFactor              = 2
 )
 
-var _ SignatureBackend = (*NetworkSigner)(nil)
+var _ SignatureGetter = (*NetworkSigner)(nil)
 
 type NetworkClient interface {
 	SendAppRequest(nodeID ids.NodeID, message []byte) ([]byte, error)
@@ -30,11 +30,11 @@ type NetworkSigner struct {
 	Client NetworkClient
 }
 
-// FetchWarpSignature attempts to fetch a BLS Signature of [unsignedWarpMessage] from [nodeID] until it succeeds or receives an invalid response
+// GetSignature attempts to fetch a BLS Signature of [unsignedWarpMessage] from [nodeID] until it succeeds or receives an invalid response
 //
 // Note: this function will continue attempting to fetch the signature from [nodeID] until it receives an invalid value or [ctx] is cancelled.
 // The caller is responsible to cancel [ctx] if it no longer needs to fetch this signature.
-func (s *NetworkSigner) FetchWarpSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
+func (s *NetworkSigner) GetSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 	signatureReq := message.SignatureRequest{
 		MessageID: unsignedWarpMessage.ID(),
 	}
