@@ -2267,7 +2267,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 }
 
 func (s *state) writeCurrentStakers(modifiedStakers []stakerStatusPair) error {
-	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
+	// Invariant: []modifiedStaker is guaranteed to be list of stakers that are
 	// either added or modified, so they are not nil
 	for _, data := range modifiedStakers {
 		switch {
@@ -2350,11 +2350,11 @@ func (s *state) writeCurrentStakers(modifiedStakers []stakerStatusPair) error {
 }
 
 func (s *state) writePendingStakers(modifiedStakers []stakerStatusPair) error {
-	// Invariant: []modifiedStakerData is guaranteed to be list of stakers that are
+	// Invariant: []modifiedStaker is guaranteed to be list of stakers that are
 	// either added or modified, so they are not nil
 	for _, data := range modifiedStakers {
 		switch {
-		case data.staker.Priority.IsCurrentValidator():
+		case data.staker.Priority.IsPendingValidator():
 			staker := data.staker
 
 			// Select db to write to
@@ -2379,7 +2379,7 @@ func (s *state) writePendingStakers(modifiedStakers []stakerStatusPair) error {
 				// should never happen, nothing to do
 			}
 
-		case data.staker.Priority.IsCurrentDelegator():
+		case data.staker.Priority.IsPendingDelegator():
 			staker := data.staker
 
 			// Select db to write to
