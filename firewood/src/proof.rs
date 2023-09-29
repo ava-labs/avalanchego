@@ -127,8 +127,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
-            let (sub_proof, traversed_nibbles) =
-                self.locate_subproof(key_nibbles, cur_proof.as_ref())?;
+            let node = NodeType::decode(cur_proof.as_ref())?;
+            let (sub_proof, traversed_nibbles) = self.locate_subproof(key_nibbles, node)?;
             key_nibbles = traversed_nibbles;
 
             cur_hash = match sub_proof {
@@ -146,25 +146,11 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     fn locate_subproof<'a>(
         &self,
         mut key_nibbles: NibblesIterator<'a, 0>,
-        encoded_node: &[u8],
+        node: NodeType,
     ) -> Result<(Option<SubProof>, NibblesIterator<'a, 0>), ProofError> {
-        let items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new()
-            .deserialize(encoded_node)
-            .map_err(ProofError::DecodeError)?;
-
-        match items.len() {
-            EXT_NODE_SIZE => {
-                let mut items = items.into_iter();
-                let decoded_key: Vec<u8> = items.next().unwrap().decode()?;
-
-                let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);
-
-                let (cur_key_path, term) =
-                    PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
-                let cur_key = cur_key_path.into_inner();
-
-                let data: Vec<u8> = items.next().unwrap().decode()?;
-
+        match node {
+            NodeType::Leaf(n) => {
+                let cur_key = &n.path().0;
                 // Check if the key of current node match with the given key
                 // and consume the current-key portion of the nibbles-iterator
                 let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
@@ -174,33 +160,41 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
                 }
 
-                let sub_proof = if term {
-                    SubProof {
-                        encoded: data,
-                        hash: None,
-                    }
-                } else {
-                    self.generate_subproof(data)?
+                let encoded = n.data().to_vec();
+
+                let sub_proof = SubProof {
+                    encoded,
+                    hash: None,
                 };
 
                 Ok((sub_proof.into(), key_nibbles))
             }
+            NodeType::Extension(n) => {
+                let cur_key = &n.path().0;
+                // Check if the key of current node match with the given key
+                // and consume the current-key portion of the nibbles-iterator
+                let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
+                    || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
 
-            BRANCH_NODE_SIZE if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
+                if does_not_match {
+                    return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
+                }
+                let data = n.chd_encoded().ok_or(ProofError::InvalidData)?.to_vec();
+                let sub_proof = self.generate_subproof(data)?;
 
-            BRANCH_NODE_SIZE => {
+                Ok((sub_proof.into(), key_nibbles))
+            }
+            NodeType::Branch(_) if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
+            NodeType::Branch(n) => {
                 let index = key_nibbles.next().unwrap() as usize;
-
                 // consume items returning the item at index
-                let data: Vec<u8> = items.into_iter().nth(index).unwrap().decode()?;
-
+                let data = n.chd_encode()[index]
+                    .as_ref()
+                    .ok_or(ProofError::InvalidData)?
+                    .to_vec();
                 self.generate_subproof(data)
                     .map(|subproof| (Some(subproof), key_nibbles))
             }
-
-            size => Err(ProofError::DecodeError(Box::new(
-                bincode::ErrorKind::Custom(format!("invalid size: {size}")),
-            ))),
         }
     }
 

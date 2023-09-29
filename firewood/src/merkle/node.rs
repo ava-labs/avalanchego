@@ -310,6 +310,10 @@ impl ExtNode {
         self.1
     }
 
+    pub fn chd_encoded(&self) -> Option<&[u8]> {
+        self.2.as_deref()
+    }
+
     pub fn chd_mut(&mut self) -> &mut DiskAddress {
         &mut self.1
     }
