@@ -1,15 +1,16 @@
 # Validators versioning
 
-One of the main responsabilities of the P-chain is to register and expose the validator set of any Subnet at every height.
+One of the main responsibilities of the P-chain is to register and expose the validator set of any Subnet at every height.
 
-This information helps Subnets to bootstrap securely, downloading information from active validators only; moreover it supports validated cross-chain communication via Warp. 
+This information helps Subnets to bootstrap securely, downloading information from active validators only; moreover it supports validated cross-chain communication via Warp.
 
 In this brief document we dive into the technicalities of how `platformVM` tracks and versions the validator set of any Subnet.
 
 ## The tracked content
 
 The entry point to retrieve validator information at a given height is the `GetValidatorSet` method in the `validators` package. Here is its signature:
-``` golang
+
+```golang
 GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error)
 ```
 
@@ -17,7 +18,7 @@ GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.No
 
 Validator data are collected in a struct named `validators.GetValidatorOutput` which holds for each active validator, its `NodeID`, its `Weight` and its `BLS Public Key` if it was registered.
 
-Note that a validator `Weight` is not just its stake; its the aggregate value of the validator's own stake and all of its delegators' stake. A validator' s `Weight` gauges how relevant its preference should be in consensus or Warp operations.
+Note that a validator `Weight` is not just its stake; its the aggregate value of the validator's own stake and all of its delegators' stake. A validator's `Weight` gauges how relevant its preference should be in consensus or Warp operations.
 
 We will see in the next section how the P-chain keeps track of this information over time as the validator set changes.
 
@@ -39,16 +40,16 @@ Note that `Weight` and `BLS Public key` behave differently throughout the valida
 1. `BLS Public key` cannot change through a validator's lifetime. It can only change when a validator is added/re-added and removed.
 2. `Weight` can change throughout a validator's lifetime by the creation and removal of its delegators as well as by validator's own creation and removal.
 
-Here is a scheme of what `Weight` and `BLS Public key` diff content we record upon relevant scenarios: 
+Here is a scheme of what `Weight` and `BLS Public key` diff content we record upon relevant scenarios:
 
 |                    | Weight Diff (forward looking)                                                                           | BLS Key Diff (backward looking)                                                       |
 |--------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| Validator creation | record ``` golang state.ValidatorWeightDiff{       Decrease: false,     Weight: validator.Weight, } ``` | record an empty byte slice if validator.BlsKey is specified; otherwise record nothing |
-| Delegator creation | record ``` golang state.ValidatorWeightDiff{      Decrease: false,     Weight: validator.Weight, } ```  | No entry is recorded                                                                  |
-| Delegator removal  | record ``` golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, } ```  | No entry is recorded                                                                  |
-| Validator removal  | record ``` golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, } ```  | record validator.BlsKey if it is specified; otherwise record nothing                  |
+| Validator creation | record ```golang state.ValidatorWeightDiff{       Decrease: false,     Weight: validator.Weight, }``` | record an empty byte slice if validator.BlsKey is specified; otherwise record nothing |
+| Delegator creation | record ```golang state.ValidatorWeightDiff{      Decrease: false,     Weight: validator.Weight, }```  | No entry is recorded                                                                  |
+| Delegator removal  | record ```golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, }```  | No entry is recorded                                                                  |
+| Validator removal  | record ```golang state.ValidatorWeightDiff{      Decrease: true,     Weight: validator.Weight, }```  | record validator.BlsKey if it is specified; otherwise record nothing                  |
 
-Note that `Weight` diffs are encoded `state.ValidatorWeightDiff` and are *forward-looking*. a diff recorded at height `H` stores the change that transforms validator weight at height `H-1` into validator weight at height `H`.
+Note that `Weight` diffs are encoded `state.ValidatorWeightDiff` and are *forward-looking*: a diff recorded at height `H` stores the change that transforms validator weight at height `H-1` into validator weight at height `H`.
 
 In contrast, `BLS Public Key` diffs are *backward-looking*: a diff recorded at height `H` stores the change that transforms validator `BLS Public Key` at height `H` into validator `BLS Public key` at height `H-1`.
 
@@ -79,7 +80,7 @@ Note that:
 Note that:
 
 1. `BLS Public Key` diffs have the same keys as `Weight` diffs. This implies that the same ordering is guaranteed.
-2. Value is either validator `BLS Public Key` bytes or an empty byte slice, as illustrated in previous section.
+2. Value is either validator `BLS Public Key` bytes or an empty byte slice, as illustrated in the previous section.
 
 ## Validators diff usage in rebuilding validators state
 
@@ -92,13 +93,13 @@ If the P-Chain's current height is `T` and we want to retrieve the Primary Netwo
 
 1. We retrieve the Primary Network validator set at current height `T`. This is the base state on top of which diffs will be applied.
 2. We apply weight diffs first. Specifically:
-   -  `Weight` diff iteration starts from the top-most height smaller or equal to `T`. Remember that entries heights do not need to be contiguous, so the iteration starts from the highest height smaller or equal to `T`, in case `T` has not diff entry.
-   -  Since `Weight` diffs are forward-looking, each diff is applied in reverse. A validator's weight is decreased if `state.ValidatorWeightDiff.Decrease` is `false` and it is increased if it is `true`.
+   - `Weight` diff iteration starts from the top-most height smaller or equal to `T`. Remember that entry heights do not need to be contiguous, so the iteration starts from the highest height smaller or equal to `T`, in case `T` does not have a diff entry.
+   - Since `Weight` diffs are forward-looking, each diff is applied in reverse. A validator's weight is decreased if `state.ValidatorWeightDiff.Decrease` is `false` and it is increased if it is `true`.
    - We take care of adding or removing a validator from the base set based on its weight. Whenever a validator weight, following diff application, becomes zero, we drop it; conversely whenever we encounter a diff increasing weight for a currently-non-existing validator, we add the validator to the base set.
-   -  The iteration stops at the first height smaller or equal to `H+1`. Note that a `Weight` diff stored at height `K` holds the content to turn validator state at height `K-1` into validator state at height `K`. So to get validator state at height `K` we must apply diff content at height `K+1`.
-3. Once all `Weight` diffs have been applied the resulting validator set will contain all Primary Network validators active at height `H` and only those. However these validators have the `BLS Public Keys` registered at height `T` which may be still set wrong: a validator may have restaked between height `H` and `T`, and may have registered a different `BLS Public Key` at the two height, or not registered any `BLS Public Key` at all at either height. We solve this by applying `BLS Public Key` diffs to the vallidator set:
+   - The iteration stops at the first height smaller or equal to `H+1`. Note that a `Weight` diff stored at height `K` holds the content to turn validator state at height `K-1` into validator state at height `K`. So to get validator state at height `K` we must apply diff content at height `K+1`.
+3. Once all `Weight` diffs have been applied, the resulting validator set will contain all Primary Network validators active at height `H` and only those. We still need to compute the correct `BLS Public Keys` registered at height `H` for these validators, as each validator may have restaked between height `H` and `T`. They may have a different (or no) `BLS Public Key` at either height. We solve this by applying `BLS Public Key` diffs to the validator set:
    - Once again we iterate `BLS Public Key` diffs from the top-most height smaller or equal to `T` till the first height smaller or equal to `H+1`.
-   - Since `BLS Public Key` diff are *backward-looking*, we simply nil the BLS key when diff is nil and we restore the BLS Key when it is specified in the diff. 
+   - Since `BLS Public Key` diffs are *backward-looking*, we simply nil the BLS key when diff is nil and we restore the BLS Key when it is specified in the diff.
 
 ### Subnet validator set rebuild
 
@@ -106,8 +107,7 @@ Let's see first the reason why Subnet validators needs to have handled different
 
 Say P-chain current height is `T` and we want to retrieve Primary network validators at height `H < T`. We proceed as follows:
 
-
 1. We retrieve both Subnet and Primary Network validator set at current height `T`,
 2. We apply `Weight` diff on top of the Subnet validator set, exactly as described in the previous section,
-3. Before applying `BLS Public Key` diffs, we retrieve `BLS Public Key` from the current Primary Network validator set for each of the current Subnet validators. This ensure that the `BLS Public Key`s are duly initilized before applying the diffs,
+3. Before applying `BLS Public Key` diffs, we retrieve `BLS Public Key` from the current Primary Network validator set for each of the current Subnet validators. This ensures the `BLS Public Key`s are duly initialized before applying the diffs,
 4. Finally we apply the `BLS Public Key` diffs exactly as described in the previous section.
