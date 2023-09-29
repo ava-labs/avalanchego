@@ -185,6 +185,6 @@ func (*VM) VerifyHeightIndex(context.Context) error {
 	return nil
 }
 
-func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return state.GetBlockIDByHeight(vm.db, height)
 }

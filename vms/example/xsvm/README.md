@@ -16,15 +16,6 @@ Cross Subnet Asset Transfers README Overview
 
 Avalanche is a network composed of multiple sub-networks (called [subnets][Subnet]) that each contain any number of blockchains. Each blockchain is an instance of a [Virtual Machine (VM)](https://docs.avax.network/learn/platform-overview#virtual-machines), much like an object in an object-oriented language is an instance of a class. That is, the VM defines the behavior of the blockchain where it is instantiated. For example, [Coreth (EVM)][Coreth] is a VM that is instantiated by the [C-Chain]. Likewise, one could deploy another instance of the EVM as their own blockchain (to take this to its logical conclusion).
 
-## AvalancheGo Compatibility
-
-```
-[v1.0.3] AvalancheGo@v1.9.9
-[v1.0.2] AvalancheGo@v1.9.6-v1.9.8
-[v1.0.1] AvalancheGo@v1.9.5
-[v1.0.0] AvalancheGo@v1.9.5
-```
-
 ## Introduction
 
 Just as [Coreth] powers the [C-Chain], XSVM can be used to power its own blockchain in an Avalanche [Subnet]. Instead of providing a place to execute Solidity smart contracts, however, XSVM enables asset transfers for assets originating on it's own chain or other XSVM chains on other subnets.
