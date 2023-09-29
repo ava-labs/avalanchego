@@ -160,8 +160,23 @@ func (p Path) Less(other Path) bool {
 	return p.value < other.value || (p.value == other.value && p.tokensLength < other.tokensLength)
 }
 
-// bitsToShift indicates how many bits to right shift the byte containing
-// the token at the given [index] to get the raw token value.
+// bitsToShift returns the number of bits to right shift a token
+// within its storage byte to get it to the rightmost
+// position in the byte. Equivalently, this is the number of bits
+// to left shift a raw token value to get it to the correct position
+// within its storage byte.
+// Example with branch factor 16:
+// Suppose the token array is
+// [0x01, 0x02, 0x03, 0x04]
+// The byte representation of this array is
+// [0b0001_0010, 0b0011_0100]
+// To get the token at index 0 (0b0001) to the rightmost position
+// in its storage byte (i.e. to make 0b0001_0010 into 0b0000_0001),
+// we need to shift 0b0001_0010 to the right by 4 bits.
+// Similarly:
+// * Token at index 1 (0b0010) needs to be shifted by 0 bits
+// * Token at index 2 (0b0011) needs to be shifted by 4 bits
+// * Token at index 3 (0b0100) needs to be shifted by 0 bits
 func (p Path) bitsToShift(index int) byte {
 	// [tokenIndex] is the index of the token in the byte.
 	// For example, if the branch factor is 16, then each byte contains 2 tokens.
