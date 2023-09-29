@@ -5,7 +5,6 @@ package builder
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -112,7 +111,8 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 
 		sender, err := currentTx.SenderID()
 		if err != nil {
-			return nil, fmt.Errorf("sender: %w", err)
+			// This tx was invalid, drop it and continue block building
+			continue
 		}
 
 		txState := versiondb.New(currentState)
@@ -126,7 +126,8 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 			// TODO: populate fees
 		}
 		if err := currentTx.Unsigned.Visit(&txExecutor); err != nil {
-			return nil, fmt.Errorf("verification: %w", err)
+			// This tx was invalid, drop it and continue block building
+			continue
 		}
 		if err := txState.Commit(); err != nil {
 			return nil, err
