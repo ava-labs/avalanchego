@@ -52,7 +52,7 @@ func TestDBEfficientLookups(t *testing.T) {
 
 	var (
 		key             = []byte("key")
-		maliciousKey, _ = newDBKey(key, 2)
+		maliciousKey, _ = newDBKeyFromUser(key, 2)
 	)
 
 	db := New(&limitIterationDB{Database: memdb.New()})
