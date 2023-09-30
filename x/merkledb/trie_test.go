@@ -132,7 +132,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Just the root
 	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 
 	// Insert a key
 	key1 := []byte{0}
@@ -154,7 +154,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Root and 1 value
 	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 
 	// Insert another key which is a child of the first
@@ -175,7 +175,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
 
@@ -197,14 +197,14 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key3, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(NewPath(key3, BranchFactor16), nodePath[1].key)
 
 	// Other key path not affected
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
 
@@ -213,7 +213,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key4, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
 
@@ -222,7 +222,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key5, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 }
 
 func Test_Trie_ViewOnCommitedView(t *testing.T) {

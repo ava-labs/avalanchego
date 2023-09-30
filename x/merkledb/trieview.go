@@ -146,7 +146,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
+	sentinelNode, err := parentTrie.getEditableNode(db.sentinelPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -155,10 +155,10 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:       root,
-		db:         db,
-		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		sentinelNode: sentinelNode,
+		db:           db,
+		parentTrie:   parentTrie,
+		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -202,16 +202,16 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[db.rootPath]
+	passedSentinelChange, ok := changes.nodes[db.sentinelPath]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
 
 	newView := &trieView{
-		root:       passedRootChange.after,
-		db:         db,
-		parentTrie: db,
-		changes:    changes,
+		sentinelNode: passedSentinelChange.after,
+		db:           db,
+		parentTrie:   db,
+		changes:      changes,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
@@ -251,7 +251,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.root)
+		t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.getMerkleRoot()
 
@@ -487,9 +487,9 @@ func (t *trieView) GetRangeProof(
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
 		proofKey := rootKey
-		if shouldUseChildAsRoot(t.root) {
-			for index, childEntry := range t.root.children {
-				proofKey = t.root.key.Append(index).Extend(childEntry.compressedPath).Bytes()
+		if shouldSkipSentinelNode(t.sentinelNode) {
+			for index, childEntry := range t.sentinelNode.children {
+				proofKey = t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath).Bytes()
 			}
 		}
 		rootProof, err := t.getProof(ctx, proofKey)
@@ -583,7 +583,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 }
 
 func (t *trieView) getMerkleRoot() ids.ID {
-	return getMerkleRoot(t.root)
+	return getMerkleRoot(t.sentinelNode)
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -790,9 +790,9 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
 		// all node paths start at the root
-		currentNode      = t.root
+		currentNode      = t.sentinelNode
 		matchedPathIndex = 0
-		nodes            = []*node{t.root}
+		nodes            = []*node{t.sentinelNode}
 	)
 
 	// while the entire path hasn't been matched

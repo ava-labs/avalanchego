@@ -54,8 +54,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot  = errors.New("start and end root are the same")
-	errNoNewRoot = errors.New("there was no updated root in change list")
+	errSameRoot      = errors.New("start and end root are the same")
+	errNoNewSentinel = errors.New("there was no updated sentinel node in change list")
 )
 
 type ChangeProofer interface {
@@ -180,8 +180,8 @@ type merkleDB struct {
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
 
-	// The root of this trie.
-	root *node
+	// The sentinel node of this trie.
+	sentinelNode *node
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -190,8 +190,8 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	newPath  func(p []byte) Path
-	rootPath Path
+	newPath      func(p []byte) Path
+	sentinelPath Path
 }
 
 // New returns a new merkle database.
@@ -240,7 +240,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		rootPath:             newPath(rootKey),
+		sentinelPath:         emptyPath(config.BranchFactor),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -278,7 +278,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(nil, db.rootPath)
+	db.sentinelNode = newNode(nil, db.sentinelPath)
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -513,10 +513,12 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return getMerkleRoot(db.root)
+	return getMerkleRoot(db.sentinelNode)
 }
 
 // shouldSkipSentinelNode returns true if the passed in sentinel node has no value and has a single child
+// When this is true, the root of the trie is the sentinel's only child
+// When this is false, the root of the trie is the sentinel node
 func shouldSkipSentinelNode(sentinel *node) bool {
 	return sentinel.valueDigest.IsNothing() && len(sentinel.children) == 1
 }
@@ -875,9 +877,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	rootChange, ok := changes.nodes[db.rootPath]
+	sentinelChange, ok := changes.nodes[db.sentinelPath]
 	if !ok {
-		return errNoNewRoot
+		return errNoNewSentinel
 	}
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
@@ -919,7 +921,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	db.root = rootChange.after
+	db.sentinelNode = sentinelChange.after
 	db.history.record(changes)
 	return nil
 }
@@ -1104,13 +1106,13 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(db.rootPath)
+	db.sentinelNode, err = db.intermediateNodeDB.Get(db.sentinelPath)
 	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(db.rootPath)
+		db.sentinelNode, err = db.valueNodeDB.Get(db.sentinelPath)
 	}
 	if err == nil {
 		// Root already exists, so calculate its id
-		db.root.calculateID(db.metrics)
+		db.sentinelNode.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
 	if err != database.ErrNotFound {
@@ -1118,16 +1120,16 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 
 	// Root doesn't exist; make a new one.
-	db.root = newNode(nil, db.rootPath)
+	db.sentinelNode = newNode(nil, db.sentinelPath)
 
 	// update its ID
-	db.root.calculateID(db.metrics)
+	db.sentinelNode.calculateID(db.metrics)
 
-	if err := db.intermediateNodeDB.Put(db.rootPath, db.root); err != nil {
+	if err := db.intermediateNodeDB.Put(db.sentinelPath, db.sentinelNode); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, nil
+	return db.sentinelNode.id, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
@@ -1203,8 +1205,8 @@ func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
-	case key == db.rootPath:
-		return db.root, nil
+	case key == db.sentinelPath:
+		return db.sentinelNode, nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)
 	}
