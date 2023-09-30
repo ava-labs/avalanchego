@@ -96,8 +96,9 @@ type trieView struct {
 
 	db *merkleDB
 
-	// The root of the trie represented by this view.
-	root *node
+	// The nil key node
+	// It is either the root of the trie or the root of the trie is its single child node
+	sentinelNode *node
 }
 
 // NewView returns a new view on top of this Trie where the passed changes
@@ -354,22 +355,22 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	closestNode := proofPath[len(proofPath)-1]
 
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if shouldUseChildAsRoot(t.root) {
-		// remove the nil key root since we should use its child instead
+	// The sentinel node is always the first node in a proof path.
+	// If the sentinel node is not required, remove it from the proofPath.
+	if shouldSkipSentinelNode(t.sentinelNode) {
 		proof.Path = proof.Path[1:]
 
-		// if there are now no nodes, add the "root" as an exclusion proof
+		// if there are no other nodes in the proof path, add the root to serve as an exclusion proof
 		if len(proof.Path) == 0 {
-			var alternateRootNode *node
-			for index, childEntry := range t.root.children {
-				alternateRootNode, err = t.getNodeWithID(childEntry.id, t.root.key.Append(index).Extend(childEntry.compressedPath), childEntry.hasValue)
+			var rootNode *node
+			for index, childEntry := range t.sentinelNode.children {
+				rootNode, err = t.getNodeWithID(childEntry.id, t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath), childEntry.hasValue)
 				if err != nil {
 					return nil, err
 				}
 			}
 
-			proof.Path = []ProofNode{alternateRootNode.asProofNode()}
+			proof.Path = []ProofNode{rootNode.asProofNode()}
 			return proof, nil
 		}
 	}

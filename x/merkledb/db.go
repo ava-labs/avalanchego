@@ -516,20 +516,20 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return getMerkleRoot(db.root)
 }
 
-// shouldUseChildAsRoot returns true if the passed in node has no value and only a single child
-func shouldUseChildAsRoot(root *node) bool {
-	return root.valueDigest.IsNothing() && len(root.children) == 1
+// shouldSkipSentinelNode returns true if the passed in sentinel node has no value and has a single child
+func shouldSkipSentinelNode(sentinel *node) bool {
+	return sentinel.valueDigest.IsNothing() && len(sentinel.children) == 1
 }
 
 // getMerkleRoot returns the id of either the passed in root or the id of the node's only child based on [shouldUseChildAsRoot]
-func getMerkleRoot(root *node) ids.ID {
-	// if the nil key root is not required, pretend the trie's root is the nil key node's child
-	if shouldUseChildAsRoot(root) {
-		for _, childEntry := range root.children {
+func getMerkleRoot(sentinel *node) ids.ID {
+	if shouldSkipSentinelNode(sentinel) {
+		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
+		for _, childEntry := range sentinel.children {
 			return childEntry.id
 		}
 	}
-	return root.id
+	return sentinel.id
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
