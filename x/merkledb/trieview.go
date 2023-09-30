@@ -357,7 +357,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	// The sentinel node is always the first node in a proof path.
 	// If the sentinel node is not required, remove it from the proofPath.
-	if shouldSkipSentinelNode(t.sentinelNode) {
+	if !isSentinelNodeTheRoot(t.sentinelNode) {
 		proof.Path = proof.Path[1:]
 
 		// if there are no other nodes in the proof path, add the root to serve as an exclusion proof
@@ -486,8 +486,8 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		proofKey := rootKey
-		if shouldSkipSentinelNode(t.sentinelNode) {
+		proofKey := sentinelKey
+		if !isSentinelNodeTheRoot(t.sentinelNode) {
 			for index, childEntry := range t.sentinelNode.children {
 				proofKey = t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath).Bytes()
 			}

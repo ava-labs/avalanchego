@@ -41,8 +41,8 @@ const (
 )
 
 var (
-	rootKey []byte
-	_       MerkleDB = (*merkleDB)(nil)
+	sentinelKey []byte
+	_           MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
@@ -518,16 +518,16 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return getMerkleRoot(db.sentinelNode)
 }
 
-// shouldSkipSentinelNode returns true if the passed in sentinel node has no value and has a single child
-// When this is true, the root of the trie is the sentinel's only child
-// When this is false, the root of the trie is the sentinel node
-func shouldSkipSentinelNode(sentinel *node) bool {
-	return sentinel.valueDigest.IsNothing() && len(sentinel.children) == 1
+// isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
+// When this is true, the root of the trie is the sentinel node
+// When this is false, the root of the trie is the sentinel node's single child
+func isSentinelNodeTheRoot(sentinel *node) bool {
+	return sentinel.valueDigest.HasValue() || len(sentinel.children) > 1
 }
 
 // getMerkleRoot returns the id of either the passed in root or the id of the node's only child based on [shouldUseChildAsRoot]
 func getMerkleRoot(sentinel *node) ids.ID {
-	if shouldSkipSentinelNode(sentinel) {
+	if !isSentinelNodeTheRoot(sentinel) {
 		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
 		for _, childEntry := range sentinel.children {
 			return childEntry.id
@@ -1105,7 +1105,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 }
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// not sure if the root exists or had a value or not
+	// not sure if the  sentinel node exists or if it had a value
 	// check under both prefixes
 	var err error
 	db.sentinelNode, err = db.intermediateNodeDB.Get(db.sentinelPath)
@@ -1113,7 +1113,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		db.sentinelNode, err = db.valueNodeDB.Get(db.sentinelPath)
 	}
 	if err == nil {
-		// Root already exists, so calculate its id
+		// sentinel node already exists, so calculate the root ID of the trie
 		db.sentinelNode.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
@@ -1121,7 +1121,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	// Root doesn't exist; make a new one.
+	// sentinel node doesn't exist; make a new one.
 	db.sentinelNode = newNode(nil, db.sentinelPath)
 
 	// update its ID
