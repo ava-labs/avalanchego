@@ -1889,7 +1889,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// set clock to the time we switched firstVM off
 	secondVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
-	secondVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
