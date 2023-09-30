@@ -205,6 +205,7 @@ func (p Path) bitsToShift(index int) byte {
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
 func (p Path) bytesNeeded(tokens int) int {
+	// adding p.tokensPerByte - 1 causes the division to always round up
 	return (tokens + p.tokensPerByte - 1) / p.tokensPerByte
 }
 
