@@ -38,6 +38,7 @@ func newDefaultDBConfig() merkledb.Config {
 		IntermediateNodeCacheSize: defaultRequestKeyLimit,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
+		BranchFactor:              merkledb.BranchFactor16,
 	}
 }
 
@@ -79,13 +80,6 @@ func sendRangeProofRequest(
 
 		serverResponseChan = make(chan []byte, 1)
 
-		// The client fetching a range proof.
-		client = NewClient(&ClientConfig{
-			NetworkClient: networkClient,
-			Metrics:       &mockMetrics{},
-			Log:           logging.NoLog{},
-		})
-
 		// The context used in client.GetRangeProof.
 		// Canceled after the first response is received because
 		// the client will keep sending requests until its context
@@ -94,6 +88,15 @@ func sendRangeProofRequest(
 	)
 
 	defer cancel()
+
+	// The client fetching a range proof.
+	client, err := NewClient(&ClientConfig{
+		NetworkClient: networkClient,
+		Metrics:       &mockMetrics{},
+		Log:           logging.NoLog{},
+		BranchFactor:  merkledb.BranchFactor16,
+	})
+	require.NoError(err)
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
@@ -135,7 +138,7 @@ func sendRangeProofRequest(
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 			var response merkledb.RangeProof
-			require.NoError(response.UnmarshalProto(&responseProto))
+			require.NoError(response.UnmarshalProto(&responseProto, merkledb.BranchFactor16))
 
 			// modify if needed
 			if modifyResponse != nil {
@@ -277,7 +280,7 @@ func TestGetRangeProof(t *testing.T) {
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
 			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
+			expectedErr: merkledb.ErrInvalidProof,
 		},
 		"removed last key in response": {
 			db: largeTrieDB,
@@ -396,19 +399,21 @@ func sendChangeProofRequest(
 
 		serverResponseChan = make(chan []byte, 1)
 
-		// The client fetching a change proof.
-		client = NewClient(&ClientConfig{
-			NetworkClient: networkClient,
-			Metrics:       &mockMetrics{},
-			Log:           logging.NoLog{},
-		})
-
 		// The context used in client.GetChangeProof.
 		// Canceled after the first response is received because
 		// the client will keep sending requests until its context
 		// expires or it succeeds.
 		ctx, cancel = context.WithCancel(context.Background())
 	)
+
+	// The client fetching a change proof.
+	client, err := NewClient(&ClientConfig{
+		NetworkClient: networkClient,
+		Metrics:       &mockMetrics{},
+		Log:           logging.NoLog{},
+		BranchFactor:  merkledb.BranchFactor16,
+	})
+	require.NoError(err)
 
 	defer cancel() // avoid leaking a goroutine
 
@@ -451,7 +456,7 @@ func sendChangeProofRequest(
 			if responseProto.GetChangeProof() != nil {
 				// Server responded with a change proof
 				var changeProof merkledb.ChangeProof
-				require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
+				require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof(), merkledb.BranchFactor16))
 
 				// modify if needed
 				if modifyChangeProof != nil {
@@ -473,7 +478,7 @@ func sendChangeProofRequest(
 
 			// Server responded with a range proof
 			var rangeProof merkledb.RangeProof
-			require.NoError(rangeProof.UnmarshalProto(responseProto.GetRangeProof()))
+			require.NoError(rangeProof.UnmarshalProto(responseProto.GetRangeProof(), merkledb.BranchFactor16))
 
 			// modify if needed
 			if modifyRangeProof != nil {
@@ -792,13 +797,15 @@ func TestAppRequestSendFailed(t *testing.T) {
 
 	networkClient := NewMockNetworkClient(ctrl)
 
-	client := NewClient(
+	client, err := NewClient(
 		&ClientConfig{
 			NetworkClient: networkClient,
 			Log:           logging.NoLog{},
 			Metrics:       &mockMetrics{},
+			BranchFactor:  merkledb.BranchFactor16,
 		},
 	)
+	require.NoError(err)
 
 	// Mock failure to send app request
 	networkClient.EXPECT().RequestAny(
@@ -807,7 +814,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 	).Return(ids.NodeID{}, nil, errAppSendFailed).Times(2)
 
-	_, err := client.GetChangeProof(
+	_, err = client.GetChangeProof(
 		context.Background(),
 		&pb.SyncGetChangeProofRequest{},
 		nil, // database is unused
