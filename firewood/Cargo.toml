@@ -48,10 +48,6 @@ clap = { version = "4.3.1", features = ['derive'] }
 test-case = "3.1.0"
 pprof = { version = "0.13.0", features = ["flamegraph"] }
 
-[features]
-# proof API
-proof = []
-
 [[bench]]
 name = "hashops"
 harness = false
