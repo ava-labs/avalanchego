@@ -106,18 +106,18 @@ func (p Path) HasPrefix(prefix Path) bool {
 
 	// The number of tokens in the last byte of [prefix], or zero
 	// if [prefix] fits into a whole number of bytes.
-	remainderTokens := prefix.tokensLength % p.tokensPerByte
-	if remainderTokens == 0 {
+	remainderTokensCount := prefix.tokensLength % p.tokensPerByte
+	if remainderTokensCount == 0 {
 		return strings.HasPrefix(p.value, prefix.value)
 	}
 
 	// check that the tokens in the partially filled final byte of [prefix] are
 	// equal to the tokens in the final byte of [p].
-	remainderBitsMask := byte(0xFF << (8 - remainderTokens*int(p.tokenBitSize)))
-	partialLastPrefixByte := prefix.value[len(prefix.value)-1] & remainderBitsMask
-	partialLastByte := p.value[len(prefix.value)-1] & remainderBitsMask
+	remainderBitsMask := byte(0xFF << (8 - remainderTokensCount*int(p.tokenBitSize)))
+	prefixRemainderTokens := prefix.value[len(prefix.value)-1] & remainderBitsMask
+	remainderTokens := p.value[len(prefix.value)-1] & remainderBitsMask
 
-	if partialLastPrefixByte != partialLastByte {
+	if prefixRemainderTokens != remainderTokens {
 		return false
 	}
 
