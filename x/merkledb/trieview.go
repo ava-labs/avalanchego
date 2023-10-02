@@ -162,7 +162,7 @@ func newTrieView(
 
 	for _, op := range changes.BatchOps {
 		key := op.Key
-		if changes.ConsumeBytes {
+		if !changes.ConsumeBytes {
 			key = slices.Clone(op.Key)
 		}
 
