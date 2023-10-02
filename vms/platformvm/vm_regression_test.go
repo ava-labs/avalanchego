@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -23,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -346,18 +344,9 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             vdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-	}}
+	vm := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()
@@ -689,7 +678,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
+	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, vm.RewardConfig.SupplyCap/2)
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(ts.MaxStakingDuration)

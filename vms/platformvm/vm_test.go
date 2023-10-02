@@ -69,18 +69,7 @@ import (
 )
 
 var (
-	defaultRewardConfig = reward.Config{
-		MaxConsumptionRate: .12 * reward.PercentDenominator,
-		MinConsumptionRate: .10 * reward.PercentDenominator,
-		MintingPeriod:      365 * 24 * time.Hour,
-		SupplyCap:          720 * units.MegaAvax,
-	}
-
-	defaultTxFee = uint64(100)
-
 	banffForkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
-
-	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are test.Keys[0], test.Keys[1], test.Keys[2]
@@ -231,25 +220,9 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		SybilProtectionEnabled: true,
-		Validators:             vdrs,
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		TransformSubnetTxFee:   100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      ts.MinValidatorStake,
-		MaxValidatorStake:      ts.MaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      ts.ValidateEndTime,
-		ApricotPhase5Time:      ts.ValidateEndTime,
-		BanffTime:              banffForkTime,
-	}}
+	vm := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
@@ -1110,15 +1083,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
-	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             firstVdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-	}}
+	firstVM := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -1191,15 +1158,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
-	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             secondVdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-	}}
+	secondVM := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	secondVM.clock.Set(initialClkTime)
@@ -1244,15 +1205,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             vdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-	}}
+	vm := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
@@ -1557,15 +1512,9 @@ func TestUnverifiedParent(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             vdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-	}}
+	vm := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
@@ -1720,14 +1669,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 
 	firstUptimePercentage := 20 // 20%
-	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       float64(firstUptimePercentage) / 100,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             firstVdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-	}}
+	firstVM := &VM{
+		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+	}
 
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	firstCtx.Lock.Lock()
@@ -1863,14 +1807,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       .2,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             vdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-	}}
+	cfg := ts.Config(true /*postBanff*/, true /*postCortina*/)
+	cfg.UptimePercentage = .2
+	vm := &VM{
+		Config: *cfg,
+	}
 
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()

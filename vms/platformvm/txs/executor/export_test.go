@@ -53,7 +53,7 @@ func TestNewExportTx(t *testing.T) {
 			require := require.New(t)
 
 			tx, err := env.txBuilder.NewExportTx(
-				ts.Balance-defaultTxFee, // Amount of tokens to export
+				ts.Balance-ts.TxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,

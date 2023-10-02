@@ -733,7 +733,7 @@ func TestGetBlock(t *testing.T) {
 			service.vm.ctx.Lock.Lock()
 			defer service.vm.ctx.Lock.Unlock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Config.CreateAssetTxFee = 100 * ts.TxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

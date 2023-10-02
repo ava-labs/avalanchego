@@ -5,13 +5,11 @@ package builder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -27,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -52,8 +49,6 @@ import (
 var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = ts.Keys[0:3]
-
-	defaultTxFee = uint64(100)
 )
 
 type environment struct {
@@ -82,7 +77,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         ts.Config(true /*postBanff*/, true /*postCortina*/),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -219,34 +214,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultConfig() *config.Config {
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return &config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             vdrs,
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: ts.ValidateEndTime,
-		ApricotPhase5Time: ts.ValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
-	}
 }
 
 func defaultClock() *mockable.Clock {

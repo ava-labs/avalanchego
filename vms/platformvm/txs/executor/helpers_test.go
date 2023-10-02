@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -28,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -47,7 +45,6 @@ import (
 )
 
 var (
-	defaultTxFee   = uint64(100)
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
@@ -92,7 +89,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
+	config := ts.Config(postBanff, postCortina)
 	clk := defaultClock(postBanff || postCortina)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
@@ -102,7 +99,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -110,7 +107,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		&config,
+		config,
 		clk,
 		fx,
 		baseState,
@@ -119,7 +116,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
@@ -131,7 +128,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	env := &environment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
+		config:         config,
 		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -221,44 +218,6 @@ func defaultState(
 	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
-}
-
-func defaultConfig(postBanff, postCortina bool) config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = ts.ValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = ts.ValidateStartTime.Add(-2 * time.Second)
-	}
-
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             vdrs,
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: ts.ValidateEndTime,
-		ApricotPhase5Time: ts.ValidateEndTime,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-	}
 }
 
 func defaultClock(postFork bool) *mockable.Clock {
