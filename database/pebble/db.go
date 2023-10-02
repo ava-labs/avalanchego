@@ -41,8 +41,6 @@ var (
 		MemTableSize:                defaultCacheSize / 4,
 		MaxOpenFiles:                4096,
 	}
-
-	comparer = pebble.DefaultComparer
 )
 
 type Database struct {
@@ -67,7 +65,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	opts := &pebble.Options{
 		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync:                cfg.BytesPerSync,
-		Comparer:                    comparer,
+		Comparer:                    pebble.DefaultComparer,
 		WALBytesPerSync:             cfg.WALBytesPerSync,
 		MemTableStopWritesThreshold: cfg.MemTableStopWritesThreshold,
 		MemTableSize:                cfg.MemTableSize,
@@ -182,7 +180,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	switch {
 	case db.closed:
 		return database.ErrClosed
-	case comparer.Compare(start, limit) >= 0:
+	case pebble.DefaultComparer.Compare(start, limit) >= 0:
 		// pebble's Compact will no-op & error if start >= limit
 		// according to pebble's comparer.
 		return nil
