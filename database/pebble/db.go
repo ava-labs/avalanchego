@@ -62,7 +62,6 @@ type Config struct {
 	MaxConcurrentCompactions    int
 }
 
-// TODO: Add support for adding a custom logger
 // TODO: Add metrics
 func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
 	opts := &pebble.Options{
