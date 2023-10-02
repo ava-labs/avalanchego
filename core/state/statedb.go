@@ -39,8 +39,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/trie"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -747,8 +747,8 @@ func copyPredicateStorageSlots(predicateStorageSlots map[common.Address][][]byte
 	res := make(map[common.Address][][]byte, len(predicateStorageSlots))
 	for address, predicates := range predicateStorageSlots {
 		copiedPredicates := make([][]byte, len(predicates))
-		for i, predicate := range predicates {
-			copiedPredicates[i] = common.CopyBytes(predicate)
+		for i, predicateBytes := range predicates {
+			copiedPredicates[i] = common.CopyBytes(predicateBytes)
 		}
 		res[address] = copiedPredicates
 	}
@@ -1190,7 +1190,7 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 			al.AddAddress(coinbase)
 		}
 
-		s.predicateStorageSlots = predicateutils.PreparePredicateStorageSlots(rules, list)
+		s.predicateStorageSlots = predicate.PreparePredicateStorageSlots(rules, list)
 	}
 	// Reset transient storage at the beginning of transaction execution
 	s.transientStorage = newTransientStorage()

@@ -10,12 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// PredicateEndByte is used as a delimiter for the bytes packed into a precompile predicate.
+// EndByte is used as a delimiter for the bytes packed into a precompile predicate.
 // Precompile predicates are encoded in the Access List of transactions in the access tuples
 // which means that its length must be a multiple of 32 (common.HashLength).
 // For messages with a length that does not comply to that, this delimiter is used to
 // append/remove padding.
-var PredicateEndByte = byte(0xff)
+var EndByte = byte(0xff)
 
 var (
 	ErrInvalidAllZeroBytes = fmt.Errorf("predicate specified invalid all zero bytes")
@@ -26,9 +26,9 @@ var (
 
 // PackPredicate packs [predicate] by delimiting the actual message with [PredicateEndByte]
 // and zero padding to reach a length that is a multiple of 32.
-func PackPredicate(predicate []byte) []byte {
-	predicate = append(predicate, PredicateEndByte)
-	return common.RightPadBytes(predicate, (len(predicate)+31)/32*32)
+func PackPredicate(predicateBytes []byte) []byte {
+	predicateBytes = append(predicateBytes, EndByte)
+	return common.RightPadBytes(predicateBytes, (len(predicateBytes)+31)/32*32)
 }
 
 // UnpackPredicate unpacks a predicate by stripping right padded zeroes, checking for the delimter,
@@ -44,35 +44,11 @@ func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", ErrInvalidPadding, len(paddedPredicate), expectedPaddedLength)
 	}
 
-	if trimmedPredicateBytes[len(trimmedPredicateBytes)-1] != PredicateEndByte {
+	if trimmedPredicateBytes[len(trimmedPredicateBytes)-1] != EndByte {
 		return nil, ErrInvalidEndDelimiter
 	}
 
 	return trimmedPredicateBytes[:len(trimmedPredicateBytes)-1], nil
-}
-
-// HashSliceToBytes serializes a []common.Hash into a tightly packed byte array.
-func HashSliceToBytes(hashes []common.Hash) []byte {
-	bytes := make([]byte, common.HashLength*len(hashes))
-	for i, hash := range hashes {
-		copy(bytes[i*common.HashLength:], hash[:])
-	}
-	return bytes
-}
-
-// BytesToHashSlice packs [b] into a slice of hash values with zero padding
-// to the right if the length of b is not a multiple of 32.
-func BytesToHashSlice(b []byte) []common.Hash {
-	var (
-		numHashes = (len(b) + 31) / 32
-		hashes    = make([]common.Hash, numHashes)
-	)
-
-	for i := range hashes {
-		start := i * common.HashLength
-		copy(hashes[i][:], b[start:])
-	}
-	return hashes
 }
 
 // GetPredicateResultBytes returns the predicate result bytes from the extra data.

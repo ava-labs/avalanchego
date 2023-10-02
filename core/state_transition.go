@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -136,7 +136,7 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 
 func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, error) {
 	var gas uint64
-	if !rules.PredicatesExist() {
+	if !rules.PredicatersExist() {
 		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
 		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
 		return gas, nil
@@ -144,7 +144,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 
 	for _, accessTuple := range accessList {
 		address := accessTuple.Address
-		predicate, ok := rules.Predicates[address]
+		predicaterContract, ok := rules.Predicaters[address]
 		if !ok {
 			// Previous access list gas calculation does not use safemath because an overflow would not be possible with
 			// the size of access lists that could be included in a block and standard access list gas costs.
@@ -157,7 +157,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			}
 			gas = totalGas
 		} else {
-			predicateGas, err := predicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
+			predicateGas, err := predicaterContract.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
 			if err != nil {
 				return 0, err
 			}

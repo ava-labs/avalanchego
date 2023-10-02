@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -31,12 +31,12 @@ func CheckPredicates(rules params.Rules, predicateContext *precompileconfig.Pred
 
 	predicateResults := make(map[common.Address][]byte)
 	// Short circuit early if there are no precompile predicates to verify
-	if len(rules.Predicates) == 0 {
+	if len(rules.Predicaters) == 0 {
 		return predicateResults, nil
 	}
 
 	// Prepare the predicate storage slots from the transaction's access list
-	predicateArguments := predicateutils.PreparePredicateStorageSlots(rules, tx.AccessList())
+	predicateArguments := predicate.PreparePredicateStorageSlots(rules, tx.AccessList())
 
 	// If there are no predicates to verify, return early and skip requiring the proposervm block
 	// context to be populated.
@@ -51,8 +51,8 @@ func CheckPredicates(rules params.Rules, predicateContext *precompileconfig.Pred
 	for address, predicates := range predicateArguments {
 		// Since [address] is only added to [predicateArguments] when there's a valid predicate in the ruleset
 		// there's no need to check if the predicate exists here.
-		predicate := rules.Predicates[address]
-		res := predicate.VerifyPredicate(predicateContext, predicates)
+		predicaterContract := rules.Predicaters[address]
+		res := predicaterContract.VerifyPredicate(predicateContext, predicates)
 		log.Debug("predicate verify", "tx", tx.Hash(), "address", address, "res", res)
 		predicateResults[address] = res
 	}

@@ -32,8 +32,7 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
-	"github.com/ava-labs/subnet-evm/precompile/results"
-	"github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	//"github.com/ethereum/go-ethereum/log"
@@ -58,7 +57,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or
 	// equal to this size. After the DUpgrade, the VM pre-verifies the extra
 	// data past the dynamic fee rollup window is valid.
-	predicateResults, err := results.ParsePredicateResults(predicateBytes)
+	predicateResults, err := predicate.ParseResults(predicateBytes)
 	if err != nil {
 		log.Error("failed to parse predicate results creating new block context", "err", err, "extra", header.Extra)
 		// As mentioned above, we pre-verify the extra data to ensure this never happens.
@@ -73,11 +72,11 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 // in header.Extra.
 // This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
 // directly rather than re-encode the latest results when executing each individaul transaction.
-func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateResults *results.PredicateResults) vm.BlockContext {
+func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateResults *predicate.Results) vm.BlockContext {
 	return newEVMBlockContext(header, chain, author, predicateResults)
 }
 
-func newEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address, predicateResults *results.PredicateResults) vm.BlockContext {
+func newEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address, predicateResults *predicate.Results) vm.BlockContext {
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int

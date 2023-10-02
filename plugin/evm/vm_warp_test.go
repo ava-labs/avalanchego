@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/predicate"
 	subnetEVMUtils "github.com/ava-labs/subnet-evm/utils"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 	"github.com/ethereum/go-ethereum/common"
@@ -316,7 +316,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	exampleWarpAddress := crypto.CreateAddress(testEthAddrs[0], 0)
 
 	tx, err := types.SignTx(
-		predicateutils.NewPredicateTx(
+		predicate.NewPredicateTx(
 			vm.chainConfig.ChainID,
 			1,
 			&exampleWarpAddress,
@@ -482,7 +482,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	getWarpMsgInput, err := warp.PackGetVerifiedWarpMessage(0)
 	require.NoError(err)
 	getVerifiedWarpMessageTx, err := types.SignTx(
-		predicateutils.NewPredicateTx(
+		predicate.NewPredicateTx(
 			vm.chainConfig.ChainID,
 			0,
 			&warp.Module.Address,

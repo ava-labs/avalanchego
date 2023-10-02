@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -27,7 +28,7 @@ func NewPredicateTx(
 ) *types.Transaction {
 	accessList = append(accessList, types.AccessTuple{
 		Address:     predicateAddress,
-		StorageKeys: BytesToHashSlice(PackPredicate(predicateBytes)),
+		StorageKeys: utils.BytesToHashSlice(PackPredicate(predicateBytes)),
 	})
 	return types.NewTx(&types.DynamicFeeTx{
 		ChainID:    chainID,

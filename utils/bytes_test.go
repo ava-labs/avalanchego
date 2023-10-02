@@ -4,10 +4,13 @@
 package utils
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIncrOne(t *testing.T) {
@@ -35,4 +38,29 @@ func TestIncrOne(t *testing.T) {
 			assert.Equal(t, output, test.expected)
 		})
 	}
+}
+
+func testBytesToHashSlice(t testing.TB, b []byte) {
+	hashSlice := BytesToHashSlice(b)
+
+	copiedBytes := HashSliceToBytes(hashSlice)
+
+	if len(b)%32 == 0 {
+		require.Equal(t, b, copiedBytes)
+	} else {
+		require.Equal(t, b, copiedBytes[:len(b)])
+		// Require that any additional padding is all zeroes
+		padding := copiedBytes[len(b):]
+		require.Equal(t, bytes.Repeat([]byte{0x00}, len(padding)), padding)
+	}
+}
+
+func FuzzHashSliceToBytes(f *testing.F) {
+	for i := 0; i < 100; i++ {
+		f.Add(utils.RandomBytes(i))
+	}
+
+	f.Fuzz(func(t *testing.T, b []byte) {
+		testBytesToHashSlice(t, b)
+	})
 }

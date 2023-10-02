@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ethereum/go-ethereum/common"
@@ -78,7 +78,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	}
 	// Note: since the predicate is verified in advance of execution, the precompile should not
 	// hit an error during execution.
-	unpackedPredicateBytes, err := predicateutils.UnpackPredicate(predicateBytes)
+	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %s", errInvalidPredicateBytes, err)
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/predicate"
 	warpValidators "github.com/ava-labs/subnet-evm/warp/validators"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -158,7 +158,7 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 		return 0, fmt.Errorf("overflow adding bytes gas cost of size %d", len(predicateBytes))
 	}
 
-	unpackedPredicateBytes, err := predicateutils.UnpackPredicate(predicateBytes)
+	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %s", errInvalidPredicateBytes, err)
 	}
@@ -184,7 +184,7 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 }
 
 func (c *Config) verifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) bool {
-	unpackedPredicateBytes, err := predicateutils.UnpackPredicate(predicateBytes)
+	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
 	if err != nil {
 		return false
 	}

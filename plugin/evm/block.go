@@ -18,8 +18,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/precompile/results"
-	"github.com/ava-labs/subnet-evm/utils/predicate"
+	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 
@@ -201,7 +200,7 @@ func (b *Block) Verify(context.Context) error {
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
-	predicates := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp()).Predicates
+	predicates := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp()).Predicaters
 	// Short circuit early if there are no predicates to verify
 	if len(predicates) == 0 {
 		return false, nil
@@ -270,19 +269,19 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 
 	switch {
-	case !rules.IsDUpgrade && rules.PredicatesExist():
+	case !rules.IsDUpgrade && rules.PredicatersExist():
 		return errors.New("cannot enable predicates before DUpgrade activation")
 	case !rules.IsDUpgrade:
 		return nil
 	}
 
-	predicateResults := results.NewPredicateResults()
+	predicateResults := predicate.NewResults()
 	for _, tx := range b.ethBlock.Transactions() {
 		results, err := core.CheckPredicates(rules, predicateContext, tx)
 		if err != nil {
 			return err
 		}
-		predicateResults.SetTxPredicateResults(tx.Hash(), results)
+		predicateResults.SetTxResults(tx.Hash(), results)
 	}
 	// TODO: document required gas constraints to ensure marshalling predicate results does not error
 	predicateResultsBytes, err := predicateResults.Bytes()
