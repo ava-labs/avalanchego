@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -49,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -77,7 +77,7 @@ type staker struct {
 	startTime, endTime time.Time
 }
 
-type tst struct {
+type test struct {
 	description           string
 	stakers               []staker
 	subnetStakers         []staker
@@ -210,12 +210,12 @@ func addSubnet(env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			test.Keys[0].PublicKey().Address(),
-			test.Keys[1].PublicKey().Address(),
-			test.Keys[2].PublicKey().Address(),
+			ts.Keys[0].PublicKey().Address(),
+			ts.Keys[1].PublicKey().Address(),
+			ts.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{test.Keys[0]},
-		test.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -250,7 +250,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisState, err := test.BuildGenesis()
+	genesisState, err := ts.BuildGenesis()
 	if err != nil {
 		panic(err)
 	}
@@ -282,10 +282,10 @@ func defaultState(
 
 func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = test.NetworkID
-	ctx.XChainID = test.XChainID
-	ctx.CChainID = test.CChainID
-	ctx.AVAXAssetID = test.AvaxAssetID
+	ctx.NetworkID = ts.NetworkID
+	ctx.XChainID = ts.XChainID
+	ctx.CChainID = ts.CChainID
+	ctx.AVAXAssetID = ts.AvaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -296,8 +296,8 @@ func defaultCtx(db database.Database) *snow.Context {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				test.XChainID:             constants.PrimaryNetworkID,
-				test.CChainID:             constants.PrimaryNetworkID,
+				ts.XChainID:               constants.PrimaryNetworkID,
+				ts.CChainID:               constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -323,23 +323,23 @@ func defaultConfig() *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       test.MinStakingDuration,
-		MaxStakeDuration:       test.MaxStakingDuration,
+		MinStakeDuration:       ts.MinStakingDuration,
+		MaxStakeDuration:       ts.MaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: test.ValidateEndTime,
-		ApricotPhase5Time: test.ValidateEndTime,
+		ApricotPhase3Time: ts.ValidateEndTime,
+		ApricotPhase5Time: ts.ValidateEndTime,
 		BanffTime:         mockable.MaxTime,
 	}
 }
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(test.GenesisTime)
+	clk.Set(ts.GenesisTime)
 	return clk
 }
 

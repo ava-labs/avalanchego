@@ -22,10 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -150,7 +151,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 			TxID: txID,
 		},
 		Asset: avax.Asset{
-			ID: test.AvaxAssetID,
+			ID: ts.AvaxAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: env.config.CreateSubnetTxFee,
@@ -307,8 +308,8 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := test.GenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(test.MinStakingDuration)
+	pendingValidatorStartTime := ts.GenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(ts.MinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	addPendingValidatorTx, err := addPendingValidator(
@@ -317,7 +318,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{test.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 	)
 	require.NoError(err)
 
@@ -367,14 +368,14 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	staker1 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
-		startTime:     test.GenesisTime.Add(1 * time.Minute),
-		endTime:       test.GenesisTime.Add(10 * test.MinStakingDuration).Add(1 * time.Minute),
+		startTime:     ts.GenesisTime.Add(1 * time.Minute),
+		endTime:       ts.GenesisTime.Add(10 * ts.MinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(test.MinStakingDuration),
+		endTime:       staker1.startTime.Add(1 * time.Minute).Add(ts.MinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
@@ -398,10 +399,10 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(test.MinStakingDuration),
+		endTime:       staker2.endTime.Add(ts.MinStakingDuration),
 	}
 
-	tests := []tst{
+	tests := []test{
 		{
 			description:   "advance time to staker 1 start with subnet",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
@@ -488,8 +489,8 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		},
 	}
 
-	for _, tst := range tests {
-		t.Run(tst.description, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
@@ -501,26 +502,26 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			env.config.TrackedSubnets.Add(subnetID)
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
-			for _, staker := range tst.stakers {
+			for _, staker := range test.stakers {
 				_, err := addPendingValidator(
 					env,
 					staker.startTime,
 					staker.endTime,
 					staker.nodeID,
 					staker.rewardAddress,
-					[]*secp256k1.PrivateKey{test.Keys[0]},
+					[]*secp256k1.PrivateKey{ts.Keys[0]},
 				)
 				require.NoError(err)
 			}
 
-			for _, staker := range tst.subnetStakers {
+			for _, staker := range test.subnetStakers {
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
 					uint64(staker.startTime.Unix()),
 					uint64(staker.endTime.Unix()),
 					staker.nodeID, // validator ID
 					subnetID,      // Subnet ID
-					[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+					[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 					ids.ShortEmpty,
 				)
 				require.NoError(err)
@@ -537,7 +538,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			env.state.SetHeight( /*dummyHeight*/ 1)
 			require.NoError(env.state.Commit())
 
-			for _, newTime := range tst.advanceTimeTo {
+			for _, newTime := range test.advanceTimeTo {
 				env.clk.Set(newTime)
 
 				// build standard block moving ahead chain time
@@ -559,7 +560,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				require.NoError(block.Accept(context.Background()))
 			}
 
-			for stakerNodeID, status := range tst.expectedStakers {
+			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
@@ -572,7 +573,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				}
 			}
 
-			for stakerNodeID, status := range tst.expectedSubnetStakers {
+			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
 					require.False(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
@@ -601,17 +602,17 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(test.Keys[0].PublicKey().Address())
+	subnetValidatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
 	// Starts after the corre
-	subnetVdr1StartTime := test.ValidateStartTime
-	subnetVdr1EndTime := test.ValidateStartTime.Add(test.MinStakingDuration)
+	subnetVdr1StartTime := ts.ValidateStartTime
+	subnetVdr1EndTime := ts.ValidateStartTime.Add(ts.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
 		subnetValidatorNodeID,              // Node ID
 		subnetID,                           // Subnet ID
-		[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -630,14 +631,14 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(test.Keys[1].PublicKey().Address())
+	subnetVdr2NodeID := ids.NodeID(ts.Keys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                              // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(test.MinStakingDuration).Unix()), // end time
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                            // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(ts.MinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
-		[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -700,17 +701,17 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := ids.NodeID(test.Keys[0].PublicKey().Address())
+			subnetValidatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
 
-			subnetVdr1StartTime := test.GenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := test.GenesisTime.Add(10 * test.MinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1StartTime := ts.GenesisTime.Add(1 * time.Minute)
+			subnetVdr1EndTime := ts.GenesisTime.Add(10 * ts.MinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
 				subnetValidatorNodeID,              // Node ID
 				subnetID,                           // Subnet ID
-				[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				ids.ShortEmpty,
 			)
 			require.NoError(err)
@@ -759,8 +760,8 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := test.GenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(test.MaxStakingDuration)
+	pendingValidatorStartTime := ts.GenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(ts.MaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	_, err := addPendingValidator(
@@ -769,7 +770,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{test.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 	)
 	require.NoError(err)
 
@@ -804,11 +805,11 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		test.Keys[0].PublicKey().Address(),
+		ts.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
-			test.Keys[0],
-			test.Keys[1],
-			test.Keys[4],
+			ts.Keys[0],
+			ts.Keys[1],
+			ts.Keys[4],
 		},
 		ids.ShortEmpty,
 	)

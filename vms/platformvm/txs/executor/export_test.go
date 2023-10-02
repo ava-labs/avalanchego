@@ -12,7 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
+
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -22,25 +23,25 @@ func TestNewExportTx(t *testing.T) {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
 
-	type tst struct {
+	type test struct {
 		description        string
 		destinationChainID ids.ID
 		sourceKeys         []*secp256k1.PrivateKey
 		timestamp          time.Time
 	}
 
-	sourceKey := test.Keys[0]
+	sourceKey := ts.Keys[0]
 
-	tests := []tst{
+	tests := []test{
 		{
 			description:        "P->X export",
-			destinationChainID: test.XChainID,
+			destinationChainID: ts.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          test.ValidateStartTime,
+			timestamp:          ts.ValidateStartTime,
 		},
 		{
 			description:        "P->C export",
-			destinationChainID: test.CChainID,
+			destinationChainID: ts.CChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.ApricotPhase5Time,
 		},
@@ -52,7 +53,7 @@ func TestNewExportTx(t *testing.T) {
 			require := require.New(t)
 
 			tx, err := env.txBuilder.NewExportTx(
-				test.Balance-defaultTxFee, // Amount of tokens to export
+				ts.Balance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,

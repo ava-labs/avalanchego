@@ -41,12 +41,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -83,7 +83,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}()
 			nodeID := ids.GenerateTestNodeID()
 
-			currentTime := test.GenesisTime
+			currentTime := ts.GenesisTime
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
@@ -261,14 +261,14 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	addr := test.Keys[0].PublicKey().Address()
+	addr := ts.Keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
 		uint64(data.endTime.Unix()),
 		data.nodeID,
 		subnetID,
-		[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		addr,
 	)
 	if err != nil {
@@ -278,11 +278,11 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 }
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := test.Keys[0].PublicKey().Address()
+	addr := ts.Keys[0].PublicKey().Address()
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
 		vm.state,
-		test.Keys,
+		ts.Keys,
 		vm.MinValidatorStake,
 		vm.Config.AddPrimaryNetworkValidatorFee,
 		addr, // change Addresss
@@ -338,7 +338,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 }
 
 func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := test.Keys[0].PublicKey().Address()
+	addr := ts.Keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
@@ -346,7 +346,7 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 		data.nodeID,
 		addr,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{test.Keys[0], test.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		addr,
 	)
 	if err != nil {
@@ -476,7 +476,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	res := make([]*validatorInputData, 0, len(events))
 
 	currentTime = currentTime.Add(txexecutor.SyncBound)
-	switch endTime := currentTime.Add(test.MinStakingDuration); events[0] {
+	switch endTime := currentTime.Add(ts.MinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
 		sk, err := bls.NewSecretKey()
 		if err != nil {
@@ -510,7 +510,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		switch currentEvent := events[i]; currentEvent {
 		case startSubnetValidator:
-			endTime := currentTime.Add(test.MinStakingDuration)
+			endTime := currentTime.Add(ts.MinStakingDuration)
 			res = append(res, &validatorInputData{
 				eventType: startSubnetValidator,
 				startTime: currentTime,
@@ -529,7 +529,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 				return nil, fmt.Errorf("could not make private key: %w", err)
 			}
 
-			endTime := currentTime.Add(test.MinStakingDuration)
+			endTime := currentTime.Add(ts.MinStakingDuration)
 			val := &validatorInputData{
 				eventType: startPrimaryWithBLS,
 				startTime: currentTime,
@@ -542,7 +542,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		case startPrimaryWithoutBLS:
 			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			endTime := currentTime.Add(test.MinStakingDuration)
+			endTime := currentTime.Add(ts.MinStakingDuration)
 			val := &validatorInputData{
 				eventType: startPrimaryWithoutBLS,
 				startTime: currentTime,
@@ -712,7 +712,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
-	forkTime := test.GenesisTime
+	forkTime := ts.GenesisTime
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -722,11 +722,11 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      test.MinValidatorStake,
-		MaxValidatorStake:      test.MaxValidatorStake,
+		MinValidatorStake:      ts.MinValidatorStake,
+		MaxValidatorStake:      ts.MaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       test.MinStakingDuration,
-		MaxStakeDuration:       test.MaxStakingDuration,
+		MinStakeDuration:       ts.MinStakingDuration,
+		MaxStakeDuration:       ts.MaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		ApricotPhase3Time:      forkTime,
 		ApricotPhase5Time:      forkTime,
@@ -783,9 +783,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// chain time ahead
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
-		[]ids.ShortID{test.Keys[0].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{test.Keys[len(test.Keys)-1]}, // pays tx fee
-		test.Keys[0].PublicKey().Address(),                   // change addr
+		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{ts.Keys[len(ts.Keys)-1]}, // pays tx fee
+		ts.Keys[0].PublicKey().Address(),                 // change addr
 	)
 	if err != nil {
 		return nil, ids.Empty, err
@@ -812,15 +812,15 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 }
 
 func buildCustomGenesis() ([]byte, error) {
-	genesisUTXOs := make([]api.UTXO, len(test.Keys))
-	for i, key := range test.Keys {
+	genesisUTXOs := make([]api.UTXO, len(ts.Keys))
+	for i, key := range ts.Keys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		if err != nil {
 			return nil, err
 		}
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(test.Balance),
+			Amount:  json.Uint64(ts.Balance),
 			Address: addr,
 		}
 	}
@@ -829,13 +829,13 @@ func buildCustomGenesis() ([]byte, error) {
 	// won't find next staker to promote/evict from stakers set. Contrary to
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
-	nodeID := ids.NodeID(test.Keys[len(test.Keys)-1].PublicKey().Address())
+	nodeID := ids.NodeID(ts.Keys[len(ts.Keys)-1].PublicKey().Address())
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	starTime := mockable.MaxTime.Add(-1 * test.MinStakingDuration)
+	starTime := mockable.MaxTime.Add(-1 * ts.MinStakingDuration)
 	endTime := mockable.MaxTime
 	genesisValidator := api.PermissionlessValidator{
 		Staker: api.Staker{
@@ -848,7 +848,7 @@ func buildCustomGenesis() ([]byte, error) {
 			Addresses: []string{addr},
 		},
 		Staked: []api.UTXO{{
-			Amount:  json.Uint64(test.Weight),
+			Amount:  json.Uint64(ts.Weight),
 			Address: addr,
 		}},
 		DelegationFee: reward.PercentDenominator,
@@ -857,11 +857,11 @@ func buildCustomGenesis() ([]byte, error) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   test.AvaxAssetID,
+		AvaxAssetID:   ts.AvaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.PermissionlessValidator{genesisValidator},
 		Chains:        nil,
-		Time:          json.Uint64(test.GenesisTime.Unix()),
+		Time:          json.Uint64(ts.GenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 

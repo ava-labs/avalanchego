@@ -24,10 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -486,7 +487,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := test.GenesisTime.Add(time.Hour)
+	now := ts.GenesisTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -514,8 +515,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 		},
 	}
 
-	for _, tst := range tests {
-		t.Run(tst.description, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
@@ -545,11 +546,11 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := block.NewBanffAbortBlock(tst.childTime, parentID, childHeight)
+			statelessAbortBlk, err := block.NewBanffAbortBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := test.GenesisTime
+			parentTime := ts.GenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
 
@@ -558,7 +559,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			onAbortState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
-				timestamp:      tst.parentTime,
+				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
 					onCommitState: onCommitState,
@@ -570,7 +571,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 			err = statelessAbortBlk.Visit(verifier)
-			require.ErrorIs(err, tst.result)
+			require.ErrorIs(err, test.result)
 		})
 	}
 }
@@ -579,7 +580,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := test.GenesisTime.Add(time.Hour)
+	now := ts.GenesisTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -607,8 +608,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 		},
 	}
 
-	for _, tst := range tests {
-		t.Run(tst.description, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
@@ -638,11 +639,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := block.NewBanffCommitBlock(tst.childTime, parentID, childHeight)
+			statelessCommitBlk, err := block.NewBanffCommitBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := test.GenesisTime
+			parentTime := ts.GenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
 
@@ -651,7 +652,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			onAbortState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
-				timestamp:      tst.parentTime,
+				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
 					onCommitState: onCommitState,
@@ -663,7 +664,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 			err = statelessCommitBlk.Visit(verifier)
-			require.ErrorIs(err, tst.result)
+			require.ErrorIs(err, test.result)
 		})
 	}
 }

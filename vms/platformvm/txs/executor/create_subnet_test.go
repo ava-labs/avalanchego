@@ -13,14 +13,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := test.GenesisTime.Add(time.Hour)
+	ap3Time := ts.GenesisTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -29,7 +30,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        test.GenesisTime,
+			time:        ts.GenesisTime,
 			fee:         0,
 			expectedErr: nil,
 		},
@@ -46,8 +47,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			expectedErr: nil,
 		},
 	}
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
@@ -57,7 +58,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				require.NoError(shutdownEnvironment(env))
 			}()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, test.Keys, 0, tst.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, ts.Keys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 
 			// Create the tx
@@ -76,7 +77,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			stateDiff.SetTimestamp(tst.time)
+			stateDiff.SetTimestamp(test.time)
 
 			executor := StandardTxExecutor{
 				Backend: &env.backend,
@@ -84,7 +85,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			require.ErrorIs(err, tst.expectedErr)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

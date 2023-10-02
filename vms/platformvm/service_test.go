@@ -40,13 +40,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -103,7 +103,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
-	require.NoError(user.PutKeys(pk, test.Keys[0]))
+	require.NoError(user.PutKeys(pk, ts.Keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
@@ -183,7 +183,7 @@ func TestGetTxStatus(t *testing.T) {
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
 
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(test.XChainID)
+	peerSharedMemory := m.NewSharedMemory(ts.XChainID)
 
 	// #nosec G404
 	utxo := &avax.UTXO{
@@ -191,7 +191,7 @@ func TestGetTxStatus(t *testing.T) {
 			TxID:        ids.GenerateTestID(),
 			OutputIndex: rand.Uint32(),
 		},
-		Asset: avax.Asset{ID: test.AvaxAssetID},
+		Asset: avax.Asset{ID: ts.AvaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1234567,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -222,7 +222,7 @@ func TestGetTxStatus(t *testing.T) {
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(test.XChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(ts.XChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
 	require.NoError(err)
 
 	mutableSharedMemory.SharedMemory = oldSharedMemory
@@ -259,12 +259,12 @@ func TestGetTxStatus(t *testing.T) {
 
 // Test issuing and then retrieving a transaction
 func TestGetTx(t *testing.T) {
-	type tst struct {
+	type test struct {
 		description string
 		createTx    func(service *Service) (*txs.Tx, error)
 	}
 
-	tests := []tst{
+	tests := []test{
 		{
 			"standard block",
 			func(service *Service) (*txs.Tx, error) {
@@ -275,7 +275,7 @@ func TestGetTx(t *testing.T) {
 					nil,
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-					test.Keys[0].PublicKey().Address(), // change addr
+					ts.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -285,12 +285,12 @@ func TestGetTx(t *testing.T) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(test.MinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(ts.MinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
-					[]*secp256k1.PrivateKey{test.Keys[0]},
-					test.Keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{ts.Keys[0]},
+					ts.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -301,8 +301,8 @@ func TestGetTx(t *testing.T) {
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
-					[]*secp256k1.PrivateKey{test.Keys[0]},
-					test.Keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{ts.Keys[0]},
+					ts.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -397,8 +397,8 @@ func TestGetBalance(t *testing.T) {
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
 
-		require.Equal(json.Uint64(test.Balance), reply.Balance)
-		require.Equal(json.Uint64(test.Balance), reply.Unlocked)
+		require.Equal(json.Uint64(ts.Balance), reply.Balance)
+		require.Equal(json.Uint64(ts.Balance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
 		require.Equal(json.Uint64(0), reply.LockedNotStakeable)
 	}
@@ -429,7 +429,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.Equal(test.Weight, uint64(response.Staked))
+		require.Equal(ts.Weight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -441,10 +441,10 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(test.Weight, out.Amount())
+		require.Equal(ts.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
-		require.Equal(test.Keys[i].PublicKey().Address(), out.Addrs[0])
+		require.Equal(ts.Keys[i].PublicKey().Address(), out.Addrs[0])
 		require.Zero(out.Locktime)
 	}
 
@@ -457,7 +457,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.Equal(len(g.Validators)*int(test.Weight), int(response.Staked))
+	require.Equal(len(g.Validators)*int(ts.Weight), int(response.Staked))
 	require.Len(response.Outputs, len(g.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -469,26 +469,26 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(test.Weight, out.Amount())
+		require.Equal(ts.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := test.Weight
+	oldStake := ts.Weight
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.NodeID(test.Keys[0].PublicKey().Address())
-	delegatorEndTime := uint64(test.GenesisTime.Add(test.MinStakingDuration).Unix())
+	delegatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
+	delegatorEndTime := uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(test.GenesisTime.Unix()),
+		uint64(ts.GenesisTime.Unix()),
 		delegatorEndTime,
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{test.Keys[0]},
-		test.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -504,7 +504,7 @@ func TestGetStake(t *testing.T) {
 	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.addrManager.FormatLocalAddress(test.Keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(ts.Keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
@@ -528,16 +528,16 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(test.GenesisTime.Add(test.MinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
-		uint64(test.GenesisTime.Unix()),
+		uint64(ts.GenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
 		0,
-		[]*secp256k1.PrivateKey{test.Keys[0]},
-		test.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -606,9 +606,9 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.NodeID(test.Keys[1].PublicKey().Address())
-	delegatorStartTime := uint64(test.ValidateStartTime.Unix())
-	delegatorEndTime := uint64(test.ValidateStartTime.Add(test.MinStakingDuration).Unix())
+	validatorNodeID := ids.NodeID(ts.Keys[1].PublicKey().Address())
+	delegatorStartTime := uint64(ts.ValidateStartTime.Unix())
+	delegatorEndTime := uint64(ts.ValidateStartTime.Add(ts.MinStakingDuration).Unix())
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -616,8 +616,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		delegatorEndTime,
 		validatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{test.Keys[0]},
-		test.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -726,8 +726,8 @@ func TestGetBlock(t *testing.T) {
 		},
 	}
 
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
@@ -743,7 +743,7 @@ func TestGetBlock(t *testing.T) {
 				nil,
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-				test.Keys[0].PublicKey().Address(), // change addr
+				ts.Keys[0].PublicKey().Address(), // change addr
 			)
 			require.NoError(err)
 
@@ -765,13 +765,13 @@ func TestGetBlock(t *testing.T) {
 
 			args := api.GetBlockArgs{
 				BlockID:  blk.ID(),
-				Encoding: tst.encoding,
+				Encoding: test.encoding,
 			}
 			response := api.GetBlockResponse{}
 			require.NoError(service.GetBlock(nil, &args, &response))
 
 			switch {
-			case tst.encoding == formatting.JSON:
+			case test.encoding == formatting.JSON:
 				require.IsType((*block.BanffStandardBlock)(nil), response.Block)
 				responseBlock := response.Block.(*block.BanffStandardBlock)
 				require.Equal(statelessBlock.ID(), responseBlock.ID())
@@ -783,7 +783,7 @@ func TestGetBlock(t *testing.T) {
 				require.Equal(blk.Bytes(), decoded)
 			}
 
-			require.Equal(tst.encoding, response.Encoding)
+			require.Equal(test.encoding, response.Encoding)
 		})
 	}
 }

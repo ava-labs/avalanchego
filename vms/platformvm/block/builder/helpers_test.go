@@ -41,13 +41,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -55,7 +55,7 @@ import (
 
 var (
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = test.Keys[0:3]
+	testSubnet1ControlKeys = ts.Keys[0:3]
 
 	defaultTxFee = uint64(100)
 
@@ -175,12 +175,12 @@ func addSubnet(t *testing.T, env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			test.Keys[0].PublicKey().Address(),
-			test.Keys[1].PublicKey().Address(),
-			test.Keys[2].PublicKey().Address(),
+			ts.Keys[0].PublicKey().Address(),
+			ts.Keys[1].PublicKey().Address(),
+			ts.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{test.Keys[0]},
-		test.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -210,7 +210,7 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	genesisState, err := test.BuildGenesis()
+	genesisState, err := ts.BuildGenesis()
 	require.NoError(err)
 	state, err := state.New(
 		db,
@@ -234,9 +234,9 @@ func defaultState(
 func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
-	ctx.XChainID = test.XChainID
-	ctx.CChainID = test.CChainID
-	ctx.AVAXAssetID = test.AvaxAssetID
+	ctx.XChainID = ts.XChainID
+	ctx.CChainID = ts.CChainID
+	ctx.AVAXAssetID = ts.AvaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -250,8 +250,8 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				test.XChainID:             constants.PrimaryNetworkID,
-				test.CChainID:             constants.PrimaryNetworkID,
+				ts.XChainID:               constants.PrimaryNetworkID,
+				ts.CChainID:               constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -277,16 +277,16 @@ func defaultConfig() *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       test.MinStakingDuration,
-		MaxStakeDuration:       test.MaxStakingDuration,
+		MinStakeDuration:       ts.MinStakingDuration,
+		MaxStakeDuration:       ts.MaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: test.ValidateEndTime,
-		ApricotPhase5Time: test.ValidateEndTime,
+		ApricotPhase3Time: ts.ValidateEndTime,
+		ApricotPhase5Time: ts.ValidateEndTime,
 		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 	}
 }
@@ -294,7 +294,7 @@ func defaultConfig() *config.Config {
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(test.GenesisTime)
+	clk.Set(ts.GenesisTime)
 	return clk
 }
 
