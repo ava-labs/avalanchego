@@ -97,8 +97,8 @@ func TestWriteValidatorMetadata(t *testing.T) {
 
 	// write state, should not reflect to DB yet
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
-	require.False(primaryDB.Has(testUptimeReward.txID.Bytes()))
-	require.False(subnetDB.Has(testUptimeReward.txID.Bytes()))
+	require.False(primaryDB.Has(testUptimeReward.txID[:]))
+	require.False(subnetDB.Has(testUptimeReward.txID[:]))
 
 	// get uptime should still return the loaded value
 	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
@@ -113,8 +113,8 @@ func TestWriteValidatorMetadata(t *testing.T) {
 
 	// write uptimes, should reflect to subnet DB
 	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
-	require.False(primaryDB.Has(testUptimeReward.txID.Bytes()))
-	require.True(subnetDB.Has(testUptimeReward.txID.Bytes()))
+	require.False(primaryDB.Has(testUptimeReward.txID[:]))
+	require.True(subnetDB.Has(testUptimeReward.txID[:]))
 }
 
 func TestValidatorDelegateeRewards(t *testing.T) {

@@ -984,7 +984,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	peerSharedMemory := m.NewSharedMemory(ctx.CChainID)
 	inputID := utxo.InputID()
 	require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{ctx.ChainID: {PutRequests: []*atomic.Element{{
-		Key:   inputID.Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			keys[0].PublicKey().Address().Bytes(),

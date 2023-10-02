@@ -22,7 +22,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	hrp := constants.GetHRP(5)
 
 	addrID := ids.ShortID{1}
-	addrStr, err := address.Format(chainAlias, hrp, addrID.Bytes())
+	addrStr, err := address.Format(chainAlias, hrp, addrID[:])
 	require.NoError(err)
 
 	msg := &AddAddresses{JSONAddresses: api.JSONAddresses{
@@ -34,7 +34,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	require.NoError(msg.parseAddresses())
 
 	require.Len(msg.addressIds, 1)
-	require.Equal(addrID.Bytes(), msg.addressIds[0])
+	require.Equal(addrID[:], msg.addressIds[0])
 }
 
 func TestFilterParamUpdateMulti(t *testing.T) {
@@ -62,12 +62,12 @@ func TestFilterParam(t *testing.T) {
 	fp.SetFilter(mapFilter)
 
 	addr := ids.GenerateTestShortID()
-	require.NoError(fp.Add(addr.Bytes()))
-	require.True(fp.Check(addr.Bytes()))
-	delete(fp.set, string(addr.Bytes()))
+	require.NoError(fp.Add(addr[:]))
+	require.True(fp.Check(addr[:]))
+	delete(fp.set, string(addr[:]))
 
-	mapFilter.Add(addr.Bytes())
-	require.True(fp.Check(addr.Bytes()))
+	mapFilter.Add(addr[:])
+	require.True(fp.Check(addr[:]))
 	require.False(fp.Check([]byte("bye")))
 }
 

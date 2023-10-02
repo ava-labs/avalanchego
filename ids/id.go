@@ -32,11 +32,6 @@ var (
 // ID wraps a 32 byte hash used as an identifier
 type ID [IDLen]byte
 
-// Any modification to Bytes will be lost since id is passed-by-value
-func (id ID) Bytes() []byte {
-	return id[:]
-}
-
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)

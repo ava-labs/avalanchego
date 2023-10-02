@@ -198,13 +198,13 @@ func (vm *VMClient) Initialize(
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
 		NetworkId:    chainCtx.NetworkID,
-		SubnetId:     chainCtx.SubnetID.Bytes(),
-		ChainId:      chainCtx.ChainID.Bytes(),
+		SubnetId:     chainCtx.SubnetID[:],
+		ChainId:      chainCtx.ChainID[:],
 		NodeId:       chainCtx.NodeID.Bytes(),
 		PublicKey:    bls.PublicKeyToBytes(chainCtx.PublicKey),
-		XChainId:     chainCtx.XChainID.Bytes(),
-		CChainId:     chainCtx.CChainID.Bytes(),
-		AvaxAssetId:  chainCtx.AVAXAssetID.Bytes(),
+		XChainId:     chainCtx.XChainID[:],
+		CChainId:     chainCtx.CChainID[:],
+		AvaxAssetId:  chainCtx.AVAXAssetID[:],
 		ChainDataDir: chainCtx.ChainDataDir,
 		GenesisBytes: genesisBytes,
 		UpgradeBytes: upgradeBytes,
@@ -487,7 +487,7 @@ func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block
 
 func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	resp, err := vm.client.GetBlock(ctx, &vmpb.GetBlockRequest{
-		Id: blkID.Bytes(),
+		Id: blkID[:],
 	})
 	if err != nil {
 		return nil, err
@@ -521,7 +521,7 @@ func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, 
 
 func (vm *VMClient) SetPreference(ctx context.Context, blkID ids.ID) error {
 	_, err := vm.client.SetPreference(ctx, &vmpb.SetPreferenceRequest{
-		Id: blkID.Bytes(),
+		Id: blkID[:],
 	})
 	return err
 }
@@ -547,7 +547,7 @@ func (vm *VMClient) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 	_, err := vm.client.CrossChainAppRequest(
 		ctx,
 		&vmpb.CrossChainAppRequestMsg{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  grpcutils.TimestampFromTime(deadline),
 			Request:   request,
@@ -560,7 +560,7 @@ func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.
 	_, err := vm.client.CrossChainAppRequestFailed(
 		ctx,
 		&vmpb.CrossChainAppRequestFailedMsg{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 		},
 	)
@@ -571,7 +571,7 @@ func (vm *VMClient) CrossChainAppResponse(ctx context.Context, chainID ids.ID, r
 	_, err := vm.client.CrossChainAppResponse(
 		ctx,
 		&vmpb.CrossChainAppResponseMsg{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Response:  response,
 		},
@@ -642,7 +642,7 @@ func (vm *VMClient) GetAncestors(
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
 	resp, err := vm.client.GetAncestors(ctx, &vmpb.GetAncestorsRequest{
-		BlkId:                 blkID.Bytes(),
+		BlkId:                 blkID[:],
 		MaxBlocksNum:          int32(maxBlocksNum),
 		MaxBlocksSize:         int32(maxBlocksSize),
 		MaxBlocksRetrivalTime: int64(maxBlocksRetrivalTime),
@@ -860,7 +860,7 @@ func (b *blockClient) ID() ids.ID {
 func (b *blockClient) Accept(ctx context.Context) error {
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(ctx, &vmpb.BlockAcceptRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	return err
 }
@@ -868,7 +868,7 @@ func (b *blockClient) Accept(ctx context.Context) error {
 func (b *blockClient) Reject(ctx context.Context) error {
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(ctx, &vmpb.BlockRejectRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	return err
 }

@@ -300,7 +300,7 @@ func TestPingUptimes(t *testing.T) {
 					1,
 					[]*p2p.SubnetUptime{
 						{
-							SubnetId: trackedSubnetID.Bytes(),
+							SubnetId: trackedSubnetID[:],
 							Uptime:   1,
 						},
 					},
@@ -327,11 +327,11 @@ func TestPingUptimes(t *testing.T) {
 						{
 							// Providing the untrackedSubnetID here should cause
 							// the remote peer to disconnect from us.
-							SubnetId: untrackedSubnetID.Bytes(),
+							SubnetId: untrackedSubnetID[:],
 							Uptime:   1,
 						},
 						{
-							SubnetId: trackedSubnetID.Bytes(),
+							SubnetId: trackedSubnetID[:],
 							Uptime:   1,
 						},
 					},

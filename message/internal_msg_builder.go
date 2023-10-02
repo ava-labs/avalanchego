@@ -91,7 +91,7 @@ func (m *GetStateSummaryFrontierFailed) String() string {
 }
 
 func (m *GetStateSummaryFrontierFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetStateSummaryFrontierFailed) GetRequestId() uint32 {
@@ -127,7 +127,7 @@ func (m *GetAcceptedStateSummaryFailed) String() string {
 }
 
 func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetAcceptedStateSummaryFailed) GetRequestId() uint32 {
@@ -164,7 +164,7 @@ func (m *GetAcceptedFrontierFailed) String() string {
 }
 
 func (m *GetAcceptedFrontierFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetAcceptedFrontierFailed) GetRequestId() uint32 {
@@ -207,7 +207,7 @@ func (m *GetAcceptedFailed) String() string {
 }
 
 func (m *GetAcceptedFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetAcceptedFailed) GetRequestId() uint32 {
@@ -250,7 +250,7 @@ func (m *GetAncestorsFailed) String() string {
 }
 
 func (m *GetAncestorsFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetAncestorsFailed) GetRequestId() uint32 {
@@ -293,7 +293,7 @@ func (m *GetFailed) String() string {
 }
 
 func (m *GetFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *GetFailed) GetRequestId() uint32 {
@@ -336,7 +336,7 @@ func (m *QueryFailed) String() string {
 }
 
 func (m *QueryFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *QueryFailed) GetRequestId() uint32 {
@@ -378,7 +378,7 @@ func (m *AppRequestFailed) String() string {
 }
 
 func (m *AppRequestFailed) GetChainId() []byte {
-	return m.ChainID.Bytes()
+	return m.ChainID[:]
 }
 
 func (m *AppRequestFailed) GetRequestId() uint32 {
@@ -420,7 +420,7 @@ func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
 }
 
 func (m *CrossChainAppRequest) GetChainId() []byte {
-	return m.DestinationChainID.Bytes()
+	return m.DestinationChainID[:]
 }
 
 func (m *CrossChainAppRequest) GetRequestId() uint32 {
@@ -466,7 +466,7 @@ func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
 }
 
 func (m *CrossChainAppRequestFailed) GetChainId() []byte {
-	return m.DestinationChainID.Bytes()
+	return m.DestinationChainID[:]
 }
 
 func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
@@ -510,7 +510,7 @@ func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
 }
 
 func (m *CrossChainAppResponse) GetChainId() []byte {
-	return m.DestinationChainID.Bytes()
+	return m.DestinationChainID[:]
 }
 
 func (m *CrossChainAppResponse) GetRequestId() uint32 {

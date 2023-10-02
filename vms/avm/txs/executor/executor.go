@@ -94,7 +94,7 @@ func (e *Executor) ImportTx(tx *txs.ImportTx) error {
 		utxoID := in.UTXOID.InputID()
 
 		e.Inputs.Add(utxoID)
-		utxoIDs[i] = utxoID.Bytes()
+		utxoIDs[i] = utxoID[:]
 	}
 	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -129,7 +129,7 @@ func (e *Executor) ExportTx(tx *txs.ExportTx) error {
 		}
 		utxoID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxoID.Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {

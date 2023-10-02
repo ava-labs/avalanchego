@@ -38,7 +38,7 @@ func (s *DBServer) GetMerkleRoot(
 		return nil, err
 	}
 	return &pb.GetMerkleRootResponse{
-		RootHash: root.Bytes(),
+		RootHash: root[:],
 	}, nil
 }
 

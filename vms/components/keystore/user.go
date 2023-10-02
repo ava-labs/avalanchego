@@ -22,7 +22,7 @@ const maxKeystoreAddresses = 5000
 var (
 	// Key in the database whose corresponding value is the list of addresses
 	// this user controls
-	addressesKey = ids.Empty.Bytes()
+	addressesKey = ids.Empty[:]
 
 	errMaxAddresses = fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
 

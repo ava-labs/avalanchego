@@ -22,7 +22,7 @@ func (t *testTx) GetID() ids.ID {
 }
 
 func (t *testTx) Marshal() ([]byte, error) {
-	return t.id.Bytes(), nil
+	return t.id[:], nil
 }
 
 func (t *testTx) Unmarshal(bytes []byte) error {

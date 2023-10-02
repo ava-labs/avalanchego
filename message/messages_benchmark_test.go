@@ -56,7 +56,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 				MyVersion:      "v1.2.3",
 				MyVersionTime:  uint64(time.Now().Unix()),
 				Sig:            []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: [][]byte{id.Bytes()},
+				TrackedSubnets: [][]byte{id[:]},
 			},
 		},
 	}
@@ -112,7 +112,7 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 				MyVersion:      "v1.2.3",
 				MyVersionTime:  uint64(time.Now().Unix()),
 				Sig:            []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: [][]byte{id.Bytes()},
+				TrackedSubnets: [][]byte{id[:]},
 			},
 		},
 	}

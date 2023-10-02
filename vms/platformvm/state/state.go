@@ -849,7 +849,7 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID.Bytes())
+	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
 	if err == database.ErrNotFound {
 		s.transformedSubnetCache.Put(subnetID, nil)
 		return nil, database.ErrNotFound
@@ -914,7 +914,7 @@ func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	if chainDB, cached := s.chainDBCache.Get(subnetID); cached {
 		return chainDB
 	}
-	rawChainDB := prefixdb.New(subnetID.Bytes(), s.chainDB)
+	rawChainDB := prefixdb.New(subnetID[:], s.chainDB)
 	chainDB := linkeddb.NewDefault(rawChainDB)
 	s.chainDBCache.Put(subnetID, chainDB)
 	return chainDB
@@ -930,7 +930,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		}
 		return tx.tx, tx.status, nil
 	}
-	txBytes, err := s.txDB.Get(txID.Bytes())
+	txBytes, err := s.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
 		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
@@ -972,7 +972,7 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 		return utxos, nil
 	}
 
-	rawTxDB := prefixdb.New(txID.Bytes(), s.rewardUTXODB)
+	rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 	txDB := linkeddb.NewDefault(rawTxDB)
 	it := txDB.NewIterator()
 	defer it.Release()
@@ -1061,7 +1061,7 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 		return *cachedSupply, nil
 	}
 
-	supply, err := database.GetUInt64(s.supplyDB, subnetID.Bytes())
+	supply, err := database.GetUInt64(s.supplyDB, subnetID[:])
 	if err == database.ErrNotFound {
 		s.supplyCache.Put(subnetID, nil)
 		return 0, database.ErrNotFound
@@ -1111,7 +1111,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 ) error {
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
 		marshalStartDiffKey(subnetID, startHeight),
-		subnetID.Bytes(),
+		subnetID[:],
 	)
 	defer diffIter.Release()
 
@@ -1232,7 +1232,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 ) error {
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
 		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
-		constants.PrimaryNetworkID.Bytes(),
+		constants.PrimaryNetworkID[:],
 	)
 	defer diffIter.Release()
 
@@ -1833,7 +1833,7 @@ func (s *state) writeBlocks() error {
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.blockCache.Evict(blkID)
-		if err := s.blockDB.Put(blkID.Bytes(), blkBytes); err != nil {
+		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
@@ -1852,7 +1852,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return blk, nil
 	}
 
-	blkBytes, err := s.blockDB.Get(blockID.Bytes())
+	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
@@ -1976,7 +1976,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
 
-				if err = validatorDB.Put(staker.TxID.Bytes(), metadataBytes); err != nil {
+				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
@@ -2013,7 +2013,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					}
 				}
 
-				if err := validatorDB.Delete(staker.TxID.Bytes()); err != nil {
+				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
@@ -2114,7 +2114,7 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to increase node weight diff: %w", err)
 		}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID.Bytes(), staker.PotentialReward); err != nil {
+		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
@@ -2124,7 +2124,7 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to decrease node weight diff: %w", err)
 		}
 
-		if err := currentDelegatorList.Delete(staker.TxID.Bytes()); err != nil {
+		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
 			return fmt.Errorf("failed to delete current staker: %w", err)
 		}
 	}
@@ -2163,12 +2163,12 @@ func writePendingDiff(
 ) error {
 	switch validatorDiff.validatorStatus {
 	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID.Bytes(), nil)
+		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID.Bytes())
+		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
@@ -2179,13 +2179,13 @@ func writePendingDiff(
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()
 
-		if err := pendingDelegatorList.Put(staker.TxID.Bytes(), nil); err != nil {
+		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
 			return fmt.Errorf("failed to write pending delegator to list: %w", err)
 		}
 	}
 
 	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID.Bytes()); err != nil {
+		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
 			return fmt.Errorf("failed to delete pending delegator: %w", err)
 		}
 	}
@@ -2213,7 +2213,7 @@ func (s *state) writeTXs() error {
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.txCache.Evict(txID)
-		if err := s.txDB.Put(txID.Bytes(), txBytes); err != nil {
+		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
@@ -2224,7 +2224,7 @@ func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
 		s.rewardUTXOsCache.Put(txID, utxos)
-		rawTxDB := prefixdb.New(txID.Bytes(), s.rewardUTXODB)
+		rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
@@ -2233,7 +2233,7 @@ func (s *state) writeRewardUTXOs() error {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
 			utxoID := utxo.InputID()
-			if err := txDB.Put(utxoID.Bytes(), utxoBytes); err != nil {
+			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
 				return fmt.Errorf("failed to add reward UTXO: %w", err)
 			}
 		}
@@ -2262,7 +2262,7 @@ func (s *state) writeSubnets() error {
 	for _, subnet := range s.addedSubnets {
 		subnetID := subnet.ID()
 
-		if err := s.subnetDB.Put(subnetID.Bytes(), nil); err != nil {
+		if err := s.subnetDB.Put(subnetID[:], nil); err != nil {
 			return fmt.Errorf("failed to write subnet: %w", err)
 		}
 	}
@@ -2279,7 +2279,7 @@ func (s *state) writeTransformedSubnets() error {
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.transformedSubnetCache.Evict(subnetID)
-		if err := database.PutID(s.transformedSubnetDB, subnetID.Bytes(), txID); err != nil {
+		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}
 	}
@@ -2291,7 +2291,7 @@ func (s *state) writeSubnetSupplies() error {
 		supply := supply
 		delete(s.modifiedSupplies, subnetID)
 		s.supplyCache.Put(subnetID, &supply)
-		if err := database.PutUInt64(s.supplyDB, subnetID.Bytes(), supply); err != nil {
+		if err := database.PutUInt64(s.supplyDB, subnetID[:], supply); err != nil {
 			return fmt.Errorf("failed to write subnet supply: %w", err)
 		}
 	}
@@ -2304,7 +2304,7 @@ func (s *state) writeChains() error {
 			chainDB := s.getChainDB(subnetID)
 
 			chainID := chain.ID()
-			if err := chainDB.Put(chainID.Bytes(), nil); err != nil {
+			if err := chainDB.Put(chainID[:], nil); err != nil {
 				return fmt.Errorf("failed to write chain: %w", err)
 			}
 		}
@@ -2435,7 +2435,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		// Since we only store accepted blocks on disk, we only need to store a map of
 		// ids.ID to Block.
 		if isStateBlk {
-			if err := s.blockDB.Put(blkID.Bytes(), blkBytes); err != nil {
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 				return fmt.Errorf("failed to write block: %w", err)
 			}
 		}
@@ -2465,7 +2465,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			if now.Sub(lastUpdate) > pruneUpdateFrequency {
 				lastUpdate = now
 
-				progress := timer.ProgressFromHash(blkID.Bytes())
+				progress := timer.ProgressFromHash(blkID[:])
 				eta := timer.EstimateETA(
 					startTime,
 					progress,
@@ -2494,7 +2494,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// duration.
 			lastCommit = time.Now()
 
-			blockIterator = s.blockDB.NewIteratorWithStart(blkID.Bytes())
+			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
 		}
 	}
 

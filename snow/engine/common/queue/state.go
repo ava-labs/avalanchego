@@ -164,7 +164,7 @@ func (s *state) Clear() error {
 
 // AddRunnableJob adds [jobID] to the runnable queue
 func (s *state) AddRunnableJob(jobID ids.ID) error {
-	return s.runnableJobIDs.Put(jobID.Bytes(), nil)
+	return s.runnableJobIDs.Put(jobID[:], nil)
 }
 
 // HasRunnableJob returns true if there is a job that can be run on the queue
@@ -212,7 +212,7 @@ func (s *state) PutJob(job Job) error {
 		s.jobsCache.Put(id, job)
 	}
 
-	if err := s.jobsDB.Put(id.Bytes(), job.Bytes()); err != nil {
+	if err := s.jobsDB.Put(id[:], job.Bytes()); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (s *state) HasJob(id ids.ID) (bool, error) {
 			return true, nil
 		}
 	}
-	return s.jobsDB.Has(id.Bytes())
+	return s.jobsDB.Has(id[:])
 }
 
 // GetJob returns the job [id]
@@ -237,7 +237,7 @@ func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 			return job, nil
 		}
 	}
-	jobBytes, err := s.jobsDB.Get(id.Bytes())
+	jobBytes, err := s.jobsDB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 // AddDependency adds [dependent] as blocking on [dependency] being completed
 func (s *state) AddDependency(dependency, dependent ids.ID) error {
 	dependentsDB := s.getDependentsDB(dependency)
-	return dependentsDB.Put(dependent.Bytes(), nil)
+	return dependentsDB.Put(dependent[:], nil)
 }
 
 // RemoveDependencies removes the set of IDs that are blocking on the completion
@@ -285,7 +285,7 @@ func (s *state) DisableCaching() {
 func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
-		if err := s.missingJobIDs.Put(missingID.Bytes(), nil); err != nil {
+		if err := s.missingJobIDs.Put(missingID[:], nil); err != nil {
 			return err
 		}
 	}
@@ -295,7 +295,7 @@ func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 func (s *state) RemoveMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
-		if err := s.missingJobIDs.Delete(missingID.Bytes()); err != nil {
+		if err := s.missingJobIDs.Delete(missingID[:]); err != nil {
 			return err
 		}
 	}
@@ -323,7 +323,7 @@ func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {
 			return dependentsDB
 		}
 	}
-	dependencyDB := prefixdb.New(dependency.Bytes(), s.dependenciesDB)
+	dependencyDB := prefixdb.New(dependency[:], s.dependenciesDB)
 	dependentsDB := linkeddb.NewDefault(dependencyDB)
 	if s.cachingEnabled {
 		s.dependentsCache.Put(dependency, dependentsDB)

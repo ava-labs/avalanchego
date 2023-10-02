@@ -79,7 +79,7 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 
 	for childIndex, childID := range node.Children {
 		childID := childID
-		pbNode.Children[uint32(childIndex)] = childID.Bytes()
+		pbNode.Children[uint32(childIndex)] = childID[:]
 	}
 
 	return pbNode

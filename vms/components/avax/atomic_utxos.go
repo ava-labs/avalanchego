@@ -57,7 +57,7 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 	i := 0
 	for addr := range addrs {
 		copied := addr
-		addrsList[i] = copied.Bytes()
+		addrsList[i] = copied[:]
 		i++
 	}
 
@@ -65,7 +65,7 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 		chainID,
 		addrsList,
 		startAddr.Bytes(),
-		startUTXOID.Bytes(),
+		startUTXOID[:],
 		limit,
 	)
 	if err != nil {

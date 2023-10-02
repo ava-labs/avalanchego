@@ -95,7 +95,7 @@ func (utxo *UTXOID) Less(other *UTXOID) bool {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
 
-	switch bytes.Compare(utxoID.Bytes(), otherID.Bytes()) {
+	switch bytes.Compare(utxoID[:], otherID[:]) {
 	case -1:
 		return true
 	case 0:

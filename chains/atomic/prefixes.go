@@ -46,7 +46,7 @@ type prefixes struct {
 }
 
 func (p *prefixes) getValueDB(myChainID, peerChainID ids.ID, db database.Database) database.Database {
-	if bytes.Compare(myChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(myChainID[:], peerChainID[:]) == -1 {
 		return prefixdb.New(p.smallerValuePrefix, db)
 	}
 	return prefixdb.New(p.largerValuePrefix, db)
@@ -54,7 +54,7 @@ func (p *prefixes) getValueDB(myChainID, peerChainID ids.ID, db database.Databas
 
 func (p *prefixes) getValueAndIndexDB(myChainID, peerChainID ids.ID, db database.Database) (database.Database, database.Database) {
 	var valueDB, indexDB database.Database
-	if bytes.Compare(myChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(myChainID[:], peerChainID[:]) == -1 {
 		valueDB = prefixdb.New(p.smallerValuePrefix, db)
 		indexDB = prefixdb.New(p.smallerIndexPrefix, db)
 	} else {

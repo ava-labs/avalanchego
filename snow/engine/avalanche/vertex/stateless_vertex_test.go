@@ -14,7 +14,7 @@ import (
 func TestVertexVerify(t *testing.T) {
 	tooManyParents := make([]ids.ID, maxNumParents+1)
 	for i := range tooManyParents {
-		tooManyParents[i].Bytes()[0] = byte(i)
+		tooManyParents[i][0] = byte(i)
 	}
 	tooManyTxs := make([][]byte, maxTxsPerVtx+1)
 	for i := range tooManyTxs {
@@ -22,7 +22,7 @@ func TestVertexVerify(t *testing.T) {
 	}
 	tooManyRestrictions := make([]ids.ID, maxTxsPerVtx+1)
 	for i := range tooManyRestrictions {
-		tooManyRestrictions[i].Bytes()[0] = byte(i)
+		tooManyRestrictions[i][0] = byte(i)
 	}
 
 	tests := []struct {

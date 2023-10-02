@@ -36,7 +36,7 @@ func (c *Client) Lookup(alias string) (ids.ID, error) {
 
 func (c *Client) PrimaryAlias(id ids.ID) (string, error) {
 	resp, err := c.client.PrimaryAlias(context.Background(), &aliasreaderpb.ID{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	if err != nil {
 		return "", err
@@ -46,7 +46,7 @@ func (c *Client) PrimaryAlias(id ids.ID) (string, error) {
 
 func (c *Client) Aliases(id ids.ID) ([]string, error) {
 	resp, err := c.client.Aliases(context.Background(), &aliasreaderpb.ID{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	if err != nil {
 		return nil, err

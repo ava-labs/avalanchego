@@ -76,7 +76,7 @@ func TestNewImportTx(t *testing.T) {
 				env.ctx.ChainID: {
 					PutRequests: []*atomic.Element{
 						{
-							Key:   inputID.Bytes(),
+							Key:   inputID[:],
 							Value: utxoBytes,
 							Traits: [][]byte{
 								sourceKey.PublicKey().Address().Bytes(),

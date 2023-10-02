@@ -133,7 +133,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	for address, assetIDs := range balanceChanges {
 		addressPrefixDB := prefixdb.New([]byte(address), i.db)
 		for assetID := range assetIDs {
-			assetPrefixDB := prefixdb.New(assetID.Bytes(), addressPrefixDB)
+			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
 			var idx uint64
 			idxBytes, err := assetPrefixDB.Get(idxKey)
@@ -156,7 +156,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 				zap.Uint64("index", idx),
 				zap.Stringer("txID", txID),
 			)
-			if err := assetPrefixDB.Put(idxBytes, txID.Bytes()); err != nil {
+			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				return fmt.Errorf("failed to write txID while indexing %s: %w", txID, err)
 			}
 
@@ -181,7 +181,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
 	addressTxDB := prefixdb.New(address, i.db)
-	assetPrefixDB := prefixdb.New(assetID.Bytes(), addressTxDB)
+	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
 
 	// get cursor in bytes
 	cursorBytes := make([]byte, wrappers.LongLen)

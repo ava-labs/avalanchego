@@ -333,7 +333,7 @@ func (i *indexer) registerChainHelper(
 	acceptorGroup snow.AcceptorGroup,
 ) (Index, error) {
 	prefix := make([]byte, ids.IDLen+wrappers.ByteLen)
-	copy(prefix, chainID.Bytes())
+	copy(prefix, chainID[:])
 	prefix[ids.IDLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
 	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
@@ -409,7 +409,7 @@ func (i *indexer) close() error {
 
 func (i *indexer) markIncomplete(chainID ids.ID) error {
 	key := make([]byte, ids.IDLen+wrappers.ByteLen)
-	copy(key, chainID.Bytes())
+	copy(key, chainID[:])
 	key[ids.IDLen] = isIncompletePrefix
 	return i.db.Put(key, nil)
 }
@@ -417,14 +417,14 @@ func (i *indexer) markIncomplete(chainID ids.ID) error {
 // Returns true if this chain is incomplete
 func (i *indexer) isIncomplete(chainID ids.ID) (bool, error) {
 	key := make([]byte, ids.IDLen+wrappers.ByteLen)
-	copy(key, chainID.Bytes())
+	copy(key, chainID[:])
 	key[ids.IDLen] = isIncompletePrefix
 	return i.db.Has(key)
 }
 
 func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
 	key := make([]byte, ids.IDLen+wrappers.ByteLen)
-	copy(key, chainID.Bytes())
+	copy(key, chainID[:])
 	key[ids.IDLen] = previouslyIndexedPrefix
 	return i.db.Put(key, nil)
 }
@@ -432,7 +432,7 @@ func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
 // Returns true if this chain is incomplete
 func (i *indexer) previouslyIndexed(chainID ids.ID) (bool, error) {
 	key := make([]byte, ids.IDLen+wrappers.ByteLen)
-	copy(key, chainID.Bytes())
+	copy(key, chainID[:])
 	key[ids.IDLen] = previouslyIndexedPrefix
 	return i.db.Has(key)
 }

@@ -28,7 +28,7 @@ func (c *Client) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	_, err := c.client.SendCrossChainAppRequest(
 		ctx,
 		&appsenderpb.SendCrossChainAppRequestMsg{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Request:   appRequestBytes,
 		},
@@ -40,7 +40,7 @@ func (c *Client) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	_, err := c.client.SendCrossChainAppResponse(
 		ctx,
 		&appsenderpb.SendCrossChainAppResponseMsg{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Response:  appResponseBytes,
 		},

@@ -1239,7 +1239,7 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	protoNode := node.ToProto()
 
 	childID := ids.GenerateTestID()
-	protoNode.Children[NodeBranchFactor] = childID.Bytes()
+	protoNode.Children[NodeBranchFactor] = childID[:]
 
 	var unmarshaledNode ProofNode
 	err := unmarshaledNode.UnmarshalProto(protoNode)

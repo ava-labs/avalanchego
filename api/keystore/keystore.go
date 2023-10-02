@@ -158,7 +158,7 @@ func (ks *keystore) GetRawDatabase(bID ids.ID, username, pw string) (database.Da
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)
-	bcDB := prefixdb.NewNested(bID.Bytes(), userDB)
+	bcDB := prefixdb.NewNested(bID[:], userDB)
 	return bcDB, nil
 }
 

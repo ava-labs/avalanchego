@@ -602,7 +602,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
 					{
-						Key:   inputID.Bytes(),
+						Key:   inputID[:],
 						Value: utxoBytes,
 					},
 				},
@@ -851,7 +851,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
 					{
-						Key:   inputID.Bytes(),
+						Key:   inputID[:],
 						Value: utxoBytes,
 					},
 				},

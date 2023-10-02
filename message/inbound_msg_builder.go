@@ -46,7 +46,7 @@ func InboundGetStateSummaryFrontier(
 		nodeID: nodeID,
 		op:     GetStateSummaryFrontierOp,
 		message: &p2p.GetStateSummaryFrontier{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 		},
@@ -64,7 +64,7 @@ func InboundStateSummaryFrontier(
 		nodeID: nodeID,
 		op:     StateSummaryFrontierOp,
 		message: &p2p.StateSummaryFrontier{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Summary:   summary,
 		},
@@ -83,7 +83,7 @@ func InboundGetAcceptedStateSummary(
 		nodeID: nodeID,
 		op:     GetAcceptedStateSummaryOp,
 		message: &p2p.GetAcceptedStateSummary{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 			Heights:   heights,
@@ -104,7 +104,7 @@ func InboundAcceptedStateSummary(
 		nodeID: nodeID,
 		op:     AcceptedStateSummaryOp,
 		message: &p2p.AcceptedStateSummary{
-			ChainId:    chainID.Bytes(),
+			ChainId:    chainID[:],
 			RequestId:  requestID,
 			SummaryIds: summaryIDBytes,
 		},
@@ -123,7 +123,7 @@ func InboundGetAcceptedFrontier(
 		nodeID: nodeID,
 		op:     GetAcceptedFrontierOp,
 		message: &p2p.GetAcceptedFrontier{
-			ChainId:    chainID.Bytes(),
+			ChainId:    chainID[:],
 			RequestId:  requestID,
 			Deadline:   uint64(deadline),
 			EngineType: engineType,
@@ -142,9 +142,9 @@ func InboundAcceptedFrontier(
 		nodeID: nodeID,
 		op:     AcceptedFrontierOp,
 		message: &p2p.AcceptedFrontier{
-			ChainId:     chainID.Bytes(),
+			ChainId:     chainID[:],
 			RequestId:   requestID,
-			ContainerId: containerID.Bytes(),
+			ContainerId: containerID[:],
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -164,7 +164,7 @@ func InboundGetAccepted(
 		nodeID: nodeID,
 		op:     GetAcceptedOp,
 		message: &p2p.GetAccepted{
-			ChainId:      chainID.Bytes(),
+			ChainId:      chainID[:],
 			RequestId:    requestID,
 			Deadline:     uint64(deadline),
 			ContainerIds: containerIDBytes,
@@ -186,7 +186,7 @@ func InboundAccepted(
 		nodeID: nodeID,
 		op:     AcceptedOp,
 		message: &p2p.Accepted{
-			ChainId:      chainID.Bytes(),
+			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ContainerIds: containerIDBytes,
 		},
@@ -206,7 +206,7 @@ func InboundPushQuery(
 		nodeID: nodeID,
 		op:     PushQueryOp,
 		message: &p2p.PushQuery{
-			ChainId:    chainID.Bytes(),
+			ChainId:    chainID[:],
 			RequestId:  requestID,
 			Deadline:   uint64(deadline),
 			Container:  container,
@@ -228,10 +228,10 @@ func InboundPullQuery(
 		nodeID: nodeID,
 		op:     PullQueryOp,
 		message: &p2p.PullQuery{
-			ChainId:     chainID.Bytes(),
+			ChainId:     chainID[:],
 			RequestId:   requestID,
 			Deadline:    uint64(deadline),
-			ContainerId: containerID.Bytes(),
+			ContainerId: containerID[:],
 			EngineType:  engineType,
 		},
 		expiration: time.Now().Add(deadline),
@@ -249,10 +249,10 @@ func InboundChits(
 		nodeID: nodeID,
 		op:     ChitsOp,
 		message: &p2p.Chits{
-			ChainId:     chainID.Bytes(),
+			ChainId:     chainID[:],
 			RequestId:   requestID,
-			PreferredId: preferredID.Bytes(),
-			AcceptedId:  acceptedID.Bytes(),
+			PreferredId: preferredID[:],
+			AcceptedId:  acceptedID[:],
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -269,7 +269,7 @@ func InboundAppRequest(
 		nodeID: nodeID,
 		op:     AppRequestOp,
 		message: &p2p.AppRequest{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  uint64(deadline),
 			AppBytes:  msg,
@@ -288,7 +288,7 @@ func InboundAppResponse(
 		nodeID: nodeID,
 		op:     AppResponseOp,
 		message: &p2p.AppResponse{
-			ChainId:   chainID.Bytes(),
+			ChainId:   chainID[:],
 			RequestId: requestID,
 			AppBytes:  msg,
 		},
@@ -299,6 +299,6 @@ func InboundAppResponse(
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
 		copy := id
-		result[i] = copy.Bytes()
+		result[i] = copy[:]
 	}
 }

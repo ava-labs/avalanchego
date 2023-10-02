@@ -96,7 +96,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 	utxoIDs := make([][]byte, len(tx.ImportedIns))
 	for i, in := range tx.ImportedIns {
 		inputID := in.UTXOID.InputID()
-		utxoIDs[i] = inputID.Bytes()
+		utxoIDs[i] = inputID[:]
 	}
 
 	allUTXOBytes, err := v.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)

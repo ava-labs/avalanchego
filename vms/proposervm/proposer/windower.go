@@ -55,7 +55,7 @@ type windower struct {
 }
 
 func New(state validators.State, subnetID, chainID ids.ID) Windower {
-	w := wrappers.Packer{Bytes: chainID.Bytes()}
+	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
 		state:       state,
 		subnetID:    subnetID,

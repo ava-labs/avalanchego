@@ -608,7 +608,7 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID.Bytes())
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
 
 	db := prefixDBManager.Current()
@@ -1013,7 +1013,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID.Bytes())
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
 
 	db := prefixDBManager.Current()

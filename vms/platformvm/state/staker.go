@@ -80,7 +80,7 @@ func (s *Staker) Less(than *Staker) bool {
 		return false
 	}
 
-	return bytes.Compare(s.TxID.Bytes(), than.TxID.Bytes()) == -1
+	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
 func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {

@@ -43,7 +43,7 @@ func (s *Server) GetSubnetID(ctx context.Context, req *pb.GetSubnetIDRequest) (*
 
 	subnetID, err := s.state.GetSubnetID(ctx, chainID)
 	return &pb.GetSubnetIDResponse{
-		SubnetId: subnetID.Bytes(),
+		SubnetId: subnetID[:],
 	}, err
 }
 
