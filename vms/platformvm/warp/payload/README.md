@@ -21,7 +21,7 @@ AddressedPayload:
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `typeID` is the payload type identifier and is `0x00000000` for `AddressedPayload`
-- `sourceAddress` is the address that called `sendWarpPrecompile` on the source chain
+- `sourceAddress` is the address that sent this message from the source chain
 - `payload` is an arbitrary byte array payload
 
 ## BlockHashPayload
