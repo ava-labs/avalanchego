@@ -7,11 +7,11 @@ import (
 	"encoding/base64"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestAddressedPayload(t *testing.T) {
