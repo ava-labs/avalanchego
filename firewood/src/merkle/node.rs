@@ -133,7 +133,7 @@ impl BranchNode {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
 
-                    if c_ref.is_encoded_big::<S>(store) {
+                    if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
                         list[i] = Encoded::Data(
                             bincode::DefaultOptions::new()
                                 .serialize(&&(*c_ref.get_root_hash::<S>(store))[..])
@@ -267,7 +267,7 @@ impl ExtNode {
         if !self.1.is_null() {
             let mut r = store.get_item(self.1).unwrap();
 
-            if r.is_encoded_big(store) {
+            if r.is_encoded_longer_than_hash_len(store) {
                 list[1] = Encoded::Data(
                     bincode::DefaultOptions::new()
                         .serialize(&&(*r.get_root_hash(store))[..])
@@ -326,7 +326,7 @@ impl ExtNode {
 #[derive(Debug)]
 pub struct Node {
     pub(super) root_hash: OnceLock<TrieHash>,
-    is_encoded_big: OnceLock<bool>,
+    is_encoded_longer_than_hash_len: OnceLock<bool>,
     encoded: OnceLock<Vec<u8>>,
     // lazy_dirty is an atomicbool, but only writers ever set it
     // Therefore, we can always use Relaxed ordering. It's atomic
@@ -340,13 +340,13 @@ impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
         let Node {
             root_hash,
-            is_encoded_big,
+            is_encoded_longer_than_hash_len,
             encoded,
             lazy_dirty,
             inner,
         } = self;
         *root_hash == other.root_hash
-            && *is_encoded_big == other.is_encoded_big
+            && *is_encoded_longer_than_hash_len == other.is_encoded_longer_than_hash_len
             && *encoded == other.encoded
             && (*lazy_dirty).load(Ordering::Relaxed) == other.lazy_dirty.load(Ordering::Relaxed)
             && *inner == other.inner
@@ -356,7 +356,7 @@ impl Clone for Node {
     fn clone(&self) -> Self {
         Self {
             root_hash: self.root_hash.clone(),
-            is_encoded_big: self.is_encoded_big.clone(),
+            is_encoded_longer_than_hash_len: self.is_encoded_longer_than_hash_len.clone(),
             encoded: self.encoded.clone(),
             lazy_dirty: AtomicBool::new(self.lazy_dirty.load(Ordering::Relaxed)),
             inner: self.inner.clone(),
@@ -424,7 +424,7 @@ impl Node {
         *max_size.get_or_init(|| {
             Self {
                 root_hash: OnceLock::new(),
-                is_encoded_big: OnceLock::new(),
+                is_encoded_longer_than_hash_len: OnceLock::new(),
                 encoded: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
                     chd: [Some(DiskAddress::null()); NBRANCH],
@@ -448,8 +448,8 @@ impl Node {
         })
     }
 
-    fn is_encoded_big<S: ShaleStore<Node>>(&self, store: &S) -> bool {
-        *self.is_encoded_big.get_or_init(|| {
+    fn is_encoded_longer_than_hash_len<S: ShaleStore<Node>>(&self, store: &S) -> bool {
+        *self.is_encoded_longer_than_hash_len.get_or_init(|| {
             self.lazy_dirty.store(true, Ordering::Relaxed);
             self.get_encoded(store).len() >= TRIE_HASH_LEN
         })
@@ -457,14 +457,14 @@ impl Node {
 
     pub(super) fn rehash(&mut self) {
         self.encoded = OnceLock::new();
-        self.is_encoded_big = OnceLock::new();
+        self.is_encoded_longer_than_hash_len = OnceLock::new();
         self.root_hash = OnceLock::new();
     }
 
     pub fn new(inner: NodeType) -> Self {
         let mut s = Self {
             root_hash: OnceLock::new(),
-            is_encoded_big: OnceLock::new(),
+            is_encoded_longer_than_hash_len: OnceLock::new(),
             encoded: OnceLock::new(),
             inner,
             lazy_dirty: AtomicBool::new(false),
@@ -483,7 +483,7 @@ impl Node {
 
     pub(super) fn new_from_hash(
         root_hash: Option<TrieHash>,
-        encoded_big: Option<bool>,
+        encoded_longer_than_hash_len: Option<bool>,
         inner: NodeType,
     ) -> Self {
         Self {
@@ -491,7 +491,7 @@ impl Node {
                 Some(h) => OnceLock::from(h),
                 None => OnceLock::new(),
             },
-            is_encoded_big: match encoded_big {
+            is_encoded_longer_than_hash_len: match encoded_longer_than_hash_len {
                 Some(b) => OnceLock::from(b),
                 None => OnceLock::new(),
             },
@@ -526,7 +526,7 @@ impl Storable for Node {
                     .expect("invalid slice"),
             ))
         };
-        let encoded_big = if attrs & Node::IS_ENCODED_BIG_VALID == 0 {
+        let is_encoded_longer_than_hash_len = if attrs & Node::IS_ENCODED_BIG_VALID == 0 {
             None
         } else {
             Some(attrs & Node::LONG_BIT != 0)
@@ -599,7 +599,7 @@ impl Storable for Node {
 
                 Ok(Self::new_from_hash(
                     root_hash,
-                    encoded_big,
+                    is_encoded_longer_than_hash_len,
                     NodeType::Branch(BranchNode {
                         chd,
                         value,
@@ -670,7 +670,7 @@ impl Storable for Node {
 
                 Ok(Self::new_from_hash(
                     root_hash,
-                    encoded_big,
+                    is_encoded_longer_than_hash_len,
                     NodeType::Extension(ExtNode(path, DiskAddress::from(ptr as usize), encoded)),
                 ))
             }
@@ -709,7 +709,7 @@ impl Storable for Node {
                 let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
                 Ok(Self::new_from_hash(
                     root_hash,
-                    encoded_big,
+                    is_encoded_longer_than_hash_len,
                     NodeType::Leaf(LeafNode(path, value)),
                 ))
             }
@@ -763,7 +763,7 @@ impl Storable for Node {
                 0
             }
         };
-        attrs |= match self.is_encoded_big.get() {
+        attrs |= match self.is_encoded_longer_than_hash_len.get() {
             Some(b) => (if *b { Node::LONG_BIT } else { 0 } | Node::IS_ENCODED_BIG_VALID),
             None => 0,
         };
