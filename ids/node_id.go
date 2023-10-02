@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	EmptyNodeID = NodeID(string(EmptyShortNodeID[:]))
+	EmptyNodeID = NodeID(EmptyShortNodeID[:])
 
 	_ utils.Sortable[NodeID] = (*NodeID)(nil)
 )
@@ -22,22 +22,22 @@ type NodeID string
 
 // Any modification to Bytes will be lost since id is passed-by-value
 // Directly access NodeID[:] if you need to modify the NodeID
-func (nodeID NodeID) Bytes() []byte {
-	return []byte(nodeID)
+func (n NodeID) Bytes() []byte {
+	return []byte(n)
 }
 
-func (nodeID NodeID) String() string {
+func (n NodeID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := cb58.Encode([]byte(nodeID))
+	str, _ := cb58.Encode([]byte(n))
 	return ShortNodeIDPrefix + str
 }
 
-func (nodeID NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + nodeID.String() + "\""), nil
+func (n NodeID) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + n.String() + "\""), nil
 }
 
-func (nodeID *NodeID) UnmarshalJSON(b []byte) error {
+func (n *NodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
@@ -52,38 +52,38 @@ func (nodeID *NodeID) UnmarshalJSON(b []byte) error {
 	}
 
 	var err error
-	*nodeID, err = NodeIDFromString(str[1:lastIndex])
+	*n, err = NodeIDFromString(str[1:lastIndex])
 	return err
 }
 
-func (nodeID NodeID) MarshalText() ([]byte, error) {
-	return []byte(nodeID.String()), nil
+func (n NodeID) MarshalText() ([]byte, error) {
+	return []byte(n.String()), nil
 }
 
-func (nodeID *NodeID) UnmarshalText(text []byte) error {
-	return nodeID.UnmarshalJSON(text)
+func (n *NodeID) UnmarshalText(text []byte) error {
+	return n.UnmarshalJSON(text)
 }
 
-func (nodeID NodeID) Less(other NodeID) bool {
-	return nodeID < other
+func (n NodeID) Less(other NodeID) bool {
+	return n < other
 }
 
 func NodeIDFromBytes(src []byte, length int) NodeID {
 	bytes := make([]byte, length)
 	copy(bytes, src)
-	return NodeID(string(bytes))
+	return NodeID(bytes)
 }
 
 // NodeIDFromShortNodeID attempt to convert a byte slice into a node id
 func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
-	return NodeID(string(nodeID.Bytes()))
+	return NodeID(nodeID.Bytes())
 }
 
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	bytes := hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
-	return NodeID(string(bytes[:]))
+	return NodeID(bytes[:])
 }
 
 // NodeIDFromString is the inverse of NodeID.String()

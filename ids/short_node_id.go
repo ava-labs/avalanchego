@@ -28,13 +28,8 @@ var (
 
 type ShortNodeID ShortID
 
-// WritableShortNode is an helper which helps modifiying NodeID content
-func WritableShortNode(id *ShortNodeID) []byte {
-	return id[:]
-}
-
-func (id ShortNodeID) Bytes() []byte {
-	return id[:]
+func (sn ShortNodeID) Bytes() []byte {
+	return sn[:]
 }
 
 // ToShortNodeID attempt to convert a byte slice into a node id
@@ -43,8 +38,8 @@ func ToShortNodeID(bytes []byte) (ShortNodeID, error) {
 	return ShortNodeID(nodeID), err
 }
 
-func (id ShortNodeID) String() string {
-	return ShortID(id).PrefixedString(ShortNodeIDPrefix)
+func (sn ShortNodeID) String() string {
+	return ShortID(sn).PrefixedString(ShortNodeIDPrefix)
 }
 
 // ShortNodeIDFromString is the inverse of NodeID.String()
@@ -68,11 +63,11 @@ func ShortNodeIDFromNodeID(nodeID NodeID) (ShortNodeID, error) {
 	return res, nil
 }
 
-func (id ShortNodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + id.String() + "\""), nil
+func (sn ShortNodeID) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + sn.String() + "\""), nil
 }
 
-func (id *ShortNodeID) UnmarshalJSON(b []byte) error {
+func (sn *ShortNodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
@@ -86,20 +81,20 @@ func (id *ShortNodeID) UnmarshalJSON(b []byte) error {
 	}
 
 	var err error
-	*id, err = ShortNodeIDFromString(str[1:lastIndex])
+	*sn, err = ShortNodeIDFromString(str[1:lastIndex])
 	return err
 }
 
-func (id ShortNodeID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
+func (sn ShortNodeID) MarshalText() ([]byte, error) {
+	return []byte(sn.String()), nil
 }
 
-func (id *ShortNodeID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+func (sn *ShortNodeID) UnmarshalText(text []byte) error {
+	return sn.UnmarshalJSON(text)
 }
 
-func (id ShortNodeID) Less(other ShortNodeID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (sn ShortNodeID) Less(other ShortNodeID) bool {
+	return bytes.Compare(sn[:], other[:]) == -1
 }
 
 func ShortNodeIDFromCert(cert *staking.Certificate) ShortNodeID {
