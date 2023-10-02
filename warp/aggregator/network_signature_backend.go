@@ -16,6 +16,7 @@ import (
 
 const (
 	initialRetryFetchSignatureDelay = 100 * time.Millisecond
+	maxRetryFetchSignatureDelay     = 5 * time.Second
 	retryBackoffFactor              = 2
 )
 
@@ -44,17 +45,30 @@ func (s *NetworkSigner) GetSignature(ctx context.Context, nodeID ids.NodeID, uns
 	}
 
 	delay := initialRetryFetchSignatureDelay
-	for ctx.Err() == nil {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	for {
 		signatureRes, err := s.Client.SendAppRequest(nodeID, signatureReqBytes)
 		// If the client fails to retrieve a response perform an exponential backoff.
 		// Note: it is up to the caller to ensure that [ctx] is eventually cancelled
 		if err != nil {
+			// Wait until the retry delay has elapsed before retrying.
+			if !timer.Stop() {
+				<-timer.C
+			}
+			timer.Reset(delay)
+
 			select {
 			case <-ctx.Done():
-				break
-			case <-time.After(delay):
+				return nil, ctx.Err()
+			case <-timer.C:
 			}
+
+			// Exponential backoff.
 			delay *= retryBackoffFactor
+			if delay > maxRetryFetchSignatureDelay {
+				delay = maxRetryFetchSignatureDelay
+			}
 			continue
 		}
 
@@ -69,6 +83,4 @@ func (s *NetworkSigner) GetSignature(ctx context.Context, nodeID ids.NodeID, uns
 		}
 		return blsSignature, nil
 	}
-
-	return nil, fmt.Errorf("ctx expired fetching signature for message %s from %s: %w", unsignedWarpMessage.ID(), nodeID, ctx.Err())
 }
