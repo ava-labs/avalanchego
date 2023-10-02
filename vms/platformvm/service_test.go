@@ -74,7 +74,7 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+func defaultService(t *testing.T) (*Service, *ts.MutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

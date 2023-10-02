@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"errors"
 	"math"
 	"testing"
@@ -15,12 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,13 +55,7 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory secp256k1.Factory
-
-	errMissing = errors.New("missing")
 )
-
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
 
 type environment struct {
 	isBootstrapped *utils.Atomic[bool]
@@ -72,7 +63,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *mutableSharedMemory
+	msm            *ts.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
@@ -96,6 +87,8 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
+	r := require.New(t)
+
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -104,7 +97,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx, msm := defaultCtx(baseDB)
+	ctx, msm := ts.Context(r, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -228,38 +221,6 @@ func defaultState(
 	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
-}
-
-func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = ts.NetworkID
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx, msm
 }
 
 func defaultConfig(postBanff, postCortina bool) config.Config {

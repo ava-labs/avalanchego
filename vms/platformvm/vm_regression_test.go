@@ -345,7 +345,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
@@ -360,7 +359,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	ctx := defaultContext(t)
+	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -379,9 +378,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		nil,
 		nil,
 	))
-
-	m := atomic.NewMemory(atomicDB)
-	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// set time to post Banff fork
 	vm.clock.Set(banffForkTime.Add(time.Second))

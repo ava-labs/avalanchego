@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -90,48 +89,7 @@ var (
 	testSubnet1ControlKeys = ts.Keys[0:3]
 
 	testKeyFactory secp256k1.Factory
-
-	errMissing = errors.New("missing")
 )
-
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
-
-func defaultContext(t *testing.T) *snow.Context {
-	require := require.New(t)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-	aliaser := ids.NewAliaser()
-
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	require.NoError(aliaser.Alias(ts.XChainID, "X"))
-	require.NoError(aliaser.Alias(ts.XChainID, ts.XChainID.String()))
-	require.NoError(aliaser.Alias(ts.CChainID, "C"))
-	require.NoError(aliaser.Alias(ts.CChainID, ts.CChainID.String()))
-
-	ctx.BCLookup = aliaser
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
-}
 
 // Returns:
 // 1) The genesis state
@@ -267,7 +225,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	require := require.New(t)
 
 	vdrs := validators.NewManager()
@@ -295,17 +253,10 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm.clock.Set(banffForkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
-
-	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx, msm := ts.Context(require, baseDBManager.Current().Database)
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -1169,15 +1120,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
-
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
-	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(firstCtx.ChainID),
-	}
-	firstCtx.SharedMemory = msm
+	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -1257,8 +1201,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
-	secondCtx.SharedMemory = msm
+	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -1266,7 +1209,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := baseDBManager.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
@@ -1313,14 +1256,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
-
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
-	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
@@ -1616,7 +1552,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
@@ -1633,7 +1569,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
+	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1644,7 +1580,7 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1776,9 +1712,9 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	firstDB := db.NewPrefixDBManager([]byte{})
+	firstDB := baseDBManager.NewPrefixDBManager([]byte{})
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
@@ -1793,7 +1729,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
+	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
@@ -1826,7 +1762,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	// Restart the VM with a larger uptime requirement
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := baseDBManager.NewPrefixDBManager([]byte{})
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
@@ -1840,7 +1776,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
+	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -1922,7 +1858,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
@@ -1936,7 +1872,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	ctx := defaultContext(t)
+	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -1944,7 +1880,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		db,
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,

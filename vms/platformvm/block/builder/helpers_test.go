@@ -4,8 +4,6 @@
 package builder
 
 import (
-	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -14,12 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,13 +54,7 @@ var (
 	testSubnet1ControlKeys = ts.Keys[0:3]
 
 	defaultTxFee = uint64(100)
-
-	errMissing = errors.New("missing")
 )
-
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
 
 type environment struct {
 	Builder
@@ -77,7 +67,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *mutableSharedMemory
+	msm            *ts.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
@@ -88,7 +78,7 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T) *environment {
-	require := require.New(t)
+	r := require.New(t)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
@@ -99,7 +89,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
-	res.ctx, res.msm = defaultCtx(res.baseDB)
+	res.ctx, res.msm = ts.Context(r, res.baseDB)
 
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
@@ -139,10 +129,10 @@ func newEnvironment(t *testing.T) *environment {
 	res.sender = &common.SenderTest{T: t}
 
 	metrics, err := metrics.New("", registerer)
-	require.NoError(err)
+	r.NoError(err)
 
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
-	require.NoError(err)
+	r.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
@@ -229,38 +219,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx, msm
 }
 
 func defaultConfig() *config.Config {
