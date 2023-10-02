@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ TestManager = (*manager)(nil)
+var _ Manager = (*manager)(nil)
 
 type Manager interface {
 	Tracker
@@ -35,22 +35,18 @@ type Calculator interface {
 	CalculateUptimePercentFrom(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) (float64, error)
 }
 
-type TestManager interface {
-	Manager
-	SetTime(time.Time)
-}
-
 type manager struct {
 	// Used to get time. Useful for faking time during tests.
-	clock mockable.Clock
+	clock *mockable.Clock
 
 	state          State
 	connections    map[ids.NodeID]map[ids.ID]time.Time // nodeID -> subnetID -> time
 	trackedSubnets set.Set[ids.ID]
 }
 
-func NewManager(state State) Manager {
+func NewManager(state State, clk *mockable.Clock) Manager {
 	return &manager{
+		clock:       clk,
 		state:       state,
 		connections: make(map[ids.NodeID]map[ids.ID]time.Time),
 	}
@@ -204,10 +200,6 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetID ids.ID,
 	}
 	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
 	return uptime, nil
-}
-
-func (m *manager) SetTime(newTime time.Time) {
-	m.clock.Set(newTime)
 }
 
 // updateSubnetUptime updates the subnet uptime of the node on the state by the amount

@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -46,6 +47,7 @@ func newDefaultConfig() Config {
 		IntermediateNodeCacheSize: units.MiB,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
+		BranchFactor:              BranchFactor16,
 	}
 }
 
@@ -61,7 +63,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(newPath(keyBytes), true)
+	n, err := db.getNode(NewPath(keyBytes, BranchFactor16), true)
 	require.NoError(err)
 
 	// node's value shouldn't be affected by the edit
@@ -94,20 +96,24 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
-	for _, test := range database.Tests {
-		db, err := getBasicDB()
-		require.NoError(t, err)
-		test(t, db)
+	for _, bf := range branchFactors {
+		for _, test := range database.Tests {
+			db, err := getBasicDBWithBranchFactor(bf)
+			require.NoError(t, err)
+			test(t, db)
+		}
 	}
 }
 
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			db, err := getBasicDB()
-			require.NoError(b, err)
-			bench(b, db, "merkledb", keys, values)
+		for _, bf := range branchFactors {
+			for _, bench := range database.Benchmarks {
+				db, err := getBasicDBWithBranchFactor(bf)
+				require.NoError(b, err)
+				bench(b, db, fmt.Sprintf("merkledb_%d", bf), keys, values)
+			}
 		}
 	}
 }
@@ -779,7 +785,19 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			}
 			require := require.New(t)
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			runRandDBTest(require, r, generateRandTest(require, r, size, 0.01 /*checkHashProbability*/))
+			for _, bf := range branchFactors {
+				runRandDBTest(
+					require,
+					r,
+					generateRandTest(
+						require,
+						r,
+						size,
+						0.01, /*checkHashProbability*/
+					),
+					bf,
+				)
+			}
 		})
 }
 
@@ -795,7 +813,20 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		}
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-		runRandDBTest(require, r, generateInitialValues(require, r, initialValues, numSteps, 0.001 /*checkHashProbability*/))
+		for _, bf := range branchFactors {
+			runRandDBTest(
+				require,
+				r,
+				generateInitialValues(
+					require,
+					r,
+					initialValues,
+					numSteps,
+					0.001, /*checkHashProbability*/
+				),
+				bf,
+			)
+		}
 	})
 }
 
@@ -820,8 +851,8 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
-	db, err := getBasicDB()
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf BranchFactor) {
+	db, err := getBasicDBWithBranchFactor(bf)
 	require.NoError(err)
 
 	const (
@@ -830,10 +861,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	)
 
 	var (
-		values               = make(map[path][]byte) // tracks content of the trie
+		values               = make(map[Path][]byte) // tracks content of the trie
 		currentBatch         = db.NewBatch()
-		uncommittedKeyValues = make(map[path][]byte)
-		uncommittedDeletes   = set.Set[path]{}
+		uncommittedKeyValues = make(map[Path][]byte)
+		uncommittedDeletes   = set.Set[Path]{}
 		pastRoots            = []ids.ID{}
 	)
 
@@ -846,13 +877,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
 
-			uncommittedKeyValues[newPath(step.key)] = step.value
-			uncommittedDeletes.Remove(newPath(step.key))
+			uncommittedKeyValues[NewPath(step.key, bf)] = step.value
+			uncommittedDeletes.Remove(NewPath(step.key, bf))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
 
-			uncommittedDeletes.Add(newPath(step.key))
-			delete(uncommittedKeyValues, newPath(step.key))
+			uncommittedDeletes.Add(NewPath(step.key, bf))
+			delete(uncommittedKeyValues, NewPath(step.key, bf))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -906,7 +937,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
-			changeProofDB, err := getBasicDB()
+			changeProofDB, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
@@ -953,10 +984,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			want := values[newPath(step.key)]
+			want := values[NewPath(step.key, bf)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 
-			trieValue, err := getNodeValue(db, string(step.key))
+			trieValue, err := getNodeValueWithBranchFactor(db, string(step.key), bf)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
@@ -964,18 +995,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
 			// Create a view with the same key-values as [db]
-			newDB, err := newDatabase(
-				context.Background(),
-				memdb.New(),
-				newDefaultConfig(),
-				&mockMetrics{},
-			)
+			newDB, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(err)
 
 			ops := make([]database.BatchOp, 0, len(values))
 			for key, value := range values {
 				ops = append(ops, database.BatchOp{
-					Key:   key.Serialize().Value,
+					Key:   key.Bytes(),
 					Value: value,
 				})
 			}
@@ -1031,7 +1057,7 @@ func generateRandTestWithKeys(
 	genEnd := func(key []byte) []byte {
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
+		got := r.Float64() // #nosec G404
 		if got < nilEndProbability {
 			return nil
 		}
@@ -1119,7 +1145,7 @@ func generateInitialValues(
 		}
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := rand.Float64() // #nosec G404
+		got := r.Float64() // #nosec G404
 		if got < nilValueProbability {
 			step.value = nil
 		} else {
