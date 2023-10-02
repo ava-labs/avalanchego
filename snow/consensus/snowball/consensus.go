@@ -51,9 +51,6 @@ type NnarySnowball interface{ NnarySnowflake }
 type NnarySnowflake interface {
 	fmt.Stringer
 
-	// Takes in beta1, beta2, and the initial choice
-	Initialize(betaVirtuous, betaRogue int, initialPreference ids.ID)
-
 	// Adds a new possible choice
 	Add(newChoice ids.ID)
 
@@ -77,9 +74,6 @@ type NnarySnowflake interface {
 type NnarySlush interface {
 	fmt.Stringer
 
-	// Takes in the initial choice
-	Initialize(initialPreference ids.ID)
-
 	// Returns the currently preferred choice to be finalized
 	Preference() ids.ID
 
@@ -98,9 +92,6 @@ type BinarySnowball interface{ BinarySnowflake }
 // reset.
 type BinarySnowflake interface {
 	fmt.Stringer
-
-	// Takes in the beta value, and the initial choice
-	Initialize(beta, initialPreference int)
 
 	// Returns the currently preferred choice to be finalized
 	Preference() int
@@ -122,9 +113,6 @@ type BinarySnowflake interface {
 type BinarySlush interface {
 	fmt.Stringer
 
-	// Takes in the initial choice
-	Initialize(initialPreference int)
-
 	// Returns the currently preferred choice to be finalized
 	Preference() int
 
@@ -138,9 +126,6 @@ type BinarySlush interface {
 // should vote. Otherwise, you should reset.
 type UnarySnowball interface {
 	fmt.Stringer
-
-	// Takes in the beta value
-	Initialize(beta int)
 
 	// RecordSuccessfulPoll records a successful poll towards finalizing
 	RecordSuccessfulPoll()
@@ -164,9 +149,6 @@ type UnarySnowball interface {
 // choice, you should vote. Otherwise, you should reset.
 type UnarySnowflake interface {
 	fmt.Stringer
-
-	// Takes in the beta value
-	Initialize(beta int)
 
 	// RecordSuccessfulPoll records a successful poll towards finalizing
 	RecordSuccessfulPoll()

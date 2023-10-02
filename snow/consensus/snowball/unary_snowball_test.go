@@ -22,17 +22,16 @@ func TestUnarySnowball(t *testing.T) {
 
 	beta := 2
 
-	sb := &unarySnowball{}
-	sb.Initialize(beta)
+	sb := newUnarySnowball(beta)
 
 	sb.RecordSuccessfulPoll()
-	UnarySnowballStateTest(t, sb, 1, 1, false)
+	UnarySnowballStateTest(t, &sb, 1, 1, false)
 
 	sb.RecordUnsuccessfulPoll()
-	UnarySnowballStateTest(t, sb, 1, 0, false)
+	UnarySnowballStateTest(t, &sb, 1, 0, false)
 
 	sb.RecordSuccessfulPoll()
-	UnarySnowballStateTest(t, sb, 2, 1, false)
+	UnarySnowballStateTest(t, &sb, 2, 1, false)
 
 	sbCloneIntf := sb.Clone()
 	require.IsType(&unarySnowball{}, sbCloneIntf)

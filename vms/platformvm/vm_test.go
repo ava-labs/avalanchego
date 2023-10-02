@@ -1969,13 +1969,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+	firstVM.clock.Set(defaultValidateEndTime)
 
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
@@ -2013,13 +2012,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	))
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
 
 	secondVM.clock.Set(defaultValidateEndTime)
-	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := secondVM.Builder.BuildBlock(context.Background()) // should advance time
 	require.NoError(err)
@@ -2148,14 +2145,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
 	blk, err := vm.Builder.BuildBlock(context.Background()) // should advance time
 	require.NoError(err)
