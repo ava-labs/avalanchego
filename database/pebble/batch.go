@@ -98,7 +98,7 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 				return err
 			}
 		default:
-			return fmt.Errorf("%w: %v", ErrInvalidOperation, kind)
+			return fmt.Errorf("%w: %v", errInvalidOperation, kind)
 		}
 	}
 }

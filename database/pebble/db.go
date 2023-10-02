@@ -30,7 +30,7 @@ const pebbleByteOverHead = 8
 var (
 	_ database.Database = (*Database)(nil)
 
-	ErrInvalidOperation = errors.New("invalid operation")
+	errInvalidOperation = errors.New("invalid operation")
 
 	defaultCacheSize = 512 * units.MiB
 	DefaultConfig    = Config{
