@@ -27,7 +27,7 @@ func TestBatch(t *testing.T) {
 	batch, ok := batchIntf.(*batch)
 	require.True(ok)
 
-	require.False(batch.written.Load())
+	require.False(batch.written)
 
 	key1, value1 := []byte("key1"), []byte("value1")
 	require.NoError(batch.Put(key1, value1))
@@ -35,13 +35,13 @@ func TestBatch(t *testing.T) {
 
 	require.NoError(batch.Write())
 
-	require.True(batch.written.Load())
+	require.True(batch.written)
 
 	got, err := db.Get(key1)
 	require.NoError(err)
 	require.Equal(value1, got)
 
 	batch.Reset()
-	require.False(batch.written.Load())
+	require.False(batch.written)
 	require.Zero(batch.Size())
 }

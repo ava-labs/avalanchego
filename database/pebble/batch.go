@@ -5,7 +5,6 @@ package pebble
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"github.com/cockroachdb/pebble"
 
@@ -22,7 +21,7 @@ type batch struct {
 
 	// True iff [batch] has been written to the database
 	// since the last time [Reset] was called.
-	written atomic.Bool
+	written bool
 }
 
 func (db *Database) NewBatch() database.Batch {
@@ -57,9 +56,13 @@ func (b *batch) Write() error {
 		return database.ErrClosed
 	}
 
-	if b.written.CompareAndSwap(false, true) {
+	if !b.written {
 		// This batch has not been written to the database yet.
-		return updateError(b.batch.Commit(pebble.Sync))
+		if err := updateError(b.batch.Commit(pebble.Sync)); err != nil {
+			return err
+		}
+		b.written = true
+		return nil
 	}
 
 	// pebble doesn't support writing a batch twice so we have to clone
@@ -77,7 +80,7 @@ func (b *batch) Write() error {
 
 func (b *batch) Reset() {
 	b.batch.Reset()
-	b.written.Store(false)
+	b.written = false
 	b.size = 0
 }
 
