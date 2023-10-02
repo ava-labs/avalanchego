@@ -211,30 +211,6 @@ func (p Path) bytesNeeded(tokens int) int {
 	return bytesNeeded
 }
 
-// Extend returns a new Path that equals the passed Path appended to the current Path
-func (p Path) Extend(path Path) Path {
-	if p.tokensLength == 0 {
-		return path
-	}
-	if path.tokensLength == 0 {
-		return p
-	}
-
-	totalLength := p.tokensLength + path.tokensLength
-
-	// copy existing value into  the buffer
-	buffer := make([]byte, p.bytesNeeded(totalLength))
-	copy(buffer, p.value)
-
-	p.extendToBuffer(p.tokensLength, buffer[len(p.value)-1:], path)
-
-	return Path{
-		value:        byteSliceToString(buffer),
-		tokensLength: totalLength,
-		pathConfig:   p.pathConfig,
-	}
-}
-
 // Treats [src] as a bit array and copies it into [dst] shifted by [shift] bits.
 // For example, if [src] is [0b0000_0001, 0b0000_0010] and [shift] is 4,
 // we copy [0b0001_0000, 0b0010_0000] into [dst].
@@ -323,33 +299,6 @@ func (p Path) extendToBuffer(prefixLength int, buffer []byte, path Path) {
 	// copy the rest of the extension path bytes into the buffer,
 	// shifted byte shift bits
 	shiftCopy(buffer[1:], path.value, shift)
-}
-
-func (p Path) Slice(start int, end int) Path {
-	if start == 0 && p.tokensLength == end {
-		return p
-	}
-	if end-start == 0 {
-		return emptyPath(p.branchFactor)
-	}
-
-	result := Path{
-		tokensLength: end - start,
-		pathConfig:   p.pathConfig,
-	}
-
-	// We need to zero out some bits of the last byte so a simple slice will not work
-	// Create a new []byte to store the altered value
-	buffer := make([]byte, result.bytesNeeded(result.tokensLength))
-
-	bitsSkipped := start * int(p.tokenBitSize)
-	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
-	shiftCopy(buffer, p.value[start/p.tokensPerByte:p.bytesNeeded(end)], bitsRemovedFromFirstRemainingByte)
-
-	mask := byte(0xFF << p.bitsToShift(end-start-1))
-	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
-	result.value = byteSliceToString(buffer)
-	return result
 }
 
 // Take returns a new Path that contains the first tokensToTake tokens of the current Path
