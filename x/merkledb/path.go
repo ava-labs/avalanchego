@@ -148,6 +148,7 @@ func (p Path) Token(index int) byte {
 func (p Path) Append(token byte) Path {
 	buffer := make([]byte, p.bytesNeeded(p.tokensLength+1))
 	copy(buffer, p.value)
+
 	// Shift [token] to the left such that it's at the correct
 	// index within its storage byte, then OR it with its storage
 	// byte to write the token into the byte.
@@ -225,26 +226,7 @@ func (p Path) Extend(path Path) Path {
 	buffer := make([]byte, p.bytesNeeded(totalLength))
 	copy(buffer, p.value)
 
-	// If the existing value fits into a whole number of bytes,
-	// the extension path can be copied directly into the buffer.
-	if !p.hasPartialByte() {
-		copy(buffer[len(p.value):], path.value)
-		return Path{
-			value:        byteSliceToString(buffer),
-			tokensLength: totalLength,
-			pathConfig:   p.pathConfig,
-		}
-	}
-
-	// The existing path doesn't fit into a whole number of bytes.
-	// Figure out how many bits to shift.
-	shift := p.bitsToShift(p.tokensLength - 1)
-	// Fill the partial byte with the first [shift] bits of the extension path
-	buffer[len(p.value)-1] |= path.value[0] >> (8 - shift)
-
-	// copy the rest of the extension path bytes into the buffer,
-	// shifted byte shift bits
-	shiftCopy(buffer[len(p.value):], path.value, shift)
+	p.extendToBuffer(p.tokensLength, buffer[len(p.value)-1:], path)
 
 	return Path{
 		value:        byteSliceToString(buffer),
@@ -296,6 +278,76 @@ func (p Path) Skip(tokensToSkip int) Path {
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
+	result.value = byteSliceToString(buffer)
+	return result
+}
+
+func (p Path) AppendExtend(token byte, path Path) Path {
+	appendBytes := p.bytesNeeded(p.tokensLength + 1)
+	totalLength := p.tokensLength + 1 + path.tokensLength
+	totalBytes := p.bytesNeeded(totalLength)
+	buffer := make([]byte, totalBytes)
+	copy(buffer, p.value)
+
+	// Shift [token] to the left such that it's at the correct
+	// index within its storage byte, then OR it with its storage
+	// byte to write the token into the byte.
+	buffer[appendBytes-1] |= token << p.bitsToShift(p.tokensLength)
+
+	p.extendToBuffer(p.tokensLength+1, buffer[appendBytes-1:], path)
+
+	return Path{
+		value:        byteSliceToString(buffer),
+		tokensLength: totalLength,
+		pathConfig:   p.pathConfig,
+	}
+}
+
+func (p Path) extendToBuffer(prefixLength int, buffer []byte, path Path) {
+	if path.tokensLength == 0 {
+		return
+	}
+	// If the existing value fits into a whole number of bytes,
+	// the extension path can be copied directly into the buffer.
+	if prefixLength%p.tokensPerByte == 0 {
+		copy(buffer[1:], path.value)
+		return
+	}
+
+	// The existing path doesn't fit into a whole number of bytes.
+	// Figure out how many bits to shift.
+	shift := p.bitsToShift(prefixLength - 1)
+	// Fill the partial byte with the first [shift] bits of the extension path
+	buffer[0] |= path.value[0] >> (8 - shift)
+
+	// copy the rest of the extension path bytes into the buffer,
+	// shifted byte shift bits
+	shiftCopy(buffer[1:], path.value, shift)
+}
+
+func (p Path) Slice(start int, end int) Path {
+	if start == 0 && p.tokensLength == end {
+		return p
+	}
+	if end-start == 0 {
+		return emptyPath(p.branchFactor)
+	}
+
+	result := Path{
+		tokensLength: end - start,
+		pathConfig:   p.pathConfig,
+	}
+
+	// We need to zero out some bits of the last byte so a simple slice will not work
+	// Create a new []byte to store the altered value
+	buffer := make([]byte, result.bytesNeeded(result.tokensLength))
+
+	bitsSkipped := start * int(p.tokenBitSize)
+	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
+	shiftCopy(buffer, p.value[start/p.tokensPerByte:p.bytesNeeded(end)], bitsRemovedFromFirstRemainingByte)
+
+	mask := byte(0xFF << p.bitsToShift(end-start-1))
+	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
 	result.value = byteSliceToString(buffer)
 	return result
 }
