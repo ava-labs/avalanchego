@@ -170,7 +170,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id[:])
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
@@ -181,7 +181,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.ShortNodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID[:])
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
@@ -237,7 +237,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id[:])
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
 		genesisUTXOs[i] = api.UTXO{
@@ -249,7 +249,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.ShortNodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID[:])
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
 		genesisValidators[i] = api.PermissionlessValidator{
@@ -416,7 +416,7 @@ func TestGenesis(t *testing.T) {
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
 			id := keys[0].PublicKey().Address()
-			addr, err := address.FormatBech32(constants.UnitTestHRP, id[:])
+			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
