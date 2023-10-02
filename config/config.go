@@ -90,8 +90,9 @@ var (
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	return snowball.Parameters{
-		K:     v.GetInt(SnowSampleSizeKey),
-		Alpha: v.GetInt(SnowQuorumSizeKey),
+		K:               v.GetInt(SnowSampleSizeKey),
+		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
 		// During the X-chain linearization we require BetaVirtuous and
 		// BetaRogue to be equal. Therefore we use the more conservative
 		// BetaRogue value for both BetaVirtuous and BetaRogue.
@@ -447,7 +448,10 @@ func getNetworkConfig(
 }
 
 func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
-	alpha := consensusParameters.Alpha
+	// AlphaConfidence is used here to ensure that benching can't cause a
+	// liveness failure. If AlphaPreference were used, the benchlist may grow to
+	// a point that committing would be extremely unlikely to happen.
+	alpha := consensusParameters.AlphaConfidence
 	k := consensusParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
