@@ -116,34 +116,6 @@ func Test_GetValues_Safety(t *testing.T) {
 	require.Equal([]byte{0}, trieVals[0])
 }
 
-func BenchmarkTrieViewGetPathTo(b *testing.B) {
-	require := require.New(b)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-	r := rand.New(rand.NewSource(0))
-	insertRandomKeyValues(
-		require,
-		r,
-		[]database.Database{db},
-		10000,
-		.1,
-	)
-	viewIntF, err := db.NewView(context.Background(), ViewChanges{})
-	require.NoError(err)
-	view := viewIntF.(*trieView)
-
-	key := make([]byte, 50)
-	b.Run("getPaths", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, err := r.Read(key)
-			require.NoError(err)
-			view.getPathTo(NewPath(key, BranchFactor16))
-		}
-	})
-
-}
-
 func TestTrieViewGetPathTo(t *testing.T) {
 	require := require.New(t)
 
