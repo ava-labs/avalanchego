@@ -203,10 +203,17 @@ func (p Path) bitsToShift(index int) byte {
 	return 7 - endBitIndex
 }
 
-// bytesNeeded returns the number of bytes needed to store the passed number of tokens
+// bytesNeeded returns the number of bytes needed to store the passed number of
+// tokens.
+//
+// Invariant: [tokens] is a non-negative, but otherwise untrusted, input and
+// this method must never overflow.
 func (p Path) bytesNeeded(tokens int) int {
-	// adding p.tokensPerByte - 1 causes the division to always round up
-	return (tokens + p.tokensPerByte - 1) / p.tokensPerByte
+	size := tokens / p.tokensPerByte
+	if tokens%p.tokensPerByte != 0 {
+		size++
+	}
+	return size
 }
 
 // Extend returns a new Path that equals the passed Path appended to the current Path
