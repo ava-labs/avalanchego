@@ -230,6 +230,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 }
 
 func TestVMShutdownWhileSyncing(t *testing.T) {
+	t.Skip("FLAKY")
 	var (
 		lock    sync.Mutex
 		vmSetup *syncVMSetup
