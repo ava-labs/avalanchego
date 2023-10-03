@@ -430,22 +430,46 @@ func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
 		return database.ErrClosed
 	}
 
+	// reuse the view so that it can keep repeated nodes in memory
 	tempView, err := newTrieView(db, db, ViewChanges{})
 	if err != nil {
 		return err
 	}
 	for _, key := range keys {
-		pathToKey, err := tempView.getPathTo(db.newPath(key))
-		if err != nil {
+		if err := db.prefetchKey(tempView, key); err != nil {
 			return err
 		}
-		for _, n := range pathToKey {
-			if n.hasValue() {
-				db.valueNodeDB.nodeCache.Put(n.key, n)
-			} else {
-				if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
-					return err
-				}
+	}
+
+	return nil
+}
+
+func (db *merkleDB) PrefetchKey(key []byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+	tempView, err := newTrieView(db, db, ViewChanges{})
+	if err != nil {
+		return err
+	}
+
+	return db.prefetchKey(tempView, key)
+}
+
+func (db *merkleDB) prefetchKey(view *trieView, key []byte) error {
+	pathToKey, err := view.getPathTo(db.newPath(key))
+	if err != nil {
+		return err
+	}
+	for _, n := range pathToKey {
+		if n.hasValue() {
+			db.valueNodeDB.nodeCache.Put(n.key, n)
+		} else {
+			if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
+				return err
 			}
 		}
 	}
