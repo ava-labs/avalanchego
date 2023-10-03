@@ -758,9 +758,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 	// Create set of nodeIDs
 	nodeIDs := set.Set[ids.NodeID]{}
-	for _, nodeID := range args.NodeIDs {
-		nodeIDs.Add(nodeID)
-	}
+	nodeIDs.Add(args.NodeIDs...)
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
