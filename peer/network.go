@@ -46,16 +46,16 @@ type Network interface {
 	// node version greater than or equal to minVersion.
 	// Returns the ID of the chosen peer, and an error if the request could not
 	// be sent to a peer with the desired [minVersion].
-	SendAppRequestAny(minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
+	SendAppRequestAny(ctx context.Context, minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
 	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
-	SendAppRequest(nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
+	SendAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
 
 	// SendCrossChainRequest sends a message to given chainID notifying handler when there's a response or timeout
-	SendCrossChainRequest(chainID ids.ID, message []byte, handler message.ResponseHandler) error
+	SendCrossChainRequest(ctx context.Context, chainID ids.ID, message []byte, handler message.ResponseHandler) error
 
 	// Shutdown stops all peer channel listeners and marks the node to have stopped
 	// n.Start() can be called again but the peers will have to be reconnected
@@ -134,16 +134,16 @@ func NewNetwork(router *p2p.Router, appSender common.AppSender, codec codec.Mana
 // the request will be sent to any peer regardless of their version.
 // Returns the ID of the chosen peer, and an error if the request could not
 // be sent to a peer with the desired [minVersion].
-func (n *network) SendAppRequestAny(minVersion *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
+func (n *network) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
 	// Take a slot from total [activeAppRequests] and block until a slot becomes available.
-	if err := n.activeAppRequests.Acquire(context.Background(), 1); err != nil {
+	if err := n.activeAppRequests.Acquire(ctx, 1); err != nil {
 		return ids.EmptyNodeID, errAcquiringSemaphore
 	}
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	if nodeID, ok := n.peers.GetAnyPeer(minVersion); ok {
-		return nodeID, n.sendAppRequest(nodeID, request, handler)
+		return nodeID, n.sendAppRequest(ctx, nodeID, request, handler)
 	}
 
 	n.activeAppRequests.Release(1)
@@ -151,20 +151,20 @@ func (n *network) SendAppRequestAny(minVersion *version.Application, request []b
 }
 
 // SendAppRequest sends request message bytes to specified nodeID, notifying the responseHandler on response or failure
-func (n *network) SendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
+func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if nodeID == ids.EmptyNodeID {
 		return fmt.Errorf("cannot send request to empty nodeID, nodeID=%s, requestLen=%d", nodeID, len(request))
 	}
 
 	// Take a slot from total [activeAppRequests] and block until a slot becomes available.
-	if err := n.activeAppRequests.Acquire(context.Background(), 1); err != nil {
+	if err := n.activeAppRequests.Acquire(ctx, 1); err != nil {
 		return errAcquiringSemaphore
 	}
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	return n.sendAppRequest(nodeID, request, responseHandler)
+	return n.sendAppRequest(ctx, nodeID, request, responseHandler)
 }
 
 // sendAppRequest sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
@@ -173,7 +173,7 @@ func (n *network) SendAppRequest(nodeID ids.NodeID, request []byte, responseHand
 // Releases active requests semaphore if there was an error in sending the request
 // Returns an error if [appSender] is unable to make the request.
 // Assumes write lock is held
-func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
+func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
 		return nil
@@ -190,7 +190,7 @@ func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHand
 
 	// Send app request to [nodeID].
 	// On failure, release the slot from [activeAppRequests] and delete request from [outstandingRequestHandlers]
-	if err := n.appSender.SendAppRequest(context.TODO(), nodeIDs, requestID, request); err != nil {
+	if err := n.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
 		n.activeAppRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
@@ -203,9 +203,9 @@ func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHand
 // SendCrossChainRequest sends request message bytes to specified chainID and adds [handler] to [outstandingRequestHandlers]
 // so that it can be invoked when the network receives either a response or failure message.
 // Returns an error if [appSender] is unable to make the request.
-func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler message.ResponseHandler) error {
+func (n *network) SendCrossChainRequest(ctx context.Context, chainID ids.ID, request []byte, handler message.ResponseHandler) error {
 	// Take a slot from total [activeCrossChainRequests] and block until a slot becomes available.
-	if err := n.activeCrossChainRequests.Acquire(context.Background(), 1); err != nil {
+	if err := n.activeCrossChainRequests.Acquire(ctx, 1); err != nil {
 		return errAcquiringSemaphore
 	}
 
@@ -222,7 +222,7 @@ func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler 
 
 	// Send cross chain request to [chainID].
 	// On failure, release the slot from [activeCrossChainRequests] and delete request from [outstandingRequestHandlers].
-	if err := n.appSender.SendCrossChainAppRequest(context.TODO(), chainID, requestID, request); err != nil {
+	if err := n.appSender.SendCrossChainAppRequest(ctx, chainID, requestID, request); err != nil {
 		n.activeCrossChainRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
