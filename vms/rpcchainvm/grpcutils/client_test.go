@@ -94,7 +94,7 @@ func TestWaitForReadyCallOption(t *testing.T) {
 	conn, err := Dial(listener.Addr().String())
 	require.NoError(err)
 	// close listener causes RPC to fail fast.
-	listener.Close()
+	_ = listener.Close()
 
 	db := pb.NewDatabaseClient(conn)
 	_, err = db.Put(context.Background(), &pb.PutRequest{Key: []byte("foo"), Value: []byte("bar")}, grpc.WaitForReady(false))
