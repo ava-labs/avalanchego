@@ -638,7 +638,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 // causes dial to return immediately.
 func TestDialContext(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
-	defer wg.Done()
 
 	dialer := newTestDialer()
 	network := networks[0]
@@ -689,4 +688,7 @@ func TestDialContext(t *testing.T) {
 		require.FailNow(t, "unexpectedly connected to peer")
 	default:
 	}
+
+	network.StartClose()
+	wg.Wait()
 }
