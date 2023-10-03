@@ -422,6 +422,37 @@ func (db *merkleDB) Close() error {
 	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
+func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	tempView, err := newTrieView(db, db, ViewChanges{})
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		pathToKey, err := tempView.getPathTo(db.newPath(key))
+		if err != nil {
+			return err
+		}
+		for _, n := range pathToKey {
+			if n.hasValue() {
+				db.valueNodeDB.cacheNode(n.key, n)
+			} else {
+				if err := db.intermediateNodeDB.cacheNode(n.key, n); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
 	// this is a duplicate because the database interface doesn't support
 	// contexts, which are used for tracing
