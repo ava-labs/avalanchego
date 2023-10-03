@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cast"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm"
+	// "github.com/ava-labs/coreth/core"
+	// "github.com/ava-labs/coreth/params"
+	// "github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -143,15 +143,15 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.Short
 
 	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
 	xChainBalances := make(XChainBalanceMap, len(c.FundedKeys))
-	cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
+	// cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
 	for _, key := range c.FundedKeys {
 		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
-		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
-			Balance: DefaultFundedKeyCChainAmount,
-		}
+		// cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+		// 	Balance: DefaultFundedKeyCChainAmount,
+		// }
 	}
 
-	genesis, err := NewTestGenesis(networkID, xChainBalances, cChainBalances, validatorIDs)
+	genesis, err := NewTestGenesis(networkID, xChainBalances /*cChainBalances,*/, validatorIDs)
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ type XChainBalanceMap map[ids.ShortID]uint64
 func NewTestGenesis(
 	networkID uint32,
 	xChainBalances XChainBalanceMap,
-	cChainBalances core.GenesisAlloc,
+	// cChainBalances core.GenesisAlloc,
 	validatorIDs []ids.ShortNodeID,
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
@@ -322,7 +322,7 @@ func NewTestGenesis(
 	if len(validatorIDs) == 0 {
 		return nil, errMissingValidatorsForGenesis
 	}
-	if len(xChainBalances) == 0 || len(cChainBalances) == 0 {
+	if len(xChainBalances) == 0 /*|| len(cChainBalances) == 0*/ {
 		return nil, errMissingBalancesForGenesis
 	}
 
@@ -394,20 +394,20 @@ func NewTestGenesis(
 		)
 	}
 
-	// Define C-Chain genesis
-	cChainGenesis := &core.Genesis{
-		Config: &params.ChainConfig{
-			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
-		},
-		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
-		GasLimit:   DefaultGasLimit,
-		Alloc:      cChainBalances,
-	}
-	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
-	}
-	config.CChainGenesis = string(cChainGenesisBytes)
+	// // Define C-Chain genesis
+	// cChainGenesis := &core.Genesis{
+	// 	Config: &params.ChainConfig{
+	// 		ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
+	// 	},
+	// 	Difficulty: big.NewInt(0), // Difficulty is a mandatory field
+	// 	GasLimit:   DefaultGasLimit,
+	// 	Alloc:      cChainBalances,
+	// }
+	// cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
+	// }
+	// config.CChainGenesis = string(cChainGenesisBytes)
 
 	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
 	// will be easier to perform with nodes other than the initial validators since the timing of

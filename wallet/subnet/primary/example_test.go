@@ -30,7 +30,7 @@ func ExampleWallet() {
 	wallet, err := MakeWallet(ctx, &WalletConfig{
 		URI:          LocalAPIURI,
 		AVAXKeychain: kc,
-		EthKeychain:  kc,
+		// EthKeychain:  kc,
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet with: %s\n", err)
