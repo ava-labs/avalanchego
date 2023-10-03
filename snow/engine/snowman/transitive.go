@@ -475,6 +475,13 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
 		acceptedAtHeight, err := t.VM.GetBlockIDAtHeight(ctx, requestedHeight)
 		if err != nil {
+			t.Ctx.Log.Debug("failed fetching accepted block",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("requestedHeight", requestedHeight),
+				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Stringer("lastAcceptedID", lastAcceptedID),
+				zap.Error(err),
+			)
 			acceptedAtHeight = lastAcceptedID
 		}
 		t.Sender.SendChits(ctx, nodeID, requestID, lastAcceptedID, acceptedAtHeight, lastAcceptedID)
@@ -497,8 +504,10 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 			// old heights on a pruning network, we log this as debug. However,
 			// this case is unexpected to be hit by correct peers.
 			t.Ctx.Log.Debug("failed fetching accepted block",
+				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Stringer("lastAcceptedID", lastAcceptedID),
 				zap.Error(err),
 			)
 			preferenceAtHeight = lastAcceptedID
@@ -508,8 +517,10 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 		preferenceAtHeight, ok = t.Consensus.PreferenceAtHeight(requestedHeight)
 		if !ok {
 			t.Ctx.Log.Debug("failed fetching processing block",
+				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Stringer("preferredID", preference),
 			)
 			// If the requested height is higher than our preferred tip, we
 			// don't prefer anything at the requested height yet.
