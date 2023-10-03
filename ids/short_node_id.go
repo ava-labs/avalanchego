@@ -29,7 +29,6 @@ func (sn ShortNodeID) Bytes() []byte {
 	return sn[:]
 }
 
-// ToShortNodeID attempt to convert a byte slice into a node id
 func ToShortNodeID(bytes []byte) (ShortNodeID, error) {
 	nodeID, err := ToShortID(bytes)
 	return ShortNodeID(nodeID), err
@@ -39,7 +38,7 @@ func (sn ShortNodeID) String() string {
 	return ShortID(sn).PrefixedString(NodeIDPrefix)
 }
 
-// ShortNodeIDFromString is the inverse of NodeID.String()
+// ShortNodeIDFromString is the inverse of ShortNodeID.String()
 func ShortNodeIDFromString(nodeIDStr string) (ShortNodeID, error) {
 	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
 	if err != nil {
