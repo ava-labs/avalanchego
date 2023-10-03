@@ -5,6 +5,7 @@ package ids
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -90,9 +91,13 @@ func NodeIDFromCert(cert *staking.Certificate) NodeID {
 
 // NodeIDFromString is the inverse of NodeID.String()
 func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
+	if !strings.HasPrefix(nodeIDStr, NodeIDPrefix) {
+		return EmptyNodeID, fmt.Errorf("ID: %s is missing the prefix: %s", nodeIDStr, NodeIDPrefix)
+	}
+
+	bytes, err := cb58.Decode(strings.TrimPrefix(nodeIDStr, NodeIDPrefix))
 	if err != nil {
 		return EmptyNodeID, err
 	}
-	return NodeID(asShort.Bytes()), nil
+	return NodeID(bytes), nil
 }
