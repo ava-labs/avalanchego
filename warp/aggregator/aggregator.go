@@ -21,12 +21,6 @@ import (
 
 var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")
 
-// SignatureGetter defines the minimum network interface to perform signature aggregation
-type SignatureGetter interface {
-	// GetSignature attempts to fetch a BLS Signature from [nodeID] for [unsignedWarpMessage]
-	GetSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error)
-}
-
 type AggregateSignatureResult struct {
 	// Weight of validators included in the aggregate signature.
 	SignatureWeight uint64
