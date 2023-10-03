@@ -422,7 +422,7 @@ func (db *merkleDB) Close() error {
 	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
-func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
+func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
@@ -436,7 +436,7 @@ func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
 		return err
 	}
 	for _, key := range keys {
-		if err := db.prefetchKey(tempView, key); err != nil {
+		if err := db.prefetchKeyPath(tempView, key); err != nil {
 			return err
 		}
 	}
@@ -444,7 +444,7 @@ func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
 	return nil
 }
 
-func (db *merkleDB) PrefetchKey(key []byte) error {
+func (db *merkleDB) PrefetchPath(key []byte) error {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
@@ -456,10 +456,10 @@ func (db *merkleDB) PrefetchKey(key []byte) error {
 		return err
 	}
 
-	return db.prefetchKey(tempView, key)
+	return db.prefetchKeyPath(tempView, key)
 }
 
-func (db *merkleDB) prefetchKey(view *trieView, key []byte) error {
+func (db *merkleDB) prefetchKeyPath(view *trieView, key []byte) error {
 	pathToKey, err := view.getPathTo(db.newPath(key))
 	if err != nil {
 		return err
