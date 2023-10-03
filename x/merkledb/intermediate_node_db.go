@@ -132,11 +132,6 @@ func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(1).Bytes())
 }
 
-// cacheNode ensures that the key/node combo is within the db's cache
-func (db *intermediateNodeDB) cacheNode(key Path, n *node) error {
-	return db.nodeCache.Put(key, n)
-}
-
 func (db *intermediateNodeDB) Put(key Path, n *node) error {
 	return db.nodeCache.Put(key, n)
 }

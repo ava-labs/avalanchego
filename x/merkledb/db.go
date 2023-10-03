@@ -441,9 +441,9 @@ func (db *merkleDB) PrefetchKeys(keys [][]byte) error {
 		}
 		for _, n := range pathToKey {
 			if n.hasValue() {
-				db.valueNodeDB.cacheNode(n.key, n)
+				db.valueNodeDB.nodeCache.Put(n.key, n)
 			} else {
-				if err := db.intermediateNodeDB.cacheNode(n.key, n); err != nil {
+				if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
 					return err
 				}
 			}

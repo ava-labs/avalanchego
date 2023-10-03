@@ -59,11 +59,6 @@ func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) datab
 	return i
 }
 
-// cacheNode ensures that the key/node combo is within the db's cache
-func (db *valueNodeDB) cacheNode(key Path, n *node) {
-	db.nodeCache.Put(key, n)
-}
-
 func (db *valueNodeDB) Close() {
 	db.closed.Set(true)
 }
