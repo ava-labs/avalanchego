@@ -632,14 +632,6 @@ func (t *trieView) remove(key Path) error {
 		return nil
 	}
 
-	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
-	// all the nodes in this path.
-	for _, node := range nodePath {
-		if err := t.recordNodeChange(node); err != nil {
-			return err
-		}
-	}
-
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
 	if err := t.recordNodeChange(nodeToDelete); err != nil {
 		return err
@@ -834,14 +826,6 @@ func (t *trieView) insert(
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
 		return nil, err
-	}
-
-	// We're inserting a node whose ancestry is [pathToNode]
-	// so we'll need to recalculate their IDs.
-	for _, node := range pathToNode {
-		if err := t.recordNodeChange(node); err != nil {
-			return nil, err
-		}
 	}
 
 	closestNode := pathToNode[len(pathToNode)-1]
