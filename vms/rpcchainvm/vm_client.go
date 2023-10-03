@@ -353,7 +353,10 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 
 func (vm *VMClient) Shutdown(ctx context.Context) error {
 	errs := wrappers.Errs{}
-	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{})
+	// Shutdown is a special case, where we want to fail fast instead of block
+	// here.
+	failFast := grpc.WaitForReady(false)
+	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{}, failFast)
 	errs.Add(err)
 
 	vm.serverCloser.Stop()
@@ -527,7 +530,10 @@ func (vm *VMClient) SetPreference(ctx context.Context, blkID ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck(ctx context.Context) (interface{}, error) {
-	health, err := vm.client.Health(ctx, &emptypb.Empty{})
+	// HealthCheck is a special case, where we want to fail fast instead of block
+	// here.
+	failFast := grpc.WaitForReady(false)
+	health, err := vm.client.Health(ctx, &emptypb.Empty{}, failFast)
 	if err != nil {
 		return nil, fmt.Errorf("health check failed: %w", err)
 	}

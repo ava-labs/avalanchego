@@ -62,6 +62,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 	}
 
 	vm := NewClient(vmpb.NewVMClient(clientConn))
+	vm.conns = append(vm.conns, clientConn)
 	vm.SetProcess(stopper, status.Pid, f.processTracker)
 
 	f.runtimeTracker.TrackRuntime(stopper)
