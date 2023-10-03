@@ -264,7 +264,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 	)
 }
 
-func TestCodecDecodePathRegression(t *testing.T) {
+func TestCodecDecodePathLengthOverflowRegression(t *testing.T) {
 	codec := codec.(*codecImpl)
 	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
 	_, err := codec.decodePath(bytes, BranchFactor16)
