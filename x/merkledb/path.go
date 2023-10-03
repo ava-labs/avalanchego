@@ -171,6 +171,16 @@ func (p Path) Less(other Path) bool {
 	return p.value < other.value || (p.value == other.value && p.tokensLength < other.tokensLength)
 }
 
+func (p Path) Cmp(other Path) int {
+	if p.value == other.value {
+		return p.tokensLength - other.tokensLength
+	}
+	if p.value < other.value {
+		return -1
+	}
+	return 1
+}
+
 // bitsToShift returns the number of bits to right shift a token
 // within its storage byte to get it to the rightmost
 // position in the byte. Equivalently, this is the number of bits
