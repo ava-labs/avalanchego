@@ -4,166 +4,120 @@
 package ids
 
 import (
-	"fmt"
+	"encoding/json"
 	"testing"
 
-	stdjson "encoding/json"
-
-	"github.com/leanovate/gopter"
-	"github.com/leanovate/gopter/gen"
-	"github.com/leanovate/gopter/prop"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMarshallUnmarshalInversion(t *testing.T) {
-	properties := gopter.NewProperties(nil)
+func FuzzNodeIDMarshallUnmarshalInversion(f *testing.F) {
+	f.Fuzz(func(t *testing.T, buf string) {
+		var (
+			require = require.New(t)
+			input   = NodeID{buf: buf}
+			output  = new(NodeID)
+		)
 
-	properties.Property("NodeID", prop.ForAll(
-		func(buf string) string {
-			var (
-				input  = NodeID{buf: buf}
-				output = new(NodeID)
-			)
+		// json package marshalling
+		b, err := json.Marshal(input)
+		require.NoError(err)
 
-			// json package marshalling
-			b, err := stdjson.Marshal(input)
-			if err != nil {
-				return err.Error()
-			}
-			if err := stdjson.Unmarshal(b, output); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		require.NoError(json.Unmarshal(b, output))
+		require.Equal(input, *output)
 
-			// MarshalJson/UnmarshalJson
-			output = new(NodeID)
-			b, err = input.MarshalJSON()
-			if err != nil {
-				return err.Error()
-			}
-			if err := output.UnmarshalJSON(b); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		// MarshalJson/UnmarshalJson
+		output = new(NodeID)
+		b, err = input.MarshalJSON()
+		require.NoError(err)
 
-			return ""
-		},
-		gen.AnyString()),
-	)
+		require.NoError(output.UnmarshalJSON(b))
+		require.Equal(input, *output)
+	})
+}
 
-	properties.Property("ShortNodeID", prop.ForAll(
-		func(buf []byte) string {
-			var (
-				input  = ShortNodeID(buf)
-				output = new(ShortNodeID)
-			)
+func FuzzShortNodeIDMarshallUnmarshalInversion(f *testing.F) {
+	f.Fuzz(func(t *testing.T, buf []byte) {
+		if len(buf) != ShortNodeIDLen {
+			return
+		}
 
-			// json package marshalling
-			b, err := stdjson.Marshal(input)
-			if err != nil {
-				return err.Error()
-			}
-			if err := stdjson.Unmarshal(b, output); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		var (
+			require = require.New(t)
+			input   = ShortNodeID(buf)
+			output  = new(ShortNodeID)
+		)
 
-			// MarshalJson/UnmarshalJson
-			output = new(ShortNodeID)
-			b, err = input.MarshalJSON()
-			if err != nil {
-				return err.Error()
-			}
-			if err := output.UnmarshalJSON(b); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		// json package marshalling
+		b, err := json.Marshal(input)
+		require.NoError(err)
 
-			return ""
-		},
-		gen.SliceOfN(ShortNodeIDLen, gen.UInt8())),
-	)
+		require.NoError(json.Unmarshal(b, output))
+		require.Equal(input, *output)
 
-	properties.Property("ShortID", prop.ForAll(
-		func(buf []byte) string {
-			var (
-				input  = ShortID(buf)
-				output = new(ShortID)
-			)
+		// MarshalJson/UnmarshalJson
+		output = new(ShortNodeID)
+		b, err = input.MarshalJSON()
+		require.NoError(err)
 
-			// json package marshalling
-			b, err := stdjson.Marshal(input)
-			if err != nil {
-				return err.Error()
-			}
-			if err := stdjson.Unmarshal(b, output); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		require.NoError(output.UnmarshalJSON(b))
+		require.Equal(input, *output)
+	})
+}
 
-			// MarshalJson/UnmarshalJson
-			output = new(ShortID)
-			b, err = input.MarshalJSON()
-			if err != nil {
-				return err.Error()
-			}
-			if err := output.UnmarshalJSON(b); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+func FuzzShortIDMarshallUnmarshalInversion(f *testing.F) {
+	f.Fuzz(func(t *testing.T, buf []byte) {
+		if len(buf) != ShortIDLen {
+			return
+		}
 
-			return ""
-		},
-		gen.SliceOfN(ShortNodeIDLen, gen.UInt8())),
-	)
+		var (
+			require = require.New(t)
+			input   = ShortID(buf)
+			output  = new(ShortID)
+		)
 
-	properties.Property("ID", prop.ForAll(
-		func(buf []byte) string {
-			var (
-				input  = ID(buf)
-				output = new(ID)
-			)
+		// json package marshalling
+		b, err := json.Marshal(input)
+		require.NoError(err)
 
-			// json package marshalling
-			b, err := stdjson.Marshal(input)
-			if err != nil {
-				return err.Error()
-			}
-			if err := stdjson.Unmarshal(b, output); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		require.NoError(json.Unmarshal(b, output))
+		require.Equal(input, *output)
 
-			// MarshalJson/UnmarshalJson
-			output = new(ID)
-			b, err = input.MarshalJSON()
-			if err != nil {
-				return err.Error()
-			}
-			if err := output.UnmarshalJSON(b); err != nil {
-				return err.Error()
-			}
-			if input != *output {
-				return fmt.Sprintf("broken inversion original %s, retrieved %s", input, *output)
-			}
+		// MarshalJson/UnmarshalJson
+		output = new(ShortID)
+		b, err = input.MarshalJSON()
+		require.NoError(err)
 
-			return ""
-		},
-		gen.SliceOfN(IDLen, gen.UInt8())),
-	)
+		require.NoError(output.UnmarshalJSON(b))
+		require.Equal(input, *output)
+	})
+}
 
-	properties.TestingRun(t)
+func FuzzIDMarshallUnmarshalInversion(f *testing.F) {
+	f.Fuzz(func(t *testing.T, buf []byte) {
+		if len(buf) != IDLen {
+			return
+		}
+
+		var (
+			require = require.New(t)
+			input   = ID(buf)
+			output  = new(ID)
+		)
+
+		// json package marshalling
+		b, err := json.Marshal(input)
+		require.NoError(err)
+
+		require.NoError(json.Unmarshal(b, output))
+		require.Equal(input, *output)
+
+		// MarshalJson/UnmarshalJson
+		output = new(ID)
+		b, err = input.MarshalJSON()
+		require.NoError(err)
+
+		require.NoError(output.UnmarshalJSON(b))
+		require.Equal(input, *output)
+	})
 }
