@@ -264,11 +264,11 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	t.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID)
 
 	t.Ctx.Log.Verbo("called Chits for the block",
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
 		zap.Stringer("preferredID", preferredID),
 		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		zap.Stringer("acceptedID", acceptedID),
-		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
 	)
 
 	addedPreferred, err := t.issueFromByID(ctx, nodeID, preferredID)
