@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
+type newConsensusFunc func(params Parameters, choice ids.ID) Consensus
+
 type Network struct {
 	params         Parameters
 	colors         []ids.ID
@@ -26,34 +28,44 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 	}
 }
 
-func (n *Network) AddNode(sb Consensus) {
+func (n *Network) AddNode(newConsensusFunc newConsensusFunc) Consensus {
 	s := sampler.NewUniform()
 	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
-	sb.Initialize(n.params, n.colors[int(indices[0])])
+
+	consensus := newConsensusFunc(n.params, n.colors[int(indices[0])])
 	for _, index := range indices[1:] {
-		sb.Add(n.colors[int(index)])
+		consensus.Add(n.colors[int(index)])
 	}
 
-	n.nodes = append(n.nodes, sb)
-	if !sb.Finalized() {
-		n.running = append(n.running, sb)
+	n.nodes = append(n.nodes, consensus)
+	if !consensus.Finalized() {
+		n.running = append(n.running, consensus)
 	}
+
+	return consensus
 }
 
-// AddNodeSpecificColor adds [sb] to the network which will initially prefer
-// [initialPreference] and additionally adds each of the specified [options] to
-// consensus.
-func (n *Network) AddNodeSpecificColor(sb Consensus, initialPreference int, options []int) {
-	sb.Initialize(n.params, n.colors[initialPreference])
+// AddNodeSpecificColor adds a new consensus instance to the network which will
+// initially prefer [initialPreference] and additionally adds each of the
+// specified [options] to consensus.
+func (n *Network) AddNodeSpecificColor(
+	newConsensusFunc newConsensusFunc,
+	initialPreference int,
+	options []int,
+) Consensus {
+	consensus := newConsensusFunc(n.params, n.colors[initialPreference])
+
 	for _, i := range options {
-		sb.Add(n.colors[i])
+		consensus.Add(n.colors[i])
 	}
 
-	n.nodes = append(n.nodes, sb)
-	if !sb.Finalized() {
-		n.running = append(n.running, sb)
+	n.nodes = append(n.nodes, consensus)
+	if !consensus.Finalized() {
+		n.running = append(n.running, consensus)
 	}
+
+	return consensus
 }
 
 // Finalized returns true iff every node added to the network has finished

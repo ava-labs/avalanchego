@@ -17,8 +17,7 @@ func TestFlat(t *testing.T) {
 	params := Parameters{
 		K: 2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	f := Flat{}
-	f.Initialize(params, Red)
+	f := NewFlat(params, Red)
 	f.Add(Green)
 	f.Add(Blue)
 
