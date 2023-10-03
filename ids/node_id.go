@@ -16,23 +16,27 @@ import (
 const NodeIDPrefix = "NodeID-"
 
 var (
-	EmptyNodeID = NodeID(EmptyShortNodeID[:])
+	EmptyNodeID = NodeID{
+		buf: string(EmptyShortNodeID[:]),
+	}
 
 	_ utils.Sortable[NodeID] = (*NodeID)(nil)
 )
 
-type NodeID string
+type NodeID struct {
+	buf string
+}
 
 // Any modification to Bytes will be lost since id is passed-by-value
 // Directly access NodeID[:] if you need to modify the NodeID
 func (n NodeID) Bytes() []byte {
-	return []byte(n)
+	return []byte(n.buf)
 }
 
 func (n NodeID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := cb58.Encode([]byte(n))
+	str, _ := cb58.Encode([]byte(n.buf))
 	return NodeIDPrefix + str
 }
 
@@ -68,25 +72,31 @@ func (n *NodeID) UnmarshalText(text []byte) error {
 }
 
 func (n NodeID) Less(other NodeID) bool {
-	return n < other
+	return n.buf < other.buf
 }
 
 func NodeIDFromBytes(src []byte, length int) NodeID {
 	bytes := make([]byte, length)
 	copy(bytes, src)
-	return NodeID(bytes)
+	return NodeID{
+		buf: string(bytes),
+	}
 }
 
 // NodeIDFromShortNodeID attempt to convert a byte slice into a node id
 func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
-	return NodeID(nodeID.Bytes())
+	return NodeID{
+		buf: string(nodeID.Bytes()),
+	}
 }
 
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	bytes := hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
-	return NodeID(bytes[:])
+	return NodeID{
+		buf: string(bytes[:]),
+	}
 }
 
 // NodeIDFromString is the inverse of NodeID.String()
@@ -99,5 +109,7 @@ func NodeIDFromString(nodeIDStr string) (NodeID, error) {
 	if err != nil {
 		return EmptyNodeID, err
 	}
-	return NodeID(bytes), nil
+	return NodeID{
+		buf: string(bytes),
+	}, nil
 }

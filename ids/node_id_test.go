@@ -20,7 +20,7 @@ func TestMarshallUnmarshalNodeID(t *testing.T) {
 	properties.Property("MarshalUnmarshalInversion", prop.ForAll(
 		func(buf string) string {
 			var (
-				input  = NodeID(buf)
+				input  = NodeID{buf: buf}
 				output = new(NodeID)
 			)
 

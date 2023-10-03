@@ -2568,7 +2568,7 @@ type jsonGetValidatorOutput struct {
 }
 
 func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
-	m := make(map[ids.ShortNodeID]*jsonGetValidatorOutput, len(v.Validators))
+	m := make(map[ids.NodeID]*jsonGetValidatorOutput, len(v.Validators))
 	for _, vdr := range v.Validators {
 		vdrJSON := &jsonGetValidatorOutput{
 			Weight: json.Uint64(vdr.Weight),
@@ -2581,11 +2581,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 			}
 			vdrJSON.PublicKey = &pk
 		}
-		nodeID, err := ids.ShortNodeIDFromNodeID(vdr.NodeID)
-		if err != nil {
-			return nil, err
-		}
-		m[nodeID] = vdrJSON
+		m[vdr.NodeID] = vdrJSON
 	}
 	return stdjson.Marshal(m)
 }
