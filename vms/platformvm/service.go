@@ -978,10 +978,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	for _, nodeID := range args.NodeIDs {
-		nodeIDs.Add(nodeID)
-	}
+	nodeIDs := set.Of(args.NodeIDs...)
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)

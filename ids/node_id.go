@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const NodeIDPrefix = "NodeID-"
+
 var (
 	EmptyNodeID = NodeID(EmptyShortNodeID[:])
 
@@ -30,7 +32,7 @@ func (n NodeID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
 	str, _ := cb58.Encode([]byte(n))
-	return ShortNodeIDPrefix + str
+	return NodeIDPrefix + str
 }
 
 func (n NodeID) MarshalJSON() ([]byte, error) {
@@ -42,8 +44,8 @@ func (n *NodeID) UnmarshalJSON(b []byte) error {
 	if str == nullStr { // If "null", do nothing
 		return nil
 	}
-	if len(str) <= 2+len(ShortNodeIDPrefix) {
-		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(ShortNodeIDPrefix))
+	if len(str) <= 2+len(NodeIDPrefix) {
+		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(NodeIDPrefix))
 	}
 
 	lastIndex := len(str) - 1
@@ -88,9 +90,9 @@ func NodeIDFromCert(cert *staking.Certificate) NodeID {
 
 // NodeIDFromString is the inverse of NodeID.String()
 func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
+	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
 	if err != nil {
 		return EmptyNodeID, err
 	}
-	return NodeID(string(asShort.Bytes())), nil
+	return NodeID(asShort.Bytes()), nil
 }

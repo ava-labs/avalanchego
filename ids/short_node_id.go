@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const (
-	ShortNodeIDPrefix = "NodeID-"
-	ShortNodeIDLen    = ShortIDLen
-)
+const ShortNodeIDLen = ShortIDLen
 
 var (
 	EmptyShortNodeID = ShortNodeID{}
@@ -39,12 +36,12 @@ func ToShortNodeID(bytes []byte) (ShortNodeID, error) {
 }
 
 func (sn ShortNodeID) String() string {
-	return ShortID(sn).PrefixedString(ShortNodeIDPrefix)
+	return ShortID(sn).PrefixedString(NodeIDPrefix)
 }
 
 // ShortNodeIDFromString is the inverse of NodeID.String()
 func ShortNodeIDFromString(nodeIDStr string) (ShortNodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, ShortNodeIDPrefix)
+	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
 	if err != nil {
 		return EmptyShortNodeID, err
 	}
@@ -71,8 +68,8 @@ func (sn *ShortNodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) <= 2+len(ShortNodeIDPrefix) {
-		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(ShortNodeIDPrefix))
+	} else if len(str) <= 2+len(NodeIDPrefix) {
+		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(NodeIDPrefix))
 	}
 
 	lastIndex := len(str) - 1
