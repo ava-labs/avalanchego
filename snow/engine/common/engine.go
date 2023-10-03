@@ -328,7 +328,7 @@ type ChitsHandler interface {
 	// PushQuery message with the same requestID.
 	//
 	// It is expected, but not guaranteed, that preferredID transitively
-	// references acceptedID.
+	// references preferredIDAtHeight and acceptedID.
 	Chits(
 		ctx context.Context,
 		nodeID ids.NodeID,
