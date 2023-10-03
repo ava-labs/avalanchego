@@ -10,11 +10,12 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"go.uber.org/zap"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
