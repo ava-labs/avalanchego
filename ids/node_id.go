@@ -27,8 +27,6 @@ type NodeID struct {
 	buf string
 }
 
-// Any modification to Bytes will be lost since id is passed-by-value
-// Directly access NodeID[:] if you need to modify the NodeID
 func (n NodeID) Bytes() []byte {
 	return []byte(n.buf)
 }
@@ -83,7 +81,6 @@ func NodeIDFromBytes(src []byte, length int) NodeID {
 	}
 }
 
-// NodeIDFromShortNodeID attempt to convert a byte slice into a node id
 func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
 	return NodeID{
 		buf: string(nodeID.Bytes()),
