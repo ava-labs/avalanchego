@@ -2,16 +2,6 @@
   {
     "inputs": [
       {
-        "internalType": "bytes32",
-        "name": "destinationChainID",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "destinationAddress",
-        "type": "address"
-      },
-      {
         "internalType": "bytes",
         "name": "payload",
         "type": "bytes"
@@ -99,16 +89,6 @@
       {
         "internalType": "address",
         "name": "originSenderAddress",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "destinationChainID",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "destinationAddress",
         "type": "address"
       },
       {

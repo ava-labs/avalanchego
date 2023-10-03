@@ -34,11 +34,10 @@ const pChainHeight uint64 = 1337
 var (
 	_ utils.Sortable[*testValidator] = (*testValidator)(nil)
 
-	errTest            = errors.New("non-nil error")
-	networkID          = uint32(54321)
-	sourceChainID      = ids.GenerateTestID()
-	sourceSubnetID     = ids.GenerateTestID()
-	destinationChainID = ids.GenerateTestID()
+	errTest        = errors.New("non-nil error")
+	networkID      = uint32(54321)
+	sourceChainID  = ids.GenerateTestID()
+	sourceSubnetID = ids.GenerateTestID()
 
 	// valid unsigned warp message used throughout testing
 	unsignedMsg *avalancheWarp.UnsignedMessage
@@ -83,8 +82,6 @@ func init() {
 
 	var err error
 	addressedPayload, err = warpPayload.NewAddressedPayload(
-		common.Address(ids.GenerateTestShortID()),
-		common.Hash(destinationChainID),
 		common.Address(ids.GenerateTestShortID()),
 		[]byte{1, 2, 3},
 	)

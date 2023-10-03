@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		subnetB := subnetIDs[1]
 		subnetBDetails, ok := manager.GetSubnet(subnetB)
 		gomega.Expect(ok).Should(gomega.BeTrue())
-		blockchainIDB := subnetBDetails.BlockchainID
+		blockchainIDB = subnetBDetails.BlockchainID
 		gomega.Expect(len(subnetBDetails.ValidatorURIs)).Should(gomega.Equal(5))
 		chainBURIs = append(chainBURIs, subnetBDetails.ValidatorURIs...)
 
@@ -198,11 +198,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		startingNonce, err := chainAWSClient.NonceAt(ctx, fundedAddress, nil)
 		gomega.Expect(err).Should(gomega.BeNil())
 
-		packedInput, err := warp.PackSendWarpMessage(warp.SendWarpMessageInput{
-			DestinationChainID: common.Hash(blockchainIDB),
-			DestinationAddress: fundedAddress,
-			Payload:            payload,
-		})
+		packedInput, err := warp.PackSendWarpMessage(payload)
 		gomega.Expect(err).Should(gomega.BeNil())
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   chainID,

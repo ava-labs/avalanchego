@@ -68,19 +68,12 @@ type GetVerifiedWarpBlockHashOutput struct {
 type WarpMessage struct {
 	SourceChainID       common.Hash
 	OriginSenderAddress common.Address
-	DestinationChainID  common.Hash
-	DestinationAddress  common.Address
 	Payload             []byte
 }
 
 type GetVerifiedWarpMessageOutput struct {
 	Message WarpMessage
 	Valid   bool
-}
-type SendWarpMessageInput struct {
-	DestinationChainID common.Hash
-	DestinationAddress common.Address
-	Payload            []byte
 }
 
 // PackGetBlockchainID packs the include selector (first 4 func signature bytes).
@@ -191,18 +184,20 @@ func getVerifiedWarpMessage(accessibleState contract.AccessibleState, caller com
 	return handleWarpMessage(accessibleState, input, suppliedGas, addressedPayloadHandler{})
 }
 
-// UnpackSendWarpMessageInput attempts to unpack [input] as SendWarpMessageInput
+// UnpackSendWarpMessageInput attempts to unpack [input] as []byte
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackSendWarpMessageInput(input []byte) (SendWarpMessageInput, error) {
-	inputStruct := SendWarpMessageInput{}
-	err := WarpABI.UnpackInputIntoInterface(&inputStruct, "sendWarpMessage", input)
-
-	return inputStruct, err
+func UnpackSendWarpMessageInput(input []byte) ([]byte, error) {
+	res, err := WarpABI.UnpackInput("sendWarpMessage", input)
+	if err != nil {
+		return []byte{}, err
+	}
+	unpacked := *abi.ConvertType(res[0], new([]byte)).(*[]byte)
+	return unpacked, nil
 }
 
-// PackSendWarpMessage packs [inputStruct] of type SendWarpMessageInput into the appropriate arguments for sendWarpMessage.
-func PackSendWarpMessage(inputStruct SendWarpMessageInput) ([]byte, error) {
-	return WarpABI.Pack("sendWarpMessage", inputStruct.DestinationChainID, inputStruct.DestinationAddress, inputStruct.Payload)
+// PackSendWarpMessage packs [inputStruct] of type []byte into the appropriate arguments for sendWarpMessage.
+func PackSendWarpMessage(payload []byte) ([]byte, error) {
+	return WarpABI.Pack("sendWarpMessage", payload)
 }
 
 // sendWarpMessage constructs an Avalanche Warp Message containing an AddressedPayload and emits a log to signal validators that they should
@@ -224,23 +219,18 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 	// unpack the arguments
-	inputStruct, err := UnpackSendWarpMessageInput(input)
+	payload, err := UnpackSendWarpMessageInput(input)
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %s", errInvalidSendInput, err)
 	}
 
 	var (
-		sourceChainID      = accessibleState.GetSnowContext().ChainID
-		destinationChainID = inputStruct.DestinationChainID
-		sourceAddress      = caller
-		destinationAddress = inputStruct.DestinationAddress
-		payload            = inputStruct.Payload
+		sourceChainID = accessibleState.GetSnowContext().ChainID
+		sourceAddress = caller
 	)
 
 	addressedPayload, err := warpPayload.NewAddressedPayload(
 		sourceAddress,
-		destinationChainID,
-		destinationAddress,
 		payload,
 	)
 	if err != nil {
@@ -260,8 +250,6 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 		ContractAddress,
 		[]common.Hash{
 			WarpABI.Events["SendWarpMessage"].ID,
-			destinationChainID,
-			destinationAddress.Hash(),
 			sourceAddress.Hash(),
 		},
 		unsignedWarpMessage.Bytes(),

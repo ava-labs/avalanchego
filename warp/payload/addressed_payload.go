@@ -12,21 +12,17 @@ import (
 // AddressedPayload defines the format for delivering a point to point message across VMs
 // ie. (ChainA, AddressA) -> (ChainB, AddressB)
 type AddressedPayload struct {
-	SourceAddress      common.Address `serialize:"true"`
-	DestinationChainID common.Hash    `serialize:"true"`
-	DestinationAddress common.Address `serialize:"true"`
-	Payload            []byte         `serialize:"true"`
+	SourceAddress common.Address `serialize:"true"`
+	Payload       []byte         `serialize:"true"`
 
 	bytes []byte
 }
 
 // NewAddressedPayload creates a new *AddressedPayload and initializes it.
-func NewAddressedPayload(sourceAddress common.Address, destinationChainID common.Hash, destinationAddress common.Address, payload []byte) (*AddressedPayload, error) {
+func NewAddressedPayload(sourceAddress common.Address, payload []byte) (*AddressedPayload, error) {
 	ap := &AddressedPayload{
-		SourceAddress:      sourceAddress,
-		DestinationChainID: destinationChainID,
-		DestinationAddress: destinationAddress,
-		Payload:            payload,
+		SourceAddress: sourceAddress,
+		Payload:       payload,
 	}
 	return ap, ap.initialize()
 }

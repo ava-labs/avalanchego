@@ -13,21 +13,15 @@ AddressedPayload:
 +---------------------+----------+-------------------+
 |       sourceAddress : [20]byte |          20 bytes |
 +---------------------+----------+-------------------+
-|  destinationChainID : [32]byte |          32 bytes |
-+---------------------+----------+-------------------+
-|  destinationAddress : [20]byte |          20 bytes |
-+---------------------+----------+-------------------+
 |             payload :   []byte |  4 + len(payload) |
 +---------------------+----------+-------------------+
-                                 | 82 + len(payload) |
+                                 | 30  + len(payload) |
                                  +-------------------+
 ```
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `typeID` is the payload type identifier and is `0x00000000` for `AddressedPayload`
 - `sourceAddress` is the address that called `sendWarpPrecompile` on the source chain
-- `destinationChainID` is the blockchainID that the message is intended for
-- `destinationAddress` is the address that should be called on the destination chain
 - `payload` is an arbitrary byte array payload
 
 ## BlockHashPayload

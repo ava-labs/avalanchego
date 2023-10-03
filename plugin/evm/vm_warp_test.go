@@ -64,11 +64,7 @@ func TestSendWarpMessage(t *testing.T) {
 
 	payload := utils.RandomBytes(100)
 
-	warpSendMessageInput, err := warp.PackSendWarpMessage(warp.SendWarpMessageInput{
-		DestinationChainID: common.Hash(vm.ctx.CChainID),
-		DestinationAddress: testEthAddrs[1],
-		Payload:            payload,
-	})
+	warpSendMessageInput, err := warp.PackSendWarpMessage(payload)
 	require.NoError(err)
 
 	// Submit a transaction to trigger sending a warp message
@@ -96,8 +92,6 @@ func TestSendWarpMessage(t *testing.T) {
 	require.Len(receipts[0].Logs, 1)
 	expectedTopics := []common.Hash{
 		warp.WarpABI.Events["SendWarpMessage"].ID,
-		common.Hash(vm.ctx.CChainID),
-		testEthAddrs[1].Hash(),
 		testEthAddrs[0].Hash(),
 	}
 	require.Equal(expectedTopics, receipts[0].Logs[0].Topics)
@@ -134,13 +128,9 @@ func TestValidateWarpMessage(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	sourceAddress := common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2")
-	destinationChainID := ids.GenerateTestID()
-	destinationAddress := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
 	payload := []byte{1, 2, 3}
 	addressedPayload, err := warpPayload.NewAddressedPayload(
 		sourceAddress,
-		common.Hash(destinationChainID),
-		destinationAddress,
 		payload,
 	)
 	require.NoError(err)
@@ -153,8 +143,6 @@ func TestValidateWarpMessage(t *testing.T) {
 		uint32(0),
 		sourceChainID,
 		sourceAddress,
-		destinationChainID,
-		destinationAddress,
 		payload,
 	)
 	require.NoError(err)
@@ -166,13 +154,9 @@ func TestValidateInvalidWarpMessage(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	sourceAddress := common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2")
-	destinationChainID := ids.GenerateTestID()
-	destinationAddress := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
 	payload := []byte{1, 2, 3}
 	addressedPayload, err := warpPayload.NewAddressedPayload(
 		sourceAddress,
-		common.Hash(destinationChainID),
-		destinationAddress,
 		payload,
 	)
 	require.NoError(err)
@@ -409,8 +393,6 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 	addressedPayload, err := warpPayload.NewAddressedPayload(
 		testEthAddrs[0],
-		common.Hash(vm.ctx.CChainID),
-		testEthAddrs[1],
 		payload,
 	)
 	require.NoError(err)
@@ -549,8 +531,6 @@ func TestReceiveWarpMessage(t *testing.T) {
 		Message: warp.WarpMessage{
 			SourceChainID:       common.Hash(vm.ctx.ChainID),
 			OriginSenderAddress: testEthAddrs[0],
-			DestinationChainID:  common.Hash(vm.ctx.CChainID),
-			DestinationAddress:  testEthAddrs[1],
 			Payload:             payload,
 		},
 		Valid: true,

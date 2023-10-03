@@ -8,13 +8,9 @@ contract ExampleWarp {
     address constant WARP_ADDRESS = 0x0200000000000000000000000000000000000005;
     IWarpMessenger warp = IWarpMessenger(WARP_ADDRESS);
 
-    // sendWarpMessage sends a warp message to the specified destination chain and address pair containing the payload
-    function sendWarpMessage(
-        bytes32 destinationChainID,
-        address destinationAddress,
-        bytes calldata payload
-    ) external {
-        warp.sendWarpMessage(destinationChainID, destinationAddress, payload);
+    // sendWarpMessage sends a warp message containing the payload
+    function sendWarpMessage(bytes calldata payload) external {
+        warp.sendWarpMessage(payload);
     }
 
     // validateWarpMessage retrieves the warp message attached to the transaction and verifies all of its attributes.
@@ -22,47 +18,33 @@ contract ExampleWarp {
         uint32 index,
         bytes32 sourceChainID,
         address originSenderAddress,
-        bytes32 destinationChainID,
-        address destinationAddress,
         bytes calldata payload
     ) external view {
         (WarpMessage memory message, bool valid) = warp.getVerifiedWarpMessage(index);
         require(valid);
         require(message.sourceChainID == sourceChainID);
         require(message.originSenderAddress == originSenderAddress);
-        require(message.destinationChainID == destinationChainID);
-        require(message.destinationAddress == destinationAddress);
         require(keccak256(message.payload) == keccak256(payload));
     }
 
-    function validateInvalidWarpMessage(
-        uint32 index
-    ) external view {
+    function validateInvalidWarpMessage(uint32 index) external view {
         (WarpMessage memory message, bool valid) = warp.getVerifiedWarpMessage(index);
         require(!valid);
         require(message.sourceChainID == bytes32(0));
         require(message.originSenderAddress == address(0));
-        require(message.destinationChainID == bytes32(0));
-        require(message.destinationAddress == address(0));
         require(keccak256(message.payload) == keccak256(bytes("")));
     }
 
     // validateWarpBlockHash retrieves the warp block hash attached to the transaction and verifies it matches the
     // expected block hash.
-    function validateWarpBlockHash(
-        uint32 index,
-        bytes32 sourceChainID,
-        bytes32 blockHash
-    ) external view {
+    function validateWarpBlockHash(uint32 index, bytes32 sourceChainID, bytes32 blockHash) external view {
         (WarpBlockHash memory warpBlockHash, bool valid) = warp.getVerifiedWarpBlockHash(index);
         require(valid);
         require(warpBlockHash.sourceChainID == sourceChainID);
         require(warpBlockHash.blockHash == blockHash);
     }
 
-    function validateInvalidWarpBlockHash(
-        uint32 index
-    ) external view {
+    function validateInvalidWarpBlockHash(uint32 index) external view {
         (WarpBlockHash memory warpBlockHash, bool valid) = warp.getVerifiedWarpBlockHash(index);
         require(!valid);
         require(warpBlockHash.sourceChainID == bytes32(0));

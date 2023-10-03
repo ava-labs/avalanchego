@@ -8,8 +8,6 @@ pragma solidity ^0.8.0;
 struct WarpMessage {
     bytes32 sourceChainID;
     address originSenderAddress;
-    bytes32 destinationChainID;
-    address destinationAddress;
     bytes payload;
 }
 
@@ -19,12 +17,7 @@ struct WarpBlockHash {
 }
 
 interface IWarpMessenger {
-    event SendWarpMessage(
-        bytes32 indexed destinationChainID,
-        address indexed destinationAddress,
-        address indexed sender,
-        bytes message
-    );
+    event SendWarpMessage(address indexed sender, bytes message);
 
     // sendWarpMessage emits a request for the subnet to send a warp message from [msg.sender]
     // with the specified parameters.
@@ -33,29 +26,23 @@ interface IWarpMessenger {
     // precompile.
     // Each validator then adds the UnsignedWarpMessage encoded in the log to the set of messages
     // it is willing to sign for an off-chain relayer to aggregate Warp signatures.
-    function sendWarpMessage(
-        bytes32 destinationChainID,
-        address destinationAddress,
-        bytes calldata payload
-    ) external;
+    function sendWarpMessage(bytes calldata payload) external;
 
     // getVerifiedWarpMessage parses the pre-verified warp message in the
     // predicate storage slots as a WarpMessage and returns it to the caller.
     // If the message exists and passes verification, returns the verified message
     // and true.
     // Otherwise, returns false and the empty value for the message.
-    function getVerifiedWarpMessage(uint32 index)
-        external view
-        returns (WarpMessage calldata message, bool valid);
+    function getVerifiedWarpMessage(uint32 index) external view returns (WarpMessage calldata message, bool valid);
 
     // getVerifiedWarpBlockHash parses the pre-verified WarpBlockHash message in the
     // predicate storage slots as a WarpBlockHash message and returns it to the caller.
     // If the message exists and passes verification, returns the verified message
     // and true.
     // Otherwise, returns false and the empty value for the message.
-    function getVerifiedWarpBlockHash(uint32 index)
-        external view
-        returns (WarpBlockHash calldata warpBlockHash, bool valid);
+    function getVerifiedWarpBlockHash(
+        uint32 index
+    ) external view returns (WarpBlockHash calldata warpBlockHash, bool valid);
 
     // getBlockchainID returns the snow.Context BlockchainID of this chain.
     // This blockchainID is the hash of the transaction that created this blockchain on the P-Chain

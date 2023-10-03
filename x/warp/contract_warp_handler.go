@@ -108,8 +108,6 @@ func (addressedPayloadHandler) handleMessage(warpMessage *warp.Message) ([]byte,
 		Message: WarpMessage{
 			SourceChainID:       common.Hash(warpMessage.SourceChainID),
 			OriginSenderAddress: addressedPayload.SourceAddress,
-			DestinationChainID:  addressedPayload.DestinationChainID,
-			DestinationAddress:  addressedPayload.DestinationAddress,
 			Payload:             addressedPayload.Payload,
 		},
 		Valid: true,

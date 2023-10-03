@@ -40,8 +40,6 @@ The Warp Precompile is broken down into three functions defined in the Solidity 
 
 - `SourceChainID` - blockchainID of the sourceChain on the Avalanche P-Chain
 - `SourceAddress` - `msg.sender` encoded as a 32 byte value that calls `sendWarpMessage`
-- `DestinationChainID` - `bytes32` argument specifies the blockchainID on the Avalanche P-Chain that should receive the message
-- `DestinationAddress` - 32 byte value that represents the destination address that should receive the message (on the EVM this is the 20 byte address left zero extended)
 - `Payload` - `payload` argument specified in the call to `sendWarpMessage` emitted as the unindexed data of the resulting log
 
 Calling this function will issue a `SendWarpMessage` event from the Warp Precompile. Since the EVM limits the number of topics to 4 including the EventID, this message includes only the topics that would be expected to help filter messages emitted from the Warp Precompile the most.
@@ -50,8 +48,6 @@ Specifically, the `payload` is not emitted as a topic because each topic must be
 
 Additionally, the `SourceChainID` is excluded because anyone parsing the chain can be expected to already know the blockchainID. Therefore, the `SendWarpMessage` event includes the indexable attributes:
 
-- `destinationChainID`
-- `destinationAddress`
 - `sender`
 
 The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including the Subnet-EVM [Addressed Payload](../../../warp/payload/payload.go).
@@ -71,8 +67,6 @@ This leads to the following advantages:
 2. The EVM can deterministically re-execute and re-verify blocks assuming the predicate was verified by the network (eg., in bootstrapping)
 
 This pre-verification is performed using the ProposerVM Block header during [block verification](../../../plugin/evm/block.go#L220) and [block building](../../../miner/worker.go#L200).
-
-Note: in order to support the notion of an `AnycastID` for the `DestinationChainID`, `getVerifiedMessage` and the predicate DO NOT require that the `DestinationChainID` matches the `blockchainID` currently running. Instead, callers of `getVerifiedMessage` should use `getBlockchainID()` to decide how they should interpret the message. In other words, does the `destinationChainID` match either the local `blockchainID` or the `AnycastID`.
 
 #### getBlockchainID
 

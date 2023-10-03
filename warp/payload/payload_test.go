@@ -18,8 +18,6 @@ func TestAddressedPayload(t *testing.T) {
 
 	addressedPayload, err := NewAddressedPayload(
 		common.Address(ids.GenerateTestShortID()),
-		common.Hash(ids.GenerateTestID()),
-		common.Address(ids.GenerateTestShortID()),
 		[]byte{1, 2, 3},
 	)
 	require.NoError(err)
@@ -36,12 +34,10 @@ func TestParseAddressedPayloadJunk(t *testing.T) {
 }
 
 func TestParseAddressedPayload(t *testing.T) {
-	base64Payload := "AAAAAAAAAQIDAAAAAAAAAAAAAAAAAAAAAAAEBQYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcICQAAAAAAAAAAAAAAAAAAAAAAAAAAAwoLDA=="
+	base64Payload := "AAAAAAAAAQIDAAAAAAAAAAAAAAAAAAAAAAAAAAADCgsM"
 	payload := &AddressedPayload{
-		SourceAddress:      common.Address{1, 2, 3},
-		DestinationChainID: common.Hash{4, 5, 6},
-		DestinationAddress: common.Address{7, 8, 9},
-		Payload:            []byte{10, 11, 12},
+		SourceAddress: common.Address{1, 2, 3},
+		Payload:       []byte{10, 11, 12},
 	}
 
 	require.NoError(t, payload.initialize())
@@ -91,8 +87,6 @@ func TestParseWrongPayloadType(t *testing.T) {
 	require.NoError(err)
 
 	addressedPayload, err := NewAddressedPayload(
-		common.Address(ids.GenerateTestShortID()),
-		common.Hash(ids.GenerateTestID()),
 		common.Address(ids.GenerateTestShortID()),
 		[]byte{1, 2, 3},
 	)
