@@ -106,17 +106,19 @@ func (p Path) HasPrefix(prefix Path) bool {
 
 	// The number of tokens in the last byte of [prefix], or zero
 	// if [prefix] fits into a whole number of bytes.
-	remainderTokens := prefix.tokensLength % p.tokensPerByte
-	if remainderTokens == 0 {
+	remainderTokensCount := prefix.tokensLength % p.tokensPerByte
+	if remainderTokensCount == 0 {
 		return strings.HasPrefix(p.value, prefix.value)
 	}
 
 	// check that the tokens in the partially filled final byte of [prefix] are
 	// equal to the tokens in the final byte of [p].
-	for i := prefix.tokensLength - remainderTokens; i < prefix.tokensLength; i++ {
-		if p.Token(i) != prefix.Token(i) {
-			return false
-		}
+	remainderBitsMask := byte(0xFF << (8 - remainderTokensCount*int(p.tokenBitSize)))
+	prefixRemainderTokens := prefix.value[len(prefix.value)-1] & remainderBitsMask
+	remainderTokens := p.value[len(prefix.value)-1] & remainderBitsMask
+
+	if prefixRemainderTokens != remainderTokens {
+		return false
 	}
 
 	// Note that this will never be an index OOB because len(prefix.value) > 0.
@@ -199,11 +201,8 @@ func (p Path) bitsToShift(index int) byte {
 
 // bytesNeeded returns the number of bytes needed to store the passed number of tokens
 func (p Path) bytesNeeded(tokens int) int {
-	bytesNeeded := tokens / p.tokensPerByte
-	if tokens%p.tokensPerByte > 0 {
-		bytesNeeded++
-	}
-	return bytesNeeded
+	// adding p.tokensPerByte - 1 causes the division to always round up
+	return (tokens + p.tokensPerByte - 1) / p.tokensPerByte
 }
 
 // Treats [src] as a bit array and copies it into [dst] shifted by [shift] bits.
@@ -215,7 +214,7 @@ func (p Path) bytesNeeded(tokens int) int {
 func shiftCopy(dst []byte, src string, shift byte) {
 	i := 0
 	for ; i < len(src)-1; i++ {
-		dst[i] = src[i]<<shift + src[i+1]>>(8-shift)
+		dst[i] = src[i]<<shift | src[i+1]>>(8-shift)
 	}
 
 	if i < len(dst) {
@@ -326,7 +325,7 @@ func (p Path) Take(tokensToTake int) Path {
 	// We want to zero out everything to the right of the last token, which is at index [tokensToTake] - 1
 	// Mask will be (8-bitsToShift) number of 1's followed by (bitsToShift) number of 0's
 	mask := byte(0xFF << p.bitsToShift(tokensToTake-1))
-	buffer[len(buffer)-1] = buffer[len(buffer)-1] & mask
+	buffer[len(buffer)-1] &= mask
 
 	result.value = byteSliceToString(buffer)
 	return result
