@@ -754,7 +754,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	reply.Validators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
-	vdrToDelegators := map[ids.ShortNodeID][]platformapi.PrimaryDelegator{}
+	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
 	nodeIDs := set.Set[ids.NodeID]{}
@@ -899,7 +899,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
 			}
-			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
+			nodeID := ids.NodeIDFromShortNodeID(delegator.NodeID)
+			vdrToDelegators[nodeID] = append(vdrToDelegators[nodeID], delegator)
 
 		case txs.SubnetPermissionedValidatorCurrentPriority:
 			uptime, err := s.getAPIUptime(currentStaker)
@@ -924,7 +925,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		if !ok {
 			continue
 		}
-		delegators, ok := vdrToDelegators[vdr.NodeID]
+		nodeID := ids.NodeIDFromShortNodeID(vdr.NodeID)
+		delegators, ok := vdrToDelegators[nodeID]
 		if !ok {
 			// If we are expected to populate the delegators field, we should
 			// always return a non-nil value.
