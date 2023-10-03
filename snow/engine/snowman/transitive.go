@@ -783,6 +783,7 @@ func (t *Transitive) sendQuery(
 			zap.String("reason", "block height overflow"),
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			zap.Error(err),
 		)
 		return
 	}
