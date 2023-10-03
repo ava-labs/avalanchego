@@ -18,7 +18,8 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
+	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
@@ -84,7 +85,7 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(arg0, arg1 interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(arg0 blocks.Block) {
+func (m *MockState) AddStatelessBlock(arg0 block.Block) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", arg0)
 }
@@ -483,10 +484,10 @@ func (mr *MockStateMockRecorder) GetStartTime(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, error) {
+func (m *MockState) GetStatelessBlock(arg0 ids.ID) (block.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", arg0)
-	ret0, _ := ret[0].(blocks.Block)
+	ret0, _ := ret[0].(block.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -495,6 +496,21 @@ func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, error) {
 func (mr *MockStateMockRecorder) GetStatelessBlock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockState)(nil).GetStatelessBlock), arg0)
+}
+
+// GetSubnetOwner mocks base method.
+func (m *MockState) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetOwner", arg0)
+	ret0, _ := ret[0].(fx.Owner)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetOwner indicates an expected call of GetSubnetOwner.
+func (mr *MockStateMockRecorder) GetSubnetOwner(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetOwner", reflect.TypeOf((*MockState)(nil).GetSubnetOwner), arg0)
 }
 
 // GetSubnetTransformation mocks base method.
@@ -698,6 +714,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetSubnetOwner mocks base method.
+func (m *MockState) SetSubnetOwner(arg0 ids.ID, arg1 fx.Owner) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetOwner", arg0, arg1)
+}
+
+// SetSubnetOwner indicates an expected call of SetSubnetOwner.
+func (mr *MockStateMockRecorder) SetSubnetOwner(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetOwner", reflect.TypeOf((*MockState)(nil).SetSubnetOwner), arg0, arg1)
 }
 
 // SetTimestamp mocks base method.

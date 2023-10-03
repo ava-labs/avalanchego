@@ -19,7 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/snow/event"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -69,7 +70,7 @@ type Transitive struct {
 	pending map[ids.ID]snowman.Block
 
 	// Block ID --> Parent ID
-	nonVerifieds AncestorTree
+	nonVerifieds ancestor.Tree
 
 	// Block ID --> Block.
 	// A block is put into this cache if it was not able to be issued. A block
@@ -82,7 +83,7 @@ type Transitive struct {
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
-	blocked events.Blocker
+	blocked event.Blocker
 
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
@@ -121,7 +122,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
-		nonVerifieds:                NewAncestorTree(),
+		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
 		polls: poll.NewSet(factory,
@@ -273,10 +274,10 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
-		t:         t,
-		vdr:       nodeID,
-		requestID: requestID,
-		response:  blkID,
+		t:               t,
+		vdr:             nodeID,
+		requestID:       requestID,
+		responseOptions: []ids.ID{blkID},
 	}
 
 	// Wait until [blkID] has been issued to consensus before applying this chit.
@@ -454,7 +455,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 }
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
-	lastAccepted := t.Consensus.LastAccepted()
+	lastAccepted, _ := t.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
@@ -525,7 +526,7 @@ func (t *Transitive) repoll(ctx context.Context) {
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullQuery(ctx, prefID)
+		t.sendQuery(ctx, prefID, nil, false)
 	}
 }
 
@@ -685,12 +686,19 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
-// send a pull query for this block ID
-func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
+// Send a query for this block. If push is set to true, blkBytes will be used to
+// send a PushQuery. Otherwise, blkBytes will be ignored and a PullQuery will be
+// sent.
+func (t *Transitive) sendQuery(
+	ctx context.Context,
+	blkID ids.ID,
+	blkBytes []byte,
+	push bool,
+) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
-	// The validators we will query
+
 	vdrIDs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
@@ -700,50 +708,21 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
-
+	vdrBag := bag.Of(vdrIDs...)
 	t.RequestID++
-	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrList := vdrBag.List()
-		vdrSet := set.Of(vdrList...)
+	if !t.polls.Add(t.RequestID, vdrBag) {
+		t.Ctx.Log.Error("dropped query for block",
+			zap.String("reason", "failed to add poll"),
+			zap.Stringer("blkID", blkID),
+		)
+		return
+	}
+
+	vdrSet := set.Of(vdrIDs...)
+	if push {
+		t.Sender.SendPushQuery(ctx, vdrSet, t.RequestID, blkBytes)
+	} else {
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
-	}
-}
-
-// Send a query for this block. Some validators will be sent
-// a Push Query and some will be sent a Pull Query.
-// If [push] is true, a push query will be used. Otherwise, a pull query will be
-// used.
-func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool) {
-	t.Ctx.Log.Verbo("sampling from validators",
-		zap.Stringer("validators", t.Validators),
-	)
-
-	blkID := blk.ID()
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
-	if err != nil {
-		t.Ctx.Log.Error("dropped query for block",
-			zap.String("reason", "insufficient number of validators"),
-			zap.Stringer("blkID", blkID),
-		)
-		return
-	}
-
-	vdrBag := bag.Bag[ids.NodeID]{}
-	vdrBag.Add(vdrIDs...)
-
-	t.RequestID++
-	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrs := vdrBag.List()
-		sendTo := set.Of(vdrs...)
-
-		if push {
-			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())
-			return
-		}
-
-		t.Sender.SendPullQuery(ctx, sendTo, t.RequestID, blk.ID())
 	}
 }
 
@@ -820,16 +799,16 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendQuery(ctx, blk, push)
+		t.sendQuery(ctx, blkID, blk.Bytes(), push)
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
+		blkID := blk.ID()
 		if t.Consensus.IsPreferred(blk) {
-			t.sendQuery(ctx, blk, push)
+			t.sendQuery(ctx, blkID, blk.Bytes(), push)
 		}
 
-		blkID := blk.ID()
 		t.removeFromPending(blk)
 		t.blocked.Fulfill(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)

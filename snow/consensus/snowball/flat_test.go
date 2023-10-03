@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
@@ -18,22 +17,19 @@ func TestFlat(t *testing.T) {
 	params := Parameters{
 		K: 2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	f := Flat{}
-	f.Initialize(params, Red)
+	f := NewFlat(params, Red)
 	f.Add(Green)
 	f.Add(Blue)
 
 	require.Equal(Red, f.Preference())
 	require.False(f.Finalized())
 
-	twoBlue := bag.Bag[ids.ID]{}
-	twoBlue.Add(Blue, Blue)
+	twoBlue := bag.Of(Blue, Blue)
 	require.True(f.RecordPoll(twoBlue))
 	require.Equal(Blue, f.Preference())
 	require.False(f.Finalized())
 
-	oneRedOneBlue := bag.Bag[ids.ID]{}
-	oneRedOneBlue.Add(Red, Blue)
+	oneRedOneBlue := bag.Of(Red, Blue)
 	require.False(f.RecordPoll(oneRedOneBlue))
 	require.Equal(Blue, f.Preference())
 	require.False(f.Finalized())

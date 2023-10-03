@@ -24,13 +24,11 @@ func TestSnowballSingleton(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
 	}
-	tree := Tree{}
-	tree.Initialize(params, Red)
+	tree := NewTree(params, Red)
 
 	require.False(tree.Finalized())
 
-	oneRed := bag.Bag[ids.ID]{}
-	oneRed.Add(Red)
+	oneRed := bag.Of(Red)
 	require.True(tree.RecordPoll(oneRed))
 	require.False(tree.Finalized())
 
@@ -51,8 +49,7 @@ func TestSnowballSingleton(t *testing.T) {
 
 	// Because the tree is already finalized, RecordPoll can return either true
 	// or false.
-	oneBlue := bag.Bag[ids.ID]{}
-	oneBlue.Add(Blue)
+	oneBlue := bag.Of(Blue)
 	tree.RecordPoll(oneBlue)
 	require.Equal(Red, tree.Preference())
 	require.True(tree.Finalized())
@@ -64,13 +61,11 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
-	tree := Tree{}
-	tree.Initialize(params, Red)
+	tree := NewTree(params, Red)
 
 	require.False(tree.Finalized())
 
-	oneRed := bag.Bag[ids.ID]{}
-	oneRed.Add(Red)
+	oneRed := bag.Of(Red)
 	require.True(tree.RecordPoll(oneRed))
 
 	tree.RecordUnsuccessfulPoll()
@@ -92,21 +87,18 @@ func TestSnowballBinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, Red)
+	tree := NewTree(params, Red)
 	tree.Add(Blue)
 
 	require.Equal(Red, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneBlue := bag.Bag[ids.ID]{}
-	oneBlue.Add(Blue)
+	oneBlue := bag.Of(Blue)
 	require.True(tree.RecordPoll(oneBlue))
 	require.Equal(Blue, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneRed := bag.Bag[ids.ID]{}
-	oneRed.Add(Red)
+	oneRed := bag.Of(Red)
 	require.True(tree.RecordPoll(oneRed))
 	require.Equal(Blue, tree.Preference())
 	require.False(tree.Finalized())
@@ -134,8 +126,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 
 	// Should do nothing
@@ -147,8 +138,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	require.Equal(zero, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneBag := bag.Bag[ids.ID]{}
-	oneBag.Add(one)
+	oneBag := bag.Of(one)
 	require.True(tree.RecordPoll(oneBag))
 	require.Equal(one, tree.Preference())
 	require.False(tree.Finalized())
@@ -176,8 +166,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 	tree.Add(four)
 
@@ -193,8 +182,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	zeroBag := bag.Bag[ids.ID]{}
-	zeroBag.Add(zero)
+	zeroBag := bag.Of(zero)
 	require.True(tree.RecordPoll(zeroBag))
 
 	{
@@ -231,8 +219,7 @@ func TestSnowballNewUnary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 3,
 	}
-	tree := Tree{}
-	tree.Initialize(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(one)
 
 	{
@@ -244,8 +231,7 @@ func TestSnowballNewUnary(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	oneBag := bag.Bag[ids.ID]{}
-	oneBag.Add(one)
+	oneBag := bag.Of(one)
 	require.True(tree.RecordPoll(oneBag))
 
 	{
@@ -279,8 +265,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, zero)
+	tree := NewTree(params, zero)
 	tree.Add(two)
 	tree.Add(eight)
 
@@ -297,8 +282,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	zeroBag := bag.Bag[ids.ID]{}
-	zeroBag.Add(zero)
+	zeroBag := bag.Of(zero)
 	require.True(tree.RecordPoll(zeroBag))
 
 	{
@@ -361,8 +345,7 @@ func TestSnowballTrinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, Green)
+	tree := NewTree(params, Green)
 	tree.Add(Red)
 	tree.Add(Blue)
 
@@ -375,22 +358,19 @@ func TestSnowballTrinary(t *testing.T) {
 	require.Equal(Green, tree.Preference())
 	require.False(tree.Finalized())
 
-	redBag := bag.Bag[ids.ID]{}
-	redBag.Add(Red)
+	redBag := bag.Of(Red)
 	require.True(tree.RecordPoll(redBag))
 	require.Equal(Red, tree.Preference())
 	require.False(tree.Finalized())
 
-	blueBag := bag.Bag[ids.ID]{}
-	blueBag.Add(Blue)
+	blueBag := bag.Of(Blue)
 	require.True(tree.RecordPoll(blueBag))
 	require.Equal(Red, tree.Preference())
 	require.False(tree.Finalized())
 
 	// Here is a case where voting for a color makes a different color become
 	// the preferred color. This is intended behavior.
-	greenBag := bag.Bag[ids.ID]{}
-	greenBag.Add(Green)
+	greenBag := bag.Of(Green)
 	require.True(tree.RecordPoll(greenBag))
 	require.Equal(Blue, tree.Preference())
 	require.False(tree.Finalized())
@@ -415,8 +395,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, yellow)
+	tree := NewTree(params, yellow)
 	tree.Add(cyan)
 	tree.Add(magenta)
 
@@ -429,21 +408,18 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
-	yellowBag := bag.Bag[ids.ID]{}
-	yellowBag.Add(yellow)
+	yellowBag := bag.Of(yellow)
 	require.True(tree.RecordPoll(yellowBag))
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
-	magentaBag := bag.Bag[ids.ID]{}
-	magentaBag.Add(magenta)
+	magentaBag := bag.Of(magenta)
 	require.True(tree.RecordPoll(magentaBag))
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
 	// Cyan has already been rejected here, so these are not successful polls.
-	cyanBag := bag.Bag[ids.ID]{}
-	cyanBag.Add(cyan)
+	cyanBag := bag.Of(cyan)
 	require.False(tree.RecordPoll(cyanBag))
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
@@ -464,16 +440,14 @@ func TestSnowballAddRejected(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c1000)
 	tree.Add(c0010)
 
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0010Bag := bag.Bag[ids.ID]{}
-	c0010Bag.Add(c0010)
+	c0010Bag := bag.Of(c0010)
 	require.True(tree.RecordPoll(c0010Bag))
 
 	{
@@ -511,16 +485,14 @@ func TestSnowballResetChild(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c0100)
 	tree.Add(c1000)
 
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0000Bag := bag.Bag[ids.ID]{}
-	c0000Bag.Add(c0000)
+	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
 	{
@@ -572,16 +544,14 @@ func TestSnowballResetSibling(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, c0000)
+	tree := NewTree(params, c0000)
 	tree.Add(c0100)
 	tree.Add(c1000)
 
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0100Bag := bag.Bag[ids.ID]{}
-	c0100Bag.Add(c0100)
+	c0100Bag := bag.Of(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 
 	{
@@ -595,8 +565,7 @@ func TestSnowballResetSibling(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c1000Bag := bag.Bag[ids.ID]{}
-	c1000Bag.Add(c1000)
+	c1000Bag := bag.Of(c1000)
 	require.True(tree.RecordPoll(c1000Bag))
 
 	{
@@ -637,16 +606,14 @@ func TestSnowball5Colors(t *testing.T) {
 		colors = append(colors, ids.Empty.Prefix(uint64(i)))
 	}
 
-	tree0 := Tree{}
-	tree0.Initialize(params, colors[4])
+	tree0 := NewTree(params, colors[4])
 
 	tree0.Add(colors[0])
 	tree0.Add(colors[1])
 	tree0.Add(colors[2])
 	tree0.Add(colors[3])
 
-	tree1 := Tree{}
-	tree1.Initialize(params, colors[3])
+	tree1 := NewTree(params, colors[3])
 
 	tree1.Add(colors[0])
 	tree1.Add(colors[1])
@@ -669,8 +636,7 @@ func TestSnowballFineGrained(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, c0000)
+	tree := NewTree(params, c0000)
 
 	require.Equal(initialUnaryDescription, tree.String())
 	require.Equal(c0000, tree.Preference())
@@ -716,8 +682,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0000Bag := bag.Bag[ids.ID]{}
-	c0000Bag.Add(c0000)
+	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
 	{
@@ -733,8 +698,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0010Bag := bag.Bag[ids.ID]{}
-	c0010Bag.Add(c0010)
+	c0010Bag := bag.Of(c0010)
 	require.True(tree.RecordPoll(c0010Bag))
 
 	{
@@ -762,8 +726,7 @@ func TestSnowballDoubleAdd(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
 	}
-	tree := Tree{}
-	tree.Initialize(params, Red)
+	tree := NewTree(params, Red)
 	tree.Add(Red)
 
 	require.Equal(initialUnaryDescription, tree.String())
@@ -787,7 +750,7 @@ func TestSnowballConsistent(t *testing.T) {
 	n.Initialize(params, numColors)
 
 	for i := 0; i < numNodes; i++ {
-		n.AddNode(&Tree{})
+		n.AddNode(NewTree)
 	}
 
 	for !n.Finalized() && !n.Disagreement() {
@@ -808,8 +771,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	params := Parameters{
 		K: 1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
 	}
-	tree := Tree{}
-	tree.Initialize(params, c0000)
+	tree := NewTree(params, c0000)
 
 	require.Equal(initialUnaryDescription, tree.String())
 	require.Equal(c0000, tree.Preference())
@@ -840,8 +802,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0000Bag := bag.Bag[ids.ID]{}
-	c0000Bag.Add(c0000)
+	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
 	{
@@ -868,8 +829,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0100Bag := bag.Bag[ids.ID]{}
-	c0100Bag.Add(c0100)
+	c0100Bag := bag.Of(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 
 	{

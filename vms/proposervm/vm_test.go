@@ -264,7 +264,9 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 		return coreBlk, nil
 	}
 
-	// test
+	// Mock the clock time to make sure that block timestamps will be equal
+	proVM.Clock.Set(time.Now())
+
 	builtBlk1, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 

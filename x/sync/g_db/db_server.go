@@ -19,14 +19,18 @@ import (
 
 var _ pb.DBServer = (*DBServer)(nil)
 
-func NewDBServer(db sync.DB) *DBServer {
-	return &DBServer{db: db}
+func NewDBServer(db sync.DB, branchFactor merkledb.BranchFactor) *DBServer {
+	return &DBServer{
+		db:           db,
+		branchFactor: branchFactor,
+	}
 }
 
 type DBServer struct {
 	pb.UnsafeDBServer
 
-	db sync.DB
+	db           sync.DB
+	branchFactor merkledb.BranchFactor
 }
 
 func (s *DBServer) GetMerkleRoot(
@@ -94,7 +98,7 @@ func (s *DBServer) VerifyChangeProof(
 	req *pb.VerifyChangeProofRequest,
 ) (*pb.VerifyChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof); err != nil {
+	if err := proof.UnmarshalProto(req.Proof, s.branchFactor); err != nil {
 		return nil, err
 	}
 
@@ -126,7 +130,7 @@ func (s *DBServer) CommitChangeProof(
 	req *pb.CommitChangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof); err != nil {
+	if err := proof.UnmarshalProto(req.Proof, s.branchFactor); err != nil {
 		return nil, err
 	}
 
@@ -171,16 +175,16 @@ func (s *DBServer) GetRangeProof(
 
 	protoProof := &pb.GetRangeProofResponse{
 		Proof: &pb.RangeProof{
-			Start:     make([]*pb.ProofNode, len(proof.StartProof)),
-			End:       make([]*pb.ProofNode, len(proof.EndProof)),
-			KeyValues: make([]*pb.KeyValue, len(proof.KeyValues)),
+			StartProof: make([]*pb.ProofNode, len(proof.StartProof)),
+			EndProof:   make([]*pb.ProofNode, len(proof.EndProof)),
+			KeyValues:  make([]*pb.KeyValue, len(proof.KeyValues)),
 		},
 	}
 	for i, node := range proof.StartProof {
-		protoProof.Proof.Start[i] = node.ToProto()
+		protoProof.Proof.StartProof[i] = node.ToProto()
 	}
 	for i, node := range proof.EndProof {
-		protoProof.Proof.End[i] = node.ToProto()
+		protoProof.Proof.EndProof[i] = node.ToProto()
 	}
 	for i, kv := range proof.KeyValues {
 		protoProof.Proof.KeyValues[i] = &pb.KeyValue{
@@ -197,7 +201,7 @@ func (s *DBServer) CommitRangeProof(
 	req *pb.CommitRangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
+	if err := proof.UnmarshalProto(req.RangeProof, s.branchFactor); err != nil {
 		return nil, err
 	}
 
@@ -206,6 +210,11 @@ func (s *DBServer) CommitRangeProof(
 		start = maybe.Some(req.StartKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, &proof)
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, end, &proof)
 	return &emptypb.Empty{}, err
 }

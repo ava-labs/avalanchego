@@ -1,37 +1,65 @@
 # https://golangci-lint.run/usage/configuration/
 run:
   timeout: 10m
-  # skip auto-generated files.
-  skip-files:
-    - ".*\\.pb\\.go$"
-    - ".*mock.*"
+
+  # Enables skipping of directories:
+  # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
+  # Default: true
+  skip-dirs-use-default: false
+
+  # If set we pass it to "go list -mod={option}". From "go help modules":
+  # If invoked with -mod=readonly, the go command is disallowed from the implicit
+  # automatic updating of go.mod described above. Instead, it fails when any changes
+  # to go.mod are needed. This setting is most useful to check that go.mod does
+  # not need updates, such as in a continuous integration and testing system.
+  # If invoked with -mod=vendor, the go command assumes that the vendor
+  # directory holds the correct copies of dependencies and ignores
+  # the dependency descriptions in go.mod.
+  #
+  # Allowed values: readonly|vendor|mod
+  # By default, it isn't set.
+  modules-download-mode: readonly
+
+output:
+  # Make issues output unique by line.
+  # Default: true
+  uniq-by-line: false
 
 issues:
-  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
   max-same-issues: 0
 
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
     - asciicheck
     - bodyclose
     - depguard
+    - dupword
     - errcheck
     - errorlint
     - exportloopref
     - forbidigo
     - goconst
     - gocritic
+    # - goerr113
     - gofmt
     - gofumpt
     - goimports
+    # - gomnd
     - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
+    # - lll
     - misspell
     - nakedret
     - noctx
@@ -41,30 +69,29 @@ linters:
     - staticcheck
     - stylecheck
     - typecheck
+    - tagalign
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     - whitespace
-    # - goerr113
-    # - gomnd
-    # - lll
 
 linters-settings:
-  goimports:
-    local-prefixes: github.com/ava-labs/avalanchego
   depguard:
-    list-type: blacklist
-    packages-with-error-message:
-      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
-      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
-      - github.com/golang/mock/gomock: 'go.uber.org/mock/gomock should be used instead.'
-    include-go-root: true
+    rules:
+      packages:
+        deny:
+          - pkg: "io/ioutil"
+            desc: io/ioutil is deprecated. Use package io or os instead.
+          - pkg: "github.com/stretchr/testify/assert"
+            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "github.com/golang/mock/gomock"
+            desc: go.uber.org/mock/gomock should be used instead.
   errorlint:
     # Check for plain type assertions and type switches.
     asserts: false
     # Check for plain error comparisons.
     comparison: false
-  # https://golangci-lint.run/usage/linters/#forbidigo
   forbidigo:
     # Forbid the following identifiers (list of regexp).
     forbid:
@@ -73,11 +100,13 @@ linters-settings:
       - 'require\.EqualValues$(# Equal should be used instead)?'
       - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
       - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
+    # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
-  # https://golangci-lint.run/usage/linters#gosec
+  goimports:
+    local-prefixes: github.com/ava-labs/avalanchego
   gosec:
     excludes:
-      - G107 # https://securego.io/docs/rules/g107.html
+      - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -121,9 +150,14 @@ linters-settings:
       - name: useless-break
         disabled: false
   staticcheck:
-    go: "1.20"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"
-      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
-      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+      - "-SA6002" # Storing non-pointer values in sync.Pool allocates memory
+      - "-SA1019" # Using a deprecated function, variable, constant or field
+  tagalign:
+    align: true
+    sort: true
+    strict: true
+    order:
+      - serialize
