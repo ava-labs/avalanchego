@@ -776,6 +776,11 @@ func (t *Transitive) sendQuery(
 	vdrBag := bag.Of(vdrIDs...)
 	t.RequestID++
 	if !t.polls.Add(t.RequestID, vdrBag) {
+		t.Ctx.Log.Error("dropped query for block",
+			zap.String("reason", "failed to add poll"),
+			zap.Stringer("blkID", blkID),
+			zap.Uint32("requestID", t.RequestID),
+		)
 		return
 	}
 

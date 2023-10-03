@@ -17,6 +17,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
 	BlockIDCacheSize:             8192,
+	FxOwnerCacheSize:             4 * units.MiB,
 	ChecksumsEnabled:             false,
 }
 
@@ -29,6 +30,7 @@ type ExecutionConfig struct {
 	ChainCacheSize               int  `json:"chain-cache-size"`
 	ChainDBCacheSize             int  `json:"chain-db-cache-size"`
 	BlockIDCacheSize             int  `json:"block-id-cache-size"`
+	FxOwnerCacheSize             int  `json:"fx-owner-cache-size"`
 	ChecksumsEnabled             bool `json:"checksums-enabled"`
 }
 

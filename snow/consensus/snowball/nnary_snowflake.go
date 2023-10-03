@@ -11,6 +11,14 @@ import (
 
 var _ NnarySnowflake = (*nnarySnowflake)(nil)
 
+func newNnarySnowflake(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowflake {
+	return nnarySnowflake{
+		nnarySlush:   newNnarySlush(choice),
+		betaVirtuous: betaVirtuous,
+		betaRogue:    betaRogue,
+	}
+}
+
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
 type nnarySnowflake struct {
@@ -35,12 +43,6 @@ type nnarySnowflake struct {
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
 	finalized bool
-}
-
-func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
-	sf.nnarySlush.Initialize(choice)
-	sf.betaVirtuous = betaVirtuous
-	sf.betaRogue = betaRogue
 }
 
 func (sf *nnarySnowflake) Add(choice ids.ID) {

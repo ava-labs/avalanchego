@@ -27,7 +27,7 @@ type intermediateNodeDB struct {
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
-	nodeCache onEvictCache[path, *node]
+	nodeCache onEvictCache[Path, *node]
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
@@ -55,7 +55,7 @@ func newIntermediateNodeDB(
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
-func (db *intermediateNodeDB) onEviction(key path, n *node) error {
+func (db *intermediateNodeDB) onEviction(key Path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
 	totalSize := cacheEntrySize(key, n)
@@ -88,7 +88,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	return nil
 }
 
-func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
+func (db *intermediateNodeDB) addToBatch(b database.Batch, key Path, n *node) error {
 	dbKey := db.constructDBKey(key)
 	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
@@ -98,7 +98,7 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) er
 	return b.Put(dbKey, n.bytes())
 }
 
-func (db *intermediateNodeDB) Get(key path) (*node, error) {
+func (db *intermediateNodeDB) Get(key Path) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
@@ -121,32 +121,18 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 
 // constructDBKey returns a key that can be used in [db.baseDB].
 // We need to be able to differentiate between two paths of equal
-// byte length but different token length so we add padding to differentiate.
+// byte length but different token length, so we add padding to differentiate.
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
-func (db *intermediateNodeDB) constructDBKey(key path) []byte {
-	compressedKey := key.Serialize()
-
-	// add one additional byte to store padding when the path
-	// has a length that fits into a whole number of bytes
-	remainder := compressedKey.NibbleLength % 2
-	keyLen := len(compressedKey.Value)
-	if remainder == 0 {
-		keyLen++
-	}
-	dbKey := getBufferFromPool(db.bufferPool, keyLen)
-	defer db.bufferPool.Put(dbKey)
-
-	copy(dbKey, compressedKey.Value)
-	if remainder == 0 {
-		dbKey[keyLen-1] = 0b1000_0000
-	} else {
-		dbKey[keyLen-1] |= 0b0000_1000
+func (db *intermediateNodeDB) constructDBKey(key Path) []byte {
+	if key.branchFactor == BranchFactor256 {
+		// For BranchFactor256, no padding is needed since byte length == token length
+		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, dbKey)
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(1).Bytes())
 }
 
-func (db *intermediateNodeDB) Put(key path, n *node) error {
+func (db *intermediateNodeDB) Put(key Path, n *node) error {
 	return db.nodeCache.Put(key, n)
 }
 
@@ -154,6 +140,6 @@ func (db *intermediateNodeDB) Flush() error {
 	return db.nodeCache.Flush()
 }
 
-func (db *intermediateNodeDB) Delete(key path) error {
+func (db *intermediateNodeDB) Delete(key Path) error {
 	return db.nodeCache.Put(key, nil)
 }
