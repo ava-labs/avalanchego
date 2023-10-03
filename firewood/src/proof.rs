@@ -4,7 +4,6 @@
 use std::cmp::Ordering;
 use std::ops::Deref;
 
-use bincode::Options;
 use nix::errno::Errno;
 use sha3::Digest;
 use shale::disk_address::DiskAddress;
@@ -12,15 +11,11 @@ use shale::ShaleError;
 use shale::ShaleStore;
 use thiserror::Error;
 
-use crate::merkle::Encoded;
 use crate::nibbles::Nibbles;
 use crate::nibbles::NibblesIterator;
 use crate::{
     db::DbError,
-    merkle::{
-        to_nibble_array, BranchNode, ExtNode, LeafNode, Merkle, MerkleError, Node, NodeType,
-        PartialPath, NBRANCH,
-    },
+    merkle::{to_nibble_array, Merkle, MerkleError, Node, NodeType},
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
     v2::api::Proof,
 };
@@ -94,9 +89,6 @@ impl From<DbError> for ProofError {
         }
     }
 }
-
-const EXT_NODE_SIZE: usize = 2;
-const BRANCH_NODE_SIZE: usize = 17;
 
 /// SubProof contains the encoded value and the hash value of a node that maps
 /// to a single proof step. If reaches an end step during proof verification,
@@ -455,93 +447,50 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         buf: &[u8],
         end_node: bool,
     ) -> Result<(DiskAddress, Option<SubProof>, usize), ProofError> {
-        let mut items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
-        let size = items.len();
+        let node = NodeType::decode(buf)?;
+        let new_node = merkle
+            .new_node(Node::new(node))
+            .map_err(ProofError::InvalidNode)?;
+        let addr = new_node.as_ptr();
+        match new_node.inner() {
+            NodeType::Leaf(n) => {
+                let cur_key = &n.path().0;
+                // Check if the key of current node match with the given key.
+                if key.len() < cur_key.len() || &key[..cur_key.len()] != cur_key {
+                    return Ok((addr, None, 0));
+                }
 
-        match size {
-            EXT_NODE_SIZE => {
-                let mut items = items.into_iter();
-
-                let cur_key_path: Vec<u8> = items
-                    .next()
-                    .unwrap()
-                    .decode()?
-                    .into_iter()
-                    .flat_map(to_nibble_array)
-                    .collect();
-
-                let (cur_key_path, term) = PartialPath::decode(&cur_key_path);
-                let cur_key = cur_key_path.into_inner();
-
-                let data: Vec<u8> = items.next().unwrap().decode()?;
+                let subproof = Some(SubProof {
+                    encoded: n.data().to_vec(),
+                    hash: None,
+                });
+                Ok((addr, subproof, cur_key.len()))
+            }
+            NodeType::Extension(n) => {
+                let cur_key = &n.path().0;
 
                 // Check if the key of current node match with the given key.
-                if key.len() < cur_key.len() || key[..cur_key.len()] != cur_key {
-                    let ext_ptr = get_ext_ptr(merkle, term, Data(data), CurKey(cur_key))?;
-
-                    return Ok((ext_ptr, None, 0));
+                if key.len() < cur_key.len() || &key[..cur_key.len()] != cur_key {
+                    return Ok((addr, None, 0));
                 }
 
-                let subproof = if term {
-                    Some(SubProof {
-                        encoded: data.clone(),
-                        hash: None,
-                    })
-                } else {
-                    generate_subproof(data.clone()).map(Some)?
-                };
+                let encoded = n.chd_encoded().ok_or(ProofError::InvalidData)?.to_vec();
+                let subproof = generate_subproof(encoded).map(Some)?;
 
-                let cur_key_len = cur_key.len();
-
-                let ext_ptr = get_ext_ptr(merkle, term, Data(data), CurKey(cur_key))?;
-
-                Ok((ext_ptr, subproof, cur_key_len))
+                Ok((addr, subproof, cur_key.len()))
             }
-
-            BRANCH_NODE_SIZE => {
-                // we've already validated the size, that's why we can safely unwrap
-                let data = items.pop().unwrap().decode()?;
-                // Extract the value of the branch node and set to None if it's an empty Vec
-                let value = Some(data).filter(|data| !data.is_empty());
-
-                // Record encoded values of all children.
-                let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
-
-                // we popped the last element, so their should only be NBRANCH items left
-                for (i, chd) in items.into_iter().enumerate() {
-                    let data = chd.decode()?;
-                    chd_encoded[i] = Some(data).filter(|data| !data.is_empty());
-                }
-
-                // If the node is the last one to be decoded, then no subproof to be extracted.
-                if end_node {
-                    let branch_ptr = build_branch_ptr(merkle, value, chd_encoded)?;
-
-                    return Ok((branch_ptr, None, 1));
-                }
-
-                if key.is_empty() {
-                    return Err(ProofError::NoSuchNode);
-                }
-
+            // If the node is the last one to be decoded, then no subproof to be extracted.
+            NodeType::Branch(_) if end_node => Ok((addr, None, 1)),
+            NodeType::Branch(_) if key.is_empty() => Err(ProofError::NoSuchNode),
+            NodeType::Branch(n) => {
                 // Check if the subproof with the given key exist.
                 let index = key[0] as usize;
-
-                let Some(data) = chd_encoded[index].clone() else {
-                    let branch_ptr = build_branch_ptr(merkle, value, chd_encoded)?;
-
-                    return Ok((branch_ptr, None, 1));
+                let Some(data) = &n.chd_encode()[index] else {
+                    return Ok((addr, None, 1));
                 };
-
-                let branch_ptr = build_branch_ptr(merkle, value, chd_encoded)?;
-                let subproof = generate_subproof(data)?;
-
-                Ok((branch_ptr, Some(subproof), 1))
+                let subproof = generate_subproof(data.to_vec())?;
+                Ok((addr, Some(subproof), 1))
             }
-
-            _ => Err(ProofError::DecodeError(Box::new(
-                bincode::ErrorKind::Custom(String::from("")),
-            ))),
         }
     }
 }
@@ -623,42 +572,6 @@ fn generate_subproof(data: Vec<u8>) -> Result<SubProof, ProofError> {
             bincode::ErrorKind::Custom(format!("invalid proof length: {len}")),
         ))),
     }
-}
-
-struct CurKey(Vec<u8>);
-struct Data(Vec<u8>);
-
-fn get_ext_ptr<S: ShaleStore<Node> + Send + Sync>(
-    merkle: &Merkle<S>,
-    term: bool,
-    Data(data): Data,
-    CurKey(cur_key): CurKey,
-) -> Result<DiskAddress, ProofError> {
-    let node = if term {
-        NodeType::Leaf(LeafNode::new(cur_key, data))
-    } else {
-        NodeType::Extension(ExtNode::new(cur_key, DiskAddress::null(), Some(data)))
-    };
-
-    merkle
-        .new_node(Node::new(node))
-        .map(|node| node.as_ptr())
-        .map_err(ProofError::InvalidNode)
-}
-
-fn build_branch_ptr<S: ShaleStore<Node> + Send + Sync>(
-    merkle: &Merkle<S>,
-    value: Option<Vec<u8>>,
-    chd_encoded: [Option<Vec<u8>>; NBRANCH],
-) -> Result<DiskAddress, ProofError> {
-    let node = BranchNode::new([None; NBRANCH], value, chd_encoded);
-    let node = NodeType::Branch(node);
-    let node = Node::new(node);
-
-    merkle
-        .new_node(node)
-        .map_err(|_| ProofError::ProofNodeMissing)
-        .map(|node| node.as_ptr())
 }
 
 // unset_internal removes all internal node references.

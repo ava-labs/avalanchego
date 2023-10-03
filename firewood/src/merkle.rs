@@ -15,7 +15,6 @@ mod node;
 mod partial_path;
 mod trie_hash;
 
-pub(crate) use node::Encoded;
 pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
 pub use partial_path::PartialPath;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
