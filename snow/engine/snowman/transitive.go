@@ -475,6 +475,9 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
 		acceptedAtHeight, err := t.VM.GetBlockIDAtHeight(ctx, requestedHeight)
 		if err != nil {
+			// Because we only return accepted state here, it's fairly likely
+			// that the requested height is higher than the last accepted block.
+			// That means that this code path is actually quite common.
 			t.Ctx.Log.Debug("failed fetching accepted block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
