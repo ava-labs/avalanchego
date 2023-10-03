@@ -17,8 +17,8 @@ import (
 //
 // All nodeIDs are assumed to be authenticated.
 //
-// It is not expected for a consensus engine to be able to recover after
-// returning an error from any of its functions.
+// A consensus engine may recover after returning an error, but it isn't
+// required.
 type Engine interface {
 	Handler
 
