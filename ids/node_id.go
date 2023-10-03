@@ -91,11 +91,10 @@ func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
 }
 
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
-	bytes := hashing.ComputeHash160Array(
-		hashing.ComputeHash256(cert.Raw),
-	)
 	return NodeID{
-		buf: string(bytes[:]),
+		buf: string(hashing.ComputeHash160(
+			hashing.ComputeHash256(cert.Raw),
+		)),
 	}
 }
 
