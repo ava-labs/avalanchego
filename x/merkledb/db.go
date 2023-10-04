@@ -422,6 +422,59 @@ func (db *merkleDB) Close() error {
 	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
+func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	// reuse the view so that it can keep repeated nodes in memory
+	tempView, err := newTrieView(db, db, ViewChanges{})
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := db.prefetchPath(tempView, key); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (db *merkleDB) PrefetchPath(key []byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+	tempView, err := newTrieView(db, db, ViewChanges{})
+	if err != nil {
+		return err
+	}
+
+	return db.prefetchPath(tempView, key)
+}
+
+func (db *merkleDB) prefetchPath(view *trieView, key []byte) error {
+	pathToKey, err := view.getPathTo(db.newPath(key))
+	if err != nil {
+		return err
+	}
+	for _, n := range pathToKey {
+		if n.hasValue() {
+			db.valueNodeDB.nodeCache.Put(n.key, n)
+		} else if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
 	// this is a duplicate because the database interface doesn't support
 	// contexts, which are used for tracing
