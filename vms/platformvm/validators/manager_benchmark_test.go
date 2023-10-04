@@ -66,11 +66,11 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	addr, err := address.FormatBech32(constants.UnitTestHRP, ids.GenerateTestShortID().Bytes())
 	require.NoError(err)
 
-	genesisValidators := []api.PermissionlessValidator{{
-		Staker: api.Staker{
-			StartTime: json.Uint64(genesisTime.Unix()),
-			EndTime:   json.Uint64(genesisEndTime.Unix()),
-			NodeID:    ids.GenerateTestShortNodeID(),
+	genesisValidators := []api.GenesisPermissionlessValidator{{
+		GenesisStaker: api.GenesisStaker{
+			StartTime:   json.Uint64(genesisTime.Unix()),
+			EndTime:     json.Uint64(genesisEndTime.Unix()),
+			ShortNodeID: ids.GenerateTestShortNodeID(),
 		},
 		RewardOwner: &api.Owner{
 			Threshold: 1,

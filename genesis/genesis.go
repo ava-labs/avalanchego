@@ -419,11 +419,11 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			api.PermissionlessValidator{
-				Staker: api.Staker{
-					StartTime: json.Uint64(genesisTime.Unix()),
-					EndTime:   json.Uint64(endStakingTime.Unix()),
-					NodeID:    staker.NodeID,
+			api.GenesisPermissionlessValidator{
+				GenesisStaker: api.GenesisStaker{
+					StartTime:   json.Uint64(genesisTime.Unix()),
+					EndTime:     json.Uint64(endStakingTime.Unix()),
+					ShortNodeID: staker.NodeID,
 				},
 				RewardOwner: &api.Owner{
 					Threshold: 1,

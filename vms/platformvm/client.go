@@ -494,7 +494,7 @@ func (c *client) AddValidator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		Staker: platformapi.Staker{
-			NodeID:      nodeID,
+			NodeID:      ids.NodeIDFromShortNodeID(nodeID),
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -527,7 +527,7 @@ func (c *client) AddDelegator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		Staker: platformapi.Staker{
-			NodeID:      nodeID,
+			NodeID:      ids.NodeIDFromShortNodeID(nodeID),
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -559,7 +559,7 @@ func (c *client) AddSubnetValidator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		Staker: platformapi.Staker{
-			NodeID:      nodeID,
+			NodeID:      ids.NodeIDFromShortNodeID(nodeID),
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),

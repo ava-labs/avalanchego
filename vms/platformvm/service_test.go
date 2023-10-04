@@ -108,7 +108,7 @@ func defaultAddress(t *testing.T, service *Service) {
 func TestAddValidator(t *testing.T) {
 	require := require.New(t)
 
-	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-45PJLL","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
 	require.NoError(err)
@@ -592,7 +592,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID != vdr.NodeID {
+			if gotVdr.NodeID != ids.NodeIDFromShortNodeID(vdr.ShortNodeID) {
 				continue
 			}
 
@@ -600,7 +600,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(vdr.StartTime, gotVdr.StartTime)
 			found = true
 		}
-		require.True(found, "expected validators to contain %s but didn't", vdr.NodeID)
+		require.True(found, "expected validators to contain %s but didn't", vdr.ShortNodeID)
 	}
 
 	// Add a delegator
@@ -640,7 +640,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+		if vdr.NodeID != ids.NodeIDFromShortNodeID(validatorNodeID) {
 			continue
 		}
 		found = true
@@ -649,7 +649,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 		innerArgs := GetCurrentValidatorsArgs{
 			SubnetID: constants.PrimaryNetworkID,
-			NodeIDs:  []ids.NodeID{ids.NodeIDFromShortNodeID(vdr.NodeID)},
+			NodeIDs:  []ids.NodeID{vdr.NodeID},
 		}
 		innerResponse := GetCurrentValidatorsReply{}
 		require.NoError(service.GetCurrentValidators(nil, &innerArgs, &innerResponse))
@@ -683,7 +683,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	for _, vdr := range response.Validators {
 		castVdr := vdr.(pchainapi.PermissionlessValidator)
-		if castVdr.NodeID != validatorNodeID {
+		if castVdr.NodeID != ids.NodeIDFromShortNodeID(validatorNodeID) {
 			continue
 		}
 		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))

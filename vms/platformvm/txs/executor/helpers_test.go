@@ -376,18 +376,18 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.ShortNodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisStaker: api.GenesisStaker{
+				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
+				ShortNodeID: nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,

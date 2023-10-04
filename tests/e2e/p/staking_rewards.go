@@ -239,7 +239,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			validators, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PrimaryNetworkID, nil)
 			require.NoError(err)
 			for _, validator := range validators {
-				if validator.NodeID == alphaShortNodeID || validator.NodeID == betaShortNodeID {
+				if validator.NodeID == alphaNodeID || validator.NodeID == betaNodeID {
 					return false
 				}
 			}

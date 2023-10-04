@@ -87,15 +87,26 @@ func (utxo UTXO) Less(other UTXO) bool {
 // [NodeID] is the node ID of the staker
 // [Uptime] is the observed uptime of this staker
 type Staker struct {
-	TxID      ids.ID          `json:"txID"`
-	StartTime json.Uint64     `json:"startTime"`
-	EndTime   json.Uint64     `json:"endTime"`
-	Weight    json.Uint64     `json:"weight"`
-	NodeID    ids.ShortNodeID `json:"nodeID"`
+	TxID      ids.ID      `json:"txID"`
+	StartTime json.Uint64 `json:"startTime"`
+	EndTime   json.Uint64 `json:"endTime"`
+	Weight    json.Uint64 `json:"weight"`
+	NodeID    ids.NodeID  `json:"nodeID"`
 
 	// Deprecated: Use Weight instead
 	// TODO: remove [StakeAmount] after enough time for dependencies to update
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+}
+
+// GenesisStaker is very similar to Staker, but it explicitly uses a ShortNodeID
+// GenesisStaker should be used to generate genesis content only.
+// APIs should use Staker struct only
+type GenesisStaker struct {
+	TxID        ids.ID          `json:"txID"`
+	StartTime   json.Uint64     `json:"startTime"`
+	EndTime     json.Uint64     `json:"endTime"`
+	Weight      json.Uint64     `json:"weight"`
+	ShortNodeID ids.ShortNodeID `json:"nodeID"`
 }
 
 // Owner is the repr. of a reward owner sent over APIs.
@@ -109,6 +120,31 @@ type Owner struct {
 // APIs.
 type PermissionlessValidator struct {
 	Staker
+	// Deprecated: RewardOwner has been replaced by ValidationRewardOwner and
+	//             DelegationRewardOwner.
+	RewardOwner *Owner `json:"rewardOwner,omitempty"`
+	// The owner of the rewards from the validation period, if applicable.
+	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
+	// The owner of the rewards from delegations during the validation period,
+	// if applicable.
+	DelegationRewardOwner  *Owner                    `json:"delegationRewardOwner,omitempty"`
+	PotentialReward        *json.Uint64              `json:"potentialReward,omitempty"`
+	AccruedDelegateeReward *json.Uint64              `json:"accruedDelegateeReward,omitempty"`
+	DelegationFee          json.Float32              `json:"delegationFee"`
+	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Uptime                 *json.Float32             `json:"uptime,omitempty"`
+	Connected              bool                      `json:"connected"`
+	Staked                 []UTXO                    `json:"staked,omitempty"`
+	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
+
+	// The delegators delegating to this validator
+	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
+	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
+	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
+}
+
+type GenesisPermissionlessValidator struct {
+	GenesisStaker
 	// Deprecated: RewardOwner has been replaced by ValidationRewardOwner and
 	//             DelegationRewardOwner.
 	RewardOwner *Owner `json:"rewardOwner,omitempty"`
@@ -170,15 +206,15 @@ type Chain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID   ids.ID                    `json:"avaxAssetID"`
-	NetworkID     json.Uint32               `json:"networkID"`
-	UTXOs         []UTXO                    `json:"utxos"`
-	Validators    []PermissionlessValidator `json:"validators"`
-	Chains        []Chain                   `json:"chains"`
-	Time          json.Uint64               `json:"time"`
-	InitialSupply json.Uint64               `json:"initialSupply"`
-	Message       string                    `json:"message"`
-	Encoding      formatting.Encoding       `json:"encoding"`
+	AvaxAssetID   ids.ID                           `json:"avaxAssetID"`
+	NetworkID     json.Uint32                      `json:"networkID"`
+	UTXOs         []UTXO                           `json:"utxos"`
+	Validators    []GenesisPermissionlessValidator `json:"validators"`
+	Chains        []Chain                          `json:"chains"`
+	Time          json.Uint64                      `json:"time"`
+	InitialSupply json.Uint64                      `json:"initialSupply"`
+	Message       string                           `json:"message"`
+	Encoding      formatting.Encoding              `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -309,7 +345,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				BlockchainID: ids.Empty,
 			}},
 			Validator: txs.Validator{
-				NodeID: vdr.NodeID,
+				NodeID: vdr.ShortNodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,

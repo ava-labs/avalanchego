@@ -178,16 +178,16 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.ShortNodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisStaker: api.GenesisStaker{
+				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
+				ShortNodeID: nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,
@@ -246,17 +246,17 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.ShortNodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisStaker: api.GenesisStaker{
+				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
+				ShortNodeID: nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,
