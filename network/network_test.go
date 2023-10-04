@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -114,7 +115,7 @@ var (
 
 		CompressionType: constants.DefaultNetworkCompressionType,
 
-		UptimeCalculator:  uptime.NewManager(uptime.NewTestState()),
+		UptimeCalculator:  uptime.NewManager(uptime.NewTestState(), &mockable.Clock{}),
 		UptimeMetricFreq:  30 * time.Second,
 		UptimeRequirement: .8,
 
@@ -637,7 +638,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 // causes dial to return immediately.
 func TestDialContext(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
-	defer wg.Done()
 
 	dialer := newTestDialer()
 	network := networks[0]
@@ -688,4 +688,7 @@ func TestDialContext(t *testing.T) {
 		require.FailNow(t, "unexpectedly connected to peer")
 	default:
 	}
+
+	network.StartClose()
+	wg.Wait()
 }

@@ -148,7 +148,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 	baseState.SetTimestamp(clk.Time())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimes := uptime.NewManager(baseState)
+	uptimes := uptime.NewManager(baseState, clk)
 	utxoHandler := utxo.NewHandler(ctx, clk, fx)
 
 	txBuilder := builder.New(
