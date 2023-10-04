@@ -150,16 +150,6 @@ pub struct Options {
     )]
     blob_ncached_objs: usize,
 
-    /// Disk Buffer options
-    #[arg(
-        long,
-        required = false,
-        default_value_t = 4096,
-        value_name = "DISK_BUFFER_MAX_BUFFERED",
-        help = "Maximum buffered disk buffer."
-    )]
-    max_buffered: usize,
-
     #[arg(
         long,
         required = false,
@@ -271,7 +261,6 @@ pub fn initialize_db_config(opts: &Options) -> DbConfig {
             merkle_ncached_objs: opts.merkle_ncached_objs,
         },
         buffer: DiskBufferConfig {
-            max_buffered: opts.max_buffered,
             max_pending: opts.max_pending,
             max_aio_requests: opts.max_aio_requests,
             max_aio_response: opts.max_aio_response,

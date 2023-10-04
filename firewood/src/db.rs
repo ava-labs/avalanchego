@@ -479,7 +479,7 @@ impl Db {
             .block_nbit(params.wal_block_nbit)
             .max_revisions(cfg.wal.max_revisions)
             .build();
-        let (sender, inbound) = tokio::sync::mpsc::channel(cfg.buffer.max_buffered);
+        let (sender, inbound) = tokio::sync::mpsc::unbounded_channel();
         let disk_requester = DiskBufferRequester::new(sender);
         let buffer = cfg.buffer.clone();
         let disk_thread = Some(std::thread::spawn(move || {
