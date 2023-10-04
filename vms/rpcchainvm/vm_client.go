@@ -110,9 +110,10 @@ type VMClient struct {
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmpb.VMClient) *VMClient {
+func NewClient(clientConn *grpc.ClientConn) *VMClient {
 	return &VMClient{
-		client: client,
+		client: vmpb.NewVMClient(clientConn),
+		conns:  []*grpc.ClientConn{clientConn},
 	}
 }
 
@@ -353,10 +354,7 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 
 func (vm *VMClient) Shutdown(ctx context.Context) error {
 	errs := wrappers.Errs{}
-	// Shutdown is a special case, where we want to fail fast instead of block
-	// here.
-	failFast := grpc.WaitForReady(false)
-	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{}, failFast)
+	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{})
 	errs.Add(err)
 
 	vm.serverCloser.Stop()
@@ -530,8 +528,7 @@ func (vm *VMClient) SetPreference(ctx context.Context, blkID ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck(ctx context.Context) (interface{}, error) {
-	// HealthCheck is a special case, where we want to fail fast instead of block
-	// here.
+	// HealthCheck is a special case, where we want to fail fast instead of block.
 	failFast := grpc.WaitForReady(false)
 	health, err := vm.client.Health(ctx, &emptypb.Empty{}, failFast)
 	if err != nil {
