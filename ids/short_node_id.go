@@ -49,6 +49,10 @@ func ShortNodeIDFromString(nodeIDStr string) (ShortNodeID, error) {
 
 // ShortNodeIDFromNodeID is the inverse of NodeID.String()
 func ShortNodeIDFromNodeID(nodeID NodeID) (ShortNodeID, error) {
+	if nodeID == EmptyNodeID {
+		return EmptyShortNodeID, nil
+	}
+
 	res, err := ToShortNodeID(nodeID.Bytes())
 	if err != nil {
 		return EmptyShortNodeID, fmt.Errorf("failed converting NodeID to ShortNodeID, %w", err)

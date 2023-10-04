@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
-func TestNodeIDEquality(t *testing.T) {
+func TestShortNodeIDEquality(t *testing.T) {
 	require := require.New(t)
 
 	id := ShortNodeID{24}
@@ -31,7 +31,7 @@ func TestShortIDBytesIsolation(t *testing.T) {
 	require.Equal(ShortID{24}, id)
 }
 
-func TestNodeIDBytesIsolation(t *testing.T) {
+func TestShortNodeIDBytesIsolation(t *testing.T) {
 	require := require.New(t)
 
 	id := ShortNodeID{24}
@@ -40,7 +40,7 @@ func TestNodeIDBytesIsolation(t *testing.T) {
 	require.Equal(ShortNodeID{24}, id)
 }
 
-func TestNodeIDFromString(t *testing.T) {
+func TestShortNodeIDFromString(t *testing.T) {
 	require := require.New(t)
 
 	id := ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
@@ -52,7 +52,7 @@ func TestNodeIDFromString(t *testing.T) {
 	require.Equal(expected, idStr)
 }
 
-func TestNodeIDFromStringError(t *testing.T) {
+func TestShortNodeIDFromStringError(t *testing.T) {
 	tests := []struct {
 		in          string
 		expectedErr error
@@ -78,7 +78,7 @@ func TestNodeIDFromStringError(t *testing.T) {
 	}
 }
 
-func TestNodeIDMarshalJSON(t *testing.T) {
+func TestShortNodeIDMarshalJSON(t *testing.T) {
 	tests := []struct {
 		label string
 		in    ShortNodeID
@@ -104,7 +104,7 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestNodeIDUnmarshalJSON(t *testing.T) {
+func TestShortNodeIDUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		label       string
 		in          []byte
@@ -161,7 +161,7 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestNodeIDString(t *testing.T) {
+func TestShortNodeIDString(t *testing.T) {
 	tests := []struct {
 		label    string
 		id       ShortNodeID
@@ -177,7 +177,7 @@ func TestNodeIDString(t *testing.T) {
 	}
 }
 
-func TestNodeIDMapMarshalling(t *testing.T) {
+func TestShortNodeIDMapMarshalling(t *testing.T) {
 	require := require.New(t)
 
 	originalMap := map[ShortNodeID]int{
@@ -192,7 +192,7 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 	require.Equal(originalMap, unmarshalledMap)
 }
 
-func TestNodeIDLess(t *testing.T) {
+func TestShortNodeIDLess(t *testing.T) {
 	require := require.New(t)
 
 	id1 := EmptyShortNodeID
@@ -214,4 +214,17 @@ func TestNodeIDLess(t *testing.T) {
 	id2 = ShortNodeID{1, 2}
 	require.True(id1.Less(id2))
 	require.False(id2.Less(id1))
+}
+
+func TestShortNodeIDToShortNodeIDConversion(t *testing.T) {
+	require := require.New(t)
+
+	// EmptyNodeID --> EmptyShortNodeID
+	outputShort, err := ShortNodeIDFromNodeID(EmptyNodeID)
+	require.NoError(err)
+	require.Equal(EmptyShortNodeID, outputShort)
+
+	// EmptyShortNodeID --> EmptyNodeID
+	output := NodeIDFromShortNodeID(EmptyShortNodeID)
+	require.Equal(EmptyNodeID, output)
 }

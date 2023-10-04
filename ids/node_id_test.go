@@ -12,13 +12,13 @@ import (
 func TestNodeIDShortNodeIDConversion(t *testing.T) {
 	require := require.New(t)
 
-	inputs := []ShortNodeID{
-		EmptyShortNodeID,
+	nonEmptyInputs := []ShortNodeID{
+		// EmptyShortNodeID,
 		{24},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 
-	for _, input := range inputs {
+	for _, input := range nonEmptyInputs {
 		nodeID := NodeIDFromShortNodeID(input)
 		require.Equal(nodeID.String(), input.String())
 		require.Equal(nodeID.Bytes(), input.Bytes())
@@ -27,4 +27,9 @@ func TestNodeIDShortNodeIDConversion(t *testing.T) {
 		require.NoError(err)
 		require.Equal(input, output)
 	}
+
+	// Empty ids work differently
+	require.Equal(EmptyNodeID, NodeIDFromShortNodeID(EmptyShortNodeID))
+	require.NotEqual(EmptyNodeID.String(), EmptyShortNodeID.String())
+	require.NotEqual(EmptyNodeID.Bytes(), EmptyShortNodeID.Bytes())
 }

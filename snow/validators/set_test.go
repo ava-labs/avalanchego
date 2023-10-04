@@ -384,7 +384,7 @@ func TestSetString(t *testing.T) {
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
 
 	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
-		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
+		"    Validator[0]:                     NodeID-45PJLL, 1\n" +
 		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806"
 	result := s.String()
 	require.Equal(expected, result)

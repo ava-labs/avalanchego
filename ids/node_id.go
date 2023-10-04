@@ -17,12 +17,17 @@ const NodeIDPrefix = "NodeID-"
 
 var (
 	EmptyNodeID = NodeID{
-		buf: string(EmptyShortNodeID[:]),
+		buf: "",
 	}
 
 	_ utils.Sortable[NodeID] = (*NodeID)(nil)
 )
 
+// NodeID embeds a string, rather than being a type alias for a string
+// to be able to use custom marshaller for json encoding.
+// See https://github.com/golang/go/blob/go1.20.8/src/encoding/json/encode.go#L1004-L1026
+// which checks for the string type first, then checks to see if a custom marshaller exists,
+// then checks if any other of the primitive types are provided.
 type NodeID struct {
 	buf string
 }
@@ -82,6 +87,9 @@ func NodeIDFromBytes(src []byte, length int) NodeID {
 }
 
 func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
+	if nodeID == EmptyShortNodeID {
+		return EmptyNodeID
+	}
 	return NodeID{
 		buf: string(nodeID.Bytes()),
 	}
