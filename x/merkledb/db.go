@@ -436,7 +436,7 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 		return err
 	}
 	for _, key := range keys {
-		if err := db.prefetchKeyPath(tempView, key); err != nil {
+		if err := db.prefetchPath(tempView, key); err != nil {
 			return err
 		}
 	}
@@ -456,10 +456,10 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 		return err
 	}
 
-	return db.prefetchKeyPath(tempView, key)
+	return db.prefetchPath(tempView, key)
 }
 
-func (db *merkleDB) prefetchKeyPath(view *trieView, key []byte) error {
+func (db *merkleDB) prefetchPath(view *trieView, key []byte) error {
 	pathToKey, err := view.getPathTo(db.newPath(key))
 	if err != nil {
 		return err
@@ -467,10 +467,8 @@ func (db *merkleDB) prefetchKeyPath(view *trieView, key []byte) error {
 	for _, n := range pathToKey {
 		if n.hasValue() {
 			db.valueNodeDB.nodeCache.Put(n.key, n)
-		} else {
-			if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
-				return err
-			}
+		} else if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
+			return err
 		}
 	}
 
