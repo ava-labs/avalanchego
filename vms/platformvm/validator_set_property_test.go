@@ -180,21 +180,25 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				}
 			}
 
+			// Checks: let's look back at validator sets at previous heights and
+			// make sure they match the snapshots already taken
 			snapshotHeights := maps.Keys(validatorSetByHeightAndSubnet)
 			sort.Slice(snapshotHeights, func(i, j int) bool { return snapshotHeights[i] < snapshotHeights[j] })
 			for idx, snapShotHeight := range snapshotHeights {
 				if idx == len(snapshotHeights)-1 {
+					// no more [snapShotHeight] and [nextSnapShotHeight] to
+					// intervals to check.
 					continue
 				}
 				nextSnapShotHeight := snapshotHeights[idx+1]
 
-				// within [snapShotHeight] and [nextSnapShotHeight] validator set
+				// within [snapShotHeight] and [nextSnapShotHeight], the validator set
 				// does not change and must be equal to snapshot at [snapShotHeight]
 				for height := snapShotHeight; height < nextSnapShotHeight; height++ {
 					for subnetID, validatorsSet := range validatorSetByHeightAndSubnet[snapShotHeight] {
 						res, err := vm.GetValidatorSet(context.Background(), height, subnetID)
 						if err != nil {
-							return fmt.Sprintf("failed GetValidatorSet: %v", err)
+							return fmt.Sprintf("failed GetValidatorSet at height %v: %v", height, err)
 						}
 						if !reflect.DeepEqual(validatorsSet, res) {
 							return "failed validators set comparison"
@@ -203,12 +207,13 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				}
 			}
 
-			// check current validator set
+			// Checks: for completeness let's check that current validator set and
+			// its reconstruction via diffs match too.
 			tipHeight := snapshotHeights[len(snapshotHeights)-1]
 			for subnetID, validatorsSet := range validatorSetByHeightAndSubnet[tipHeight] {
 				res, err := vm.GetValidatorSet(context.Background(), tipHeight, subnetID)
 				if err != nil {
-					return fmt.Sprintf("failed GetValidatorSet: %v", err)
+					return fmt.Sprintf("failed GetValidatorSet for current tip, height %v: %v", tipHeight, err)
 				}
 				if !reflect.DeepEqual(validatorsSet, res) {
 					return "failed validators set comparison"
