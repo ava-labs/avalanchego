@@ -276,9 +276,16 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return err
 	}
 
-	addedPreferredIDAtHeight, err := t.issueFromByID(ctx, nodeID, preferredIDAtHeight)
-	if err != nil {
-		return err
+	var (
+		addedPreferredIDAtHeight = addedPreferred
+		responseOptions          = []ids.ID{preferredID}
+	)
+	if preferredID != preferredIDAtHeight {
+		addedPreferredIDAtHeight, err = t.issueFromByID(ctx, nodeID, preferredIDAtHeight)
+		if err != nil {
+			return err
+		}
+		responseOptions = append(responseOptions, preferredIDAtHeight)
 	}
 
 	// Will record chits once [preferredID] and [preferredIDAtHeight] have been
@@ -287,7 +294,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		t:               t,
 		vdr:             nodeID,
 		requestID:       requestID,
-		responseOptions: []ids.ID{preferredID, preferredIDAtHeight},
+		responseOptions: responseOptions,
 	}
 
 	// Wait until [preferredID] and [preferredIDAtHeight] have been issued to
@@ -513,6 +520,8 @@ func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID
 				zap.Stringer("lastAcceptedID", lastAcceptedID),
 				zap.Error(err),
 			)
+			t.numMissingAcceptedBlocks.Inc()
+
 			preferenceAtHeight = lastAcceptedID
 		}
 	} else {

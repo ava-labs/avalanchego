@@ -719,9 +719,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 }
 
-// SendAncestors sends an Ancestors message to the consensus engine running on
-// the specified chain on the specified node.
-// The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
@@ -755,10 +752,6 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 }
 
-// SendGet sends a Get message to the consensus engine running on the specified
-// chain to the specified node. The Get message signifies that this
-// consensus engine would like the recipient to send this consensus engine the
-// specified container.
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
@@ -843,10 +836,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 }
 
-// SendPut sends a Put message to the consensus engine running on the specified
-// chain on the specified node.
-// The Put message signifies that this consensus engine is giving to the
-// recipient the contents of the specified container.
 func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container, s.engineType)
@@ -889,11 +878,6 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 }
 
-// SendPushQuery sends a PushQuery message to the consensus engines running on
-// the specified chains on the specified nodes.
-// The PushQuery message signifies that this consensus engine would like each
-// node to send their preferred frontier given the existence of the specified
-// container.
 func (s *sender) SendPushQuery(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -1033,10 +1017,6 @@ func (s *sender) SendPushQuery(
 	}
 }
 
-// SendPullQuery sends a PullQuery message to the consensus engines running on
-// the specified chains on the specified nodes.
-// The PullQuery message signifies that this consensus engine would like each
-// node to send their preferred frontier.
 func (s *sender) SendPullQuery(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -1165,7 +1145,6 @@ func (s *sender) SendPullQuery(
 	}
 }
 
-// SendChits sends chits
 func (s *sender) SendChits(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -1274,9 +1253,6 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return nil
 }
 
-// SendAppRequest sends an application-level request to the given nodes.
-// The meaning of this request, and how it should be handled, is defined by the
-// VM.
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
@@ -1401,8 +1377,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	return nil
 }
 
-// SendAppResponse sends a response to an application-level request from the
-// given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
@@ -1506,7 +1480,6 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 	return nil
 }
 
-// SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1550,7 +1523,6 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	return nil
 }
 
-// SendGossip gossips the provided container
 func (s *sender) SendGossip(_ context.Context, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(
