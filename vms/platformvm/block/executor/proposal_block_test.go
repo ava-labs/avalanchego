@@ -90,10 +90,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
-	nodeID := utx.NodeID()
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:      addValTx.ID(),
-		NodeID:    nodeID,
+		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		NextTime:  chainTime,
@@ -101,9 +100,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), nodeID).Return(&state.Staker{
+	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), utx.NodeID()).Return(&state.Staker{
 		TxID:      addValTx.ID(),
-		NodeID:    nodeID,
+		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		NextTime:  chainTime,
@@ -111,7 +110,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, nodeID).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
@@ -225,9 +224,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:     nextStakerTxID,
+		NodeID:   ids.EmptyNodeID,
 		EndTime:  nextStakerTime,
 		NextTime: nextStakerTime,
-		NodeID:   ids.EmptyNodeID,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 	}).AnyTimes()
 	currentStakersIt.EXPECT().Release().AnyTimes()
