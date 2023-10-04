@@ -91,7 +91,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	}, mutableSharedMemory
 }
 
-// Give user [testUsername] control of [testPrivateKey] and test.Keys[0] (which is funded)
+// Give user [testUsername] control of [testPrivateKey] and ts.Keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
 	require := require.New(t)
 
@@ -385,7 +385,7 @@ func TestGetBalance(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	// Ensure GetStake is correct for each of the g validators
+	// Ensure GetStake is correct for each of the genesis validators
 	g, _ := defaultGenesis(t)
 	for _, utxo := range g.UTXOs {
 		request := GetBalanceRequest{
@@ -414,7 +414,7 @@ func TestGetStake(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	// Ensure GetStake is correct for each of the g validators
+	// Ensure GetStake is correct for each of the genesis validators
 	g, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for i, validator := range g.Validators {
