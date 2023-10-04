@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var errTest = errors.New("non-nil error")
@@ -26,17 +27,18 @@ func TestStartTracking(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	currentTime := startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestStartTrackingDBError(t *testing.T) {
@@ -50,10 +52,11 @@ func TestStartTrackingDBError(t *testing.T) {
 	s.dbWriteError = errTest
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	currentTime := startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	err := up.StartTracking([]ids.NodeID{nodeID0}, subnetID)
 	require.ErrorIs(err, errTest)
@@ -63,7 +66,8 @@ func TestStartTrackingNonValidator(t *testing.T) {
 	require := require.New(t)
 
 	s := NewTestState()
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	nodeID0 := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
@@ -82,10 +86,11 @@ func TestStartTrackingInThePast(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	currentTime := startTime.Add(-time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
@@ -106,25 +111,25 @@ func TestStopTrackingDecreasesUptime(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
-	up = NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	up = NewManager(s, &clk)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Duration(0), duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestStopTrackingIncreasesUptime(t *testing.T) {
@@ -138,27 +143,27 @@ func TestStopTrackingIncreasesUptime(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
-	up = NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	up = NewManager(s, &clk)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
@@ -168,7 +173,8 @@ func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	s := NewTestState()
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	require.NoError(up.StartTracking(nil, subnetID))
 
@@ -185,7 +191,8 @@ func TestStopTrackingConnectedDBError(t *testing.T) {
 
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	require.NoError(up.StartTracking(nil, subnetID))
 
@@ -206,13 +213,14 @@ func TestStopTrackingNonConnectedPast(t *testing.T) {
 
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(-time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
@@ -232,13 +240,14 @@ func TestStopTrackingNonConnectedDBError(t *testing.T) {
 
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	s.dbWriteError = errTest
 	err := up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
@@ -268,8 +277,9 @@ func TestConnectAndDisconnect(t *testing.T) {
 			startTime := currentTime
 
 			s := NewTestState()
-			up := NewManager(s).(*manager)
-			up.clock.Set(currentTime)
+			clk := mockable.Clock{}
+			up := NewManager(s, &clk)
+			clk.Set(currentTime)
 
 			for _, subnetID := range tt.subnetIDs {
 				s.AddNode(nodeID0, subnetID, startTime)
@@ -285,7 +295,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 				duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 				require.NoError(err)
 				require.Equal(time.Duration(0), duration)
-				require.Equal(up.clock.UnixTime(), lastUpdated)
+				require.Equal(clk.UnixTime(), lastUpdated)
 
 				require.NoError(up.Connect(nodeID0, subnetID))
 
@@ -294,13 +304,13 @@ func TestConnectAndDisconnect(t *testing.T) {
 			}
 
 			currentTime = currentTime.Add(time.Second)
-			up.clock.Set(currentTime)
+			clk.Set(currentTime)
 
 			for _, subnetID := range tt.subnetIDs {
 				duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 				require.NoError(err)
 				require.Equal(time.Second, duration)
-				require.Equal(up.clock.UnixTime(), lastUpdated)
+				require.Equal(clk.UnixTime(), lastUpdated)
 			}
 
 			require.NoError(up.Disconnect(nodeID0))
@@ -311,13 +321,13 @@ func TestConnectAndDisconnect(t *testing.T) {
 			}
 
 			currentTime = currentTime.Add(time.Second)
-			up.clock.Set(currentTime)
+			clk.Set(currentTime)
 
 			for _, subnetID := range tt.subnetIDs {
 				duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 				require.NoError(err)
 				require.Equal(time.Second, duration)
-				require.Equal(up.clock.UnixTime(), lastUpdated)
+				require.Equal(clk.UnixTime(), lastUpdated)
 			}
 		})
 	}
@@ -334,14 +344,15 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.Disconnect(nodeID0))
 
@@ -350,7 +361,7 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(2*time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestUnrelatedNodeDisconnect(t *testing.T) {
@@ -365,37 +376,38 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Duration(0), duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	require.NoError(up.Connect(nodeID1, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 
 	require.NoError(up.Disconnect(nodeID1))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(2*time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeWhenNeverTracked(t *testing.T) {
@@ -408,15 +420,16 @@ func TestCalculateUptimeWhenNeverTracked(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	currentTime := startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime.Truncate(time.Second))
 	require.NoError(err)
@@ -432,19 +445,20 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 
 	s := NewTestState()
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	require.NoError(up.StartTracking([]ids.NodeID{}, subnetID))
 
 	s.AddNode(nodeID0, subnetID, startTime)
 
 	currentTime := startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Duration(0), duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime)
 	require.NoError(err)
@@ -462,23 +476,24 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(2*time.Second, duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
@@ -492,23 +507,24 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(2 * time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = currentTime.Add(-time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0, subnetID)
 	require.NoError(err)
 	require.Equal(time.Duration(0), duration)
-	require.Equal(up.clock.UnixTime(), lastUpdated)
+	require.Equal(clk.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeNonValidator(t *testing.T) {
@@ -520,7 +536,8 @@ func TestCalculateUptimeNonValidator(t *testing.T) {
 
 	s := NewTestState()
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	_, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -537,8 +554,9 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime.Truncate(time.Second))
 	require.NoError(err)
@@ -556,12 +574,13 @@ func TestCalculateUptimePercentage(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = currentTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime.Truncate(time.Second))
 	require.NoError(err)
@@ -579,32 +598,33 @@ func TestStopTrackingUnixTimeRegression(t *testing.T) {
 	s := NewTestState()
 	s.AddNode(nodeID0, subnetID, startTime)
 
-	up := NewManager(s).(*manager)
-	up.clock.Set(currentTime)
+	clk := mockable.Clock{}
+	up := NewManager(s, &clk)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StopTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
-	up = NewManager(s).(*manager)
+	up = NewManager(s, &clk)
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}, subnetID))
 
 	require.NoError(up.Connect(nodeID0, subnetID))
 
 	currentTime = startTime.Add(time.Second)
-	up.clock.Set(currentTime)
+	clk.Set(currentTime)
 
 	perc, err := up.CalculateUptimePercent(nodeID0, subnetID)
 	require.NoError(err)
