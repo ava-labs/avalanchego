@@ -989,8 +989,11 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	}
 
 	if !p.Send(p.onClosingCtx, peerListMsg) {
-		p.Log.Error("failed to send peer list for handshake",
+		// Because throttling was marked to be bypassed with this message,
+		// sending should only fail if the peer has started closing.
+		p.Log.Debug("failed to send peer list for handshake",
 			zap.Stringer("nodeID", p.id),
+			zap.Error(p.onClosingCtx.Err()),
 		)
 	}
 }
