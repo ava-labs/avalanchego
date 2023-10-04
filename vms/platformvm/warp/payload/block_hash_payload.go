@@ -9,29 +9,31 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// BlockHashPayload includes the block hash
-type BlockHashPayload struct {
+var _ byteSetter = (*BlockHash)(nil)
+
+// BlockHash includes the block hash
+type BlockHash struct {
 	BlockHash ids.ID `serialize:"true"`
 
 	bytes []byte
 }
 
-// NewBlockHashPayload creates a new *BlockHashPayload and initializes it.
-func NewBlockHashPayload(blockHash ids.ID) (*BlockHashPayload, error) {
-	bhp := &BlockHashPayload{
+// NewBlockHash creates a new *BlockHash and initializes it.
+func NewBlockHash(blockHash ids.ID) (*BlockHash, error) {
+	bhp := &BlockHash{
 		BlockHash: blockHash,
 	}
 	return bhp, bhp.initialize()
 }
 
-// ParseBlockHashPayload converts a slice of bytes into an initialized
-// BlockHashPayload
-func ParseBlockHashPayload(b []byte) (*BlockHashPayload, error) {
+// ParseBlockHash converts a slice of bytes into an initialized
+// BlockHash
+func ParseBlockHash(b []byte) (*BlockHash, error) {
 	var unmarshalledPayloadIntf any
 	if _, err := c.Unmarshal(b, &unmarshalledPayloadIntf); err != nil {
 		return nil, err
 	}
-	payload, ok := unmarshalledPayloadIntf.(*BlockHashPayload)
+	payload, ok := unmarshalledPayloadIntf.(*BlockHash)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", errWrongType, unmarshalledPayloadIntf)
 	}
@@ -40,7 +42,7 @@ func ParseBlockHashPayload(b []byte) (*BlockHashPayload, error) {
 }
 
 // initialize recalculates the result of Bytes().
-func (b *BlockHashPayload) initialize() error {
+func (b *BlockHash) initialize() error {
 	payloadIntf := any(b)
 	bytes, err := c.Marshal(codecVersion, &payloadIntf)
 	if err != nil {
@@ -50,8 +52,12 @@ func (b *BlockHashPayload) initialize() error {
 	return nil
 }
 
+func (b *BlockHash) setBytes(bytes []byte) {
+	b.bytes = bytes
+}
+
 // Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewBlockHashPayload or ParseBlockHashPayload.
-func (b *BlockHashPayload) Bytes() []byte {
+// payload is initialized from either NewBlockHash or ParseBlockHash.
+func (b *BlockHash) Bytes() []byte {
 	return b.bytes
 }

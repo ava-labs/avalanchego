@@ -5,6 +5,7 @@ package payload
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -33,11 +34,31 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		lc.RegisterType(&AddressedPayload{}),
-		lc.RegisterType(&BlockHashPayload{}),
+		lc.RegisterType(&AddressedCall{}),
+		lc.RegisterType(&BlockHash{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
+}
+
+// byteSetter provides an interface to set the bytes of an underlying type to [b]
+// after unmarshalling into that type.
+type byteSetter interface {
+	setBytes(b []byte)
+}
+
+func Parse(bytes []byte) (interface{}, error) {
+	var intf interface{}
+	if _, err := c.Unmarshal(bytes, &intf); err != nil {
+		return nil, err
+	}
+
+	payload, ok := intf.(byteSetter)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", errWrongType, intf)
+	}
+	payload.setBytes(bytes)
+	return payload, nil
 }

@@ -14,92 +14,130 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-func TestAddressedPayload(t *testing.T) {
+func TestAddressedCall(t *testing.T) {
 	require := require.New(t)
 	shortID := ids.GenerateTestShortID()
 
-	addressedPayload, err := NewAddressedPayload(
+	addressedPayload, err := NewAddressedCall(
 		shortID[:],
 		[]byte{1, 2, 3},
 	)
 	require.NoError(err)
 
 	addressedPayloadBytes := addressedPayload.Bytes()
-	addressedPayload2, err := ParseAddressedPayload(addressedPayloadBytes)
+	addressedPayload2, err := ParseAddressedCall(addressedPayloadBytes)
 	require.NoError(err)
 	require.Equal(addressedPayload, addressedPayload2)
 }
 
-func TestParseAddressedPayloadJunk(t *testing.T) {
+func TestParseAddressedCallJunk(t *testing.T) {
 	require := require.New(t)
-	_, err := ParseAddressedPayload(utils.RandomBytes(1024))
+	_, err := ParseAddressedCall(utils.RandomBytes(1024))
 	require.ErrorIs(err, codec.ErrUnknownVersion)
 }
 
-func TestParseAddressedPayload(t *testing.T) {
+func TestParseAddressedCall(t *testing.T) {
+	require := require.New(t)
 	base64Payload := "AAAAAAAAAAAAEAECAwAAAAAAAAAAAAAAAAAAAAADCgsM"
-	payload := &AddressedPayload{
+	payload := &AddressedCall{
 		SourceAddress: []byte{1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		Payload:       []byte{10, 11, 12},
 	}
 
-	require.NoError(t, payload.initialize())
+	require.NoError(payload.initialize())
 
-	require.Equal(t, base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
+	require.Equal(base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
 
-	parsedPayload, err := ParseAddressedPayload(payload.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, payload, parsedPayload)
+	parsedPayload, err := ParseAddressedCall(payload.Bytes())
+	require.NoError(err)
+	require.Equal(payload, parsedPayload)
 }
 
-func TestBlockHashPayload(t *testing.T) {
+func TestBlockHash(t *testing.T) {
 	require := require.New(t)
 
-	blockHashPayload, err := NewBlockHashPayload(ids.GenerateTestID())
+	blockHashPayload, err := NewBlockHash(ids.GenerateTestID())
 	require.NoError(err)
 
 	blockHashPayloadBytes := blockHashPayload.Bytes()
-	blockHashPayload2, err := ParseBlockHashPayload(blockHashPayloadBytes)
+	blockHashPayload2, err := ParseBlockHash(blockHashPayloadBytes)
 	require.NoError(err)
 	require.Equal(blockHashPayload, blockHashPayload2)
 }
 
-func TestParseBlockHashPayloadJunk(t *testing.T) {
+func TestParseBlockHashJunk(t *testing.T) {
 	require := require.New(t)
-	_, err := ParseBlockHashPayload(utils.RandomBytes(1024))
+	_, err := ParseBlockHash(utils.RandomBytes(1024))
 	require.ErrorIs(err, codec.ErrUnknownVersion)
 }
 
-func TestParseBlockHashPayload(t *testing.T) {
+func TestParseBlockHash(t *testing.T) {
+	require := require.New(t)
 	base64Payload := "AAAAAAABBAUGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-	payload := &BlockHashPayload{
+	payload := &BlockHash{
 		BlockHash: ids.ID{4, 5, 6},
 	}
 
-	require.NoError(t, payload.initialize())
+	require.NoError(payload.initialize())
 
-	require.Equal(t, base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
+	require.Equal(base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
 
-	parsedPayload, err := ParseBlockHashPayload(payload.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, payload, parsedPayload)
+	parsedPayload, err := ParseBlockHash(payload.Bytes())
+	require.NoError(err)
+	require.Equal(payload, parsedPayload)
 }
 
 func TestParseWrongPayloadType(t *testing.T) {
 	require := require.New(t)
-	blockHashPayload, err := NewBlockHashPayload(ids.GenerateTestID())
+	blockHashPayload, err := NewBlockHash(ids.GenerateTestID())
 	require.NoError(err)
 
 	shortID := ids.GenerateTestShortID()
-	addressedPayload, err := NewAddressedPayload(
+	addressedPayload, err := NewAddressedCall(
 		shortID[:],
 		[]byte{1, 2, 3},
 	)
 	require.NoError(err)
 
-	_, err = ParseAddressedPayload(blockHashPayload.Bytes())
+	_, err = ParseAddressedCall(blockHashPayload.Bytes())
 	require.ErrorIs(err, errWrongType)
 
-	_, err = ParseBlockHashPayload(addressedPayload.Bytes())
+	_, err = ParseBlockHash(addressedPayload.Bytes())
 	require.ErrorIs(err, errWrongType)
+}
+
+func TestParseJunk(t *testing.T) {
+	require := require.New(t)
+	_, err := Parse(utils.RandomBytes(1024))
+	require.ErrorIs(err, codec.ErrUnknownVersion)
+}
+
+func TestParsePayload(t *testing.T) {
+	require := require.New(t)
+	base64BlockHashPayload := "AAAAAAABBAUGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	blockHashPayload := &BlockHash{
+		BlockHash: ids.ID{4, 5, 6},
+	}
+
+	require.NoError(blockHashPayload.initialize())
+
+	require.Equal(base64BlockHashPayload, base64.StdEncoding.EncodeToString(blockHashPayload.Bytes()))
+
+	parsedBlockHashPayload, err := Parse(blockHashPayload.Bytes())
+	require.NoError(err)
+	require.Equal(blockHashPayload, parsedBlockHashPayload)
+
+	base64AddressedPayload := "AAAAAAAAAAAAEAECAwAAAAAAAAAAAAAAAAAAAAADCgsM"
+	addressedPayload := &AddressedCall{
+		SourceAddress: []byte{1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		Payload:       []byte{10, 11, 12},
+	}
+
+	require.NoError(addressedPayload.initialize())
+
+	require.Equal(base64AddressedPayload, base64.StdEncoding.EncodeToString(addressedPayload.Bytes()))
+
+	parsedAddressedPayload, err := Parse(addressedPayload.Bytes())
+	require.NoError(err)
+	require.Equal(addressedPayload, parsedAddressedPayload)
 }
