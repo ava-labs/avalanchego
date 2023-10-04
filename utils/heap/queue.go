@@ -10,13 +10,21 @@ import (
 
 var _ stdheap.Interface = (*queue[int])(nil)
 
-// NewQueue returns an empty min-heap ordered by less. See OfQueue for more.
+// NewQueue returns an empty min-heap ordered by less. See QueueOf for more.
 func NewQueue[T any](less func(a, b T) bool) Queue[T] {
-	return Queue[T]{
+	return QueueOf(less)
+}
+
+func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
+	q := Queue[T]{
 		queue: &queue[T]{
 			entries: make([]T, 0),
 			less:    less,
 		},
+	}
+
+	for _, e := range entries {
+		q.Push(e)
 	}
 }
 
