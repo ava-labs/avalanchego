@@ -1540,7 +1540,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
-	peerID := ids.NodeIDFromShortNodeID(ids.ShortNodeID{1, 2, 3, 4, 5, 4, 3, 2, 1})
+	peerID := ids.GenerateTestNodeID()
 	beacons := validators.NewSet()
 	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
 
