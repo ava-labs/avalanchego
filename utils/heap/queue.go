@@ -19,14 +19,13 @@ func NewQueue[T any](less func(a, b T) bool) Queue[T] {
 func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
 	q := Queue[T]{
 		queue: &queue[T]{
-			entries: make([]T, 0),
+			entries: make([]T, 0, len(entries)),
 			less:    less,
 		},
 	}
 
-	for _, e := range entries {
-		q.Push(e)
-	}
+	q.queue.entries = append(q.queue.entries, entries...)
+	stdheap.Init(q.queue)
 
 	return q
 }
