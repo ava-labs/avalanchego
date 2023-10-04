@@ -11,11 +11,12 @@ import (
 
 var _ stdheap.Interface = (*queue[int])(nil)
 
-// NewQueue returns an empty min-heap ordered by less. See QueueOf for more.
+// NewQueue returns an empty heap. See QueueOf for more.
 func NewQueue[T any](less func(a, b T) bool) Queue[T] {
 	return QueueOf(less)
 }
 
+// QueueOf returns a heap containing entries ordered by less.
 func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
 	q := Queue[T]{
 		queue: &queue[T]{
