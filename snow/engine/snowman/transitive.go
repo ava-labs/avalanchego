@@ -278,10 +278,10 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	var (
 		addedPreferredIDAtHeight = addedPreferred
-		// Invariant: The order of [responseOptions] is important. The order
-		// must be [preferredID] then (optionally) [preferredIDAtHeight]. During
-		// vote application, the first vote that can be applied will be used.
-		// So, the votes should be populated in order of decreasing height.
+		// Invariant: The order of [responseOptions] must be [preferredID] then
+		// (optionally) [preferredIDAtHeight]. During vote application, the
+		// first vote that can be applied will be used. So, the votes should be
+		// populated in order of decreasing height.
 		responseOptions = []ids.ID{preferredID}
 	)
 	if preferredID != preferredIDAtHeight {
