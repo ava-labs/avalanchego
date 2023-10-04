@@ -129,7 +129,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
-	res.uptimes = uptime.NewManager(res.state)
+	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(

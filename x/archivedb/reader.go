@@ -35,7 +35,7 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 // modified at, and a boolean to indicate if the last modification was an
 // insertion. If the key has never been modified, ErrNotFound will be returned.
 func (r *Reader) GetEntry(key []byte) ([]byte, uint64, bool, error) {
-	it := r.db.db.NewIteratorWithStartAndPrefix(newDBKey(key, r.height))
+	it := r.db.db.NewIteratorWithStartAndPrefix(newDBKeyFromUser(key, r.height))
 	defer it.Release()
 
 	next := it.Next()
@@ -48,7 +48,7 @@ func (r *Reader) GetEntry(key []byte) ([]byte, uint64, bool, error) {
 		return nil, 0, false, database.ErrNotFound
 	}
 
-	_, height, err := parseDBKey(it.Key())
+	_, height, err := parseDBKeyFromUser(it.Key())
 	if err != nil {
 		return nil, 0, false, err
 	}
