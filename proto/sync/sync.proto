@@ -139,7 +139,7 @@ message RangeProof {
 }
 
 message ProofNode {
-  SerializedPath key = 1;
+  Path key = 1;
   MaybeBytes value_or_hash = 2;
   map<uint32, bytes> children = 3;
 }
@@ -149,8 +149,8 @@ message KeyChange {
   MaybeBytes value = 2;
 }
 
-message SerializedPath {
-  uint64 nibble_length = 1;
+message Path {
+  uint64 length = 1;
   bytes value = 2;
 }
 

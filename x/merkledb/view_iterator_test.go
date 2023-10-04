@@ -229,7 +229,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	for iter.Next() {
 		expectedKey := uniqueKeys[i]
 		expectedValue := uniqueKeyChanges[expectedKey]
-		require.Equal([]byte(expectedKey), iter.Key())
+		require.True(bytes.Equal([]byte(expectedKey), iter.Key()))
 		if len(expectedValue) == 0 {
 			// Don't differentiate between nil and []byte{}
 			require.Empty(iter.Value())
