@@ -366,8 +366,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return proof, nil
 	}
 
-	childNode, err := t.getNodeWithID(
-		child.id,
+	childNode, err := t.getNode(
 		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
 		child.hasValue,
 	)
@@ -691,7 +690,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
+		nextNode, err := t.getNode(childPath, childEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -771,7 +770,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
+		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}
@@ -798,7 +797,7 @@ func (t *trieView) getEditableNode(key Path, hadValue bool) (*node, error) {
 	}
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ids.Empty, key, hadValue)
+	n, err := t.getNode(key, hadValue)
 	if err != nil {
 		return nil, err
 	}
@@ -977,11 +976,9 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 }
 
 // Retrieves a node with the given [key].
-// If the node is fetched from [t.parentTrie] and [id] isn't empty,
-// sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key Path, hasValue bool) (*node, error) {
+func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -998,12 +995,6 @@ func (t *trieView) getNodeWithID(id ids.ID, key Path, hasValue bool) (*node, err
 	}
 	parentTrieNodeClone := parentTrieNode.clone()
 	t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: parentTrieNodeClone}
-
-	// only need to initialize the id if it's from the parent trie.
-	// nodes in the current view change list have already been initialized.
-	if id != ids.Empty {
-		parentTrieNodeClone.id = id
-	}
 	return parentTrieNodeClone, nil
 }
 
