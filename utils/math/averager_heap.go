@@ -4,15 +4,11 @@
 package math
 
 import (
-	"container/heap"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
-var (
-	_ AveragerHeap   = averagerHeap{}
-	_ heap.Interface = (*averagerHeapBackend)(nil)
-)
+var _ AveragerHeap = averagerHeap{}
 
 // AveragerHeap maintains a heap of the averagers.
 type AveragerHeap interface {
@@ -33,113 +29,70 @@ type AveragerHeap interface {
 	Len() int
 }
 
-type averagerHeapEntry struct {
-	nodeID   ids.NodeID
-	averager Averager
-	index    int
-}
-
-type averagerHeapBackend struct {
-	isMaxHeap     bool
-	nodeIDToEntry map[ids.NodeID]*averagerHeapEntry
-	entries       []*averagerHeapEntry
-}
-
 type averagerHeap struct {
-	b *averagerHeapBackend
+	heap heap.Map[ids.NodeID, *Averager]
 }
 
 // NewMinAveragerHeap returns a new empty min heap. The returned heap is not
 // thread safe.
 func NewMinAveragerHeap() AveragerHeap {
-	return averagerHeap{b: &averagerHeapBackend{
-		nodeIDToEntry: make(map[ids.NodeID]*averagerHeapEntry),
-	}}
+	return averagerHeap{
+		heap: heap.NewMap[ids.NodeID, *Averager](func(a, b *Averager) bool {
+			return (*a).Read() < (*b).Read()
+		}),
+	}
 }
 
 // NewMaxAveragerHeap returns a new empty max heap. The returned heap is not
 // thread safe.
 func NewMaxAveragerHeap() AveragerHeap {
-	return averagerHeap{b: &averagerHeapBackend{
-		isMaxHeap:     true,
-		nodeIDToEntry: make(map[ids.NodeID]*averagerHeapEntry),
-	}}
+	return averagerHeap{
+		heap: heap.NewMap[ids.NodeID, *Averager](func(a, b *Averager) bool {
+			return (*a).Read() > (*b).Read()
+		}),
+	}
 }
 
 func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool) {
-	if e, exists := h.b.nodeIDToEntry[nodeID]; exists {
-		oldAverager := e.averager
-		e.averager = averager
-		heap.Fix(h.b, e.index)
+	if i, exists := h.heap.Index()[nodeID]; exists {
+		_, averagerPtr := h.heap.Get(i)
+		oldAverager := *averagerPtr
+		*averagerPtr = averager
+		h.heap.Fix(i)
 		return oldAverager, true
 	}
 
-	heap.Push(h.b, &averagerHeapEntry{
-		nodeID:   nodeID,
-		averager: averager,
-	})
+	h.heap.Push(nodeID, &averager)
 	return nil, false
 }
 
 func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
-	e, exists := h.b.nodeIDToEntry[nodeID]
+	i, exists := h.heap.Index()[nodeID]
 	if !exists {
 		return nil, false
 	}
-	heap.Remove(h.b, e.index)
-	return e.averager, true
+	_, averager := h.heap.Remove(i)
+	return *averager, true
 }
 
 func (h averagerHeap) Pop() (ids.NodeID, Averager, bool) {
-	if len(h.b.entries) == 0 {
+	if h.heap.Len() == 0 {
 		return ids.EmptyNodeID, nil, false
 	}
-	e := h.b.entries[0]
-	heap.Pop(h.b)
-	return e.nodeID, e.averager, true
+
+	nodeID, averagerPtr, _ := h.heap.Pop()
+	return nodeID, *averagerPtr, true
 }
 
 func (h averagerHeap) Peek() (ids.NodeID, Averager, bool) {
-	if len(h.b.entries) == 0 {
+	if h.heap.Len() == 0 {
 		return ids.EmptyNodeID, nil, false
 	}
-	e := h.b.entries[0]
-	return e.nodeID, e.averager, true
+
+	nodeID, averagerPtr, _ := h.heap.Peek()
+	return nodeID, *averagerPtr, true
 }
 
 func (h averagerHeap) Len() int {
-	return len(h.b.entries)
-}
-
-func (h *averagerHeapBackend) Len() int {
-	return len(h.entries)
-}
-
-func (h *averagerHeapBackend) Less(i, j int) bool {
-	if h.isMaxHeap {
-		return h.entries[i].averager.Read() > h.entries[j].averager.Read()
-	}
-	return h.entries[i].averager.Read() < h.entries[j].averager.Read()
-}
-
-func (h *averagerHeapBackend) Swap(i, j int) {
-	h.entries[i], h.entries[j] = h.entries[j], h.entries[i]
-	h.entries[i].index = i
-	h.entries[j].index = j
-}
-
-func (h *averagerHeapBackend) Push(x interface{}) {
-	e := x.(*averagerHeapEntry)
-	e.index = len(h.entries)
-	h.nodeIDToEntry[e.nodeID] = e
-	h.entries = append(h.entries, e)
-}
-
-func (h *averagerHeapBackend) Pop() interface{} {
-	newLen := len(h.entries) - 1
-	e := h.entries[newLen]
-	h.entries[newLen] = nil
-	delete(h.nodeIDToEntry, e.nodeID)
-	h.entries = h.entries[:newLen]
-	return e
+	return h.heap.Len()
 }

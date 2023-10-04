@@ -4,29 +4,16 @@
 package vertex
 
 import (
-	"container/heap"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
-var (
-	_ Heap           = (*maxHeightVertexHeap)(nil)
-	_ heap.Interface = (*priorityQueue)(nil)
-)
+var _ Heap = (*maxHeightVertexHeap)(nil)
 
-type priorityQueue []avalanche.Vertex
-
-func (pq priorityQueue) Len() int {
-	return len(pq)
-}
-
-// Returns true if the vertex at index i has greater height than the vertex at
-// index j.
-func (pq priorityQueue) Less(i, j int) bool {
-	statusI := pq[i].Status()
-	statusJ := pq[j].Status()
+func Less(i, j avalanche.Vertex) bool {
+	statusI := i.Status()
+	statusJ := j.Status()
 
 	// Put unknown vertices at the front of the heap to ensure once we have made
 	// it below a certain height in DAG traversal we do not need to reset
@@ -38,35 +25,15 @@ func (pq priorityQueue) Less(i, j int) bool {
 	}
 
 	// Treat errors on retrieving the height as if the vertex is not fetched
-	heightI, errI := pq[i].Height()
+	heightI, errI := i.Height()
 	if errI != nil {
 		return true
 	}
-	heightJ, errJ := pq[j].Height()
+	heightJ, errJ := j.Height()
 	if errJ != nil {
 		return false
 	}
 	return heightI > heightJ
-}
-
-func (pq priorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-}
-
-// Push adds an item to this priority queue. x must have type *vertexItem
-func (pq *priorityQueue) Push(x interface{}) {
-	item := x.(avalanche.Vertex)
-	*pq = append(*pq, item)
-}
-
-// Pop returns the last item in this priorityQueue
-func (pq *priorityQueue) Pop() interface{} {
-	old := *pq
-	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil
-	*pq = old[0 : n-1]
-	return item
 }
 
 // Heap defines the functionality of a heap of vertices with unique VertexIDs
@@ -91,29 +58,28 @@ type Heap interface {
 
 // NewHeap returns an empty Heap
 func NewHeap() Heap {
-	return &maxHeightVertexHeap{}
+	return &maxHeightVertexHeap{
+		heap: heap.NewMap[ids.ID, avalanche.Vertex](Less),
+	}
 }
 
 type maxHeightVertexHeap struct {
-	heap       priorityQueue
-	elementIDs set.Set[ids.ID]
+	heap heap.Map[ids.ID, avalanche.Vertex]
 }
 
 func (vh *maxHeightVertexHeap) Clear() {
-	vh.heap = priorityQueue{}
-	vh.elementIDs.Clear()
+	vh.heap = heap.NewMap[ids.ID, avalanche.Vertex](Less)
 }
 
 // Push adds an element to this heap. Returns true if the element was added.
 // Returns false if it was already in the heap.
 func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	vtxID := vtx.ID()
-	if vh.elementIDs.Contains(vtxID) {
+	if _, ok := vh.heap.Index()[vtxID]; ok {
 		return false
 	}
 
-	vh.elementIDs.Add(vtxID)
-	heap.Push(&vh.heap, vtx)
+	vh.heap.Push(vtxID, vtx)
 	return true
 }
 
@@ -121,8 +87,7 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 // vertex and returns it. Otherwise, removes and returns the vertex in this heap
 // with the greatest height.
 func (vh *maxHeightVertexHeap) Pop() avalanche.Vertex {
-	vtx := heap.Pop(&vh.heap).(avalanche.Vertex)
-	vh.elementIDs.Remove(vtx.ID())
+	_, vtx, _ := vh.heap.Pop()
 	return vtx
 }
 
@@ -131,5 +96,6 @@ func (vh *maxHeightVertexHeap) Len() int {
 }
 
 func (vh *maxHeightVertexHeap) Contains(vtxID ids.ID) bool {
-	return vh.elementIDs.Contains(vtxID)
+	_, ok := vh.heap.Index()[vtxID]
+	return ok
 }
