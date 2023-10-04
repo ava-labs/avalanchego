@@ -26,6 +26,8 @@ func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
 	for _, e := range entries {
 		q.Push(e)
 	}
+
+	return q
 }
 
 type Queue[T any] struct {
