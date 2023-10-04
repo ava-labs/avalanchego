@@ -21,7 +21,6 @@ func TestHeap(t *testing.T) {
 				h.Push(1)
 				h.Push(2)
 				h.Push(3)
-
 			},
 			expected: []int{1, 2, 3},
 		},
@@ -70,5 +69,4 @@ func TestHeap(t *testing.T) {
 			}
 		})
 	}
-
 }

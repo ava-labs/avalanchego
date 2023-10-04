@@ -5,6 +5,7 @@ package heap
 
 import (
 	stdheap "container/heap"
+
 	"github.com/ava-labs/avalanchego/utils"
 )
 
