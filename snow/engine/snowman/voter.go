@@ -113,6 +113,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("bubbledVoteID", bubbledVote),
 				zap.Error(err),
 			)
+			v.t.numProcessingAncestorFetchesFailed.Inc()
 			return ids.Empty, false
 		}
 
@@ -124,6 +125,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("status", blk.Status()),
 				zap.Uint64("height", blk.Height()),
 			)
+			v.t.numProcessingAncestorFetchesDropped.Inc()
 			return ids.Empty, false
 		}
 
@@ -133,6 +135,11 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("bubbledVoteID", bubbledVote),
 				zap.Uint64("height", blk.Height()),
 			)
+			if bubbledVote != initialVote {
+				v.t.numProcessingAncestorFetchesSucceeded.Inc()
+			} else {
+				v.t.numProcessingAncestorFetchesUnneeded.Inc()
+			}
 			return bubbledVote, true
 		}
 
