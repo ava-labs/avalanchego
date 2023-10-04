@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -21,6 +22,8 @@ const (
 
 var (
 	EmptyNodeID = NodeID{}
+
+	ErrBadNodeIDLenght = errors.New("bad nodeID length")
 
 	_ utils.Sortable[NodeID] = (*NodeID)(nil)
 )
@@ -93,7 +96,7 @@ func ToNodeID(src []byte) (NodeID, error) {
 		}, nil
 
 	default:
-		return EmptyNodeID, fmt.Errorf("expected %d or %d bytes but got %d", ShortNodeIDLen, LongNodeIDLen, len(src))
+		return EmptyNodeID, fmt.Errorf("expected %d or %d bytes but got %d: %w", ShortNodeIDLen, LongNodeIDLen, len(src), ErrBadNodeIDLenght)
 	}
 }
 

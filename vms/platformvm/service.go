@@ -811,7 +811,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			EndTime:     json.Uint64(currentStaker.EndTime.Unix()),
 			Weight:      weight,
 			StakeAmount: &weight,
-			NodeID:      currentStaker.NodeID,
+			NodeID:      nodeID,
 		}
 		potentialReward := json.Uint64(currentStaker.PotentialReward)
 

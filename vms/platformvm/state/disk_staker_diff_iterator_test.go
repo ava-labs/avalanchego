@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,8 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 
 		subnetID, height, nodeID, err := unmarshalDiffKey(key)
 		if err != nil {
-			require.ErrorIs(err, errUnexpectedZeroLenghtNodeID)
+			okError := errors.Is(err, ids.ErrBadNodeIDLenght) || errors.Is(err, errUnexpectedNegativeLenghtNodeID)
+			require.True(okError)
 			return
 		}
 

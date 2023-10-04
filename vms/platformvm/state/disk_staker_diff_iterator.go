@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	errUnexpectedZeroLenghtNodeID  = errors.New("nodeID has zero length")
-	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
+	errUnexpectedNegativeLenghtNodeID = errors.New("nodeID has negative length")
+	errUnexpectedWeightValueLength    = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
 // marshalStartDiffKey is used to determine the starting key when iterating.
@@ -49,7 +49,7 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 
 func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) < startDiffKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedZeroLenghtNodeID
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedNegativeLenghtNodeID
 	}
 	var (
 		subnetID ids.ID
