@@ -958,7 +958,6 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	// Note that if [start] is Nothing, smallestPath is the empty path.
 	smallestPath := maybe.Bind(start, db.newPath)
 
 	// Make sure the start proof, if given, is well-formed.
