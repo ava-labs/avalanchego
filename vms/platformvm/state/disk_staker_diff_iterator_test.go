@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/thepudds/fzgen/fuzzer"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
