@@ -10,7 +10,7 @@ description = "Simple and modular write-ahead-logging implementation."
 
 [dependencies]
 crc = "3.0.0"
-lru = "0.11.0"
+lru = "0.12.0"
 scan_fmt = "0.2.6"
 regex = "1.6.0"
 async-trait = "0.1.57"

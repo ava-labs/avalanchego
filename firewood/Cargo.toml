@@ -25,7 +25,7 @@ libaio = {version = "0.0.4", path = "../libaio" }
 shale = { version = "0.0.4", path = "../shale" }
 futures = "0.3.24"
 hex = "0.4.3"
-lru = "0.11.0"
+lru = "0.12.0"
 metered = "0.9.0"
 nix = {version = "0.27.1", features = ["fs", "uio"]}
 parking_lot = "0.12.1"
