@@ -243,15 +243,19 @@ impl LeafNode {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct ExtNode(
-    pub(super) PartialPath,
-    pub(super) DiskAddress,
-    pub(super) Option<Vec<u8>>,
-);
+pub struct ExtNode {
+    path: PartialPath,
+    chd: DiskAddress,
+    chd_encoded: Option<Vec<u8>>,
+}
 
 impl Debug for ExtNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "[Extension {:?} {:?} {:?}]", self.0, self.1, self.2)
+        write!(
+            f,
+            "[Extension {:?} {:?} {:?}]",
+            self.path, self.chd, self.chd_encoded
+        )
     }
 }
 
@@ -260,12 +264,12 @@ impl ExtNode {
         let mut list = <[Encoded<Vec<u8>>; 2]>::default();
         list[0] = Encoded::Data(
             bincode::DefaultOptions::new()
-                .serialize(&from_nibbles(&self.0.encode(false)).collect::<Vec<_>>())
+                .serialize(&from_nibbles(&self.path.encode(false)).collect::<Vec<_>>())
                 .unwrap(),
         );
 
-        if !self.1.is_null() {
-            let mut r = store.get_item(self.1).unwrap();
+        if !self.chd.is_null() {
+            let mut r = store.get_item(self.chd).unwrap();
 
             if r.is_encoded_longer_than_hash_len(store) {
                 list[1] = Encoded::Data(
@@ -284,7 +288,7 @@ impl ExtNode {
         } else {
             // Check if there is already a caclucated encoded value for the child, which
             // can happen when manually constructing a trie from proof.
-            if let Some(v) = &self.2 {
+            if let Some(v) = &self.chd_encoded {
                 if v.len() == TRIE_HASH_LEN {
                     list[1] = Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
                 } else {
@@ -299,27 +303,35 @@ impl ExtNode {
     }
 
     pub fn new(path: Vec<u8>, chd: DiskAddress, chd_encoded: Option<Vec<u8>>) -> Self {
-        ExtNode(PartialPath(path), chd, chd_encoded)
+        ExtNode {
+            path: PartialPath(path),
+            chd,
+            chd_encoded,
+        }
     }
 
     pub fn path(&self) -> &PartialPath {
-        &self.0
+        &self.path
+    }
+
+    pub fn path_mut(&mut self) -> &mut PartialPath {
+        &mut self.path
     }
 
     pub fn chd(&self) -> DiskAddress {
-        self.1
+        self.chd
     }
 
     pub fn chd_encoded(&self) -> Option<&[u8]> {
-        self.2.as_deref()
+        self.chd_encoded.as_deref()
     }
 
     pub fn chd_mut(&mut self) -> &mut DiskAddress {
-        &mut self.1
+        &mut self.chd
     }
 
     pub fn chd_encoded_mut(&mut self) -> &mut Option<Vec<u8>> {
-        &mut self.2
+        &mut self.chd_encoded
     }
 }
 
@@ -671,7 +683,11 @@ impl Storable for Node {
                 Ok(Self::new_from_hash(
                     root_hash,
                     is_encoded_longer_than_hash_len,
-                    NodeType::Extension(ExtNode(path, DiskAddress::from(ptr as usize), encoded)),
+                    NodeType::Extension(ExtNode {
+                        path,
+                        chd: DiskAddress::from(ptr as usize),
+                        chd_encoded: encoded,
+                    }),
                 ))
             }
             Self::LEAF_NODE => {
@@ -739,8 +755,8 @@ impl Storable for Node {
                 }
                 NodeType::Extension(n) => {
                     1 + 8
-                        + n.0.dehydrated_len()
-                        + match &n.2 {
+                        + n.path.dehydrated_len()
+                        + match n.chd_encoded() {
                             Some(v) => 1 + v.len() as u64,
                             None => 1,
                         }
@@ -802,12 +818,11 @@ impl Storable for Node {
             }
             NodeType::Extension(n) => {
                 cur.write_all(&[Self::EXT_NODE])?;
-                let path: Vec<u8> = from_nibbles(&n.0.encode(false)).collect();
+                let path: Vec<u8> = from_nibbles(&n.path.encode(false)).collect();
                 cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&n.1.to_le_bytes())?;
+                cur.write_all(&n.chd.to_le_bytes())?;
                 cur.write_all(&path)?;
-                if n.2.is_some() {
-                    let encoded = n.2.as_ref().unwrap();
+                if let Some(encoded) = n.chd_encoded() {
                     cur.write_all(&[encoded.len() as u8])?;
                     cur.write_all(encoded)?;
                 }

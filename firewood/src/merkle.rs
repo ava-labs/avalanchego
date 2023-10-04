@@ -140,7 +140,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             NodeType::Leaf(n) => writeln!(w, "{n:?}").unwrap(),
             NodeType::Extension(n) => {
                 writeln!(w, "{n:?}")?;
-                self.dump_(n.1, w)?
+                self.dump_(n.chd(), w)?
             }
         }
         Ok(())
@@ -161,7 +161,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             .write(|p| {
                 match &mut p.inner {
                     NodeType::Branch(pp) => pp.chd[*idx as usize] = Some(new_chd),
-                    NodeType::Extension(pp) => pp.1 = new_chd,
+                    NodeType::Extension(pp) => *pp.chd_mut() = new_chd,
                     _ => unreachable!(),
                 }
                 p.rehash();
@@ -191,7 +191,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     .write(|u| {
                         (*match &mut u.inner {
                             NodeType::Leaf(u) => &mut u.0,
-                            NodeType::Extension(u) => &mut u.0,
+                            NodeType::Extension(u) => u.path_mut(),
                             _ => unreachable!(),
                         }) = PartialPath(n_path[idx + 1..].to_vec());
                         u.rehash();
@@ -207,9 +207,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 chd[rem_path[idx] as usize] = Some(leaf_ptr);
                 chd[n_path[idx] as usize] = Some(match &u_ref.inner {
                     NodeType::Extension(u) => {
-                        if u.0.len() == 0 {
+                        if u.path().len() == 0 {
                             deleted.push(u_ptr);
-                            u.1
+                            u.chd()
                         } else {
                             u_ptr
                         }
@@ -224,8 +224,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 });
                 let branch_ptr = self.new_node(Node::new(t))?.as_ptr();
                 if idx > 0 {
-                    self.new_node(Node::new(NodeType::Extension(ExtNode(
-                        PartialPath(rem_path[..idx].to_vec()),
+                    self.new_node(Node::new(NodeType::Extension(ExtNode::new(
+                        rem_path[..idx].to_vec(),
                         branch_ptr,
                         None,
                     ))))?
@@ -245,20 +245,22 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             match &mut u.inner {
                                 NodeType::Leaf(u) => u.1 = Data(val),
                                 NodeType::Extension(u) => {
-                                    let write_result = self.get_node(u.1).and_then(|mut b_ref| {
-                                        let write_result = b_ref.write(|b| {
-                                            b.inner.as_branch_mut().unwrap().value =
-                                                Some(Data(val));
-                                            b.rehash()
+                                    let write_result =
+                                        self.get_node(u.chd()).and_then(|mut b_ref| {
+                                            let write_result = b_ref.write(|b| {
+                                                b.inner.as_branch_mut().unwrap().value =
+                                                    Some(Data(val));
+                                                b.rehash()
+                                            });
+
+                                            if write_result.is_err() {
+                                                *u.chd_mut() =
+                                                    self.new_node(b_ref.clone())?.as_ptr();
+                                                deleted.push(b_ref.as_ptr());
+                                            }
+
+                                            Ok(())
                                         });
-
-                                        if write_result.is_err() {
-                                            u.1 = self.new_node(b_ref.clone())?.as_ptr();
-                                            deleted.push(b_ref.as_ptr());
-                                        }
-
-                                        Ok(())
-                                    });
 
                                     if let Err(e) = write_result {
                                         result = Err(e);
@@ -281,7 +283,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         .write(|u| {
                             (*match &mut u.inner {
                                 NodeType::Leaf(u) => &mut u.0,
-                                NodeType::Extension(u) => &mut u.0,
+                                NodeType::Extension(u) => u.path_mut(),
                                 _ => unreachable!(),
                             }) = PartialPath(n_path[rem_path.len() + 1..].to_vec());
                             u.rehash();
@@ -290,9 +292,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     (
                         match &u_ref.inner {
                             NodeType::Extension(u) => {
-                                if u.0.len() == 0 {
+                                if u.path().len() == 0 {
                                     deleted.push(u_ptr);
-                                    u.1
+                                    u.chd()
                                 } else {
                                     u_ptr
                                 }
@@ -328,8 +330,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     })))?
                     .as_ptr();
                 if !prefix.is_empty() {
-                    self.new_node(Node::new(NodeType::Extension(ExtNode(
-                        PartialPath(prefix.to_vec()),
+                    self.new_node(Node::new(NodeType::Extension(ExtNode::new(
+                        prefix.to_vec(),
                         branch_ptr,
                         None,
                     ))))?
@@ -430,8 +432,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     break;
                 }
                 NodeType::Extension(n) => {
-                    let n_path = n.0.to_vec();
-                    let n_ptr = n.1;
+                    let n_path = n.path().to_vec();
+                    let n_ptr = n.chd();
                     nskip = n_path.len() - 1;
                     let rem_path = key_nibbles
                         .into_iter()
@@ -490,14 +492,14 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                 }
                             }
                             NodeType::Extension(n) => {
-                                let idx = n.0[0];
-                                let more = if n.0.len() > 1 {
-                                    n.0 = PartialPath(n.0[1..].to_vec());
+                                let idx = n.path()[0];
+                                let more = if n.path().len() > 1 {
+                                    *n.path_mut() = PartialPath(n.path()[1..].to_vec());
                                     true
                                 } else {
                                     false
                                 };
-                                Some((idx, more, Some(n.1)))
+                                Some((idx, more, Some(n.chd())))
                             }
                         };
                         u.rehash()
@@ -587,7 +589,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // to: P -> [Leaf (v)]
                     let leaf = self
                         .new_node(Node::new(NodeType::Leaf(LeafNode(
-                            PartialPath(n.0.clone().into_inner()),
+                            PartialPath(n.path().clone().into_inner()),
                             val,
                         ))))?
                         .as_ptr();
@@ -610,8 +612,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Ext] -> [Branch]
                             let ext = self
-                                .new_node(Node::new(NodeType::Extension(ExtNode(
-                                    PartialPath(vec![idx]),
+                                .new_node(Node::new(NodeType::Extension(ExtNode::new(
+                                    vec![idx],
                                     c_ptr,
                                     None,
                                 ))))?
@@ -629,8 +631,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                 p_ref,
                                 |p| {
                                     let pp = p.inner.as_extension_mut().unwrap();
-                                    pp.0 .0.push(idx);
-                                    pp.1 = c_ptr;
+                                    pp.path_mut().0.push(idx);
+                                    *pp.chd_mut() = c_ptr;
                                     p.rehash();
                                 },
                                 parents,
@@ -651,7 +653,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             let write_result = c_ref.write(|c| {
                                 let partial_path = match &mut c.inner {
                                     NodeType::Leaf(n) => &mut n.0,
-                                    NodeType::Extension(n) => &mut n.0,
+                                    NodeType::Extension(n) => n.path_mut(),
                                     _ => unreachable!(),
                                 };
 
@@ -688,11 +690,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                 self,
                                 c_ref,
                                 |c| {
-                                    let mut path = n.0.clone().into_inner();
+                                    let mut path = n.path().clone().into_inner();
                                     path.push(idx);
                                     let path0 = match &mut c.inner {
                                         NodeType::Leaf(n) => &mut n.0,
-                                        NodeType::Extension(n) => &mut n.0,
+                                        NodeType::Extension(n) => n.path_mut(),
                                         _ => unreachable!(),
                                     };
                                     path.extend(&**path0);
@@ -738,19 +740,18 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                 NodeType::Branch(n) => {
                                     // from: [Branch] -> [Branch]x -> [Branch]
                                     // to: [Branch] -> [Ext] -> [Branch]
-                                    n.chd[b_idx as usize] =
-                                        Some(
-                                            self.new_node(Node::new(NodeType::Extension(
-                                                ExtNode(PartialPath(vec![idx]), c_ptr, None),
-                                            )))?
-                                            .as_ptr(),
-                                        );
+                                    n.chd[b_idx as usize] = Some(
+                                        self.new_node(Node::new(NodeType::Extension(
+                                            ExtNode::new(vec![idx], c_ptr, None),
+                                        )))?
+                                        .as_ptr(),
+                                    );
                                 }
                                 NodeType::Extension(n) => {
                                     // from: [Ext] -> [Branch]x -> [Branch]
                                     // to: [Ext] -> [Branch]
-                                    n.0 .0.push(idx);
-                                    n.1 = c_ptr
+                                    n.path_mut().0.push(idx);
+                                    *n.chd_mut() = c_ptr
                                 }
                                 _ => unreachable!(),
                             }
@@ -774,7 +775,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     let write_result = c_ref.write(|c| {
                         match &mut c.inner {
                             NodeType::Leaf(n) => &mut n.0,
-                            NodeType::Extension(n) => &mut n.0,
+                            NodeType::Extension(n) => n.path_mut(),
                             _ => unreachable!(),
                         }
                         .0
@@ -799,11 +800,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // from: P -> [Ext] -> [Branch]x -> [Leaf/Ext]
                     // to: P -> [Leaf/Ext]
                     let write_result = c_ref.write(|c| {
-                        let mut path = n.0.clone().into_inner();
+                        let mut path = n.path().clone().into_inner();
                         path.push(idx);
                         let path0 = match &mut c.inner {
                             NodeType::Leaf(n) => &mut n.0,
-                            NodeType::Extension(n) => &mut n.0,
+                            NodeType::Extension(n) => n.path_mut(),
                             _ => unreachable!(),
                         };
                         path.extend(&**path0);
@@ -866,13 +867,13 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     break;
                 }
                 NodeType::Extension(n) => {
-                    let n_path = &*n.0;
+                    let n_path = &*n.path().0;
                     let rem_path = &chunks[i..];
                     if rem_path < n_path || &rem_path[..n_path.len()] != n_path {
                         return Ok(None);
                     }
                     nskip = n_path.len() - 1;
-                    n.1
+                    n.chd()
                 }
             };
 
@@ -934,7 +935,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 }
             }
             NodeType::Leaf(_) => (),
-            NodeType::Extension(n) => self.remove_tree_(n.1, deleted)?,
+            NodeType::Extension(n) => self.remove_tree_(n.chd(), deleted)?,
         }
         deleted.push(u);
         Ok(())
@@ -987,13 +988,13 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     return Ok(Some(RefMut::new(u_ptr, parents, self)));
                 }
                 NodeType::Extension(n) => {
-                    let n_path = &*n.0;
+                    let n_path = &*n.path().0;
                     let rem_path = &chunks[i..];
                     if rem_path.len() < n_path.len() || &rem_path[..n_path.len()] != n_path {
                         return Ok(None);
                     }
                     nskip = n_path.len() - 1;
-                    n.1
+                    n.chd()
                 }
             };
             parents.push((u_ptr, *nib));
@@ -1067,7 +1068,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 NodeType::Extension(n) => {
                     // the key passed in must match the entire remainder of this
                     // extension node, otherwise we break out
-                    let n_path = &*n.0;
+                    let n_path = n.path();
                     let remaining_path = key_nibbles.into_iter().skip(i);
                     if remaining_path.size_hint().0 < n_path.len() {
                         // all bytes aren't there
@@ -1078,7 +1079,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         break;
                     }
                     nskip = n_path.len() - 1;
-                    n.1
+                    n.chd()
                 }
             };
             u_ref = self.get_node(next_ptr)?;
@@ -1140,7 +1141,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     return Ok(Some(Ref(u_ref)));
                 }
                 NodeType::Extension(n) => {
-                    let n_path = &*n.0;
+                    let n_path = n.path();
                     let rem_path = key_nibbles.into_iter().skip(i);
                     if rem_path.size_hint().0 < n_path.len() {
                         return Ok(None);
@@ -1149,7 +1150,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         return Ok(None);
                     }
                     nskip = n_path.len() - 1;
-                    n.1
+                    n.chd()
                 }
             };
             u_ref = self.get_node(next_ptr)?;
@@ -1345,8 +1346,8 @@ mod test {
             Node::new_from_hash(
                 None,
                 None,
-                NodeType::Extension(ExtNode(
-                    PartialPath(vec![0x1, 0x2, 0x3]),
+                NodeType::Extension(ExtNode::new(
+                    vec![0x1, 0x2, 0x3],
                     DiskAddress::from(0x42),
                     None,
                 )),
@@ -1354,8 +1355,8 @@ mod test {
             Node::new_from_hash(
                 None,
                 None,
-                NodeType::Extension(ExtNode(
-                    PartialPath(vec![0x1, 0x2, 0x3]),
+                NodeType::Extension(ExtNode::new(
+                    vec![0x1, 0x2, 0x3],
                     DiskAddress::null(),
                     Some(vec![0x1, 0x2, 0x3]),
                 )),
@@ -1452,8 +1453,8 @@ mod test {
             let new_chd_encoded = new_chd.get_encoded(merkle.store.as_ref());
             assert_eq!(chd_encoded, new_chd_encoded);
 
-            let node = Node::new(NodeType::Extension(ExtNode(
-                PartialPath(vec![0x1, 0x2, 0x3]),
+            let node = Node::new(NodeType::Extension(ExtNode::new(
+                vec![0x1, 0x2, 0x3],
                 DiskAddress::null(),
                 Some(chd_encoded.to_vec()),
             )));
