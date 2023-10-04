@@ -1356,10 +1356,9 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	}()
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		thisNodeID := proVM.ctx.NodeID
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			thisNodeID: {
-				NodeID: thisNodeID,
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
 				Weight: 10,
 			},
 		}, nil
