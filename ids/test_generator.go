@@ -28,3 +28,14 @@ func GenerateTestShortNodeID() ShortNodeID {
 func GenerateTestNodeID() NodeID {
 	return NodeIDFromShortNodeID(GenerateTestShortNodeID())
 }
+
+// TestNodeIDFromBytes is an utility to build NodeID from bytes in UTs
+// It must not be used in production code. In production code we should
+// use ToNodeID, which performs proper length checking.
+func TestNodeIDFromBytes(src []byte, length int) NodeID {
+	bytes := make([]byte, length)
+	copy(bytes, src)
+	return NodeID{
+		buf: string(bytes),
+	}
+}

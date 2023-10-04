@@ -100,6 +100,7 @@ func TestContextVMSummary(t *testing.T) {
 	defer stopper.Stop(context.Background())
 
 	ctx := snow.DefaultContextTest()
+	ctx.NodeID = ids.GenerateTestNodeID()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil))

@@ -13,12 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const NodeIDPrefix = "NodeID-"
+const (
+	NodeIDPrefix = "NodeID-"
+
+	LongNodeIDLen = 32
+)
 
 var (
-	EmptyNodeID = NodeID{
-		buf: "",
-	}
+	EmptyNodeID = NodeID{}
 
 	_ utils.Sortable[NodeID] = (*NodeID)(nil)
 )
@@ -78,11 +80,20 @@ func (n NodeID) Less(other NodeID) bool {
 	return n.buf < other.buf
 }
 
-func NodeIDFromBytes(src []byte, length int) NodeID {
-	bytes := make([]byte, length)
-	copy(bytes, src)
-	return NodeID{
-		buf: string(bytes),
+func ToNodeID(src []byte) (NodeID, error) {
+	switch {
+	case len(src) == 0:
+		return EmptyNodeID, nil
+
+	case len(src) == ShortIDLen || len(src) == LongNodeIDLen:
+		bytes := make([]byte, len(src))
+		copy(bytes, src)
+		return NodeID{
+			buf: string(bytes),
+		}, nil
+
+	default:
+		return EmptyNodeID, fmt.Errorf("expected %d or %d bytes but got %d", ShortNodeIDLen, LongNodeIDLen, len(src))
 	}
 }
 

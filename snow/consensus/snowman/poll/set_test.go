@@ -21,11 +21,11 @@ var (
 	blkID3 = ids.ID{3}
 	blkID4 = ids.ID{4}
 
-	vdr1 = ids.NodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen)
-	vdr2 = ids.NodeIDFromBytes([]byte{0x02}, ids.ShortNodeIDLen)
-	vdr3 = ids.NodeIDFromBytes([]byte{0x03}, ids.ShortNodeIDLen)
-	vdr4 = ids.NodeIDFromBytes([]byte{0x04}, ids.ShortNodeIDLen)
-	vdr5 = ids.NodeIDFromBytes([]byte{0x05}, ids.ShortNodeIDLen) // k = 5
+	vdr1 = ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen)
+	vdr2 = ids.TestNodeIDFromBytes([]byte{0x02}, ids.ShortNodeIDLen)
+	vdr3 = ids.TestNodeIDFromBytes([]byte{0x03}, ids.ShortNodeIDLen)
+	vdr4 = ids.TestNodeIDFromBytes([]byte{0x04}, ids.ShortNodeIDLen)
+	vdr5 = ids.TestNodeIDFromBytes([]byte{0x05}, ids.ShortNodeIDLen) // k = 5
 )
 
 func TestNewSetErrorOnMetrics(t *testing.T) {

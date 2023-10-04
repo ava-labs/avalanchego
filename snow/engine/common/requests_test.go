@@ -30,7 +30,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.EmptyNodeID, 1)
 	require.False(removed)
 
-	_, removed = req.Remove(ids.NodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen), 0)
+	_, removed = req.Remove(ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen), 0)
 	require.False(removed)
 
 	require.True(req.Contains(ids.Empty))
@@ -42,7 +42,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.EmptyNodeID, 1)
 	require.False(removed)
 
-	_, removed = req.Remove(ids.NodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen), 0)
+	_, removed = req.Remove(ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen), 0)
 	require.False(removed)
 
 	require.True(req.Contains(ids.Empty))

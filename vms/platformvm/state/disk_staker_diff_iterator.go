@@ -57,7 +57,11 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	copy(subnetID[:], key)
 	height := unpackIterableHeight(key[ids.IDLen:])
 	nodeBytes := key[diffKeyNodeIDOffset:]
-	nodeID = ids.NodeIDFromBytes(nodeBytes, len(nodeBytes))
+	nodeID, err := ids.ToNodeID(nodeBytes)
+	if err != nil {
+		return ids.Empty, 0, ids.EmptyNodeID, err
+	}
+
 	return subnetID, height, nodeID, nil
 }
 

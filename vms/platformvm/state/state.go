@@ -1229,7 +1229,10 @@ func (s *state) ApplyValidatorWeightDiffs(
 
 		for diffIter.Next() {
 			key := diffIter.Key()
-			nodeID := ids.NodeIDFromBytes(key, len(key))
+			nodeID, err := ids.ToNodeID(key)
+			if err != nil {
+				return err
+			}
 
 			weightDiff := ValidatorWeightDiff{}
 			_, err = block.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
