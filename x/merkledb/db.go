@@ -855,7 +855,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// move any child views of the committed trie onto the db
 	db.moveChildViewsToDB(trieToCommit)
 
-	if len(changes.nodes) == 0 {
+	if len(changes.values) == 0 {
 		return nil
 	}
 

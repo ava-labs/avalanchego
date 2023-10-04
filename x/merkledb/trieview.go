@@ -632,9 +632,7 @@ func (t *trieView) remove(key Path) error {
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
+	t.recordNodeChange(nodeToDelete)
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -674,9 +672,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 
 	// delete all empty nodes with a single child under [node]
 	for len(node.children) == 1 && !node.hasValue() {
-		if err := t.recordNodeDeleted(node); err != nil {
-			return err
-		}
+		t.recordNodeDeleted(node)
 
 		var (
 			childEntry child
@@ -700,7 +696,8 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	parent.addChild(node)
-	return t.recordNodeChange(parent)
+	t.recordNodeChange(parent)
+	return nil
 }
 
 // Starting from the last node in [nodePath], traverses toward the root
@@ -717,16 +714,10 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	nextParentIndex := len(nodePath) - 2
 
 	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		if err := t.recordNodeDeleted(node); err != nil {
-			return err
-		}
-
+		t.recordNodeDeleted(node)
 		parent := nodePath[nextParentIndex]
-
 		parent.removeChild(node)
-		if err := t.recordNodeChange(parent); err != nil {
-			return err
-		}
+		t.recordNodeChange(parent)
 
 		node = parent
 	}
@@ -832,7 +823,7 @@ func (t *trieView) insert(
 	// a node with that exact path already exists so update its value
 	if closestNode.key == key {
 		closestNode.setValue(value)
-		// closestNode was already marked as changed in the ancestry loop above
+		t.recordNodeChange(closestNode)
 		return closestNode, nil
 	}
 
@@ -850,7 +841,8 @@ func (t *trieView) insert(
 			key,
 		)
 		newNode.setValue(value)
-		return newNode, t.recordNodeChange(newNode)
+		t.recordNodeChange(newNode)
+		return newNode, nil
 	}
 
 	// if we have reached this point, then the [fullpath] we are trying to insert and
@@ -887,9 +879,7 @@ func (t *trieView) insert(
 			key,
 		)
 		newNode.setValue(value)
-		if err := t.recordNodeChange(newNode); err != nil {
-			return nil, err
-		}
+		t.recordNodeChange(newNode)
 		nodeWithValue = newNode
 	}
 
@@ -902,43 +892,40 @@ func (t *trieView) insert(
 			hasValue:       existingChildEntry.hasValue,
 		})
 
-	return nodeWithValue, t.recordNodeChange(branchNode)
+	t.recordNodeChange(branchNode)
+	return nodeWithValue, nil
 }
 
 // Records that an existing node has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeChange(after *node) error {
-	return t.recordKeyChange(after.key, after)
+func (t *trieView) recordNodeChange(after *node) {
+	t.recordKeyChange(after.key, after)
 }
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeDeleted(after *node) error {
+func (t *trieView) recordNodeDeleted(after *node) {
 	// don't delete the root.
 	if after.key.tokensLength == 0 {
-		return t.recordKeyChange(after.key, after)
+		t.recordKeyChange(after.key, after)
+		return
 	}
 
-	return t.recordKeyChange(after.key, nil)
+	t.recordKeyChange(after.key, nil)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key Path, after *node) error {
-	if t.nodesAlreadyCalculated.Get() {
-		return ErrNodesAlreadyCalculated
-	}
-
+func (t *trieView) recordKeyChange(key Path, after *node) {
 	if existing, ok := t.changes.nodes[key]; ok {
 		existing.after = after
-		return nil
+		return
 	}
 
 	t.changes.nodes[key] = &change[*node]{
 		after: after,
 	}
-	return nil
 }
 
 // Records that a key's value has been added or updated.
