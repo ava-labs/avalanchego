@@ -33,7 +33,7 @@ func NewMergedIterator(stakers ...StakerIterator) StakerIterator {
 	}
 
 	it := &mergedIterator{
-		heap: heap.QueueOf[StakerIterator](
+		heap: heap.QueueOf(
 			func(a, b StakerIterator) bool {
 				return a.Value().Less(b.Value())
 			},
