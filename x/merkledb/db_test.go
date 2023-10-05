@@ -63,7 +63,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(NewPath(keyBytes, BranchFactor16), true)
+	n, err := db.getNode(ConvertToKey(keyBytes, BranchFactor16), true)
 	require.NoError(err)
 
 	// node's value shouldn't be affected by the edit
@@ -861,10 +861,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 	)
 
 	var (
-		values               = make(map[Path][]byte) // tracks content of the trie
+		values               = make(map[Key][]byte) // tracks content of the trie
 		currentBatch         = db.NewBatch()
-		uncommittedKeyValues = make(map[Path][]byte)
-		uncommittedDeletes   = set.Set[Path]{}
+		uncommittedKeyValues = make(map[Key][]byte)
+		uncommittedDeletes   = set.Set[Key]{}
 		pastRoots            = []ids.ID{}
 	)
 
@@ -877,13 +877,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
 
-			uncommittedKeyValues[NewPath(step.key, bf)] = step.value
-			uncommittedDeletes.Remove(NewPath(step.key, bf))
+			uncommittedKeyValues[ConvertToKey(step.key, bf)] = step.value
+			uncommittedDeletes.Remove(ConvertToKey(step.key, bf))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
 
-			uncommittedDeletes.Add(NewPath(step.key, bf))
-			delete(uncommittedKeyValues, NewPath(step.key, bf))
+			uncommittedDeletes.Add(ConvertToKey(step.key, bf))
+			delete(uncommittedKeyValues, ConvertToKey(step.key, bf))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -984,7 +984,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			want := values[NewPath(step.key, bf)]
+			want := values[ConvertToKey(step.key, bf)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 
 			trieValue, err := getNodeValueWithBranchFactor(db, string(step.key), bf)

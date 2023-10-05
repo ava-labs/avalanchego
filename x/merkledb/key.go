@@ -13,7 +13,7 @@ import (
 var (
 	errInvalidBranchFactor = errors.New("invalid branch factor")
 
-	branchFactorToPathConfig = map[BranchFactor]pathConfig{
+	branchFactorToTokenConfig = map[BranchFactor]tokenConfig{
 		BranchFactor2: {
 			branchFactor:    BranchFactor2,
 			tokenBitSize:    1,
@@ -51,71 +51,71 @@ const (
 )
 
 func (f BranchFactor) Valid() error {
-	if _, ok := branchFactorToPathConfig[f]; ok {
+	if _, ok := branchFactorToTokenConfig[f]; ok {
 		return nil
 	}
 	return fmt.Errorf("%w: %d", errInvalidBranchFactor, f)
 }
 
-type pathConfig struct {
+type tokenConfig struct {
 	branchFactor    BranchFactor
 	tokensPerByte   int
 	tokenBitSize    byte
 	singleTokenMask byte
 }
 
-type Path struct {
-	tokensLength int
-	value        string
-	pathConfig
+type Key struct {
+	tokenLength int
+	value       string
+	tokenConfig
 }
 
-func emptyPath(bf BranchFactor) Path {
-	return Path{
-		pathConfig: branchFactorToPathConfig[bf],
+func emptyKey(bf BranchFactor) Key {
+	return Key{
+		tokenConfig: branchFactorToTokenConfig[bf],
 	}
 }
 
-// NewPath returns [p] as a new path with the given [branchFactor].
+// ConvertToKey returns [keyBytes] as a new key with the given [branchFactor].
 // Assumes [branchFactor] is valid.
-func NewPath(p []byte, branchFactor BranchFactor) Path {
-	pConfig := branchFactorToPathConfig[branchFactor]
-	return Path{
-		value:        byteSliceToString(p),
-		pathConfig:   pConfig,
-		tokensLength: len(p) * pConfig.tokensPerByte,
+func ConvertToKey(keyBytes []byte, branchFactor BranchFactor) Key {
+	tc := branchFactorToTokenConfig[branchFactor]
+	return Key{
+		value:       byteSliceToString(keyBytes),
+		tokenConfig: tc,
+		tokenLength: len(keyBytes) * tc.tokensPerByte,
 	}
 }
 
-// TokensLength returns the number of tokens in [p].
-func (p Path) TokensLength() int {
-	return p.tokensLength
+// TokensLength returns the number of tokens in [k].
+func (k Key) TokensLength() int {
+	return k.tokenLength
 }
 
-// hasPartialByte returns true iff the path fits into a non-whole number of bytes
-func (p Path) hasPartialByte() bool {
-	return p.tokensLength%p.tokensPerByte > 0
+// hasPartialByte returns true iff the key fits into a non-whole number of bytes
+func (k Key) hasPartialByte() bool {
+	return k.tokenLength%k.tokensPerByte > 0
 }
 
-// HasPrefix returns true iff [prefix] is a prefix of [p] or equal to it.
-func (p Path) HasPrefix(prefix Path) bool {
-	// [prefix] must be shorter than [p] to be a prefix.
-	if p.tokensLength < prefix.tokensLength {
+// HasPrefix returns true iff [prefix] is a prefix of [k] or equal to it.
+func (k Key) HasPrefix(prefix Key) bool {
+	// [prefix] must be shorter than [k] to be a prefix.
+	if k.tokenLength < prefix.tokenLength {
 		return false
 	}
 
 	// The number of tokens in the last byte of [prefix], or zero
 	// if [prefix] fits into a whole number of bytes.
-	remainderTokensCount := prefix.tokensLength % p.tokensPerByte
+	remainderTokensCount := prefix.tokenLength % k.tokensPerByte
 	if remainderTokensCount == 0 {
-		return strings.HasPrefix(p.value, prefix.value)
+		return strings.HasPrefix(k.value, prefix.value)
 	}
 
 	// check that the tokens in the partially filled final byte of [prefix] are
-	// equal to the tokens in the final byte of [p].
-	remainderBitsMask := byte(0xFF << (8 - remainderTokensCount*int(p.tokenBitSize)))
+	// equal to the tokens in the final byte of [k].
+	remainderBitsMask := byte(0xFF << (8 - remainderTokensCount*int(k.tokenBitSize)))
 	prefixRemainderTokens := prefix.value[len(prefix.value)-1] & remainderBitsMask
-	remainderTokens := p.value[len(prefix.value)-1] & remainderBitsMask
+	remainderTokens := k.value[len(prefix.value)-1] & remainderBitsMask
 
 	if prefixRemainderTokens != remainderTokens {
 		return false
@@ -125,50 +125,50 @@ func (p Path) HasPrefix(prefix Path) bool {
 	// If len(prefix.value) == 0 were true, [remainderTokens] would be 0 so we
 	// would have returned above.
 	prefixWithoutPartialByte := prefix.value[:len(prefix.value)-1]
-	return strings.HasPrefix(p.value, prefixWithoutPartialByte)
+	return strings.HasPrefix(k.value, prefixWithoutPartialByte)
 }
 
-// HasStrictPrefix returns true iff [prefix] is a prefix of [p]
+// HasStrictPrefix returns true iff [prefix] is a prefix of [k]
 // but is not equal to it.
-func (p Path) HasStrictPrefix(prefix Path) bool {
-	return p != prefix && p.HasPrefix(prefix)
+func (k Key) HasStrictPrefix(prefix Key) bool {
+	return k != prefix && k.HasPrefix(prefix)
 }
 
 // Token returns the token at the specified index,
-func (p Path) Token(index int) byte {
-	// Find the index in [p.value] of the byte containing the token at [index].
-	storageByteIndex := index / p.tokensPerByte
-	storageByte := p.value[storageByteIndex]
+func (k Key) Token(index int) byte {
+	// Find the index in [k.value] of the byte containing the token at [index].
+	storageByteIndex := index / k.tokensPerByte
+	storageByte := k.value[storageByteIndex]
 	// Shift the byte right to get the token to the rightmost position.
-	storageByte >>= p.bitsToShift(index)
+	storageByte >>= k.bitsToShift(index)
 	// Apply a mask to remove any other tokens in the byte.
-	return storageByte & p.singleTokenMask
+	return storageByte & k.singleTokenMask
 }
 
-// Append returns a new Path that equals the current
-// Path with [token] appended to the end.
-func (p Path) Append(token byte) Path {
-	buffer := make([]byte, p.bytesNeeded(p.tokensLength+1))
-	copy(buffer, p.value)
+// Append returns a new Key that equals the current
+// Key with [token] appended to the end.
+func (k Key) Append(token byte) Key {
+	buffer := make([]byte, k.bytesNeeded(k.tokenLength+1))
+	copy(buffer, k.value)
 	// Shift [token] to the left such that it's at the correct
 	// index within its storage byte, then OR it with its storage
 	// byte to write the token into the byte.
-	buffer[len(buffer)-1] |= token << p.bitsToShift(p.tokensLength)
-	return Path{
-		value:        byteSliceToString(buffer),
-		tokensLength: p.tokensLength + 1,
-		pathConfig:   p.pathConfig,
+	buffer[len(buffer)-1] |= token << k.bitsToShift(k.tokenLength)
+	return Key{
+		value:       byteSliceToString(buffer),
+		tokenLength: k.tokenLength + 1,
+		tokenConfig: k.tokenConfig,
 	}
 }
 
-// Greater returns true if current Path is greater than other Path
-func (p Path) Greater(other Path) bool {
-	return p.value > other.value || (p.value == other.value && p.tokensLength > other.tokensLength)
+// Greater returns true if current Key is greater than other Key
+func (k Key) Greater(other Key) bool {
+	return k.value > other.value || (k.value == other.value && k.tokenLength > other.tokenLength)
 }
 
-// Less returns true if current Path is less than other Path
-func (p Path) Less(other Path) bool {
-	return p.value < other.value || (p.value == other.value && p.tokensLength < other.tokensLength)
+// Less returns true if current Key is less than other Key
+func (k Key) Less(other Key) bool {
+	return k.value < other.value || (k.value == other.value && k.tokenLength < other.tokenLength)
 }
 
 // bitsToShift returns the number of bits to right shift a token
@@ -188,15 +188,15 @@ func (p Path) Less(other Path) bool {
 // * Token at index 1 (0b0010) needs to be shifted by 0 bits
 // * Token at index 2 (0b0011) needs to be shifted by 4 bits
 // * Token at index 3 (0b0100) needs to be shifted by 0 bits
-func (p Path) bitsToShift(index int) byte {
+func (k Key) bitsToShift(index int) byte {
 	// [tokenIndex] is the index of the token in the byte.
 	// For example, if the branch factor is 16, then each byte contains 2 tokens.
 	// The first is at index 0, and the second is at index 1, by this definition.
-	tokenIndex := index % p.tokensPerByte
+	tokenIndex := index % k.tokensPerByte
 	// The bit within the byte that the token starts at.
-	startBitIndex := p.tokenBitSize * byte(tokenIndex)
+	startBitIndex := k.tokenBitSize * byte(tokenIndex)
 	// The bit within the byte that the token ends at.
-	endBitIndex := startBitIndex + p.tokenBitSize - 1
+	endBitIndex := startBitIndex + k.tokenBitSize - 1
 	// We want to right shift until [endBitIndex] is at the last index, so return
 	// the distance from the end of the byte to the end of the token.
 	// Note that 7 is the index of the last bit in a byte.
@@ -208,54 +208,54 @@ func (p Path) bitsToShift(index int) byte {
 //
 // Invariant: [tokens] is a non-negative, but otherwise untrusted, input and
 // this method must never overflow.
-func (p Path) bytesNeeded(tokens int) int {
-	size := tokens / p.tokensPerByte
-	if tokens%p.tokensPerByte != 0 {
+func (k Key) bytesNeeded(tokens int) int {
+	size := tokens / k.tokensPerByte
+	if tokens%k.tokensPerByte != 0 {
 		size++
 	}
 	return size
 }
 
-// Extend returns a new Path that equals the passed Path appended to the current Path
-func (p Path) Extend(path Path) Path {
-	if p.tokensLength == 0 {
-		return path
+// Extend returns a new Key that equals the passed Key appended to the current Key
+func (k Key) Extend(extension Key) Key {
+	if k.tokenLength == 0 {
+		return extension
 	}
-	if path.tokensLength == 0 {
-		return p
+	if extension.tokenLength == 0 {
+		return k
 	}
 
-	totalLength := p.tokensLength + path.tokensLength
+	totalLength := k.tokenLength + extension.tokenLength
 
 	// copy existing value into  the buffer
-	buffer := make([]byte, p.bytesNeeded(totalLength))
-	copy(buffer, p.value)
+	buffer := make([]byte, k.bytesNeeded(totalLength))
+	copy(buffer, k.value)
 
 	// If the existing value fits into a whole number of bytes,
-	// the extension path can be copied directly into the buffer.
-	if !p.hasPartialByte() {
-		copy(buffer[len(p.value):], path.value)
-		return Path{
-			value:        byteSliceToString(buffer),
-			tokensLength: totalLength,
-			pathConfig:   p.pathConfig,
+	// the extension key can be copied directly into the buffer.
+	if !k.hasPartialByte() {
+		copy(buffer[len(k.value):], extension.value)
+		return Key{
+			value:       byteSliceToString(buffer),
+			tokenLength: totalLength,
+			tokenConfig: k.tokenConfig,
 		}
 	}
 
-	// The existing path doesn't fit into a whole number of bytes.
+	// The existing key doesn't fit into a whole number of bytes.
 	// Figure out how many bits to shift.
-	shift := p.bitsToShift(p.tokensLength - 1)
-	// Fill the partial byte with the first [shift] bits of the extension path
-	buffer[len(p.value)-1] |= path.value[0] >> (8 - shift)
+	shift := k.bitsToShift(k.tokenLength - 1)
+	// Fill the partial byte with the first [shift] bits of the extension key
+	buffer[len(k.value)-1] |= extension.value[0] >> (8 - shift)
 
-	// copy the rest of the extension path bytes into the buffer,
+	// copy the rest of the extension key bytes into the buffer,
 	// shifted byte shift bits
-	shiftCopy(buffer[len(p.value):], path.value, shift)
+	shiftCopy(buffer[len(k.value):], extension.value, shift)
 
-	return Path{
-		value:        byteSliceToString(buffer),
-		tokensLength: totalLength,
-		pathConfig:   p.pathConfig,
+	return Key{
+		value:       byteSliceToString(buffer),
+		tokenLength: totalLength,
+		tokenConfig: k.tokenConfig,
 	}
 }
 
@@ -277,28 +277,28 @@ func shiftCopy(dst []byte, src string, shift byte) {
 	}
 }
 
-// Skip returns a new Path that contains the last
-// p.length-tokensToSkip tokens of [p].
-func (p Path) Skip(tokensToSkip int) Path {
-	if p.tokensLength == tokensToSkip {
-		return emptyPath(p.branchFactor)
+// Skip returns a new Key that contains the last
+// k.length-tokensToSkip tokens of [k].
+func (k Key) Skip(tokensToSkip int) Key {
+	if k.tokenLength == tokensToSkip {
+		return emptyKey(k.branchFactor)
 	}
-	result := Path{
-		value:        p.value[tokensToSkip/p.tokensPerByte:],
-		tokensLength: p.tokensLength - tokensToSkip,
-		pathConfig:   p.pathConfig,
+	result := Key{
+		value:       k.value[tokensToSkip/k.tokensPerByte:],
+		tokenLength: k.tokenLength - tokensToSkip,
+		tokenConfig: k.tokenConfig,
 	}
 
 	// if the tokens to skip is a whole number of bytes,
-	// the remaining bytes exactly equals the new path.
-	if tokensToSkip%p.tokensPerByte == 0 {
+	// the remaining bytes exactly equals the new key.
+	if tokensToSkip%k.tokensPerByte == 0 {
 		return result
 	}
 
 	// tokensToSkip does not remove a whole number of bytes.
 	// copy the remaining shifted bytes into a new buffer.
-	buffer := make([]byte, p.bytesNeeded(result.tokensLength))
-	bitsSkipped := tokensToSkip * int(p.tokenBitSize)
+	buffer := make([]byte, k.bytesNeeded(result.tokenLength))
+	bitsSkipped := tokensToSkip * int(k.tokenBitSize)
 	bitsRemovedFromFirstRemainingByte := byte(bitsSkipped % 8)
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
@@ -306,42 +306,42 @@ func (p Path) Skip(tokensToSkip int) Path {
 	return result
 }
 
-// Take returns a new Path that contains the first tokensToTake tokens of the current Path
-func (p Path) Take(tokensToTake int) Path {
-	if p.tokensLength == tokensToTake {
-		return p
+// Take returns a new Key that contains the first tokensToTake tokens of the current Key
+func (k Key) Take(tokensToTake int) Key {
+	if k.tokenLength == tokensToTake {
+		return k
 	}
 
-	result := Path{
-		tokensLength: tokensToTake,
-		pathConfig:   p.pathConfig,
+	result := Key{
+		tokenLength: tokensToTake,
+		tokenConfig: k.tokenConfig,
 	}
 
 	if !result.hasPartialByte() {
-		result.value = p.value[:tokensToTake/p.tokensPerByte]
+		result.value = k.value[:tokensToTake/k.tokensPerByte]
 		return result
 	}
 
 	// We need to zero out some bits of the last byte so a simple slice will not work
 	// Create a new []byte to store the altered value
-	buffer := make([]byte, p.bytesNeeded(tokensToTake))
-	copy(buffer, p.value)
+	buffer := make([]byte, k.bytesNeeded(tokensToTake))
+	copy(buffer, k.value)
 
 	// We want to zero out everything to the right of the last token, which is at index [tokensToTake] - 1
 	// Mask will be (8-bitsToShift) number of 1's followed by (bitsToShift) number of 0's
-	mask := byte(0xFF << p.bitsToShift(tokensToTake-1))
+	mask := byte(0xFF << k.bitsToShift(tokensToTake-1))
 	buffer[len(buffer)-1] &= mask
 
 	result.value = byteSliceToString(buffer)
 	return result
 }
 
-// Bytes returns the raw bytes of the Path
+// Bytes returns the raw bytes of the Key
 // Invariant: The returned value must not be modified.
-func (p Path) Bytes() []byte {
+func (k Key) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
-	return stringToByteSlice(p.value)
+	return stringToByteSlice(k.value)
 }
 
 // byteSliceToString converts the []byte to a string
