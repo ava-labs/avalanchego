@@ -116,9 +116,7 @@ type mutableStakerIterator struct {
 }
 
 func newStakerHeap() heap.Queue[*Staker] {
-	return heap.NewQueue[*Staker](func(a, b *Staker) bool {
-		return a.Less(b)
-	})
+	return heap.NewQueue((*Staker).Less)
 }
 
 func newMutableStakerIterator(iterator StakerIterator) *mutableStakerIterator {
