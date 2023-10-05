@@ -1,6 +1,6 @@
 # Payload
 
-An Avalanche Unsigned Warp Message already includes a `networkID`, `sourceChainID`, and `payload` field. The `payload` field is parsed into one of the types included in this package to be further handled by the VM.
+An Avalanche Unsigned Warp Message already includes a `networkID`, `sourceChainID`, and `payload` field. The `payload` field can be parsed into one of the types included in this package to be further handled by the VM.
 
 ## AddressedCall
 
@@ -41,4 +41,4 @@ BlockHash:
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `typeID` is the payload type identifier and is `0x00000001` for `BlockHash`
-- `blockHash` is a blockHash from the `sourceChainID`. A signed block hash payload indicates that the signer has accepted the block on the source chain.
+- `blockHash` is a blockHash from the `sourceChainID`. A signed block hash payload should indicate that the signers have accepted the block on the source chain

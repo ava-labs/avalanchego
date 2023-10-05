@@ -5,11 +5,13 @@ package payload
 
 import "fmt"
 
-var _ byteSetter = (*AddressedCall)(nil)
+var _ Payload = (*AddressedCall)(nil)
 
 // AddressedCall defines the format for delivering a call across VMs including a
 // source address and a payload.
-// Implementation of destinationAddress can be implemented on top of this payload.
+//
+// Note: If a destination address is expected, it should be encoded in the
+// payload.
 type AddressedCall struct {
 	SourceAddress []byte `serialize:"true"`
 	Payload       []byte `serialize:"true"`
@@ -23,41 +25,29 @@ func NewAddressedCall(sourceAddress []byte, payload []byte) (*AddressedCall, err
 		SourceAddress: sourceAddress,
 		Payload:       payload,
 	}
-	return ap, ap.initialize()
+	return ap, initialize(ap)
 }
 
 // ParseAddressedCall converts a slice of bytes into an initialized
 // AddressedCall.
 func ParseAddressedCall(b []byte) (*AddressedCall, error) {
-	var unmarshalledPayloadIntf any
-	if _, err := c.Unmarshal(b, &unmarshalledPayloadIntf); err != nil {
+	payloadIntf, err := Parse(b)
+	if err != nil {
 		return nil, err
 	}
-	payload, ok := unmarshalledPayloadIntf.(*AddressedCall)
+	payload, ok := payloadIntf.(*AddressedCall)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errWrongType, unmarshalledPayloadIntf)
+		return nil, fmt.Errorf("%w: %T", errWrongType, payloadIntf)
 	}
-	payload.bytes = b
 	return payload, nil
-}
-
-// initialize recalculates the result of Bytes().
-func (a *AddressedCall) initialize() error {
-	payloadIntf := any(a)
-	bytes, err := c.Marshal(codecVersion, &payloadIntf)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal warp addressed payload: %w", err)
-	}
-	a.bytes = bytes
-	return nil
-}
-
-func (a *AddressedCall) setBytes(bytes []byte) {
-	a.bytes = bytes
 }
 
 // Bytes returns the binary representation of this payload. It assumes that the
 // payload is initialized from either NewAddressedCall or ParseAddressedCall.
 func (a *AddressedCall) Bytes() []byte {
 	return a.bytes
+}
+
+func (a *AddressedCall) initialize(bytes []byte) {
+	a.bytes = bytes
 }

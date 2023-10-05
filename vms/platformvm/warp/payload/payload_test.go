@@ -44,7 +44,7 @@ func TestParseAddressedCall(t *testing.T) {
 		Payload:       []byte{10, 11, 12},
 	}
 
-	require.NoError(payload.initialize())
+	require.NoError(initialize(payload))
 
 	require.Equal(base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
 
@@ -78,7 +78,7 @@ func TestParseBlockHash(t *testing.T) {
 		BlockHash: ids.ID{4, 5, 6},
 	}
 
-	require.NoError(payload.initialize())
+	require.NoError(initialize(payload))
 
 	require.Equal(base64Payload, base64.StdEncoding.EncodeToString(payload.Bytes()))
 
@@ -119,7 +119,7 @@ func TestParsePayload(t *testing.T) {
 		BlockHash: ids.ID{4, 5, 6},
 	}
 
-	require.NoError(blockHashPayload.initialize())
+	require.NoError(initialize(blockHashPayload))
 
 	require.Equal(base64BlockHashPayload, base64.StdEncoding.EncodeToString(blockHashPayload.Bytes()))
 
@@ -133,7 +133,7 @@ func TestParsePayload(t *testing.T) {
 		Payload:       []byte{10, 11, 12},
 	}
 
-	require.NoError(addressedPayload.initialize())
+	require.NoError(initialize(addressedPayload))
 
 	require.Equal(base64AddressedPayload, base64.StdEncoding.EncodeToString(addressedPayload.Bytes()))
 

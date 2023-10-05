@@ -4,16 +4,11 @@
 package payload
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
-
-var errWrongType = errors.New("wrong payload type")
 
 const (
 	codecVersion = 0
@@ -22,7 +17,7 @@ const (
 
 	// Note: Modifying this variable can have subtle implications on memory
 	// usage when parsing malformed payloads.
-	MaxSliceLen = 24 * units.KiB
+	MaxSliceLen = 24 * 1024
 )
 
 // Codec does serialization and deserialization for Warp messages.
@@ -41,24 +36,4 @@ func init() {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-}
-
-// byteSetter provides an interface to set the bytes of an underlying type to [b]
-// after unmarshalling into that type.
-type byteSetter interface {
-	setBytes(b []byte)
-}
-
-func Parse(bytes []byte) (byteSetter, error) {
-	var intf interface{}
-	if _, err := c.Unmarshal(bytes, &intf); err != nil {
-		return nil, err
-	}
-
-	payload, ok := intf.(byteSetter)
-	if !ok {
-		return nil, fmt.Errorf("%w: %T", errWrongType, intf)
-	}
-	payload.setBytes(bytes)
-	return payload, nil
 }
