@@ -60,18 +60,21 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 	require.Equal(Red, sf.Preference())
 	require.False(sf.Finalized())
 
-	for i := 0; i < 3; i++ {
+	// Increase Blue's confidence without finalizing
+	for i := 0; i < betaRogue-1; i++ {
 		sf.RecordSuccessfulPoll(Blue)
 		require.Equal(Blue, sf.Preference())
 		require.False(sf.Finalized())
 	}
 
-	for i := 0; i < 3; i++ {
+	// Increase Red's confidence without finalizing
+	for i := 0; i < betaRogue-1; i++ {
 		sf.RecordSuccessfulPoll(Red)
 		require.Equal(Red, sf.Preference())
 		require.False(sf.Finalized())
 	}
 
+	// One more round of voting for Red should accept Red
 	sf.RecordSuccessfulPoll(Red)
 	require.Equal(Red, sf.Preference())
 	require.True(sf.Finalized())

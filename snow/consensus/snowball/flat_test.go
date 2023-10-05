@@ -43,6 +43,7 @@ func TestFlat(t *testing.T) {
 	require.Equal(Green, f.Preference())
 	require.False(f.Finalized())
 
+	// Reset the confidence from previous round
 	oneEach := bag.Of(Red, Green, Blue)
 	require.False(f.RecordPoll(oneEach))
 	require.Equal(Green, f.Preference())
@@ -50,7 +51,7 @@ func TestFlat(t *testing.T) {
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())
-	require.False(f.Finalized())
+	require.False(f.Finalized()) // Not finalized before BetaRogue rounds
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())

@@ -414,22 +414,20 @@ func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 		u.shouldReset = true // Make sure my child is also reset correctly
 	}
 
-	numVotes := votes.Len()
-	if numVotes < u.tree.params.AlphaPreference {
+	switch numVotes := votes.Len(); {
+	case numVotes >= u.tree.params.AlphaConfidence:
+		// I got enough votes to increase my confidence
+		u.snowball.RecordSuccessfulPoll()
+	case numVotes >= u.tree.params.AlphaPreference:
+		// I got enough votes to update my preference, but not increase my
+		// confidence.
+		u.snowball.RecordPollPreference()
+	default:
 		// I didn't get enough votes, I must reset and my child must reset as
 		// well
 		u.snowball.RecordUnsuccessfulPoll()
 		u.shouldReset = true
 		return u, false
-	}
-
-	if numVotes < u.tree.params.AlphaConfidence {
-		// I got enough votes to update my preference, but not increase my
-		// confidence.
-		u.snowball.RecordPollPreference()
-	} else {
-		// I got enough votes to increase my confidence
-		u.snowball.RecordSuccessfulPoll()
 	}
 
 	if u.child != nil {
@@ -541,21 +539,19 @@ func (b *binaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) 
 	b.shouldReset[1-bit] = true // They didn't get the threshold of votes
 
 	prunedVotes := splitVotes[bit]
-	numVotes := prunedVotes.Len()
-	if numVotes < b.tree.params.AlphaPreference {
+	switch numVotes := prunedVotes.Len(); {
+	case numVotes >= b.tree.params.AlphaConfidence:
+		// I got enough votes to increase my confidence.
+		b.snowball.RecordSuccessfulPoll(bit)
+	case numVotes >= b.tree.params.AlphaPreference:
+		// I got enough votes to update my preference, but not increase my
+		// confidence.
+		b.snowball.RecordPollPreference(bit)
+	default:
 		b.snowball.RecordUnsuccessfulPoll()
 		// The winning child didn't get enough votes either
 		b.shouldReset[bit] = true
 		return b, false
-	}
-
-	if numVotes < b.tree.params.AlphaConfidence {
-		// I got enough votes to update my preference, but not increase my
-		// confidence.
-		b.snowball.RecordPollPreference(bit)
-	} else {
-		// I got enough votes to increase my confidence.
-		b.snowball.RecordSuccessfulPoll(bit)
 	}
 
 	if child := b.children[bit]; child != nil {
