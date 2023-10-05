@@ -47,7 +47,7 @@ var (
 	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
-func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO, startTime *time.Time) *VM { //nolint:unparam
+func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO, startTime *time.Time) *VM {
 	vm := &VM{Config: defaultCaminoConfig(true)}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)

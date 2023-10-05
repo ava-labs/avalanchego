@@ -12,13 +12,18 @@ import (
 )
 
 var (
+	errEndNotAfterStart           = errors.New("proposal end-time is not after start-time")
 	ErrWrongVote                  = errors.New("this proposal can't be voted with this vote")
 	ErrNotAllowedToVoteOnProposal = errors.New("this address has already voted or not allowed to vote on this proposal")
 )
 
-type VerifierVisitor interface{}
+type VerifierVisitor interface {
+	BaseFeeProposal(*BaseFeeProposal) error
+}
 
-type ExecutorVisitor interface{}
+type ExecutorVisitor interface {
+	BaseFeeProposal(*BaseFeeProposalState) error
+}
 
 type Proposal interface {
 	verify.Verifiable

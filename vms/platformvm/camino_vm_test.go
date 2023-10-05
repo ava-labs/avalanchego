@@ -21,8 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -528,6 +530,200 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
+func TestProposals(t *testing.T) {
+	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	require.NoError(t, err)
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	require.NoError(t, err)
+
+	defaultConfig := defaultCaminoConfig(true)
+	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
+	newFee := (defaultTxFee + 7) * 10
+
+	type vote struct {
+		option  uint32
+		success bool // proposal is successful after this vote
+	}
+
+	tests := map[string]struct {
+		feeOptions    []uint64
+		winningOption uint32
+		earlyFinish   bool
+		votes         []vote // no more than 5 votes, cause we have only 5 validators
+	}{
+		"Early success: 1|3 votes": {
+			feeOptions:    []uint64{1, newFee},
+			winningOption: 1,
+			earlyFinish:   true,
+			votes: []vote{
+				{option: 1},
+				{option: 1},
+				{option: 0, success: true},
+				{option: 1, success: true},
+			},
+		},
+		"Early fail: 2|2|1 votes, not reaching mostVoted threshold and being ambiguous": {
+			feeOptions:  []uint64{1, 2, 3},
+			earlyFinish: true,
+			votes: []vote{
+				{option: 0},
+				{option: 0},
+				{option: 1, success: true},
+				{option: 1},
+				{option: 2},
+			},
+		},
+		"Success: 0|2|1 votes": {
+			feeOptions:    []uint64{1, newFee, 17},
+			winningOption: 1,
+			votes: []vote{
+				{option: 1},
+				{option: 1},
+				{option: 2, success: true},
+			},
+		},
+		"Fail: 0 votes": {
+			feeOptions: []uint64{1},
+			votes:      []vote{},
+		},
+		"Fail: 2|1|1 votes, not reaching mostVoted threshold": {
+			feeOptions: []uint64{1, 2, 3},
+			votes: []vote{
+				{option: 0},
+				{option: 0},
+				{option: 1, success: true},
+				{option: 2},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			balance := proposalBondAmount + defaultTxFee*(uint64(len(tt.votes))+1) + newFee
+
+			// Prepare vm
+			vm := newCaminoVM(api.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				InitialAdmin:        caminoPreFundedKeys[0].Address(),
+			}, []api.UTXO{
+				{
+					Amount:  json.Uint64(balance),
+					Address: proposerAddrStr,
+				},
+				{
+					Amount:  json.Uint64(defaultTxFee),
+					Address: caminoPreFundedKey0AddrStr,
+				},
+			}, &defaultConfig.BanffTime)
+			vm.ctx.Lock.Lock()
+			defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+			checkBalance(t, vm.state, proposerAddr,
+				balance,          // total
+				0, 0, 0, balance, // unlocked
+			)
+
+			fee := defaultTxFee
+			burnedAmt := uint64(0)
+
+			// Give proposer address role to make proposals
+			addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+				proposerAddr,
+				false,
+				txs.AddressStateBitCaminoProposer,
+				[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+				nil,
+			)
+			require.NoError(err)
+			blk := buildAndAcceptBlock(t, vm, addrStateTx)
+			require.Len(blk.Txs(), 1)
+			checkTx(t, vm, blk.ID(), addrStateTx.ID())
+
+			// Add proposal
+			chainTime := vm.state.GetTimestamp()
+			proposalTx := buildBaseFeeProposalTx(t, vm, proposerKey, proposalBondAmount, fee,
+				proposerKey, tt.feeOptions, chainTime.Add(100*time.Second), chainTime.Add(200*time.Second))
+			proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish := makeProposalWithTx(t, vm, proposalTx)
+			require.EqualValues(5, proposalState.TotalAllowedVoters)          // all 5 validators must vote
+			require.Equal([]ids.ID{proposalTx.ID()}, nextProposalIDsToExpire) // we have only one proposal
+			require.Equal(proposalState.EndTime(), nexExpirationTime)
+			require.Empty(proposalIDsToFinish) // no early-finished proposals
+			burnedAmt += fee
+			checkBalance(t, vm.state, proposerAddr,
+				balance-burnedAmt,                          // total
+				proposalBondAmount,                         // bonded
+				0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
+			)
+
+			// Fast-forward clock to time a bit forward, but still before proposals start
+			// Try to vote on proposal, expect to fail
+			vm.clock.Set(proposalState.StartTime().Add(-time.Second))
+			addVoteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[0], 0)
+			require.Error(vm.Builder.AddUnverifiedTx(addVoteTx))
+			vm.clock.Set(proposalState.StartTime())
+
+			optionWeights := make([]uint32, len(proposalState.Options))
+			for i, vote := range tt.votes {
+				optionWeights[vote.option]++
+				voteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[i], vote.option)
+				proposalIDsToFinish, proposalState = voteOnBaseFeeWithTx(t, vm, voteTx, proposalTx.ID(), optionWeights)
+				if tt.earlyFinish && i == len(tt.votes)-1 {
+					require.Equal([]ids.ID{proposalTx.ID()}, proposalIDsToFinish) // proposal has finished early
+				} else {
+					require.Empty(proposalIDsToFinish) // no early-finished proposals
+				}
+				nextProposalIDsToExpire, nexExpirationTime, err := vm.state.GetNextToExpireProposalIDsAndTime(nil)
+				require.NoError(err)
+				require.Equal([]ids.ID{proposalTx.ID()}, nextProposalIDsToExpire)
+				require.Equal(proposalState.EndTime(), nexExpirationTime)
+				require.Equal(tt.earlyFinish && i == len(tt.votes)-1, proposalState.CanBeFinished())
+				require.Equal(vote.success, proposalState.IsSuccessful())
+				burnedAmt += fee
+				checkBalance(t, vm.state, proposerAddr,
+					balance-burnedAmt,                          // total
+					proposalBondAmount,                         // bonded
+					0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
+				)
+			}
+
+			if !tt.earlyFinish { // no early finish
+				vm.clock.Set(proposalState.EndTime())
+			}
+
+			blk = buildAndAcceptBlock(t, vm, nil)
+			require.Len(blk.Txs(), 1)
+			checkTx(t, vm, blk.ID(), blk.Txs()[0].ID())
+			_, err = vm.state.GetProposal(proposalTx.ID())
+			require.ErrorIs(err, database.ErrNotFound)
+			_, _, err = vm.state.GetNextToExpireProposalIDsAndTime(nil)
+			require.ErrorIs(err, database.ErrNotFound)
+			proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
+			require.NoError(err)
+			require.Empty(proposalIDsToFinish)
+			checkBalance(t, vm.state, proposerAddr,
+				balance-burnedAmt,          // total
+				0, 0, 0, balance-burnedAmt, // unlocked
+			)
+
+			if len(tt.votes) != 0 && tt.votes[len(tt.votes)-1].success { // last vote
+				fee = tt.feeOptions[tt.winningOption]
+				baseFee, err := vm.state.GetBaseFee()
+				require.NoError(err)
+				require.Equal(fee, baseFee) // fee has changed
+			}
+
+			// Create arbitrary tx to verify which fee is used
+			buildAndAcceptBaseTx(t, vm, proposerKey, fee)
+			burnedAmt += fee
+			checkBalance(t, vm.state, proposerAddr,
+				balance-burnedAmt,          // total
+				0, 0, 0, balance-burnedAmt, // unlocked
+			)
+		})
+	}
+}
+
 func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
 	t.Helper()
 	if tx != nil {
@@ -555,4 +751,211 @@ func getUnlockedBalance(t *testing.T, db avax.UTXOReader, addr ids.ShortID) uint
 		}
 	}
 	return balance
+}
+
+func getBalance(t *testing.T, db avax.UTXOReader, addr ids.ShortID) (total, bonded, deposited, depositBonded, unlocked uint64) {
+	t.Helper()
+	utxos, err := avax.GetAllUTXOs(db, set.Set[ids.ShortID]{addr: struct{}{}})
+	require.NoError(t, err)
+	for _, utxo := range utxos {
+		if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); ok {
+			unlocked += out.Amount()
+			total += out.Amount()
+		} else {
+			out, ok := utxo.Out.(*locked.Out)
+			require.True(t, ok)
+			switch out.LockState() {
+			case locked.StateDepositedBonded:
+				depositBonded += out.Amount()
+			case locked.StateDeposited:
+				deposited += out.Amount()
+			case locked.StateBonded:
+				bonded += out.Amount()
+			}
+			total += out.Amount()
+		}
+	}
+	return
+}
+
+func checkBalance(
+	t *testing.T, db avax.UTXOReader, addr ids.ShortID,
+	expectedTotal, expectedBonded, expectedDeposited, expectedDepositBonded, expectedUnlocked uint64, //nolint:unparam
+) {
+	t.Helper()
+	total, bonded, deposited, depositBonded, unlocked := getBalance(t, db, addr)
+	require.Equal(t, expectedTotal, total)
+	require.Equal(t, expectedBonded, bonded)
+	require.Equal(t, expectedDeposited, deposited)
+	require.Equal(t, expectedDepositBonded, depositBonded)
+	require.Equal(t, expectedUnlocked, unlocked)
+}
+
+func checkTx(t *testing.T, vm *VM, blkID, txID ids.ID) {
+	t.Helper()
+	state, ok := vm.manager.GetState(blkID)
+	require.True(t, ok)
+	_, txStatus, err := state.GetTx(txID)
+	require.NoError(t, err)
+	require.Equal(t, status.Committed, txStatus)
+	_, txStatus, err = vm.state.GetTx(txID)
+	require.NoError(t, err)
+	require.Equal(t, status.Committed, txStatus)
+}
+
+func buildBaseFeeProposalTx(
+	t *testing.T,
+	vm *VM,
+	fundsKey *secp256k1.PrivateKey,
+	amountToBond uint64,
+	amountToBurn uint64,
+	proposerKey *secp256k1.PrivateKey,
+	options []uint64,
+	startTime time.Time,
+	endTime time.Time,
+) *txs.Tx {
+	t.Helper()
+	ins, outs, signers, _, err := vm.txBuilder.Lock(
+		vm.state,
+		[]*secp256k1.PrivateKey{fundsKey},
+		amountToBond,
+		amountToBurn,
+		locked.StateBonded,
+		nil, nil, 0,
+	)
+	require.NoError(t, err)
+	proposal := &txs.ProposalWrapper{Proposal: &dac.BaseFeeProposal{
+		Start:   uint64(startTime.Unix()),
+		End:     uint64(endTime.Unix()),
+		Options: options,
+	}}
+	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
+	require.NoError(t, err)
+	proposalTx, err := txs.NewSigned(&txs.AddProposalTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		ProposalPayload: proposalBytes,
+		ProposerAddress: proposerKey.Address(),
+		ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+	}, txs.Codec, append(signers, []*secp256k1.PrivateKey{proposerKey}))
+	require.NoError(t, err)
+	return proposalTx
+}
+
+func makeProposalWithTx(
+	t *testing.T,
+	vm *VM,
+	tx *txs.Tx,
+) (
+	proposal *dac.BaseFeeProposalState,
+	nextProposalIDsToExpire []ids.ID,
+	nexExpirationTime time.Time,
+	proposalIDsToFinish []ids.ID,
+) {
+	t.Helper()
+	blk := buildAndAcceptBlock(t, vm, tx)
+	require.Len(t, blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), tx.ID())
+	proposalState, err := vm.state.GetProposal(tx.ID())
+	require.NoError(t, err)
+	baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
+	require.True(t, ok)
+	nextProposalIDsToExpire, nexExpirationTime, err = vm.state.GetNextToExpireProposalIDsAndTime(nil)
+	require.NoError(t, err)
+	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
+	require.NoError(t, err)
+	return baseFeeProposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish
+}
+
+func buildSimpleVoteTx(
+	t *testing.T,
+	vm *VM,
+	fundsKey *secp256k1.PrivateKey,
+	amountToBurn uint64,
+	proposalID ids.ID,
+	voterKey *secp256k1.PrivateKey,
+	votedOption uint32,
+) *txs.Tx {
+	t.Helper()
+	ins, outs, signers, _, err := vm.txBuilder.Lock(
+		vm.state,
+		[]*secp256k1.PrivateKey{fundsKey},
+		0,
+		amountToBurn,
+		locked.StateUnlocked,
+		nil, nil, 0,
+	)
+	require.NoError(t, err)
+	voteBytes, err := txs.Codec.Marshal(txs.Version, &txs.VoteWrapper{Vote: &dac.SimpleVote{OptionIndex: votedOption}})
+	require.NoError(t, err)
+	addVoteTx, err := txs.NewSigned(&txs.AddVoteTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		ProposalID:   proposalID,
+		VotePayload:  voteBytes,
+		VoterAddress: voterKey.Address(),
+		VoterAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+	}, txs.Codec, append(signers, []*secp256k1.PrivateKey{voterKey}))
+	require.NoError(t, err)
+	return addVoteTx
+}
+
+func voteOnBaseFeeWithTx(
+	t *testing.T,
+	vm *VM,
+	tx *txs.Tx,
+	proposalID ids.ID,
+	expectedVoteWeights []uint32,
+) (proposalIDsToFinish []ids.ID, baseFeeProposalState *dac.BaseFeeProposalState) {
+	t.Helper()
+	blk := buildAndAcceptBlock(t, vm, tx)
+	require.Len(t, blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), tx.ID())
+	proposalState, err := vm.state.GetProposal(proposalID)
+	require.NoError(t, err)
+	baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
+	require.True(t, ok)
+	require.Len(t, baseFeeProposalState.Options, len(expectedVoteWeights))
+	for i := range baseFeeProposalState.Options {
+		require.Equal(t, expectedVoteWeights[i], baseFeeProposalState.Options[i].Weight)
+	}
+	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
+	require.NoError(t, err)
+	return proposalIDsToFinish, baseFeeProposalState
+}
+
+func buildAndAcceptBaseTx(
+	t *testing.T,
+	vm *VM,
+	fundsKey *secp256k1.PrivateKey,
+	amountToBurn uint64,
+) {
+	t.Helper()
+	ins, outs, signers, _, err := vm.txBuilder.Lock(
+		vm.state,
+		[]*secp256k1.PrivateKey{fundsKey},
+		0,
+		amountToBurn,
+		locked.StateUnlocked,
+		nil, nil, 0,
+	)
+	require.NoError(t, err)
+	feeTestingTx, err := txs.NewSigned(&txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    vm.ctx.NetworkID,
+		BlockchainID: vm.ctx.ChainID,
+		Ins:          ins,
+		Outs:         outs,
+	}}, txs.Codec, signers)
+	require.NoError(t, err)
+	blk := buildAndAcceptBlock(t, vm, feeTestingTx)
+	require.Len(t, blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), feeTestingTx.ID())
 }

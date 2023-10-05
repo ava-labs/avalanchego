@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -348,7 +349,7 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 	return generateTestUTXOWithIndex(txID, 0, assetID, amount, outputOwners, depositTxID, bondTxID, true)
 }
 
-func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID, init bool) *avax.UTXO {
+func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID, init bool) *avax.UTXO { //nolint:unparam
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
 		OutputOwners: outputOwners,
@@ -374,6 +375,34 @@ func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amo
 		testUTXO.InputID()
 	}
 	return testUTXO
+}
+
+func generateTestOutFromUTXO(utxo *avax.UTXO, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
+	out := utxo.Out
+	if lockedOut, ok := out.(*locked.Out); ok {
+		out = lockedOut.TransferableOut
+	}
+	secpOut, ok := out.(*secp256k1fx.TransferOutput)
+	if !ok {
+		panic("not secp out")
+	}
+	var innerOut avax.TransferableOut = &secp256k1fx.TransferOutput{
+		Amt:          secpOut.Amt,
+		OutputOwners: secpOut.OutputOwners,
+	}
+	if depositTxID != ids.Empty || bondTxID != ids.Empty {
+		innerOut = &locked.Out{
+			IDs: locked.IDs{
+				DepositTxID: depositTxID,
+				BondTxID:    bondTxID,
+			},
+			TransferableOut: innerOut,
+		}
+	}
+	return &avax.TransferableOutput{
+		Asset: avax.Asset{ID: utxo.AssetID()},
+		Out:   innerOut,
+	}
 }
 
 func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
@@ -705,6 +734,36 @@ func expectVerifyUnlockDeposit(
 	t.Helper()
 	expectGetUTXOsFromInputs(t, s, ins, utxos)
 	expectGetMultisigAliases(t, s, addrs, aliases)
+}
+
+func expectUnlock(
+	t *testing.T,
+	s *state.MockDiff,
+	lockTxIDs []ids.ID,
+	addrs []ids.ShortID,
+	utxos []*avax.UTXO,
+	removedLockState locked.State, //nolint:unparam
+) {
+	t.Helper()
+	lockTxIDsSet := set.NewSet[ids.ID](len(lockTxIDs))
+	addrsSet := set.NewSet[ids.ShortID](len(addrs))
+	lockTxIDsSet.Add(lockTxIDs...)
+	addrsSet.Add(addrs...)
+	for _, txID := range lockTxIDs {
+		s.EXPECT().GetTx(txID).Return(&txs.Tx{
+			Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+				Outs: []*avax.TransferableOutput{{
+					Out: &locked.Out{
+						IDs: locked.IDsEmpty.Lock(removedLockState),
+						TransferableOut: &secp256k1fx.TransferOutput{
+							OutputOwners: secp256k1fx.OutputOwners{Addrs: addrs},
+						},
+					},
+				}},
+			}},
+		}, status.Committed, nil)
+	}
+	s.EXPECT().LockedUTXOs(lockTxIDsSet, addrsSet, removedLockState).Return(utxos, nil)
 }
 
 func expectGetUTXOsFromInputs(t *testing.T, s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {

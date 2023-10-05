@@ -74,6 +74,10 @@ type CaminoApply interface {
 }
 
 type CaminoDiff interface {
+	// Singletones
+	GetBaseFee() (uint64, error)
+	SetBaseFee(uint64)
+
 	// Address State
 
 	SetAddressStates(ids.ShortID, txs.AddressState)

@@ -181,3 +181,11 @@ func (s *state) GetNextProposalExpirationTime(removedProposalIDs set.Set[ids.ID]
 func (s *state) GetProposalIterator() (ProposalsIterator, error) {
 	return s.caminoState.GetProposalIterator()
 }
+
+func (s *state) GetBaseFee() (uint64, error) {
+	return s.caminoState.GetBaseFee()
+}
+
+func (s *state) SetBaseFee(baseFee uint64) {
+	s.caminoState.SetBaseFee(baseFee)
+}

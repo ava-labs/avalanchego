@@ -617,10 +617,30 @@ func (it *diffProposalsIterator) key() (ids.ID, error) {
 	return it.parentIterator.key() // err should never happen
 }
 
+func (d *diff) GetBaseFee() (uint64, error) {
+	if d.caminoDiff.modifiedBaseFee != nil {
+		return *d.caminoDiff.modifiedBaseFee, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetBaseFee()
+}
+
+func (d *diff) SetBaseFee(baseFee uint64) {
+	d.caminoDiff.modifiedBaseFee = &baseFee
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
 		baseState.SetNotDistributedValidatorReward(*d.caminoDiff.modifiedNotDistributedValidatorReward)
+	}
+	if d.caminoDiff.modifiedBaseFee != nil {
+		baseState.SetBaseFee(*d.caminoDiff.modifiedBaseFee)
 	}
 
 	for k, v := range d.caminoDiff.modifiedAddressStates {

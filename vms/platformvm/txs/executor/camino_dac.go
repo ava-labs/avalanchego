@@ -4,6 +4,8 @@
 package executor
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -13,6 +15,9 @@ import (
 var (
 	_ dac.VerifierVisitor = (*proposalVerifier)(nil)
 	_ dac.ExecutorVisitor = (*proposalExecutor)(nil)
+
+	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
+	errAlreadyActiveProposal        = errors.New("there is already active proposal of this type")
 )
 
 type proposalVerifier struct {
@@ -43,4 +48,47 @@ func (e *CaminoStandardTxExecutor) proposalVerifier(tx *txs.AddProposalTx) *prop
 
 func (e *CaminoStandardTxExecutor) proposalExecutor() *proposalExecutor {
 	return &proposalExecutor{state: e.State, fx: e.Fx}
+}
+
+// BaseFeeProposal
+
+func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
+	// verify address state (role)
+	proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
+	if err != nil {
+		return err
+	}
+
+	if proposerAddressState.IsNot(txs.AddressStateCaminoProposer) {
+		return errNotPermittedToCreateProposal
+	}
+
+	// verify that there is no existing base fee proposal
+	proposalsIterator, err := e.state.GetProposalIterator()
+	if err != nil {
+		return err
+	}
+	defer proposalsIterator.Release()
+	for proposalsIterator.Next() {
+		proposal, err := proposalsIterator.Value()
+		if err != nil {
+			return err
+		}
+		if _, ok := proposal.(*dac.BaseFeeProposalState); ok {
+			return errAlreadyActiveProposal
+		}
+	}
+
+	if err := proposalsIterator.Error(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// should never error
+func (e *proposalExecutor) BaseFeeProposal(proposal *dac.BaseFeeProposalState) error {
+	_, mostVotedOptionIndex, _ := proposal.GetMostVoted()
+	e.state.SetBaseFee(proposal.Options[mostVotedOptionIndex].Value)
+	return nil
 }

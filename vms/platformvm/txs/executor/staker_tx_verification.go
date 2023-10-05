@@ -299,6 +299,11 @@ func removeSubnetValidatorValidation(
 		return nil, false, err
 	}
 
+	fee, err := chainState.GetBaseFee()
+	if err != nil {
+		return nil, false, err
+	}
+
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -307,7 +312,7 @@ func removeSubnetValidatorValidation(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %v", errFlowCheckFailed, err)

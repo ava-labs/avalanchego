@@ -175,6 +175,11 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
+		fee, err := e.State.GetBaseFee()
+		if err != nil {
+			return err
+		}
+
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			e.State,
 			tx,
@@ -183,7 +188,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
+				e.Ctx.AVAXAssetID: fee,
 			},
 		); err != nil {
 			return err
@@ -220,6 +225,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		}
 	}
 
+	fee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	// Verify the flowcheck
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -228,7 +238,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)

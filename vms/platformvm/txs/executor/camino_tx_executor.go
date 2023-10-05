@@ -738,6 +738,11 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return err
 	}
 
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -745,7 +750,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		tx.Outs,
 		baseTxCreds,
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateDeposited,
 	); err != nil {
@@ -864,7 +869,11 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 
 	amountToBurn := uint64(0)
 	if !hasExpiredDeposits {
-		amountToBurn = e.Config.TxFee
+		baseFee, err := e.State.GetBaseFee()
+		if err != nil {
+			return err
+		}
+		amountToBurn = baseFee
 	}
 
 	if err := e.FlowChecker.VerifyUnlockDeposit(
@@ -1109,6 +1118,11 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 	}
 
 	// BaseTx check (fee, reward outs)
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1116,7 +1130,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-len(tx.Claimables)],
 		claimedAmount,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
@@ -1211,6 +1225,11 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	}
 
 	// verify the flowcheck
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1218,7 +1237,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-2], // base tx creds
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
@@ -1456,6 +1475,11 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	if e.Bootstrapped.Get() {
+		baseFee, err := e.State.GetBaseFee()
+		if err != nil {
+			return err
+		}
+
 		if err := e.FlowChecker.VerifyLock(
 			tx,
 			e.State,
@@ -1463,7 +1487,7 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			0,
-			e.Config.TxFee,
+			baseFee,
 			e.Ctx.AVAXAssetID,
 			locked.StateUnlocked,
 		); err != nil {
@@ -1530,6 +1554,11 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 	}
 
 	// verify the flowcheck
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1537,7 +1566,7 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		tx.Outs,
 		baseCreds,
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
@@ -1579,6 +1608,11 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 	}
 
 	// verify the flowcheck
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1586,7 +1620,7 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx credentials
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
@@ -1716,6 +1750,12 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 
 	// verify the flowcheck
 
+	lockState := locked.StateBonded
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1723,9 +1763,9 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx creds
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
-		locked.StateBonded,
+		lockState,
 	); err != nil {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
@@ -1829,6 +1869,12 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 	}
 
 	// verify the flowcheck
+
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -1836,7 +1882,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx creds
 		0,
-		e.Config.TxFee,
+		baseFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
@@ -2149,6 +2195,11 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 
 	// Verify the flowcheck
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -2156,7 +2207,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		tx.Outs,
 		creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: baseFee,
 		},
 	); err != nil {
 		return err
