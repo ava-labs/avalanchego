@@ -444,9 +444,11 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
-		vm.ctx.Log.Info("state pruning finished",
-			zap.Error(err),
-		)
+		if err != nil {
+			vm.ctx.Log.Warn("state pruning failed",
+				zap.Error(err),
+			)
+		}
 	}()
 
 	return nil
