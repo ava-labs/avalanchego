@@ -445,7 +445,11 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
 		if err != nil {
-			vm.ctx.Log.Error("state pruning failed",
+			// It isn't easy to allow cancelling Prune, because Shutdown is
+			// called with the context lock held and Prune may be blocked on
+			// acquiring the context lock. So, it is expected that Prune may
+			// return an error during VM shutdown.
+			vm.ctx.Log.Debug("state pruning failed",
 				zap.Error(err),
 			)
 		}
