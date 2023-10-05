@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -133,7 +134,7 @@ func TestSendWarpMessage(t *testing.T) {
 				require.Len(t, logsData, 1)
 				logData := logsData[0]
 
-				unsignedWarpMsg, err := avalancheWarp.ParseUnsignedMessage(logData)
+				unsignedWarpMsg, err := UnpackSendWarpEventDataToMessage(logData)
 				require.NoError(t, err)
 				addressedPayload, err := warpPayload.ParseAddressedPayload(unsignedWarpMsg.Payload)
 				require.NoError(t, err)
@@ -675,4 +676,34 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 	}
 
 	testutils.RunPrecompileTests(t, Module, state.NewTestStateDB, tests)
+}
+
+func TestPackEvents(t *testing.T) {
+	sourceChainID := ids.GenerateTestID()
+	sourceAddress := common.HexToAddress("0x0123")
+	payload := []byte("mcsorley")
+	networkID := uint32(54321)
+
+	addressedPayload, err := warpPayload.NewAddressedPayload(
+		sourceAddress,
+		payload,
+	)
+	require.NoError(t, err)
+
+	unsignedWarpMessage, err := warp.NewUnsignedMessage(
+		networkID,
+		sourceChainID,
+		addressedPayload.Bytes(),
+	)
+	require.NoError(t, err)
+
+	_, data, err := PackSendWarpMessageEvent(
+		sourceAddress,
+		unsignedWarpMessage.Bytes(),
+	)
+	require.NoError(t, err)
+
+	unpacked, err := UnpackSendWarpEventDataToMessage(data)
+	require.NoError(t, err)
+	require.Equal(t, unsignedWarpMessage.Bytes(), unpacked.Bytes())
 }

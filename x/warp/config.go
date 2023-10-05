@@ -104,7 +104,7 @@ func (c *Config) Equal(s precompileconfig.Config) bool {
 }
 
 func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error {
-	unsignedMessage, err := warp.ParseUnsignedMessage(logData)
+	unsignedMessage, err := UnpackSendWarpEventDataToMessage(logData)
 	if err != nil {
 		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}

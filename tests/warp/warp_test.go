@@ -232,7 +232,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		// the log extracted from the last block.
 		txLog := logs[0]
 		log.Info("Parsing logData as unsigned warp message")
-		unsignedMsg, err := avalancheWarp.ParseUnsignedMessage(txLog.Data)
+		unsignedMsg, err := warp.UnpackSendWarpEventDataToMessage(txLog.Data)
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		// Set local variables for the duration of the test

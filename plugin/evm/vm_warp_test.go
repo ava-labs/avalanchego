@@ -96,7 +96,7 @@ func TestSendWarpMessage(t *testing.T) {
 	}
 	require.Equal(expectedTopics, receipts[0].Logs[0].Topics)
 	logData := receipts[0].Logs[0].Data
-	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(logData)
+	unsignedMessage, err := warp.UnpackSendWarpEventDataToMessage(logData)
 	require.NoError(err)
 	unsignedMessageID := unsignedMessage.ID()
 
