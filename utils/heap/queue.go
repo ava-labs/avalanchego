@@ -20,7 +20,7 @@ func NewQueue[T any](less func(a, b T) bool) Queue[T] {
 func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
 	q := Queue[T]{
 		queue: &queue[T]{
-			entries: make([]T, 0, len(entries)),
+			entries: make([]T, len(entries)),
 			less:    less,
 		},
 	}
