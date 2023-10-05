@@ -58,7 +58,7 @@ message Message {
     AppGossip app_gossip = 32;
 
     PeerListAck peer_list_ack = 33;
-    AppError app_error = 34;
+    AppRequestFailed app_request_failed = 34;
   }
 }
 
@@ -350,10 +350,11 @@ message AppResponse {
   bytes app_bytes = 3;
 }
 
-message AppError {
+message AppRequestFailed {
   bytes chain_id = 1;
   uint32 request_id = 2;
-  string error = 3;
+  uint32 error_code = 3;
+  string error_message = 4;
 }
 
 message AppGossip {
