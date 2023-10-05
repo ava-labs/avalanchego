@@ -73,6 +73,7 @@ The plugin version is unchanged at `28` and compatible with versions `v1.10.9 - 
 - Add Warp Payload Types by @nytzuga in https://github.com/ava-labs/avalanchego/pull/2116
 - Add height voting for chits by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2102
 - Add Heap Queue by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2135
+- Add additional payload.Hash examples by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2145
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.11...v1.10.12
 
