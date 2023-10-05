@@ -4,12 +4,12 @@
 package heap
 
 import (
-	stdheap "container/heap"
+	"container/heap"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ stdheap.Interface = (*queue[int])(nil)
+var _ heap.Interface = (*queue[int])(nil)
 
 // NewQueue returns an empty heap. See QueueOf for more.
 func NewQueue[T any](less func(a, b T) bool) Queue[T] {
@@ -26,7 +26,7 @@ func QueueOf[T any](less func(a, b T) bool, entries ...T) Queue[T] {
 	}
 
 	copy(q.queue.entries, entries)
-	stdheap.Init(q.queue)
+	heap.Init(q.queue)
 	return q
 }
 
@@ -39,7 +39,7 @@ func (q *Queue[T]) Len() int {
 }
 
 func (q *Queue[T]) Push(t T) {
-	stdheap.Push(q.queue, t)
+	heap.Push(q.queue, t)
 }
 
 func (q *Queue[T]) Pop() (T, bool) {
@@ -47,7 +47,7 @@ func (q *Queue[T]) Pop() (T, bool) {
 		return utils.Zero[T](), false
 	}
 
-	return stdheap.Pop(q.queue).(T), true
+	return heap.Pop(q.queue).(T), true
 }
 
 func (q *Queue[T]) Peek() (T, bool) {
@@ -59,7 +59,7 @@ func (q *Queue[T]) Peek() (T, bool) {
 }
 
 func (q *Queue[T]) Fix(i int) {
-	stdheap.Fix(q.queue, i)
+	heap.Fix(q.queue, i)
 }
 
 type queue[T any] struct {
