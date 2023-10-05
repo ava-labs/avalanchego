@@ -26,6 +26,7 @@ type metrics struct {
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
 	getAncestorsBlks                      metric.Averager
+	selectedVoteIndex                     metric.Averager
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -104,6 +105,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		namespace,
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
+		reg,
+		&errs,
+	)
+	m.selectedVoteIndex = metric.NewAveragerWithErrs(
+		namespace,
+		"selected_vote_index",
+		"index of the voteID that was passed into consensus",
 		reg,
 		&errs,
 	)
