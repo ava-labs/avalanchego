@@ -458,7 +458,7 @@ func TestkeyBytesNeeded(t *testing.T) {
 	}
 }
 
-func FuzzkeyExtend(f *testing.F) {
+func FuzzKeyExtend(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
@@ -488,7 +488,7 @@ func FuzzkeyExtend(f *testing.F) {
 	})
 }
 
-func FuzzkeySkip(f *testing.F) {
+func FuzzKeySkip(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
@@ -509,7 +509,7 @@ func FuzzkeySkip(f *testing.F) {
 	})
 }
 
-func FuzzkeyTake(f *testing.F) {
+func FuzzKeyTake(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
