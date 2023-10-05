@@ -119,6 +119,13 @@ var (
 	}
 	AthensPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
 
+	BerlinPhaseTimes = map[uint32]time.Time{
+		constants.KopernikusID: time.Date(2023, time.July, 4, 13, 0, 0, 0, time.UTC),
+		constants.ColumbusID:   time.Date(2023, time.July, 7, 8, 0, 0, 0, time.UTC),
+		constants.CaminoID:     time.Date(2023, time.July, 17, 8, 0, 0, 0, time.UTC),
+	}
+	BerlinPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
+
 	// TODO: update this before release
 	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
@@ -202,6 +209,13 @@ func GetAthensPhaseTime(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return AthensPhaseDefaultTime
+}
+
+func GetBerlinPhaseTime(networkID uint32) time.Time {
+	if upgradeTime, exists := BerlinPhaseTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return BerlinPhaseDefaultTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {

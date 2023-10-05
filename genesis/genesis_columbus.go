@@ -40,7 +40,7 @@ var (
 				SupplyCap:          1000 * units.MegaAvax,
 			},
 			CaminoConfig: caminoconfig.Config{
-				DaoProposalBondAmount: 100 * units.Avax,
+				DACProposalBondAmount: 100 * units.Avax,
 			},
 		},
 	}

@@ -13,4 +13,7 @@ type CaminoVisitor interface {
 	BaseTx(*BaseTx) error
 	MultisigAliasTx(*MultisigAliasTx) error
 	AddDepositOfferTx(*AddDepositOfferTx) error
+	AddProposalTx(*AddProposalTx) error
+	AddVoteTx(*AddVoteTx) error
+	FinishProposalsTx(*FinishProposalsTx) error
 }

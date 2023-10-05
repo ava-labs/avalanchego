@@ -72,6 +72,7 @@ func caminoBuildBlock(
 		return nil, nil
 	}
 
+	// Ulocking expired deposits
 	depositsTxIDs, shouldUnlock, err := getNextDepositsToUnlock(parentState, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next deposits to unlock: %w", err)
@@ -87,6 +88,31 @@ func caminoBuildBlock(
 			parentID,
 			height,
 			[]*txs.Tx{unlockDepositTx},
+		)
+	}
+
+	// Finishing expired and early finished proposals
+	expiredProposalIDs, err := getExpiredProposals(parentState, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("could not find expired proposals: %w", err)
+	}
+	earlyFinishedProposalIDs, err := parentState.GetProposalIDsToFinish()
+	if err != nil {
+		return nil, fmt.Errorf("could not find successful proposals: %w", err)
+	}
+	if len(expiredProposalIDs) > 0 || len(earlyFinishedProposalIDs) > 0 {
+		finishProposalsTx, err := txBuilder.FinishProposalsTx(parentState, earlyFinishedProposalIDs, expiredProposalIDs)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to finish proposals: %w", err)
+		}
+
+		// FinishProposalsTx should never be in block with addVoteTx,
+		// because it can affect state of proposals.
+		return blocks.NewBanffStandardBlock(
+			timestamp,
+			parentID,
+			height,
+			[]*txs.Tx{finishProposalsTx},
 		)
 	}
 
@@ -132,4 +158,26 @@ func getNextDepositsToUnlock(
 	}
 
 	return nextDeposits, nextDepositsEndtime.Equal(chainTime), nil
+}
+
+func getExpiredProposals(
+	preferredState state.Chain,
+	chainTime time.Time,
+) ([]ids.ID, error) {
+	if !chainTime.Before(mockable.MaxTime) {
+		return nil, errEndOfTime
+	}
+
+	nextProposals, nextProposalsEndtime, err := preferredState.GetNextToExpireProposalIDsAndTime(nil)
+	if err == database.ErrNotFound {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if nextProposalsEndtime.Equal(chainTime) {
+		return nextProposals, nil
+	}
+
+	return nil, nil
 }

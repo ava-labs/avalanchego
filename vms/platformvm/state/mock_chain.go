@@ -16,6 +16,7 @@ import (
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	multisig "github.com/ava-labs/avalanchego/vms/components/multisig"
 	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	dac "github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -280,6 +281,36 @@ func (mr *MockChainMockRecorder) GetClaimable(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClaimable", reflect.TypeOf((*MockChain)(nil).GetClaimable), arg0)
 }
 
+// GetProposal mocks base method.
+func (m *MockChain) GetProposal(arg0 ids.ID) (dac.ProposalState, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProposal", arg0)
+	ret0, _ := ret[0].(dac.ProposalState)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProposal indicates an expected call of GetProposal.
+func (mr *MockChainMockRecorder) GetProposal(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProposal", reflect.TypeOf((*MockChain)(nil).GetProposal), arg0)
+}
+
+// GetBaseFee mocks base method.
+func (m *MockChain) GetBaseFee() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBaseFee")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBaseFee indicates an expected call of GetBaseFee.
+func (mr *MockChainMockRecorder) GetBaseFee() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBaseFee", reflect.TypeOf((*MockChain)(nil).GetBaseFee))
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -384,6 +415,67 @@ func (m *MockChain) GetNextToUnlockDepositIDsAndTime(arg0 set.Set[ids.ID]) ([]id
 func (mr *MockChainMockRecorder) GetNextToUnlockDepositIDsAndTime(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositIDsAndTime", reflect.TypeOf((*MockChain)(nil).GetNextToUnlockDepositIDsAndTime), arg0)
+}
+
+// GetNextProposalExpirationTime mocks base method.
+func (m *MockChain) GetNextProposalExpirationTime(arg0 set.Set[ids.ID]) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextProposalExpirationTime", arg0)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextProposalExpirationTime indicates an expected call of GetNextProposalExpirationTime.
+func (mr *MockChainMockRecorder) GetNextProposalExpirationTime(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextProposalExpirationTime", reflect.TypeOf((*MockChain)(nil).GetNextProposalExpirationTime), arg0)
+}
+
+// GetNextToExpireProposalIDsAndTime mocks base method.
+func (m *MockChain) GetNextToExpireProposalIDsAndTime(arg0 set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextToExpireProposalIDsAndTime", arg0)
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(time.Time)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetNextToExpireProposalIDsAndTime indicates an expected call of GetNextToExpireProposalIDsAndTime.
+func (mr *MockChainMockRecorder) GetNextToExpireProposalIDsAndTime(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToExpireProposalIDsAndTime", reflect.TypeOf((*MockChain)(nil).GetNextToExpireProposalIDsAndTime), arg0)
+}
+
+// GetProposalIDsToFinish mocks base method.
+func (m *MockChain) GetProposalIDsToFinish() ([]ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProposalIDsToFinish")
+	ret0, _ := ret[0].([]ids.ID)
+	ret2, _ := ret[1].(error)
+	return ret0, ret2
+}
+
+// GetProposalIDsToFinish indicates an expected call of GetProposalIDsToFinish.
+func (mr *MockChainMockRecorder) GetProposalIDsToFinish() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProposalIDsToFinish", reflect.TypeOf((*MockChain)(nil).GetProposalIDsToFinish))
+}
+
+// GetProposalIterator mocks base method.
+func (m *MockChain) GetProposalIterator() (ProposalsIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProposalIterator")
+	ret0, _ := ret[0].(ProposalsIterator)
+	ret2, _ := ret[1].(error)
+	return ret0, ret2
+}
+
+// GetProposalIterator indicates an expected call of GetProposalIterator.
+func (mr *MockChainMockRecorder) GetProposalIterator() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProposalIterator", reflect.TypeOf((*MockChain)(nil).GetProposalIterator))
 }
 
 // GetDepositOffer mocks base method.
@@ -720,6 +812,78 @@ func (m *MockChain) SetClaimable(arg0 ids.ID, arg1 *Claimable) {
 func (mr *MockChainMockRecorder) SetClaimable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetClaimable", reflect.TypeOf((*MockChain)(nil).SetClaimable), arg0, arg1)
+}
+
+// AddProposal mocks base method.
+func (m *MockChain) AddProposal(arg0 ids.ID, arg1 dac.ProposalState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddProposal", arg0, arg1)
+}
+
+// AddProposal indicates an expected call of AddProposal.
+func (mr *MockChainMockRecorder) AddProposal(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddProposal", reflect.TypeOf((*MockChain)(nil).AddProposal), arg0, arg1)
+}
+
+// ModifyProposal mocks base method.
+func (m *MockChain) ModifyProposal(arg0 ids.ID, arg1 dac.ProposalState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ModifyProposal", arg0, arg1)
+}
+
+// ModifyProposal indicates an expected call of ModifyProposal.
+func (mr *MockChainMockRecorder) ModifyProposal(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModifyProposal", reflect.TypeOf((*MockChain)(nil).ModifyProposal), arg0, arg1)
+}
+
+// RemoveProposal mocks base method.
+func (m *MockChain) RemoveProposal(arg0 ids.ID, arg1 dac.ProposalState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemoveProposal", arg0, arg1)
+}
+
+// RemoveProposal indicates an expected call of RemoveProposal.
+func (mr *MockChainMockRecorder) RemoveProposal(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveProposal", reflect.TypeOf((*MockChain)(nil).RemoveProposal), arg0, arg1)
+}
+
+// AddProposalIDToFinish mocks base method.
+func (m *MockChain) AddProposalIDToFinish(arg0 ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddProposalIDToFinish", arg0)
+}
+
+// AddProposalIDToFinish indicates an expected call of AddProposalIDToFinish.
+func (mr *MockChainMockRecorder) AddProposalIDToFinish(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddProposalIDToFinish", reflect.TypeOf((*MockChain)(nil).AddProposalIDToFinish), arg0)
+}
+
+// RemoveProposalIDToFinish mocks base method.
+func (m *MockChain) RemoveProposalIDToFinish(arg0 ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemoveProposalIDToFinish", arg0)
+}
+
+// RemoveProposalIDToFinish indicates an expected call of RemoveProposalIDToFinish.
+func (mr *MockChainMockRecorder) RemoveProposalIDToFinish(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveProposalIDToFinish", reflect.TypeOf((*MockChain)(nil).RemoveProposalIDToFinish), arg0)
+}
+
+// SetBaseFee mocks base method.
+func (m *MockChain) SetBaseFee(arg0 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetBaseFee", arg0)
+}
+
+// SetBaseFee indicates an expected call of SetBaseFee.
+func (mr *MockChainMockRecorder) SetBaseFee(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBaseFee", reflect.TypeOf((*MockChain)(nil).SetBaseFee), arg0)
 }
 
 // SetCurrentSupply mocks base method.

@@ -3046,8 +3046,260 @@ func TestDiffGetDeferredStakerIterator(t *testing.T) {
 	}
 }
 
+func TestDiffAddProposalIDToFinish(t *testing.T) {
+	proposalID1 := ids.ID{1}
+	proposalID2 := ids.ID{2}
+	proposalID3 := ids.ID{3}
+
+	tests := map[string]struct {
+		diff         *diff
+		proposalID   ids.ID
+		expectedDiff *diff
+	}{
+		"OK": {
+			proposalID: proposalID3,
+			diff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: true,
+					proposalID2: true,
+				},
+			}},
+			expectedDiff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: true,
+					proposalID2: true,
+					proposalID3: true,
+				},
+			}},
+		},
+		"OK: already exist": {
+			proposalID: proposalID2,
+			diff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: true,
+					proposalID2: true,
+				},
+			}},
+			expectedDiff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: true,
+					proposalID2: true,
+				},
+			}},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt.diff.AddProposalIDToFinish(tt.proposalID)
+			require.Equal(t, tt.expectedDiff, tt.diff)
+		})
+	}
+}
+
+func TestDiffRemoveProposalIDToFinish(t *testing.T) {
+	proposalID1 := ids.ID{1}
+	proposalID2 := ids.ID{2}
+	proposalID3 := ids.ID{3}
+
+	tests := map[string]struct {
+		diff         *diff
+		proposalID   ids.ID
+		expectedDiff *diff
+	}{
+		"OK": {
+			proposalID: proposalID3,
+			diff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: false,
+					proposalID2: false,
+				},
+			}},
+			expectedDiff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: false,
+					proposalID2: false,
+					proposalID3: false,
+				},
+			}},
+		},
+		"OK: not exist": {
+			proposalID: proposalID2,
+			diff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: false,
+					proposalID2: false,
+				},
+			}},
+			expectedDiff: &diff{caminoDiff: &caminoDiff{
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					proposalID1: false,
+					proposalID2: false,
+				},
+			}},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt.diff.RemoveProposalIDToFinish(tt.proposalID)
+			require.Equal(t, tt.expectedDiff, tt.diff)
+		})
+	}
+}
+
+func TestDiffGetProposalIDsToFinish(t *testing.T) {
+	parentStateID := ids.ID{1, 1}
+	proposalID1 := ids.ID{1}
+	proposalID2 := ids.ID{2}
+	proposalID3 := ids.ID{3}
+	proposalID4 := ids.ID{4}
+	proposalID5 := ids.ID{5}
+	proposalID6 := ids.ID{6}
+	testErr := errors.New("test err")
+
+	tests := map[string]struct {
+		diff                        func(*gomock.Controller) *diff
+		expectedDiff                func(actualDiff *diff) *diff
+		expectedProposalIDsToFinish []ids.ID
+		expectedErr                 error
+	}{
+		"Parent errored": {
+			diff: func(c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().GetProposalIDsToFinish().Return(nil, testErr)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedDiff: func(actualDiff *diff) *diff {
+				return &diff{
+					stateVersions: actualDiff.stateVersions,
+					parentID:      actualDiff.parentID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedErr: testErr,
+		},
+		"OK: no proposals to finish": {
+			diff: func(c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().GetProposalIDsToFinish().Return(nil, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedDiff: func(actualDiff *diff) *diff {
+				return &diff{
+					stateVersions: actualDiff.stateVersions,
+					parentID:      actualDiff.parentID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedProposalIDsToFinish: nil,
+		},
+		"OK: only parent proposals to finish": {
+			diff: func(c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{proposalID1, proposalID2}, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedDiff: func(actualDiff *diff) *diff {
+				return &diff{
+					stateVersions: actualDiff.stateVersions,
+					parentID:      actualDiff.parentID,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedProposalIDsToFinish: []ids.ID{proposalID1, proposalID2},
+		},
+		"OK: only diff proposals to finish": {
+			diff: func(c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().GetProposalIDsToFinish().Return(nil, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					caminoDiff: &caminoDiff{
+						modifiedProposalIDsToFinish: map[ids.ID]bool{
+							proposalID1: true,
+							proposalID2: false,
+							proposalID3: true,
+						},
+					},
+				}
+			},
+			expectedDiff: func(actualDiff *diff) *diff {
+				return &diff{
+					stateVersions: actualDiff.stateVersions,
+					parentID:      actualDiff.parentID,
+					caminoDiff: &caminoDiff{
+						modifiedProposalIDsToFinish: map[ids.ID]bool{
+							proposalID1: true,
+							proposalID2: false,
+							proposalID3: true,
+						},
+					},
+				}
+			},
+			expectedProposalIDsToFinish: []ids.ID{proposalID1, proposalID3},
+		},
+		"OK": {
+			diff: func(c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{proposalID1, proposalID2, proposalID3}, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					caminoDiff: &caminoDiff{
+						modifiedProposalIDsToFinish: map[ids.ID]bool{
+							proposalID2: false,
+							proposalID4: true,
+							proposalID5: false,
+							proposalID6: true,
+						},
+					},
+				}
+			},
+			expectedDiff: func(actualDiff *diff) *diff {
+				return &diff{
+					stateVersions: actualDiff.stateVersions,
+					parentID:      actualDiff.parentID,
+					caminoDiff: &caminoDiff{
+						modifiedProposalIDsToFinish: map[ids.ID]bool{
+							proposalID2: false,
+							proposalID4: true,
+							proposalID5: false,
+							proposalID6: true,
+						},
+					},
+				}
+			},
+			expectedProposalIDsToFinish: []ids.ID{proposalID1, proposalID3, proposalID4, proposalID6},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			diff := tt.diff(ctrl)
+			proposalIDsToFinish, err := diff.GetProposalIDsToFinish()
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedProposalIDsToFinish, proposalIDsToFinish)
+			require.Equal(t, tt.expectedDiff(diff), diff)
+		})
+	}
+}
+
 func TestDiffApplyCaminoState(t *testing.T) {
 	reward := uint64(12345)
+	baseFee := uint64(6789)
 	tests := map[string]struct {
 		diff         *diff
 		state        func(*gomock.Controller, *diff) *MockState
@@ -3080,12 +3332,18 @@ func TestDiffApplyCaminoState(t *testing.T) {
 					{12}: {ValidatorReward: 112},
 					{13}: nil,
 				},
+				modifiedProposals: map[ids.ID]*proposalDiff{},
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					{17}: true, {18}: false, {19}: true, {20}: false,
+				},
 				modifiedNotDistributedValidatorReward: &reward,
+				modifiedBaseFee:                       &baseFee,
 				deferredStakerDiffs:                   diffStakers{},
 			}},
 			state: func(c *gomock.Controller, d *diff) *MockState {
 				s := NewMockState(c)
 				s.EXPECT().SetNotDistributedValidatorReward(*d.caminoDiff.modifiedNotDistributedValidatorReward)
+				s.EXPECT().SetBaseFee(*d.caminoDiff.modifiedBaseFee)
 				for k, v := range d.caminoDiff.modifiedAddressStates {
 					s.EXPECT().SetAddressStates(k, v)
 				}
@@ -3111,6 +3369,23 @@ func TestDiffApplyCaminoState(t *testing.T) {
 				}
 				for ownerID, claimable := range d.caminoDiff.modifiedClaimables {
 					s.EXPECT().SetClaimable(ownerID, claimable)
+				}
+				for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+					switch {
+					case proposalDiff.added:
+						s.EXPECT().AddProposal(proposalID, proposalDiff.Proposal)
+					case proposalDiff.removed:
+						s.EXPECT().RemoveProposal(proposalID, proposalDiff.Proposal)
+					default:
+						s.EXPECT().ModifyProposal(proposalID, proposalDiff.Proposal)
+					}
+				}
+				for proposalID, added := range d.caminoDiff.modifiedProposalIDsToFinish {
+					if added {
+						s.EXPECT().AddProposalIDToFinish(proposalID)
+					} else {
+						s.EXPECT().RemoveProposalIDToFinish(proposalID)
+					}
 				}
 				for _, validatorDiffs := range d.caminoDiff.deferredStakerDiffs.validatorDiffs {
 					for _, validatorDiff := range validatorDiffs {
@@ -3150,8 +3425,13 @@ func TestDiffApplyCaminoState(t *testing.T) {
 					{12}: {ValidatorReward: 112},
 					{13}: nil,
 				},
+				modifiedProposals: map[ids.ID]*proposalDiff{},
+				modifiedProposalIDsToFinish: map[ids.ID]bool{
+					{17}: true, {18}: false, {19}: true, {20}: false,
+				},
 				deferredStakerDiffs:                   diffStakers{},
 				modifiedNotDistributedValidatorReward: &reward,
+				modifiedBaseFee:                       &baseFee,
 			}},
 		},
 	}

@@ -450,3 +450,46 @@ func defaultGenesisState(addresses []pvm_genesis.AddressState, deposits []*txs.T
 		},
 	}
 }
+
+func TestGetBaseFee(t *testing.T) {
+	tests := map[string]struct {
+		caminoState         *caminoState
+		expectedCaminoState *caminoState
+		expectedBaseFee     uint64
+		expectedErr         error
+	}{
+		"OK": {
+			caminoState:         &caminoState{baseFee: 123},
+			expectedCaminoState: &caminoState{baseFee: 123},
+			expectedBaseFee:     123,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			baseFee, err := tt.caminoState.GetBaseFee()
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedBaseFee, baseFee)
+			require.Equal(t, tt.expectedCaminoState, tt.caminoState)
+		})
+	}
+}
+
+func TestSetBaseFee(t *testing.T) {
+	tests := map[string]struct {
+		baseFee             uint64
+		caminoState         *caminoState
+		expectedCaminoState *caminoState
+	}{
+		"OK": {
+			baseFee:             123,
+			caminoState:         &caminoState{baseFee: 111},
+			expectedCaminoState: &caminoState{baseFee: 123},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt.caminoState.SetBaseFee(tt.baseFee)
+			require.Equal(t, tt.expectedCaminoState, tt.caminoState)
+		})
+	}
+}

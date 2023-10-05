@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	DaoProposalBondAmountKey = "dao-proposal-bond-amount"
+	DACProposalBondAmountKey = "dac-proposal-bond-amount"
 )
 
 func addCaminoFlags(fs *flag.FlagSet) {
-	// Bond amount required to place a DAO proposal on the Primary Network
-	fs.Uint64(DaoProposalBondAmountKey, genesis.LocalParams.CaminoConfig.DaoProposalBondAmount, "Amount, in nAVAX, required to place a DAO proposal")
+	// Bond amount required to place a DAC proposal on the Primary Network
+	fs.Uint64(DACProposalBondAmountKey, genesis.LocalParams.CaminoConfig.DACProposalBondAmount, "Amount, in nAVAX, required to place a DAC proposal")
 }
 
 func getCaminoPlatformConfig(v *viper.Viper) caminoconfig.Config {
 	conf := caminoconfig.Config{
-		DaoProposalBondAmount: v.GetUint64(DaoProposalBondAmountKey),
+		DACProposalBondAmount: v.GetUint64(DACProposalBondAmountKey),
 	}
 	return conf
 }

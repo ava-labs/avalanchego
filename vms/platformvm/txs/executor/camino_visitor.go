@@ -45,6 +45,18 @@ func (*StandardTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	return errWrongTxType
 }
 
+func (*StandardTxExecutor) AddProposalTx(*txs.AddProposalTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) AddVoteTx(*txs.AddVoteTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errWrongTxType
+}
+
 // Proposal
 
 func (*ProposalTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
@@ -80,6 +92,18 @@ func (*ProposalTxExecutor) MultisigAliasTx(*txs.MultisigAliasTx) error {
 }
 
 func (*ProposalTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) AddProposalTx(*txs.AddProposalTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) AddVoteTx(*txs.AddVoteTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return errWrongTxType
 }
 
@@ -121,6 +145,18 @@ func (*AtomicTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	return errWrongTxType
 }
 
+func (*AtomicTxExecutor) AddProposalTx(*txs.AddProposalTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) AddVoteTx(*txs.AddVoteTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errWrongTxType
+}
+
 // MemPool
 
 func (v *MempoolTxVerifier) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -157,4 +193,16 @@ func (v *MempoolTxVerifier) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
 
 func (v *MempoolTxVerifier) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
 	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddProposalTx(tx *txs.AddProposalTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddVoteTx(tx *txs.AddVoteTx) error {
+	return v.standardTx(tx)
+}
+
+func (*MempoolTxVerifier) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errWrongTxType
 }

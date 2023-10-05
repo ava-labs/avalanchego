@@ -26,12 +26,13 @@ const (
 	AddressStateBitRoleKYC         AddressStateBit = 1
 	AddressStateBitRoleOffersAdmin AddressStateBit = 2
 
-	AddressStateBitKYCVerified   AddressStateBit = 32
-	AddressStateBitKYCExpired    AddressStateBit = 33
-	AddressStateBitConsortium    AddressStateBit = 38
-	AddressStateBitNodeDeferred  AddressStateBit = 39
-	AddressStateBitOffersCreator AddressStateBit = 50
-	AddressStateBitMax           AddressStateBit = 63
+	AddressStateBitKYCVerified    AddressStateBit = 32
+	AddressStateBitKYCExpired     AddressStateBit = 33
+	AddressStateBitConsortium     AddressStateBit = 38
+	AddressStateBitNodeDeferred   AddressStateBit = 39
+	AddressStateBitOffersCreator  AddressStateBit = 50
+	AddressStateBitCaminoProposer AddressStateBit = 51
+	AddressStateBitMax            AddressStateBit = 63
 
 	// States
 
@@ -50,12 +51,24 @@ const (
 	AddressStateNodeDeferred     AddressState = AddressState(1) << AddressStateBitNodeDeferred          // 0b1000000000000000000000000000000000000000
 	AddressStateVotableBits      AddressState = AddressStateConsortiumMember | AddressStateNodeDeferred // 0b1100000000000000000000000000000000000000
 
-	AddressStateOffersCreator AddressState = AddressState(1) << AddressStateBitOffersCreator // 0b100000000000000000000000000000000000000000000000000
-
-	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits | AddressStateOffersCreator // 0b100000000001100001100000000000000000000000000000111
+	AddressStateOffersCreator  AddressState = AddressState(1) << AddressStateBitOffersCreator  // 0b0100000000000000000000000000000000000000000000000000
+	AddressStateCaminoProposer AddressState = AddressState(1) << AddressStateBitCaminoProposer // 0b1000000000000000000000000000000000000000000000000000
 
 	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
+	AddressStateBerlinPhaseBits = AddressStateCaminoProposer
+
+	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits |
+		AddressStateAthensPhaseBits |
+		AddressStateBerlinPhaseBits // 0b1100000000001100001100000000000000000000000000000111
 )
+
+func (as AddressState) Is(state AddressState) bool {
+	return as&state == state
+}
+
+func (as AddressState) IsNot(state AddressState) bool {
+	return as&state != state
+}
 
 var (
 	_ UnsignedTx = (*AddressStateTx)(nil)

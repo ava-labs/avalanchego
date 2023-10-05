@@ -21,7 +21,10 @@ type caminoTxMetrics struct {
 	numRewardsImportTxs,
 	numBaseTxs,
 	numMultisigAliasTxs,
-	numAddDepositOfferTxs prometheus.Counter
+	numAddDepositOfferTxs,
+	numAddProposalTxs,
+	numAddVoteTxs,
+	numFinishProposalsTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -46,6 +49,9 @@ func newCaminoTxMetrics(
 		numBaseTxs:            newTxMetric(namespace, "base", registerer, &errs),
 		numMultisigAliasTxs:   newTxMetric(namespace, "multisig_alias", registerer, &errs),
 		numAddDepositOfferTxs: newTxMetric(namespace, "add_deposit_offer", registerer, &errs),
+		numAddProposalTxs:     newTxMetric(namespace, "add_proposal", registerer, &errs),
+		numAddVoteTxs:         newTxMetric(namespace, "add_vote", registerer, &errs),
+		numFinishProposalsTxs: newTxMetric(namespace, "finish_proposals", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -85,6 +91,18 @@ func (*txMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
 }
 
 func (*txMetrics) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	return nil
+}
+
+func (*txMetrics) AddProposalTx(*txs.AddProposalTx) error {
+	return nil
+}
+
+func (*txMetrics) AddVoteTx(*txs.AddVoteTx) error {
+	return nil
+}
+
+func (*txMetrics) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return nil
 }
 
@@ -132,5 +150,20 @@ func (m *caminoTxMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
 
 func (m *caminoTxMetrics) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	m.numAddDepositOfferTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) AddProposalTx(*txs.AddProposalTx) error {
+	m.numAddProposalTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) AddVoteTx(*txs.AddVoteTx) error {
+	m.numAddVoteTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	m.numFinishProposalsTxs.Inc()
 	return nil
 }

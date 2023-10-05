@@ -538,7 +538,7 @@ func (h *handler) Unlock(
 		for i, output := range outputs {
 			lockedOut, ok := output.Out.(*locked.Out)
 			if !ok || !lockedOut.IsNewlyLockedWith(removedLockState) {
-				// we'r only intersed in outs locked by this tx
+				// we'r only interested in outs locked by this tx
 				continue
 			}
 			innerOut, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)

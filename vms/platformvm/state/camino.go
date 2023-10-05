@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -37,19 +38,23 @@ const (
 	shortLinksCacheSize   = 1024
 	msigOwnersCacheSize   = 16_384
 	claimablesCacheSize   = 1024
+	proposalsCacheSize    = 1024
 )
 
 var (
 	_ CaminoState = (*caminoState)(nil)
 
-	caminoPrefix              = []byte("camino")
-	addressStatePrefix        = []byte("addressState")
-	depositOffersPrefix       = []byte("depositOffers")
-	depositsPrefix            = []byte("deposits")
-	depositIDsByEndtimePrefix = []byte("depositIDsByEndtime")
-	multisigOwnersPrefix      = []byte("multisigOwners")
-	shortLinksPrefix          = []byte("shortLinks")
-	claimablesPrefix          = []byte("claimables")
+	caminoPrefix               = []byte("camino")
+	addressStatePrefix         = []byte("addressState")
+	depositOffersPrefix        = []byte("depositOffers")
+	depositsPrefix             = []byte("deposits")
+	depositIDsByEndtimePrefix  = []byte("depositIDsByEndtime")
+	multisigOwnersPrefix       = []byte("multisigOwners")
+	shortLinksPrefix           = []byte("shortLinks")
+	claimablesPrefix           = []byte("claimables")
+	proposalsPrefix            = []byte("proposals")
+	proposalIDsByEndtimePrefix = []byte("proposalIDsByEndtime")
+	proposalIDsToFinishPrefix  = []byte("proposalIDsToFinish")
 
 	// Used for prefixing the validatorsDB
 	deferredPrefix = []byte("deferred")
@@ -57,6 +62,7 @@ var (
 	nodeSignatureKey                 = []byte("nodeSignature")
 	depositBondModeKey               = []byte("depositBondMode")
 	notDistributedValidatorRewardKey = []byte("notDistributedValidatorReward")
+	baseFeeKey                       = []byte("baseFee")
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
@@ -114,6 +120,22 @@ type CaminoDiff interface {
 	PutDeferredValidator(staker *Staker)
 	DeleteDeferredValidator(staker *Staker)
 	GetDeferredStakerIterator() (StakerIterator, error)
+
+	// DAC proposals and votes
+
+	// proposal should never be nil
+	AddProposal(proposalID ids.ID, proposal dac.ProposalState)
+	// proposal start and end time should never be modified, proposal should never be nil
+	ModifyProposal(proposalID ids.ID, proposal dac.ProposalState)
+	// proposal start and end time should never be modified, proposal should never be nil
+	RemoveProposal(proposalID ids.ID, proposal dac.ProposalState)
+	GetProposal(proposalID ids.ID) (dac.ProposalState, error)
+	GetProposalIterator() (ProposalsIterator, error)
+	AddProposalIDToFinish(proposalID ids.ID)
+	GetProposalIDsToFinish() ([]ids.ID, error)
+	RemoveProposalIDToFinish(ids.ID)
+	GetNextProposalExpirationTime(removedProposalIDs set.Set[ids.ID]) (time.Time, error)
+	GetNextToExpireProposalIDsAndTime(removedProposalIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error)
 }
 
 // For state and diff
@@ -149,7 +171,10 @@ type caminoDiff struct {
 	modifiedMultisigAliases               map[ids.ShortID]*multisig.AliasWithNonce
 	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
+	modifiedProposals                     map[ids.ID]*proposalDiff
+	modifiedProposalIDsToFinish           map[ids.ID]bool
 	modifiedNotDistributedValidatorReward *uint64
+	modifiedBaseFee                       *uint64
 }
 
 type caminoState struct {
@@ -159,6 +184,7 @@ type caminoState struct {
 	genesisSynced       bool
 	verifyNodeSignature bool
 	lockModeBondDeposit bool
+	baseFee             uint64
 
 	// Deferred Stakers
 	deferredStakers       *baseStakers
@@ -192,16 +218,26 @@ type caminoState struct {
 	notDistributedValidatorReward uint64
 	claimablesDB                  database.Database
 	claimablesCache               cache.Cacher[ids.ID, *Claimable]
+
+	proposalsNextExpirationTime *time.Time
+	proposalsNextToExpireIDs    []ids.ID
+	proposalIDsToFinish         []ids.ID
+	proposalsCache              cache.Cacher[ids.ID, dac.ProposalState]
+	proposalsDB                 database.Database
+	proposalIDsByEndtimeDB      database.Database
+	proposalIDsToFinishDB       database.Database
 }
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:   make(map[ids.ShortID]txs.AddressState),
-		modifiedDepositOffers:   make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:        make(map[ids.ID]*depositDiff),
-		modifiedMultisigAliases: make(map[ids.ShortID]*multisig.AliasWithNonce),
-		modifiedShortLinks:      make(map[ids.ID]*ids.ShortID),
-		modifiedClaimables:      make(map[ids.ID]*Claimable),
+		modifiedAddressStates:       make(map[ids.ShortID]txs.AddressState),
+		modifiedDepositOffers:       make(map[ids.ID]*deposit.Offer),
+		modifiedDeposits:            make(map[ids.ID]*depositDiff),
+		modifiedMultisigAliases:     make(map[ids.ShortID]*multisig.AliasWithNonce),
+		modifiedShortLinks:          make(map[ids.ID]*ids.ShortID),
+		modifiedClaimables:          make(map[ids.ID]*Claimable),
+		modifiedProposals:           make(map[ids.ID]*proposalDiff),
+		modifiedProposalIDsToFinish: make(map[ids.ID]bool),
 	}
 }
 
@@ -251,6 +287,15 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 		return nil, err
 	}
 
+	proposalsCache, err := metercacher.New[ids.ID, dac.ProposalState](
+		"proposals_cache",
+		metricsReg,
+		&cache.LRU[ids.ID, dac.ProposalState]{Size: proposalsCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	deferredValidatorsDB := prefixdb.New(deferredPrefix, validatorsDB)
 
 	return &caminoState{
@@ -283,6 +328,11 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 		deferredStakers:       newBaseStakers(),
 		deferredValidatorsDB:  deferredValidatorsDB,
 		deferredValidatorList: linkeddb.NewDefault(deferredValidatorsDB),
+
+		proposalsCache:         proposalsCache,
+		proposalsDB:            prefixdb.New(proposalsPrefix, baseDB),
+		proposalIDsByEndtimeDB: prefixdb.New(proposalIDsByEndtimePrefix, baseDB),
+		proposalIDsToFinishDB:  prefixdb.New(proposalIDsToFinishPrefix, baseDB),
 
 		caminoDB:   prefixdb.New(caminoPrefix, baseDB),
 		caminoDiff: newCaminoDiff(),
@@ -487,12 +537,27 @@ func (cs *caminoState) Load(s *state) error {
 	}
 	cs.lockModeBondDeposit = mode
 
+	baseFee, err := database.GetUInt64(cs.caminoDB, baseFeeKey)
+	if err == database.ErrNotFound {
+		// if baseFee is not in db yet, than its first time when we access it
+		// and it should be equal to config base fee
+		config, err := s.Config()
+		if err != nil {
+			return err
+		}
+		baseFee = config.TxFee
+	} else if err != nil {
+		return err
+	}
+	cs.baseFee = baseFee
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		cs.loadDepositOffers(),
 		cs.loadDeposits(),
 		cs.loadValidatorRewards(),
 		cs.loadDeferredValidators(s),
+		cs.loadProposals(),
 	)
 	return errs.Err
 }
@@ -507,6 +572,7 @@ func (cs *caminoState) Write() error {
 		)
 	}
 	errs.Add(
+		database.PutUInt64(cs.caminoDB, baseFeeKey, cs.baseFee),
 		cs.writeAddressStates(),
 		cs.writeDepositOffers(),
 		cs.writeDeposits(),
@@ -514,6 +580,7 @@ func (cs *caminoState) Write() error {
 		cs.writeShortLinks(),
 		cs.writeClaimableAndValidatorRewards(),
 		cs.writeDeferredStakers(),
+		cs.writeProposals(),
 	)
 	return errs.Err
 }
@@ -530,6 +597,17 @@ func (cs *caminoState) Close() error {
 		cs.shortLinksDB.Close(),
 		cs.claimablesDB.Close(),
 		cs.deferredValidatorsDB.Close(),
+		cs.proposalsDB.Close(),
+		cs.proposalIDsByEndtimeDB.Close(),
+		cs.proposalIDsToFinishDB.Close(),
 	)
 	return errs.Err
+}
+
+func (cs *caminoState) GetBaseFee() (uint64, error) {
+	return cs.baseFee, nil
+}
+
+func (cs *caminoState) SetBaseFee(baseFee uint64) {
+	cs.baseFee = baseFee
 }

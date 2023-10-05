@@ -64,7 +64,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		},
 	}
 
-	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs)
+	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs, nil)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -262,7 +262,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		},
 	}
 
-	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs)
+	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs, nil)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -475,7 +475,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	vm := newCaminoVM(caminoGenesisConf, []api.UTXO{{
 		Amount:  json.Uint64(depositOffer.MinAmount + defaultTxFee),
 		Address: depositOwnerAddrBech32,
-	}})
+	}}, nil)
 	vm.ctx.Lock.Lock()
 	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
 
@@ -529,6 +529,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 }
 
 func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
+	t.Helper()
 	if tx != nil {
 		require.NoError(t, vm.Builder.AddUnverifiedTx(tx))
 	}
@@ -544,6 +545,7 @@ func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
 }
 
 func getUnlockedBalance(t *testing.T, db avax.UTXOReader, addr ids.ShortID) uint64 {
+	t.Helper()
 	utxos, err := avax.GetAllUTXOs(db, set.Set[ids.ShortID]{addr: struct{}{}})
 	require.NoError(t, err)
 	balance := uint64(0)

@@ -269,7 +269,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CaminoConfig: caminoconfig.Config{
-			DaoProposalBondAmount: 100 * units.Avax,
+			DACProposalBondAmount: 100 * units.Avax,
 		},
 	}
 }
@@ -490,9 +490,13 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 }
 
 func generateInsFromUTXOs(utxos []*avax.UTXO) []*avax.TransferableInput {
+	return generateInsFromUTXOsWithSigIndices(utxos, []uint32{0})
+}
+
+func generateInsFromUTXOsWithSigIndices(utxos []*avax.UTXO, sigIndices []uint32) []*avax.TransferableInput {
 	ins := make([]*avax.TransferableInput, len(utxos))
 	for i := range utxos {
-		ins[i] = generateTestInFromUTXO(utxos[i], []uint32{0})
+		ins[i] = generateTestInFromUTXO(utxos[i], sigIndices)
 	}
 	return ins
 }
@@ -657,11 +661,13 @@ func newCaminoEnvironmentWithMocks(
 	}
 }
 
-func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
-	expectGetMultisigAliases(s, addrs, aliases)
+func expectVerifyMultisigPermission(t *testing.T, s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+	t.Helper()
+	expectGetMultisigAliases(t, s, addrs, aliases)
 }
 
-func expectGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+func expectGetMultisigAliases(t *testing.T, s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+	t.Helper()
 	for i := range addrs {
 		var alias *multisig.AliasWithNonce
 		if i < len(aliases) {
@@ -676,28 +682,33 @@ func expectGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliases []
 }
 
 func expectVerifyLock(
+	t *testing.T,
 	s *state.MockDiff,
 	ins []*avax.TransferableInput,
 	utxos []*avax.UTXO,
 	addrs []ids.ShortID,
 	aliases []*multisig.AliasWithNonce,
 ) {
-	expectGetUTXOsFromInputs(s, ins, utxos)
-	expectGetMultisigAliases(s, addrs, aliases)
+	t.Helper()
+	expectGetUTXOsFromInputs(t, s, ins, utxos)
+	expectGetMultisigAliases(t, s, addrs, aliases)
 }
 
 func expectVerifyUnlockDeposit(
+	t *testing.T,
 	s *state.MockDiff,
 	ins []*avax.TransferableInput,
 	utxos []*avax.UTXO,
 	addrs []ids.ShortID,
 	aliases []*multisig.AliasWithNonce, //nolint:unparam
 ) {
-	expectGetUTXOsFromInputs(s, ins, utxos)
-	expectGetMultisigAliases(s, addrs, aliases)
+	t.Helper()
+	expectGetUTXOsFromInputs(t, s, ins, utxos)
+	expectGetMultisigAliases(t, s, addrs, aliases)
 }
 
-func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+func expectGetUTXOsFromInputs(t *testing.T, s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+	t.Helper()
 	for i := range ins {
 		if utxos[i] == nil {
 			s.EXPECT().GetUTXO(ins[i].InputID()).Return(nil, database.ErrNotFound)
@@ -707,13 +718,15 @@ func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, 
 	}
 }
 
-func expectConsumeUTXOs(s *state.MockDiff, ins []*avax.TransferableInput) {
+func expectConsumeUTXOs(t *testing.T, s *state.MockDiff, ins []*avax.TransferableInput) {
+	t.Helper()
 	for _, in := range ins {
 		s.EXPECT().DeleteUTXO(in.InputID())
 	}
 }
 
-func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) { //nolint:unparam
+func expectProduceUTXOs(t *testing.T, s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) { //nolint:unparam
+	t.Helper()
 	for i := range outs {
 		s.EXPECT().AddUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{
@@ -726,7 +739,8 @@ func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID
 	}
 }
 
-func expectProduceNewlyLockedUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int, lockState locked.State) { //nolint:unparam
+func expectProduceNewlyLockedUTXOs(t *testing.T, s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int, lockState locked.State) { //nolint:unparam
+	t.Helper()
 	for i := range outs {
 		out := outs[i].Out
 		if lockedOut, ok := out.(*locked.Out); ok {

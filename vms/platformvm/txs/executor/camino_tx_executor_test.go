@@ -270,8 +270,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			},
 			expectedErr: errSignatureMissing,
 		},
-		// TODO@
-		// "Not enough sigs from msig node owner": {
+		// "Not enough sigs from msig node owner": {// TODO @evlekht can't be created with tx builder, needs manual creation
 		// 	generateArgs: func() args {
 		// 		return args{
 		// 			stakeAmount:          env.config.MinValidatorStake,
@@ -2009,7 +2008,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 
 	tests := map[string]struct {
 		caminoGenesisConf   api.Camino
-		state               func(*gomock.Controller, *txs.DepositTx, ids.ID, *config.Config, int) *state.MockDiff
+		state               func(*testing.T, *gomock.Controller, *txs.DepositTx, ids.ID, *config.Config, int) *state.MockDiff
 		utx                 func() *txs.DepositTx
 		chaintime           time.Time
 		signers             [][]*secp256k1.PrivateKey
@@ -2017,7 +2016,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		expectedErr         []error // expectedErr[i] is expected for phase[i]
 	}{
 		"Wrong lockModeBondDeposit flag": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: false}, nil)
 				return s
@@ -2034,7 +2033,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errWrongLockMode, errWrongLockMode},
 		},
 		"Stakeable ins": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				return s
@@ -2054,7 +2053,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{locked.ErrWrongInType, locked.ErrWrongInType},
 		},
 		"Stakeable outs": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				return s
@@ -2074,7 +2073,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{locked.ErrWrongOutType, locked.ErrWrongOutType},
 		},
 		"Not existing deposit offer ID": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(nil, database.ErrNotFound)
@@ -2093,7 +2092,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{database.ErrNotFound, database.ErrNotFound},
 		},
 		"Deposit offer is inactive by flag": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(&deposit.Offer{Flags: deposit.OfferFlagLocked}, nil)
@@ -2114,7 +2113,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositOfferInactive, errDepositOfferInactive},
 		},
 		"Deposit offer is not active yet": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
@@ -2135,7 +2134,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositOfferInactive, errDepositOfferInactive},
 		},
 		"Deposit offer has expired": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
@@ -2156,7 +2155,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositOfferInactive, errDepositOfferInactive},
 		},
 		"Deposit duration is too small": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
@@ -2178,7 +2177,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositDurationTooSmall, errDepositDurationTooSmall},
 		},
 		"Deposit duration is too big": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
@@ -2200,7 +2199,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositDurationTooBig, errDepositDurationTooBig},
 		},
 		"Deposit amount is too small": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
@@ -2225,7 +2224,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositTooSmall, errDepositTooSmall},
 		},
 		"Deposit amount is too big (offer.TotalMaxAmount)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithMaxAmount, nil)
@@ -2251,7 +2250,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errDepositTooBig, errDepositTooBig},
 		},
 		"Deposit amount is too big (offer.TotalMaxRewardAmount)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithMaxRewardAmount, nil)
@@ -2277,12 +2276,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errDepositTooBig},
 		},
 		"UTXO not found": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{unlockedUTXO1, nil}, nil, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{unlockedUTXO1, nil}, nil, nil)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2307,12 +2307,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errFlowCheckFailed, errFlowCheckFailed},
 		},
 		"Inputs and credentials length mismatch": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{unlockedUTXO1}, nil, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{unlockedUTXO1}, nil, nil)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2337,13 +2338,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errFlowCheckFailed, errFlowCheckFailed},
 		},
 		"Owned offer, bad offer permission credential (wrong deposit creator addr)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
 			},
@@ -2384,13 +2385,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad offer permission credential (wrong offer owner key)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
 			},
@@ -2431,13 +2432,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad offer permission credential (wrong offer owner auth)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
 			},
@@ -2478,13 +2479,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad deposit creator credential (wrong key)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
 				}
 				return s
 			},
@@ -2525,13 +2526,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errDepositCreatorCredentialMismatch},
 		},
 		"Owned offer, bad deposit creator credential (wrong auth)": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
 				}
 				return s
 			},
@@ -2572,12 +2573,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase, errDepositCreatorCredentialMismatch},
 		},
 		"Supply overflow": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, unlockedUTXO1},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2617,12 +2619,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errSupplyOverflow, errSupplyOverflow},
 		},
 		"OK": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, unlockedUTXO1},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2639,8 +2642,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2665,12 +2668,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: fee change to new address": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{doubleFeeUTXO, unlockedUTXO1},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2687,8 +2691,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2714,12 +2718,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: deposit bonded": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, bondedUTXOWithMinAmount},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2736,8 +2741,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2762,12 +2767,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: deposit bonded and unlocked": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, unlockedUTXO1, bondedUTXOWithMinAmount},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, utxoOwnerAddr, // consumed
@@ -2784,8 +2790,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2812,12 +2818,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: deposited for new owner": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offer, nil)
 				s.EXPECT().GetTimestamp().Return(offer.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, unlockedUTXO1},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2834,8 +2841,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2860,12 +2867,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: deposit offer with max amount": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithMaxAmount, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithMaxAmount.StartTime())
-				expectVerifyLock(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, unlockedUTXO2},
 					[]ids.ShortID{
 						feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2885,8 +2893,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				updatedOffer.DepositedAmount += utx.DepositAmount()
 				s.EXPECT().SetDepositOffer(&updatedOffer)
 				s.EXPECT().AddDeposit(txID, deposit1)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				return s
 			},
 			utx: func() *txs.DepositTx {
@@ -2912,13 +2920,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			signers:   [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
 		},
 		"OK: deposit offer with max reward amount": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithMaxRewardAmount, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithMaxRewardAmount.StartTime())
 				if phaseIndex > 0 {
-					expectVerifyLock(s, utx.Ins,
+					s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+					expectVerifyLock(t, s, utx.Ins,
 						[]*avax.UTXO{feeUTXO, unlockedUTXO3},
 						[]ids.ShortID{
 							feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2939,8 +2948,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					s.EXPECT().SetDepositOffer(&updatedOffer)
 					s.EXPECT().SetCurrentSupply(constants.PrimaryNetworkID, cfg.RewardConfig.SupplyCap)
 					s.EXPECT().AddDeposit(txID, deposit1)
-					expectConsumeUTXOs(s, utx.Ins)
-					expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+					expectConsumeUTXOs(t, s, utx.Ins)
+					expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				}
 				return s
 			},
@@ -2968,14 +2977,15 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: []error{errNotAthensPhase},
 		},
 		"OK|Fail: deposit offer with owner": {
-			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
 				if phaseIndex > 0 { // if Athens
-					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
-					expectVerifyLock(s, utx.Ins,
+					expectVerifyMultisigPermission(t, s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
+					s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+					expectVerifyLock(t, s, utx.Ins,
 						[]*avax.UTXO{feeUTXO, unlockedUTXO1},
 						[]ids.ShortID{
 							feeOwnerAddr, utxoOwnerAddr, // consumed
@@ -2992,8 +3002,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 						Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
 					s.EXPECT().AddDeposit(txID, deposit1)
-					expectConsumeUTXOs(s, utx.Ins)
-					expectProduceNewlyLockedUTXOs(s, utx.Outs, txID, 0, locked.StateDeposited)
+					expectConsumeUTXOs(t, s, utx.Ins)
+					expectProduceNewlyLockedUTXOs(t, s, utx.Outs, txID, 0, locked.StateDeposited)
 				}
 				return s
 			},
@@ -3061,7 +3071,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 					StandardTxExecutor{
 						Backend: &env.backend,
-						State:   tt.state(ctrl, utx, tx.ID(), env.config, phaseIndex),
+						State:   tt.state(t, ctrl, utx, tx.ID(), env.config, phaseIndex),
 						Tx:      tx,
 					},
 				})
@@ -3143,13 +3153,13 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	unlockedUTXOWithLargerTxID := generateTestUTXO(ids.ID{7}, ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty)
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.UnlockDepositTx, ids.ID) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.UnlockDepositTx, ids.ID) *state.MockDiff
 		utx         *txs.UnlockDepositTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
 		"Wrong lockModeBondDeposit flag": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: false}, nil)
 				return s
@@ -3158,11 +3168,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errWrongLockMode,
 		},
 		"Unlock before deposit's unlock period": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1StartUnlockTime.Add(-1 * time.Second))
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, deposit1UTXO},
 					[]ids.ShortID{
 						feeOwnerAddr, owner1Addr, // consumed (not expired deposit)
@@ -3183,7 +3194,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errUnlockedMoreThanAvailable,
 		},
 		"Unlock expired deposit, tx has unlocked input before deposited input": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
@@ -3197,7 +3208,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errMixedDeposits,
 		},
 		"Unlock expired deposit, tx has unlocked input after deposited input": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
@@ -3211,7 +3222,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errMixedDeposits,
 		},
 		"Unlock active and expired deposits": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
@@ -3226,11 +3237,11 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errMixedDeposits,
 		},
 		"Unlock not full amount, deposit expired": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{deposit1UTXO},
 					[]ids.ShortID{
 						owner1Addr, // produced unlocked
@@ -3248,11 +3259,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errExpiredDepositNotFullyUnlocked,
 		},
 		"Unlock more, than available": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, deposit1UTXO},
 					[]ids.ShortID{
 						feeOwnerAddr, owner1Addr, // consumed (not expired deposit)
@@ -3273,7 +3285,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errUnlockedMoreThanAvailable,
 		},
 		"Burned tokens, while unlocking expired deposits": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
@@ -3289,11 +3301,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errBurnedDepositUnlock,
 		},
 		"Only burn fee, nothing unlocked": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, lessFeeUTXO, deposit1UTXO},
 					[]ids.ShortID{
 						feeOwnerAddr, feeOwnerAddr, owner1Addr, // consumed (not expired deposit)
@@ -3313,12 +3326,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errNoUnlock,
 		},
 		"OK: unlock full amount, expired deposit with unclaimed reward": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// checks
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{deposit1WithRewardUTXO},
 					[]ids.ShortID{
 						owner1Addr, // produced unlocked
@@ -3334,8 +3347,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				})
 				s.EXPECT().RemoveDeposit(depositWithRewardTxID1, deposit1WithReward)
 				// state update: ins/outs/utxos
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -3346,12 +3359,13 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			}}},
 		},
 		"OK: unlock available amount, deposit is still unlocking": {
-			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// checks
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
-				expectVerifyUnlockDeposit(s, utx.Ins,
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, deposit1UTXO, deposit2UTXO},
 					[]ids.ShortID{
 						feeOwnerAddr, owner1Addr, owner1Addr, // consumed (not expired deposit)
@@ -3382,8 +3396,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 					RewardOwner:         deposit2.RewardOwner,
 				})
 				// state update: ins/outs/utxos
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -3413,7 +3427,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, tt.utx, tx.ID()),
+					State:   tt.state(t, ctrl, tt.utx, tx.ID()),
 					Tx:      tx,
 				},
 			})
@@ -3484,13 +3498,13 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.ClaimTx, ids.ID) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.ClaimTx, ids.ID) *state.MockDiff
 		utx         *txs.ClaimTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
 		"Deposit not found": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3515,7 +3529,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errDepositNotFound,
 		},
 		"Bad deposit credential": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3523,7 +3537,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				// deposit
 				s.EXPECT().GetDeposit(depositTxID1).
 					Return(&deposit.Deposit{RewardOwner: &depositRewardOwner}, nil)
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				return s
 			},
 			utx: &txs.ClaimTx{
@@ -3542,14 +3556,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errClaimableCredentialMismatch,
 		},
 		"Bad claimable credential": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				return s
 			},
 			utx: &txs.ClaimTx{
@@ -3569,7 +3583,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 		},
 		// no test case for expired deposits - expected to be alike
 		"Claimed more than available (validator rewards)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3577,7 +3591,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable 1
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimableValidatorReward1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:           claimableValidatorReward1.Owner,
 					ValidatorReward: claimableValidatorReward1.ValidatorReward - utx.Claimables[0].Amount,
@@ -3585,7 +3599,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable 2
 				s.EXPECT().GetClaimable(claimableOwnerID2).Return(claimableValidatorReward2, nil)
-				expectVerifyMultisigPermission(s, claimableOwner2.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner2.Addrs, nil)
 				return s
 			},
 			utx: &txs.ClaimTx{
@@ -3613,7 +3627,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"Claimed more than available (all treasury)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3621,7 +3635,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable 1
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:                claimable1.Owner,
 					ExpiredDepositReward: 1,
@@ -3629,7 +3643,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable 2
 				s.EXPECT().GetClaimable(claimableOwnerID2).Return(claimable2, nil)
-				expectVerifyMultisigPermission(s, claimableOwner2.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner2.Addrs, nil)
 				return s
 			},
 			utx: &txs.ClaimTx{
@@ -3657,7 +3671,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"Claimed more than available (active deposit)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3672,7 +3686,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					RewardOwner:    &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
 					InterestRateNominator: 1_000_000, // 100%
 				}, nil)
@@ -3694,18 +3708,19 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"OK, 2 deposits and claimable": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr1, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// deposit1
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
@@ -3728,7 +3743,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				})
 
 				// deposit2
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				deposit2 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
@@ -3752,7 +3767,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, nil)
 				return s
 			},
@@ -3809,27 +3824,28 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, 2 claimable (splitted outs)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{
 						feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr2,
 						claimToOwnerAddr1, claimToOwnerAddr1,
 					}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// claimable1
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimableValidatorReward1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, nil)
 
 				// claimable2
 				s.EXPECT().GetClaimable(claimableOwnerID2).Return(claimableValidatorReward2, nil)
-				expectVerifyMultisigPermission(s, claimableOwner2.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner2.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID2, &state.Claimable{
 					Owner:           claimableValidatorReward2.Owner,
 					ValidatorReward: claimableValidatorReward2.ValidatorReward - utx.Claimables[1].Amount,
@@ -3889,24 +3905,25 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, 2 claimable (compacted out)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// claimable1
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimableValidatorReward1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, nil)
 
 				// claimable2
 				s.EXPECT().GetClaimable(claimableOwnerID2).Return(claimableValidatorReward2, nil)
-				expectVerifyMultisigPermission(s, claimableOwner2.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner2.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID2, &state.Claimable{
 					Owner:           claimableValidatorReward2.Owner,
 					ValidatorReward: claimableValidatorReward2.ValidatorReward - utx.Claimables[1].Amount,
@@ -3945,18 +3962,19 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, active deposit with non-zero already claimed reward and no rewards period": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// deposit
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID:      depositOfferID,
 					Start:               uint64(timestamp.Unix()) - 365*24*60*60/12*6, // 6 month
@@ -4002,18 +4020,19 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, partial claim": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// deposit1
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
@@ -4037,7 +4056,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:                claimable1.Owner,
 					ExpiredDepositReward: claimable1.ExpiredDepositReward / 2,
@@ -4083,19 +4102,20 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, claim (expired deposit rewards)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:           claimable1.Owner,
 					ValidatorReward: claimable1.ValidatorReward,
@@ -4123,19 +4143,20 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, claim (validator rewards)": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO},
 					[]ids.ShortID{feeOwnerAddr, claimToOwnerAddr1}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimable1, nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
+				expectVerifyMultisigPermission(t, s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:                claimable1.Owner,
 					ExpiredDepositReward: claimable1.ExpiredDepositReward,
@@ -4163,11 +4184,12 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, msig fee, claimable and deposit": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee+
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{msigFeeUTXO},
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{msigFeeUTXO},
 					[]ids.ShortID{
 						feeMsigAlias.ID,
 						feeMsigAliasOwner.Addrs[0],
@@ -4176,11 +4198,11 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					},
 					[]*multisig.AliasWithNonce{feeMsigAlias})
 				s.EXPECT().GetTimestamp().Return(timestamp)
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 
 				// deposit1
-				expectVerifyMultisigPermission(s, []ids.ShortID{
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{
 					depositRewardMsigAlias.ID,
 					depositRewardMsigAliasOwner.Addrs[0],
 					depositRewardMsigAliasOwner.Addrs[1],
@@ -4208,7 +4230,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 				// claimable
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimableMsigOwned, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{
 					claimableMsigAlias.ID,
 					claimableMsigAliasOwner.Addrs[0],
 					claimableMsigAliasOwner.Addrs[1],
@@ -4272,7 +4294,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, tt.utx, tx.ID()),
+					State:   tt.state(t, ctrl, tt.utx, tx.ID()),
 					Tx:      tx,
 				},
 			})
@@ -4305,13 +4327,13 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.RegisterNodeTx) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.RegisterNodeTx) *state.MockDiff
 		utx         func() *txs.RegisterNodeTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
 		"Not consortium member": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateEmpty, nil)
 				return s
@@ -4331,7 +4353,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			expectedErr: errNotConsortiumMember,
 		},
 		"Consortium member has already registered node": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
@@ -4353,12 +4375,12 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			expectedErr: errConsortiumMemberHasNode,
 		},
 		"Old node is in current validator's set": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
 				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, utx.OldNodeID).Return(nil, nil) // no error
 				return s
 			},
@@ -4379,12 +4401,12 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			expectedErr: errValidatorExists,
 		},
 		"Old node is in pending validator's set": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
 				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, utx.OldNodeID).
 					Return(nil, database.ErrNotFound)
 				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, utx.OldNodeID).Return(nil, nil) // no error
@@ -4407,12 +4429,12 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			expectedErr: errValidatorExists,
 		},
 		"Old node is in deferred validator's set": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
 				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, utx.OldNodeID).
 					Return(nil, database.ErrNotFound)
 				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, utx.OldNodeID).
@@ -4437,19 +4459,20 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			expectedErr: errValidatorExists,
 		},
 		"OK: change registered node": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
 				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, utx.OldNodeID).
 					Return(nil, database.ErrNotFound)
 				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, utx.OldNodeID).
 					Return(nil, database.ErrNotFound)
 				s.EXPECT().GetDeferredValidator(constants.PrimaryNetworkID, utx.OldNodeID).
 					Return(nil, database.ErrNotFound)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().SetShortIDLink(ids.ShortID(utx.OldNodeID), state.ShortLinkKeyRegisterNode, nil)
 				s.EXPECT().SetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode, nil)
 				s.EXPECT().SetShortIDLink(
@@ -4463,7 +4486,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 					state.ShortLinkKeyRegisterNode,
 					&link,
 				)
-				expectConsumeUTXOs(s, utx.Ins)
+				expectConsumeUTXOs(t, s, utx.Ins)
 				return s
 			},
 			utx: func() *txs.RegisterNodeTx {
@@ -4482,14 +4505,14 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 		},
 		"OK: consortium member is msig alias": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
-				expectVerifyMultisigPermission(s,
+				expectVerifyMultisigPermission(t, s,
 					[]ids.ShortID{
 						utx.NodeOwnerAddress,
 						consortiumMemberMsigAliasOwner.Addrs[0],
@@ -4497,7 +4520,8 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 						consortiumMemberMsigAliasOwner.Addrs[2],
 					},
 					[]*multisig.AliasWithNonce{consortiumMemberMsigAlias})
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().SetShortIDLink(
 					ids.ShortID(utx.NewNodeID),
 					state.ShortLinkKeyRegisterNode,
@@ -4509,7 +4533,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 					state.ShortLinkKeyRegisterNode,
 					&link,
 				)
-				expectConsumeUTXOs(s, utx.Ins)
+				expectConsumeUTXOs(t, s, utx.Ins)
 				return s
 			},
 			utx: func() *txs.RegisterNodeTx {
@@ -4528,15 +4552,16 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 		},
 		"OK": {
-			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().SetShortIDLink(
 					ids.ShortID(utx.NewNodeID),
 					state.ShortLinkKeyRegisterNode,
@@ -4548,7 +4573,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 					state.ShortLinkKeyRegisterNode,
 					&link,
 				)
-				expectConsumeUTXOs(s, utx.Ins)
+				expectConsumeUTXOs(t, s, utx.Ins)
 				return s
 			},
 			utx: func() *txs.RegisterNodeTx {
@@ -4583,7 +4608,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, utx),
+					State:   tt.state(t, ctrl, utx),
 					Tx:      tx,
 				},
 			})
@@ -5312,13 +5337,13 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.MultisigAliasTx, ids.ID) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.MultisigAliasTx, ids.ID) *state.MockDiff
 		utx         *txs.MultisigAliasTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
 		"Add nested alias": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetMultisigAlias(msigAliasOwners.Addrs[0]).Return(&multisig.AliasWithNonce{}, nil)
 				return s
@@ -5344,9 +5369,9 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errNestedMsigAlias,
 		},
 		"Updating alias which does not exist": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
+				expectGetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(nil, database.ErrNotFound)
 				return s
 			},
@@ -5368,11 +5393,11 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errAliasNotFound,
 		},
 		"Updating existing alias with less signatures than threshold": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
+				expectGetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
 					msigAliasOwners.Addrs[1],
 				}, []*multisig.AliasWithNonce{})
@@ -5396,21 +5421,22 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errAliasCredentialMismatch,
 		},
 		"OK, update existing alias": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
+				expectGetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
 					msigAliasOwners.Addrs[1],
 				}, []*multisig.AliasWithNonce{})
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
 				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
 					Alias: msigAlias.Alias,
 					Nonce: msigAlias.Nonce + 1,
 				})
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
 			utx: &txs.MultisigAliasTx{
@@ -5430,10 +5456,11 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			},
 		},
 		"OK, add new alias": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
+				expectGetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
 				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
 					Alias: multisig.Alias{
 						ID:     multisig.ComputeAliasID(txID),
@@ -5442,8 +5469,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 					},
 					Nonce: 0,
 				})
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
 			utx: &txs.MultisigAliasTx{
@@ -5466,10 +5493,11 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			},
 		},
 		"OK, add new alias with multisig sender": {
-			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				expectGetMultisigAliases(s, msigAliasOwners.Addrs, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{msigUTXO}, []ids.ShortID{
+				expectGetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{msigUTXO}, []ids.ShortID{
 					msigAlias.ID,
 					msigAliasOwners.Addrs[0],
 					msigAliasOwners.Addrs[1],
@@ -5482,8 +5510,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 					},
 					Nonce: 0,
 				})
-				expectConsumeUTXOs(s, utx.Ins)
-				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
 			utx: &txs.MultisigAliasTx{
@@ -5523,7 +5551,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, tt.utx, tx.ID()),
+					State:   tt.state(t, ctrl, tt.utx, tx.ID()),
 					Tx:      tx,
 				},
 			})
@@ -5562,13 +5590,13 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.AddDepositOfferTx, ids.ID, *config.Config) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.AddDepositOfferTx, ids.ID, *config.Config) *state.MockDiff
 		utx         func() *txs.AddDepositOfferTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
 		"Not AthensPhase": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime.Add(-1 * time.Second))
 				return s
@@ -5587,10 +5615,11 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			expectedErr: errNotAthensPhase,
 		},
 		"Not offer creator": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(time.Unix(100, 0))
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateEmpty, nil)
 				return s
 			},
@@ -5608,12 +5637,13 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			expectedErr: errNotOfferCreator,
 		},
 		"Bad offer creator signature": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(time.Unix(100, 0))
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				return s
 			},
 			utx: func() *txs.AddDepositOfferTx {
@@ -5630,14 +5660,15 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			expectedErr: errOfferCreatorCredentialMismatch,
 		},
 		"Supply overflow (v1, no existing offers)": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				chainTime := time.Unix(100, 0)
 
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(chainTime)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-offer1.TotalMaxRewardAmount+1, nil)
 				s.EXPECT().GetAllDepositOffers().Return(nil, nil)
@@ -5658,7 +5689,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			expectedErr: errSupplyOverflow,
 		},
 		"Supply overflow (v1, existing offers)": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				chainTime := time.Unix(100, 0)
 				existingOffers := []*deposit.Offer{
 					{ // [0], expired
@@ -5705,9 +5736,10 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(chainTime)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(currentSupply, nil)
 				s.EXPECT().GetAllDepositOffers().Return(existingOffers, nil)
 				return s
@@ -5727,12 +5759,13 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			expectedErr: errSupplyOverflow,
 		},
 		"OK: v1": {
-			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(time.Time{})
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
-				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-offer1.TotalMaxRewardAmount, nil)
 				s.EXPECT().GetAllDepositOffers().Return(nil, nil)
@@ -5741,7 +5774,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				offer.ID = txID
 				s.EXPECT().SetDepositOffer(&offer)
 
-				expectConsumeUTXOs(s, utx.Ins)
+				expectConsumeUTXOs(t, s, utx.Ins)
 				return s
 			},
 			utx: func() *txs.AddDepositOfferTx {
@@ -5774,7 +5807,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, utx, tx.ID(), env.config),
+					State:   tt.state(t, ctrl, utx, tx.ID(), env.config),
 					Tx:      tx,
 				},
 			})

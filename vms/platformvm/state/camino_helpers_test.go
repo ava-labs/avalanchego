@@ -55,8 +55,7 @@ func generateBaseTx(assetID ids.ID, amount uint64, outputOwners secp256k1fx.Outp
 
 func newEmptyState(t *testing.T) *state {
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constants.PrimaryNetworkID, validators.NewSet())
 	newState, err := new(
 		memdb.New(),
 		metrics.Noop,

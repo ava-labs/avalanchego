@@ -1051,6 +1051,7 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 func TestUnlockDeposit(t *testing.T) {
 	testHandler := defaultCaminoHandler(t)
 	ctx := testHandler.ctx
+	testHandler.clk.Set(time.Now())
 
 	testID := ids.GenerateTestID()
 	txID := ids.GenerateTestID()
@@ -1060,7 +1061,7 @@ func TestUnlockDeposit(t *testing.T) {
 		generateTestUTXO(txID, ctx.AVAXAssetID, depositedAmount, outputOwners, testID, ids.Empty),
 	}
 
-	nowMinus10m := uint64(time.Now().Add(-10 * time.Minute).Unix())
+	nowMinus10m := uint64(testHandler.clk.Time().Add(-10 * time.Minute).Unix())
 
 	type args struct {
 		state        func(*gomock.Controller) state.Chain

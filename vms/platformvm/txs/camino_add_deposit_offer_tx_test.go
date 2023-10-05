@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -17,8 +16,7 @@ import (
 )
 
 func TestAddDepositOfferTxSyntacticVerify(t *testing.T) {
-	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := defaultContext()
 	owner1 := secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{{0, 0, 1}}}
 	depositTxID := ids.ID{0, 1}
 	creatorAddress := ids.ShortID{1}
@@ -139,7 +137,7 @@ func TestAddDepositOfferTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: locked.ErrWrongOutType,
 		},
-		"OK: v1": {
+		"OK: offer v1": {
 			tx: &AddDepositOfferTx{
 				BaseTx:                     baseTx,
 				DepositOfferCreatorAddress: creatorAddress,

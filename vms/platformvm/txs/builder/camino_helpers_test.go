@@ -395,7 +395,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CaminoConfig: caminoconfig.Config{
-			DaoProposalBondAmount: 100 * units.Avax,
+			DACProposalBondAmount: 100 * units.Avax,
 		},
 	}
 }

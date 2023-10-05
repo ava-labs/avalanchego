@@ -161,7 +161,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetDeferredStakerIterator().Return(deferredStakersIt, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetNextToUnlockDepositTime(nil).Return(time.Time{}, database.ErrNotFound).AnyTimes()
-	onParentAccept.EXPECT().GetNextToUnlockDepositIDsAndTime(nil).Return(nil, time.Time{}, database.ErrNotFound).AnyTimes()
+	onParentAccept.EXPECT().GetNextProposalExpirationTime(nil).Return(time.Time{}, database.ErrNotFound).AnyTimes()
+	onParentAccept.EXPECT().GetProposalIDsToFinish().Return(nil, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 

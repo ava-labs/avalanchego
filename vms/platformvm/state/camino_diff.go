@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -390,6 +391,232 @@ func (d *diff) GetDeferredStakerIterator() (StakerIterator, error) {
 	return d.caminoDiff.deferredStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
+func (d *diff) AddProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	d.caminoDiff.modifiedProposals[proposalID] = &proposalDiff{Proposal: proposal, added: true}
+}
+
+func (d *diff) ModifyProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	d.caminoDiff.modifiedProposals[proposalID] = &proposalDiff{Proposal: proposal}
+}
+
+func (d *diff) RemoveProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	d.caminoDiff.modifiedProposals[proposalID] = &proposalDiff{Proposal: proposal, removed: true}
+}
+
+func (d *diff) GetProposal(proposalID ids.ID) (dac.ProposalState, error) {
+	if proposalDiff, ok := d.caminoDiff.modifiedProposals[proposalID]; ok {
+		if proposalDiff.removed {
+			return nil, database.ErrNotFound
+		}
+		return proposalDiff.Proposal, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetProposal(proposalID)
+}
+
+func (d *diff) AddProposalIDToFinish(proposalID ids.ID) {
+	d.caminoDiff.modifiedProposalIDsToFinish[proposalID] = true
+}
+
+func (d *diff) RemoveProposalIDToFinish(proposalID ids.ID) {
+	d.caminoDiff.modifiedProposalIDsToFinish[proposalID] = false
+}
+
+func (d *diff) GetProposalIDsToFinish() ([]ids.ID, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentProposalIDsToFinish, err := parentState.GetProposalIDsToFinish()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(d.caminoDiff.modifiedProposalIDsToFinish) == 0 {
+		return parentProposalIDsToFinish, nil
+	}
+
+	uniqueProposalIDsToFinish := set.Set[ids.ID]{}
+
+	for _, proposalID := range parentProposalIDsToFinish {
+		if notRemoved, ok := d.caminoDiff.modifiedProposalIDsToFinish[proposalID]; !ok || notRemoved {
+			uniqueProposalIDsToFinish.Add(proposalID)
+		}
+	}
+	for proposalID, added := range d.caminoDiff.modifiedProposalIDsToFinish {
+		if added {
+			uniqueProposalIDsToFinish.Add(proposalID)
+		}
+	}
+
+	proposalIDsToFinish := uniqueProposalIDsToFinish.List()
+	utils.Sort(proposalIDsToFinish)
+
+	return proposalIDsToFinish, nil
+}
+
+func (d *diff) GetNextProposalExpirationTime(removedProposalIDs set.Set[ids.ID]) (time.Time, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		if proposalDiff.removed {
+			removedProposalIDs.Add(proposalID)
+		}
+	}
+
+	nextExpirationTime, err := parentState.GetNextProposalExpirationTime(removedProposalIDs)
+	if err != nil && err != database.ErrNotFound {
+		return time.Time{}, err
+	}
+
+	// calculating earliest expiration time from added proposals and parent expiration time
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		proposalEndtime := proposalDiff.Proposal.EndTime()
+		if proposalDiff.added && proposalEndtime.Before(nextExpirationTime) && !removedProposalIDs.Contains(proposalID) {
+			nextExpirationTime = proposalEndtime
+		}
+	}
+
+	// no proposals
+	if nextExpirationTime.Equal(mockable.MaxTime) {
+		return mockable.MaxTime, database.ErrNotFound
+	}
+
+	return nextExpirationTime, nil
+}
+
+func (d *diff) GetNextToExpireProposalIDsAndTime(removedProposalIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		if proposalDiff.removed {
+			removedProposalIDs.Add(proposalID)
+		}
+	}
+
+	parentNextProposalIDs, parentNextExpirationTime, err := parentState.GetNextToExpireProposalIDsAndTime(removedProposalIDs)
+	if err != nil && err != database.ErrNotFound {
+		return nil, time.Time{}, err
+	}
+
+	// calculating earliest expiration time from added proposals and parent expiration time
+	nextExpirationTime := parentNextExpirationTime
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		proposalEndtime := proposalDiff.Proposal.EndTime()
+		if proposalDiff.added && proposalEndtime.Before(nextExpirationTime) && !removedProposalIDs.Contains(proposalID) {
+			nextExpirationTime = proposalEndtime
+		}
+	}
+
+	// no proposals
+	if nextExpirationTime.Equal(mockable.MaxTime) {
+		return nil, mockable.MaxTime, database.ErrNotFound
+	}
+
+	var nextProposalIDs []ids.ID
+	if !parentNextExpirationTime.After(nextExpirationTime) {
+		nextProposalIDs = parentNextProposalIDs
+	}
+
+	// getting added proposals with endtime matching nextExpirationTime
+	needSort := false
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		if proposalDiff.added && proposalDiff.Proposal.EndTime().Equal(nextExpirationTime) && !removedProposalIDs.Contains(proposalID) {
+			nextProposalIDs = append(nextProposalIDs, proposalID)
+			needSort = true
+		}
+	}
+
+	if needSort {
+		utils.Sort(nextProposalIDs)
+	}
+
+	return nextProposalIDs, nextExpirationTime, nil
+}
+
+func (d *diff) GetProposalIterator() (ProposalsIterator, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentIterator, err := parentState.GetProposalIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	return &diffProposalsIterator{
+		parentIterator:    parentIterator,
+		modifiedProposals: d.caminoDiff.modifiedProposals,
+	}, nil
+}
+
+var _ ProposalsIterator = (*diffProposalsIterator)(nil)
+
+type diffProposalsIterator struct {
+	parentIterator    ProposalsIterator
+	modifiedProposals map[ids.ID]*proposalDiff
+	err               error
+}
+
+func (it *diffProposalsIterator) Next() bool {
+	for it.parentIterator.Next() {
+		proposalID, err := it.parentIterator.key()
+		if err != nil { // should never happen
+			it.err = err
+			return false
+		}
+		if proposalDiff, ok := it.modifiedProposals[proposalID]; !ok || !proposalDiff.removed {
+			return true
+		}
+	}
+	return false
+}
+
+func (it *diffProposalsIterator) Value() (dac.ProposalState, error) {
+	proposalID, err := it.parentIterator.key()
+	if err != nil { // should never happen
+		return nil, err
+	}
+	if proposalDiff, ok := it.modifiedProposals[proposalID]; ok {
+		return proposalDiff.Proposal, nil
+	}
+	return it.parentIterator.Value()
+}
+
+func (it *diffProposalsIterator) Error() error {
+	parentIteratorErr := it.parentIterator.Error()
+	switch {
+	case parentIteratorErr != nil && it.err != nil:
+		return fmt.Errorf("%w, %s", it.err, parentIteratorErr)
+	case parentIteratorErr == nil && it.err != nil:
+		return it.err
+	case parentIteratorErr != nil && it.err == nil:
+		return parentIteratorErr
+	}
+	return nil
+}
+
+func (it *diffProposalsIterator) Release() {
+	it.parentIterator.Release()
+}
+
+func (it *diffProposalsIterator) key() (ids.ID, error) {
+	return it.parentIterator.key() // err should never happen
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
@@ -426,6 +653,25 @@ func (d *diff) ApplyCaminoState(baseState State) {
 
 	for ownerID, claimable := range d.caminoDiff.modifiedClaimables {
 		baseState.SetClaimable(ownerID, claimable)
+	}
+
+	for proposalID, proposalDiff := range d.caminoDiff.modifiedProposals {
+		switch {
+		case proposalDiff.added:
+			baseState.AddProposal(proposalID, proposalDiff.Proposal)
+		case proposalDiff.removed:
+			baseState.RemoveProposal(proposalID, proposalDiff.Proposal)
+		default:
+			baseState.ModifyProposal(proposalID, proposalDiff.Proposal)
+		}
+	}
+
+	for proposalID, added := range d.caminoDiff.modifiedProposalIDsToFinish {
+		if added {
+			baseState.AddProposalIDToFinish(proposalID)
+		} else {
+			baseState.RemoveProposalIDToFinish(proposalID)
+		}
 	}
 
 	for _, validatorDiffs := range d.caminoDiff.deferredStakerDiffs.validatorDiffs {

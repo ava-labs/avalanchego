@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -105,6 +106,12 @@ type CaminoTxBuilder interface {
 
 	NewSystemUnlockDepositTx(
 		depositTxIDs []ids.ID,
+	) (*txs.Tx, error)
+
+	FinishProposalsTx(
+		state state.Chain,
+		earlyFinishedProposalIDs []ids.ID,
+		expiredProposalIDs []ids.ID,
 	) (*txs.Tx, error)
 }
 
@@ -675,6 +682,62 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 			Outs:         outs,
 		}},
 	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *caminoBuilder) FinishProposalsTx(
+	state state.Chain,
+	earlyFinishedProposalIDs []ids.ID,
+	expiredProposalIDs []ids.ID,
+) (*txs.Tx, error) {
+	ins, outs, err := b.Unlock(
+		state,
+		append(earlyFinishedProposalIDs, expiredProposalIDs...),
+		locked.StateBonded,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx := &txs.FinishProposalsTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    b.ctx.NetworkID,
+		BlockchainID: b.ctx.ChainID,
+		Ins:          ins,
+		Outs:         outs,
+	}}}
+
+	for _, proposalID := range earlyFinishedProposalIDs {
+		proposal, err := state.GetProposal(proposalID)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get proposal from state: %w", err)
+		}
+		if proposal.IsSuccessful() {
+			utx.EarlyFinishedSuccessfulProposalIDs = append(utx.EarlyFinishedSuccessfulProposalIDs, proposalID)
+		} else {
+			utx.EarlyFinishedFailedProposalIDs = append(utx.EarlyFinishedFailedProposalIDs, proposalID)
+		}
+	}
+	for _, proposalID := range expiredProposalIDs {
+		proposal, err := state.GetProposal(proposalID)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get proposal from state: %w", err)
+		}
+		if proposal.IsSuccessful() {
+			utx.ExpiredSuccessfulProposalIDs = append(utx.ExpiredSuccessfulProposalIDs, proposalID)
+		} else {
+			utx.ExpiredFailedProposalIDs = append(utx.ExpiredFailedProposalIDs, proposalID)
+		}
+	}
+
+	utils.Sort(utx.EarlyFinishedSuccessfulProposalIDs)
+	utils.Sort(utx.EarlyFinishedFailedProposalIDs)
+	utils.Sort(utx.ExpiredSuccessfulProposalIDs)
+	utils.Sort(utx.ExpiredFailedProposalIDs)
 
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {

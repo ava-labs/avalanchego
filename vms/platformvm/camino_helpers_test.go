@@ -30,7 +30,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
 )
@@ -45,14 +47,18 @@ var (
 	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
-func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) *VM {
+func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO, startTime *time.Time) *VM { //nolint:unparam
 	vm := &VM{Config: defaultCaminoConfig(true)}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
-	vm.clock.Set(banffForkTime.Add(time.Second))
+	if startTime == nil {
+		defaultStartTime := banffForkTime.Add(time.Second)
+		startTime = &defaultStartTime
+	}
+	vm.clock.Set(*startTime)
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
@@ -64,7 +70,7 @@ func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) *VM {
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	_, genesisBytes := newCaminoGenesisWithUTXOs(genesisConfig, genesisUTXOs)
+	_, genesisBytes := newCaminoGenesisWithUTXOs(genesisConfig, genesisUTXOs, startTime)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
@@ -140,7 +146,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CaminoConfig: caminoconfig.Config{
-			DaoProposalBondAmount: 100 * units.Avax,
+			DACProposalBondAmount: 100 * units.Avax,
 		},
 	}
 }
@@ -148,9 +154,12 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []api.UTXO) (*api.BuildGenesisArgs, []byte) {
+func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []api.UTXO, starttime *time.Time) (*api.BuildGenesisArgs, []byte) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 
+	if starttime == nil {
+		starttime = &defaultValidateStartTime
+	}
 	caminoGenesisConfig.UTXODeposits = make([]api.UTXODeposit, len(genesisUTXOs))
 	caminoGenesisConfig.ValidatorDeposits = make([][]api.UTXODeposit, len(caminoPreFundedKeys))
 	caminoGenesisConfig.ValidatorConsortiumMembers = make([]ids.ShortID, len(caminoPreFundedKeys))
@@ -163,8 +172,8 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 		}
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				StartTime: json.Uint64(starttime.Unix()),
+				EndTime:   json.Uint64(starttime.Add(10 * defaultMinStakingDuration).Unix()),
 				NodeID:    caminoPreFundedNodeIDs[i],
 			},
 			RewardOwner: &api.Owner{
@@ -178,6 +187,10 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 		}
 		caminoGenesisConfig.ValidatorDeposits[i] = make([]api.UTXODeposit, 1)
 		caminoGenesisConfig.ValidatorConsortiumMembers[i] = key.Address()
+		caminoGenesisConfig.AddressStates = append(caminoGenesisConfig.AddressStates, genesis.AddressState{
+			Address: key.Address(),
+			State:   txs.AddressStateConsortiumMember,
+		})
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
@@ -207,6 +220,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 }
 
 func generateKeyAndOwner(t *testing.T) (*secp256k1.PrivateKey, ids.ShortID, secp256k1fx.OutputOwners) {
+	t.Helper()
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(t, err)
 	addr := key.Address()

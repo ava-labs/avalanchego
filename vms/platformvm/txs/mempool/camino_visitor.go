@@ -4,8 +4,12 @@
 package mempool
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
+
+var errUnsupportedTxType = errors.New("unsupported tx type")
 
 // Issuer
 
@@ -54,6 +58,20 @@ func (i *issuer) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	return nil
 }
 
+func (i *issuer) AddProposalTx(*txs.AddProposalTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
+func (i *issuer) AddVoteTx(*txs.AddVoteTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
+func (*issuer) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errUnsupportedTxType
+}
+
 // Remover
 
 func (r *remover) AddressStateTx(*txs.AddressStateTx) error {
@@ -98,5 +116,20 @@ func (r *remover) MultisigAliasTx(*txs.MultisigAliasTx) error {
 
 func (r *remover) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) AddProposalTx(*txs.AddProposalTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) AddVoteTx(*txs.AddVoteTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (*remover) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	// this tx is never in mempool
 	return nil
 }

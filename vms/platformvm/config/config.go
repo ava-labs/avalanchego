@@ -112,6 +112,9 @@ type Config struct {
 	// Time of the Athens Phase network upgrade
 	AthensPhaseTime time.Time
 
+	// Time of the BerlinPhase network upgrade
+	BerlinPhaseTime time.Time
+
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.
 	// [constants.PrimaryNetworkID] is always a key in this map.
@@ -147,6 +150,10 @@ func (c *Config) IsBanffActivated(timestamp time.Time) bool {
 
 func (c *Config) IsAthensPhaseActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.AthensPhaseTime)
+}
+
+func (c *Config) IsBerlinPhaseActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.BerlinPhaseTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

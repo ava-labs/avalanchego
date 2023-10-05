@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -139,4 +140,44 @@ func (s *state) DeleteDeferredValidator(staker *Staker) {
 
 func (s *state) GetDeferredStakerIterator() (StakerIterator, error) {
 	return s.caminoState.GetDeferredStakerIterator()
+}
+
+func (s *state) AddProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	s.caminoState.AddProposal(proposalID, proposal)
+}
+
+func (s *state) ModifyProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	s.caminoState.ModifyProposal(proposalID, proposal)
+}
+
+func (s *state) RemoveProposal(proposalID ids.ID, proposal dac.ProposalState) {
+	s.caminoState.RemoveProposal(proposalID, proposal)
+}
+
+func (s *state) GetProposal(proposalID ids.ID) (dac.ProposalState, error) {
+	return s.caminoState.GetProposal(proposalID)
+}
+
+func (s *state) AddProposalIDToFinish(proposalID ids.ID) {
+	s.caminoState.AddProposalIDToFinish(proposalID)
+}
+
+func (s *state) GetProposalIDsToFinish() ([]ids.ID, error) {
+	return s.caminoState.GetProposalIDsToFinish()
+}
+
+func (s *state) RemoveProposalIDToFinish(proposalID ids.ID) {
+	s.caminoState.RemoveProposalIDToFinish(proposalID)
+}
+
+func (s *state) GetNextToExpireProposalIDsAndTime(removedProposalIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
+	return s.caminoState.GetNextToExpireProposalIDsAndTime(removedProposalIDs)
+}
+
+func (s *state) GetNextProposalExpirationTime(removedProposalIDs set.Set[ids.ID]) (time.Time, error) {
+	return s.caminoState.GetNextProposalExpirationTime(removedProposalIDs)
+}
+
+func (s *state) GetProposalIterator() (ProposalsIterator, error) {
+	return s.caminoState.GetProposalIterator()
 }

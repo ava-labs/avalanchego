@@ -4,5 +4,5 @@
 package caminoconfig
 
 type Config struct {
-	DaoProposalBondAmount uint64
+	DACProposalBondAmount uint64
 }

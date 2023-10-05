@@ -46,6 +46,18 @@ func (b *backendVisitor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) AddProposalTx(tx *txs.AddProposalTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) AddVoteTx(tx *txs.AddVoteTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (*backendVisitor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errUnsupportedTxType
+}
+
 // signer
 
 func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -114,4 +126,24 @@ func (s *signerVisitor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
 		return err
 	}
 	return sign(s.tx, false, txSigners)
+}
+
+func (s *signerVisitor) AddProposalTx(tx *txs.AddProposalTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
+func (s *signerVisitor) AddVoteTx(tx *txs.AddVoteTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
+func (*signerVisitor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errUnsupportedTxType
 }

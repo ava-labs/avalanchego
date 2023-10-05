@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -1012,6 +1013,7 @@ func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
 
 type GetUpgradePhasesReply struct {
 	AthensPhase utilsjson.Uint32 `json:"athensPhase"`
+	BerlinPhase utilsjson.Uint32 `json:"berlinPhase"`
 }
 
 func (s *CaminoService) GetUpgradePhases(_ *http.Request, _ *struct{}, response *GetUpgradePhasesReply) error {
@@ -1019,6 +1021,54 @@ func (s *CaminoService) GetUpgradePhases(_ *http.Request, _ *struct{}, response 
 
 	if s.vm.Config.IsAthensPhaseActivated(s.vm.state.GetTimestamp()) {
 		response.AthensPhase = 1
+	}
+	if s.vm.Config.IsBerlinPhaseActivated(s.vm.state.GetTimestamp()) {
+		response.BerlinPhase = 1
+	}
+	return nil
+}
+
+type ConsortiumMemberValidator struct {
+	ValidatorWeight         utilsjson.Uint64 `json:"validatorWeight"`
+	ConsortiumMemberAddress string           `json:"consortiumMemberAddress"`
+}
+
+type GetValidatorsAtReply2 struct {
+	Validators map[ids.NodeID]ConsortiumMemberValidator `json:"validators"`
+}
+
+// Overrides avax service GetValidatorsAt
+func (s *CaminoService) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply2) error {
+	height := uint64(args.Height)
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorsAt"),
+		zap.Uint64("height", height),
+		zap.Stringer("subnetID", args.SubnetID),
+	)
+
+	ctx := r.Context()
+	var err error
+	vdrs, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get validator set: %w", err)
+	}
+	reply.Validators = make(map[ids.NodeID]ConsortiumMemberValidator, len(vdrs))
+	for _, vdr := range vdrs {
+		cMemberAddr, err := s.vm.state.GetShortIDLink(ids.ShortID(vdr.NodeID), state.ShortLinkKeyRegisterNode)
+		if err != nil {
+			return fmt.Errorf("failed to get consortium member address: %w", err)
+		}
+
+		addrStr, err := address.Format("P", constants.GetHRP(s.vm.ctx.NetworkID), cMemberAddr[:])
+		if err != nil {
+			return fmt.Errorf("failed to format consortium member address: %w", err)
+		}
+
+		reply.Validators[vdr.NodeID] = ConsortiumMemberValidator{
+			ValidatorWeight:         utilsjson.Uint64(vdr.Weight),
+			ConsortiumMemberAddress: addrStr,
+		}
 	}
 	return nil
 }
