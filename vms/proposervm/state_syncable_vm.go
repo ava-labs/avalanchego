@@ -164,10 +164,10 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 
 var errNotYetImplemented = errors.New("backfilling not yet implemented")
 
-func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (*VM) BackfillBlocksEnabled(context.Context) (ids.ID, error) {
 	return ids.Empty, errNotYetImplemented
 }
 
-func (vm *VM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+func (*VM) BackfillBlocks(context.Context, [][]byte) error {
 	return errNotYetImplemented
 }
