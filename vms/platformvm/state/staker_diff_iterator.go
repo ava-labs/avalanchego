@@ -115,15 +115,11 @@ type mutableStakerIterator struct {
 	heap              heap.Queue[*Staker]
 }
 
-func newStakerHeap() heap.Queue[*Staker] {
-	return heap.NewQueue((*Staker).Less)
-}
-
 func newMutableStakerIterator(iterator StakerIterator) *mutableStakerIterator {
 	return &mutableStakerIterator{
 		iteratorExhausted: !iterator.Next(),
 		iterator:          iterator,
-		heap:              newStakerHeap(),
+		heap:              heap.NewQueue((*Staker).Less),
 	}
 }
 
@@ -164,5 +160,5 @@ func (it *mutableStakerIterator) Value() *Staker {
 func (it *mutableStakerIterator) Release() {
 	it.iteratorExhausted = true
 	it.iterator.Release()
-	it.heap = newStakerHeap()
+	it.heap = heap.NewQueue((*Staker).Less)
 }
