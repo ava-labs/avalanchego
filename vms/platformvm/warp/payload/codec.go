@@ -49,7 +49,7 @@ type byteSetter interface {
 	setBytes(b []byte)
 }
 
-func Parse(bytes []byte) (interface{}, error) {
+func Parse(bytes []byte) (byteSetter, error) {
 	var intf interface{}
 	if _, err := c.Unmarshal(bytes, &intf); err != nil {
 		return nil, err
