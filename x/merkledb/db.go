@@ -540,7 +540,7 @@ func (db *merkleDB) getValueWithoutLock(key Path) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 
-	n, err := db.getNode(key, true /* hasValue */)
+	n, err := db.getNodeWithoutLock(key, true /* hasValue */)
 	if err != nil {
 		return nil, err
 	}
@@ -1219,15 +1219,15 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key Path, hasValue bool) (*node, error) {
+func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	n, err := db.getNode(key, hasValue)
+	n, err := db.getNodeWithoutLock(key, hasValue)
 	if err != nil {
 		return nil, err
 	}
-	return n.clone(), nil
+	return n, nil
 }
 
 // Returns the node with the given [key].
@@ -1235,7 +1235,7 @@ func (db *merkleDB) getEditableNode(key Path, hasValue bool) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
+func (db *merkleDB) getNodeWithoutLock(key Path, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed

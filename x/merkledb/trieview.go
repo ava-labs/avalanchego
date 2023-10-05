@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
+	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -780,28 +780,6 @@ func getLengthOfCommonPrefix(first, second Path, secondOffset int) int {
 	return commonIndex
 }
 
-// Get a copy of the node matching the passed key from the trie.
-// Used by views to get nodes from their ancestors.
-func (t *trieView) getEditableNode(key Path, hadValue bool) (*node, error) {
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	// grab the node in question
-	n, err := t.getNode(key, hadValue)
-	if err != nil {
-		return nil, err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	// return a clone of the node, so it can be edited without affecting this trie
-	return n.clone(), nil
-}
-
 // insert a key/value pair into the correct node of the trie.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) insert(
@@ -976,7 +954,7 @@ func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hasValue)
+	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue)
 	if err != nil {
 		return nil, err
 	}
