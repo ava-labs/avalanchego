@@ -11,6 +11,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	ids "github.com/ava-labs/avalanchego/ids"
 	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -36,6 +37,35 @@ func NewMockStateSyncableVM(ctrl *gomock.Controller) *MockStateSyncableVM {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStateSyncableVM) EXPECT() *MockStateSyncableVMMockRecorder {
 	return m.recorder
+}
+
+// BackfillBlocks mocks base method.
+func (m *MockStateSyncableVM) BackfillBlocks(arg0 context.Context, arg1 [][]byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BackfillBlocks", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BackfillBlocks indicates an expected call of BackfillBlocks.
+func (mr *MockStateSyncableVMMockRecorder) BackfillBlocks(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BackfillBlocks", reflect.TypeOf((*MockStateSyncableVM)(nil).BackfillBlocks), arg0, arg1)
+}
+
+// BackfillBlocksEnabled mocks base method.
+func (m *MockStateSyncableVM) BackfillBlocksEnabled(arg0 context.Context) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BackfillBlocksEnabled", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BackfillBlocksEnabled indicates an expected call of BackfillBlocksEnabled.
+func (mr *MockStateSyncableVMMockRecorder) BackfillBlocksEnabled(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BackfillBlocksEnabled", reflect.TypeOf((*MockStateSyncableVM)(nil).BackfillBlocksEnabled), arg0)
 }
 
 // GetLastStateSummary mocks base method.

@@ -80,6 +80,11 @@ service VM {
   // [summaryHeight].
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
 
+  // BackfillBlocksEnabled indicates whether the block backfilling is enabled for this VM.
+  rpc BackfillBlocksEnabled(google.protobuf.Empty) returns (BackfillBlocksEnabledResponse);
+  // BackfillBlocks pushes to the VM downloaded blocks to be backfilled.
+  rpc BackfillBlocks(BackfillBlocksRequest) returns (BackfillBlocksResponse);
+
   // Block
   rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
   rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
@@ -394,6 +399,19 @@ message GetStateSummaryResponse {
   bytes id = 1;
   bytes bytes = 2;
   Error err = 3;
+}
+
+message BackfillBlocksEnabledResponse {
+  bytes id = 1;
+  Error err = 2;
+}
+
+message BackfillBlocksRequest {
+  repeated bytes blks_bytes = 1;
+}
+
+message BackfillBlocksResponse {
+  Error err = 1;
 }
 
 message StateSummaryAcceptRequest {

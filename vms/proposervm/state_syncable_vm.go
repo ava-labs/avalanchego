@@ -5,11 +5,13 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -158,4 +160,14 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 		block:        block,
 		vm:           vm,
 	}, nil
+}
+
+var errNotYetImplemented = errors.New("backfilling not yet implemented")
+
+func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+	return ids.Empty, errNotYetImplemented
+}
+
+func (vm *VM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+	return errNotYetImplemented
 }

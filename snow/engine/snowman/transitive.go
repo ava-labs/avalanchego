@@ -420,6 +420,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
+
 	return nil
 }
 

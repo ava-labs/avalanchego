@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,6 +20,8 @@ var (
 	errGetLastStateSummary        = errors.New("unexpectedly called GetLastStateSummary")
 	errParseStateSummary          = errors.New("unexpectedly called ParseStateSummary")
 	errGetStateSummary            = errors.New("unexpectedly called GetStateSummary")
+	errBackfillBlocksEnabled      = errors.New("unexpectedly called BackfillBlocksEnabled")
+	errBackfillBlock              = errors.New("unexpectedly called BackfillBlock")
 )
 
 type TestStateSyncableVM struct {
@@ -35,6 +38,9 @@ type TestStateSyncableVM struct {
 	GetLastStateSummaryF        func(context.Context) (StateSummary, error)
 	ParseStateSummaryF          func(ctx context.Context, summaryBytes []byte) (StateSummary, error)
 	GetStateSummaryF            func(ctx context.Context, summaryHeight uint64) (StateSummary, error)
+
+	BackfillBlocksEnabledF func(context.Context) (ids.ID, error)
+	BackfillBlocksF        func(context.Context, [][]byte) error
 }
 
 func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -85,4 +91,24 @@ func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeigh
 		require.FailNow(vm.T, errGetStateSummary.Error())
 	}
 	return nil, errGetStateSummary
+}
+
+func (vm *TestStateSyncableVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+	if vm.BackfillBlocksEnabledF != nil {
+		return vm.BackfillBlocksEnabledF(ctx)
+	}
+	if vm.CantGetStateSummary && vm.T != nil {
+		require.FailNow(vm.T, errGetStateSummary.Error())
+	}
+	return ids.Empty, errBackfillBlocksEnabled
+}
+
+func (vm *TestStateSyncableVM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+	if vm.BackfillBlocksF != nil {
+		return vm.BackfillBlocksF(ctx, blocks)
+	}
+	if vm.CantGetStateSummary && vm.T != nil {
+		require.FailNow(vm.T, errGetStateSummary.Error())
+	}
+	return errBackfillBlock
 }

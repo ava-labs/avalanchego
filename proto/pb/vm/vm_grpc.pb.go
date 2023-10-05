@@ -50,6 +50,8 @@ const (
 	VM_GetLastStateSummary_FullMethodName        = "/vm.VM/GetLastStateSummary"
 	VM_ParseStateSummary_FullMethodName          = "/vm.VM/ParseStateSummary"
 	VM_GetStateSummary_FullMethodName            = "/vm.VM/GetStateSummary"
+	VM_BackfillBlocksEnabled_FullMethodName      = "/vm.VM/BackfillBlocksEnabled"
+	VM_BackfillBlocks_FullMethodName             = "/vm.VM/BackfillBlocks"
 	VM_BlockVerify_FullMethodName                = "/vm.VM/BlockVerify"
 	VM_BlockAccept_FullMethodName                = "/vm.VM/BlockAccept"
 	VM_BlockReject_FullMethodName                = "/vm.VM/BlockReject"
@@ -125,6 +127,10 @@ type VMClient interface {
 	// GetStateSummary retrieves the state summary that was generated at height
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
+	// BackfillBlocksEnabled indicates whether the block backfilling is enabled for this VM.
+	BackfillBlocksEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BackfillBlocksEnabledResponse, error)
+	// BackfillBlocks pushes to the VM downloaded blocks to be backfilled.
+	BackfillBlocks(ctx context.Context, in *BackfillBlocksRequest, opts ...grpc.CallOption) (*BackfillBlocksResponse, error)
 	// Block
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -411,6 +417,24 @@ func (c *vMClient) GetStateSummary(ctx context.Context, in *GetStateSummaryReque
 	return out, nil
 }
 
+func (c *vMClient) BackfillBlocksEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BackfillBlocksEnabledResponse, error) {
+	out := new(BackfillBlocksEnabledResponse)
+	err := c.cc.Invoke(ctx, VM_BackfillBlocksEnabled_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) BackfillBlocks(ctx context.Context, in *BackfillBlocksRequest, opts ...grpc.CallOption) (*BackfillBlocksResponse, error) {
+	out := new(BackfillBlocksResponse)
+	err := c.cc.Invoke(ctx, VM_BackfillBlocks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
 	out := new(BlockVerifyResponse)
 	err := c.cc.Invoke(ctx, VM_BlockVerify_FullMethodName, in, out, opts...)
@@ -516,6 +540,10 @@ type VMServer interface {
 	// GetStateSummary retrieves the state summary that was generated at height
 	// [summaryHeight].
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
+	// BackfillBlocksEnabled indicates whether the block backfilling is enabled for this VM.
+	BackfillBlocksEnabled(context.Context, *emptypb.Empty) (*BackfillBlocksEnabledResponse, error)
+	// BackfillBlocks pushes to the VM downloaded blocks to be backfilled.
+	BackfillBlocks(context.Context, *BackfillBlocksRequest) (*BackfillBlocksResponse, error)
 	// Block
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
@@ -618,6 +646,12 @@ func (UnimplementedVMServer) ParseStateSummary(context.Context, *ParseStateSumma
 }
 func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSummary not implemented")
+}
+func (UnimplementedVMServer) BackfillBlocksEnabled(context.Context, *emptypb.Empty) (*BackfillBlocksEnabledResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BackfillBlocksEnabled not implemented")
+}
+func (UnimplementedVMServer) BackfillBlocks(context.Context, *BackfillBlocksRequest) (*BackfillBlocksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BackfillBlocks not implemented")
 }
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
@@ -1184,6 +1218,42 @@ func _VM_GetStateSummary_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_BackfillBlocksEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BackfillBlocksEnabled(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VM_BackfillBlocksEnabled_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BackfillBlocksEnabled(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_BackfillBlocks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BackfillBlocksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BackfillBlocks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VM_BackfillBlocks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BackfillBlocks(ctx, req.(*BackfillBlocksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockVerifyRequest)
 	if err := dec(in); err != nil {
@@ -1382,6 +1452,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStateSummary",
 			Handler:    _VM_GetStateSummary_Handler,
+		},
+		{
+			MethodName: "BackfillBlocksEnabled",
+			Handler:    _VM_BackfillBlocksEnabled_Handler,
+		},
+		{
+			MethodName: "BackfillBlocks",
+			Handler:    _VM_BackfillBlocks_Handler,
 		},
 		{
 			MethodName: "BlockVerify",

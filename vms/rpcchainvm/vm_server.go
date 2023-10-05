@@ -827,6 +827,16 @@ func (vm *VMServer) GetStateSummary(
 	}, nil
 }
 
+var errNotYetImplemented = errors.New("backfilling not yet implemented")
+
+func (vm *VMServer) BackfillBlocksEnabled(context.Context, *emptypb.Empty) (*vmpb.BackfillBlocksEnabledResponse, error) {
+	return &vmpb.BackfillBlocksEnabledResponse{}, errNotYetImplemented
+}
+
+func (vm *VMServer) BackfillBlocks(context.Context, *vmpb.BackfillBlocksRequest) (*vmpb.BackfillBlocksResponse, error) {
+	return &vmpb.BackfillBlocksResponse{}, errNotYetImplemented
+}
+
 func (vm *VMServer) BlockVerify(ctx context.Context, req *vmpb.BlockVerifyRequest) (*vmpb.BlockVerifyResponse, error) {
 	blk, err := vm.vm.ParseBlock(ctx, req.Bytes)
 	if err != nil {

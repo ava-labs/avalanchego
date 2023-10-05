@@ -10,6 +10,7 @@ import (
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -70,4 +71,28 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 	defer span.End()
 
 	return vm.ssVM.GetStateSummary(ctx, height)
+}
+
+func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+	if vm.ssVM == nil {
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+	}
+
+	ctx, span := vm.tracer.Start(ctx, vm.backfillBlocksEnabledTag)
+	defer span.End()
+
+	return vm.ssVM.BackfillBlocksEnabled(ctx)
+}
+
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+	if vm.ssVM == nil {
+		return block.ErrStateSyncableVMNotImplemented
+	}
+
+	ctx, span := vm.tracer.Start(ctx, vm.backfillBlocksTag, oteltrace.WithAttributes(
+		attribute.Int("blocksCount", len(blocks)),
+	))
+	defer span.End()
+
+	return vm.ssVM.BackfillBlocks(ctx, blocks)
 }

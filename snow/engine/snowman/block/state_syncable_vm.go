@@ -6,6 +6,8 @@ package block
 import (
 	"context"
 	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
@@ -42,4 +44,8 @@ type StateSyncableVM interface {
 	// Returns database.ErrNotFound if no summary is available at
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error)
+
+	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
+
+	BackfillBlocks(ctx context.Context, blocks [][]byte) error
 }

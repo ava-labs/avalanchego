@@ -6,6 +6,7 @@ package metervm
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -77,4 +78,38 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 	}
 	vm.blockMetrics.getStateSummary.Observe(duration)
 	return summary, nil
+}
+
+func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+	if vm.ssVM == nil {
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+	}
+
+	start := vm.clock.Time()
+	blkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
+	if err != nil {
+		vm.blockMetrics.backfillBlocksEnabled.Observe(duration)
+		return ids.Empty, err
+	}
+	vm.blockMetrics.backfillBlocksEnabled.Observe(duration)
+	return blkID, nil
+}
+
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+	if vm.ssVM == nil {
+		return block.ErrStateSyncableVMNotImplemented
+	}
+
+	start := vm.clock.Time()
+	err := vm.ssVM.BackfillBlocks(ctx, blocks)
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
+	if err != nil {
+		vm.blockMetrics.backfillBlocks.Observe(duration)
+		return err
+	}
+	vm.blockMetrics.backfillBlocks.Observe(duration)
+	return nil
 }
