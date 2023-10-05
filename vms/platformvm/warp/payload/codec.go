@@ -29,8 +29,8 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
-		lc.RegisterType(&BlockHash{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {

@@ -43,7 +43,7 @@ func ParseAddressedCall(b []byte) (*AddressedCall, error) {
 }
 
 // Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewAddressedCall or ParseAddressedCall.
+// payload is initialized from either NewAddressedCall or Parse.
 func (a *AddressedCall) Bytes() []byte {
 	return a.bytes
 }
