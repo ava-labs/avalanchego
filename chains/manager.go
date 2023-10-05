@@ -244,8 +244,11 @@ type manager struct {
 	// queue that holds chain create requests
 	chainsQueue buffer.BlockingDeque[ChainParameters]
 	// unblocks chain creator to start processing the queue
-	unblockChainCreatorCh  chan struct{}
+	unblockChainCreatorCh chan struct{}
+	// shutdown the chain creator goroutine if the queue hasn't started to be
+	// processed.
 	chainCreatorShutdownCh chan struct{}
+	chainCreatorExited     sync.WaitGroup
 
 	subnetsLock sync.RWMutex
 	// Key: Subnet's ID
@@ -1393,11 +1396,14 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	m.createChain(platformParams)
 
 	m.Log.Info("starting chain creator")
+	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 	return nil
 }
 
 func (m *manager) dispatchChainCreator() {
+	defer m.chainCreatorExited.Done()
+
 	select {
 	// This channel will be closed when Shutdown is called on the manager.
 	case <-m.chainCreatorShutdownCh:
@@ -1419,16 +1425,11 @@ func (m *manager) dispatchChainCreator() {
 }
 
 // Shutdown stops all the chains
-func (m *manager) closeChainCreator() {
-	m.Log.Info("stopping chain creator")
-	m.chainsQueue.Close()
-	close(m.chainCreatorShutdownCh)
-}
-
-// Shutdown stops all the chains
 func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
-	m.closeChainCreator()
+	m.chainsQueue.Close()
+	close(m.chainCreatorShutdownCh)
+	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
 
