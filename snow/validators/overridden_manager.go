@@ -40,24 +40,24 @@ func (o *overriddenManager) AddWeight(_ ids.ID, nodeID ids.NodeID, weight uint64
 	return o.manager.AddWeight(o.subnetID, nodeID, weight)
 }
 
-func (o *overriddenManager) GetWeight(_ ids.ID, validatorID ids.NodeID) uint64 {
-	return o.manager.GetWeight(o.subnetID, validatorID)
+func (o *overriddenManager) GetWeight(_ ids.ID, nodeID ids.NodeID) uint64 {
+	return o.manager.GetWeight(o.subnetID, nodeID)
 }
 
-func (o *overriddenManager) GetValidator(_ ids.ID, validatorID ids.NodeID) (*Validator, bool) {
-	return o.manager.GetValidator(o.subnetID, validatorID)
+func (o *overriddenManager) GetValidator(_ ids.ID, nodeID ids.NodeID) (*Validator, bool) {
+	return o.manager.GetValidator(o.subnetID, nodeID)
 }
 
-func (o *overriddenManager) SubsetWeight(_ ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error) {
-	return o.manager.SubsetWeight(o.subnetID, validatorIDs)
+func (o *overriddenManager) SubsetWeight(_ ids.ID, nodeIDs set.Set[ids.NodeID]) (uint64, error) {
+	return o.manager.SubsetWeight(o.subnetID, nodeIDs)
 }
 
 func (o *overriddenManager) RemoveWeight(_ ids.ID, nodeID ids.NodeID, weight uint64) error {
 	return o.manager.RemoveWeight(o.subnetID, nodeID, weight)
 }
 
-func (o *overriddenManager) Contains(_ ids.ID, validatorID ids.NodeID) bool {
-	return o.manager.Contains(o.subnetID, validatorID)
+func (o *overriddenManager) Contains(_ ids.ID, nodeID ids.NodeID) bool {
+	return o.manager.Contains(o.subnetID, nodeID)
 }
 
 func (o *overriddenManager) Count(ids.ID) int {
@@ -106,6 +106,6 @@ func (o *overriddenManager) String() string {
 	return sb.String()
 }
 
-func (o *overriddenManager) GetValidatorIDs(_ ids.ID) []ids.NodeID {
+func (o *overriddenManager) GetValidatorIDs(ids.ID) []ids.NodeID {
 	return o.manager.GetValidatorIDs(o.subnetID)
 }

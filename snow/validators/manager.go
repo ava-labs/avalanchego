@@ -24,9 +24,9 @@ var (
 )
 
 type SetCallbackListener interface {
-	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
-	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
-	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
+	OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
+	OnValidatorRemoved(nodeID ids.NodeID, weight uint64)
+	OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64)
 }
 
 // Manager holds the validator set of each subnet
@@ -51,11 +51,11 @@ type Manager interface {
 	AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
 
 	// GetWeight retrieves the validator weight from the subnet.
-	GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64
+	GetWeight(subnetID ids.ID, nodeID ids.NodeID) uint64
 
 	// GetValidator returns the validator tied to the specified ID in subnet.
 	// If the validator doesn't exist, returns false.
-	GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool)
+	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Validator, bool)
 
 	// GetValidatoIDs returns the validator IDs in the subnet.
 	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
@@ -75,7 +75,7 @@ type Manager interface {
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the subnet.
-	Contains(subnetID ids.ID, validatorID ids.NodeID) bool
+	Contains(subnetID ids.ID, nodeID ids.NodeID) bool
 
 	// Count returns the number of validators currently in the subnet.
 	Count(subnetID ids.ID) int
@@ -140,7 +140,7 @@ func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) e
 	return set.AddWeight(nodeID, weight)
 }
 
-func (m *manager) GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64 {
+func (m *manager) GetWeight(subnetID ids.ID, nodeID ids.NodeID) uint64 {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -149,10 +149,10 @@ func (m *manager) GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64 {
 		return 0
 	}
 
-	return set.GetWeight(validatorID)
+	return set.GetWeight(nodeID)
 }
 
-func (m *manager) GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool) {
+func (m *manager) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Validator, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -161,7 +161,7 @@ func (m *manager) GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Valida
 		return nil, false
 	}
 
-	return set.Get(validatorID)
+	return set.Get(nodeID)
 }
 
 func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error) {
@@ -200,7 +200,7 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	return nil
 }
 
-func (m *manager) Contains(subnetID ids.ID, validatorID ids.NodeID) bool {
+func (m *manager) Contains(subnetID ids.ID, nodeID ids.NodeID) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -209,7 +209,7 @@ func (m *manager) Contains(subnetID ids.ID, validatorID ids.NodeID) bool {
 		return false
 	}
 
-	return set.Contains(validatorID)
+	return set.Contains(nodeID)
 }
 
 func (m *manager) Count(subnetID ids.ID) int {
@@ -313,6 +313,5 @@ func (m *manager) GetValidatorIDs(subnetID ids.ID) []ids.NodeID {
 	}
 	m.lock.RUnlock()
 
-	vdrsMap := vdrs.Map()
-	return maps.Keys(vdrsMap)
+	return vdrs.GetValidatorIDs()
 }

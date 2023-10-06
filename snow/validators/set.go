@@ -358,3 +358,14 @@ func (s *vdrSet) callValidatorRemovedCallbacks(node ids.NodeID, weight uint64) {
 		callbackListener.OnValidatorRemoved(node, weight)
 	}
 }
+
+func (s *vdrSet) GetValidatorIDs() []ids.NodeID {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	list := make([]ids.NodeID, len(s.vdrSlice))
+	for _, vdr := range s.vdrSlice {
+		list = append(list, vdr.NodeID)
+	}
+	return list
+}
