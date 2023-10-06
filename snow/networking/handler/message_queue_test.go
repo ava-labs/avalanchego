@@ -43,6 +43,7 @@ func TestQueue(t *testing.T) {
 			0,
 			time.Second,
 			ids.GenerateTestID(),
+			0,
 			vdr1ID,
 			engineType,
 		),
@@ -102,6 +103,7 @@ func TestQueue(t *testing.T) {
 			0,
 			time.Second,
 			ids.GenerateTestID(),
+			0,
 			vdr2ID,
 			engineType,
 		),
@@ -130,11 +132,11 @@ func TestQueue(t *testing.T) {
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	msg3 := Message{
-		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, engineType),
+		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, 0, nonVdrNodeID1, engineType),
 		EngineType:     engineType,
 	}
 	msg4 := Message{
-		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2, engineType),
+		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, 0, nonVdrNodeID2, engineType),
 		EngineType:     engineType,
 	}
 	u.Push(context.Background(), msg3)
