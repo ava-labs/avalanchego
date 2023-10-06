@@ -1339,7 +1339,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 
 	totalWeightInt, err := n.config.Validators.TotalWeight(subnetID)
 	if err != nil {
-		return UptimeResult{}, fmt.Errorf("error while fetching weight for subnet %s:%w", subnetID, err)
+		return UptimeResult{}, fmt.Errorf("error while fetching weight for subnet %s: %w", subnetID, err)
 	}
 
 	var (
