@@ -37,6 +37,7 @@ use std::{
     sync::Arc,
     thread::JoinHandle,
 };
+use tokio::task::block_in_place;
 
 mod proposal;
 
@@ -390,7 +391,8 @@ impl api::Db for Db {
     type Proposal = Proposal;
 
     async fn revision(&self, root_hash: HashKey) -> Result<Arc<Self::Historical>, api::Error> {
-        if let Some(rev) = self.get_revision(&TrieHash(root_hash)) {
+        let rev = block_in_place(|| self.get_revision(&TrieHash(root_hash)));
+        if let Some(rev) = rev {
             Ok(Arc::new(rev.rev))
         } else {
             Err(api::Error::HashNotFound {

@@ -139,7 +139,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
 }
 
 #[async_trait]
-impl<T: api::DbView + Send + Sync> api::Proposal<T> for Proposal<T> {
+impl<T: api::DbView + Send + Sync> api::Proposal for Proposal<T> {
     type Proposal = Proposal<T>;
 
     async fn propose<K: KeyType, V: ValueType>(
@@ -150,12 +150,12 @@ impl<T: api::DbView + Send + Sync> api::Proposal<T> for Proposal<T> {
         Ok(Proposal::new(ProposalBase::Proposal(self), data))
     }
 
-    async fn commit(self: Arc<Self>) -> Result<Arc<T>, api::Error> {
+    async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
         // TODO: commit should modify the db; this will only work for
         // emptydb at the moment
         match &self.base {
             ProposalBase::Proposal(base) => base.clone().commit().await,
-            ProposalBase::View(v) => Ok(v.clone()),
+            ProposalBase::View(_) => Ok(()),
         }
     }
 }

@@ -96,7 +96,7 @@ pub struct Proof<N>(pub HashMap<HashKey, N>);
 pub trait Db {
     type Historical: DbView;
 
-    type Proposal: DbView + Proposal<Self::Historical>;
+    type Proposal: DbView + Proposal;
 
     /// Get a reference to a specific view based on a hash
     ///
@@ -172,15 +172,11 @@ pub trait DbView {
 /// [DbView], which means you can fetch values from it or
 /// obtain proofs.
 #[async_trait]
-pub trait Proposal<T: DbView>: DbView {
-    type Proposal: DbView + Proposal<T>;
+pub trait Proposal: DbView {
+    type Proposal: DbView + Proposal;
 
     /// Commit this revision
-    ///
-    /// # Return value
-    ///
-    /// * A reference to a new historical view
-    async fn commit(self: Arc<Self>) -> Result<Arc<T>, Error>;
+    async fn commit(self: Arc<Self>) -> Result<(), Error>;
 
     /// Propose a new revision on top of an existing proposal
     ///

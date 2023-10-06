@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use parking_lot::{Mutex, RwLock};
 use shale::CachedStore;
 use std::{io::ErrorKind, sync::Arc};
+use tokio::task::block_in_place;
 
 pub use crate::v2::api::{Batch, BatchOp};
 
@@ -43,11 +44,11 @@ pub enum ProposalBase {
 }
 
 #[async_trait]
-impl<T: crate::v2::api::DbView> crate::v2::api::Proposal<T> for Proposal {
+impl crate::v2::api::Proposal for Proposal {
     type Proposal = Proposal;
 
-    async fn commit(self: Arc<Self>) -> Result<Arc<T>, api::Error> {
-        todo!()
+    async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
+        block_in_place(|| self.commit_sync().map_err(Into::into))
     }
 
     async fn propose<K: api::KeyType, V: api::ValueType>(
