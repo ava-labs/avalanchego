@@ -54,15 +54,15 @@ func NewMaxAveragerHeap() AveragerHeap {
 }
 
 func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool) {
-	if old, hasOldValue := h.heap.Push(nodeID, &averager); hasOldValue {
-		return *old, true
+	if prev, ok := h.heap.Push(nodeID, &averager); ok {
+		return *prev, true
 	}
 	return nil, false
 }
 
 func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
-	if _, averager, existed := h.heap.Remove(nodeID); existed {
-		return *averager, existed
+	if _, averager, ok := h.heap.Remove(nodeID); ok {
+		return *averager, ok
 	}
 	return nil, false
 }

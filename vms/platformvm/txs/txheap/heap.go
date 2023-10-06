@@ -59,7 +59,7 @@ func (h *txHeap) List() []*txs.Tx {
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
-	if _, removed, existed := h.heap.Remove(txID); existed {
+	if _, removed, ok := h.heap.Remove(txID); ok {
 		return removed.tx
 	}
 	return nil
