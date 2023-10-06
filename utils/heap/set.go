@@ -34,13 +34,13 @@ func (s Set[T]) Len() int {
 	return s.set.Len()
 }
 
-func (s Set[T]) Remove(i int) T {
-	remove, _ := s.set.Remove(i)
-	return remove
+func (s Set[T]) Remove(t T) (T, bool) {
+	remove, _, existed := s.set.Remove(t)
+	return remove, existed
 }
 
-func (s Set[T]) Fix(i int) {
-	s.set.Fix(i)
+func (s Set[T]) Fix(t T) {
+	s.set.Fix(t)
 }
 
 func (s Set[T]) Index() map[T]int {
