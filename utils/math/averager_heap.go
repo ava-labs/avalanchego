@@ -10,6 +10,7 @@ import (
 
 var _ AveragerHeap = averagerHeap{}
 
+// TODO replace this interface with utils/heap
 // AveragerHeap maintains a heap of the averagers.
 type AveragerHeap interface {
 	// Add the average to the heap. If [nodeID] is already in the heap, the

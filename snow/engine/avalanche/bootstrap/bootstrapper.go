@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -413,11 +414,11 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	// Vertices that we need to process. Store them in a heap for deduplication
 	// and so we always process vertices further down in the DAG first. This helps
 	// to reduce the number of repeated DAG traversals.
-	toProcess := vertex.NewHeap()
+	toProcess := heap.NewMap[ids.ID, avalanche.Vertex](vertex.Less)
 	for _, vtx := range vtxs {
 		vtxID := vtx.ID()
 		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
-			toProcess.Push(vtx)
+			_, _ = toProcess.Push(vtxID, vtx)
 		} else {
 			b.VtxBlocked.RemoveMissingID(vtxID)
 		}
@@ -426,14 +427,12 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	vtxHeightSet := set.Set[ids.ID]{}
 	prevHeight := uint64(0)
 
-	for toProcess.Len() > 0 { // While there are unprocessed vertices
+	for toProcess.Len() > 0 {
 		if b.Halted() {
 			return nil
 		}
 
-		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
-		vtxID := vtx.ID()
-
+		vtxID, vtx, _ := toProcess.Pop()
 		switch vtx.Status() {
 		case choices.Unknown:
 			b.VtxBlocked.AddMissingID(vtxID)
@@ -504,7 +503,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 				parentID := parent.ID()
 				if _, ok := b.processedCache.Get(parentID); !ok { // But only if we haven't processed the parent
 					if !vtxHeightSet.Contains(parentID) {
-						toProcess.Push(parent)
+						toProcess.Push(parent.ID(), parent)
 					}
 				}
 			}

@@ -6,7 +6,7 @@ package heap
 import (
 	"testing"
 
-	require "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMap(t *testing.T) {
@@ -60,6 +60,16 @@ func TestMap(t *testing.T) {
 			expected: []entry[int, int]{
 				{4, 40},
 				{5, 50},
+			},
+		},
+		{
+			name: "duplicate key is overridden",
+			setup: func(h Map[int, int]) {
+				h.Push(1, 10)
+				h.Push(1, 20)
+			},
+			expected: []entry[int, int]{
+				{k: 1, v: 20},
 			},
 		},
 	}
