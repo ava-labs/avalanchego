@@ -244,18 +244,19 @@ impl LeafNode {
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct ExtNode {
-    path: PartialPath,
-    chd: DiskAddress,
-    chd_encoded: Option<Vec<u8>>,
+    pub(crate) path: PartialPath,
+    pub(crate) child: DiskAddress,
+    pub(crate) child_encoded: Option<Vec<u8>>,
 }
 
 impl Debug for ExtNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "[Extension {:?} {:?} {:?}]",
-            self.path, self.chd, self.chd_encoded
-        )
+        let Self {
+            path,
+            child,
+            child_encoded,
+        } = self;
+        write!(f, "[Extension {path:?} {child:?} {child_encoded:?}]",)
     }
 }
 
@@ -268,8 +269,8 @@ impl ExtNode {
                 .unwrap(),
         );
 
-        if !self.chd.is_null() {
-            let mut r = store.get_item(self.chd).unwrap();
+        if !self.child.is_null() {
+            let mut r = store.get_item(self.child).unwrap();
 
             if r.is_encoded_longer_than_hash_len(store) {
                 list[1] = Encoded::Data(
@@ -288,7 +289,7 @@ impl ExtNode {
         } else {
             // Check if there is already a caclucated encoded value for the child, which
             // can happen when manually constructing a trie from proof.
-            if let Some(v) = &self.chd_encoded {
+            if let Some(v) = &self.child_encoded {
                 if v.len() == TRIE_HASH_LEN {
                     list[1] = Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
                 } else {
@@ -302,36 +303,20 @@ impl ExtNode {
             .unwrap()
     }
 
-    pub fn new(path: Vec<u8>, chd: DiskAddress, chd_encoded: Option<Vec<u8>>) -> Self {
-        ExtNode {
-            path: PartialPath(path),
-            chd,
-            chd_encoded,
-        }
-    }
-
-    pub fn path(&self) -> &PartialPath {
-        &self.path
-    }
-
-    pub fn path_mut(&mut self) -> &mut PartialPath {
-        &mut self.path
-    }
-
     pub fn chd(&self) -> DiskAddress {
-        self.chd
+        self.child
     }
 
     pub fn chd_encoded(&self) -> Option<&[u8]> {
-        self.chd_encoded.as_deref()
+        self.child_encoded.as_deref()
     }
 
     pub fn chd_mut(&mut self) -> &mut DiskAddress {
-        &mut self.chd
+        &mut self.child
     }
 
     pub fn chd_encoded_mut(&mut self) -> &mut Option<Vec<u8>> {
-        &mut self.chd_encoded
+        &mut self.child_encoded
     }
 }
 
@@ -411,11 +396,11 @@ impl NodeType {
                 if term {
                     Ok(NodeType::Leaf(LeafNode::new(cur_key, data)))
                 } else {
-                    Ok(NodeType::Extension(ExtNode::new(
-                        cur_key,
-                        DiskAddress::null(),
-                        Some(data),
-                    )))
+                    Ok(NodeType::Extension(ExtNode {
+                        path: PartialPath(cur_key),
+                        child: DiskAddress::null(),
+                        child_encoded: Some(data),
+                    }))
                 }
             }
             BRANCH_NODE_SIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?)),
@@ -685,8 +670,8 @@ impl Storable for Node {
                     is_encoded_longer_than_hash_len,
                     NodeType::Extension(ExtNode {
                         path,
-                        chd: DiskAddress::from(ptr as usize),
-                        chd_encoded: encoded,
+                        child: DiskAddress::from(ptr as usize),
+                        child_encoded: encoded,
                     }),
                 ))
             }
@@ -820,7 +805,7 @@ impl Storable for Node {
                 cur.write_all(&[Self::EXT_NODE])?;
                 let path: Vec<u8> = from_nibbles(&n.path.encode(false)).collect();
                 cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&n.chd.to_le_bytes())?;
+                cur.write_all(&n.child.to_le_bytes())?;
                 cur.write_all(&path)?;
                 if let Some(encoded) = n.chd_encoded() {
                     cur.write_all(&[encoded.len() as u8])?;

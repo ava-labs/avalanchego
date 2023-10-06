@@ -467,7 +467,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 Ok((addr, subproof, cur_key.len()))
             }
             NodeType::Extension(n) => {
-                let cur_key = &n.path().0;
+                let cur_key = &n.path.0;
 
                 // Check if the key of current node match with the given key.
                 if key.len() < cur_key.len() || &key[..cur_key.len()] != cur_key {
@@ -521,7 +521,7 @@ fn locate_subproof(
             Ok((sub_proof.into(), key_nibbles))
         }
         NodeType::Extension(n) => {
-            let cur_key = &n.path().0;
+            let cur_key = &n.path.0;
             // Check if the key of current node match with the given key
             // and consume the current-key portion of the nibbles-iterator
             let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
@@ -629,7 +629,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
             NodeType::Extension(n) => {
                 // If either the key of left proof or right proof doesn't match with
                 // shortnode, stop here and the forkpoint is the shortnode.
-                let cur_key = n.path().clone().into_inner();
+                let cur_key = n.path.clone().into_inner();
 
                 fork_left = if left_chunks.len() - index < cur_key.len() {
                     left_chunks[index..].cmp(&cur_key)
@@ -703,7 +703,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
             // - left proof points to the shortnode, but right proof is greater
             // - right proof points to the shortnode, but left proof is less
             let node = n.chd();
-            let cur_key = n.path().clone().into_inner();
+            let cur_key = n.path.clone().into_inner();
 
             if fork_left.is_lt() && fork_right.is_lt() {
                 return Err(ProofError::EmptyRange);
@@ -877,13 +877,13 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
             unset_node_ref(merkle, p, node, key, index + 1, remove_left)
         }
 
-        NodeType::Extension(n) if chunks[index..].starts_with(n.path()) => {
+        NodeType::Extension(n) if chunks[index..].starts_with(&n.path) => {
             let node = Some(n.chd());
-            unset_node_ref(merkle, p, node, key, index + n.path().len(), remove_left)
+            unset_node_ref(merkle, p, node, key, index + n.path.len(), remove_left)
         }
 
         NodeType::Extension(n) => {
-            let cur_key = n.path();
+            let cur_key = &n.path;
             let mut p_ref = merkle
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
