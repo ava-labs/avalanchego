@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Manager = (*manager)(nil)
+var _ Manager = (*overriddenManager)(nil)
 
 // NewOverriddenManager returns a Manager that overrides of all calls to the underlying Manager
 // to only operate on the validators in [subnetID].
