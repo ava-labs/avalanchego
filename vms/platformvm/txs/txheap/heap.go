@@ -31,8 +31,7 @@ type txHeap struct {
 
 func (h *txHeap) Add(tx *txs.Tx) {
 	txID := tx.ID()
-	_, exists := h.heap.Index()[txID]
-	if exists {
+	if h.heap.Contains(txID) {
 		return
 	}
 	htx := heapTx{
@@ -44,13 +43,10 @@ func (h *txHeap) Add(tx *txs.Tx) {
 }
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
-	i, exists := h.heap.Index()[txID]
-	if !exists {
-		return nil
+	if _, got, ok := h.heap.Get(txID); ok {
+		return got.tx
 	}
-
-	_, got := h.heap.Get(i)
-	return got.tx
+	return nil
 }
 
 func (h *txHeap) List() []*txs.Tx {
@@ -63,13 +59,10 @@ func (h *txHeap) List() []*txs.Tx {
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
-	entry, exists := h.heap.Index()[txID]
-	if !exists {
-		return nil
+	if _, removed, existed := h.heap.Remove(txID); existed {
+		return removed.tx
 	}
-
-	_, removed := h.heap.Remove(entry)
-	return removed.tx
+	return nil
 }
 
 func (h *txHeap) Peek() *txs.Tx {
