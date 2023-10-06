@@ -8,15 +8,12 @@ import (
 )
 
 func Less(i, j avalanche.Vertex) bool {
-	statusI := i.Status()
-	statusJ := j.Status()
-
 	// Put unknown vertices at the front of the heap to ensure once we have made
 	// it below a certain height in DAG traversal we do not need to reset
-	if !statusI.Fetched() {
+	if !i.Status().Fetched() {
 		return true
 	}
-	if !statusJ.Fetched() {
+	if !j.Status().Fetched() {
 		return false
 	}
 
@@ -29,5 +26,6 @@ func Less(i, j avalanche.Vertex) bool {
 	if errJ != nil {
 		return false
 	}
+
 	return heightI > heightJ
 }
