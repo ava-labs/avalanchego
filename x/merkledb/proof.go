@@ -129,7 +129,7 @@ type Proof struct {
 	// (or node that would be where key is if it doesn't exist).
 	// Must always be non-empty (i.e. have the root node).
 	Path []ProofNode
-	// This is a proof that [key] exists/doesn't exist.
+	// This is a proof that [Key] exists/doesn't exist.
 	Key Key
 
 	// Nothing if [Key] isn't in the trie.
