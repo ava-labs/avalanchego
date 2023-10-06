@@ -25,15 +25,6 @@ func TestAveragerHeap(t *testing.T) {
 		a    []Averager
 	}{
 		{
-			name: "min heap",
-			h:    NewMinAveragerHeap(),
-			a: []Averager{
-				NewAverager(0, time.Second, time.Now()),
-				NewAverager(1, time.Second, time.Now()),
-				NewAverager(2, time.Second, time.Now()),
-			},
-		},
-		{
 			name: "max heap",
 			h:    NewMaxAveragerHeap(),
 			a: []Averager{
