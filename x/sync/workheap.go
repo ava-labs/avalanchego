@@ -5,13 +5,22 @@ package sync
 
 import (
 	"bytes"
+	"container/heap"
 
-	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	"github.com/google/btree"
 )
+
+var _ heap.Interface = (*innerHeap)(nil)
+
+type heapItem struct {
+	workItem  *workItem
+	heapIndex int
+}
+
+type innerHeap []*heapItem
 
 // A priority queue of syncWorkItems.
 // Note that work item ranges never overlap.
@@ -20,23 +29,20 @@ import (
 type workHeap struct {
 	// Max heap of items by priority.
 	// i.e. heap.Pop returns highest priority item.
-	innerHeap heap.Set[*workItem]
+	innerHeap innerHeap
 	// The heap items sorted by range start.
 	// A Nothing start is considered to be the smallest.
-	sortedItems *btree.BTreeG[*workItem]
+	sortedItems *btree.BTreeG[*heapItem]
 	closed      bool
 }
 
 func newWorkHeap() *workHeap {
 	return &workHeap{
-		innerHeap: heap.NewSet[*workItem](func(a, b *workItem) bool {
-			return a.priority > b.priority
-		}),
 		sortedItems: btree.NewG(
 			2,
-			func(a, b *workItem) bool {
-				aNothing := a.start.IsNothing()
-				bNothing := b.start.IsNothing()
+			func(a, b *heapItem) bool {
+				aNothing := a.workItem.start.IsNothing()
+				bNothing := b.workItem.start.IsNothing()
 				if aNothing {
 					// [a] is Nothing, so if [b] is Nothing, they're equal.
 					// Otherwise, [b] is greater.
@@ -47,7 +53,7 @@ func newWorkHeap() *workHeap {
 					return false
 				}
 				// [a] and [b] both contain values. Compare the values.
-				return bytes.Compare(a.start.Value(), b.start.Value()) < 0
+				return bytes.Compare(a.workItem.start.Value(), b.workItem.start.Value()) < 0
 			},
 		),
 	}
@@ -64,8 +70,10 @@ func (wh *workHeap) Insert(item *workItem) {
 		return
 	}
 
-	wh.innerHeap.Push(item)
-	wh.sortedItems.ReplaceOrInsert(item)
+	wrappedItem := &heapItem{workItem: item}
+
+	heap.Push(&wh.innerHeap, wrappedItem)
+	wh.sortedItems.ReplaceOrInsert(wrappedItem)
 }
 
 // Pops and returns a work item from the heap.
@@ -74,9 +82,9 @@ func (wh *workHeap) GetWork() *workItem {
 	if wh.closed || wh.Len() == 0 {
 		return nil
 	}
-	item, _ := wh.innerHeap.Pop()
+	item := heap.Pop(&wh.innerHeap).(*heapItem)
 	wh.sortedItems.Delete(item)
-	return item
+	return item.workItem
 }
 
 // Insert the item into the heap, merging it with existing items
@@ -91,23 +99,25 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 		return
 	}
 
-	var mergedBefore, mergedAfter *workItem
-	searchItem := &workItem{
-		start: item.start,
+	var mergedBefore, mergedAfter *heapItem
+	searchItem := &heapItem{
+		workItem: &workItem{
+			start: item.start,
+		},
 	}
 
 	// Find the item with the greatest start range which is less than [item.start].
 	// Note that the iterator function will run at most once, since it always returns false.
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
-		func(beforeItem *workItem) bool {
-			if item.localRootID == beforeItem.localRootID &&
-				maybe.Equal(item.start, beforeItem.end, bytes.Equal) {
+		func(beforeItem *heapItem) bool {
+			if item.localRootID == beforeItem.workItem.localRootID &&
+				maybe.Equal(item.start, beforeItem.workItem.end, bytes.Equal) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
-				beforeItem.end = item.end
-				beforeItem.priority = math.Max(item.priority, beforeItem.priority)
-				wh.innerHeap.Fix(beforeItem)
+				beforeItem.workItem.end = item.end
+				beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
+				heap.Fix(&wh.innerHeap, beforeItem.heapIndex)
 				mergedBefore = beforeItem
 			}
 			return false
@@ -117,14 +127,14 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	// Note that the iterator function will run at most once, since it always returns false.
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
-		func(afterItem *workItem) bool {
-			if item.localRootID == afterItem.localRootID &&
-				maybe.Equal(item.end, afterItem.start, bytes.Equal) {
+		func(afterItem *heapItem) bool {
+			if item.localRootID == afterItem.workItem.localRootID &&
+				maybe.Equal(item.end, afterItem.workItem.start, bytes.Equal) {
 				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 				// [item.start, afterItem.end].
-				afterItem.start = item.start
-				afterItem.priority = math.Max(item.priority, afterItem.priority)
-				wh.innerHeap.Fix(afterItem)
+				afterItem.workItem.start = item.start
+				afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
+				heap.Fix(&wh.innerHeap, afterItem.heapIndex)
 				mergedAfter = afterItem
 			}
 			return false
@@ -134,12 +144,12 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	// we can combine the before item with the after item
 	if mergedBefore != nil && mergedAfter != nil {
 		// combine the two ranges
-		mergedBefore.end = mergedAfter.end
+		mergedBefore.workItem.end = mergedAfter.workItem.end
 		// remove the second range since it is now covered by the first
 		wh.remove(mergedAfter)
 		// update the priority
-		mergedBefore.priority = math.Max(mergedBefore.priority, mergedAfter.priority)
-		wh.innerHeap.Fix(mergedBefore)
+		mergedBefore.workItem.priority = math.Max(mergedBefore.workItem.priority, mergedAfter.workItem.priority)
+		heap.Fix(&wh.innerHeap, mergedBefore.heapIndex)
 	}
 
 	// nothing was merged, so add new item to the heap
@@ -150,11 +160,43 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 }
 
 // Deletes [item] from the heap.
-func (wh *workHeap) remove(item *workItem) {
-	wh.innerHeap.Remove(item)
+func (wh *workHeap) remove(item *heapItem) {
+	heap.Remove(&wh.innerHeap, item.heapIndex)
+
 	wh.sortedItems.Delete(item)
 }
 
 func (wh *workHeap) Len() int {
 	return wh.innerHeap.Len()
+}
+
+// below this line are the implementations required for heap.Interface
+
+func (h innerHeap) Len() int {
+	return len(h)
+}
+
+func (h innerHeap) Less(i int, j int) bool {
+	return h[i].workItem.priority > h[j].workItem.priority
+}
+
+func (h innerHeap) Swap(i int, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].heapIndex = i
+	h[j].heapIndex = j
+}
+
+func (h *innerHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	*h = old[0 : n-1]
+	return item
+}
+
+func (h *innerHeap) Push(x interface{}) {
+	item := x.(*heapItem)
+	item.heapIndex = len(*h)
+	*h = append(*h, item)
 }
