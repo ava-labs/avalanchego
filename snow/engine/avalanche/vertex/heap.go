@@ -39,9 +39,6 @@ func Less(i, j avalanche.Vertex) bool {
 // Heap defines the functionality of a heap of vertices with unique VertexIDs
 // ordered by height
 type Heap interface {
-	// Empty the heap.
-	Clear()
-
 	// Add the provided vertex to the heap. Vertices are de-duplicated, returns
 	// true if the vertex was added, false if it was dropped.
 	Push(avalanche.Vertex) bool
@@ -65,10 +62,6 @@ func NewHeap() Heap {
 
 type maxHeightVertexHeap struct {
 	heap heap.Map[ids.ID, avalanche.Vertex]
-}
-
-func (vh *maxHeightVertexHeap) Clear() {
-	vh.heap = heap.NewMap[ids.ID, avalanche.Vertex](Less)
 }
 
 // Push adds an element to this heap. Returns true if the element was added.
