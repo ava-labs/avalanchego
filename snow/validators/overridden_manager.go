@@ -72,7 +72,7 @@ func (o *overriddenManager) Sample(_ ids.ID, size int) ([]ids.NodeID, error) {
 	return o.manager.Sample(o.subnetID, size)
 }
 
-func (o *overriddenManager) GetMap(_ ids.ID) map[ids.NodeID]*GetValidatorOutput {
+func (o *overriddenManager) GetMap(ids.ID) map[ids.NodeID]*GetValidatorOutput {
 	return o.manager.GetMap(o.subnetID)
 }
 
