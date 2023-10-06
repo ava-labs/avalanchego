@@ -5,6 +5,7 @@ package heap
 
 import (
 	"container/heap"
+
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -80,7 +81,6 @@ func (m *Map[K, V]) Remove(k K) (K, V, bool) {
 		return removed.k, removed.v, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
-
 }
 
 func (m *Map[K, V]) Contains(k K) bool {
