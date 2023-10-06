@@ -54,6 +54,9 @@ var (
 type Parameters struct {
 	// K is the number of nodes to query and sample in a round.
 	K int `json:"k" yaml:"k"`
+	// Alpha is used for backwards compatibility purposes and is only referenced
+	// during json parsing.
+	Alpha *int `json:"alpha,omitempty" yaml:"alpha,omitempty"`
 	// AlphaPreference is the vote threshold to change your preference.
 	AlphaPreference int `json:"alphaPreference" yaml:"alphaPreference"`
 	// AlphaConfidence is the vote threshold to increase your confidence.

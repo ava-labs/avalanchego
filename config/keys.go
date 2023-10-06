@@ -122,6 +122,7 @@ const (
 	LogRotaterCompressEnabledKey                       = "log-rotater-compress-enabled"
 	LogDisableDisplayPluginLogsKey                     = "log-disable-display-plugin-logs"
 	SnowSampleSizeKey                                  = "snow-sample-size"
+	SnowQuorumSizeKey                                  = "snow-quorum-size"
 	SnowPreferenceQuorumSizeKey                        = "snow-preference-quorum-size"
 	SnowConfidenceQuorumSizeKey                        = "snow-confidence-quorum-size"
 	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"

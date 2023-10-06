@@ -89,7 +89,7 @@ var (
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
-	return snowball.Parameters{
+	p := snowball.Parameters{
 		K:               v.GetInt(SnowSampleSizeKey),
 		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
@@ -106,6 +106,11 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
 		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
+	if v.IsSet(SnowQuorumSizeKey) {
+		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		p.AlphaConfidence = p.AlphaPreference
+	}
+	return p
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -1106,6 +1111,11 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
+			if config.ConsensusParameters.Alpha != nil {
+				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+			}
+
 			if err := config.Valid(); err != nil {
 				return nil, err
 			}
@@ -1152,6 +1162,11 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
+		}
+
+		if config.ConsensusParameters.Alpha != nil {
+			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
 		}
 
 		if err := config.Valid(); err != nil {
