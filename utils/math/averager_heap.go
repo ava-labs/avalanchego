@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
-var _ AveragerHeap = averagerHeap{}
+var _ AveragerHeap = (*averagerHeap)(nil)
 
 // TODO replace this interface with utils/heap
 // AveragerHeap maintains a heap of the averagers.
@@ -32,16 +32,6 @@ type AveragerHeap interface {
 
 type averagerHeap struct {
 	heap heap.Map[ids.NodeID, *Averager]
-}
-
-// NewMinAveragerHeap returns a new empty min heap. The returned heap is not
-// thread safe.
-func NewMinAveragerHeap() AveragerHeap {
-	return averagerHeap{
-		heap: heap.NewMap[ids.NodeID, *Averager](func(a, b *Averager) bool {
-			return (*a).Read() < (*b).Read()
-		}),
-	}
 }
 
 // NewMaxAveragerHeap returns a new empty max heap. The returned heap is not
