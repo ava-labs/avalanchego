@@ -810,7 +810,7 @@ func (m *manager) createAvalancheChain(
 
 	bootstrapWeight, err := vdrs.TotalWeight(ctx.SubnetID)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching weight for subnet %s:%w", ctx.SubnetID, err)
+		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
 	consensusParams := sb.Config().ConsensusParameters
