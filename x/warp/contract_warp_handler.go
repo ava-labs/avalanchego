@@ -62,7 +62,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	state := accessibleState.GetStateDB()
 	predicateBytes, exists := state.GetPredicateStorageSlots(ContractAddress, warpIndex)
 	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.GetTxHash(), ContractAddress)
-	valid := exists && set.BitsFromBytes(predicateResults).Contains(warpIndex)
+	valid := exists && !set.BitsFromBytes(predicateResults).Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), remainingGas, nil
 	}

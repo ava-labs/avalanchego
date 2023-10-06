@@ -223,7 +223,7 @@ func createValidPredicateTest(snowCtx *snow.Context, numKeys uint64, predicateBy
 		StorageSlots: [][]byte{predicateBytes},
 		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + numKeys*GasCostPerWarpSigner,
 		GasErr:       nil,
-		PredicateRes: set.NewBits(0).Bytes(),
+		PredicateRes: set.NewBits().Bytes(),
 	}
 }
 
@@ -287,7 +287,7 @@ func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
 		StorageSlots: [][]byte{predicateBytes},
 		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
 		GasErr:       nil,
-		PredicateRes: set.NewBits(0).Bytes(),
+		PredicateRes: set.NewBits().Bytes(),
 	}
 
 	test.Run(t)
@@ -393,7 +393,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 		StorageSlots: [][]byte{predicateBytes},
 		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
 		GasErr:       nil,
-		PredicateRes: set.NewBits().Bytes(),
+		PredicateRes: set.NewBits(0).Bytes(),
 	}
 
 	test.Run(t)
@@ -467,9 +467,9 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 			predicateBytes           = createPredicate(numSigners)
 			expectedPredicateResults = set.NewBits()
 		)
-		// If the number of signers is greater than the required numerator and does not exceed the denominator, then
-		// mark the expected result as valid.
-		if numSigners >= int(params.WarpDefaultQuorumNumerator) && numSigners <= int(params.WarpQuorumDenominator) {
+		// If the number of signers is less than the required numerator or exceeds the denominator, then
+		// mark the expected result as invalid.
+		if numSigners < int(params.WarpDefaultQuorumNumerator) || numSigners > int(params.WarpQuorumDenominator) {
 			expectedPredicateResults.Add(0)
 		}
 		tests[fmt.Sprintf("default quorum %d signature(s)", numSigners)] = testutils.PredicateTest{
@@ -518,10 +518,10 @@ func TestWarpMultiplePredicates(t *testing.T) {
 		expectedGas := uint64(0)
 		for index, valid := range validMessageIndices {
 			if valid {
-				expectedPredicateResults.Add(index)
 				predicates[index] = common.CopyBytes(validPredicateBytes)
 				expectedGas += GasCostPerSignatureVerification + uint64(len(validPredicateBytes))*GasCostPerWarpMessageBytes + uint64(numSigners)*GasCostPerWarpSigner
 			} else {
+				expectedPredicateResults.Add(index)
 				expectedGas += GasCostPerSignatureVerification + uint64(len(invalidPredicateBytes))*GasCostPerWarpMessageBytes + uint64(1)*GasCostPerWarpSigner
 				predicates[index] = invalidPredicateBytes
 			}
@@ -564,9 +564,9 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 			predicateBytes           = createPredicate(numSigners)
 			expectedPredicateResults = set.NewBits()
 		)
-		// If the number of signers is greater than the required numerator and does not exceed the denominator, then
-		// mark the expected result as valid.
-		if numSigners >= nonDefaultQuorumNumerator && numSigners <= int(params.WarpQuorumDenominator) {
+		// If the number of signers is less than the required numerator or exceeds the denominator, then
+		// mark the expected result as invalid.
+		if numSigners < nonDefaultQuorumNumerator || numSigners > int(params.WarpQuorumDenominator) {
 			expectedPredicateResults.Add(0)
 		}
 		name := fmt.Sprintf("non-default quorum %d signature(s)", numSigners)

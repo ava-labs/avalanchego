@@ -197,12 +197,13 @@ func (c *Config) verifyPredicate(predicateContext *precompileconfig.PredicateCon
 	return c.verifyWarpMessage(predicateContext, warpMessage)
 }
 
-// VerifyPredicate verifies the predicate represents a valid signed and properly formatted Avalanche Warp Message.
+// VerifyPredicate computes indices of predicates that failed verification as a bitset then returns the result
+// as a byte slice.
 func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, predicates [][]byte) []byte {
 	resultBitSet := set.NewBits()
 
 	for predicateIndex, predicateBytes := range predicates {
-		if c.verifyPredicate(predicateContext, predicateBytes) {
+		if !c.verifyPredicate(predicateContext, predicateBytes) {
 			resultBitSet.Add(predicateIndex)
 		}
 	}
