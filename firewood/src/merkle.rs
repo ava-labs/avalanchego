@@ -360,7 +360,6 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut parents = Vec::new();
 
         let mut next_node = Some(self.get_node(root)?);
-        let mut nskip = 0;
 
         // wrap the current value into an Option to indicate whether it has been
         // inserted yet. If we haven't inserted it after we traverse the tree, we
@@ -377,12 +376,6 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             let Some(key_nib) = key_nibbles.next() else {
                 break;
             };
-
-            // special handling for extension nodes
-            if nskip > 0 {
-                nskip -= 1;
-                continue;
-            }
 
             // move the current node into node; next_node becomes None
             // unwrap() is okay here since we are certain we have something
@@ -439,8 +432,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 NodeType::Extension(n) => {
                     let n_path = n.path().to_vec();
                     let n_ptr = n.chd();
-                    nskip = n_path.len() - 1;
                     let rem_path = once(key_nib).chain(key_nibbles.clone()).collect::<Vec<_>>();
+                    let n_path_len = n_path.len();
 
                     if let Some(v) = self.split(
                         node,
@@ -451,6 +444,10 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         val.take().unwrap(),
                         &mut deleted,
                     )? {
+                        (0..n_path_len).skip(1).for_each(|_| {
+                            key_nibbles.next();
+                        });
+
                         // we couldn't split this, so we
                         // skip n_path items and follow the
                         // extension node's next pointer
