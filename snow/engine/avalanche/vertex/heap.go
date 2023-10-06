@@ -3,9 +3,7 @@
 
 package vertex
 
-import (
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-)
+import "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 
 func Less(i, j avalanche.Vertex) bool {
 	// Put unknown vertices at the front of the heap to ensure once we have made
