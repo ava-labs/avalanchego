@@ -5,6 +5,7 @@ package ipcs
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -15,13 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // IPCServer maintains the IPCs
 type IPCServer struct {
+	lock         sync.Mutex
 	httpServer   server.Server
 	chainManager chains.Manager
 	log          logging.Logger
@@ -29,7 +30,7 @@ type IPCServer struct {
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer server.Server, ipcs *ipcs.ChainIPCs) (http.Handler, error) {
 	ipcServer := &IPCServer{
 		log:          log,
 		chainManager: chainManager,
@@ -43,7 +44,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer serv
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 
-	return &common.HTTPHandler{Handler: newServer}, newServer.RegisterService(ipcServer, "ipcs")
+	return newServer, newServer.RegisterService(ipcServer, "ipcs")
 }
 
 // PublishBlockchainArgs are the arguments for calling PublishBlockchain
@@ -59,6 +60,9 @@ type PublishBlockchainReply struct {
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
 func (ipc *IPCServer) PublishBlockchain(_ *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
+	ipc.lock.Lock()
+	defer ipc.lock.Unlock()
+
 	ipc.log.Warn("deprecated API called",
 		zap.String("service", "ipcs"),
 		zap.String("method", "publishBlockchain"),
@@ -96,6 +100,9 @@ type UnpublishBlockchainArgs struct {
 
 // UnpublishBlockchain closes publishing of a blockchainID
 func (ipc *IPCServer) UnpublishBlockchain(_ *http.Request, args *UnpublishBlockchainArgs, _ *api.EmptyReply) error {
+	ipc.lock.Lock()
+	defer ipc.lock.Unlock()
+
 	ipc.log.Warn("deprecated API called",
 		zap.String("service", "ipcs"),
 		zap.String("method", "unpublishBlockchain"),
@@ -129,6 +136,9 @@ type GetPublishedBlockchainsReply struct {
 
 // GetPublishedBlockchains returns blockchains being published
 func (ipc *IPCServer) GetPublishedBlockchains(_ *http.Request, _ *struct{}, reply *GetPublishedBlockchainsReply) error {
+	ipc.lock.Lock()
+	defer ipc.lock.Unlock()
+
 	ipc.log.Warn("deprecated API called",
 		zap.String("service", "ipcs"),
 		zap.String("method", "getPublishedBlockchains"),
