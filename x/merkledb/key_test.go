@@ -341,7 +341,7 @@ func Test_Key_Extend(t *testing.T) {
 	require.Equal(byte(1), extendedP.Token(1))
 }
 
-func TestkeyBytesNeeded(t *testing.T) {
+func TestKeyBytesNeeded(t *testing.T) {
 	type test struct {
 		BranchFactor
 		tokensLength int
