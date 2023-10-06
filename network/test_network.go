@@ -207,7 +207,6 @@ func NewTestNetwork(
 		return nil, err
 	}
 	networkConfig.CPUTargeter = tracker.NewTargeter(
-		ctx.SubnetID,
 		ctx.Log,
 		&tracker.TargeterConfig{
 			VdrAlloc:           float64(runtime.NumCPU()),
@@ -218,7 +217,6 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.CPUTracker(),
 	)
 	networkConfig.DiskTargeter = tracker.NewTargeter(
-		ctx.SubnetID,
 		ctx.Log,
 		&tracker.TargeterConfig{
 			VdrAlloc:           1000 * units.GiB,

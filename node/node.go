@@ -1307,11 +1307,9 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 // Initialize [n.cpuTargeter].
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
-	subnetID ids.ID,
 	config *tracker.TargeterConfig,
 ) {
 	n.cpuTargeter = tracker.NewTargeter(
-		subnetID,
 		n.Log,
 		config,
 		n.vdrs,
@@ -1322,11 +1320,9 @@ func (n *Node) initCPUTargeter(
 // Initialize [n.diskTargeter].
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initDiskTargeter(
-	subnetID ids.ID,
 	config *tracker.TargeterConfig,
 ) {
 	n.diskTargeter = tracker.NewTargeter(
-		subnetID,
 		n.Log,
 		config,
 		n.vdrs,
@@ -1424,8 +1420,8 @@ func (n *Node) Initialize(
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
-	n.initCPUTargeter(constants.PrimaryNetworkID, &config.CPUTargeterConfig)
-	n.initDiskTargeter(constants.PrimaryNetworkID, &config.DiskTargeterConfig)
+	n.initCPUTargeter(&config.CPUTargeterConfig)
+	n.initDiskTargeter(&config.DiskTargeterConfig)
 	if err := n.initNetworking(n.vdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}

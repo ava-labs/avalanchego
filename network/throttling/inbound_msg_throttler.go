@@ -57,7 +57,6 @@ func NewInboundMsgThrottler(
 	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
-	subnetID ids.ID,
 	throttlerConfig InboundMsgThrottlerConfig,
 	resourceTracker tracker.ResourceTracker,
 	cpuTargeter tracker.Targeter,
@@ -68,7 +67,6 @@ func NewInboundMsgThrottler(
 		namespace,
 		registerer,
 		vdrs,
-		subnetID,
 		throttlerConfig.MsgByteThrottlerConfig,
 	)
 	if err != nil {

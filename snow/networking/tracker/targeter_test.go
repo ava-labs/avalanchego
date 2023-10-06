@@ -29,7 +29,6 @@ func TestNewTargeter(t *testing.T) {
 	tracker := NewMockTracker(ctrl)
 
 	targeterIntf := NewTargeter(
-		ids.Empty,
 		logging.NoLog{},
 		config,
 		vdrs,
@@ -63,7 +62,6 @@ func TestTarget(t *testing.T) {
 	}
 
 	targeter := NewTargeter(
-		subnetID,
 		logging.NoLog{},
 		config,
 		vdrs,

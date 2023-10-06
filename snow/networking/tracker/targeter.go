@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -35,14 +36,12 @@ type TargeterConfig struct {
 }
 
 func NewTargeter(
-	subnetID ids.ID,
 	logger logging.Logger,
 	config *TargeterConfig,
 	vdrs validators.Manager,
 	tracker Tracker,
 ) Targeter {
 	return &targeter{
-		subnetID:           subnetID,
 		log:                logger,
 		vdrs:               vdrs,
 		tracker:            tracker,
@@ -55,7 +54,6 @@ func NewTargeter(
 type targeter struct {
 	vdrs               validators.Manager
 	log                logging.Logger
-	subnetID           ids.ID
 	tracker            Tracker
 	vdrAlloc           float64
 	maxNonVdrUsage     float64
@@ -69,11 +67,11 @@ func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	baseAlloc = math.Min(baseAlloc, t.maxNonVdrNodeUsage)
 
 	// This node gets a stake-weighted portion of the validator allocation.
-	weight := t.vdrs.GetWeight(t.subnetID, nodeID)
-	totalWeight, err := t.vdrs.TotalWeight(t.subnetID)
+	subnetID := constants.PrimaryNetworkID
+	weight := t.vdrs.GetWeight(subnetID, nodeID)
+	totalWeight, err := t.vdrs.TotalWeight(subnetID)
 	if err != nil {
-		t.log.Error("couldn't get total weight of subnet",
-			zap.Stringer("subnetID", t.subnetID),
+		t.log.Error("couldn't get total weight of primary network",
 			zap.Error(err),
 		)
 		return baseAlloc

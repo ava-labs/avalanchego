@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -45,14 +46,12 @@ func NewSybilOutboundMsgThrottler(
 	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
-	subnetID ids.ID,
 	config MsgByteThrottlerConfig,
 ) (OutboundMsgThrottler, error) {
 	t := &outboundMsgThrottler{
 		commonMsgThrottler: commonMsgThrottler{
 			log:                    log,
 			vdrs:                   vdrs,
-			subnetID:               subnetID,
 			maxVdrBytes:            config.VdrAllocSize,
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
@@ -88,12 +87,12 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight := t.vdrs.GetWeight(t.subnetID, nodeID)
+	subnetID := constants.PrimaryNetworkID
+	weight := t.vdrs.GetWeight(subnetID, nodeID)
 	if weight != 0 {
-		totalWeight, err := t.vdrs.TotalWeight(t.subnetID)
+		totalWeight, err := t.vdrs.TotalWeight(subnetID)
 		if err != nil {
-			t.log.Error("Failed to get total weight of network validators",
-				zap.Stringer("subnetID", t.subnetID),
+			t.log.Error("Failed to get total weight of primary network validators",
 				zap.Error(err),
 			)
 			t.metrics.acquireFailures.Inc()

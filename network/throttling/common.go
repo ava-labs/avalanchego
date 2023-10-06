@@ -20,10 +20,8 @@ type MsgByteThrottlerConfig struct {
 
 // Used by the sybil-safe inbound and outbound message throttlers
 type commonMsgThrottler struct {
-	log      logging.Logger
-	subnetID ids.ID
-	lock     sync.Mutex
-	// Primary network validator set
+	log  logging.Logger
+	lock sync.Mutex
 	vdrs validators.Manager
 	// Max number of bytes that can be taken from the
 	// at-large byte allocation by a given node.

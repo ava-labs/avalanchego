@@ -134,7 +134,6 @@ func init() {
 
 func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
 	return tracker.NewTargeter(
-		ids.Empty,
 		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           10,

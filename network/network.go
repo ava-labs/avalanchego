@@ -213,7 +213,6 @@ func NewNetwork(
 		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
-		constants.PrimaryNetworkID,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 		config.ResourceTracker,
 		config.CPUTargeter,
@@ -228,7 +227,6 @@ func NewNetwork(
 		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
-		constants.PrimaryNetworkID,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
