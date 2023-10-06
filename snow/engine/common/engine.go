@@ -13,7 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-// Engine describes the standard interface of a consensus engine
+// Engine describes the standard interface of a consensus engine.
+//
+// All nodeIDs are assumed to be authenticated.
+//
+// A consensus engine may recover after returning an error, but it isn't
+// required.
 type Engine interface {
 	Handler
 
@@ -54,489 +59,422 @@ type AllGetsServer interface {
 	GetHandler
 }
 
-// GetStateSummaryFrontierHandler defines how a consensus engine reacts to a get
-// state summary frontier message from another validator. Functions only return
-// fatal errors.
 type GetStateSummaryFrontierHandler interface {
-	// Notify this engine of a request for the frontier of state summaries.
+	// Notify this engine of a request for a StateSummaryFrontier message with
+	// the same requestID and the engine's most recently accepted state summary.
 	//
-	// The accepted frontier is the last state summary available locally.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID.
-	//
-	// This engine should respond with an StateSummaryFrontier message with the
-	// same requestID, and the engine's current state summary frontier.
-	GetStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function can be called by any node at any time.
+	GetStateSummaryFrontier(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// StateSummaryFrontierHandler defines how a consensus engine reacts to a state
-// summary frontier message from other validators. Functions only return fatal
-// errors.
 type StateSummaryFrontierHandler interface {
-	// Notify this engine of a state summary frontier.
+	// Notify this engine of the response to a previously sent
+	// GetStateSummaryFrontier message with the same requestID.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a GetStateSummaryFrontier message, is
-	// utilizing a unique requestID, or that the summary bytes are from a valid
-	// state summary.
-	StateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) error
+	// It is not guaranteed that the summary bytes are from a valid state
+	// summary.
+	StateSummaryFrontier(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		summary []byte,
+	) error
 
-	// Notify this engine that a get state summary frontier request it issued
-	// has failed.
-	//
-	// This function will be called if the engine sent a GetStateSummaryFrontier
-	// message that is not anticipated to be responded to. This could be because
-	// the recipient of the message is unknown or if the message request has
-	// timed out.
-	//
-	// The validatorID, and requestID, are assumed to be the same as those sent
-	// in the GetStateSummaryFrontier message.
-	GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
-}
-
-// GetAcceptedStateSummaryHandler defines how a consensus engine reacts to a get
-// accepted state summary message from another validator. Functions only return
-// fatal errors.
-type GetAcceptedStateSummaryHandler interface {
-	// Notify this engine of a request to return state summary IDs referenced by
-	// the provided keys.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. However, the validatorID is
-	// assumed to be authenticated.
-	//
-	// This engine should respond with an AcceptedStateSummary message with the
-	// same requestID, and the subset of the state summaries that this node has
-	// locally available.
-	GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys []uint64) error
-}
-
-// AcceptedStateSummaryHandler defines how a consensus engine reacts to an
-// accepted state summary message from another validator. Functions only return
-// fatal errors.
-type AcceptedStateSummaryHandler interface {
-	// Notify this engine of a set of state summaries.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a GetAcceptedStateSummary message,
-	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
-	// state summaries requested by key from a GetAcceptedStateSummary message.
-	AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
-
-	// Notify this engine that a get accepted state summary request it issued has
+	// Notify this engine that a GetStateSummaryFrontier request it issued has
 	// failed.
 	//
-	// This function will be called if the engine sent a GetAcceptedStateSummary
-	// message that is not anticipated to be responded to. This could be because
-	// the recipient of the message is unknown or if the message request has
-	// timed out.
-	//
-	// The validatorID, and requestID, are assumed to be the same as those sent
-	// in the GetAcceptedStateSummary message.
-	GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function will be called if a GetStateSummaryFrontier message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
+	GetStateSummaryFrontierFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
-// accepted frontier message from another validator. Functions only return fatal
-// errors.
+type GetAcceptedStateSummaryHandler interface {
+	// Notify this engine of a request for an AcceptedStateSummary message with
+	// the same requestID and the state summary IDs at the requested heights.
+	// If this node doesn't have access to a state summary ID at a requested
+	// height, that height should be ignored.
+	//
+	// This function can be called by any node at any time.
+	GetAcceptedStateSummary(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		heights []uint64,
+	) error
+}
+
+type AcceptedStateSummaryHandler interface {
+	// Notify this engine of the response to a previously sent
+	// GetAcceptedStateSummary message with the same requestID.
+	//
+	// It is not guaranteed that the summaryIDs have heights corresponding to
+	// the heights in the request.
+	AcceptedStateSummary(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		summaryIDs []ids.ID,
+	) error
+
+	// Notify this engine that a GetAcceptedStateSummary request it issued has
+	// failed.
+	//
+	// This function will be called if a GetAcceptedStateSummary message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
+	GetAcceptedStateSummaryFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
+}
+
 type GetAcceptedFrontierHandler interface {
-	// Notify this engine of a request for the accepted frontier of vertices.
+	// Notify this engine of a request for an AcceptedFrontier message with the
+	// same requestID and the ID of the most recently accepted container.
 	//
-	// The accepted frontier is the set of accepted vertices that do not have
-	// any accepted descendants.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID.
-	//
-	// This engine should respond with an AcceptedFrontier message with the same
-	// requestID, and the engine's current accepted frontier.
-	GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function can be called by any node at any time.
+	GetAcceptedFrontier(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// AcceptedFrontierHandler defines how a consensus engine reacts to accepted
-// frontier messages from other validators. Functions only return fatal errors.
 type AcceptedFrontierHandler interface {
-	// Notify this engine of an accepted frontier.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a GetAcceptedFrontier message, is
-	// utilizing a unique requestID, or that the containerID is a valid
-	// frontier.
+	// Notify this engine of the response to a previously sent
+	// GetAcceptedFrontier message with the same requestID.
 	AcceptedFrontier(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
 	) error
 
-	// Notify this engine that a get accepted frontier request it issued has
+	// Notify this engine that a GetAcceptedFrontier request it issued has
 	// failed.
 	//
-	// This function will be called if the engine sent a GetAcceptedFrontier
-	// message that is not anticipated to be responded to. This could be because
-	// the recipient of the message is unknown or if the message request has
-	// timed out.
-	//
-	// The validatorID, and requestID, are assumed to be the same as those sent
-	// in the GetAcceptedFrontier message.
-	GetAcceptedFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function will be called if a GetAcceptedFrontier message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
+	GetAcceptedFrontierFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// GetAcceptedHandler defines how a consensus engine reacts to a get accepted
-// message from another validator. Functions only return fatal errors.
 type GetAcceptedHandler interface {
-	// Notify this engine of a request to filter non-accepted vertices.
+	// Notify this engine of a request for an Accepted message with the same
+	// requestID and the subset of containerIDs that this node has accepted.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. However, the validatorID is
-	// assumed to be authenticated.
-	//
-	// This engine should respond with an Accepted message with the same
-	// requestID, and the subset of the containerIDs that this node has decided
-	// are accepted.
+	// This function can be called by any node at any time.
 	GetAccepted(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
 }
 
-// AcceptedHandler defines how a consensus engine reacts to accepted messages
-// from other validators. Functions only return fatal
-// errors.
 type AcceptedHandler interface {
-	// Notify this engine of a set of accepted vertices.
+	// Notify this engine of the response to a previously sent GetAccepted
+	// message with the same requestID.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a GetAccepted message, is utilizing a
-	// unique requestID, or that the containerIDs are a subset of the
-	// containerIDs from a GetAccepted message.
+	// It is not guaranteed that the containerIDs are a subset of the
+	// containerIDs provided in the request.
 	Accepted(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
 
-	// Notify this engine that a get accepted request it issued has failed.
+	// Notify this engine that a GetAccepted request it issued has failed.
 	//
-	// This function will be called if the engine sent a GetAccepted message
-	// that is not anticipated to be responded to. This could be because the
-	// recipient of the message is unknown or if the message request has timed
-	// out.
-	//
-	// The validatorID, and requestID, are assumed to be the same as those sent
-	// in the GetAccepted message.
-	GetAcceptedFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function will be called if a GetAccepted message with nodeID and
+	// requestID was previously sent by this engine and will not receive a
+	// response.
+	GetAcceptedFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// GetAncestorsHandler defines how a consensus engine reacts to a get ancestors
-// message from another validator. Functions only return fatal errors.
 type GetAncestorsHandler interface {
-	// Notify this engine of a request for a container and its ancestors.
+	// Notify this engine of a request for an Ancestors message with the same
+	// requestID, containerID, and some of its ancestors on a best effort basis.
 	//
-	// The request is from validator [validatorID]. The requested container is
-	// [containerID].
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. It is also not safe to
-	// assume the requested containerID exists.
-	//
-	// This engine should respond with an Ancestors message with the same
-	// requestID, which contains [containerID] as well as its ancestors. See
-	// Ancestors's documentation.
-	//
-	// If this engine doesn't have some ancestors, it should reply with its best
-	// effort attempt at getting them. If this engine doesn't have [containerID]
-	// it can ignore this message.
-	GetAncestors(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
+	// This function can be called by any node at any time.
+	GetAncestors(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		containerID ids.ID,
+	) error
 }
 
-// AncestorsHandler defines how a consensus engine reacts to bootstrapping
-// retrieval messages from other validators. Functions only return fatal errors.
 type AncestorsHandler interface {
-	// Notify this engine of multiple containers.
+	// Notify this engine of the response to a previously sent GetAncestors
+	// message with the same requestID.
 	//
-	// Each element of [containers] is the byte representation of a container.
-	//
-	// This should only be called during bootstrapping, in response to a
-	// GetAncestors message to [validatorID] with request ID [requestID].
-	//
-	// This call should contain the container requested in that message, along
-	// with ancestors. The containers should be in BFS order (ie the first
-	// container must be the container requested in the GetAncestors message and
-	// further back ancestors are later in [containers]
-	//
-	// It is not safe to assume this message is in response to a GetAncestor
-	// message, that this message has a unique requestID or that any of the
-	// containers in [containers] are valid.
+	// It is expected, but not guaranteed, that the first element in containers
+	// should be the container referenced in the request and that the rest of
+	// the containers should be referenced by a prior container in the list.
 	Ancestors(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		containers [][]byte,
 	) error
 
 	// Notify this engine that a GetAncestors request it issued has failed.
 	//
-	// This function will be called if the engine sent a GetAncestors message
-	// that is not anticipated to be responded to. This could be because the
-	// recipient of the message is unknown or if the message request has timed
-	// out.
-	//
-	// The validatorID and requestID are assumed to be the same as those sent in
-	// the GetAncestors message.
-	GetAncestorsFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
-}
-
-// GetHandler defines how a consensus engine reacts to get message from another
-// validator. Functions only return fatal errors.
-type GetHandler interface {
-	// Notify this engine of a request for a container.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. It is also not safe to
-	// assume the requested containerID exists.
-	//
-	// There should never be a situation where a virtuous node sends a Get
-	// request to another virtuous node that does not have the requested
-	// container.
-	//
-	// This engine should respond with a Put message with the same requestID if
-	// the container was locally available. Otherwise, the message can be safely
-	// dropped.
-	Get(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
-}
-
-// PutHandler defines how a consensus engine reacts to put messages from other
-// validators. Functions only return fatal errors.
-type PutHandler interface {
-	// Notify this engine of a container.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID.
-	Put(
+	// This function will be called if a GetAncestors message with nodeID and
+	// requestID was previously sent by this engine and will not receive a
+	// response.
+	GetAncestorsFailed(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
-		container []byte,
 	) error
-
-	// Notify this engine that a get request it issued has failed.
-	//
-	// This function will be called if the engine sent a Get message that is not
-	// anticipated to be responded to. This could be because the recipient of
-	// the message is unknown or if the message request has timed out.
-	//
-	// The validatorID and requestID are assumed to be the same as those sent in
-	// the Get message.
-	GetFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
-// QueryHandler defines how a consensus engine reacts to query messages from
-// other validators. Functions only return fatal errors.
-type QueryHandler interface {
-	// Notify this engine of a request for our preferences.
+type GetHandler interface {
+	// Notify this engine of a request for a Put message with the same requestID
+	// and the container whose ID is containerID.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. However, the validatorID is
-	// assumed to be authenticated.
-	//
-	// If the container or its ancestry is incomplete, this engine is expected
-	// to request the missing containers from the validator. Once the ancestry
-	// is complete, this engine should send this validator the current
-	// preferences in a Chits message. The Chits message should have the same
-	// requestID that was passed in here.
-	PullQuery(
+	// This function can be called by any node at any time.
+	Get(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
 	) error
+}
 
-	// Notify this engine of a request for our preferences.
+type PutHandler interface {
+	// Notify this engine of either the response to a previously sent Get
+	// message with the same requestID or an unsolicited container if the
+	// requestID is MaxUint32.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID.
-	//
-	// This function is meant to behave the same way as PullQuery, except the
-	// container is optimistically provided to potentially remove the need for
-	// a series of Get/Put messages.
-	//
-	// If the ancestry of the container is incomplete, this engine is expected
-	// to request the ancestry from the validator. Once the ancestry is
-	// complete, this engine should send this validator the current preferences
-	// in a Chits message. The Chits message should have the same requestID that
-	// was passed in here.
-	PushQuery(
+	// It is not guaranteed that container can be parsed or issued.
+	Put(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		container []byte,
 	) error
+
+	// Notify this engine that a Get request it issued has failed.
+	//
+	// This function will be called if a Get message with nodeID and requestID
+	// was previously sent by this engine and will not receive a response.
+	GetFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// ChitsHandler defines how a consensus engine reacts to query response messages
-// from other validators. Functions only return fatal errors.
-type ChitsHandler interface {
-	// Notify this engine of the specified validators preferences.
+type QueryHandler interface {
+	// Notify this engine of a request for a Chits message with the same
+	// requestID.
 	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a PullQuery or a PushQuery message.
-	// However, the validatorID is assumed to be authenticated.
+	// If the provided containerID is not processing, the engine is expected to
+	// respond with the node's current preferences before attempting to issue
+	// it.
+	//
+	// This function can be called by any node at any time.
+	PullQuery(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		containerID ids.ID,
+		requestedHeight uint64,
+	) error
+
+	// Notify this engine of a request for a Chits message with the same
+	// requestID.
+	//
+	// If the provided container is not processing, the engine is expected to
+	// respond with the node's current preferences before attempting to issue
+	// it.
+	//
+	// It is not guaranteed that container can be parsed or issued.
+	//
+	// This function can be called by any node at any time.
+	PushQuery(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		container []byte,
+		requestedHeight uint64,
+	) error
+}
+
+type ChitsHandler interface {
+	// Notify this engine of the response to a previously sent PullQuery or
+	// PushQuery message with the same requestID.
+	//
+	// It is expected, but not guaranteed, that preferredID transitively
+	// references preferredIDAtHeight and acceptedID.
 	Chits(
 		ctx context.Context,
-		validatorID ids.NodeID,
+		nodeID ids.NodeID,
 		requestID uint32,
 		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 	) error
 
-	// Notify this engine that a query it issued has failed.
+	// Notify this engine that a Query request it issued has failed.
 	//
-	// This function will be called if the engine sent a PullQuery or PushQuery
-	// message that is not anticipated to be responded to. This could be because
-	// the recipient of the message is unknown or if the message request has
-	// timed out.
-	//
-	// The validatorID and the requestID are assumed to be the same as those
-	// sent in the Query message.
-	QueryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
+	// This function will be called if a PullQuery or PushQuery message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
+	QueryFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
 }
 
-// NetworkAppHandler defines how a consensus engine reacts to app specific
-// messages from the network.
-//
-// Functions only return fatal errors.
 type NetworkAppHandler interface {
-	// Notify this engine of a request for data from [nodeID].
+	AppRequestHandler
+	AppResponseHandler
+	AppGossipHandler
+}
+
+type AppRequestHandler interface {
+	// Notify this engine of a request for an AppResponse with the same
+	// requestID.
 	//
-	// The meaning of [request], and what should be sent in response to it, is
+	// The meaning of request, and what should be sent in response to it, is
 	// application (VM) specific.
 	//
-	// It is not guaranteed that:
-	// * [request] is well-formed/valid.
+	// It is not guaranteed that request is well-formed or valid.
 	//
-	// This node should typically send an AppResponse to [nodeID] in response to
-	// a valid message using the same request ID before the deadline. However,
-	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
+	// This function can be called by any node at any time.
+	AppRequest(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		deadline time.Time,
+		request []byte,
+	) error
+}
 
-	// Notify this engine that an AppRequest message it sent to [nodeID] with
-	// request ID [requestID] failed.
+type AppResponseHandler interface {
+	// Notify this engine of the response to a previously sent AppRequest with
+	// the same requestID.
 	//
-	// This may be because the request timed out or because the message couldn't
-	// be sent to [nodeID].
+	// The meaning of response is application (VM) specifc.
 	//
-	// It is guaranteed that:
-	// * This engine sent a request to [nodeID] with ID [requestID].
-	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
-	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	// It is not guaranteed that response is well-formed or valid.
+	AppResponse(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		response []byte,
+	) error
 
-	// Notify this engine of a response to the AppRequest message it sent to
-	// [nodeID] with request ID [requestID].
+	// Notify this engine that an AppRequest it issued has failed.
 	//
-	// The meaning of [response] is application (VM) specifc.
-	//
-	// It is guaranteed that:
-	// * This engine sent a request to [nodeID] with ID [requestID].
-	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
-	// * AppResponse([nodeID], [requestID]) has not already been called.
-	//
-	// It is not guaranteed that:
-	// * [response] contains the expected response
-	// * [response] is well-formed/valid.
-	//
-	// If [response] is invalid or not the expected response, the VM chooses how
-	// to react. For example, the VM may send another AppRequest, or it may give
-	// up trying to get the requested information.
-	AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error
+	// This function will be called if an AppRequest message with nodeID and
+	// requestID was previously sent by this engine and will not receive a
+	// response.
+	AppRequestFailed(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+	) error
+}
 
-	// Notify this engine of a gossip message from [nodeID].
+type AppGossipHandler interface {
+	// Notify this engine of a gossip message from nodeID.
 	//
-	// The meaning of [msg] is application (VM) specific, and the VM defines how
+	// The meaning of msg is application (VM) specific, and the VM defines how
 	// to react to this message.
 	//
 	// This message is not expected in response to any event, and it does not
 	// need to be responded to.
-	//
-	// A node may gossip the same message multiple times. That is,
-	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppGossip(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		msg []byte,
+	) error
 }
 
-// CrossChainAppHandler defines how a consensus engine reacts to cross-chain app
-// specific messages.
-//
-// Functions only return fatal errors.
 type CrossChainAppHandler interface {
-	// CrossChainAppRequest Notify this engine of a request for data from
-	// [chainID].
+	CrossChainAppRequestHandler
+	CrossChainAppResponseHandler
+}
+
+type CrossChainAppRequestHandler interface {
+	// Notify this engine of a request for a CrossChainAppResponse with the same
+	// requestID.
 	//
-	// The meaning of [request], and what should be sent in response to it, is
+	// The meaning of request, and what should be sent in response to it, is
 	// application (VM) specific.
 	//
 	// Guarantees surrounding the request are specific to the implementation of
 	// the requesting VM. For example, the request may or may not be guaranteed
 	// to be well-formed/valid depending on the implementation of the requesting
 	// VM.
+	CrossChainAppRequest(
+		ctx context.Context,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		request []byte,
+	) error
+}
+
+type CrossChainAppResponseHandler interface {
+	// Notify this engine of the response to a previously sent
+	// CrossChainAppRequest with the same requestID.
 	//
-	// This node should typically send a CrossChainAppResponse to [chainID] in
-	// response to a valid message using the same request ID before the
-	// deadline. However, the VM may arbitrarily choose to not send a response
-	// to this request.
-	CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
-	// CrossChainAppRequestFailed notifies this engine that a
-	// CrossChainAppRequest message it sent to [chainID] with request ID
-	// [requestID] failed.
-	//
-	// This may be because the request timed out or because the message couldn't
-	// be sent to [chainID].
-	//
-	// It is guaranteed that:
-	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
-	// called.
-	// * CrossChainAppResponse([chainID], [requestID]) has not already been
-	// called.
-	CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error
-	// CrossChainAppResponse notifies this engine of a response to the
-	// CrossChainAppRequest message it sent to [chainID] with request ID
-	// [requestID].
-	//
-	// The meaning of [response] is application (VM) specific.
-	//
-	// It is guaranteed that:
-	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
-	// called.
-	// * CrossChainAppResponse([chainID], [requestID]) has not already been
-	// called.
+	// The meaning of response is application (VM) specifc.
 	//
 	// Guarantees surrounding the response are specific to the implementation of
 	// the responding VM. For example, the response may or may not be guaranteed
 	// to be well-formed/valid depending on the implementation of the requesting
 	// VM.
+	CrossChainAppResponse(
+		ctx context.Context,
+		chainID ids.ID,
+		requestID uint32,
+		response []byte,
+	) error
+
+	// Notify this engine that a CrossChainAppRequest it issued has failed.
 	//
-	// If [response] is invalid or not the expected response, the VM chooses how
-	// to react. For example, the VM may send another CrossChainAppRequest, or
-	// it may give up trying to get the requested information.
-	CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error
+	// This function will be called if a CrossChainAppRequest message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
+	CrossChainAppRequestFailed(
+		ctx context.Context,
+		chainID ids.ID,
+		requestID uint32,
+	) error
 }
 
-// AppHandler defines how a consensus engine reacts to app specific messages.
-// Functions only return fatal errors.
 type AppHandler interface {
 	NetworkAppHandler
 	CrossChainAppHandler
 }
 
-// InternalHandler defines how this consensus engine reacts to messages from
-// other components of this validator. Functions only return fatal errors if
-// they occur.
 type InternalHandler interface {
 	// Notify this engine of peer changes.
 	validators.Connector

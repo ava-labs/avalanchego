@@ -5,7 +5,9 @@ package merkledb
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -260,4 +262,11 @@ func FuzzEncodeHashValues(f *testing.F) {
 			}
 		},
 	)
+}
+
+func TestCodecDecodePathLengthOverflowRegression(t *testing.T) {
+	codec := codec.(*codecImpl)
+	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
+	_, err := codec.decodePath(bytes, BranchFactor16)
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
