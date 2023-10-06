@@ -262,7 +262,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID, uint64) error {
 		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
@@ -308,7 +308,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	go func() {
 		chainID := ids.ID{}
 		msg := handler.Message{
-			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), nodeID, engineType),
+			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID, engineType),
 			EngineType:     engineType,
 		}
 		h.Push(context.Background(), msg)
@@ -808,6 +808,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			requestID,
 			0,
 			nil,
+			0,
 			nodeID,
 			engineType,
 		)
@@ -1051,6 +1052,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			ids.Empty,
 			ids.Empty,
+			ids.Empty,
 			nodeID,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
@@ -1191,7 +1193,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID, uint64) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -1239,6 +1241,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
+		0,
 		nID,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
@@ -1254,6 +1257,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
+		0,
 		vID,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
@@ -1642,7 +1646,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID, uint64) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -1684,6 +1688,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
+		0,
 		nID,
 		engineType,
 	)
@@ -1699,6 +1704,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
+		0,
 		allowedID,
 		engineType,
 	)
@@ -1716,6 +1722,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		reqID,
 		time.Hour,
 		dummyContainerID,
+		0,
 		vID,
 		engineType,
 	)
