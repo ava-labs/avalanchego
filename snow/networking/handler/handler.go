@@ -691,7 +691,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PushQuery:
-		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
+		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container, msg.RequestedHeight)
 
 	case *p2p.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -706,7 +706,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
+		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
 
 	case *p2p.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
@@ -721,6 +721,20 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
+		preferredIDAtHeight, err := ids.ToID(msg.PreferredIdAtHeight)
+		if err != nil {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.ChitsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "PreferredIDAtHeight"),
+				zap.Error(err),
+			)
+			// TODO: Require this field to be populated correctly after v1.11.x
+			// is activated.
+			preferredIDAtHeight = preferredID
+		}
+
 		acceptedID, err := ids.ToID(msg.AcceptedId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -733,7 +747,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
