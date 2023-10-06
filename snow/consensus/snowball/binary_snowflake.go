@@ -49,6 +49,15 @@ func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
+func (sf *binarySnowflake) RecordPollPreference(choice int) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	sf.confidence = 0
+	sf.binarySlush.RecordSuccessfulPoll(choice)
+}
+
 func (sf *binarySnowflake) RecordUnsuccessfulPoll() {
 	sf.confidence = 0
 }
