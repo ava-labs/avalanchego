@@ -64,7 +64,7 @@ func (o *overriddenManager) Count(ids.ID) int {
 	return o.manager.Count(o.subnetID)
 }
 
-func (o *overriddenManager) TotalWeight(_ ids.ID) (uint64, error) {
+func (o *overriddenManager) TotalWeight(ids.ID) (uint64, error) {
 	return o.manager.TotalWeight(o.subnetID)
 }
 
