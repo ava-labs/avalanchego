@@ -76,7 +76,7 @@ func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 			zap.Stringer("subnetID", t.subnetID),
 			zap.Error(err),
 		)
-		return 0
+		return baseAlloc
 	}
 
 	vdrAlloc := t.vdrAlloc * float64(weight) / float64(totalWeight)
