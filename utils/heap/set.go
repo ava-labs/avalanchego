@@ -42,7 +42,3 @@ func (s Set[T]) Remove(t T) (T, bool) {
 func (s Set[T]) Fix(t T) {
 	s.set.Fix(t)
 }
-
-func (s Set[T]) Index() map[T]int {
-	return s.set.queue.index
-}
