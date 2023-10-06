@@ -75,7 +75,7 @@ func (vh *maxHeightVertexHeap) Clear() {
 // Returns false if it was already in the heap.
 func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	vtxID := vtx.ID()
-	if _, ok := vh.heap.Index()[vtxID]; ok {
+	if ok := vh.heap.Contains(vtxID); ok {
 		return false
 	}
 
@@ -96,6 +96,5 @@ func (vh *maxHeightVertexHeap) Len() int {
 }
 
 func (vh *maxHeightVertexHeap) Contains(vtxID ids.ID) bool {
-	_, ok := vh.heap.Index()[vtxID]
-	return ok
+	return vh.heap.Contains(vtxID)
 }

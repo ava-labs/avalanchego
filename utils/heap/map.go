@@ -5,6 +5,7 @@ package heap
 
 import (
 	"container/heap"
+
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -74,22 +75,31 @@ func (m *Map[K, V]) Len() int {
 	return m.queue.Len()
 }
 
-func (m *Map[K, V]) Remove(i int) (K, V) {
-	removed := heap.Remove(m.queue, i).(entry[K, V])
-	return removed.k, removed.v
+func (m *Map[K, V]) Remove(k K) (K, V, bool) {
+	if i, ok := m.queue.index[k]; ok {
+		removed := heap.Remove(m.queue, i).(entry[K, V])
+		return removed.k, removed.v, true
+	}
+	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (m *Map[K, V]) Get(i int) (K, V) {
-	got := m.queue.entries[i]
-	return got.k, got.v
+func (m *Map[K, V]) Contains(k K) bool {
+	_, ok := m.queue.index[k]
+	return ok
 }
 
-func (m *Map[K, V]) Fix(i int) {
-	heap.Fix(m.queue, i)
+func (m *Map[K, V]) Get(k K) (K, V, bool) {
+	if i, ok := m.queue.index[k]; ok {
+		got := m.queue.entries[i]
+		return got.k, got.v, true
+	}
+	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (m *Map[K, V]) Index() map[K]int {
-	return m.queue.index
+func (m *Map[K, V]) Fix(k K) {
+	if i, ok := m.queue.index[k]; ok {
+		heap.Fix(m.queue, i)
+	}
 }
 
 type indexedQueue[K comparable, V any] struct {
