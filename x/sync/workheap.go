@@ -107,7 +107,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 				// merged into [beforeItem.start, item.end]
 				beforeItem.end = item.end
 				beforeItem.priority = math.Max(item.priority, beforeItem.priority)
-				wh.innerHeap.Fix(wh.innerHeap.Index()[beforeItem])
+				wh.innerHeap.Fix(beforeItem)
 				mergedBefore = beforeItem
 			}
 			return false
@@ -124,7 +124,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 				// [item.start, afterItem.end].
 				afterItem.start = item.start
 				afterItem.priority = math.Max(item.priority, afterItem.priority)
-				wh.innerHeap.Fix(wh.innerHeap.Index()[afterItem])
+				wh.innerHeap.Fix(afterItem)
 				mergedAfter = afterItem
 			}
 			return false
@@ -139,7 +139,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 		wh.remove(mergedAfter)
 		// update the priority
 		mergedBefore.priority = math.Max(mergedBefore.priority, mergedAfter.priority)
-		wh.innerHeap.Fix(wh.innerHeap.Index()[mergedBefore])
+		wh.innerHeap.Fix(mergedBefore)
 	}
 
 	// nothing was merged, so add new item to the heap
@@ -151,7 +151,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 
 // Deletes [item] from the heap.
 func (wh *workHeap) remove(item *workItem) {
-	wh.innerHeap.Remove(wh.innerHeap.Index()[item])
+	wh.innerHeap.Remove(item)
 	wh.sortedItems.Delete(item)
 }
 

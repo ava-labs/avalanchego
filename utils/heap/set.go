@@ -14,10 +14,9 @@ type Set[T comparable] struct {
 	set Map[T, T]
 }
 
-// Push returns if a value was overwritten
-func (s Set[T]) Push(t T) bool {
-	_, ok := s.set.Push(t, t)
-	return ok
+// Push returns the evicted previous value if present
+func (s Set[T]) Push(t T) (T, bool) {
+	return s.set.Push(t, t)
 }
 
 func (s Set[T]) Pop() (T, bool) {
@@ -34,15 +33,20 @@ func (s Set[T]) Len() int {
 	return s.set.Len()
 }
 
-func (s Set[T]) Remove(i int) T {
-	remove, _ := s.set.Remove(i)
-	return remove
+func (s Set[T]) Remove(t T) (T, bool) {
+	remove, _, existed := s.set.Remove(t)
+	return remove, existed
 }
 
-func (s Set[T]) Fix(i int) {
-	s.set.Fix(i)
+func (s Set[T]) Fix(t T) {
+	s.set.Fix(t)
 }
 
-func (s Set[T]) Index() map[T]int {
-	return s.set.queue.index
+func (s Set[T]) Contains(t T) bool {
+	return s.set.Contains(t)
+}
+
+func (s Set[T]) Get(t T) (T, bool) {
+	key, _, ok := s.set.Get(t)
+	return key, ok
 }
