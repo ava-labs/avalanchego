@@ -60,7 +60,7 @@ func (o *overriddenManager) Contains(_ ids.ID, validatorID ids.NodeID) bool {
 	return o.manager.Contains(o.subnetID, validatorID)
 }
 
-func (o *overriddenManager) Count(_ ids.ID) int {
+func (o *overriddenManager) Count(ids.ID) int {
 	return o.manager.Count(o.subnetID)
 }
 
