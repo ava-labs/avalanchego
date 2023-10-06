@@ -364,8 +364,8 @@ func (s *vdrSet) GetValidatorIDs() []ids.NodeID {
 	defer s.lock.RUnlock()
 
 	list := make([]ids.NodeID, len(s.vdrSlice))
-	for _, vdr := range s.vdrSlice {
-		list = append(list, vdr.NodeID)
+	for i, vdr := range s.vdrSlice {
+		list[i] = vdr.NodeID
 	}
 	return list
 }
