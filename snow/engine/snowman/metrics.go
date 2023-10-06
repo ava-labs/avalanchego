@@ -20,11 +20,13 @@ type metrics struct {
 	numBuildsFailed                       prometheus.Counter
 	numUselessPutBytes                    prometheus.Counter
 	numUselessPushQueryBytes              prometheus.Counter
+	numMissingAcceptedBlocks              prometheus.Counter
 	numProcessingAncestorFetchesFailed    prometheus.Counter
 	numProcessingAncestorFetchesDropped   prometheus.Counter
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
 	getAncestorsBlks                      metric.Averager
+	selectedVoteIndex                     metric.Averager
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -74,6 +76,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "num_useless_push_query_bytes",
 		Help:      "Amount of useless bytes received in PushQuery messages",
 	})
+	m.numMissingAcceptedBlocks = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_missing_accepted_blocks",
+		Help:      "Number of times an accepted block height was referenced and it wasn't locally available",
+	})
 	m.numProcessingAncestorFetchesFailed = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "num_processing_ancestor_fetches_failed",
@@ -101,6 +108,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg,
 		&errs,
 	)
+	m.selectedVoteIndex = metric.NewAveragerWithErrs(
+		namespace,
+		"selected_vote_index",
+		"index of the voteID that was passed into consensus",
+		reg,
+		&errs,
+	)
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
@@ -112,6 +126,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numBuildsFailed),
 		reg.Register(m.numUselessPutBytes),
 		reg.Register(m.numUselessPushQueryBytes),
+		reg.Register(m.numMissingAcceptedBlocks),
 		reg.Register(m.numProcessingAncestorFetchesFailed),
 		reg.Register(m.numProcessingAncestorFetchesDropped),
 		reg.Register(m.numProcessingAncestorFetchesSucceeded),
