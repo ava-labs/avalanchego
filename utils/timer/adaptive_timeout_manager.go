@@ -197,13 +197,11 @@ func (tm *adaptiveTimeoutManager) Remove(id ids.RequestID) {
 
 // Assumes [tm.lock] is held
 func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
-	i, exists := tm.timeoutHeap.Index()[id]
+	// Observe the response time to update average network response time.
+	_, timeout, exists := tm.timeoutHeap.Get(id)
 	if !exists {
 		return
 	}
-
-	// Observe the response time to update average network response time.
-	_, timeout := tm.timeoutHeap.Get(i)
 	if timeout.measureLatency {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 		latency := now.Sub(timeoutRegisteredAt)
@@ -211,7 +209,7 @@ func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
 	}
 
 	// Remove the timeout from the queue
-	tm.timeoutHeap.Remove(i)
+	tm.timeoutHeap.Remove(id)
 	tm.numPendingTimeouts.Set(float64(tm.timeoutHeap.Len()))
 }
 
