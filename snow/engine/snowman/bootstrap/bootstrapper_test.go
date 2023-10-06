@@ -392,9 +392,9 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	requestID := new(uint32)
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		require.Equal(blkID1, vtxID)
+		require.Equal(blkID1, blkID)
 		*requestID = reqID
 	}
 
@@ -540,11 +540,11 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
+		require.Contains([]ids.ID{blkID1, blkID2}, blkID)
 		*requestID = reqID
-		requested = vtxID
+		requested = blkID
 	}
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request blk2
@@ -846,11 +846,11 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
+		require.Contains([]ids.ID{blkID1, blkID2}, blkID)
 		*requestID = reqID
-		requested = vtxID
+		requested = blkID
 	}
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))                                    // should request blk2
@@ -965,9 +965,9 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		requestIDs[vtxID] = reqID
+		requestIDs[blkID] = reqID
 	}
 
 	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk2 and blk1
@@ -1125,9 +1125,9 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		requestIDs[vtxID] = reqID
+		requestIDs[blkID] = reqID
 	}
 
 	// Force Accept blk3
@@ -1231,9 +1231,9 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		requestIDs[vtxID] = reqID
+		requestIDs[blkID] = reqID
 	}
 
 	// Force Accept, the already transitively accepted, blk0
