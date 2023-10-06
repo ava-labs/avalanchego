@@ -6,25 +6,17 @@ package heap
 // NewSet returns a heap without duplicates ordered by its values
 func NewSet[T comparable](less func(a, b T) bool) Set[T] {
 	return Set[T]{
-		set: Map[T, struct{}]{
-			queue: &indexedQueue[T, struct{}]{
-				entries: make([]entry[T, struct{}], 0),
-				index:   make(map[T]int),
-				less: func(a, b entry[T, struct{}]) bool {
-					return less(a.k, b.k)
-				},
-			},
-		},
+		set: NewMap[T, T](less),
 	}
 }
 
 type Set[T comparable] struct {
-	set Map[T, struct{}]
+	set Map[T, T]
 }
 
 // Push returns if a value was overwritten
 func (s Set[T]) Push(t T) bool {
-	_, ok := s.set.Push(t, struct{}{})
+	_, ok := s.set.Push(t, t)
 	return ok
 }
 
