@@ -112,19 +112,13 @@ type manager struct {
 }
 
 func (m *manager) AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
-	// Use write lock in case we need to create a new set
 	m.lock.Lock()
+	defer m.lock.Unlock()
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
 		set = newSet()
 		m.subnetToVdrs[subnetID] = set
 	}
-	m.lock.Unlock()
-
-	// Use read lock for all other operations
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	return set.Add(nodeID, pk, txID, weight)
 }
 
@@ -177,7 +171,8 @@ func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]
 }
 
 func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
-	m.lock.RLock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
 		return errMissingValidator
@@ -186,11 +181,6 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	if err := set.RemoveWeight(nodeID, weight); err != nil {
 		return err
 	}
-	m.lock.RUnlock()
-
-	// Use write lock to remove the subnet if it is empty
-	m.lock.Lock()
-	defer m.lock.Unlock()
 	// If this was the last validator in the subnet
 	// and no callback listeners are registered, remove the subnet
 	if set.Len() == 0 && !set.hasCallbackRegistered() {
