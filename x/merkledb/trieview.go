@@ -173,7 +173,7 @@ func newTrieView(
 				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-		if err := newView.recordValueChange(db.convertToKey(key), newVal); err != nil {
+		if err := newView.recordValueChange(db.toKey(key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -181,7 +181,7 @@ func newTrieView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(db.convertToKey(stringToByteSlice(keyString)), val); err != nil {
+		if err := newView.recordValueChange(db.toKey(stringToByteSlice(keyString)), val); err != nil {
 			return nil, err
 		}
 	}
@@ -334,7 +334,7 @@ func (t *trieView) getProof(ctx context.Context, keyBytes []byte) (*Proof, error
 	defer span.End()
 
 	proof := &Proof{
-		Key: t.db.convertToKey(keyBytes),
+		Key: t.db.toKey(keyBytes),
 	}
 
 	proofPath, err := t.getPathTo(proof.Key)
@@ -561,7 +561,7 @@ func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []er
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValueCopy(t.db.convertToKey(key))
+		results[i], valueErrors[i] = t.getValueCopy(t.db.toKey(key))
 	}
 	return results, valueErrors
 }
@@ -572,7 +572,7 @@ func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
 	defer span.End()
 
-	return t.getValueCopy(t.db.convertToKey(key))
+	return t.getValueCopy(t.db.toKey(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].

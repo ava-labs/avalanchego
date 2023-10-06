@@ -52,7 +52,7 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
-	serializedKey := ConvertToKey(key, BranchFactor16)
+	serializedKey := ToKey(key, BranchFactor16)
 
 	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404

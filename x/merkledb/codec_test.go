@@ -159,7 +159,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					_, _ = r.Read(childKeyBytes)              // #nosec G404
 
 					children[byte(i)] = child{
-						compressedKey: ConvertToKey(childKeyBytes, branchFactor),
+						compressedKey: ToKey(childKeyBytes, branchFactor),
 						id:            childID,
 					}
 				}
@@ -230,7 +230,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 					_, _ = r.Read(compressedKeyBytes) // #nosec G404
 
 					children[byte(i)] = child{
-						compressedKey: ConvertToKey(compressedKeyBytes, branchFactor),
+						compressedKey: ToKey(compressedKeyBytes, branchFactor),
 						id:            ids.GenerateTestID(),
 						hasValue:      r.Intn(2) == 1, // #nosec G404
 					}
@@ -250,7 +250,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 				hv := &hashValues{
 					Children: children,
 					Value:    value,
-					Key:      ConvertToKey(key, branchFactor),
+					Key:      ToKey(key, branchFactor),
 				}
 
 				// Serialize the *hashValues with both codecs

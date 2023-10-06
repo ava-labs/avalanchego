@@ -190,8 +190,8 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	convertToKey func(p []byte) Key
-	rootKey      Key
+	toKey   func(p []byte) Key
+	rootKey Key
 }
 
 // New returns a new merkle database.
@@ -218,8 +218,8 @@ func newDatabase(
 		return nil, err
 	}
 
-	convertToKey := func(b []byte) Key {
-		return ConvertToKey(b, config.BranchFactor)
+	toKey := func(b []byte) Key {
+		return ToKey(b, config.BranchFactor)
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
@@ -234,13 +234,13 @@ func newDatabase(
 		baseDB:               db,
 		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.BranchFactor),
 		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
-		history:              newTrieHistory(int(config.HistoryLength), convertToKey),
+		history:              newTrieHistory(int(config.HistoryLength), toKey),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		convertToKey:         convertToKey,
-		rootKey:              convertToKey(rootKey),
+		toKey:                toKey,
+		rootKey:              toKey(rootKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -460,7 +460,7 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	pathToKey, err := view.getPathTo(db.convertToKey(keyBytes))
+	pathToKey, err := view.getPathTo(db.toKey(keyBytes))
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(db.convertToKey(key))
+		values[i], errors[i] = db.getValueCopy(db.toKey(key))
 	}
 	return values, errors
 }
@@ -508,7 +508,7 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(db.convertToKey(key))
+	return db.getValueCopy(db.toKey(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
@@ -774,7 +774,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(db.convertToKey(k))
+	_, err := db.getValueWithoutLock(db.toKey(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -1011,7 +1011,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestKey := maybe.Bind(start, db.convertToKey)
+	smallestKey := maybe.Bind(start, db.toKey)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestKey); err != nil {
@@ -1021,12 +1021,12 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestKey] is also used when we add children of proof nodes to [trie] below.
-	largestKey := maybe.Bind(end, db.convertToKey)
+	largestKey := maybe.Bind(end, db.toKey)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = maybe.Some(db.convertToKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+		largestKey = maybe.Some(db.toKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
@@ -1036,7 +1036,7 @@ func (db *merkleDB) VerifyChangeProof(
 
 	keyValues := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[db.convertToKey(keyValue.Key)] = keyValue.Value
+		keyValues[db.toKey(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads

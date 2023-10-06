@@ -404,7 +404,7 @@ func (m *Manager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.ConvertToKey(lastReceivedKey, m.branchFactor)
+	proofKeyPath := merkledb.ToKey(lastReceivedKey, m.branchFactor)
 
 	// If the received proof is an exclusion proof, the last node may be for a
 	// key that is after the [lastReceivedKey].

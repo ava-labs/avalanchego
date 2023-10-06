@@ -170,7 +170,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(ConvertToKey(key, i.db.branchFactor), i.nodeIter.Value())
+	n, err := parseNode(ToKey(key, i.db.branchFactor), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

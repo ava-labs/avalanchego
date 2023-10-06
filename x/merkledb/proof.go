@@ -98,7 +98,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	case pbNode.Key == nil:
 		return ErrNilPath
 	}
-	node.Key = ConvertToKey(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
+	node.Key = ToKey(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
 
 	if len(node.Key.value) != node.Key.bytesNeeded(node.Key.tokenLength) {
 		return ErrInvalidPathLength
@@ -225,7 +225,7 @@ func (proof *Proof) UnmarshalProto(pbProof *pb.Proof, bf BranchFactor) error {
 		return ErrInvalidMaybe
 	}
 
-	proof.Key = ConvertToKey(pbProof.Key, bf)
+	proof.Key = ToKey(pbProof.Key, bf)
 
 	if !pbProof.Value.IsNothing {
 		proof.Value = maybe.Some(pbProof.Value.Value)
@@ -323,23 +323,23 @@ func (proof *RangeProof) Verify(
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
 	smallestProvenPath := maybe.Bind(start, func(b []byte) Key {
-		return ConvertToKey(b, branchFactor)
+		return ToKey(b, branchFactor)
 	})
 
 	largestProvenPath := maybe.Bind(end, func(b []byte) Key {
-		return ConvertToKey(b, branchFactor)
+		return ToKey(b, branchFactor)
 	})
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenPath] to ancestors of the node containing
 		// [largestProvenPath] so that we get the expected root ID.
-		largestProvenPath = maybe.Some(ConvertToKey(proof.KeyValues[len(proof.KeyValues)-1].Key, branchFactor))
+		largestProvenPath = maybe.Some(ToKey(proof.KeyValues[len(proof.KeyValues)-1].Key, branchFactor))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
 	keyValues := make(map[Key][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[ConvertToKey(keyValue.Key, branchFactor)] = keyValue.Value
+		keyValues[ToKey(keyValue.Key, branchFactor)] = keyValue.Value
 	}
 
 	// Ensure that the start proof is valid and contains values that

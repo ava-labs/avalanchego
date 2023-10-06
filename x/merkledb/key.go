@@ -76,9 +76,9 @@ func emptyKey(bf BranchFactor) Key {
 	}
 }
 
-// ConvertToKey returns [keyBytes] as a new key with the given [branchFactor].
+// ToKey returns [keyBytes] as a new key with the given [branchFactor].
 // Assumes [branchFactor] is valid.
-func ConvertToKey(keyBytes []byte, branchFactor BranchFactor) Key {
+func ToKey(keyBytes []byte, branchFactor BranchFactor) Key {
 	tc := branchFactorToTokenConfig[branchFactor]
 	return Key{
 		value:       byteSliceToString(keyBytes),
