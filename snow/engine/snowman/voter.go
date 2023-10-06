@@ -45,18 +45,21 @@ func (v *voter) Update(ctx context.Context) {
 	var (
 		vote       ids.ID
 		shouldVote bool
+		voteIndex  int
 	)
-	for _, voteOption := range v.responseOptions {
+	for i, voteOption := range v.responseOptions {
 		// To prevent any potential deadlocks with undisclosed dependencies,
 		// votes must be bubbled to the nearest valid block
 		vote, shouldVote = v.getProcessingAncestor(ctx, voteOption)
 		if shouldVote {
+			voteIndex = i
 			break
 		}
 	}
 
 	var results []bag.Bag[ids.ID]
 	if shouldVote {
+		v.t.selectedVoteIndex.Observe(float64(voteIndex))
 		results = v.t.polls.Vote(v.requestID, v.vdr, vote)
 	} else {
 		results = v.t.polls.Drop(v.requestID, v.vdr)
@@ -113,6 +116,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("bubbledVoteID", bubbledVote),
 				zap.Error(err),
 			)
+			v.t.numProcessingAncestorFetchesFailed.Inc()
 			return ids.Empty, false
 		}
 
@@ -124,6 +128,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("status", blk.Status()),
 				zap.Uint64("height", blk.Height()),
 			)
+			v.t.numProcessingAncestorFetchesDropped.Inc()
 			return ids.Empty, false
 		}
 
@@ -133,6 +138,11 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 				zap.Stringer("bubbledVoteID", bubbledVote),
 				zap.Uint64("height", blk.Height()),
 			)
+			if bubbledVote != initialVote {
+				v.t.numProcessingAncestorFetchesSucceeded.Inc()
+			} else {
+				v.t.numProcessingAncestorFetchesUnneeded.Inc()
+			}
 			return bubbledVote, true
 		}
 

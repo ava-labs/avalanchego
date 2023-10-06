@@ -131,14 +131,33 @@ type QuerySender interface {
 	// existence of the specified container.
 	// This is the same as PullQuery, except that this message includes the body
 	// of the container rather than its ID.
-	SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte)
+	SendPushQuery(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		requestID uint32,
+		container []byte,
+		requestedHeight uint64,
+	)
 
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
-	SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
+	SendPullQuery(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		requestID uint32,
+		containerID ids.ID,
+		requestedHeight uint64,
+	)
 
 	// Send chits to the specified node
-	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID)
+	SendChits(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
+		acceptedID ids.ID,
+	)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted
