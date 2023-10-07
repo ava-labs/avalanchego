@@ -341,9 +341,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
-	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
-		"/wallet": {Handler: walletServer},
+	return map[string]http.Handler{
+		"":        rpcServer,
+		"/wallet": walletServer,
 		"/events": vm.pubsub,
 	}, err
 }

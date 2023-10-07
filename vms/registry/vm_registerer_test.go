@@ -5,6 +5,7 @@ package registry
 
 import (
 	"context"
+	"net/http"
 	"path"
 	"testing"
 
@@ -14,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -92,8 +92,8 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -121,8 +121,8 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -151,8 +151,8 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -189,8 +189,8 @@ func TestRegisterHappyCase(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -288,8 +288,8 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -317,8 +317,8 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -347,8 +347,8 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -385,8 +385,8 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
