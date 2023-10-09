@@ -129,15 +129,12 @@ func (vm *VM) CreateHandlers(_ context.Context) (map[string]*common.HTTPHandler,
 		vm.chain,
 		vm.builder,
 	)
-	if err := server.RegisterService(api, Name); err != nil {
-		return nil, err
-	}
 	return map[string]*common.HTTPHandler{
 		"": {
-			LockOptions: common.WriteLock,
+			LockOptions: common.NoLock,
 			Handler:     server,
 		},
-	}, nil
+	}, server.RegisterService(api, Name)
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
