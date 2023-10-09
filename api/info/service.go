@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -59,7 +58,6 @@ type Parameters struct {
 	VMManager                     vms.Manager
 }
 
-// NewService returns a new admin API service
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
@@ -69,7 +67,7 @@ func NewService(
 	network network.Network,
 	validators validators.Set,
 	benchlist benchlist.Manager,
-) (*common.HTTPHandler, error) {
+) (http.Handler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -86,10 +84,7 @@ func NewService(
 	}, "info"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     newServer,
-	}, nil
+	return newServer, nil
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
