@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -33,8 +32,6 @@ import (
 const baseURL = "/ext"
 
 var (
-	errUnknownLockOption = errors.New("invalid lock options")
-
 	_ PathAdder = readPathAdder{}
 	_ Server    = (*server)(nil)
 )
