@@ -68,23 +68,23 @@ func NewService(
 	validators validators.Set,
 	benchlist benchlist.Manager,
 ) (http.Handler, error) {
-	newServer := rpc.NewServer()
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Info{
-		Parameters:   parameters,
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		myIP:         myIP,
-		networking:   network,
-		validators:   validators,
-		benchlist:    benchlist,
-	}, "info"); err != nil {
-		return nil, err
-	}
-	return newServer, nil
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
+	return server, server.RegisterService(
+		&Info{
+			Parameters:   parameters,
+			log:          log,
+			chainManager: chainManager,
+			vmManager:    vmManager,
+			myIP:         myIP,
+			networking:   network,
+			validators:   validators,
+			benchlist:    benchlist,
+		},
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
