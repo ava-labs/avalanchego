@@ -337,9 +337,6 @@ func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply 
 
 // GetConfig returns the config that the node was started with.
 func (a *Admin) GetConfig(_ *http.Request, _ *struct{}, reply *interface{}) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "getConfig"),
