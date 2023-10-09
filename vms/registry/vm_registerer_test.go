@@ -103,7 +103,6 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -132,7 +131,6 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -162,7 +160,6 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -200,7 +197,6 @@ func TestRegisterHappyCase(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -299,7 +295,6 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -328,7 +323,6 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -358,7 +352,6 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -396,7 +389,6 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).

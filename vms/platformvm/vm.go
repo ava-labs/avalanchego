@@ -436,10 +436,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		return nil, err
 	}
 
-	return map[string]*common.HTTPHandler{
-		"": {
-			Handler: server,
-		},
+	return map[string]http.Handler{
+		"": server,
 	}, nil
 }
 

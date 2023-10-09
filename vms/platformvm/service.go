@@ -2226,7 +2226,6 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetT
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	txBytes := tx.Bytes()
 	response.Encoding = args.Encoding
 
 	var result any
@@ -2234,6 +2233,7 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetT
 		tx.Unsigned.InitCtx(s.vm.ctx)
 		result = tx
 	} else {
+		txBytes := tx.Bytes()
 		result, err = formatting.Encode(args.Encoding, txBytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode tx as %s: %w", args.Encoding, err)
