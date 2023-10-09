@@ -118,7 +118,7 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 	return nil, nil
 }
 
-func (vm *VM) CreateHandlers(_ context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
