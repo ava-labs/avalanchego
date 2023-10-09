@@ -481,9 +481,14 @@ func TestServiceGetTx(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
-		TxID: txID,
+		TxID:     txID,
+		Encoding: formatting.Hex,
 	}, &reply))
-	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx.(string))
+
+	var txStr string
+	require.NoError(stdjson.Unmarshal(reply.Tx, &txStr))
+
+	txBytes, err := formatting.Decode(reply.Encoding, txStr)
 	require.NoError(err)
 	require.Equal(env.genesisTx.Bytes(), txBytes)
 }
@@ -507,9 +512,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 	require.Contains(jsonString, `"memo":"0x0102030405060708"`)
 	require.Contains(jsonString, `"inputs":[{"txID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","outputIndex":2,"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","input":{"amount":50000,"signatureIndices":[0]}}]`)
 	require.Contains(jsonString, `"outputs":[{"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","output":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":49000,"locktime":0,"threshold":1}}]`)
@@ -534,9 +537,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 	require.Contains(jsonString, `"inputs":[{"txID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","outputIndex":2,"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","input":{"amount":50000,"signatureIndices":[0]}}]`)
 	require.Contains(jsonString, `"exportedOutputs":[{"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","output":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":49000,"locktime":0,"threshold":1}}]}`)
 }
@@ -566,9 +567,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// contains the address in the right format
 	require.Contains(jsonString, `"outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":1,"locktime":0,"threshold":1},{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":2,"locktime":0,"threshold":1}]}`)
@@ -605,9 +604,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 	// assert memo and payload are in hex
 	require.Contains(jsonString, `"memo":"0x"`)
 	require.Contains(jsonString, `"payload":"0x68656c6c6f"`)
@@ -651,9 +648,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// contains the address in the right format
 	require.Contains(jsonString, `"outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
@@ -693,9 +688,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// ensure memo is in hex
 	require.Contains(jsonString, `"memo":"0x"`)
@@ -741,9 +734,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// contains the address in the right format
 	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
@@ -784,9 +775,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// ensure memo is in hex
 	require.Contains(jsonString, `"memo":"0x"`)
@@ -831,9 +820,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(err)
-	jsonString := string(jsonTxBytes)
+	jsonString := string(reply.Tx)
 
 	// contains the address in the right format
 	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
@@ -2111,7 +2098,11 @@ func TestServiceGetBlock(t *testing.T) {
 				return
 			}
 			require.Equal(tt.encoding, reply.Encoding)
-			require.Equal(expected, reply.Block)
+
+			expectedJSON, err := stdjson.Marshal(expected)
+			require.NoError(err)
+
+			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
 		})
 	}
 }
@@ -2313,7 +2304,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				return
 			}
 			require.Equal(tt.encoding, reply.Encoding)
-			require.Equal(expected, reply.Block)
+
+			expectedJSON, err := stdjson.Marshal(expected)
+			require.NoError(err)
+
+			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
 		})
 	}
 }
