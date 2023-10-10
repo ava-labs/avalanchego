@@ -323,7 +323,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
-		Alpha:                 2,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
 		BetaVirtuous:          1,
 		BetaRogue:             2,
 		ConcurrentRepolls:     1,
@@ -722,7 +723,8 @@ func TestVoteCanceling(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
-		Alpha:                 2,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
 		BetaVirtuous:          1,
 		BetaRogue:             2,
 		ConcurrentRepolls:     1,
@@ -1594,7 +1596,8 @@ func TestEngineDoubleChit(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     2,
-		Alpha:                 2,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
 		BetaVirtuous:          1,
 		BetaRogue:             2,
 		ConcurrentRepolls:     1,
@@ -1697,7 +1700,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	engCfg := DefaultConfigs()
 	engCfg.Params.K = 1
-	engCfg.Params.Alpha = 1
+	engCfg.Params.AlphaPreference = 1
+	engCfg.Params.AlphaConfidence = 1
 	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
@@ -2723,7 +2727,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     1,
-		Alpha:                 1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
 		BetaVirtuous:          2,
 		BetaRogue:             2,
 		ConcurrentRepolls:     1,

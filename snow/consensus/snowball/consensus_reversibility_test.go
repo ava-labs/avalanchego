@@ -18,9 +18,7 @@ func TestSnowballGovernance(t *testing.T) {
 	numNodes := 100
 	numByzantine := 10
 	numRed := 55
-	params := Parameters{
-		K: 20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
-	}
+	params := DefaultParameters
 	seed := int64(0)
 
 	nBitwise := Network{}
