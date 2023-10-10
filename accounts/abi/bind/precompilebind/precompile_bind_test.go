@@ -514,7 +514,7 @@ func TestPrecompileBind(t *testing.T) {
 	// Create a temporary workspace for the test suite
 	ws := t.TempDir()
 
-	pkg := filepath.Join(ws, "bindtest")
+	pkg := filepath.Join(ws, "precompilebindtest")
 	if err := os.MkdirAll(pkg, 0o700); err != nil {
 		t.Fatalf("failed to create package: %v", err)
 	}
@@ -581,7 +581,7 @@ func TestPrecompileBind(t *testing.T) {
 		})
 	}
 
-	moder := exec.Command(gocmd, "mod", "init", "bindtest")
+	moder := exec.Command(gocmd, "mod", "init", "precompilebindtest")
 	moder.Dir = pkg
 	if out, err := moder.CombinedOutput(); err != nil {
 		t.Fatalf("failed to convert binding test to modules: %v\n%s", err, out)
