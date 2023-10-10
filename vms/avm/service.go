@@ -328,21 +328,18 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 
 	var result any
 	if args.Encoding == formatting.JSON {
-		err := tx.Unsigned.Visit(&txInit{
+		err = tx.Unsigned.Visit(&txInit{
 			tx:            tx,
 			ctx:           s.vm.ctx,
 			typeToFxIndex: s.vm.typeToFxIndex,
 			fxs:           s.vm.fxs,
 		})
-		if err != nil {
-			return err
-		}
 		result = tx
 	} else {
 		result, err = formatting.Encode(args.Encoding, tx.Bytes())
-		if err != nil {
-			return fmt.Errorf("couldn't encode tx as string: %w", err)
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	reply.Tx, err = stdjson.Marshal(result)
