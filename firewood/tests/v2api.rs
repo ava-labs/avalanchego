@@ -4,28 +4,13 @@
 use std::{error::Error, path::PathBuf, sync::Arc};
 
 use firewood::{
-    db::{BatchOp, Db as PersistedDb, DbConfig, DbError, WalConfig},
+    db::{BatchOp, Db as PersistedDb, DbConfig, DbError},
     v2::api::{Db, DbView, Proposal},
 };
 
 #[tokio::test(flavor = "multi_thread")]
 async fn smoke() -> Result<(), Box<dyn Error>> {
-    let cfg = DbConfig::builder()
-        .meta_ncached_pages(1024)
-        .meta_ncached_files(128)
-        .payload_ncached_pages(1024)
-        .payload_ncached_files(128)
-        .payload_file_nbit(16)
-        .payload_regn_nbit(16)
-        .wal(
-            WalConfig::builder()
-                .file_nbit(15)
-                .block_nbit(8)
-                .max_revisions(10)
-                .build(),
-        )
-        .truncate(true)
-        .build();
+    let cfg = DbConfig::builder().truncate(true).build();
     let db = Arc::new(testdb(cfg).await?);
     let empty_hash = db.root_hash().await?;
     assert_ne!(empty_hash, [0; 32]);
