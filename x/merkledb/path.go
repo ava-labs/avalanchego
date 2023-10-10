@@ -128,6 +128,18 @@ func (p Path) HasPrefix(prefix Path) bool {
 	return strings.HasPrefix(p.value, prefixWithoutPartialByte)
 }
 
+func (p Path) iteratedHasPrefix(skipTokens int, prefix Path) bool {
+	if p.tokensLength-skipTokens < prefix.tokensLength {
+		return false
+	}
+	for i := 0; i < prefix.tokensLength; i++ {
+		if p.Token(skipTokens+i) != prefix.Token(i) {
+			return false
+		}
+	}
+	return true
+}
+
 // HasStrictPrefix returns true iff [prefix] is a prefix of [p]
 // but is not equal to it.
 func (p Path) HasStrictPrefix(prefix Path) bool {

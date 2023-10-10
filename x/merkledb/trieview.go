@@ -768,7 +768,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 		// the current token for the child entry has now been handled, so increment the matchedPathIndex
 		matchedPathIndex += 1
 
-		if !hasChild || !key.Skip(matchedPathIndex).HasPrefix(nextChildEntry.compressedPath) {
+		if !hasChild || !key.iteratedHasPrefix(matchedPathIndex, nextChildEntry.compressedPath) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nodes, nil
 		}
