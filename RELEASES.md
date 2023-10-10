@@ -20,6 +20,8 @@ The plugin version is unchanged at `28` and compatible with versions `v1.10.9 - 
 
 ### Configs
 
+- Added `--snow-preference-quorum-size` flag
+- Added `--snow-confidence-quorum-size` flag
 - Added `"fx-owner-cache-size"` to the P-chain config
 
 ### Fixes
@@ -74,6 +76,7 @@ The plugin version is unchanged at `28` and compatible with versions `v1.10.9 - 
 - Add height voting for chits by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2102
 - Add Heap Queue by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2135
 - Add additional payload.Hash examples by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2145
+- Split Alpha into AlphaPreference and AlphaConfidence by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2125
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.11...v1.10.12
 
