@@ -341,7 +341,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
 	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
+		"":        {LockOptions: common.NoLock, Handler: rpcServer},
 		"/wallet": {LockOptions: common.NoLock, Handler: walletServer},
 		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}, err
