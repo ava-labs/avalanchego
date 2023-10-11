@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -392,7 +393,9 @@ func (m *Manager) findNextKey(
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
 		// Start fetching from the next key after [lastReceivedKey].
-		return maybe.Some(append(lastReceivedKey, 0)), nil
+		nextKey := lastReceivedKey
+		nextKey = append(nextKey, 0)
+		return maybe.Some(nextKey), nil
 	}
 
 	// We want the first key larger than the [lastReceivedKey].
@@ -426,6 +429,8 @@ func (m *Manager) findNextKey(
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
+	nextKey := maybe.Nothing[[]byte]()
+
 	// Add sentinel node back into the localProofNodes, if it is missing.
 	// Required to ensure that a common node exists in both proofs
 	if len(localProofNodes) > 0 && localProofNodes[0].KeyPath.TokensLength() != 0 {
@@ -442,7 +447,6 @@ func (m *Manager) findNextKey(
 			endProof...)
 	}
 
-	nextKey := maybe.Nothing[[]byte]()
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(endProof) - 1
 
@@ -517,7 +521,9 @@ func (m *Manager) findNextKey(
 	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
 	// the open range (lastReceivedKey, rangeEnd).
 	if nextKey.HasValue() && bytes.Compare(nextKey.Value(), lastReceivedKey) <= 0 {
-		nextKey = maybe.Some(append(lastReceivedKey, 0))
+		nextKeyVal := slices.Clone(lastReceivedKey)
+		nextKeyVal = append(nextKeyVal, 0)
+		nextKey = maybe.Some(nextKeyVal)
 	}
 
 	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
