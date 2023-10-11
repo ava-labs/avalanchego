@@ -198,7 +198,7 @@ func newTrieView(
 func newHistoricalTrieView(
 	db *merkleDB,
 	changes *changeSummary,
-) (ReadOnlyTrie, error) {
+) (*trieView, error) {
 	if changes == nil {
 		return nil, ErrNoValidRoot
 	}
@@ -208,7 +208,7 @@ func newHistoricalTrieView(
 	}
 
 	newView := &trieView{
-		root:       changes.rootNode,
+		root:       changes.rootNode.clone(),
 		db:         db,
 		parentTrie: db,
 		changes:    changes,

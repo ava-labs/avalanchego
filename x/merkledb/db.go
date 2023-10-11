@@ -716,7 +716,7 @@ func (db *merkleDB) GetChangeProof(
 	}
 
 	if largestKey.HasValue() {
-		endProof, err := historicalView.GetProof(ctx, largestKey.Value())
+		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -724,7 +724,7 @@ func (db *merkleDB) GetChangeProof(
 	}
 
 	if start.HasValue() {
-		startProof, err := historicalView.GetProof(ctx, start.Value())
+		startProof, err := historicalView.getProof(ctx, start.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -1206,7 +1206,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
-) (ReadOnlyTrie, error) {
+) (*trieView, error) {
 	currentRootID := db.getMerkleRoot()
 
 	// looking for the trie's current root id, so return the trie unmodified
