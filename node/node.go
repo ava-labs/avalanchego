@@ -1112,7 +1112,15 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "")
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     service,
+		},
+		&sync.RWMutex{},
+		"info",
+		"",
+	)
 }
 
 // initHealthAPI initializes the Health API service
