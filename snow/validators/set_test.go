@@ -101,9 +101,7 @@ func TestSetSubsetWeight(t *testing.T) {
 	weight1 := uint64(123)
 	weight2 := uint64(810)
 
-	subset := set.Set[ids.NodeID]{}
-	subset.Add(nodeID0)
-	subset.Add(nodeID1)
+	subset := set.Of(nodeID0, nodeID1)
 
 	s := NewSet()
 

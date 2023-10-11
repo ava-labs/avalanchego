@@ -524,8 +524,7 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBa
 		return err
 	}
 
-	addrSet := set.Set[ids.ShortID]{}
-	addrSet.Add(addr)
+	addrSet := set.Of(addr)
 
 	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
 	if err != nil {
@@ -592,8 +591,7 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
-	addrSet := set.Set[ids.ShortID]{}
-	addrSet.Add(address)
+	addrSet := set.Of(address)
 
 	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
 	if err != nil {

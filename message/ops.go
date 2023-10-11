@@ -185,19 +185,19 @@ var (
 		AppRequestFailedOp:              AppResponseOp,
 		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
 	}
-	UnrequestedOps = set.Set[Op]{
-		GetAcceptedFrontierOp:     {},
-		GetAcceptedOp:             {},
-		GetAncestorsOp:            {},
-		GetOp:                     {},
-		PushQueryOp:               {},
-		PullQueryOp:               {},
-		AppRequestOp:              {},
-		AppGossipOp:               {},
-		CrossChainAppRequestOp:    {},
-		GetStateSummaryFrontierOp: {},
-		GetAcceptedStateSummaryOp: {},
-	}
+	UnrequestedOps = set.Of(
+		GetAcceptedFrontierOp,
+		GetAcceptedOp,
+		GetAncestorsOp,
+		GetOp,
+		PushQueryOp,
+		PullQueryOp,
+		AppRequestOp,
+		AppGossipOp,
+		CrossChainAppRequestOp,
+		GetStateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp,
+	)
 
 	errUnknownMessageType = errors.New("unknown message type")
 )

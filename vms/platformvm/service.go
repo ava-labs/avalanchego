@@ -757,8 +757,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Of(args.NodeIDs...)
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -972,8 +971,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Of(args.NodeIDs...)
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -1789,8 +1787,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	}
 	// If creating AVM instance, use secp256k1fx
 	// TODO: Document FXs and have user specify them in API call
-	fxIDsSet := set.Set[ids.ID]{}
-	fxIDsSet.Add(fxIDs...)
+	fxIDsSet := set.Of(fxIDs...)
 	if vmID == constants.AVMID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
