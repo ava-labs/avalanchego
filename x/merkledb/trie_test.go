@@ -181,13 +181,6 @@ func TestTrieViewRootUpdates(t *testing.T) {
 	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte{}, Delete: true})
 	require.NotNil(trie.root)
 	require.Equal(db.emptyPath, trie.root.key)
-
-	/*
-		// create a situation where the root will need to compress in compressNodePath
-		trie = updateTrieView(require, trie, database.BatchOp{Key: keyShort, Value: []byte("value")})
-		require.NotNil(trie.root)
-		require.Equal(db.newPath(keyShort), trie.root.key)*/
-
 }
 
 func TestTrieViewGetPathTo(t *testing.T) {
