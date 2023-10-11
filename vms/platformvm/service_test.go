@@ -269,9 +269,9 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
-					nil,
+					[]byte{},
 					constants.AVMID,
-					nil,
+					[]ids.ID{},
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					keys[0].PublicKey().Address(), // change addr
@@ -356,14 +356,17 @@ func TestGetTx(t *testing.T) {
 				switch encoding {
 				case formatting.Hex:
 					// we're always guaranteed a string for hex encodings.
-					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+					var txStr string
+					require.NoError(stdjson.Unmarshal(response.Tx, &txStr))
+					responseTxBytes, err := formatting.Decode(response.Encoding, txStr)
 					require.NoError(err)
 					require.Equal(tx.Bytes(), responseTxBytes)
 
 				case formatting.JSON:
-					require.IsType((*txs.Tx)(nil), response.Tx)
-					responseTx := response.Tx.(*txs.Tx)
-					require.Equal(tx.ID(), responseTx.ID())
+					tx.Unsigned.InitCtx(service.vm.ctx)
+					expectedTxJSON, err := stdjson.Marshal(tx)
+					require.NoError(err)
+					require.Equal(expectedTxJSON, []byte(response.Tx))
 				}
 
 				require.NoError(service.vm.Shutdown(context.Background()))
@@ -737,9 +740,9 @@ func TestGetBlock(t *testing.T) {
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 				testSubnet1.ID(),
-				nil,
+				[]byte{},
 				constants.AVMID,
-				nil,
+				[]ids.ID{},
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				keys[0].PublicKey().Address(), // change addr
@@ -771,15 +774,16 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.IsType((*block.BanffStandardBlock)(nil), response.Block)
-				responseBlock := response.Block.(*block.BanffStandardBlock)
-				require.Equal(statelessBlock.ID(), responseBlock.ID())
-
-				_, err = stdjson.Marshal(response)
+				statelessBlock.InitCtx(service.vm.ctx)
+				expectedBlockJSON, err := stdjson.Marshal(statelessBlock)
 				require.NoError(err)
+				require.Equal(expectedBlockJSON, []byte(response.Block))
 			default:
-				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				require.Equal(blk.Bytes(), decoded)
+				var blockStr string
+				require.NoError(stdjson.Unmarshal(response.Block, &blockStr))
+				responseBlockBytes, err := formatting.Decode(response.Encoding, blockStr)
+				require.NoError(err)
+				require.Equal(blk.Bytes(), responseBlockBytes)
 			}
 
 			require.Equal(test.encoding, response.Encoding)
@@ -998,11 +1002,15 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			reply := &api.GetBlockResponse{}
 			err := service.GetBlockByHeight(nil, args, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr == nil {
+			if tt.expectedErr != nil {
 				return
 			}
 			require.Equal(tt.encoding, reply.Encoding)
-			require.Equal(expected, reply.Block)
+
+			expectedJSON, err := stdjson.Marshal(expected)
+			require.NoError(err)
+
+			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
 		})
 	}
 }

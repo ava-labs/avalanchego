@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -59,7 +58,6 @@ type Parameters struct {
 	VMManager                     vms.Manager
 }
 
-// NewService returns a new admin API service
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
@@ -69,27 +67,24 @@ func NewService(
 	network network.Network,
 	validators validators.Set,
 	benchlist benchlist.Manager,
-) (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+) (http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Info{
-		Parameters:   parameters,
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		myIP:         myIP,
-		networking:   network,
-		validators:   validators,
-		benchlist:    benchlist,
-	}, "info"); err != nil {
-		return nil, err
-	}
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     newServer,
-	}, nil
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
+	return server, server.RegisterService(
+		&Info{
+			Parameters:   parameters,
+			log:          log,
+			chainManager: chainManager,
+			vmManager:    vmManager,
+			myIP:         myIP,
+			networking:   network,
+			validators:   validators,
+			benchlist:    benchlist,
+		},
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

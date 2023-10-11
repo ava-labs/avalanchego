@@ -61,6 +61,11 @@ type NnarySnowflake interface {
 	// specified choice. Assumes the choice was previously added.
 	RecordSuccessfulPoll(choice ids.ID)
 
+	// RecordPollPreference records a poll that preferred the specified choice
+	// but did not contribute towards finalizing the specified choice. Assumes
+	// the choice was previously added.
+	RecordPollPreference(choice ids.ID)
+
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()
 
@@ -100,6 +105,10 @@ type BinarySnowflake interface {
 	// specified choice
 	RecordSuccessfulPoll(choice int)
 
+	// RecordPollPreference records a poll that preferred the specified choice
+	// but did not contribute towards finalizing the specified choice
+	RecordPollPreference(choice int)
+
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()
 
@@ -129,6 +138,10 @@ type UnarySnowball interface {
 
 	// RecordSuccessfulPoll records a successful poll towards finalizing
 	RecordSuccessfulPoll()
+
+	// RecordPollPreference records a poll that strengthens the preference but
+	// did not contribute towards finalizing
+	RecordPollPreference()
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()

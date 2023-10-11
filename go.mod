@@ -56,10 +56,11 @@ require (
 	go.uber.org/goleak v1.2.1
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
+	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/term v0.7.0
+	golang.org/x/term v0.13.0
 	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4
@@ -141,9 +142,8 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/net v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

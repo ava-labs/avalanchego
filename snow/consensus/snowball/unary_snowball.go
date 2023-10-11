@@ -18,13 +18,18 @@ type unarySnowball struct {
 	// wrap the unary snowflake logic
 	unarySnowflake
 
-	// numSuccessfulPolls tracks the total number of successful network polls
-	numSuccessfulPolls int
+	// preferenceStrength tracks the total number of polls with a preference
+	preferenceStrength int
 }
 
 func (sb *unarySnowball) RecordSuccessfulPoll() {
-	sb.numSuccessfulPolls++
+	sb.preferenceStrength++
 	sb.unarySnowflake.RecordSuccessfulPoll()
+}
+
+func (sb *unarySnowball) RecordPollPreference() {
+	sb.preferenceStrength++
+	sb.unarySnowflake.RecordUnsuccessfulPoll()
 }
 
 func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
@@ -37,7 +42,7 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 		},
 		preference: choice,
 	}
-	bs.numSuccessfulPolls[choice] = sb.numSuccessfulPolls
+	bs.preferenceStrength[choice] = sb.preferenceStrength
 	return bs
 }
 
@@ -47,7 +52,7 @@ func (sb *unarySnowball) Clone() UnarySnowball {
 }
 
 func (sb *unarySnowball) String() string {
-	return fmt.Sprintf("SB(NumSuccessfulPolls = %d, %s)",
-		sb.numSuccessfulPolls,
+	return fmt.Sprintf("SB(PreferenceStrength = %d, %s)",
+		sb.preferenceStrength,
 		&sb.unarySnowflake)
 }
