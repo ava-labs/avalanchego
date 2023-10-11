@@ -249,7 +249,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.getMerkleRoot()
+		t.changes.rootID = getMerkleRoot(t.sentinelNode)
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -562,11 +562,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.getMerkleRoot(), nil
-}
-
-func (t *trieView) getMerkleRoot() ids.ID {
-	return getMerkleRoot(t.sentinelNode)
+	return getMerkleRoot(t.sentinelNode), nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -962,17 +958,16 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 }
 
 func (t *trieView) getRoot() *node {
-	if isSentinelNodeTheRoot(t.sentinelNode) {
-		return t.sentinelNode
+	if !isSentinelNodeTheRoot(t.sentinelNode) {
+		// sentinelNode has one child, which is the root
+		for index, childEntry := range t.sentinelNode.children {
+			childPath := t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath)
+			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
+			return root
+		}
 	}
 
-	// sentinelNode has one child, which is the root
-	for index, childEntry := range t.sentinelNode.children {
-		childPath := t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath)
-		root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
-		return root
-	}
-	return nil
+	return t.sentinelNode
 }
 
 // Records that the node associated with the given key has been changed.
