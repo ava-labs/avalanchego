@@ -1048,7 +1048,15 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "")
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     service,
+		},
+		&sync.RWMutex{},
+		"admin",
+		"",
+	)
 }
 
 // initProfiler initializes the continuous profiling
