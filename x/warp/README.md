@@ -52,7 +52,6 @@ Additionally, the `SourceChainID` is excluded because anyone parsing the chain c
 
 The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including the Subnet-EVM [Addressed Payload](../../../warp/payload/payload.go).
 
-
 #### getVerifiedMessage
 
 `getVerifiedMessage` is used to read the contents of the delivered Avalanche Warp Message into the expected format.
@@ -72,10 +71,9 @@ This pre-verification is performed using the ProposerVM Block header during [blo
 
 `getBlockchainID` returns the blockchainID of the blockchain that Subnet-EVM is running on.
 
-This is different from the conventional Ethereum ChainID registered to https://chainlist.org/.
+This is different from the conventional Ethereum ChainID registered to [ChainList](https://chainlist.org/).
 
 The `blockchainID` in Avalanche refers to the txID that created the blockchain on the Avalanche P-Chain ([docs](https://docs.avax.network/specs/platform-transaction-serialization#unsigned-create-chain-tx)).
-
 
 ### Predicate Encoding
 

@@ -7,11 +7,13 @@ package warp
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanche-network-runner/rpcpb"
 	"github.com/ava-labs/avalanchego/api/info"
@@ -28,6 +30,7 @@ import (
 	"github.com/ava-labs/subnet-evm/tests/utils"
 	"github.com/ava-labs/subnet-evm/tests/utils/runner"
 	warpBackend "github.com/ava-labs/subnet-evm/warp"
+	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -362,4 +365,42 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(receipt.Status).Should(gomega.Equal(types.ReceiptStatusSuccessful))
 	})
+
+	ginkgo.It("Send Message from A to B from Hardhat", ginkgo.Label("Warp", "IWarpMessenger", "SendWarpMessage"), func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		log.Info("Subscribing to new heads")
+		newHeads := make(chan *types.Header, 10)
+		sub, err := chainAWSClient.SubscribeNewHead(ctx, newHeads)
+		gomega.Expect(err).Should(gomega.BeNil())
+		defer sub.Unsubscribe()
+
+		rpcURI := toRPCURI(chainAURIs[0], blockchainIDA.String())
+		senderAddress := common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+		addressedPayload, err := warpPayload.NewAddressedPayload(
+			senderAddress,
+			payload,
+		)
+		gomega.Expect(err).Should(gomega.BeNil())
+		expectedUnsignedMessage, err := avalancheWarp.NewUnsignedMessage(
+			1337,
+			blockchainIDA,
+			addressedPayload.Bytes(),
+		)
+		gomega.Expect(err).Should(gomega.BeNil())
+
+		os.Setenv("SENDER_ADDRESS", senderAddress.Hex())
+		os.Setenv("SOURCE_CHAIN_ID", "0x"+blockchainIDA.Hex())
+		os.Setenv("PAYLOAD", "0x"+common.Bytes2Hex(payload))
+		os.Setenv("EXPECTED_UNSIGNED_MESSAGE", "0x"+hex.EncodeToString(expectedUnsignedMessage.Bytes()))
+
+		cmdPath := "./contracts"
+		// test path is relative to the cmd path
+		testPath := "./test/warp.ts"
+		utils.RunHardhatTestsCustomURI(ctx, rpcURI, cmdPath, testPath)
+	})
 })
+
+func toRPCURI(uri string, blockchainID string) string {
+	return fmt.Sprintf("%s/ext/bc/%s/rpc", uri, blockchainID)
+}

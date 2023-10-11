@@ -9,8 +9,6 @@ const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
 const REWARD_MANAGER_ADDRESS = "0x0200000000000000000000000000000000000004"
 
 describe("ExampleRewardManager", function () {
-  this.timeout("30s")
-
   beforeEach('Setup DS-Test contract', async function () {
     const signer = await ethers.getSigner(ADMIN_ADDRESS)
     const rewardManagerPromise = ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS, signer)
@@ -35,7 +33,7 @@ describe("ExampleRewardManager", function () {
 
   test("should be appointed as reward address", "step_setRewardAddress")
 
-  // we need to change the fee receiver, send a transaction for the new receiver to receive fees, then check the balance change. 
+  // we need to change the fee receiver, send a transaction for the new receiver to receive fees, then check the balance change.
   // the new fee receiver won't receive fees in the same block where it was set.
   test("should be able to receive fees", ["step_setupReceiveFees", "step_receiveFees", "step_checkReceiveFees"])
 

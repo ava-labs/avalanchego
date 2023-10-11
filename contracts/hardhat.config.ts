@@ -47,5 +47,8 @@ export default {
       ],
       pollingInterval: "1s"
     },
+  },
+  mocha: {
+    timeout: 30000
   }
 }

@@ -95,9 +95,12 @@ func RegisterNodeRun() {
 // [execPath] is the path where the test command is executed
 func RunHardhatTests(ctx context.Context, blockchainID string, execPath string, testPath string) {
 	chainURI := GetDefaultChainURI(blockchainID)
+	RunHardhatTestsCustomURI(ctx, chainURI, execPath, testPath)
+}
+
+func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath string, testPath string) {
 	log.Info(
 		"Executing HardHat tests on blockchain",
-		"blockchainID", blockchainID,
 		"testPath", testPath,
 		"ChainURI", chainURI,
 	)

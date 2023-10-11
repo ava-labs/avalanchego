@@ -11,8 +11,6 @@ const FEE_MANAGER = "0x0200000000000000000000000000000000000003"
 const GENESIS_CONFIG = require('../../tests/precompile/genesis/fee_manager.json')
 
 describe("ExampleFeeManager", function () {
-  this.timeout("30s")
-
   beforeEach("setup DS-Test contract", async function () {
     const signer = await ethers.getSigner(ADMIN_ADDRESS)
     const feeManagerPromise = ethers.getContractAt("IFeeManager", FEE_MANAGER, signer)

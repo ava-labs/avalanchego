@@ -5,7 +5,8 @@ An Avalanche Unsigned Warp Message already includes a `networkID`, `sourceChainI
 ## AddressedPayload
 
 AddressedPayload:
-```
+
+```text
 +---------------------+----------+-------------------+
 |             codecID :   uint16 |           2 bytes |
 +---------------------+----------+-------------------+
@@ -27,7 +28,8 @@ AddressedPayload:
 ## BlockHashPayload
 
 BlockHashPayload:
-```
+
+```text
 +-----------------+----------+-----------+
 |         codecID :   uint16 |   2 bytes |
 +-----------------+----------+-----------+
