@@ -1244,11 +1244,19 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Warn("initializing deprecated ipc API")
-	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.APIServer, n.IPCs)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.IPCs)
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "")
+	return n.APIServer.AddRoute(
+		&common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     service,
+		},
+		&sync.RWMutex{},
+		"ipcs",
+		"",
+	)
 }
 
 // Give chains aliases as specified by the genesis information
