@@ -454,23 +454,21 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         let addr = new_node.as_ptr();
         match new_node.inner() {
             NodeType::Leaf(n) => {
-                let cur_key = &n.path().0;
-                // Check if the key of current node match with the given key.
-                if key.len() < cur_key.len() || &key[..cur_key.len()] != cur_key {
+                let cur_key = n.path().0.as_ref();
+                if !key.contains_other(cur_key) {
                     return Ok((addr, None, 0));
                 }
 
-                let subproof = Some(SubProof {
+                let subproof = SubProof {
                     encoded: n.data().to_vec(),
                     hash: None,
-                });
-                Ok((addr, subproof, cur_key.len()))
+                };
+                Ok((addr, subproof.into(), cur_key.len()))
             }
             NodeType::Extension(n) => {
-                let cur_key = &n.path.0;
+                let cur_key = n.path.0.as_ref();
 
-                // Check if the key of current node match with the given key.
-                if key.len() < cur_key.len() || &key[..cur_key.len()] != cur_key {
+                if !key.contains_other(cur_key) {
                     return Ok((addr, None, 0));
                 }
 
@@ -961,5 +959,18 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
 
             Ok(())
         }
+    }
+}
+
+pub trait ContainsOtherExt {
+    fn contains_other(&self, other: Self) -> bool;
+}
+
+impl<T> ContainsOtherExt for &[T]
+where
+    [T]: PartialEq<[T]>,
+{
+    fn contains_other(&self, other: Self) -> bool {
+        self.len() >= other.len() && &self[..other.len()] == other
     }
 }
