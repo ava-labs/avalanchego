@@ -41,8 +41,7 @@ const (
 )
 
 var (
-	sentinelKey []byte
-	_           MerkleDB = (*merkleDB)(nil)
+	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
