@@ -490,3 +490,34 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 
 	return nil
 }
+
+// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
+// This transaction will result in [tx.NodeID] being removed as a validator of
+// [tx.SubnetID].
+// Note: [tx.NodeID] may be either a current or pending validator.
+func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	if isCurrentValidator {
+		e.State.DeleteCurrentValidator(staker)
+	} else {
+		e.State.DeletePendingValidator(staker)
+	}
+
+	// Invariant: There are no permissioned subnet delegators to remove.
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}

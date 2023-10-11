@@ -94,6 +94,9 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 
 		targetCodec.RegisterType(&signer.Empty{}),
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
+
+		// D additions:
+		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
 	)
 	return errs.Err
 }
