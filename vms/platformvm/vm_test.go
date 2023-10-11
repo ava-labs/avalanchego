@@ -1684,7 +1684,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Validators:    beacons,
 		Params: snowball.Parameters{
 			K:                     1,
-			Alpha:                 1,
+			AlphaPreference:       1,
+			AlphaConfidence:       1,
 			BetaVirtuous:          20,
 			BetaRogue:             20,
 			ConcurrentRepolls:     1,

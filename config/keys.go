@@ -123,6 +123,8 @@ const (
 	LogDisableDisplayPluginLogsKey                     = "log-disable-display-plugin-logs"
 	SnowSampleSizeKey                                  = "snow-sample-size"
 	SnowQuorumSizeKey                                  = "snow-quorum-size"
+	SnowPreferenceQuorumSizeKey                        = "snow-preference-quorum-size"
+	SnowConfidenceQuorumSizeKey                        = "snow-confidence-quorum-size"
 	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"
 	SnowRogueCommitThresholdKey                        = "snow-rogue-commit-threshold"
 	SnowConcurrentRepollsKey                           = "snow-concurrent-repolls"

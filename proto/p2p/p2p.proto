@@ -303,6 +303,7 @@ message PushQuery {
   uint64 deadline = 3;
   bytes container = 4;
   EngineType engine_type = 5;
+  uint64 requested_height = 6;
 }
 
 // Message that contains a preferred container ID to query other peers
@@ -316,6 +317,7 @@ message PullQuery {
   uint64 deadline = 3;
   bytes container_id = 4;
   EngineType engine_type = 5;
+  uint64 requested_height = 6;
 }
 
 // Message that contains the votes/preferences of the node. It is sent in
@@ -326,14 +328,14 @@ message PullQuery {
 // will respond with a "get" message to fetch the missing block from the remote
 // peer.
 message Chits {
-  reserved 5; // Until Cortina upgrade is activated
-
   bytes chain_id = 1;
   uint32 request_id = 2;
   // Represents the current preferred block.
   bytes preferred_id = 3;
   // Represents the last accepted block.
   bytes accepted_id = 4;
+  // Represents the current preferred block at the requested height.
+  bytes preferred_id_at_height = 5;
 }
 
 message AppRequest {

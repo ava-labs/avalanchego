@@ -2142,7 +2142,6 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.
 	return nil
 }
 
-// GetTx gets a tx
 func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetTxReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -2153,20 +2152,21 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetT
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	txBytes := tx.Bytes()
 	response.Encoding = args.Encoding
 
+	var result any
 	if args.Encoding == formatting.JSON {
 		tx.Unsigned.InitCtx(s.vm.ctx)
-		response.Tx = tx
-		return nil
+		result = tx
+	} else {
+		result, err = formatting.Encode(args.Encoding, tx.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't encode tx as %s: %w", args.Encoding, err)
+		}
 	}
 
-	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
-	if err != nil {
-		return fmt.Errorf("couldn't encode tx as %s: %w", args.Encoding, err)
-	}
-	return nil
+	response.Tx, err = stdjson.Marshal(result)
+	return err
 }
 
 type GetTxStatusArgs struct {
@@ -2638,18 +2638,19 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 	}
 	response.Encoding = args.Encoding
 
+	var result any
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
-		response.Block = block
-		return nil
+		result = block
+	} else {
+		result, err = formatting.Encode(args.Encoding, block.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't encode block %s as %s: %w", args.BlockID, args.Encoding, err)
+		}
 	}
 
-	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as %s: %w", args.BlockID, args.Encoding, err)
-	}
-
-	return nil
+	response.Block, err = stdjson.Marshal(result)
+	return err
 }
 
 // GetBlockByHeight returns the block at the given height.
@@ -2676,18 +2677,19 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	}
 	response.Encoding = args.Encoding
 
+	var result any
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
-		response.Block = block
-		return nil
+		result = block
+	} else {
+		result, err = formatting.Encode(args.Encoding, block.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't encode block %s as %s: %w", blockID, args.Encoding, err)
+		}
 	}
 
-	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as %s: %w", blockID, args.Encoding, err)
-	}
-
-	return nil
+	response.Block, err = stdjson.Marshal(result)
+	return err
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
