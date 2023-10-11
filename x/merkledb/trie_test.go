@@ -610,7 +610,7 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// Make sure the branch node with the common prefix was created.
 	// Note it's only created on call to GetMerkleRoot, not in NewView.
-	_, err = view2.getEditableNode(NewPath(keyPrefix, BranchFactor16), false)
+	_, err = view2.getNode(NewPath(keyPrefix, BranchFactor16), false)
 	require.NoError(err)
 
 	// only hashes the new branch node and the new child node
@@ -751,7 +751,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(emptyPath(BranchFactor16), false)
+	root, err := newTrie.getNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
@@ -768,7 +768,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(newTrie.getRootPath(), false)
+	root, err = newTrie.getNode(newTrie.getRootPath(), false)
 	require.NoError(err)
 	require.Equal(newTrie.getRootPath(), root.key)
 	// since all values have been deleted, the nodes should have been cleaned up
@@ -834,15 +834,15 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(emptyPath(BranchFactor16), false)
+	root, err := trie.getNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	root, err = trie.getEditableNode(emptyPath(BranchFactor16), false)
+	root, err = trie.getNode(emptyPath(BranchFactor16), false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err := trie.getEditableNode(getSingleChildPath(root), true)
+	firstNode, err := trie.getNode(getSingleChildPath(root), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -860,7 +860,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(trie.getRootPath(), false)
+	root, err = trie.getNode(trie.getRootPath(), false)
 	require.NoError(err)
 	require.Len(root.children, 2)
 }

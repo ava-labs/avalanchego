@@ -63,7 +63,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(NewPath(keyBytes, BranchFactor16), true)
+	n, err := db.getNodeWithoutLock(NewPath(keyBytes, BranchFactor16), true)
 	require.NoError(err)
 
 	// node's value shouldn't be affected by the edit

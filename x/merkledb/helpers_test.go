@@ -66,7 +66,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 		}
 	}
 
-	hasValue := rand.Intn(2) == 1 // #nosec G404
+	hasValue := r.Intn(2) == 1 // #nosec G404
 	var valueOrHash maybe.Maybe[[]byte]
 	if hasValue {
 		// use the hash instead when length is greater than the hash length
