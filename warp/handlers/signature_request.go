@@ -12,28 +12,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/warp"
-	"github.com/ava-labs/subnet-evm/warp/handlers/stats"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// SignatureRequestHandler is a peer.RequestHandler for message.SignatureRequest
-// serving requested BLS signature data
-type SignatureRequestHandler interface {
-	OnSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest message.SignatureRequest) ([]byte, error)
-}
-
-// signatureRequestHandler implements the SignatureRequestHandler interface
-type signatureRequestHandler struct {
+// SignatureRequestHandler serves warp signature requests. It is a peer.RequestHandler for message.SignatureRequest.
+type SignatureRequestHandler struct {
 	backend warp.Backend
 	codec   codec.Manager
-	stats   stats.SignatureRequestHandlerStats
+	stats   *handlerStats
 }
 
-func NewSignatureRequestHandler(backend warp.Backend, codec codec.Manager, stats stats.SignatureRequestHandlerStats) SignatureRequestHandler {
-	return &signatureRequestHandler{
+func NewSignatureRequestHandler(backend warp.Backend, codec codec.Manager) *SignatureRequestHandler {
+	return &SignatureRequestHandler{
 		backend: backend,
 		codec:   codec,
-		stats:   stats,
+		stats:   newStats(),
 	}
 }
 
@@ -42,7 +35,7 @@ func NewSignatureRequestHandler(backend warp.Backend, codec codec.Manager, stats
 // Expects returned errors to be treated as FATAL
 // Returns empty response if signature is not found
 // Assumes ctx is active
-func (s *signatureRequestHandler) OnSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest message.SignatureRequest) ([]byte, error) {
+func (s *SignatureRequestHandler) OnSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest message.SignatureRequest) ([]byte, error) {
 	startTime := time.Now()
 	s.stats.IncSignatureRequest()
 
