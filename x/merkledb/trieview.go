@@ -668,7 +668,6 @@ func (t *trieView) remove(key Path) error {
 	if len(nodePath) > 1 {
 		parent = nodePath[len(nodePath)-2]
 	}
-
 	// merge this node and its descendants into a single node if possible
 	return t.compressNodePath(parent, nodeToDelete)
 }
@@ -686,12 +685,12 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
+	// don't collapse this node if it doesn't have 1 child, or has a value
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
 	}
 	var err error
-	// delete all empty nodes with a single child under [node]
+	// delete all nodes without a value that have a single child
 	for len(node.children) == 1 && !node.hasValue() {
 		t.recordNodeDeleted(node)
 
@@ -713,11 +712,13 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		}
 	}
 
+	// the node passed in was the old root so update the parent to be the new root
+	if parent == nil {
+		parent = t.root
+	}
+
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
-	if parent == nil {
-		parent = newNode(nil, t.db.emptyPath)
-	}
 	parent.addChild(node)
 	t.recordNodeChange(parent)
 	return nil
@@ -863,6 +864,7 @@ func (t *trieView) insert(
 		)
 		newNode.setValue(value)
 		t.recordNodeChange(newNode)
+		t.recordNodeChange(closestNode)
 		return newNode, nil
 	}
 
@@ -926,20 +928,22 @@ func (t *trieView) recordNodeChange(after *node) {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) {
-	// don't delete the root.
-	if after.key.tokensLength == 0 {
-		t.recordKeyChange(after.key, after)
-		return
+	if after == t.root {
+		t.root = newNode(nil, t.db.emptyPath)
+		t.changes.nodes[t.root.key] = &change[*node]{
+			after: t.root,
+		}
 	}
-
 	t.recordKeyChange(after.key, nil)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-
 func (t *trieView) recordKeyChange(key Path, after *node) {
+	if after != nil && key.tokensLength <= t.getRootPath().tokensLength {
+		t.root = after
+	}
 	if existing, ok := t.changes.nodes[key]; ok {
 		existing.after = after
 		return

@@ -18,6 +18,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+func updateTrieView(require *require.Assertions, trie TrieView, op database.BatchOp) *trieView {
+	trieIntf, err := trie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{op},
+		},
+	)
+	require.NoError(err)
+	require.IsType(&trieView{}, trieIntf)
+	newTrie := trieIntf.(*trieView)
+	require.NoError(newTrie.calculateNodeIDs(context.Background()))
+	return newTrie
+}
+
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	return getNodeValueWithBranchFactor(t, key, BranchFactor16)
 }
@@ -123,6 +137,59 @@ func Test_GetValues_Safety(t *testing.T) {
 	require.Equal([]byte{0}, trieVals[0])
 }
 
+func TestTrieViewRootUpdates(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	trieIntf, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	require.IsType(&trieView{}, trieIntf)
+	trie := trieIntf.(*trieView)
+
+	require.NotNil(trie.root)
+	require.Equal(db.emptyPath, trie.root.key)
+
+	// Insert a key.
+	// Root should switch to new key.
+	keyLong := []byte{0, 1, 2, 3}
+	keyShort := []byte{0}
+	trie = updateTrieView(require, trie, database.BatchOp{Key: keyLong, Value: []byte("value")})
+	require.NotNil(trie.root)
+	require.Equal(db.newPath(keyLong), trie.root.key)
+
+	// root should switch to shorter key
+	trie = updateTrieView(require, trie, database.BatchOp{Key: keyShort, Value: []byte("value")})
+	require.NotNil(trie.root)
+	require.Equal(db.newPath(keyShort), trie.root.key)
+
+	// Delete the root.
+	// Root should switch to longer key.
+	trie = updateTrieView(require, trie, database.BatchOp{Key: keyShort, Delete: true})
+	require.NotNil(trie.root)
+	require.Equal(db.newPath(keyLong), trie.root.key)
+
+	// Delete the root again.
+	// Root should switch to empty key.
+	trie = updateTrieView(require, trie, database.BatchOp{Key: keyLong, Delete: true})
+	require.NotNil(trie.root)
+	require.Equal(db.emptyPath, trie.root.key)
+
+	// Delete the root again.
+	// Root should remain since the trie is empty.
+	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte{}, Delete: true})
+	require.NotNil(trie.root)
+	require.Equal(db.emptyPath, trie.root.key)
+
+	/*
+		// create a situation where the root will need to compress in compressNodePath
+		trie = updateTrieView(require, trie, database.BatchOp{Key: keyShort, Value: []byte("value")})
+		require.NotNil(trie.root)
+		require.Equal(db.newPath(keyShort), trie.root.key)*/
+
+}
+
 func TestTrieViewGetPathTo(t *testing.T) {
 	require := require.New(t)
 
@@ -143,18 +210,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key
 	key1 := []byte{0}
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: key1, Value: []byte("value")},
-			},
-		},
-	)
-	require.NoError(err)
-	require.IsType(&trieView{}, trieIntf)
-	trie = trieIntf.(*trieView)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	trie = updateTrieView(require, trie, database.BatchOp{Key: key1, Value: []byte("value")})
 
 	nodePath, err = trie.getPathTo(NewPath(key1, BranchFactor16))
 	require.NoError(err)
@@ -166,18 +222,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: key2, Value: []byte("value")},
-			},
-		},
-	)
-	require.NoError(err)
-	require.IsType(&trieView{}, trieIntf)
-	trie = trieIntf.(*trieView)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	trie = updateTrieView(require, trie, database.BatchOp{Key: key2, Value: []byte("value")})
 
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
 	require.NoError(err)
@@ -188,18 +233,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: key3, Value: []byte("value")},
-			},
-		},
-	)
-	require.NoError(err)
-	require.IsType(&trieView{}, trieIntf)
-	trie = trieIntf.(*trieView)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	trie = updateTrieView(require, trie, database.BatchOp{Key: key3, Value: []byte("value")})
 
 	nodePath, err = trie.getPathTo(NewPath(key3, BranchFactor16))
 	require.NoError(err)
@@ -421,32 +455,13 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key"), Value: []byte("value0")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie := trieIntf.(*trieView)
+	trie := updateTrieView(require, dbTrie, database.BatchOp{Key: []byte("key"), Value: []byte("value0")})
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key1"), Value: []byte("value1")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie = trieIntf.(*trieView)
-
+	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte("key1"), Value: []byte("value1")})
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
@@ -455,17 +470,7 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key12"), Value: []byte("value12")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie = trieIntf.(*trieView)
-
+	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte("key12"), Value: []byte("value12")})
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
@@ -485,32 +490,12 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key12"), Value: []byte("value12")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie := trieIntf.(*trieView)
-
+	trie := updateTrieView(require, dbTrie, database.BatchOp{Key: []byte("key12"), Value: []byte("value12")})
 	value, err := getNodeValue(trie, "key12")
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key1"), Value: []byte("value1")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie = trieIntf.(*trieView)
-
+	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte("key1"), Value: []byte("value1")})
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
@@ -519,17 +504,7 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	trieIntf, err = trie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key"), Value: []byte("value")},
-			},
-		},
-	)
-	require.NoError(err)
-	trie = trieIntf.(*trieView)
-
+	trie = updateTrieView(require, trie, database.BatchOp{Key: []byte("key"), Value: []byte("value")})
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
@@ -580,15 +555,7 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	key1, key2, keyPrefix := []byte("key12"), []byte("key1F"), []byte("key1")
 
-	trieIntf, err := dbTrie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: key1, Value: []byte("")},
-			},
-		})
-	require.NoError(err)
-	trie := trieIntf.(*trieView)
+	trie := updateTrieView(require, dbTrie, database.BatchOp{Key: key1, Value: []byte("")})
 
 	// create new node with common prefix whose children
 	// are key1, key2
