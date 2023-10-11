@@ -7,6 +7,13 @@ import "fmt"
 
 var _ BinarySnowflake = (*binarySnowflake)(nil)
 
+func newBinarySnowflake(beta, choice int) binarySnowflake {
+	return binarySnowflake{
+		binarySlush: newBinarySlush(choice),
+		beta:        beta,
+	}
+}
+
 // binarySnowflake is the implementation of a binary snowflake instance
 type binarySnowflake struct {
 	// wrap the binary slush logic
@@ -25,11 +32,6 @@ type binarySnowflake struct {
 	finalized bool
 }
 
-func (sf *binarySnowflake) Initialize(beta, choice int) {
-	sf.binarySlush.Initialize(choice)
-	sf.beta = beta
-}
-
 func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	if sf.finalized {
 		return // This instance is already decided.
@@ -44,6 +46,15 @@ func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	}
 
 	sf.finalized = sf.confidence >= sf.beta
+	sf.binarySlush.RecordSuccessfulPoll(choice)
+}
+
+func (sf *binarySnowflake) RecordPollPreference(choice int) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	sf.confidence = 0
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
