@@ -275,8 +275,8 @@ func Test_Proof(t *testing.T) {
 	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.Path[2].KeyPath)
 	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
 
-	require.Equal(NewPath([]byte{}, BranchFactor16), proof.Path[0].KeyPath)
-	require.True(proof.Path[0].ValueOrHash.IsNothing())
+	require.Equal(NewPath([]byte("key"), BranchFactor16), proof.Path[0].KeyPath)
+	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -651,9 +651,9 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Len(proof.StartProof, 1)
 	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.StartProof[0].KeyPath, BranchFactor16)
 
-	require.Len(proof.EndProof, 3)
-	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[2].KeyPath, BranchFactor16)
-	require.Equal(NewPath([]byte{}, BranchFactor16), proof.EndProof[0].KeyPath, BranchFactor16)
+	require.Len(proof.EndProof, 2)
+	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[1].KeyPath, BranchFactor16)
+	require.Equal(NewPath([]byte("key1"), BranchFactor16).Take(7), proof.EndProof[0].KeyPath, BranchFactor16)
 
 	require.NoError(proof.Verify(
 		context.Background(),

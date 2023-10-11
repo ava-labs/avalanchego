@@ -253,7 +253,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// Use valueDigest instead of value because proof verification only sets the digest
 		if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
 			for index, childEntry := range t.root.children {
-				t.root, err = t.getNodeWithID(childEntry.id, t.root.key+path([]byte{index})+childEntry.compressedPath, childEntry.hasValue)
+				t.root, err = t.getNodeWithID(childEntry.id, t.root.key.Append(index).Extend(childEntry.compressedPath), childEntry.hasValue)
 				if err != nil {
 					return
 				}
@@ -729,7 +729,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	if parent == nil {
-		parent = newNode(nil, EmptyPath)
+		parent = newNode(nil, t.db.emptyPath)
 	}
 	parent.addChild(node)
 	return t.recordNodeChange(parent)
@@ -754,9 +754,9 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 		}
 
 		if nextParentIndex < 0 {
-			if currentNode.key != EmptyPath {
+			if currentNode.key != t.db.emptyPath {
 				// deleting the root, so create a new one
-				return t.recordNodeChange(newNode(nil, EmptyPath))
+				return t.recordNodeChange(newNode(nil, t.db.emptyPath))
 			}
 			return nil
 		}
@@ -773,7 +773,7 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	var parent *node
 	if nextParentIndex >= 0 {
 		parent = nodePath[nextParentIndex]
-	} else if currentNode.key == EmptyPath {
+	} else if currentNode.key == t.db.emptyPath {
 		return nil
 	}
 
@@ -797,7 +797,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	}
 
 	nodes = append(nodes, t.root)
-	matchedKeyIndex := len(t.root.key)
+	matchedPathIndex := t.getRootPath().tokensLength
 
 	// while the entire path hasn't been matched
 	for matchedPathIndex < key.tokensLength {
@@ -875,7 +875,7 @@ func (t *trieView) insert(
 	}
 
 	if len(pathToNode) == 0 {
-		newRoot := newNode(nil, EmptyPath)
+		newRoot := newNode(nil, t.db.emptyPath)
 		newRoot.addChild(t.root)
 		pathToNode = []*node{newRoot}
 	}
@@ -996,7 +996,7 @@ func (t *trieView) recordKeyChange(key Path, after *node, hadValue bool, newNode
 		return ErrNodesAlreadyCalculated
 	}
 
-	if after != nil && len(after.key) < len(t.getRootPath()) {
+	if after != nil && after.key.tokensLength < t.getRootPath().tokensLength {
 		t.root = after
 	}
 

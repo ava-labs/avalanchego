@@ -50,7 +50,7 @@ type ReadOnlyTrie interface {
 	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	// getRootPath returns the path of the trie's root
-	getRootPath() path
+	getRootPath() Path
 }
 
 type ViewChanges struct {

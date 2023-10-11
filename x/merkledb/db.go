@@ -193,7 +193,7 @@ type merkleDB struct {
 	emptyPath Path
 }
 
-func (db *merkleDB) getRootPath() path {
+func (db *merkleDB) getRootPath() Path {
 	return db.root.key
 }
 
@@ -282,7 +282,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(nil, EmptyPath)
+	db.root = newNode(nil, db.emptyPath)
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -1143,9 +1143,9 @@ func (db *merkleDB) initializeRoot() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(db.rootPath)
+	db.root, err = db.intermediateNodeDB.Get(db.emptyPath)
 	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(db.rootPath)
+		db.root, err = db.valueNodeDB.Get(db.emptyPath)
 	}
 	if err == nil {
 		// If the root has no value and only a single child,
@@ -1153,7 +1153,7 @@ func (db *merkleDB) initializeRoot() (ids.ID, error) {
 		// Use its child node instead as the root
 		if db.root.value.IsNothing() && len(db.root.children) == 1 {
 			for index, childEntry := range db.root.children {
-				if db.root, err = db.getNode(path([]byte{index})+childEntry.compressedPath, childEntry.hasValue); err != nil {
+				if db.root, err = db.getNode(db.getRootPath().Append(index).Extend(childEntry.compressedPath), childEntry.hasValue); err != nil {
 					return ids.Empty, err
 				}
 			}
@@ -1168,11 +1168,11 @@ func (db *merkleDB) initializeRoot() (ids.ID, error) {
 	}
 
 	// Root doesn't exist; make a new one.
-	db.root = newNode(nil, EmptyPath)
+	db.root = newNode(nil, db.emptyPath)
 
 	// update its ID
 	db.root.calculateID(db.metrics)
-	if err := db.intermediateNodeDB.Put(EmptyPath, db.root); err != nil {
+	if err := db.intermediateNodeDB.Put(db.emptyPath, db.root); err != nil {
 		return ids.Empty, err
 	}
 

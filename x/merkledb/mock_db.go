@@ -389,10 +389,10 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 }
 
 // getRootPath mocks base method.
-func (m *MockMerkleDB) getRootPath() path {
+func (m *MockMerkleDB) getRootPath() Path {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getRootPath")
-	ret0, _ := ret[0].(path)
+	ret0, _ := ret[0].(Path)
 	return ret0
 }
 
