@@ -27,6 +27,7 @@ The plugin version is unchanged at `28` and compatible with versions `v1.10.9 - 
 ### Fixes
 
 - Fixed concurrent node shutdown and chain creation race
+- Updated http2 implementation to patch CVE-2023-39325
 - Exited `network.dial` early to avoid goroutine leak when shutting down
 - Reduced log level of `"failed to send peer list for handshake"` messages from `ERROR` to `DEBUG`
 - Reduced log level of `"state pruning failed"` messages from `ERROR` to `WARN`
