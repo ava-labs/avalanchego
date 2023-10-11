@@ -272,7 +272,7 @@ func verifyAddSubnetValidatorTx(
 // * [sTx]'s creds authorize it to spend the stated inputs.
 // * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
 // * The flow checker passes.
-func removeSubnetValidatorValidation(
+func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *txs.Tx,
