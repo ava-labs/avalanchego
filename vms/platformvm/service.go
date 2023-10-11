@@ -7,11 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
 	stdjson "encoding/json"
-	stdmath "math"
 
 	"go.uber.org/zap"
 
@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -45,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -244,16 +244,16 @@ utxoFor:
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
 			if out.Locktime <= currentTime {
-				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					unlockeds[assetID] = stdmath.MaxUint64
+					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			} else {
-				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedNotStakeables[assetID] = stdmath.MaxUint64
+					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
@@ -267,23 +267,23 @@ utxoFor:
 				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
-				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedNotStakeables[assetID] = stdmath.MaxUint64
+					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
 			case out.Locktime <= currentTime:
-				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					unlockeds[assetID] = stdmath.MaxUint64
+					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			default:
-				newBalance, err := math.Add64(lockedStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedStakeables[assetID] = stdmath.MaxUint64
+					lockedStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedStakeables[assetID] = newBalance
 				}
@@ -297,17 +297,17 @@ utxoFor:
 
 	balances := maps.Clone(lockedStakeables)
 	for assetID, amount := range lockedNotStakeables {
-		newBalance, err := math.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add64(balances[assetID], amount)
 		if err != nil {
-			balances[assetID] = stdmath.MaxUint64
+			balances[assetID] = math.MaxUint64
 		} else {
 			balances[assetID] = newBalance
 		}
 	}
 	for assetID, amount := range unlockeds {
-		newBalance, err := math.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add64(balances[assetID], amount)
 		if err != nil {
-			balances[assetID] = stdmath.MaxUint64
+			balances[assetID] = math.MaxUint64
 		} else {
 			balances[assetID] = newBalance
 		}
@@ -2762,9 +2762,9 @@ func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked ma
 		}
 
 		assetID := output.AssetID()
-		newAmount, err := math.Add64(totalAmountStaked[assetID], secpOut.Amt)
+		newAmount, err := safemath.Add64(totalAmountStaked[assetID], secpOut.Amt)
 		if err != nil {
-			newAmount = stdmath.MaxUint64
+			newAmount = math.MaxUint64
 		}
 		totalAmountStaked[assetID] = newAmount
 
