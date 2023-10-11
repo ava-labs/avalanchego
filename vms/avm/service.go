@@ -9,6 +9,8 @@ import (
 	"math"
 	"net/http"
 
+	stdjson "encoding/json"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -79,6 +81,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 	}
 	reply.Encoding = args.Encoding
 
+	var result any
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
 		for _, tx := range block.Txs() {
@@ -92,16 +95,16 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 				return err
 			}
 		}
-		reply.Block = block
-		return nil
+		result = block
+	} else {
+		result, err = formatting.Encode(args.Encoding, block.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
+		}
 	}
 
-	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
-	}
-
-	return nil
+	reply.Block, err = stdjson.Marshal(result)
+	return err
 }
 
 // GetBlockByHeight returns the block at the given height.
@@ -130,6 +133,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
 	}
 
+	var result any
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
 		for _, tx := range block.Txs() {
@@ -143,16 +147,16 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 				return err
 			}
 		}
-		reply.Block = block
-		return nil
+		result = block
+	} else {
+		result, err = formatting.Encode(args.Encoding, block.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
+		}
 	}
 
-	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
-	}
-
-	return nil
+	reply.Block, err = stdjson.Marshal(result)
+	return err
 }
 
 // GetHeight returns the height of the last accepted block.
@@ -320,23 +324,26 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 	if err != nil {
 		return err
 	}
-
 	reply.Encoding = args.Encoding
+
+	var result any
 	if args.Encoding == formatting.JSON {
-		reply.Tx = tx
-		return tx.Unsigned.Visit(&txInit{
+		err = tx.Unsigned.Visit(&txInit{
 			tx:            tx,
 			ctx:           s.vm.ctx,
 			typeToFxIndex: s.vm.typeToFxIndex,
 			fxs:           s.vm.fxs,
 		})
+		result = tx
+	} else {
+		result, err = formatting.Encode(args.Encoding, tx.Bytes())
+	}
+	if err != nil {
+		return err
 	}
 
-	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode tx as string: %w", err)
-	}
-	return nil
+	reply.Tx, err = stdjson.Marshal(result)
+	return err
 }
 
 // GetUTXOs gets all utxos for passed in addresses
