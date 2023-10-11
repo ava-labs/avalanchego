@@ -748,17 +748,13 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	currentNode := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
-	for ; nextParentIndex >= -1 && len(currentNode.children) == 0 && !currentNode.hasValue(); nextParentIndex-- {
+	for ; len(currentNode.children) == 0 && !currentNode.hasValue(); nextParentIndex-- {
 		if err := t.recordNodeDeleted(currentNode); err != nil {
 			return err
 		}
 
-		if nextParentIndex < 0 {
-			if currentNode.key != t.db.emptyPath {
-				// deleting the root, so create a new one
-				return t.recordNodeChange(newNode(nil, t.db.emptyPath))
-			}
-			return nil
+		if nextParentIndex == -1 {
+			return t.recordNodeChange(newNode(nil, t.db.emptyPath))
 		}
 
 		parent := nodePath[nextParentIndex]
@@ -817,6 +813,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
+
 		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
@@ -981,10 +978,6 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
-	// don't delete the root.
-	if after.key.tokensLength == 0 {
-		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
-	}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 

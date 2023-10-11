@@ -62,11 +62,13 @@ type encoder interface {
 	encodeDBNode(n *dbNode, factor BranchFactor) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
+	encodePath(dst *bytes.Buffer, p Path)
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
+	decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error)
 }
 
 func newCodec() encoderDecoder {

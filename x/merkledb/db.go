@@ -50,6 +50,7 @@ var (
 	intermediateNodePrefix = []byte{2}
 
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
+	rootPathKey             = []byte(string(metadataPrefix) + "rootPath")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
@@ -246,7 +247,19 @@ func newDatabase(
 		emptyPath:            emptyPath(config.BranchFactor),
 	}
 
-	root, err := trieDB.initializeRoot()
+	rootPath := emptyPath(config.BranchFactor)
+	rootPathBytes, err := db.Get(rootPathKey)
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			return nil, err
+		}
+	} else {
+		rootPath, err = codec.decodePath(bytes.NewReader(rootPathBytes), config.BranchFactor)
+		if err != nil {
+			return nil, err
+		}
+	}
+	root, err := trieDB.initializeRoot(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -956,6 +969,11 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	if err != nil {
 		return err
 	}
+	var buf bytes.Buffer
+	codec.encodePath(&buf, changes.rootNode.key)
+	if err := db.baseDB.Put(rootPathKey, buf.Bytes()); err != nil {
+		return err
+	}
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
@@ -1139,13 +1157,13 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *merkleDB) initializeRoot() (ids.ID, error) {
+func (db *merkleDB) initializeRoot(rootPath Path) (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(db.emptyPath)
+	db.root, err = db.intermediateNodeDB.Get(rootPath)
 	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(db.emptyPath)
+		db.root, err = db.valueNodeDB.Get(rootPath)
 	}
 	if err == nil {
 		// If the root has no value and only a single child,
