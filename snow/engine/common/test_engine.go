@@ -107,18 +107,20 @@ type EngineTest struct {
 
 	CantGetVM bool
 
-	StartF                          func(ctx context.Context, startReqID uint32) error
-	IsBootstrappedF                 func() bool
-	ContextF                        func() *snow.ConsensusContext
-	HaltF                           func(context.Context)
-	TimeoutF, GossipF, ShutdownF    func(context.Context) error
-	NotifyF                         func(context.Context, Message) error
-	GetF, GetAncestorsF, PullQueryF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
-	AncestorsF                      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
-	AcceptedFrontierF               func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	GetAcceptedF, AcceptedF         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
-	ChitsF                          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error
+	StartF                       func(ctx context.Context, startReqID uint32) error
+	IsBootstrappedF              func() bool
+	ContextF                     func() *snow.ConsensusContext
+	HaltF                        func(context.Context)
+	TimeoutF, GossipF, ShutdownF func(context.Context) error
+	NotifyF                      func(context.Context, Message) error
+	GetF, GetAncestorsF          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	PullQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error
+	PutF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
+	PushQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error
+	AncestorsF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
+	AcceptedFrontierF            func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetAcceptedF, AcceptedF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
+	ChitsF                       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
@@ -507,9 +509,9 @@ func (e *EngineTest) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID
 	return errAncestors
 }
 
-func (e *EngineTest) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error {
+func (e *EngineTest) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error {
 	if e.PushQueryF != nil {
-		return e.PushQueryF(ctx, nodeID, requestID, container)
+		return e.PushQueryF(ctx, nodeID, requestID, container, requestedHeight)
 	}
 	if !e.CantPushQuery {
 		return nil
@@ -520,9 +522,9 @@ func (e *EngineTest) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return errPushQuery
 }
 
-func (e *EngineTest) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *EngineTest) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error {
 	if e.PullQueryF != nil {
-		return e.PullQueryF(ctx, nodeID, requestID, containerID)
+		return e.PullQueryF(ctx, nodeID, requestID, containerID, requestedHeight)
 	}
 	if !e.CantPullQuery {
 		return nil
@@ -637,9 +639,9 @@ func (e *EngineTest) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byt
 	return errAppGossip
 }
 
-func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error {
+func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
 	if e.ChitsF != nil {
-		return e.ChitsF(ctx, nodeID, requestID, preferredID, acceptedID)
+		return e.ChitsF(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
 	}
 	if !e.CantChits {
 		return nil
