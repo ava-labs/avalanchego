@@ -342,7 +342,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
-		"/wallet": {Handler: walletServer},
+		"/wallet": {LockOptions: common.NoLock, Handler: walletServer},
 		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}, err
 }
