@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Don't export them as they're used in the context of other calls
-AVALANCHE_VERSION=${AVALANCHE_VERSION:-'v1.10.10'}
+AVALANCHE_VERSION=${AVALANCHE_VERSION:-'v1.10.12'}
 AVALANCHEGO_VERSION=${AVALANCHEGO_VERSION:-$AVALANCHE_VERSION}
 GINKGO_VERSION=${GINKGO_VERSION:-'v2.2.0'}
 
