@@ -5,15 +5,15 @@ package common
 
 import (
 	"context"
-
-	stdmath "math"
+	"math"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -195,14 +195,14 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	weight := b.Beacons.GetWeight(nodeID)
 	for _, containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
-		newWeight, err := math.Add64(weight, previousWeight)
+		newWeight, err := safemath.Add64(weight, previousWeight)
 		if err != nil {
 			b.Ctx.Log.Error("failed calculating the Accepted votes",
 				zap.Uint64("weight", weight),
 				zap.Uint64("previousWeight", previousWeight),
 				zap.Error(err),
 			)
-			newWeight = stdmath.MaxUint64
+			newWeight = math.MaxUint64
 		}
 		b.acceptedVotes[containerID] = newWeight
 	}
