@@ -13,13 +13,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
-	"github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -132,7 +132,7 @@ func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *
 
 	// If Warp is enabled, add the block hash as an unsigned message to the warp backend.
 	if rules.IsPrecompileEnabled(warp.ContractAddress) {
-		blockHashPayload, err := payload.NewBlockHashPayload(b.ethBlock.Hash())
+		blockHashPayload, err := payload.NewHash(ids.ID(b.ethBlock.Hash().Bytes()))
 		if err != nil {
 			return fmt.Errorf("failed to create block hash payload: %w", err)
 		}

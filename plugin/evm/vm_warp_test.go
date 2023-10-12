@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/predicate"
 	subnetEVMUtils "github.com/ava-labs/subnet-evm/utils"
-	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ava-labs/subnet-evm/x/warp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -62,9 +62,9 @@ func TestSendWarpMessage(t *testing.T) {
 	logsSub := vm.eth.APIBackend.SubscribeAcceptedLogsEvent(acceptedLogsChan)
 	defer logsSub.Unsubscribe()
 
-	payload := utils.RandomBytes(100)
+	payloadData := utils.RandomBytes(100)
 
-	warpSendMessageInput, err := warp.PackSendWarpMessage(payload)
+	warpSendMessageInput, err := warp.PackSendWarpMessage(payloadData)
 	require.NoError(err)
 
 	// Submit a transaction to trigger sending a warp message
@@ -128,10 +128,10 @@ func TestValidateWarpMessage(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	sourceAddress := common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2")
-	payload := []byte{1, 2, 3}
-	addressedPayload, err := warpPayload.NewAddressedPayload(
-		sourceAddress,
-		payload,
+	payloadData := []byte{1, 2, 3}
+	addressedPayload, err := payload.NewAddressedCall(
+		sourceAddress.Bytes(),
+		payloadData,
 	)
 	require.NoError(err)
 	unsignedMessage, err := avalancheWarp.NewUnsignedMessage(testNetworkID, sourceChainID, addressedPayload.Bytes())
@@ -143,7 +143,7 @@ func TestValidateWarpMessage(t *testing.T) {
 		uint32(0),
 		sourceChainID,
 		sourceAddress,
-		payload,
+		payloadData,
 	)
 	require.NoError(err)
 
@@ -154,10 +154,10 @@ func TestValidateInvalidWarpMessage(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	sourceAddress := common.HexToAddress("0x376c47978271565f56DEB45495afa69E59c16Ab2")
-	payload := []byte{1, 2, 3}
-	addressedPayload, err := warpPayload.NewAddressedPayload(
-		sourceAddress,
-		payload,
+	payloadData := []byte{1, 2, 3}
+	addressedPayload, err := payload.NewAddressedCall(
+		sourceAddress.Bytes(),
+		payloadData,
 	)
 	require.NoError(err)
 	unsignedMessage, err := avalancheWarp.NewUnsignedMessage(testNetworkID, sourceChainID, addressedPayload.Bytes())
@@ -177,7 +177,7 @@ func TestValidateWarpBlockHash(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	blockHash := ids.GenerateTestID()
-	blockHashPayload, err := warpPayload.NewBlockHashPayload(common.Hash(blockHash))
+	blockHashPayload, err := payload.NewHash(blockHash)
 	require.NoError(err)
 	unsignedMessage, err := avalancheWarp.NewUnsignedMessage(testNetworkID, sourceChainID, blockHashPayload.Bytes())
 	require.NoError(err)
@@ -198,7 +198,7 @@ func TestValidateInvalidWarpBlockHash(t *testing.T) {
 	require := require.New(t)
 	sourceChainID := ids.GenerateTestID()
 	blockHash := ids.GenerateTestID()
-	blockHashPayload, err := warpPayload.NewBlockHashPayload(common.Hash(blockHash))
+	blockHashPayload, err := payload.NewHash(blockHash)
 	require.NoError(err)
 	unsignedMessage, err := avalancheWarp.NewUnsignedMessage(testNetworkID, sourceChainID, blockHashPayload.Bytes())
 	require.NoError(err)
@@ -389,11 +389,11 @@ func TestReceiveWarpMessage(t *testing.T) {
 	logsSub := vm.eth.APIBackend.SubscribeAcceptedLogsEvent(acceptedLogsChan)
 	defer logsSub.Unsubscribe()
 
-	payload := utils.RandomBytes(100)
+	payloadData := utils.RandomBytes(100)
 
-	addressedPayload, err := warpPayload.NewAddressedPayload(
-		testEthAddrs[0],
-		payload,
+	addressedPayload, err := payload.NewAddressedCall(
+		testEthAddrs[0].Bytes(),
+		payloadData,
 	)
 	require.NoError(err)
 	unsignedMessage, err := avalancheWarp.NewUnsignedMessage(
@@ -531,7 +531,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		Message: warp.WarpMessage{
 			SourceChainID:       common.Hash(vm.ctx.ChainID),
 			OriginSenderAddress: testEthAddrs[0],
-			Payload:             payload,
+			Payload:             payloadData,
 		},
 		Valid: true,
 	})

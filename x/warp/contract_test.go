@@ -14,12 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/vmerrs"
-	warpPayload "github.com/ava-labs/subnet-evm/warp/payload"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -136,10 +136,10 @@ func TestSendWarpMessage(t *testing.T) {
 
 				unsignedWarpMsg, err := UnpackSendWarpEventDataToMessage(logData)
 				require.NoError(t, err)
-				addressedPayload, err := warpPayload.ParseAddressedPayload(unsignedWarpMsg.Payload)
+				addressedPayload, err := payload.ParseAddressedCall(unsignedWarpMsg.Payload)
 				require.NoError(t, err)
 
-				require.Equal(t, addressedPayload.SourceAddress, callerAddr)
+				require.Equal(t, common.BytesToAddress(addressedPayload.SourceAddress), callerAddr)
 				require.Equal(t, unsignedWarpMsg.SourceChainID, blockchainID)
 				require.Equal(t, addressedPayload.Payload, sendWarpMessagePayload)
 			},
@@ -155,8 +155,8 @@ func TestGetVerifiedWarpMessage(t *testing.T) {
 	sourceAddress := common.HexToAddress("0x456789")
 	sourceChainID := ids.GenerateTestID()
 	packagedPayloadBytes := []byte("mcsorley")
-	addressedPayload, err := warpPayload.NewAddressedPayload(
-		sourceAddress,
+	addressedPayload, err := payload.NewAddressedCall(
+		sourceAddress.Bytes(),
 		packagedPayloadBytes,
 	)
 	require.NoError(t, err)
@@ -438,8 +438,8 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()
-	blockHash := common.Hash(ids.GenerateTestID())
-	blockHashPayload, err := warpPayload.NewBlockHashPayload(blockHash)
+	blockHash := ids.GenerateTestID()
+	blockHashPayload, err := payload.NewHash(blockHash)
 	require.NoError(t, err)
 	unsignedWarpMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, blockHashPayload.Bytes())
 	require.NoError(t, err)
@@ -467,7 +467,7 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
 						SourceChainID: common.Hash(sourceChainID),
-						BlockHash:     blockHash,
+						BlockHash:     common.Hash(blockHash),
 					},
 					Valid: true,
 				})
@@ -519,7 +519,7 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
 						SourceChainID: common.Hash(sourceChainID),
-						BlockHash:     blockHash,
+						BlockHash:     common.Hash(blockHash),
 					},
 					Valid: true,
 				})
@@ -583,7 +583,7 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
 						SourceChainID: common.Hash(sourceChainID),
-						BlockHash:     blockHash,
+						BlockHash:     common.Hash(blockHash),
 					},
 					Valid: true,
 				})
@@ -715,12 +715,12 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 func TestPackEvents(t *testing.T) {
 	sourceChainID := ids.GenerateTestID()
 	sourceAddress := common.HexToAddress("0x0123")
-	payload := []byte("mcsorley")
+	payloadData := []byte("mcsorley")
 	networkID := uint32(54321)
 
-	addressedPayload, err := warpPayload.NewAddressedPayload(
-		sourceAddress,
-		payload,
+	addressedPayload, err := payload.NewAddressedCall(
+		sourceAddress.Bytes(),
+		payloadData,
 	)
 	require.NoError(t, err)
 
