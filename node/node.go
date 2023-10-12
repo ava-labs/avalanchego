@@ -762,8 +762,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	cChainID := createEVMTx.ID()
 
 	// If any of these chains die, the node shuts down
-	criticalChains := set.Set[ids.ID]{}
-	criticalChains.Add(
+	criticalChains := set.Of(
 		constants.PlatformChainID,
 		xChainID,
 		cChainID,
