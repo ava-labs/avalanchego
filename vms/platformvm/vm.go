@@ -422,24 +422,20 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
-	if err := server.RegisterService(
-		&Service{
-			vm:          vm,
-			addrManager: avax.NewAddressManager(vm.ctx),
-			stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-				Size: stakerAttributesCacheSize,
-			},
+	service := &Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
+			Size: stakerAttributesCacheSize,
 		},
-		"platform",
-	); err != nil {
-		return nil, err
 	}
-
+	err := server.RegisterService(service, "platform")
 	return map[string]*common.HTTPHandler{
 		"": {
-			Handler: server,
+			LockOptions: common.NoLock,
+			Handler:     server,
 		},
-	}, nil
+	}, err
 }
 
 // CreateStaticHandlers returns a map where:
@@ -449,16 +445,12 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(&api.StaticService{}, "platform"); err != nil {
-		return nil, err
-	}
-
 	return map[string]*common.HTTPHandler{
 		"": {
 			LockOptions: common.NoLock,
 			Handler:     server,
 		},
-	}, nil
+	}, server.RegisterService(&api.StaticService{}, "platform")
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
