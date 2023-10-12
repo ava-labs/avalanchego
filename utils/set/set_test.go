@@ -229,3 +229,29 @@ func TestSetUnmarshalJSON(t *testing.T) {
 		require.Equal(set1, set2)
 	}
 }
+
+func TestSetReflectJSONMarshal(t *testing.T) {
+	require := require.New(t)
+	set := Set[int]{}
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal("[]", string(asJSON))
+	}
+	id1JSON, err := json.Marshal(1)
+	require.NoError(err)
+	id2JSON, err := json.Marshal(2)
+	require.NoError(err)
+	set.Add(1)
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal(fmt.Sprintf("[%s]", string(id1JSON)), string(asJSON))
+	}
+	set.Add(2)
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)), string(asJSON))
+	}
+}
