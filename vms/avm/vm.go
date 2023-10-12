@@ -341,23 +341,24 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
 	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
-		"/wallet": {Handler: walletServer},
+		"":        {LockOptions: common.NoLock, Handler: rpcServer},
+		"/wallet": {LockOptions: common.NoLock, Handler: walletServer},
 		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}, err
 }
 
 func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-
-	// name this service "avm"
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	staticService := CreateStaticService()
 	return map[string]*common.HTTPHandler{
-		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}, newServer.RegisterService(staticService, "avm")
+		"": {
+			LockOptions: common.NoLock,
+			Handler:     server,
+		},
+	}, server.RegisterService(staticService, "avm")
 }
 
 /*
