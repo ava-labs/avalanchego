@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -368,13 +369,13 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 	return errs.Err
 }
 
-func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	resp, err := vm.client.CreateHandlers(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
 
-	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	handlers := make(map[string]http.Handler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
 		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
@@ -382,21 +383,18 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]*common.HTTP
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = &common.HTTPHandler{
-			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
-		}
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
 	}
 	return handlers, nil
 }
 
-func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	resp, err := vm.client.CreateStaticHandlers(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
 
-	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	handlers := make(map[string]http.Handler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
 		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
@@ -404,10 +402,7 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*commo
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = &common.HTTPHandler{
-			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
-		}
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
 	}
 	return handlers, nil
 }
