@@ -114,6 +114,7 @@ func Test_Path_Has_Prefix(t *testing.T) {
 				pathB := tt.pathB(bf)
 
 				require.Equal(tt.isPrefix, pathA.HasPrefix(pathB))
+				require.Equal(tt.isPrefix, pathA.iteratedHasPrefix(0, pathB))
 				require.Equal(tt.isStrictPrefix, pathA.HasStrictPrefix(pathB))
 			})
 		}
