@@ -264,14 +264,14 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
+			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty, 0)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
+			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil, 0)
 		}
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
@@ -444,10 +444,9 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := set.Set[ids.NodeID]{}
-			vdrIDs.Add(ids.NodeID{1})
+			vdrIDs := set.Of(ids.NodeID{1})
 
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -596,9 +595,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := set.Set[ids.NodeID]{}
-			vdrIDs.Add(ids.GenerateTestNodeID())
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
+			vdrIDs := set.Of(ids.GenerateTestNodeID())
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
 		}
 	}()
 

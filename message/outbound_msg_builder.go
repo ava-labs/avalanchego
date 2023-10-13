@@ -133,6 +133,7 @@ type OutboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		container []byte,
+		requestedHeight uint64,
 		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
@@ -141,6 +142,7 @@ type OutboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		containerID ids.ID,
+		requestedHeight uint64,
 		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
@@ -148,6 +150,7 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 	) (OutboundMessage, error)
 
@@ -560,17 +563,19 @@ func (b *outMsgBuilder) PushQuery(
 	requestID uint32,
 	deadline time.Duration,
 	container []byte,
+	requestedHeight uint64,
 	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_PushQuery{
 				PushQuery: &p2p.PushQuery{
-					ChainId:    chainID[:],
-					RequestId:  requestID,
-					Deadline:   uint64(deadline),
-					Container:  container,
-					EngineType: engineType,
+					ChainId:         chainID[:],
+					RequestId:       requestID,
+					Deadline:        uint64(deadline),
+					Container:       container,
+					RequestedHeight: requestedHeight,
+					EngineType:      engineType,
 				},
 			},
 		},
@@ -584,17 +589,19 @@ func (b *outMsgBuilder) PullQuery(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
+	requestedHeight uint64,
 	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_PullQuery{
 				PullQuery: &p2p.PullQuery{
-					ChainId:     chainID[:],
-					RequestId:   requestID,
-					Deadline:    uint64(deadline),
-					ContainerId: containerID[:],
-					EngineType:  engineType,
+					ChainId:         chainID[:],
+					RequestId:       requestID,
+					Deadline:        uint64(deadline),
+					ContainerId:     containerID[:],
+					RequestedHeight: requestedHeight,
+					EngineType:      engineType,
 				},
 			},
 		},
@@ -607,16 +614,18 @@ func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	preferredID ids.ID,
+	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
 				Chits: &p2p.Chits{
-					ChainId:     chainID[:],
-					RequestId:   requestID,
-					PreferredId: preferredID[:],
-					AcceptedId:  acceptedID[:],
+					ChainId:             chainID[:],
+					RequestId:           requestID,
+					PreferredId:         preferredID[:],
+					PreferredIdAtHeight: preferredIDAtHeight[:],
+					AcceptedId:          acceptedID[:],
 				},
 			},
 		},

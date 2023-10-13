@@ -291,7 +291,7 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	ts.pollNumber++
 
 	var voteStack []votes
-	if voteBag.Len() >= ts.params.Alpha {
+	if voteBag.Len() >= ts.params.AlphaPreference {
 		// Since we received at least alpha votes, it's possible that
 		// we reached an alpha majority on a processing block.
 		// We must perform the traversals to calculate all block
@@ -459,7 +459,7 @@ func (ts *Topological) pushVotes() []votes {
 
 		// If there are at least Alpha votes, then this block needs to record
 		// the poll on the snowball instance
-		if kahnNode.votes.Len() >= ts.params.Alpha {
+		if kahnNode.votes.Len() >= ts.params.AlphaPreference {
 			voteStack = append(voteStack, votes{
 				parentID: leafID,
 				votes:    kahnNode.votes,
