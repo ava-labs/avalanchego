@@ -399,7 +399,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
+			givenJSON: `{"consensusParameters":{"k": 111, "alphaPreference":1234} }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
@@ -407,14 +407,14 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alpha":16} }`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16} }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.Equal(true, config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.Alpha)
+				require.Equal(16, config.ConsensusParameters.AlphaConfidence)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
 			},
@@ -499,7 +499,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 111,
-						"alpha": 1234
+						"alphaPreference": 1234
 					}
 				}
 			}`,
@@ -513,7 +513,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 30,
-						"alpha": 20
+						"alphaPreference": 16,
+						"alphaConfidence": 20
 					},
 					"validatorOnly": true
 				}
@@ -523,7 +524,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				require.Equal(true, config.ValidatorOnly)
-				require.Equal(20, config.ConsensusParameters.Alpha)
+				require.Equal(16, config.ConsensusParameters.AlphaPreference)
+				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
 				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)

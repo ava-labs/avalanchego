@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	stdjson "encoding/json"
@@ -319,7 +320,7 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	codec := json.NewCodec()
 
 	rpcServer := rpc.NewServer()
@@ -340,24 +341,22 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
-	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
-		"/wallet": {Handler: walletServer},
-		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
+	return map[string]http.Handler{
+		"":        rpcServer,
+		"/wallet": walletServer,
+		"/events": vm.pubsub,
 	}, err
 }
 
-func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-
-	// name this service "avm"
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	staticService := CreateStaticService()
-	return map[string]*common.HTTPHandler{
-		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}, newServer.RegisterService(staticService, "avm")
+	return map[string]http.Handler{
+		"": server,
+	}, server.RegisterService(staticService, "avm")
 }
 
 /*

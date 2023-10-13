@@ -67,6 +67,15 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
+func (sf *nnarySnowflake) RecordPollPreference(choice ids.ID) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	sf.confidence = 0
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
+}
+
 func (sf *nnarySnowflake) RecordUnsuccessfulPoll() {
 	sf.confidence = 0
 }

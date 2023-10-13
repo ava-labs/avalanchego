@@ -345,6 +345,34 @@ func (mr *MockMerkleDBMockRecorder) NewView(arg0, arg1 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0, arg1)
 }
 
+// PrefetchPath mocks base method.
+func (m *MockMerkleDB) PrefetchPath(arg0 []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrefetchPath", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrefetchPath indicates an expected call of PrefetchPath.
+func (mr *MockMerkleDBMockRecorder) PrefetchPath(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrefetchPath", reflect.TypeOf((*MockMerkleDB)(nil).PrefetchPath), arg0)
+}
+
+// PrefetchPaths mocks base method.
+func (m *MockMerkleDB) PrefetchPaths(arg0 [][]byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrefetchPaths", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrefetchPaths indicates an expected call of PrefetchPaths.
+func (mr *MockMerkleDBMockRecorder) PrefetchPaths(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrefetchPaths", reflect.TypeOf((*MockMerkleDB)(nil).PrefetchPaths), arg0)
+}
+
 // Put mocks base method.
 func (m *MockMerkleDB) Put(arg0, arg1 []byte) error {
 	m.ctrl.T.Helper()
