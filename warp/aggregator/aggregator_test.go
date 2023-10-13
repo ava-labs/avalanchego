@@ -142,7 +142,7 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errTest).AnyTimes()
+				client.EXPECT().GetSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errTest).Times(len(vdrSet))
 				return New(subnetID, state, client)
 			},
 			unsignedMsg: unsignedMsg,
@@ -162,9 +162,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nil, errTest)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nil, errTest).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg: unsignedMsg,
@@ -184,9 +184,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg: unsignedMsg,
@@ -206,9 +206,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nil, errTest).MaxTimes(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -229,9 +229,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil).MaxTimes(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil).MaxTimes(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil).MaxTimes(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -252,9 +252,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil).MaxTimes(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -275,9 +275,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nonVdrSig, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nonVdrSig, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(nonVdrSig, nil).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg: unsignedMsg,
@@ -297,9 +297,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nonVdrSig, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg: unsignedMsg,
@@ -307,7 +307,7 @@ func TestAggregateSignatures(t *testing.T) {
 			expectedErr: avalancheWarp.ErrInsufficientWeight,
 		},
 		{
-			name: "2/3 validators reply with signature; 1 invalid signature; sufficient weight",
+			name: "1/3 validators reply with signature; 1 invalid signature; 1 error; sufficient weight",
 			contextWithCancelFunc: func() (context.Context, context.CancelFunc) {
 				return context.Background(), nil
 			},
@@ -319,9 +319,9 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nil, errTest)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(nonVdrSig, nil).MaxTimes(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(nil, errTest).MaxTimes(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).Return(sig3, nil).Times(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -353,7 +353,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).Times(1)
 				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).DoAndReturn(
 					func(ctx context.Context, _ ids.NodeID, _ *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 						<-ctx.Done()
@@ -361,7 +361,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).MaxTimes(1)
 				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).DoAndReturn(
 					func(ctx context.Context, _ ids.NodeID, _ *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 						<-ctx.Done()
@@ -369,7 +369,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).MaxTimes(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -397,7 +397,7 @@ func TestAggregateSignatures(t *testing.T) {
 						cancel()
 						return sig1, nil
 					},
-				)
+				).Times(1)
 				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).DoAndReturn(
 					func(ctx context.Context, _ ids.NodeID, _ *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 						// Should not be able to grab another signature since context was cancelled in another go routine
@@ -406,7 +406,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).MaxTimes(1)
 				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).DoAndReturn(
 					func(ctx context.Context, _ ids.NodeID, _ *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
 						// Should not be able to grab another signature since context was cancelled in another go routine
@@ -415,7 +415,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).MaxTimes(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
@@ -436,8 +436,8 @@ func TestAggregateSignatures(t *testing.T) {
 				)
 
 				client := NewMockSignatureGetter(ctrl)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil)
-				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID1, gomock.Any()).Return(sig1, nil).Times(1)
+				client.EXPECT().GetSignature(gomock.Any(), nodeID2, gomock.Any()).Return(sig2, nil).Times(1)
 				client.EXPECT().GetSignature(gomock.Any(), nodeID3, gomock.Any()).DoAndReturn(
 					// The aggregator will receive sig1 and sig2 which is sufficient weight,
 					// so the remaining outstanding goroutine should be cancelled.
@@ -447,7 +447,7 @@ func TestAggregateSignatures(t *testing.T) {
 						require.ErrorIs(t, err, context.Canceled)
 						return nil, err
 					},
-				)
+				).MaxTimes(1)
 				return New(subnetID, state, client)
 			},
 			unsignedMsg:     unsignedMsg,
