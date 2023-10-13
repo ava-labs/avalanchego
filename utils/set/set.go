@@ -168,13 +168,13 @@ func (s *Set[T]) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (s *Set[_]) MarshalJSON() ([]byte, error) {
+func (s Set[_]) MarshalJSON() ([]byte, error) {
 	var (
-		eltBytes = make([][]byte, len(*s))
+		eltBytes = make([][]byte, len(s))
 		i        int
 		err      error
 	)
-	for elt := range *s {
+	for elt := range s {
 		eltBytes[i], err = stdjson.Marshal(elt)
 		if err != nil {
 			return nil, err

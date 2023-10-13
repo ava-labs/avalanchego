@@ -114,6 +114,19 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
+type Prefetcher interface {
+	// PrefetchPath attempts to load all trie nodes on the path of [key]
+	// into the cache.
+	PrefetchPath(key []byte) error
+
+	// PrefetchPaths attempts to load all trie nodes on the paths of [keys]
+	// into the cache.
+	//
+	// Using PrefetchPaths can be more efficient than PrefetchPath because
+	// the underlying view used to compute each path can be reused.
+	PrefetchPaths(keys [][]byte) error
+}
+
 type MerkleDB interface {
 	database.Database
 	Trie
@@ -121,6 +134,7 @@ type MerkleDB interface {
 	ProofGetter
 	ChangeProofer
 	RangeProofer
+	Prefetcher
 }
 
 type Config struct {
