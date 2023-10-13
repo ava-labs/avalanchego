@@ -1223,11 +1223,7 @@ func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	n, err := db.getNodeWithoutLock(key, hasValue)
-	if err != nil {
-		return nil, err
-	}
-	return n, nil
+	return db.getNodeWithoutLock(key, hasValue)
 }
 
 // Returns the node with the given [key].
