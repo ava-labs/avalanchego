@@ -16,6 +16,25 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
 
+### Filtering test execution with labels
+
+In cases where a change can be verified against only a subset of
+tests, it is possible to filter the tests that will be executed by the
+declarative labels that have been applied to them. Available labels
+are defined as constants in [`describe.go`](./describe.go) with names
+of the form `*Label`. The following example runs only those tests that
+primarily target the X-Chain:
+
+
+```bash
+./tests/e2e/e2e.test \
+  --avalanchego-path=./build/avalanchego \
+  --ginkgo.label-filter=x
+```
+
+The ginkgo docs provide further detail on [how to compose label
+queries](https://onsi.github.io/ginkgo/#spec-labels).
+
 ## Adding tests
 
 Define any flags/configurations in [`e2e.go`](./e2e.go).
@@ -76,3 +95,15 @@ ginkgo -v ./tests/e2e -- \
 ```
 
 See the testnet fixture [README](../fixture/testnet/README.md) for more details.
+
+## Skipping bootstrap checks
+
+By default many tests will attempt to bootstrap a new node with the
+post-test network state. While this is a valuable activity to perform
+in CI, it can add considerable latency to test development. To disable
+these bootstrap checks during development, set the
+`E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
+
+```bash
+E2E_SKIP_BOOTSTRAP_CHECKS=1 ginkgo -v ./tests/e2e ...
+```

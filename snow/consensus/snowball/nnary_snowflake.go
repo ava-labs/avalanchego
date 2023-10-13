@@ -11,6 +11,14 @@ import (
 
 var _ NnarySnowflake = (*nnarySnowflake)(nil)
 
+func newNnarySnowflake(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowflake {
+	return nnarySnowflake{
+		nnarySlush:   newNnarySlush(choice),
+		betaVirtuous: betaVirtuous,
+		betaRogue:    betaRogue,
+	}
+}
+
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
 type nnarySnowflake struct {
@@ -37,12 +45,6 @@ type nnarySnowflake struct {
 	finalized bool
 }
 
-func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
-	sf.nnarySlush.Initialize(choice)
-	sf.betaVirtuous = betaVirtuous
-	sf.betaRogue = betaRogue
-}
-
 func (sf *nnarySnowflake) Add(choice ids.ID) {
 	sf.rogue = sf.rogue || choice != sf.preference
 }
@@ -62,6 +64,15 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 
 	sf.finalized = (!sf.rogue && sf.confidence >= sf.betaVirtuous) ||
 		sf.confidence >= sf.betaRogue
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
+}
+
+func (sf *nnarySnowflake) RecordPollPreference(choice ids.ID) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	sf.confidence = 0
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 

@@ -128,7 +128,7 @@ func StartNetwork(
 	nodeCount int,
 	keyCount int,
 ) (*LocalNetwork, error) {
-	if _, err := fmt.Fprintln(w, "Preparing configuration for new local network..."); err != nil {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new local network with %s\n", network.ExecPath); err != nil {
 		return nil, err
 	}
 
@@ -658,20 +658,33 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		return nil, err
 	}
 
-	// Collect staking addresses of running nodes for use in bootstraping the new node
-	if err := ln.ReadNodes(); err != nil {
-		return nil, fmt.Errorf("failed to read local network nodes: %w", err)
+	bootstrapIPs, bootstrapIDs, err := ln.GetBootstrapIPsAndIDs()
+	if err != nil {
+		return nil, err
 	}
 
 	var (
 		// Use dynamic port allocation.
 		httpPort    uint16 = 0
 		stakingPort uint16 = 0
+	)
+	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
 
+	if err := node.WriteConfig(); err != nil {
+		return nil, err
+	}
+	return node, node.Start(w, ln.ExecPath)
+}
+
+func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
+	// Collect staking addresses of running nodes for use in bootstrapping a node
+	if err := ln.ReadNodes(); err != nil {
+		return nil, nil, fmt.Errorf("failed to read local network nodes: %w", err)
+	}
+	var (
 		bootstrapIPs = make([]string, 0, len(ln.Nodes))
 		bootstrapIDs = make([]string, 0, len(ln.Nodes))
 	)
-
 	for _, node := range ln.Nodes {
 		if len(node.StakingAddress) == 0 {
 			// Node is not running
@@ -681,14 +694,10 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 	}
+
 	if len(bootstrapIDs) == 0 {
-		return nil, errMissingBootstrapNodes
+		return nil, nil, errMissingBootstrapNodes
 	}
 
-	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
-
-	if err := node.WriteConfig(); err != nil {
-		return nil, err
-	}
-	return node, node.Start(w, ln.ExecPath)
+	return bootstrapIPs, bootstrapIDs, nil
 }

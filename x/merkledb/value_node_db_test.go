@@ -28,10 +28,11 @@ func TestValueNodeDB(t *testing.T) {
 		},
 		&mockMetrics{},
 		size,
+		BranchFactor16,
 	)
 
 	// Getting a key that doesn't exist should return an error.
-	key := newPath([]byte{0x01})
+	key := NewPath([]byte{0x01}, BranchFactor16)
 	_, err := db.Get(key)
 	require.ErrorIs(err, database.ErrNotFound)
 
@@ -40,6 +41,7 @@ func TestValueNodeDB(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0x01}),
 		},
+		key: key,
 	}
 	batch := db.NewBatch()
 	batch.Put(key, node1)
@@ -74,6 +76,7 @@ func TestValueNodeDB(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0x02}),
 		},
+		key: key,
 	}
 	batch = db.NewBatch()
 	batch.Put(key, node1)
@@ -121,15 +124,17 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
+		BranchFactor16,
 	)
 
 	// Put key-node pairs.
 	for i := 0; i < cacheSize; i++ {
-		key := newPath([]byte{byte(i)})
+		key := NewPath([]byte{byte(i)}, BranchFactor16)
 		node := &node{
 			dbNode: dbNode{
 				value: maybe.Some([]byte{byte(i)}),
 			},
+			key: key,
 		}
 		batch := db.NewBatch()
 		batch.Put(key, node)
@@ -162,21 +167,23 @@ func TestValueNodeDBIterator(t *testing.T) {
 	it.Release()
 
 	// Put key-node pairs with a common prefix.
-	key := newPath([]byte{0xFF, 0x00})
+	key := NewPath([]byte{0xFF, 0x00}, BranchFactor16)
 	n := &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x00}),
 		},
+		key: key,
 	}
 	batch := db.NewBatch()
 	batch.Put(key, n)
 	require.NoError(batch.Write())
 
-	key = newPath([]byte{0xFF, 0x01})
+	key = NewPath([]byte{0xFF, 0x01}, BranchFactor16)
 	n = &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x01}),
 		},
+		key: key,
 	}
 	batch = db.NewBatch()
 	batch.Put(key, n)

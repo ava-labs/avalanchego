@@ -15,8 +15,7 @@ func TestNnarySnowball(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 	sb.Add(Green)
 
@@ -31,8 +30,20 @@ func TestNnarySnowball(t *testing.T) {
 	require.Equal(Blue, sb.Preference())
 	require.False(sb.Finalized())
 
+	sb.RecordPollPreference(Red)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
+
+	sb.RecordSuccessfulPoll(Red)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
+
+	sb.RecordPollPreference(Blue)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
+
 	sb.RecordSuccessfulPoll(Blue)
-	require.Equal(Blue, sb.Preference())
+	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
@@ -46,8 +57,7 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 	betaVirtuous := 1
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
@@ -63,8 +73,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
@@ -86,7 +95,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	require.Equal(Blue, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, NumSuccessfulPolls = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
+	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
 	require.Equal(expected, sb.String())
 
 	for i := 0; i < 4; i++ {
@@ -103,8 +112,7 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())

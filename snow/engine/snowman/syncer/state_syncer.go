@@ -6,8 +6,7 @@ package syncer
 import (
 	"context"
 	"fmt"
-
-	stdmath "math"
+	"math"
 
 	"go.uber.org/zap"
 
@@ -19,9 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ common.StateSyncer = (*stateSyncer)(nil)
@@ -250,7 +250,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 			continue
 		}
 
-		newWeight, err := math.Add64(nodeWeight, ws.weight)
+		newWeight, err := safemath.Add64(nodeWeight, ws.weight)
 		if err != nil {
 			ss.Ctx.Log.Error("failed to calculate new summary weight",
 				zap.Stringer("nodeID", nodeID),
@@ -260,7 +260,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 				zap.Uint64("previousWeight", ws.weight),
 				zap.Error(err),
 			)
-			newWeight = stdmath.MaxUint64
+			newWeight = math.MaxUint64
 		}
 
 		ss.Ctx.Log.Verbo("updating summary weight",
