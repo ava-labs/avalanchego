@@ -1230,7 +1230,6 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 
 // Returns a copy of the node with the given [key].
 // hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
-// This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
 func (db *merkleDB) getNode(key Path, hasValue bool, _ bool) (*node, error) {

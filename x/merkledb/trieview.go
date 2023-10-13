@@ -159,6 +159,7 @@ func newTrieView(
 		parentTrie: parentTrie,
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
+	// before should never be modified
 	newView.changes.nodes[db.rootPath] = &change[*node]{before: root, after: newView.root}
 
 	for _, op := range changes.BatchOps {
@@ -933,7 +934,7 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 	default:
 		return err
 	}
-
+	// before should never be modified
 	t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
 		before: beforeMaybe,
 		after:  value,
@@ -943,6 +944,7 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 
 // Retrieves a node with the given [key].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
+// forChild indicates that the requested node is for a child view and shouldn't be marked as a change
 // Returns database.ErrNotFound if the node doesn't exist.
 func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error) {
 	// check for the key within the changed nodes
@@ -962,6 +964,7 @@ func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error
 	nodeToReturn := parentTrieNode
 	if !forChild {
 		nodeToReturn = parentTrieNode.clone()
+		// before should never be modified
 		t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: nodeToReturn}
 	}
 	return nodeToReturn, nil

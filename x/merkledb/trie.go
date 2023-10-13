@@ -38,6 +38,9 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Path) ([]byte, error)
 
+	// get the node with the given key path
+	// hasValue indicates which db to look in (value or intermediate)
+	// forChild indicates that the requested node is for a child view
 	getNode(key Path, hasValue bool, forChild bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
