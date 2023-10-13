@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */)
+	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */, true)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -369,6 +369,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	childNode, err := t.getNode(
 		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
 		child.hasValue,
+		true,
 	)
 	if err != nil {
 		return nil, err
@@ -686,7 +687,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNode(childPath, childEntry.hasValue)
+		nextNode, err := t.getNode(childPath, childEntry.hasValue, false)
 		if err != nil {
 			return err
 		}
@@ -761,7 +762,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue)
+		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue, false)
 		if err != nil {
 			return nil, err
 		}
@@ -943,7 +944,7 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 // Retrieves a node with the given [key].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
+func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -954,13 +955,16 @@ func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue)
+	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue, true)
 	if err != nil {
 		return nil, err
 	}
-	parentTrieNodeClone := parentTrieNode.clone()
-	t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: parentTrieNodeClone}
-	return parentTrieNodeClone, nil
+	nodeToReturn := parentTrieNode
+	if !forChild {
+		nodeToReturn = parentTrieNode.clone()
+		t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: nodeToReturn}
+	}
+	return nodeToReturn, nil
 }
 
 // Get the parent trie of the view

@@ -1233,7 +1233,7 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
+func (db *merkleDB) getNode(key Path, hasValue bool, _ bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

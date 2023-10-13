@@ -38,7 +38,7 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Path) ([]byte, error)
 
-	getNode(key Path, hasValue bool) (*node, error)
+	getNode(key Path, hasValue bool, forChild bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].
