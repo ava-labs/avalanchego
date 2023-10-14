@@ -23,6 +23,8 @@ var (
 		TestBigArray,
 		TestPointerToStruct,
 		TestSliceOfStruct,
+		TestStructWithPtr,
+		TestStructWithPtrNil,
 		TestInterface,
 		TestSliceOfInterface,
 		TestArrayOfInterface,
@@ -63,7 +65,8 @@ type Foo interface {
 }
 
 type MyInnerStruct struct {
-	Str string `serialize:"true"`
+	Str               string `serialize:"true"`
+	NumberNotProvided *int32 `serialize:"true":121`
 }
 
 func (*MyInnerStruct) Foo() int {
@@ -84,6 +87,11 @@ type MyInnerStruct3 struct {
 	Str string        `serialize:"true"`
 	M1  MyInnerStruct `serialize:"true"`
 	F   Foo           `serialize:"true"`
+}
+
+type MyStructWithPtr struct {
+	N1 *int32 `serialize:"true"`
+	N2 *int64 `serialize:"true"`
 }
 
 type myStruct struct {
@@ -145,21 +153,23 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	myMap7["key"] = "value"
 	myMap7[int32(1)] = int32(2)
 
+	number := int32(8)
+
 	myStructInstance := myStruct{
-		InnerStruct:  MyInnerStruct{"hello"},
-		InnerStruct2: &MyInnerStruct{"yello"},
+		InnerStruct:  MyInnerStruct{"hello", nil},
+		InnerStruct2: &MyInnerStruct{"yello", nil},
 		Member1:      1,
 		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
-		MySlice3:     []MyInnerStruct{{"abc"}, {"ab"}, {"c"}},
+		MySlice3:     []MyInnerStruct{{"abc", nil}, {"ab", &number}, {"c", nil}},
 		MySlice4:     []*MyInnerStruct2{{true}, {}},
 		MySlice5:     []Foo{&MyInnerStruct2{true}, &MyInnerStruct2{}},
 		MyArray:      [4]byte{5, 6, 7, 8},
 		MyArray2:     [5]string{"four", "five", "six", "seven"},
-		MyArray3:     [3]MyInnerStruct{{"d"}, {"e"}, {"f"}},
+		MyArray3:     [3]MyInnerStruct{{"d", nil}, {"e", nil}, {"f", nil}},
 		MyArray4:     [2]*MyInnerStruct2{{}, {true}},
-		MyInterface:  &MyInnerStruct{"yeet"},
+		MyInterface:  &MyInnerStruct{"yeet", &number},
 		InnerStruct3: MyInnerStruct3{
 			Str: "str",
 			M1: MyInnerStruct{
@@ -414,20 +424,70 @@ func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
 	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
+func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+	n1 := int32(5)
+	n2 := int64(10)
+	struct1 := MyStructWithPtr{
+		N1: &n1,
+		N2: &n2,
+	}
+
+	require.NoError(codec.RegisterType(&MyStructWithPtr{}))
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, struct1)
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, struct1)
+	require.NoError(err)
+	require.Len(bytes, bytesLen)
+
+	var struct1Unmarshaled MyStructWithPtr
+	version, err := manager.Unmarshal(bytes, &struct1Unmarshaled)
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(struct1, struct1Unmarshaled)
+}
+
+func TestStructWithPtrNil(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+	struct1 := MyStructWithPtr{}
+
+	require.NoError(codec.RegisterType(&MyStructWithPtr{}))
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, struct1)
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, struct1)
+	require.NoError(err)
+	require.Len(bytes, bytesLen)
+
+	var struct1Unmarshaled MyStructWithPtr
+	version, err := manager.Unmarshal(bytes, &struct1Unmarshaled)
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(struct1, struct1Unmarshaled)
+}
+
 // Test marshalling a slice of structs
 func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
-
+	n1 := int32(-1)
+	n2 := int32(0xff)
 	mySlice := []MyInnerStruct3{
 		{
 			Str: "One",
-			M1:  MyInnerStruct{"Two"},
-			F:   &MyInnerStruct{"Three"},
+			M1:  MyInnerStruct{"Two", &n1},
+			F:   &MyInnerStruct{"Three", &n2},
 		},
 		{
 			Str: "Four",
-			M1:  MyInnerStruct{"Five"},
-			F:   &MyInnerStruct{"Six"},
+			M1:  MyInnerStruct{"Five", nil},
+			F:   &MyInnerStruct{"Six", nil},
 		},
 	}
 	require.NoError(codec.RegisterType(&MyInnerStruct{}))
