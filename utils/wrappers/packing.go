@@ -4,6 +4,7 @@
 package wrappers
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"math"
@@ -177,6 +178,23 @@ func (p *Packer) PackFixedBytes(bytes []byte) {
 
 	copy(p.Bytes[p.Offset:], bytes)
 	p.Offset += len(bytes)
+}
+
+func (p *Packer) UnpackIfMatches(values ...[]byte) []byte {
+	totalLength := len(p.Bytes)
+	for _, value := range values {
+		length := len(value)
+		if totalLength-p.Offset < length {
+			continue
+		}
+
+		if bytes.Equal(value, p.Bytes[p.Offset:p.Offset+length]) {
+			p.Offset += length
+			return value
+		}
+	}
+
+	return nil
 }
 
 // UnpackFixedBytes unpack a byte slice, with no length descriptor from the byte

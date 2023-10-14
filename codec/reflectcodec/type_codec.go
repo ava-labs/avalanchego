@@ -20,6 +20,12 @@ import (
 const DefaultTagName = "serialize"
 
 var (
+	MagicBytesPtrNil        = []byte{0xff, 0x32, 0x31, 0x36, 0x98}
+	MagicBytesPtr           = []byte{0xc3, 0xa1, 0x00, 0x33, 0x25}
+	magicBytesPtrPrefixSize = len(MagicBytesPtrNil)
+)
+
+var (
 	_ codec.Codec = (*genericCodec)(nil)
 
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
@@ -85,7 +91,13 @@ func (c *genericCodec) Size(value interface{}) (int, error) {
 		return 0, errMarshalNil // can't marshal nil
 	}
 
-	size, _, err := c.size(reflect.ValueOf(value))
+	metaValue := reflect.ValueOf(value)
+	switch valueKind := metaValue.Kind(); valueKind {
+	case reflect.Ptr:
+		metaValue = metaValue.Elem()
+	}
+
+	size, _, err := c.size(metaValue)
 	return size, err
 }
 
@@ -114,10 +126,13 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			// Can't marshal nil pointers (but nil slices are fine)
-			return 0, false, errMarshalNil
+			return magicBytesPtrPrefixSize, false, nil
 		}
-		return c.size(value.Elem())
+		size, _, err := c.size(value.Elem())
+		if err != nil {
+			return 0, false, err
+		}
+		return magicBytesPtrPrefixSize + size, false, nil
 
 	case reflect.Interface:
 		if value.IsNil() {
@@ -279,7 +294,13 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 		return errMarshalNil // can't marshal nil
 	}
 
-	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen)
+	metaValue := reflect.ValueOf(value)
+	switch valueKind := metaValue.Kind(); valueKind {
+	case reflect.Ptr:
+		metaValue = metaValue.Elem()
+	}
+
+	return c.marshal(metaValue, p, c.maxSliceLen)
 }
 
 // marshal writes the byte representation of [value] to [p]
@@ -318,8 +339,13 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Ptr:
-		if value.IsNil() { // Can't marshal nil (except nil slices)
-			return errMarshalNil
+		if value.IsNil() {
+			p.PackFixedBytes(MagicBytesPtrNil)
+			return p.Err
+		}
+		p.PackFixedBytes(MagicBytesPtr)
+		if p.Err != nil {
+			return p.Err
 		}
 		return c.marshal(value.Elem(), p, c.maxSliceLen)
 	case reflect.Interface:
@@ -643,6 +669,10 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		// Create a new pointer to a new value of the underlying type
 		v := reflect.New(t)
 		// Fill the value
+		if bytes.Equal(MagicBytesPtrNil, p.UnpackIfMatches(MagicBytesPtrNil, MagicBytesPtr)) {
+			// Nil
+			return nil
+		}
 		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
