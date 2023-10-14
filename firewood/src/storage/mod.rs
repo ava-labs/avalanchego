@@ -6,6 +6,7 @@ use self::buffer::DiskBufferRequester;
 use crate::file::File;
 use nix::fcntl::{flock, FlockArg};
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use shale::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
 use std::{
     collections::HashMap,
@@ -57,13 +58,13 @@ pub trait MemStoreR: Debug + Send + Sync {
 // Page should be boxed as to not take up so much stack-space
 type Page = Box<[u8; PAGE_SIZE as usize]>;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SpaceWrite {
     offset: u64,
     data: Box<[u8]>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// In memory representation of Write-ahead log with `undo` and `redo`.
 pub struct Ash {
     /// Deltas to undo the changes.
@@ -78,78 +79,19 @@ impl Ash {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AshRecord(pub HashMap<SpaceId, Ash>);
 
 impl growthring::wal::Record for AshRecord {
     fn serialize(&self) -> growthring::wal::WalBytes {
-        let len_bytes = (self.0.len() as u64).to_le_bytes();
-        let ash_record_bytes = self
-            .0
-            .iter()
-            .map(|(space_id, w)| {
-                let space_id_bytes = space_id.to_le_bytes();
-                let undo_len = u32::try_from(w.undo.len()).expect("size of undo shoud be a `u32`");
-                let ash_bytes = w.iter().flat_map(|(undo, redo)| {
-                    let undo_data_len = u64::try_from(undo.data.len())
-                        .expect("length of undo data shoud be a `u64`");
-
-                    undo.offset
-                        .to_le_bytes()
-                        .into_iter()
-                        .chain(undo_data_len.to_le_bytes())
-                        .chain(undo.data.iter().copied())
-                        .chain(redo.data.iter().copied())
-                });
-
-                (space_id_bytes, undo_len, ash_bytes)
-            })
-            .flat_map(|(space_id_bytes, undo_len, ash_bytes)| {
-                space_id_bytes
-                    .into_iter()
-                    .chain(undo_len.to_le_bytes())
-                    .chain(ash_bytes)
-            });
-
-        len_bytes.into_iter().chain(ash_record_bytes).collect()
+        bincode::serialize(self).unwrap().into()
     }
 }
 
 impl AshRecord {
     #[allow(clippy::boxed_local)]
     fn deserialize(raw: growthring::wal::WalBytes) -> Self {
-        let mut r = &raw[..];
-        let len = u64::from_le_bytes(r[..8].try_into().unwrap());
-        r = &r[8..];
-        let writes = (0..len)
-            .map(|_| {
-                let space_id = u8::from_le_bytes(r[..1].try_into().unwrap());
-                let wlen = u32::from_le_bytes(r[1..5].try_into().unwrap());
-                r = &r[5..];
-                let mut undo = Vec::new();
-                let mut redo = Vec::new();
-                for _ in 0..wlen {
-                    let offset = u64::from_le_bytes(r[..8].try_into().unwrap());
-                    let data_len = u64::from_le_bytes(r[8..16].try_into().unwrap());
-                    r = &r[16..];
-                    let undo_write = SpaceWrite {
-                        offset,
-                        data: r[..data_len as usize].into(),
-                    };
-                    r = &r[data_len as usize..];
-                    // let new_data: Box<[u8]> = r[..data_len as usize].into();
-                    let redo_write = SpaceWrite {
-                        offset,
-                        data: r[..data_len as usize].into(),
-                    };
-                    r = &r[data_len as usize..];
-                    undo.push(undo_write);
-                    redo.push(redo_write);
-                }
-                (space_id, Ash { undo, redo })
-            })
-            .collect();
-        Self(writes)
+        bincode::deserialize(raw.as_ref()).unwrap()
     }
 }
 
