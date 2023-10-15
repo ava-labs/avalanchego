@@ -357,8 +357,7 @@ func (i *indexer) registerChainHelper(
 		_ = index.Close()
 		return nil, err
 	}
-	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
-	if err := i.pathAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint); err != nil {
+	if err := i.pathAdder.AddRoute(apiServer, "index/"+name, "/"+endpoint); err != nil {
 		_ = index.Close()
 		return nil, err
 	}
