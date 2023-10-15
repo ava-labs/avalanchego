@@ -58,6 +58,7 @@ linters:
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
     # - lll
     - misspell
@@ -107,6 +108,15 @@ linters-settings:
   gosec:
     excludes:
       - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+  importas:
+    # Do not allow unaliased imports of aliased packages.
+    no-unaliased: false
+    # Do not allow non-required aliases.
+    no-extra-aliases: false
+    # List of aliases
+    alias:
+      - pkg: github.com/ava-labs/avalanchego/utils/math
+        alias: safemath
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
