@@ -11,9 +11,9 @@ import (
 
 // useDefault is just an attempt to set clock time the way it is currently
 // in different packages. TODO drop it and find common, meaningfull times
-func Clock(fork ActiveFork, useDefault bool) *mockable.Clock {
+func Clock(fork ActiveFork) *mockable.Clock {
 	now := GenesisTime
-	if !useDefault && (fork == BanffFork || fork == CortinaFork || fork == DFork) {
+	if fork == BanffFork || fork == CortinaFork || fork == DFork {
 		// 1 second after Banff fork
 		now = ValidateEndTime.Add(-2 * time.Second)
 	}

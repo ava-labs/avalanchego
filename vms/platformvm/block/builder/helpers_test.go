@@ -78,7 +78,7 @@ func newEnvironment(t *testing.T) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         ts.Config(ts.LatestFork),
-		clk:            ts.Clock(ts.LatestFork, true),
+		clk:            ts.Clock(ts.LatestFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -184,6 +184,7 @@ func addSubnet(t *testing.T, env *environment) {
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(

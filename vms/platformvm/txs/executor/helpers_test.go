@@ -89,7 +89,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	isBootstrapped.Set(true)
 
 	config := ts.Config(fork)
-	clk := ts.Clock(fork, false)
+	clk := ts.Clock(fork)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -181,6 +181,7 @@ func addSubnet(
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(

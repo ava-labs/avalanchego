@@ -109,7 +109,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         ts.Config(ts.LatestFork),
-		clk:            ts.Clock(ts.LatestFork, false),
+		clk:            ts.Clock(ts.LatestFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -183,7 +183,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			res.backend,
 			pvalidators.TestManager,
 		)
-		addSubnet(res)
+		addSubnet(t, res)
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
@@ -199,7 +199,9 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	return res
 }
 
-func addSubnet(env *environment) {
+func addSubnet(t *testing.T, env *environment) {
+	require := require.New(t)
+
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
@@ -212,16 +214,12 @@ func addSubnet(env *environment) {
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ts.Keys[0].PublicKey().Address(),
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	executor := executor.StandardTxExecutor{
 		Backend: env.backend,
@@ -234,9 +232,8 @@ func addSubnet(env *environment) {
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
