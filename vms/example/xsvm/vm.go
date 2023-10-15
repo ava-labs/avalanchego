@@ -114,11 +114,11 @@ func (*VM) Version(context.Context) (string, error) {
 	return Version.String(), nil
 }
 
-func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
 	return nil, nil
 }
 
-func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -129,11 +129,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 		vm.chain,
 		vm.builder,
 	)
-	return map[string]*common.HTTPHandler{
-		"": {
-			LockOptions: common.NoLock,
-			Handler:     server,
-		},
+	return map[string]http.Handler{
+		"": server,
 	}, server.RegisterService(api, Name)
 }
 

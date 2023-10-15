@@ -407,8 +407,7 @@ func TestGenesis(t *testing.T) {
 		addr, err := ids.ToShortID(addrBytes)
 		require.NoError(err)
 
-		addrs := set.Set[ids.ShortID]{}
-		addrs.Add(addr)
+		addrs := set.Of(addr)
 		utxos, err := avax.GetAllUTXOs(vm.state, addrs)
 		require.NoError(err)
 		require.Len(utxos, 1)

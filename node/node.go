@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -727,15 +726,11 @@ func (n *Node) initAPIServer() error {
 
 	// only create auth service if token authorization is required
 	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
-	authService, err := a.CreateHandler()
+	handler, err := a.CreateHandler()
 	if err != nil {
 		return err
 	}
-	handler := &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     authService,
-	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "")
+	return n.APIServer.AddRoute(handler, "auth", "")
 }
 
 // Add the default VM aliases
@@ -770,8 +765,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	cChainID := createEVMTx.ID()
 
 	// If any of these chains die, the node shuts down
-	criticalChains := set.Set[ids.ID]{}
-	criticalChains.Add(
+	criticalChains := set.Of(
 		constants.PlatformChainID,
 		xChainID,
 		cChainID,
@@ -971,7 +965,7 @@ func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
 	n.keystore = keystore.New(n.Log, keystoreDB)
-	keystoreHandler, err := n.keystore.CreateHandler()
+	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
 	}
@@ -980,11 +974,7 @@ func (n *Node) initKeystoreAPI() error {
 		return nil
 	}
 	n.Log.Warn("initializing deprecated keystore API")
-	handler := &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     keystoreHandler,
-	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "")
+	return n.APIServer.AddRoute(handler, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -1014,14 +1004,10 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler: promhttp.HandlerFor(
-				n.MetricsGatherer,
-				promhttp.HandlerOpts{},
-			),
-		},
-		&sync.RWMutex{},
+		promhttp.HandlerFor(
+			n.MetricsGatherer,
+			promhttp.HandlerOpts{},
+		),
 		"metrics",
 		"",
 	)
@@ -1051,11 +1037,7 @@ func (n *Node) initAdminAPI() error {
 		return err
 	}
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     service,
-		},
-		&sync.RWMutex{},
+		service,
 		"admin",
 		"",
 	)
@@ -1123,11 +1105,7 @@ func (n *Node) initInfoAPI() error {
 		return err
 	}
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     service,
-		},
-		&sync.RWMutex{},
+		service,
 		"info",
 		"",
 	)
@@ -1197,11 +1175,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     handler,
-		},
-		&sync.RWMutex{},
+		handler,
 		"health",
 		"",
 	)
@@ -1210,11 +1184,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Readiness),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Readiness),
 		"health",
 		"/readiness",
 	)
@@ -1223,11 +1193,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Health),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Health),
 		"health",
 		"/health",
 	)
@@ -1236,11 +1202,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Liveness),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Liveness),
 		"health",
 		"/liveness",
 	)
@@ -1259,11 +1221,7 @@ func (n *Node) initIPCAPI() error {
 		return err
 	}
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     service,
-		},
-		&sync.RWMutex{},
+		service,
 		"ipcs",
 		"",
 	)
