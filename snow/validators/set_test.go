@@ -4,17 +4,17 @@
 package validators
 
 import (
+	"math"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestSetAddZeroWeight(t *testing.T) {
@@ -43,8 +43,8 @@ func TestSetAddOverflow(t *testing.T) {
 	s := NewSet()
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
-	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
-	require.ErrorIs(err, math.ErrOverflow)
+	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, math.MaxUint64)
+	require.ErrorIs(err, safemath.ErrOverflow)
 
 	require.Equal(uint64(1), s.Weight())
 }
@@ -71,8 +71,8 @@ func TestSetAddWeightOverflow(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	err := s.AddWeight(nodeID, stdmath.MaxUint64-1)
-	require.ErrorIs(err, math.ErrOverflow)
+	err := s.AddWeight(nodeID, math.MaxUint64-1)
+	require.ErrorIs(err, safemath.ErrOverflow)
 
 	require.Equal(uint64(2), s.Weight())
 }
@@ -101,9 +101,7 @@ func TestSetSubsetWeight(t *testing.T) {
 	weight1 := uint64(123)
 	weight2 := uint64(810)
 
-	subset := set.Set[ids.NodeID]{}
-	subset.Add(nodeID0)
-	subset.Add(nodeID1)
+	subset := set.Of(nodeID0, nodeID1)
 
 	s := NewSet()
 
@@ -150,7 +148,7 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.RemoveWeight(nodeID, 2)
-	require.ErrorIs(err, math.ErrUnderflow)
+	require.ErrorIs(err, safemath.ErrUnderflow)
 
 	require.Equal(uint64(2), s.Weight())
 }
@@ -354,7 +352,7 @@ func TestSetSample(t *testing.T) {
 	require.ErrorIs(err, sampler.ErrOutOfRange)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	require.NoError(s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
+	require.NoError(s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1))
 
 	sampled, err = s.Sample(1)
 	require.NoError(err)
@@ -381,7 +379,7 @@ func TestSetString(t *testing.T) {
 	s := NewSet()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
 
-	require.NoError(s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
+	require.NoError(s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1))
 
 	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
 		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +

@@ -231,8 +231,7 @@ func TestEngineQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blockID)
 		require.Equal(uint64(1), requestedHeight)
@@ -282,8 +281,7 @@ func TestEngineQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blockID)
 		require.Equal(uint64(1), requestedHeight)
@@ -393,8 +391,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk0.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -467,8 +464,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*secondQueryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -637,8 +633,7 @@ func TestEnginePushQuery(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID, requestedHeight uint64) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.True(inVdrs.Equals(vdrSet))
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -684,8 +679,7 @@ func TestEngineBuildBlock(t *testing.T) {
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ []byte, _ uint64) {
 		require.False(*pushSent)
 		*pushSent = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -707,8 +701,7 @@ func TestEngineRepoll(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -792,8 +785,7 @@ func TestVoteCanceling(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.Bytes(), blkBytes)
 		require.Equal(uint64(1), requestedHeight)
@@ -1170,8 +1162,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(issuedBlk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -1664,8 +1655,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		require.False((*queried))
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1)
+		vdrSet := set.Of(vdr0, vdr1)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -1771,8 +1761,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		reqID = rID
 		require.False(queried)
 		queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -2272,8 +2261,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.NodeID]{}
-	expectedVdrSet.Add(vdr)
+	expectedVdrSet := set.Of(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
@@ -2347,8 +2335,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		*queried = true
 
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -2446,8 +2433,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.NodeID]{}
-	expectedVdrSet.Add(vdr)
+	expectedVdrSet := set.Of(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
