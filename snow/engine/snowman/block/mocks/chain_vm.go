@@ -9,6 +9,7 @@ package mocks
 
 import (
 	context "context"
+	http "net/http"
 	reflect "reflect"
 	time "time"
 
@@ -130,10 +131,10 @@ func (mr *MockChainVMMockRecorder) Connected(arg0, arg1, arg2 interface{}) *gomo
 }
 
 // CreateHandlers mocks base method.
-func (m *MockChainVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockChainVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -145,10 +146,10 @@ func (mr *MockChainVMMockRecorder) CreateHandlers(arg0 interface{}) *gomock.Call
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockChainVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockChainVM) CreateStaticHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
