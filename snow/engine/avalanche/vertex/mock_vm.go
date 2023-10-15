@@ -9,6 +9,7 @@ package vertex
 
 import (
 	context "context"
+	http "net/http"
 	reflect "reflect"
 	time "time"
 
@@ -131,10 +132,10 @@ func (mr *MockLinearizableVMMockRecorder) Connected(arg0, arg1, arg2 interface{}
 }
 
 // CreateHandlers mocks base method.
-func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -146,10 +147,10 @@ func (mr *MockLinearizableVMMockRecorder) CreateHandlers(arg0 interface{}) *gomo
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
