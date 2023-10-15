@@ -25,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
-
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
@@ -295,7 +293,7 @@ func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, 
 	clientConn, err := grpcutils.Dial(status.Addr)
 	require.NoError(err)
 
-	return NewClient(vmpb.NewVMClient(clientConn)), stopper
+	return NewClient(clientConn), stopper
 }
 
 func TestStateSyncEnabled(t *testing.T) {

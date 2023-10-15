@@ -17,7 +17,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 	vdrs := bag.Of(vdr1) // k = 1
 	alpha := 1
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -34,7 +34,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -52,7 +52,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -66,13 +66,13 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 }
 
 // Tests case 2
-func TestEarlyTermNoTraversalTerminatesEarlyWithoutAlpha(t *testing.T) {
+func TestEarlyTermNoTraversalTerminatesEarlyWithoutAlphaPreference(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr1)
@@ -83,13 +83,38 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithoutAlpha(t *testing.T) {
 }
 
 // Tests case 3
-func TestEarlyTermNoTraversalTerminatesEarlyWithAlpha(t *testing.T) {
+func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
-	alpha := 3
+	alphaPreference := 3
+	alphaConfidence := 5
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence)
+	poll := factory.New(vdrs)
+
+	poll.Vote(vdr1, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID1)
+	require.False(poll.Finished())
+
+	poll.Drop(vdr4)
+	require.True(poll.Finished())
+}
+
+// Tests case 4
+func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 3
+	alphaConfidence := 3
+
+	factory := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -113,7 +138,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4) // k = 4
 	alpha := 4
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID2)
@@ -135,7 +160,7 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr2, blkID1)
@@ -152,7 +177,7 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha)
+	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr2)

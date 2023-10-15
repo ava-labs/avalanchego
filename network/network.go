@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/pires/go-proxyproto"
 
@@ -37,11 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -143,7 +143,7 @@ type network struct {
 	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
 	onCloseCtxCancel func()
 
-	sendFailRateCalculator math.Averager
+	sendFailRateCalculator safemath.Averager
 
 	// Tracks which peers know about which peers
 	gossipTracker peer.GossipTracker
@@ -289,7 +289,7 @@ func NewNetwork(
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
 
-		sendFailRateCalculator: math.NewSyncAverager(math.NewAverager(
+		sendFailRateCalculator: safemath.NewSyncAverager(safemath.NewAverager(
 			0,
 			config.SendFailRateHalflife,
 			time.Now(),
@@ -558,7 +558,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 				// Stop tracking the old IP and start tracking the new one.
 				tracked := tracked.trackNewIP(ip.IPPort)
 				n.trackedIPs[nodeID] = tracked
-				n.dial(n.onCloseCtx, nodeID, tracked)
+				n.dial(nodeID, tracked)
 			}
 		case verifiedIP && shouldDial:
 			// Invariant: [isTracked] is false here.
@@ -575,7 +575,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 
 			tracked := newTrackedIP(ip.IPPort)
 			n.trackedIPs[nodeID] = tracked
-			n.dial(n.onCloseCtx, nodeID, tracked)
+			n.dial(nodeID, tracked)
 		default:
 			// This IP isn't desired
 			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
@@ -829,7 +829,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	if !isTracked {
 		tracked := newTrackedIP(ip)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(n.onCloseCtx, nodeID, tracked)
+		n.dial(nodeID, tracked)
 	}
 }
 
@@ -965,7 +965,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 		if n.wantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
-			n.dial(n.onCloseCtx, nodeID, tracked)
+			n.dial(nodeID, tracked)
 		} else {
 			tracked.stopTracking()
 			delete(n.peerIPs, nodeID)
@@ -989,7 +989,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 		prevIP := n.peerIPs[nodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(n.onCloseCtx, nodeID, tracked)
+		n.dial(nodeID, tracked)
 	} else {
 		delete(n.peerIPs, nodeID)
 	}
@@ -1064,7 +1064,7 @@ func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.C
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
+func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -1073,6 +1073,9 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			timer := time.NewTimer(ip.getDelay())
 
 			select {
+			case <-n.onCloseCtx.Done():
+				timer.Stop()
+				return
 			case <-ip.onStopTracking:
 				timer.Stop()
 				return
@@ -1141,7 +1144,7 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				continue
 			}
 
-			conn, err := n.dialer.Dial(ctx, ip.ip)
+			conn, err := n.dialer.Dial(n.onCloseCtx, ip.ip)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to reach peer, attempting again",
@@ -1385,8 +1388,8 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 	}
 
 	return UptimeResult{
-		WeightedAveragePercentage: gomath.Abs(totalWeightedPercent / totalWeight),
-		RewardingStakePercentage:  gomath.Abs(100 * rewardingStake / totalWeight),
+		WeightedAveragePercentage: math.Abs(totalWeightedPercent / totalWeight),
+		RewardingStakePercentage:  math.Abs(100 * rewardingStake / totalWeight),
 	}, nil
 }
 

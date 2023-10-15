@@ -7,10 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
-
-	stdmath "math"
 
 	"github.com/google/btree"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -46,6 +44,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -58,8 +58,6 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
-	ErrCantFindSubnet               = errors.New("couldn't find subnet")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
@@ -82,6 +80,7 @@ var (
 	rewardUTXOsPrefix                   = []byte("rewardUTXOs")
 	utxoPrefix                          = []byte("utxo")
 	subnetPrefix                        = []byte("subnet")
+	subnetOwnerPrefix                   = []byte("subnetOwner")
 	transformedSubnetPrefix             = []byte("transformedSubnet")
 	supplyPrefix                        = []byte("supply")
 	chainPrefix                         = []byte("chain")
@@ -116,6 +115,7 @@ type Chain interface {
 	AddSubnet(createSubnetTx *txs.Tx)
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
+	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -275,6 +275,8 @@ type stateBlk struct {
  * |-. subnets
  * | '-. list
  * |   '-- txID -> nil
+ * |-. subnetOwners
+ * | '-. subnetID -> owner
  * |-. chains
  * | '-. subnetID
  * |   '-. list
@@ -353,6 +355,11 @@ type state struct {
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
+	// Subnet ID --> Owner of the subnet
+	subnetOwners     map[ids.ID]fx.Owner
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwnerDB    database.Database
+
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
@@ -393,14 +400,14 @@ type ValidatorWeightDiff struct {
 func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
 	if v.Decrease == negative {
 		var err error
-		v.Amount, err = math.Add64(v.Amount, amount)
+		v.Amount, err = safemath.Add64(v.Amount, amount)
 		return err
 	}
 
 	if v.Amount > amount {
 		v.Amount -= amount
 	} else {
-		v.Amount = math.AbsDiff(v.Amount, amount)
+		v.Amount = safemath.AbsDiff(v.Amount, amount)
 		v.Decrease = negative
 	}
 	return nil
@@ -419,6 +426,11 @@ type txBytesAndStatus struct {
 type txAndStatus struct {
 	tx     *txs.Tx
 	status status.Status
+}
+
+type fxOwnerAndSize struct {
+	owner fx.Owner
+	size  int
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -574,6 +586,18 @@ func newState(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
+	subnetOwnerDB := prefixdb.New(subnetOwnerPrefix, baseDB)
+	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
+		"subnet_owner_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+			return ids.IDLen + f.size
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -669,6 +693,10 @@ func newState(
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
+
+		subnetOwners:     make(map[ids.ID]fx.Owner),
+		subnetOwnerDB:    subnetOwnerDB,
+		subnetOwnerCache: subnetOwnerCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -828,14 +856,39 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	if owner, exists := s.subnetOwners[subnetID]; exists {
+		return owner, nil
+	}
+
+	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
+		if ownerAndSize.owner == nil {
+			return nil, database.ErrNotFound
+		}
+		return ownerAndSize.owner, nil
+	}
+
+	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
+	if err == nil {
+		var owner fx.Owner
+		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+			return nil, err
+		}
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+		return owner, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"%w %q: %w",
-			ErrCantFindSubnet,
-			subnetID,
-			err,
-		)
+		if err == database.ErrNotFound {
+			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
+		}
+		return nil, err
 	}
 
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
@@ -843,7 +896,12 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
 	}
 
+	s.SetSubnetOwner(subnetID, subnet.Owner)
 	return subnet.Owner, nil
+}
+
+func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	s.subnetOwners[subnetID] = owner
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -1214,11 +1272,11 @@ func applyWeightDiff(
 	if weightDiff.Decrease {
 		// The validator's weight was decreased at this block, so in the
 		// prior block it was higher.
-		vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
+		vdr.Weight, err = safemath.Add64(vdr.Weight, weightDiff.Amount)
 	} else {
 		// The validator's weight was increased at this block, so in the
 		// prior block it was lower.
-		vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
+		vdr.Weight, err = safemath.Sub(vdr.Weight, weightDiff.Amount)
 	}
 	if err != nil {
 		return err
@@ -1281,7 +1339,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1290,7 +1348,8 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
-		s.AddUTXO(utxo)
+		avaxUTXO := utxo.UTXO
+		s.AddUTXO(&avaxUTXO)
 	}
 
 	// Persist primary network validator set at genesis
@@ -1312,7 +1371,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.State) erro
 			stakeAmount,
 			currentSupply,
 		)
-		newCurrentSupply, err := math.Add64(currentSupply, potentialReward)
+		newCurrentSupply, err := safemath.Add64(currentSupply, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1709,6 +1768,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
 		s.writeSubnets(),
+		s.writeSubnetOwners(),
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
@@ -1784,11 +1844,11 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	genesisState, err := genesis.ParseState(genesisBytes)
+	genesis, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}
-	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
+	if err := s.syncGenesis(genesisBlock, genesis); err != nil {
 		return err
 	}
 
@@ -2418,6 +2478,29 @@ func (s *state) writeSubnets() error {
 	return nil
 }
 
+func (s *state) writeSubnetOwners() error {
+	for subnetID, owner := range s.subnetOwners {
+		subnetID := subnetID
+		owner := owner
+		delete(s.subnetOwners, subnetID)
+
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+
+		if err := s.subnetOwnerDB.Put(subnetID[:], ownerBytes); err != nil {
+			return fmt.Errorf("failed to write subnet owner: %w", err)
+		}
+	}
+	return nil
+}
+
 func (s *state) writeTransformedSubnets() error {
 	for subnetID, tx := range s.transformedSubnets {
 		txID := tx.ID()
@@ -2617,7 +2700,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 				eta := timer.EstimateETA(
 					startTime,
 					progress,
-					stdmath.MaxUint64,
+					math.MaxUint64,
 				)
 
 				log.Info("committing state pruning and indexing",
@@ -2632,7 +2715,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// could take an extremely long period of time; which we should not
 			// delay processing for.
 			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := math.Min(
+			sleepDuration := safemath.Min(
 				pruneCommitSleepMultiplier*pruneDuration,
 				pruneCommitSleepCap,
 			)

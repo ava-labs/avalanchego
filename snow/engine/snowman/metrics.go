@@ -11,12 +11,24 @@ import (
 )
 
 type metrics struct {
-	bootstrapFinished, numRequests, numBlocked, numBlockers, numNonVerifieds prometheus.Gauge
-	numBuilt, numBuildsFailed, numUselessPutBytes, numUselessPushQueryBytes  prometheus.Counter
-	getAncestorsBlks                                                         metric.Averager
+	bootstrapFinished                     prometheus.Gauge
+	numRequests                           prometheus.Gauge
+	numBlocked                            prometheus.Gauge
+	numBlockers                           prometheus.Gauge
+	numNonVerifieds                       prometheus.Gauge
+	numBuilt                              prometheus.Counter
+	numBuildsFailed                       prometheus.Counter
+	numUselessPutBytes                    prometheus.Counter
+	numUselessPushQueryBytes              prometheus.Counter
+	numMissingAcceptedBlocks              prometheus.Counter
+	numProcessingAncestorFetchesFailed    prometheus.Counter
+	numProcessingAncestorFetchesDropped   prometheus.Counter
+	numProcessingAncestorFetchesSucceeded prometheus.Counter
+	numProcessingAncestorFetchesUnneeded  prometheus.Counter
+	getAncestorsBlks                      metric.Averager
+	selectedVoteIndex                     metric.Averager
 }
 
-// Initialize the metrics
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.bootstrapFinished = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -39,6 +51,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blockers",
 		Help:      "Number of blocks that are blocking other blocks from being issued because they haven't been issued",
 	})
+	m.numNonVerifieds = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "non_verified_blks",
+		Help:      "Number of non-verified blocks in the memory",
+	})
 	m.numBuilt = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "blks_built",
@@ -59,6 +76,31 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "num_useless_push_query_bytes",
 		Help:      "Amount of useless bytes received in PushQuery messages",
 	})
+	m.numMissingAcceptedBlocks = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_missing_accepted_blocks",
+		Help:      "Number of times an accepted block height was referenced and it wasn't locally available",
+	})
+	m.numProcessingAncestorFetchesFailed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_processing_ancestor_fetches_failed",
+		Help:      "Number of votes that were dropped due to unknown blocks",
+	})
+	m.numProcessingAncestorFetchesDropped = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_processing_ancestor_fetches_dropped",
+		Help:      "Number of votes that were dropped due to decided blocks",
+	})
+	m.numProcessingAncestorFetchesSucceeded = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_processing_ancestor_fetches_succeeded",
+		Help:      "Number of votes that were applied to ancestor blocks",
+	})
+	m.numProcessingAncestorFetchesUnneeded = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_processing_ancestor_fetches_unneeded",
+		Help:      "Number of votes that were directly applied to blocks",
+	})
 	m.getAncestorsBlks = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_blks",
@@ -66,11 +108,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg,
 		&errs,
 	)
-	m.numNonVerifieds = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "non_verified_blks",
-		Help:      "Number of non-verified blocks in the memory",
-	})
+	m.selectedVoteIndex = metric.NewAveragerWithErrs(
+		namespace,
+		"selected_vote_index",
+		"index of the voteID that was passed into consensus",
+		reg,
+		&errs,
+	)
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
@@ -82,6 +126,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numBuildsFailed),
 		reg.Register(m.numUselessPutBytes),
 		reg.Register(m.numUselessPushQueryBytes),
+		reg.Register(m.numMissingAcceptedBlocks),
+		reg.Register(m.numProcessingAncestorFetchesFailed),
+		reg.Register(m.numProcessingAncestorFetchesDropped),
+		reg.Register(m.numProcessingAncestorFetchesSucceeded),
+		reg.Register(m.numProcessingAncestorFetchesUnneeded),
 	)
 	return errs.Err
 }

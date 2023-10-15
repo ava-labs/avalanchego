@@ -7,23 +7,25 @@ import "fmt"
 
 var _ BinarySnowball = (*binarySnowball)(nil)
 
+func newBinarySnowball(beta, choice int) binarySnowball {
+	return binarySnowball{
+		binarySnowflake: newBinarySnowflake(beta, choice),
+		preference:      choice,
+	}
+}
+
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {
 	// wrap the binary snowflake logic
 	binarySnowflake
 
-	// preference is the choice with the largest number of successful polls.
-	// Ties are broken by switching choice lazily
+	// preference is the choice with the largest number of polls which preferred
+	// the color. Ties are broken by switching choice lazily
 	preference int
 
-	// numSuccessfulPolls tracks the total number of successful network polls of
-	// the 0 and 1 choices
-	numSuccessfulPolls [2]int
-}
-
-func (sb *binarySnowball) Initialize(beta, choice int) {
-	sb.binarySnowflake.Initialize(beta, choice)
-	sb.preference = choice
+	// preferenceStrength tracks the total number of network polls which
+	// preferred each choice
+	preferenceStrength [2]int
 }
 
 func (sb *binarySnowball) Preference() int {
@@ -38,18 +40,27 @@ func (sb *binarySnowball) Preference() int {
 }
 
 func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {
-	sb.numSuccessfulPolls[choice]++
-	if sb.numSuccessfulPolls[choice] > sb.numSuccessfulPolls[1-choice] {
-		sb.preference = choice
-	}
+	sb.increasePreferenceStrength(choice)
 	sb.binarySnowflake.RecordSuccessfulPoll(choice)
+}
+
+func (sb *binarySnowball) RecordPollPreference(choice int) {
+	sb.increasePreferenceStrength(choice)
+	sb.binarySnowflake.RecordPollPreference(choice)
 }
 
 func (sb *binarySnowball) String() string {
 	return fmt.Sprintf(
-		"SB(Preference = %d, NumSuccessfulPolls[0] = %d, NumSuccessfulPolls[1] = %d, %s)",
+		"SB(Preference = %d, PreferenceStrength[0] = %d, PreferenceStrength[1] = %d, %s)",
 		sb.preference,
-		sb.numSuccessfulPolls[0],
-		sb.numSuccessfulPolls[1],
+		sb.preferenceStrength[0],
+		sb.preferenceStrength[1],
 		&sb.binarySnowflake)
+}
+
+func (sb *binarySnowball) increasePreferenceStrength(choice int) {
+	sb.preferenceStrength[choice]++
+	if sb.preferenceStrength[choice] > sb.preferenceStrength[1-choice] {
+		sb.preference = choice
+	}
 }

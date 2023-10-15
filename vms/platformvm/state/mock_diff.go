@@ -502,6 +502,18 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetSubnetOwner mocks base method.
+func (m *MockDiff) SetSubnetOwner(arg0 ids.ID, arg1 fx.Owner) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetOwner", arg0, arg1)
+}
+
+// SetSubnetOwner indicates an expected call of SetSubnetOwner.
+func (mr *MockDiffMockRecorder) SetSubnetOwner(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetOwner", reflect.TypeOf((*MockDiff)(nil).SetSubnetOwner), arg0, arg1)
+}
+
 // SetTimestamp mocks base method.
 func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 	m.ctrl.T.Helper()

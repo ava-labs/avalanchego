@@ -75,6 +75,7 @@ func NewDiff(
 		timestamp:          parentState.GetTimestamp(),
 		currentStakerDiffs: newDiffStakers(),
 		pendingStakerDiffs: newDiffStakers(),
+		subnetOwners:       make(map[ids.ID]fx.Owner),
 	}, nil
 }
 
@@ -304,16 +305,6 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	if d.cachedSubnets != nil {
 		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
 	}
-
-	castTx := createSubnetTx.Unsigned.(*txs.CreateSubnetTx)
-	subnetID := createSubnetTx.ID()
-	if d.subnetOwners == nil {
-		d.subnetOwners = map[ids.ID]fx.Owner{
-			subnetID: castTx.Owner,
-		}
-	} else {
-		d.subnetOwners[subnetID] = castTx.Owner
-	}
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
@@ -328,6 +319,10 @@ func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return nil, ErrMissingParentState
 	}
 	return parentState.GetSubnetOwner(subnetID)
+}
+
+func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	d.subnetOwners[subnetID] = owner
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -602,6 +597,9 @@ func (d *diff) Apply(baseState State) error {
 		} else {
 			baseState.DeleteUTXO(utxoID)
 		}
+	}
+	for subnetID, owner := range d.subnetOwners {
+		baseState.SetSubnetOwner(subnetID, owner)
 	}
 	return nil
 }

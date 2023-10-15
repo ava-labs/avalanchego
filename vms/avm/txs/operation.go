@@ -25,9 +25,9 @@ var (
 
 type Operation struct {
 	avax.Asset `serialize:"true"`
-	UTXOIDs    []*avax.UTXOID  `serialize:"true" json:"inputIDs"`
+	UTXOIDs    []*avax.UTXOID  `serialize:"true"  json:"inputIDs"`
 	FxID       ids.ID          `serialize:"false" json:"fxID"`
-	Op         fxs.FxOperation `serialize:"true" json:"operation"`
+	Op         fxs.FxOperation `serialize:"true"  json:"operation"`
 }
 
 func (op *Operation) Verify() error {

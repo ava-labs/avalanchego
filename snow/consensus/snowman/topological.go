@@ -68,6 +68,10 @@ type Topological struct {
 	// preferredIDs stores the set of IDs that are currently preferred.
 	preferredIDs set.Set[ids.ID]
 
+	// preferredHeights maps a height to the currently preferred block ID at
+	// that height.
+	preferredHeights map[uint64]ids.ID // height -> blockID
+
 	// tail is the preferred block with no children
 	tail ids.ID
 
@@ -101,7 +105,13 @@ type votes struct {
 	votes bag.Bag[ids.ID]
 }
 
-func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64, rootTime time.Time) error {
+func (ts *Topological) Initialize(
+	ctx *snow.ConsensusContext,
+	params snowball.Parameters,
+	rootID ids.ID,
+	rootHeight uint64,
+	rootTime time.Time,
+) error {
 	if err := params.Verify(); err != nil {
 		return err
 	}
@@ -139,6 +149,7 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	ts.blocks = map[ids.ID]*snowmanBlock{
 		rootID: {params: ts.params},
 	}
+	ts.preferredHeights = make(map[uint64]ids.ID)
 	ts.tail = rootID
 
 	// Initially set the metrics for the last accepted block.
@@ -154,6 +165,9 @@ func (ts *Topological) NumProcessing() int {
 
 func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	blkID := blk.ID()
+	ts.ctx.Log.Verbo("adding block",
+		zap.Stringer("blkID", blkID),
+	)
 
 	// Make sure a block is not inserted twice. This enforces the invariant that
 	// blocks are always added in topological order. Essentially, a block that
@@ -169,6 +183,11 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
+		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
+			zap.Stringer("blkID", blkID),
+			zap.Stringer("parentID", parentID),
+		)
+
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
@@ -190,7 +209,13 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	if ts.tail == parentID {
 		ts.tail = blkID
 		ts.preferredIDs.Add(blkID)
+		ts.preferredHeights[blk.Height()] = blkID
 	}
+
+	ts.ctx.Log.Verbo("added block",
+		zap.Stringer("blkID", blkID),
+		zap.Stringer("parentID", parentID),
+	)
 	return nil
 }
 
@@ -224,12 +249,20 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-func (ts *Topological) LastAccepted() ids.ID {
-	return ts.head
+func (ts *Topological) LastAccepted() (ids.ID, uint64) {
+	return ts.head, ts.height
 }
 
 func (ts *Topological) Preference() ids.ID {
 	return ts.tail
+}
+
+func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
+	if height == ts.height {
+		return ts.head, true
+	}
+	blkID, ok := ts.preferredHeights[height]
+	return blkID, ok
 }
 
 // The votes bag contains at most K votes for blocks in the tree. If there is a
@@ -251,14 +284,14 @@ func (ts *Topological) Preference() ids.ID {
 // unsuccessful poll on that block and every descendant block.
 //
 // The complexity of this function is:
-// - Runtime = 3 * |live set| + |votes|
+// - Runtime = 4 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
 func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) error {
 	// Register a new poll call
 	ts.pollNumber++
 
 	var voteStack []votes
-	if voteBag.Len() >= ts.params.Alpha {
+	if voteBag.Len() >= ts.params.AlphaPreference {
 		// Since we received at least alpha votes, it's possible that
 		// we reached an alpha majority on a processing block.
 		// We must perform the traversals to calculate all block
@@ -288,8 +321,9 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 		return nil
 	}
 
-	// Runtime = |live set| ; Space = Constant
+	// Runtime = 2 * |live set| ; Space = Constant
 	ts.preferredIDs.Clear()
+	maps.Clear(ts.preferredHeights)
 
 	ts.tail = preferred
 	startBlock := ts.blocks[ts.tail]
@@ -297,20 +331,23 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
 	for block := startBlock; !block.Accepted(); {
-		ts.preferredIDs.Add(block.blk.ID())
+		blkID := block.blk.ID()
+		ts.preferredIDs.Add(blkID)
+		ts.preferredHeights[block.blk.Height()] = blkID
 		block = ts.blocks[block.blk.Parent()]
 	}
 	// Traverse from the preferred ID to the preferred child until there are no
 	// children.
-	for block := startBlock; block.sb != nil; block = ts.blocks[ts.tail] {
+	for block := startBlock; block.sb != nil; {
 		ts.tail = block.sb.Preference()
 		ts.preferredIDs.Add(ts.tail)
+		block = ts.blocks[ts.tail]
+		// Invariant: Because the prior block had an initialized snowball
+		// instance, it must have a processing child. This guarantees that
+		// block.blk is non-nil here.
+		ts.preferredHeights[block.blk.Height()] = ts.tail
 	}
 	return nil
-}
-
-func (ts *Topological) Finalized() bool {
-	return len(ts.blocks) == 1
 }
 
 // HealthCheck returns information about the consensus health.
@@ -422,7 +459,7 @@ func (ts *Topological) pushVotes() []votes {
 
 		// If there are at least Alpha votes, then this block needs to record
 		// the poll on the snowball instance
-		if kahnNode.votes.Len() >= ts.params.Alpha {
+		if kahnNode.votes.Len() >= ts.params.AlphaPreference {
 			voteStack = append(voteStack, votes{
 				parentID: leafID,
 				votes:    kahnNode.votes,
@@ -483,7 +520,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// get the block that we are going to vote on
 		parentBlock, notRejected := ts.blocks[vote.parentID]
 
-		// if the block block we are going to vote on was already rejected, then
+		// if the block we are going to vote on was already rejected, then
 		// we should stop applying the votes
 		if !notRejected {
 			break
@@ -610,6 +647,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
+	delete(ts.preferredHeights, ts.height)
 
 	ts.Latency.Accepted(pref, ts.pollNumber, len(bytes))
 	ts.Height.Accepted(ts.height)
