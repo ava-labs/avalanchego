@@ -1415,8 +1415,7 @@ func TestConnectedSubnet(t *testing.T) {
 	peerNodeID := ids.GenerateTestNodeID()
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
-	trackedSubnets := set.Set[ids.ID]{}
-	trackedSubnets.Add(subnetID0, subnetID1)
+	trackedSubnets := set.Of(subnetID0, subnetID1)
 	chainRouter := ChainRouter{}
 	require.NoError(chainRouter.Initialize(
 		myNodeID,
