@@ -89,7 +89,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	isBootstrapped.Set(true)
 
 	config := ts.Config(fork)
-	clk := ts.DefaultClock(fork, false)
+	clk := ts.Clock(fork, false)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)

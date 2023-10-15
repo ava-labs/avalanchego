@@ -78,7 +78,7 @@ func newEnvironment(t *testing.T) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         ts.Config(ts.LatestFork),
-		clk:            ts.DefaultClock(ts.LatestFork, true),
+		clk:            ts.Clock(ts.LatestFork, true),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -93,6 +93,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state.SetTimestamp(res.clk.Time())
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)

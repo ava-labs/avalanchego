@@ -109,7 +109,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         ts.Config(ts.LatestFork),
-		clk:            ts.DefaultClock(ts.LatestFork, false),
+		clk:            ts.Clock(ts.LatestFork, false),
 	}
 	res.isBootstrapped.Set(true)
 
