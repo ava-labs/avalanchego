@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -83,14 +82,14 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
+func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	r := require.New(t)
 
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := ts.Config(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	config := ts.Config(fork)
+	clk := ts.DefaultClock(fork, false)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -218,17 +217,6 @@ func defaultState(
 	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
-}
-
-func defaultClock(postFork bool) *mockable.Clock {
-	now := ts.GenesisTime
-	if postFork {
-		// 1 second after Banff fork
-		now = ts.ValidateEndTime.Add(-2 * time.Second)
-	}
-	clk := &mockable.Clock{}
-	clk.Set(now)
-	return clk
 }
 
 type fxVMInt struct {

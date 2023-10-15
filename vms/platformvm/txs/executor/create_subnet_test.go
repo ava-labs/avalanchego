@@ -51,7 +51,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+			env := newEnvironment(t, ts.ApricotPhase5Fork)
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer func() {

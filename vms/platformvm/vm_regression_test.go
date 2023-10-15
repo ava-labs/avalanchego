@@ -345,7 +345,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)

@@ -24,7 +24,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, ts.ApricotPhase5Fork)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()

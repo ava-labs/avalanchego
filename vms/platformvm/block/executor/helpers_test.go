@@ -108,8 +108,8 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(true /*postBanff*/, true /*postCortina*/),
-		clk:            defaultClock(),
+		config:         ts.Config(ts.LatestFork),
+		clk:            ts.DefaultClock(ts.LatestFork, false),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -273,12 +273,6 @@ func defaultState(
 	}
 	genesisBlkID = state.GetLastAccepted()
 	return state
-}
-
-func defaultClock() *mockable.Clock {
-	clk := &mockable.Clock{}
-	clk.Set(ts.GenesisTime)
-	return clk
 }
 
 type fxVMInt struct {

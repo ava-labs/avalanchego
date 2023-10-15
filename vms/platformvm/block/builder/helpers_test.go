@@ -77,8 +77,8 @@ func newEnvironment(t *testing.T) *environment {
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(true /*postBanff*/, true /*postCortina*/),
-		clk:            defaultClock(),
+		config:         ts.Config(ts.LatestFork),
+		clk:            ts.DefaultClock(ts.LatestFork, true),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -214,13 +214,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultClock() *mockable.Clock {
-	// set time after Banff fork (and before default nextStakerTime)
-	clk := &mockable.Clock{}
-	clk.Set(ts.GenesisTime)
-	return clk
 }
 
 type fxVMInt struct {

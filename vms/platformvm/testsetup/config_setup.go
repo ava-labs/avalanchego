@@ -4,7 +4,7 @@
 package testsetup
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -18,15 +18,38 @@ import (
 
 var TxFee = uint64(100) // a default Tx Fee
 
-func Config(postBanff, postCortina bool) *config.Config {
-	forkTime := ValidateEndTime.Add(-2 * time.Second)
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = ValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = ValidateStartTime.Add(-2 * time.Second)
+func Config(fork ActiveFork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		dTime             = mockable.MaxTime
+	)
+
+	switch fork {
+	case ApricotPhase3Fork:
+		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+	case ApricotPhase5Fork:
+		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
+		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+	case BanffFork:
+		banffTime = forkTimes[BanffFork]
+		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
+		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+	case CortinaFork:
+		cortinaTime = forkTimes[CortinaFork]
+		banffTime = forkTimes[BanffFork]
+		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
+		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+	case DFork:
+		dTime = forkTimes[DFork]
+		cortinaTime = forkTimes[CortinaFork]
+		banffTime = forkTimes[BanffFork]
+		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
+		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	vdrs := validators.NewManager()
@@ -53,10 +76,10 @@ func Config(postBanff, postCortina bool) *config.Config {
 			MintingPeriod:      MaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: forkTime,
-		ApricotPhase5Time: forkTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DTime:             mockable.MaxTime,
+		DTime:             dTime,
 	}
 }

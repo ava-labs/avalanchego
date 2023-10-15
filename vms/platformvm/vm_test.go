@@ -221,7 +221,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1083,7 +1083,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1158,7 +1158,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -1205,7 +1205,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -1513,7 +1513,7 @@ func TestUnverifiedParent(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -1670,7 +1670,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstUptimePercentage := 20 // 20%
 	firstVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
+		Config: *ts.Config(ts.LatestFork),
 	}
 
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -1807,7 +1807,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	cfg := ts.Config(true /*postBanff*/, true /*postCortina*/)
+	cfg := ts.Config(ts.LatestFork)
 	cfg.UptimePercentage = .2
 	vm := &VM{
 		Config: *cfg,
