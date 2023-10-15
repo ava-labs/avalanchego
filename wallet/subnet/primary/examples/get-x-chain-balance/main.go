@@ -8,7 +8,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -24,8 +23,7 @@ func main() {
 		log.Fatalf("failed to parse address: %s\n", err)
 	}
 
-	addresses := set.Set[ids.ShortID]{}
-	addresses.Add(addr)
+	addresses := set.Of(addr)
 
 	ctx := context.Background()
 

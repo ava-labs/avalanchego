@@ -7,10 +7,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
-
-	stdmath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -24,12 +23,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -715,7 +715,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 				eta := timer.EstimateETA(
 					startTime,
 					progress-startProgress,
-					stdmath.MaxUint64-startProgress,
+					math.MaxUint64-startProgress,
 				)
 				log.Info("committing state pruning",
 					zap.Int("numPruned", numPruned),
@@ -728,7 +728,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			// could take an extremely long period of time; which we should not
 			// delay processing for.
 			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := math.Min(
+			sleepDuration := safemath.Min(
 				pruneCommitSleepMultiplier*pruneDuration,
 				pruneCommitSleepCap,
 			)

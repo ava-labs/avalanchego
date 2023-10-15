@@ -5,13 +5,12 @@ package sampler
 
 import (
 	"fmt"
+	"math"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -89,8 +88,8 @@ func TestAllWeighted(t *testing.T) {
 }
 
 func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1, stdmath.MaxUint64})
-	require.ErrorIs(t, err, math.ErrOverflow)
+	err := s.Initialize([]uint64{1, math.MaxUint64})
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
 func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
