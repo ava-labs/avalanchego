@@ -145,15 +145,11 @@ func (k Key) Token(index int) byte {
 	return storageByte & k.singleTokenMask
 }
 
-// Append returns a new Key that equals the current
-// Key with [token] appended to the end.
+// Append returns a new Path that equals the current
+// Path with [token] appended to the end.
 func (k Key) Append(token byte) Key {
 	buffer := make([]byte, k.bytesNeeded(k.tokenLength+1))
-	copy(buffer, k.value)
-	// Shift [token] to the left such that it's at the correct
-	// index within its storage byte, then OR it with its storage
-	// byte to write the token into the byte.
-	buffer[len(buffer)-1] |= token << k.bitsToShift(k.tokenLength)
+	k.appendIntoBuffer(buffer, token)
 	return Key{
 		value:       byteSliceToString(buffer),
 		tokenLength: k.tokenLength + 1,
@@ -216,47 +212,52 @@ func (k Key) bytesNeeded(tokens int) int {
 	return size
 }
 
-// Extend returns a new Key that equals the passed Key appended to the current Key
-func (k Key) Extend(extension Key) Key {
-	if k.tokenLength == 0 {
-		return extension
-	}
-	if extension.tokenLength == 0 {
-		return k
-	}
-
-	totalLength := k.tokenLength + extension.tokenLength
-
-	// copy existing value into  the buffer
+func (k Key) AppendExtend(token byte, extensionKey Key) Key {
+	appendBytes := k.bytesNeeded(k.tokenLength + 1)
+	totalLength := k.tokenLength + 1 + extensionKey.tokenLength
 	buffer := make([]byte, k.bytesNeeded(totalLength))
-	copy(buffer, k.value)
+	k.appendIntoBuffer(buffer[:appendBytes], token)
 
-	// If the existing value fits into a whole number of bytes,
-	// the extension key can be copied directly into the buffer.
-	if !k.hasPartialByte() {
-		copy(buffer[len(k.value):], extension.value)
-		return Key{
-			value:       byteSliceToString(buffer),
-			tokenLength: totalLength,
-			tokenConfig: k.tokenConfig,
-		}
-	}
-
-	// The existing key doesn't fit into a whole number of bytes.
-	// Figure out how many bits to shift.
-	shift := k.bitsToShift(k.tokenLength - 1)
-	// Fill the partial byte with the first [shift] bits of the extension key
-	buffer[len(k.value)-1] |= extension.value[0] >> (8 - shift)
-
-	// copy the rest of the extension key bytes into the buffer,
-	// shifted byte shift bits
-	shiftCopy(buffer[len(k.value):], extension.value, shift)
-
-	return Key{
+	// the extension path will be shifted based on the number of tokens in the partial byte
+	tokenRemainder := (k.tokenLength + 1) % k.tokensPerByte
+	result := Key{
 		value:       byteSliceToString(buffer),
 		tokenLength: totalLength,
 		tokenConfig: k.tokenConfig,
 	}
+
+	extensionBuffer := buffer[appendBytes-1:]
+	if extensionKey.tokenLength == 0 {
+		return result
+	}
+
+	// If the existing value fits into a whole number of bytes,
+	// the extension path can be copied directly into the buffer.
+	if tokenRemainder == 0 {
+		copy(extensionBuffer[1:], extensionKey.value)
+		return result
+	}
+
+	// The existing path doesn't fit into a whole number of bytes.
+	// Figure out how many bits to shift.
+	shift := extensionKey.bitsToShift(tokenRemainder - 1)
+	// Fill the partial byte with the first [shift] bits of the extension path
+	extensionBuffer[0] |= extensionKey.value[0] >> (8 - shift)
+
+	// copy the rest of the extension path bytes into the buffer,
+	// shifted byte shift bits
+	shiftCopy(extensionBuffer[1:], extensionKey.value, shift)
+
+	return result
+}
+
+func (k Key) appendIntoBuffer(buffer []byte, token byte) {
+	copy(buffer, k.value)
+
+	// Shift [token] to the left such that it's at the correct
+	// index within its storage byte, then OR it with its storage
+	// byte to write the token into the byte.
+	buffer[len(buffer)-1] |= token << k.bitsToShift(k.tokenLength)
 }
 
 // Treats [src] as a bit array and copies it into [dst] shifted by [shift] bits.
@@ -342,6 +343,20 @@ func (k Key) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
 	return stringToByteSlice(k.value)
+}
+
+// iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
+// this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
+func (k Key) iteratedHasPrefix(skipTokens int, prefix Key) bool {
+	if k.tokenLength-skipTokens < prefix.tokenLength {
+		return false
+	}
+	for i := 0; i < prefix.tokenLength; i++ {
+		if k.Token(skipTokens+i) != prefix.Token(i) {
+			return false
+		}
+	}
+	return true
 }
 
 // byteSliceToString converts the []byte to a string
