@@ -53,9 +53,10 @@ type changeSummaryAndInsertNumber struct {
 
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
-	rootID ids.ID
-	nodes  map[Path]*change[*node]
-	values map[Path]*change[maybe.Maybe[[]byte]]
+	rootPath Path // TODO populate
+	rootID   ids.ID
+	nodes    map[Path]*change[*node]
+	values   map[Path]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {

@@ -41,8 +41,8 @@ const (
 )
 
 var (
-	rootKey []byte
-	_       MerkleDB = (*merkleDB)(nil)
+	emptyKey []byte
+	_        MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
@@ -51,6 +51,7 @@ var (
 	intermediateNodePrefix = []byte{2}
 
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
+	rootDBKey               = []byte(string(metadataPrefix) + "root")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
@@ -205,7 +206,7 @@ type merkleDB struct {
 	calculateNodeIDsSema *semaphore.Weighted
 
 	newPath  func(p []byte) Path
-	rootPath Path
+	rootPath Path // TODO what should this be?
 }
 
 // New returns a new merkle database.
@@ -254,7 +255,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		rootPath:             newPath(rootKey),
+		rootPath:             newPath(emptyKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -292,7 +293,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(nil, db.rootPath)
+	db.root = newNode(nil, NewPath(emptyKey, db.valueNodeDB.branchFactor))
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -926,7 +927,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	rootChange, ok := changes.nodes[db.rootPath]
+	rootChange, ok := changes.nodes[changes.rootPath]
 	if !ok {
 		return errNoNewRoot
 	}
@@ -1151,29 +1152,30 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 }
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// not sure if the root exists or had a value or not
-	// check under both prefixes
-	var err error
-	db.root, err = db.intermediateNodeDB.Get(db.rootPath)
-	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(db.rootPath)
-	}
-	if err == nil {
-		// Root already exists, so calculate its id
+	rootBytes, err := db.baseDB.Get(rootDBKey)
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			return ids.ID{}, err
+		}
+	} else {
+		rootKey, root, err := codec.decodeKeyAndNode(rootBytes, db.valueNodeDB.branchFactor)
+		if err != nil {
+			return ids.ID{}, err
+		}
+		_ = rootKey // TODO remove?
+		db.root = root
 		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
-	if err != database.ErrNotFound {
-		return ids.Empty, err
-	}
 
 	// Root doesn't exist; make a new one.
-	db.root = newNode(nil, db.rootPath)
+	db.root = newNode(nil, NewPath(emptyKey, db.valueNodeDB.branchFactor))
 
 	// update its ID
 	db.root.calculateID(db.metrics)
 
-	if err := db.intermediateNodeDB.Put(db.rootPath, db.root); err != nil {
+	rootBytes = codec.encodeKeyAndNode(db.root.key, &db.root.dbNode, db.valueNodeDB.branchFactor)
+	if err := db.baseDB.Put(rootDBKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
 

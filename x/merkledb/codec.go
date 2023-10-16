@@ -62,11 +62,13 @@ type encoder interface {
 	encodeDBNode(n *dbNode, factor BranchFactor) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
+	encodeKeyAndNode(key Path, n *dbNode, factor BranchFactor) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
+	decodeKeyAndNode(bytes []byte, factor BranchFactor) (Path, *node, error)
 }
 
 func newCodec() encoderDecoder {
@@ -133,6 +135,19 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	return buf.Bytes()
 }
 
+func (c *codecImpl) encodeKeyAndNode(key Path, n *dbNode, factor BranchFactor) []byte {
+	var (
+		numChildren = len(n.children)
+		// Estimate size of [n] to prevent memory allocations
+		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
+
+	c.encodePath(buf, key)
+	_, _ = buf.Write(c.encodeDBNode(n, factor)) // TODO improve
+	return buf.Bytes()
+}
+
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
@@ -190,6 +205,29 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 		return errExtraSpace
 	}
 	return nil
+}
+
+func (c *codecImpl) decodeKeyAndNode(b []byte, branchFactor BranchFactor) (Path, *node, error) {
+	if ids.IDLen+minDBNodeLen > len(b) {
+		return Path{}, nil, io.ErrUnexpectedEOF
+	}
+
+	src := bytes.NewReader(b)
+
+	key, err := c.decodePath(src, branchFactor)
+	if err != nil {
+		return Path{}, nil, err
+	}
+
+	nodeBytes, err := c.decodeByteSlice(src)
+	if err != nil {
+		return Path{}, nil, err
+	}
+	node, err := parseNode(key, nodeBytes)
+	if err != nil {
+		return Path{}, nil, err
+	}
+	return key, node, nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
