@@ -92,7 +92,8 @@ type trieView struct {
 	// Changes made to this view.
 	// May include nodes that haven't been updated
 	// but will when their ID is recalculated.
-	changes *changeSummary
+	changes          *changeSummary
+	beforeNodesCache map[Path]*node
 
 	db *merkleDB
 
@@ -145,7 +146,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */, true)
+	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -154,13 +155,13 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:       root.clone(),
-		db:         db,
-		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		root:             root.clone(),
+		db:               db,
+		parentTrie:       parentTrie,
+		changes:          newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		beforeNodesCache: map[Path]*node{},
 	}
-	// before should never be modified
-	newView.changes.nodes[db.rootPath] = &change[*node]{before: root, after: newView.root}
+	newView.beforeNodesCache[db.rootPath] = root
 
 	for _, op := range changes.BatchOps {
 		key := op.Key
@@ -205,10 +206,11 @@ func newHistoricalTrieView(
 	}
 
 	newView := &trieView{
-		root:       passedRootChange.after,
-		db:         db,
-		parentTrie: db,
-		changes:    changes,
+		root:             passedRootChange.after,
+		db:               db,
+		parentTrie:       db,
+		changes:          changes,
+		beforeNodesCache: map[Path]*node{},
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
@@ -370,7 +372,6 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	childNode, err := t.getNode(
 		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
 		child.hasValue,
-		true,
 	)
 	if err != nil {
 		return nil, err
@@ -633,8 +634,18 @@ func (t *trieView) remove(key Path) error {
 		return nil
 	}
 
+	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
+	// all the nodes in this path.
+	for _, node := range nodePath {
+		if err := t.recordNodeChange(node); err != nil {
+			return err
+		}
+	}
+
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	t.recordNodeChange(nodeToDelete)
+	if err := t.recordNodeChange(nodeToDelete); err != nil {
+		return err
+	}
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -674,7 +685,9 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 
 	// delete all empty nodes with a single child under [node]
 	for len(node.children) == 1 && !node.hasValue() {
-		t.recordNodeDeleted(node)
+		if err := t.recordNodeDeleted(node); err != nil {
+			return err
+		}
 
 		var (
 			childEntry child
@@ -688,7 +701,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNode(childPath, childEntry.hasValue, false)
+		nextNode, err := t.getNode(childPath, childEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -698,8 +711,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	parent.addChild(node)
-	t.recordNodeChange(parent)
-	return nil
+	return t.recordNodeChange(parent)
 }
 
 // Starting from the last node in [nodePath], traverses toward the root
@@ -716,10 +728,16 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	nextParentIndex := len(nodePath) - 2
 
 	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		t.recordNodeDeleted(node)
+		if err := t.recordNodeDeleted(node); err != nil {
+			return err
+		}
+
 		parent := nodePath[nextParentIndex]
+
 		parent.removeChild(node)
-		t.recordNodeChange(parent)
+		if err := t.recordNodeChange(parent); err != nil {
+			return err
+		}
 
 		node = parent
 	}
@@ -763,7 +781,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue, false)
+		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}
@@ -798,12 +816,20 @@ func (t *trieView) insert(
 		return nil, err
 	}
 
+	// We're inserting a node whose ancestry is [pathToNode]
+	// so we'll need to recalculate their IDs.
+	for _, node := range pathToNode {
+		if err := t.recordNodeChange(node); err != nil {
+			return nil, err
+		}
+	}
+
 	closestNode := pathToNode[len(pathToNode)-1]
 
 	// a node with that exact path already exists so update its value
 	if closestNode.key == key {
 		closestNode.setValue(value)
-		t.recordNodeChange(closestNode)
+		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
 
@@ -821,8 +847,7 @@ func (t *trieView) insert(
 			key,
 		)
 		newNode.setValue(value)
-		t.recordNodeChange(newNode)
-		return newNode, nil
+		return newNode, t.recordNewNode(newNode)
 	}
 
 	// if we have reached this point, then the [fullpath] we are trying to insert and
@@ -859,7 +884,9 @@ func (t *trieView) insert(
 			key,
 		)
 		newNode.setValue(value)
-		t.recordNodeChange(newNode)
+		if err := t.recordNewNode(newNode); err != nil {
+			return nil, err
+		}
 		nodeWithValue = newNode
 	}
 
@@ -872,40 +899,60 @@ func (t *trieView) insert(
 			hasValue:       existingChildEntry.hasValue,
 		})
 
-	t.recordNodeChange(branchNode)
-	return nodeWithValue, nil
+	return nodeWithValue, t.recordNewNode(branchNode)
+}
+
+// Records that a node has been created.
+// Must not be called after [calculateNodeIDs] has returned.
+func (t *trieView) recordNewNode(after *node) error {
+	return t.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
 }
 
 // Records that an existing node has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeChange(after *node) {
-	t.recordKeyChange(after.key, after)
+func (t *trieView) recordNodeChange(after *node) error {
+	return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeDeleted(after *node) {
+func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
 	if after.key.tokensLength == 0 {
-		t.recordKeyChange(after.key, after)
-		return
+		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
-
-	t.recordKeyChange(after.key, nil)
+	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key Path, after *node) {
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
-		return
+func (t *trieView) recordKeyChange(key Path, after *node, hadValue bool, newNode bool) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
 	}
 
-	t.changes.nodes[key] = &change[*node]{
-		after: after,
+	if existing, ok := t.changes.nodes[key]; ok {
+		existing.after = after
+		return nil
 	}
+
+	if newNode {
+		t.changes.nodes[key] = &change[*node]{
+			after: after,
+		}
+		return nil
+	}
+
+	before, err := t.getBeforeNode(key, hadValue)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return err
+	}
+	t.changes.nodes[key] = &change[*node]{
+		before: before,
+		after:  after,
+	}
+	return nil
 }
 
 // Records that a key's value has been added or updated.
@@ -934,7 +981,7 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 	default:
 		return err
 	}
-	// before should never be modified
+
 	t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
 		before: beforeMaybe,
 		after:  value,
@@ -944,9 +991,8 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 
 // Retrieves a node with the given [key].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// forChild indicates that the requested node is for a child view and shouldn't be marked as a change
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error) {
+func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -957,17 +1003,29 @@ func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue, true)
+	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue)
 	if err != nil {
 		return nil, err
 	}
-	nodeToReturn := parentTrieNode
-	if !forChild {
-		nodeToReturn = parentTrieNode.clone()
-		// before should never be modified
-		t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: nodeToReturn}
+	t.beforeNodesCache[key] = parentTrieNode
+	return parentTrieNode.clone(), nil
+}
+
+// Retrieves the node with the given [key] before any changes have been made.
+// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
+// Returns database.ErrNotFound if the node doesn't exist.
+func (t *trieView) getBeforeNode(key Path, hasValue bool) (*node, error) {
+	if n, ok := t.beforeNodesCache[key]; ok {
+		// this will now be stored in t.changes.nodes, so no longer is required here
+		delete(t.beforeNodesCache, key)
+		t.db.metrics.ViewNodeCacheHit()
+		if n == nil {
+			return nil, database.ErrNotFound
+		}
+		return n, nil
 	}
-	return nodeToReturn, nil
+
+	return t.getParentTrie().getNode(key, hasValue)
 }
 
 // Get the parent trie of the view

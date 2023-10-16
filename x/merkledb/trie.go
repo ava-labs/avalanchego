@@ -41,7 +41,7 @@ type ReadOnlyTrie interface {
 	// get the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
 	// forChild indicates that the requested node is for a child view
-	getNode(key Path, hasValue bool, forChild bool) (*node, error)
+	getNode(key Path, hasValue bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].

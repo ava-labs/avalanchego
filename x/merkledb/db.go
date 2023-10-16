@@ -922,7 +922,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// move any child views of the committed trie onto the db
 	db.moveChildViewsToDB(trieToCommit)
 
-	if len(changes.values) == 0 {
+	if len(changes.nodes) == 0 {
 		return nil
 	}
 
@@ -1232,7 +1232,7 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 // hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getNode(key Path, hasValue bool, _ bool) (*node, error) {
+func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
