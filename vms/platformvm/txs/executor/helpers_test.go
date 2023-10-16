@@ -100,6 +100,9 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
 
+	// align chain time with local clock
+	baseState.SetTimestamp(clk.Time())
+
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
 	utxoHandler := utxo.NewHandler(ctx, clk, fx)

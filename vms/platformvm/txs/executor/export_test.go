@@ -52,8 +52,13 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
+			// ts.Balance holds the full Avax amount originally hold by any test keys
+			// However in our test environment we add a subnet, so we need to account
+			// for the reduced avax availability
+			amountToExport := ts.Balance - env.config.GetCreateSubnetTxFee(env.clk.Time()) - ts.TxFee
+
 			tx, err := env.txBuilder.NewExportTx(
-				ts.Balance-ts.TxFee, // Amount of tokens to export
+				amountToExport,
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,
