@@ -1264,6 +1264,10 @@ func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	return db.intermediateNodeDB.Get(key)
 }
 
+func (db *merkleDB) getRootKey() Path {
+	return db.root.key
+}
+
 // Returns [key] prefixed by [prefix].
 // The returned []byte is taken from [bufferPool] and
 // should be returned to it when the caller is done with it.

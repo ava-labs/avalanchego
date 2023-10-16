@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(Path{} /*TODO pass root key*/, false /* hasValue */)
+	root, err := parentTrie.getEditableNode(parentTrie.getRootKey(), false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -213,6 +213,10 @@ func newHistoricalTrieView(
 	newView.calculateNodesOnce.Do(func() {})
 	newView.nodesAlreadyCalculated.Set(true)
 	return newView, nil
+}
+
+func (t *trieView) getRootKey() Path {
+	return t.root.key
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
