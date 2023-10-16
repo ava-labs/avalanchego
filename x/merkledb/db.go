@@ -205,8 +205,7 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	newPath  func(p []byte) Path
-	rootPath Path // TODO what should this be?
+	newPath func(p []byte) Path
 }
 
 // New returns a new merkle database.
@@ -255,7 +254,6 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		rootPath:             newPath(emptyKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -265,9 +263,10 @@ func newDatabase(
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootID: root,
-		values: map[Path]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Path]*change[*node]{},
+		rootPath: trieDB.root.key,
+		rootID:   root,
+		values:   map[Path]*change[maybe.Maybe[[]byte]]{},
+		nodes:    map[Path]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)

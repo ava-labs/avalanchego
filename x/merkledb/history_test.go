@@ -690,7 +690,7 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			name:   "most recent change",
 			rootID: changes[maxHistoryLen-1].rootID,
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Equal(newChangeSummary(defaultPreallocationSize), got)
+				require.Equal(newChangeSummary(defaultPreallocationSize, ids.Empty /*TODO*/, Path{} /*TODO*/), got)
 			},
 		},
 		{

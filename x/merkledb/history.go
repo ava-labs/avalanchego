@@ -53,13 +53,15 @@ type changeSummaryAndInsertNumber struct {
 
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
-	rootPath Path // TODO populate
-	rootID   ids.ID
-	nodes    map[Path]*change[*node]
-	values   map[Path]*change[maybe.Maybe[[]byte]]
+	// The key of the root after these changes.
+	rootPath Path
+	// The ID of the trie after these changes.
+	rootID ids.ID
+	nodes  map[Path]*change[*node]
+	values map[Path]*change[maybe.Maybe[[]byte]]
 }
 
-func newChangeSummary(estimatedSize int) *changeSummary {
+func newChangeSummary(estimatedSize int, endRootID ids.ID, endRootKey Path) *changeSummary {
 	return &changeSummary{
 		nodes:  make(map[Path]*change[*node], estimatedSize),
 		values: make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
@@ -92,10 +94,6 @@ func (th *trieHistory) getValueChanges(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	if startRoot == endRoot {
-		return newChangeSummary(maxLength), nil
-	}
-
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	// TODO when we update to minimum go version 1.20.X, make this return another
 	// wrapped error ErrNoEndRoot. In NetworkServer.HandleChangeProofRequest, if we return
@@ -104,6 +102,10 @@ func (th *trieHistory) getValueChanges(
 	endRootChanges, ok := th.lastChanges[endRoot]
 	if !ok {
 		return nil, fmt.Errorf("%w: end root %s not found", ErrInsufficientHistory, endRoot)
+	}
+
+	if startRoot == endRoot {
+		return newChangeSummary(maxLength, endRoot, endRootChanges.rootPath), nil
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -166,7 +168,7 @@ func (th *trieHistory) getValueChanges(
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 		// add the changes to keys in [start, end] to [combinedChanges].
 		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-		combinedChanges = newChangeSummary(maxLength)
+		combinedChanges = newChangeSummary(maxLength, endRoot, Path{} /*populated last iteration*/)
 
 		// The difference between the index of [startRootChanges] and [endRootChanges] in [th.history].
 		startToEndOffset = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
@@ -180,6 +182,10 @@ func (th *trieHistory) getValueChanges(
 	// [endRootChanges], record the change in [combinedChanges].
 	for i := startRootIndex + 1; i <= endRootIndex; i++ {
 		changes, _ := th.history.Index(i)
+
+		if i == endRootIndex {
+			combinedChanges.rootPath = changes.rootPath
+		}
 
 		// Add the changes from this commit to [combinedChanges].
 		for key, valueChange := range changes.values {
@@ -240,7 +246,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	var (
 		startPath                    = maybe.Bind(start, th.newPath)
 		endPath                      = maybe.Bind(end, th.newPath)
-		combinedChanges              = newChangeSummary(defaultPreallocationSize)
+		combinedChanges              = newChangeSummary(defaultPreallocationSize, rootID, Path{} /*populated first iteration*/)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
 		offset                       = int(mostRecentChangeInsertNumber - lastRootChange.insertNumber)
@@ -252,6 +258,10 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// Record each change in [combinedChanges].
 	for i := mostRecentChangeIndex; i > lastRootChangeIndex; i-- {
 		changes, _ := th.history.Index(i)
+
+		if i == mostRecentChangeIndex {
+			combinedChanges.rootPath = changes.rootPath
+		}
 
 		for key, changedNode := range changes.nodes {
 			combinedChanges.nodes[key] = &change[*node]{

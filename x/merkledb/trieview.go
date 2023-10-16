@@ -153,11 +153,16 @@ func newTrieView(
 		return nil, err
 	}
 
+	parentRoot, err := parentTrie.GetMerkleRoot(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	newView := &trieView{
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		changes:    newChangeSummary(len(changes.BatchOps)+len(changes.MapOps), parentRoot, root.key),
 	}
 
 	for _, op := range changes.BatchOps {
