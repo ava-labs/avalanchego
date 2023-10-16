@@ -250,7 +250,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		// If the root has no value and only a single child, that child can become the root.
+		// If the current root has no value and only a single child, that child can become the root.
 		// Use valueDigest instead of value because proof verification only sets the digest
 		if t.root.valueDigest.IsNothing() && len(t.root.children) == 1 {
 			for index, childEntry := range t.root.children {
@@ -765,7 +765,6 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
-// Always returns at least the root node.
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
 		// all paths start at the root
