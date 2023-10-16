@@ -17,7 +17,7 @@ const (
 	BanffFork         ActiveFork = 2
 	CortinaFork       ActiveFork = 3
 	DFork             ActiveFork = 4
-	LatestFork        ActiveFork = DFork
+	LatestFork        ActiveFork = CortinaFork // DFork not activated yet!
 )
 
 // default times of each P-chain fork
