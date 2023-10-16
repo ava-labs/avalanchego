@@ -992,6 +992,9 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 	return nil
 }
 
+// getNode retrieves a node with the given [key].
+// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
+// Returns database.ErrNotFound if the node doesn't exist.
 func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
