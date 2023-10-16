@@ -63,8 +63,10 @@ type changeSummary struct {
 
 func newChangeSummary(estimatedSize int, endRootID ids.ID, endRootKey Path) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[Path]*change[*node], estimatedSize),
-		values: make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
+		rootID:   endRootID,
+		rootPath: endRootKey,
+		nodes:    make(map[Path]*change[*node], estimatedSize),
+		values:   make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 

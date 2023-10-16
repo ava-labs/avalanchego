@@ -351,6 +351,8 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, err
 	}
 
+	// TODO handle len(proofPath) == 0
+
 	// From root --> node from left --> right.
 	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
 	for i, node := range proofPath {
@@ -632,6 +634,10 @@ func (t *trieView) remove(key Path) error {
 	if err != nil {
 		return err
 	}
+	if len(nodePath) == 0 {
+		// the key wasn't in the trie
+		return nil
+	}
 
 	nodeToDelete := nodePath[len(nodePath)-1]
 
@@ -760,12 +766,18 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
-// Always returns at least the root node.
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
+	if !key.HasPrefix(t.root.key) {
+		return nil, nil
+	}
+	if key == t.root.key {
+		return []*node{t.root}, nil
+	}
+
 	var (
 		// all node paths start at the root
 		currentNode      = t.root
-		matchedPathIndex = 0
+		matchedPathIndex = t.root.key.tokensLength
 		nodes            = []*node{t.root}
 	)
 
@@ -843,6 +855,10 @@ func (t *trieView) insert(
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO handle new root creation
+	//if len(pathToNode) == 0 {
+	//}
 
 	// We're inserting a node whose ancestry is [pathToNode]
 	// so we'll need to recalculate their IDs.
