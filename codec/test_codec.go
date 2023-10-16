@@ -66,7 +66,7 @@ type Foo interface {
 
 type MyInnerStruct struct {
 	Str               string `serialize:"true"`
-	NumberNotProvided *int32 `serialize:"true":121`
+	NumberNotProvided *int32 `serialize:"true,omitempty"`
 }
 
 func (*MyInnerStruct) Foo() int {
@@ -90,31 +90,31 @@ type MyInnerStruct3 struct {
 }
 
 type MyStructWithPtr struct {
-	N1 *int32 `serialize:"true"`
-	N2 *int64 `serialize:"true"`
+	N1 *int32 `serialize:"true,omitempty"`
+	N2 *int64 `serialize:"true,omitempty"`
 }
 
 type myStruct struct {
-	InnerStruct  MyInnerStruct               `serialize:"true"`
+	InnerStruct  MyInnerStruct               `serialize:"true,omitempty"`
 	InnerStruct2 *MyInnerStruct              `serialize:"true"`
 	Member1      int64                       `serialize:"true"`
 	Member2      uint16                      `serialize:"true"`
 	MyArray2     [5]string                   `serialize:"true"`
 	MyArray3     [3]MyInnerStruct            `serialize:"true"`
-	MyArray4     [2]*MyInnerStruct2          `serialize:"true"`
+	MyArray4     [2]*MyInnerStruct2          `serialize:"true,omitempty"`
 	MySlice      []byte                      `serialize:"true"`
 	MySlice2     []string                    `serialize:"true"`
 	MySlice3     []MyInnerStruct             `serialize:"true"`
-	MySlice4     []*MyInnerStruct2           `serialize:"true"`
+	MySlice4     []*MyInnerStruct2           `serialize:"true,omitempty"`
 	MyArray      [4]byte                     `serialize:"true"`
 	MyInterface  Foo                         `serialize:"true"`
 	MySlice5     []Foo                       `serialize:"true"`
 	InnerStruct3 MyInnerStruct3              `serialize:"true"`
-	MyPointer    *Foo                        `serialize:"true"`
+	MyPointer    *Foo                        `serialize:"true,omitempty"`
 	MyMap1       map[string]string           `serialize:"true"`
 	MyMap2       map[int32][]MyInnerStruct3  `serialize:"true"`
 	MyMap3       map[MyInnerStruct2][]int32  `serialize:"true"`
-	MyMap4       map[int32]*int32            `serialize:"true"`
+	MyMap4       map[int32]*int32            `serialize:"true,omitempty"`
 	MyMap5       map[int32]int32             `serialize:"true"`
 	MyMap6       map[[5]int32]int32          `serialize:"true"`
 	MyMap7       map[interface{}]interface{} `serialize:"true"`
