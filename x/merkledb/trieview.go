@@ -95,8 +95,9 @@ type trieView struct {
 	changes *changeSummary
 
 	// Key --> Node whose state is that of this key
-	// before any changes to it. Must be cloned before
-	// modification.
+	// before any changes to it.
+	// Should not modify nodes in this cache
+	// Only for recording the before value in changes.nodes
 	beforeNodesCache map[Path]*node
 
 	db *merkleDB
