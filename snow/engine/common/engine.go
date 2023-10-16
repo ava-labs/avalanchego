@@ -292,7 +292,8 @@ type QueryHandler interface {
 	// requestID.
 	//
 	// If the provided containerID is not processing, the engine is expected to
-	// respond with the node's current preference before attempting to issue it.
+	// respond with the node's current preferences before attempting to issue
+	// it.
 	//
 	// This function can be called by any node at any time.
 	PullQuery(
@@ -300,13 +301,15 @@ type QueryHandler interface {
 		nodeID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
+		requestedHeight uint64,
 	) error
 
 	// Notify this engine of a request for a Chits message with the same
 	// requestID.
 	//
 	// If the provided container is not processing, the engine is expected to
-	// respond with the node's current preference before attempting to issue it.
+	// respond with the node's current preferences before attempting to issue
+	// it.
 	//
 	// It is not guaranteed that container can be parsed or issued.
 	//
@@ -316,6 +319,7 @@ type QueryHandler interface {
 		nodeID ids.NodeID,
 		requestID uint32,
 		container []byte,
+		requestedHeight uint64,
 	) error
 }
 
@@ -324,12 +328,13 @@ type ChitsHandler interface {
 	// PushQuery message with the same requestID.
 	//
 	// It is expected, but not guaranteed, that preferredID transitively
-	// references acceptedID.
+	// references preferredIDAtHeight and acceptedID.
 	Chits(
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
 		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 	) error
 

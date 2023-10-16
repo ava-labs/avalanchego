@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.8'
+          go-version: '~1.20.10'
           check-latest: true
       - uses: bufbuild/buf-setup-action@v1.26.1
       - shell: bash
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.8'
+          go-version: '~1.20.10'
           check-latest: true
       - shell: bash
         run: scripts/mock.gen.sh
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.8'
+          go-version: '~1.20.10'
           check-latest: true
       - shell: bash
         run: go mod tidy

@@ -6,6 +6,7 @@ package common
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -51,8 +52,8 @@ type TestVM struct {
 	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
-	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
-	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
+	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
+	CreateStaticHandlersF       func(context.Context) (map[string]http.Handler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
@@ -141,7 +142,7 @@ func (vm *TestVM) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlersF(ctx)
 	}
@@ -151,7 +152,7 @@ func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, 
 	return nil, nil
 }
 
-func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	if vm.CreateStaticHandlersF != nil {
 		return vm.CreateStaticHandlersF(ctx)
 	}
