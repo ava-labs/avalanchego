@@ -159,9 +159,8 @@ func newTrieView(
 		db:               db,
 		parentTrie:       parentTrie,
 		changes:          newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
-		beforeNodesCache: map[Path]*node{},
+		beforeNodesCache: map[Path]*node{db.rootPath: root},
 	}
-	newView.beforeNodesCache[db.rootPath] = root
 
 	for _, op := range changes.BatchOps {
 		key := op.Key
