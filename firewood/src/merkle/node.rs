@@ -59,20 +59,20 @@ impl<T: DeserializeOwned + AsRef<[u8]>> Encoded<T> {
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct BranchNode {
-    pub(super) chd: [Option<DiskAddress>; NBRANCH],
+    pub(super) children: [Option<DiskAddress>; NBRANCH],
     pub(super) value: Option<Data>,
-    pub(super) chd_encoded: [Option<Vec<u8>>; NBRANCH],
+    pub(super) children_encoded: [Option<Vec<u8>>; NBRANCH],
 }
 
 impl Debug for BranchNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "[Branch")?;
-        for (i, c) in self.chd.iter().enumerate() {
+        for (i, c) in self.children.iter().enumerate() {
             if let Some(c) = c {
                 write!(f, " ({i:x} {c:?})")?;
             }
         }
-        for (i, c) in self.chd_encoded.iter().enumerate() {
+        for (i, c) in self.children_encoded.iter().enumerate() {
             if let Some(c) = c {
                 write!(f, " ({i:x} {:?})", c)?;
             }
@@ -92,7 +92,7 @@ impl BranchNode {
     pub(super) fn single_child(&self) -> (Option<(DiskAddress, u8)>, bool) {
         let mut has_chd = false;
         let mut only_chd = None;
-        for (i, c) in self.chd.iter().enumerate() {
+        for (i, c) in self.children.iter().enumerate() {
             if c.is_some() {
                 has_chd = true;
                 if only_chd.is_some() {
@@ -128,7 +128,7 @@ impl BranchNode {
     fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut list = <[Encoded<Vec<u8>>; NBRANCH + 1]>::default();
 
-        for (i, c) in self.chd.iter().enumerate() {
+        for (i, c) in self.children.iter().enumerate() {
             match c {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
@@ -153,7 +153,7 @@ impl BranchNode {
                 None => {
                     // Check if there is already a calculated encoded value for the child, which
                     // can happen when manually constructing a trie from proof.
-                    if let Some(v) = &self.chd_encoded[i] {
+                    if let Some(v) = &self.children_encoded[i] {
                         if v.len() == TRIE_HASH_LEN {
                             list[i] =
                                 Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
@@ -180,9 +180,9 @@ impl BranchNode {
         chd_encoded: [Option<Vec<u8>>; NBRANCH],
     ) -> Self {
         BranchNode {
-            chd,
+            children: chd,
             value: value.map(Data),
-            chd_encoded,
+            children_encoded: chd_encoded,
         }
     }
 
@@ -191,19 +191,19 @@ impl BranchNode {
     }
 
     pub fn chd(&self) -> &[Option<DiskAddress>; NBRANCH] {
-        &self.chd
+        &self.children
     }
 
     pub fn chd_mut(&mut self) -> &mut [Option<DiskAddress>; NBRANCH] {
-        &mut self.chd
+        &mut self.children
     }
 
     pub fn chd_encode(&self) -> &[Option<Vec<u8>>; NBRANCH] {
-        &self.chd_encoded
+        &self.children_encoded
     }
 
     pub fn chd_encoded_mut(&mut self) -> &mut [Option<Vec<u8>>; NBRANCH] {
-        &mut self.chd_encoded
+        &mut self.children_encoded
     }
 }
 
@@ -370,14 +370,6 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
-        match &self {
-            NodeType::Leaf(n) => n.encode(),
-            NodeType::Extension(n) => n.encode(store),
-            NodeType::Branch(n) => n.encode(store),
-        }
-    }
-
     pub fn decode(buf: &[u8]) -> Result<NodeType, Error> {
         let items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
@@ -409,6 +401,24 @@ impl NodeType {
             )))),
         }
     }
+
+    pub fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
+        match &self {
+            NodeType::Leaf(n) => n.encode(),
+            NodeType::Extension(n) => n.encode(store),
+            NodeType::Branch(n) => n.encode(store),
+        }
+    }
+
+    pub fn path_mut(&mut self) -> Option<&mut PartialPath> {
+        let path = match self {
+            NodeType::Branch(_) => return None,
+            NodeType::Leaf(node) => &mut node.0,
+            NodeType::Extension(node) => &mut node.path,
+        };
+
+        path.into()
+    }
 }
 
 impl Node {
@@ -424,9 +434,9 @@ impl Node {
                 is_encoded_longer_than_hash_len: OnceLock::new(),
                 encoded: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
-                    chd: [Some(DiskAddress::null()); NBRANCH],
+                    children: [Some(DiskAddress::null()); NBRANCH],
                     value: Some(Data(Vec::new())),
-                    chd_encoded: Default::default(),
+                    children_encoded: Default::default(),
                 }),
                 lazy_dirty: AtomicBool::new(false),
             }
@@ -468,6 +478,14 @@ impl Node {
         };
         s.rehash();
         s
+    }
+
+    pub fn branch(node: BranchNode) -> Self {
+        Self::new(NodeType::Branch(node))
+    }
+
+    pub fn leaf(path: PartialPath, data: Data) -> Self {
+        Self::new(NodeType::Leaf(LeafNode(path, data)))
     }
 
     pub fn inner(&self) -> &NodeType {
@@ -598,9 +616,9 @@ impl Storable for Node {
                     root_hash,
                     is_encoded_longer_than_hash_len,
                     NodeType::Branch(BranchNode {
-                        chd,
+                        children: chd,
                         value,
-                        chd_encoded,
+                        children_encoded: chd_encoded,
                     }),
                 ))
             }
@@ -724,7 +742,7 @@ impl Storable for Node {
             + match &self.inner {
                 NodeType::Branch(n) => {
                     let mut encoded_len = 0;
-                    for emcoded in n.chd_encoded.iter() {
+                    for emcoded in n.children_encoded.iter() {
                         encoded_len += match emcoded {
                             Some(v) => 1 + v.len() as u64,
                             None => 1,
@@ -773,7 +791,7 @@ impl Storable for Node {
         match &self.inner {
             NodeType::Branch(n) => {
                 cur.write_all(&[Self::BRANCH_NODE]).unwrap();
-                for c in n.chd.iter() {
+                for c in n.children.iter() {
                     cur.write_all(&match c {
                         Some(p) => p.to_le_bytes(),
                         None => 0u64.to_le_bytes(),
@@ -790,7 +808,7 @@ impl Storable for Node {
                 }
                 // Since child encoding will only be unset after initialization (only used for range proof),
                 // it is fine to encode its value adjacent to other fields. Same for extention node.
-                for encoded in n.chd_encoded.iter() {
+                for encoded in n.children_encoded.iter() {
                     match encoded {
                         Some(v) => {
                             cur.write_all(&[v.len() as u8])?;
