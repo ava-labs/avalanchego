@@ -1162,26 +1162,18 @@ func (db *merkleDB) initializeRoot(rootPath Path) (ids.ID, error) {
 	// check under both prefixes
 	var err error
 	db.root, err = db.intermediateNodeDB.Get(rootPath)
-	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(rootPath)
-	}
 	if err == nil {
-		// If the root has no value and only a single child,
-		// then it isn't needed to form a valid trie.
-		// Use its child node instead as the root
-		if db.root.value.IsNothing() && len(db.root.children) == 1 {
-			for index, childEntry := range db.root.children {
-				if db.root, err = db.getNode(db.getRootPath().Append(index).Extend(childEntry.compressedPath), childEntry.hasValue); err != nil {
-					return ids.Empty, err
-				}
-			}
-		}
-
 		// Root already exists, so calculate its id
 		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
-	if err != database.ErrNotFound {
+
+	if errors.Is(err, database.ErrNotFound) {
+		db.root, err = db.valueNodeDB.Get(rootPath)
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return ids.Empty, err
+		}
+	} else {
 		return ids.Empty, err
 	}
 
