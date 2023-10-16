@@ -1153,11 +1153,8 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
-	if err != nil {
-		if !errors.Is(err, database.ErrNotFound) {
-			return ids.ID{}, err
-		}
-	} else {
+	if err == nil {
+		// Root is on disk.
 		db.root, err = codec.decodeKeyAndNode(rootBytes, db.valueNodeDB.branchFactor)
 		if err != nil {
 			return ids.ID{}, err
@@ -1165,8 +1162,12 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
+	if !errors.Is(err, database.ErrNotFound) {
+		return ids.ID{}, err
+	}
 
-	// Root doesn't exist; make a new one.
+	// Root not on disk; make a new one.
+	// TODO should we have a "fake" root?
 	db.root = newNode(nil, NewPath(emptyKey, db.valueNodeDB.branchFactor))
 
 	// update its ID
