@@ -18,6 +18,10 @@ const (
 
 	// TagValue is the value the tag must have to be serialized.
 	TagValue = "true"
+
+	// TagValue is the value the tag must have to be serialized, this variant
+	// includes Omit Empty
+	TagWithOmitEmptyValue = "true,omitempty"
 )
 
 var _ StructFielder = (*structFielder)(nil)
@@ -25,6 +29,7 @@ var _ StructFielder = (*structFielder)(nil)
 type FieldDesc struct {
 	Index       int
 	MaxSliceLen uint32
+	OmitEmpty   bool
 }
 
 // StructFielder handles discovery of serializable fields in a struct.
@@ -83,9 +88,16 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 		// Serialize/Deserialize field if it has
 		// any tag with the right value
 		captureField := false
+		omitEmpty := false
 		for _, tag := range s.tags {
-			if field.Tag.Get(tag) == TagValue {
+			switch tagValue := field.Tag.Get(tag); tagValue {
+			case TagValue:
 				captureField = true
+			case TagWithOmitEmptyValue:
+				captureField = true
+				omitEmpty = true
+			}
+			if captureField {
 				break
 			}
 		}
@@ -107,6 +119,7 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 		serializedFields = append(serializedFields, FieldDesc{
 			Index:       i,
 			MaxSliceLen: maxSliceLen,
+			OmitEmpty:   omitEmpty,
 		})
 	}
 	s.serializedFieldIndices[t] = serializedFields // cache result
