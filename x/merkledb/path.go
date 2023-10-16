@@ -128,6 +128,8 @@ func (p Path) HasPrefix(prefix Path) bool {
 	return strings.HasPrefix(p.value, prefixWithoutPartialByte)
 }
 
+// iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
+// this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
 func (p Path) iteratedHasPrefix(skipTokens int, prefix Path) bool {
 	if p.tokensLength-skipTokens < prefix.tokensLength {
 		return false
