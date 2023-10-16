@@ -747,7 +747,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [Key], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, Key maybe.Maybe[Key]) error {
+func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
 	}
@@ -755,7 +755,7 @@ func verifyProofPath(proof []ProofNode, Key maybe.Maybe[Key]) error {
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].Key
-		if Key.HasValue() && nodeKey.branchFactor != Key.Value().branchFactor {
+		if key.HasValue() && nodeKey.branchFactor != key.Value().branchFactor {
 			return ErrInconsistentBranchFactor
 		}
 
@@ -766,7 +766,7 @@ func verifyProofPath(proof []ProofNode, Key maybe.Maybe[Key]) error {
 		}
 
 		// each node should have a key that has the proven key as a prefix
-		if Key.HasValue() && !Key.Value().HasStrictPrefix(nodeKey) {
+		if key.HasValue() && !key.Value().HasStrictPrefix(nodeKey) {
 			return ErrProofNodeNotForKey
 		}
 
@@ -833,15 +833,15 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		Key := proofNode.Key
+		key := proofNode.Key
 
-		if Key.hasPartialByte() && !proofNode.ValueOrHash.IsNothing() {
+		if key.hasPartialByte() && !proofNode.ValueOrHash.IsNothing() {
 			return ErrPartialByteLengthWithValue
 		}
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insert(Key, maybe.Nothing[[]byte]())
+		n, err := t.insert(key, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -857,12 +857,12 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := emptyKey(Key.branchFactor)
+		compressedPath := emptyKey(key.branchFactor)
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
-			childPath := Key.AppendExtend(index, compressedPath)
+			childPath := key.AppendExtend(index, compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
