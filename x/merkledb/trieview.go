@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
+	root, err := parentTrie.getEditableNode(Path{} /*TODO pass root key*/, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -197,7 +197,7 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[db.rootPath]
+	passedRootChange, ok := changes.nodes[changes.rootPath]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
