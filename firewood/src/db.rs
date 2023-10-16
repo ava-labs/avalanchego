@@ -409,7 +409,7 @@ impl api::Db for Db {
         &self,
         batch: api::Batch<K, V>,
     ) -> Result<Self::Proposal, api::Error> {
-        self.new_proposal(batch).map_err(Into::into)
+        block_in_place(|| self.new_proposal(batch)).map_err(Into::into)
     }
 }
 

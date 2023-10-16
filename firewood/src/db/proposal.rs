@@ -55,7 +55,7 @@ impl crate::v2::api::Proposal for Proposal {
         self: Arc<Self>,
         data: api::Batch<K, V>,
     ) -> Result<Self::Proposal, api::Error> {
-        self.propose_sync(data).map_err(Into::into)
+        block_in_place(|| self.propose_sync(data)).map_err(Into::into)
     }
 }
 
