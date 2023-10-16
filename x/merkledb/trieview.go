@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */, true)
+	root, err := parentTrie.getNode(db.rootPath, false /* hasValue */, false /* willChange */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -160,7 +160,10 @@ func newTrieView(
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 	// before should never be modified
-	newView.changes.nodes[db.rootPath] = &change[*node]{before: root, after: newView.root}
+	newView.changes.nodes[db.rootPath] = &change[*node]{
+		before: root,
+		after:  newView.root,
+	}
 
 	for _, op := range changes.BatchOps {
 		key := op.Key
@@ -370,7 +373,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	childNode, err := t.getNode(
 		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
 		child.hasValue,
-		true,
+		false, /* willChange */
 	)
 	if err != nil {
 		return nil, err
@@ -688,7 +691,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry = entry
 		}
 
-		nextNode, err := t.getNode(childPath, childEntry.hasValue, false)
+		nextNode, err := t.getNode(childPath, childEntry.hasValue, true /* willChange */)
 		if err != nil {
 			return err
 		}
@@ -763,7 +766,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue, false)
+		currentNode, err = t.getNode(key.Take(matchedPathIndex), nextChildEntry.hasValue, true /* willChange */)
 		if err != nil {
 			return nil, err
 		}
@@ -942,11 +945,7 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 	return nil
 }
 
-// Retrieves a node with the given [key].
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// forChild indicates that the requested node is for a child view and shouldn't be marked as a change
-// Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error) {
+func (t *trieView) getNode(key Path, hasValue bool, willChange bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -956,18 +955,23 @@ func (t *trieView) getNode(key Path, hasValue bool, forChild bool) (*node, error
 		return nodeChange.after, nil
 	}
 
-	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getNode(key, hasValue, true)
+	// get the node from the parent trie
+	n, err := t.getParentTrie().getNode(key, hasValue, false /* willChange */)
 	if err != nil {
 		return nil, err
 	}
-	nodeToReturn := parentTrieNode
-	if !forChild {
-		nodeToReturn = parentTrieNode.clone()
-		// before should never be modified
-		t.changes.nodes[key] = &change[*node]{before: parentTrieNode, after: nodeToReturn}
+
+	if !willChange {
+		return n, nil
 	}
-	return nodeToReturn, nil
+
+	nClone := n.clone()
+	// before should never be modified
+	t.changes.nodes[key] = &change[*node]{
+		before: n,
+		after:  nClone,
+	}
+	return nClone, nil
 }
 
 // Get the parent trie of the view
