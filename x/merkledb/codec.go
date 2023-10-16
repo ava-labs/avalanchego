@@ -68,7 +68,7 @@ type encoder interface {
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndNode(bytes []byte, factor BranchFactor) (Path, *node, error)
+	decodeKeyAndNode(bytes []byte, factor BranchFactor) (*node, error)
 }
 
 func newCodec() encoderDecoder {
@@ -207,27 +207,27 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	return nil
 }
 
-func (c *codecImpl) decodeKeyAndNode(b []byte, branchFactor BranchFactor) (Path, *node, error) {
+func (c *codecImpl) decodeKeyAndNode(b []byte, branchFactor BranchFactor) (*node, error) {
 	if ids.IDLen+minDBNodeLen > len(b) {
-		return Path{}, nil, io.ErrUnexpectedEOF
+		return nil, io.ErrUnexpectedEOF
 	}
 
 	src := bytes.NewReader(b)
 
 	key, err := c.decodePath(src, branchFactor)
 	if err != nil {
-		return Path{}, nil, err
+		return nil, err
 	}
 
 	nodeBytes, err := c.decodeByteSlice(src)
 	if err != nil {
-		return Path{}, nil, err
+		return nil, err
 	}
 	node, err := parseNode(key, nodeBytes)
 	if err != nil {
-		return Path{}, nil, err
+		return nil, err
 	}
-	return key, node, nil
+	return node, nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {

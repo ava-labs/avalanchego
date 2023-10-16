@@ -1158,12 +1158,10 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 			return ids.ID{}, err
 		}
 	} else {
-		rootKey, root, err := codec.decodeKeyAndNode(rootBytes, db.valueNodeDB.branchFactor)
+		db.root, err = codec.decodeKeyAndNode(rootBytes, db.valueNodeDB.branchFactor)
 		if err != nil {
 			return ids.ID{}, err
 		}
-		_ = rootKey // TODO remove?
-		db.root = root
 		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}
