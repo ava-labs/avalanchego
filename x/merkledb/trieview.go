@@ -92,7 +92,11 @@ type trieView struct {
 	// Changes made to this view.
 	// May include nodes that haven't been updated
 	// but will when their ID is recalculated.
-	changes          *changeSummary
+	changes *changeSummary
+
+	// Key --> Node whose state is that of this key
+	// before any changes to it. Must be cloned before
+	// modification.
 	beforeNodesCache map[Path]*node
 
 	db *merkleDB
@@ -988,9 +992,6 @@ func (t *trieView) recordValueChange(key Path, value maybe.Maybe[[]byte]) error 
 	return nil
 }
 
-// Retrieves a node with the given [key].
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
-// Returns database.ErrNotFound if the node doesn't exist.
 func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
@@ -1011,7 +1012,8 @@ func (t *trieView) getNode(key Path, hasValue bool) (*node, error) {
 }
 
 // Retrieves the node with the given [key] before any changes have been made.
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
+// If [hasValue], looks for a value node.
+// Otherwise looks for an intermediate node.
 // Returns database.ErrNotFound if the node doesn't exist.
 func (t *trieView) getBeforeNode(key Path, hasValue bool) (*node, error) {
 	if n, ok := t.beforeNodesCache[key]; ok {
