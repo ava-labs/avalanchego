@@ -52,7 +52,7 @@ func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool)
 }
 
 func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
-	if _, averager, ok := h.heap.Remove(nodeID); ok {
+	if averager, ok := h.heap.Remove(nodeID); ok {
 		return *averager, ok
 	}
 	return nil, false

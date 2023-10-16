@@ -43,7 +43,7 @@ func (h *txHeap) Add(tx *txs.Tx) {
 }
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
-	if _, got, ok := h.heap.Get(txID); ok {
+	if got, ok := h.heap.Get(txID); ok {
 		return got.tx
 	}
 	return nil
@@ -59,7 +59,7 @@ func (h *txHeap) List() []*txs.Tx {
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
-	if _, removed, ok := h.heap.Remove(txID); ok {
+	if removed, ok := h.heap.Remove(txID); ok {
 		return removed.tx
 	}
 	return nil

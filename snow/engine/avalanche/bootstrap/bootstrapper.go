@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -411,10 +410,10 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 
 // Process the vertices in [vtxs].
 func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
-	// Vertices that we need to process. Store them in a heap for deduplication
-	// and so we always process vertices further down in the DAG first. This helps
-	// to reduce the number of repeated DAG traversals.
-	toProcess := heap.NewMap[ids.ID, avalanche.Vertex](vertex.Less)
+	// Vertices that we need to process prioritized by vertices that are unknown or the furthest down the DAG.
+	// Unknown vertices are prioritized to ensure that once we have made it below a certain height in DAG traversal we
+	// do not need to reset and repeat DAG traversals.
+	toProcess := heap.NewMap[ids.ID, avalanche.Vertex](vertexLess)
 	for _, vtx := range vtxs {
 		vtxID := vtx.ID()
 		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
@@ -624,4 +623,27 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 
 	b.processedCache.Flush()
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+}
+
+// A vertex is less than another vertex if it is unknown. Ties are broken by prioritizing vertices that have a greater
+// height.
+func vertexLess(i, j avalanche.Vertex) bool {
+	if !i.Status().Fetched() {
+		return true
+	}
+	if !j.Status().Fetched() {
+		return false
+	}
+
+	// Treat errors on retrieving the height as if the vertex is not fetched
+	heightI, errI := i.Height()
+	if errI != nil {
+		return true
+	}
+	heightJ, errJ := j.Height()
+	if errJ != nil {
+		return false
+	}
+
+	return heightI > heightJ
 }

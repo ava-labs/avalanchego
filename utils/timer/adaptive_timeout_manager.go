@@ -198,7 +198,7 @@ func (tm *adaptiveTimeoutManager) Remove(id ids.RequestID) {
 // Assumes [tm.lock] is held
 func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
 	// Observe the response time to update average network response time.
-	_, timeout, exists := tm.timeoutHeap.Get(id)
+	timeout, exists := tm.timeoutHeap.Get(id)
 	if !exists {
 		return
 	}

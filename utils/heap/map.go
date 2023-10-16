@@ -75,12 +75,12 @@ func (m *Map[K, V]) Len() int {
 	return m.queue.Len()
 }
 
-func (m *Map[K, V]) Remove(k K) (K, V, bool) {
+func (m *Map[K, V]) Remove(k K) (V, bool) {
 	if i, ok := m.queue.index[k]; ok {
 		removed := heap.Remove(m.queue, i).(entry[K, V])
-		return removed.k, removed.v, true
+		return removed.v, true
 	}
-	return utils.Zero[K](), utils.Zero[V](), false
+	return utils.Zero[V](), false
 }
 
 func (m *Map[K, V]) Contains(k K) bool {
@@ -88,12 +88,12 @@ func (m *Map[K, V]) Contains(k K) bool {
 	return ok
 }
 
-func (m *Map[K, V]) Get(k K) (K, V, bool) {
+func (m *Map[K, V]) Get(k K) (V, bool) {
 	if i, ok := m.queue.index[k]; ok {
 		got := m.queue.entries[i]
-		return got.k, got.v, true
+		return got.v, true
 	}
-	return utils.Zero[K](), utils.Zero[V](), false
+	return utils.Zero[V](), false
 }
 
 func (m *Map[K, V]) Fix(k K) {
