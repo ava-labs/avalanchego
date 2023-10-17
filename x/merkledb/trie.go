@@ -38,7 +38,9 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Path) ([]byte, error)
 
-	getRootKey() Path
+	// If this trie is non-empty, returns the root node.
+	// Otherwise returns Nothing.
+	getRoot() maybe.Maybe[*node]
 
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)

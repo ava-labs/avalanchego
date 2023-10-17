@@ -196,7 +196,7 @@ type merkleDB struct {
 	infoTracer  trace.Tracer
 
 	// The root of this trie.
-	root *node
+	root maybe.Maybe[*node]
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -263,10 +263,9 @@ func newDatabase(
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootPath: trieDB.root.key,
-		rootID:   root,
-		values:   map[Path]*change[maybe.Maybe[[]byte]]{},
-		nodes:    map[Path]*change[*node]{},
+		rootID: root,
+		values: map[Path]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Path]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -293,7 +292,7 @@ func newDatabase(
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	rootPath := NewPath(emptyKey, db.valueNodeDB.branchFactor)
-	db.root = newNode(nil, rootPath)
+	db.root = maybe.Some(newNode(nil, rootPath)) // todo what to do here?
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -581,7 +580,10 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return db.root.id
+	if db.root.IsNothing() {
+		return ids.Empty // TODO document this
+	}
+	return db.root.Value().id
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -927,15 +929,13 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	rootChange, ok := changes.nodes[changes.rootPath]
-	if !ok {
-		return errNoNewRoot
-	}
-
+	var root *node
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
-
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
+		if nodeChange.after != nil && nodeChange.after.id == changes.rootID {
+			root = nodeChange.after
+		}
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
 		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
 
@@ -971,10 +971,21 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	db.root = rootChange.after
-	rootKeyAndNodeBytes := codec.encodeKeyAndNode(db.root.key, &db.root.dbNode, db.valueNodeDB.branchFactor)
-	if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {
-		return err
+	if changes.rootID == ids.Empty {
+		db.root = maybe.Nothing[*node]()
+		if err := db.baseDB.Delete(rootDBKey); err != nil {
+			return err
+		}
+	} else {
+		db.root = maybe.Some(root)
+		rootKeyAndNodeBytes := codec.encodeKeyAndNode(
+			root.key,
+			&root.dbNode,
+			db.valueNodeDB.branchFactor,
+		)
+		if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {
+			return err
+		}
 	}
 	db.history.record(changes)
 	return nil
@@ -1157,39 +1168,28 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
-	if err == nil {
-		// Root is on disk.
-		var rootDBNode dbNode
-		rootKey, err := codec.decodeKeyAndNode(rootBytes, &rootDBNode, db.valueNodeDB.branchFactor)
-		if err != nil {
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
 			return ids.ID{}, err
 		}
-		db.root = &node{
-			dbNode: rootDBNode,
-			key:    rootKey,
-		}
-		db.root.setValueDigest()
-		db.root.calculateID(db.metrics)
-		return db.root.id, nil
+		// Root isn't on disk.
+		return ids.Empty, nil // TODO document empty ID meaning empty trie
 	}
-	if !errors.Is(err, database.ErrNotFound) {
+
+	// Root is on disk.
+	var rootDBNode dbNode
+	rootKey, err := codec.decodeKeyAndNode(rootBytes, &rootDBNode, db.valueNodeDB.branchFactor)
+	if err != nil {
 		return ids.ID{}, err
 	}
-
-	// Root not on disk; make a new one.
-	// TODO should we have a "fake" root?
-	rootPath := NewPath(emptyKey, db.valueNodeDB.branchFactor)
-	db.root = newNode(nil, rootPath)
-
-	// update its ID
-	db.root.calculateID(db.metrics)
-
-	rootBytes = codec.encodeKeyAndNode(db.root.key, &db.root.dbNode, db.valueNodeDB.branchFactor)
-	if err := db.baseDB.Put(rootDBKey, rootBytes); err != nil {
-		return ids.Empty, err
+	root := &node{
+		dbNode: rootDBNode,
+		key:    rootKey,
 	}
-
-	return db.root.id, nil
+	root.setValueDigest()
+	root.calculateID(db.metrics)
+	db.root = maybe.Some(root)
+	return root.id, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
@@ -1265,16 +1265,16 @@ func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
-	case key == db.root.key:
-		return db.root, nil
+	case db.root.HasValue() && key == db.root.Value().key:
+		return db.root.Value(), nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)
 }
 
-func (db *merkleDB) getRootKey() Path {
-	return db.root.key
+func (db *merkleDB) getRoot() maybe.Maybe[*node] {
+	return db.root
 }
 
 // Returns [key] prefixed by [prefix].

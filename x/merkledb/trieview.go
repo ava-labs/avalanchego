@@ -97,7 +97,7 @@ type trieView struct {
 	db *merkleDB
 
 	// The root of the trie represented by this view.
-	root *node
+	root maybe.Maybe[*node]
 }
 
 // NewView returns a new view on top of this Trie where the passed changes
@@ -145,24 +145,31 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(parentTrie.getRootKey(), false /* hasValue */)
-	if err != nil {
-		if err == database.ErrNotFound {
-			return nil, ErrNoValidRoot
-		}
-		return nil, err
+	// root, err := parentTrie.getEditableNode(parentTrie.getRootKey(), false /* hasValue */)
+	// if err != nil {
+	// 	if err == database.ErrNotFound {
+	// 		return nil, ErrNoValidRoot
+	// 	}
+	// 	return nil, err
+	// }
+	root := parentTrie.getRoot()
+	if root.HasValue() {
+		root = maybe.Some(root.Value().clone()) // TODO better way of doing this?
+	} else {
+		root = maybe.Nothing[*node]() // TODO is this right?
 	}
 
-	parentRoot, err := parentTrie.GetMerkleRoot(context.Background())
-	if err != nil {
-		return nil, err
+	var rootID ids.ID
+	if root.HasValue() {
+		rootValue := root.Value()
+		rootID = rootValue.id
 	}
 
 	newView := &trieView{
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps)+len(changes.MapOps), parentRoot, root.key),
+		changes:    newChangeSummary(len(changes.BatchOps)+len(changes.MapOps), rootID /*TODO fix*/),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -202,13 +209,16 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[changes.rootPath]
-	if !ok {
-		return nil, ErrNoValidRoot
+	root := maybe.Nothing[*node]()
+	for _, node := range changes.nodes {
+		if node.after.id == changes.rootID {
+			root = maybe.Some(node.after.clone()) // todo is this right?
+			break
+		}
 	}
 
 	newView := &trieView{
-		root:       passedRootChange.after,
+		root:       root,
 		db:         db,
 		parentTrie: db,
 		changes:    changes,
@@ -220,8 +230,8 @@ func newHistoricalTrieView(
 	return newView, nil
 }
 
-func (t *trieView) getRootKey() Path {
-	return t.root.key
+func (t *trieView) getRoot() maybe.Maybe[*node] {
+	return t.root
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
@@ -254,10 +264,15 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
+		if t.root.IsNothing() {
+			return // TODO is this right?
+		}
+
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.root)
+		root := t.root.Value()
+		t.calculateNodeIDsHelper(root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.root.id
+		t.changes.rootID = root.id
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -563,7 +578,10 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.root.id, nil
+	if t.root.IsNothing() {
+		return ids.Empty, nil // TODO document/handle
+	}
+	return t.root.Value().id, nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -663,12 +681,12 @@ func (t *trieView) remove(key Path) error {
 		return err
 	}
 
-	if nodeToDelete.key == t.root.key {
+	if nodeToDelete.key == t.root.Value().key { // TODO is this right?
 		// We're deleting the root.
 		switch len(nodeToDelete.children) {
 		case 0:
 			// The trie is empty now.
-			t.root = nil // TODO how to handle empty trie?
+			t.root = maybe.Nothing[*node]()
 			return t.recordNodeDeleted(nodeToDelete)
 		case 1:
 			// The root has one child, so make that child the new root.
@@ -684,7 +702,7 @@ func (t *trieView) remove(key Path) error {
 			if err != nil {
 				return err
 			}
-			t.root = newRoot
+			t.root = maybe.Some(newRoot)
 			return nil
 		default:
 			// The root has multiple children so we can't delete it.
@@ -798,18 +816,22 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
-	if !key.HasPrefix(t.root.key) {
+	if t.root.IsNothing() {
 		return nil, nil
 	}
-	if key == t.root.key {
-		return []*node{t.root}, nil
+	root := t.root.Value()
+	if !key.HasPrefix(root.key) {
+		return nil, nil
+	}
+	if key == root.key {
+		return []*node{root}, nil
 	}
 
 	var (
 		// all node paths start at the root
-		currentNode      = t.root
-		matchedPathIndex = t.root.key.tokensLength
-		nodes            = []*node{t.root}
+		currentNode      = root
+		matchedPathIndex = root.key.tokensLength
+		nodes            = []*node{root}
 	)
 
 	// while the entire path hasn't been matched
@@ -881,6 +903,14 @@ func (t *trieView) insert(
 		return nil, ErrNodesAlreadyCalculated
 	}
 
+	if t.root.IsNothing() {
+		// the trie is empty, so create a new root node.
+		root := newNode(nil, key)
+		root.setValue(value)
+		t.root = maybe.Some(root)
+		return root, t.recordNewNode(root)
+	}
+
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
@@ -888,27 +918,28 @@ func (t *trieView) insert(
 	}
 
 	if len(pathToNode) == 0 {
+		oldRoot := t.root.Value()
 		// [t.root.key] isn't a prefix of [key].
-		commonPrefixLength := getLengthOfCommonPrefix(t.root.key, key, 0 /*offset*/)
-		commonPrefix := t.root.key.Take(commonPrefixLength)
-		oldRoot := t.root
-		t.root = newNode(nil, commonPrefix)
-		t.root.addChild(oldRoot)
+		commonPrefixLength := getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/)
+		commonPrefix := oldRoot.key.Take(commonPrefixLength)
+		newRoot := newNode(nil, commonPrefix)
+		newRoot.addChild(oldRoot)
+		if err := t.recordNewNode(newRoot); err != nil {
+			return nil, err
+		}
+		t.root = maybe.Some(newRoot)
 
 		if commonPrefix == key {
 			// [key] is a prefix of [t.root.key] so it should be the new root.
-			t.root.setValue(value)
-			return t.root, t.recordNewNode(t.root)
+			newRoot.setValue(value)
+			return newRoot, t.recordNewNode(newRoot)
 		}
 
 		// Neither [key] nor [t.root.key] is a prefix of the other.
 		// Make a new root whose children are the old root and the new node.
-		t.root.addChild(oldRoot)
-		newValueNode := newNode(t.root, key)
+		newRoot.addChild(oldRoot)
+		newValueNode := newNode(newRoot, key)
 		newValueNode.setValue(value)
-		if err := t.recordNewNode(t.root); err != nil {
-			return nil, err
-		}
 		return newValueNode, t.recordNewNode(newValueNode)
 	}
 

@@ -36,7 +36,7 @@ func Test_History_Simple(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -336,7 +336,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -378,7 +378,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -410,7 +410,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -438,7 +438,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -466,7 +466,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.root.id
+	origRootID := db.root.Value().id
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
@@ -690,7 +690,7 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			name:   "most recent change",
 			rootID: changes[maxHistoryLen-1].rootID,
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				expected := newChangeSummary(defaultPreallocationSize, changes[maxHistoryLen-1].rootID, changes[maxHistoryLen-1].rootPath)
+				expected := newChangeSummary(defaultPreallocationSize, changes[maxHistoryLen-1].rootID)
 				require.Equal(expected, got)
 			},
 		},
