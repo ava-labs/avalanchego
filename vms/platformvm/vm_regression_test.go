@@ -1014,11 +1014,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		nodeID0: ts.Weight,
-		nodeID1: ts.Weight,
-		nodeID2: ts.Weight,
-		nodeID3: ts.Weight,
-		nodeID4: ts.Weight,
+		nodeID0: ts.GenesisValidatorWeight,
+		nodeID1: ts.GenesisValidatorWeight,
+		nodeID2: ts.GenesisValidatorWeight,
+		nodeID3: ts.GenesisValidatorWeight,
+		nodeID4: ts.GenesisValidatorWeight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1112,11 +1112,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		nodeID0: ts.Weight,
-		nodeID1: ts.Weight,
-		nodeID2: ts.Weight,
-		nodeID3: ts.Weight,
-		nodeID4: ts.Weight,
+		nodeID0: ts.GenesisValidatorWeight,
+		nodeID1: ts.GenesisValidatorWeight,
+		nodeID2: ts.GenesisValidatorWeight,
+		nodeID3: ts.GenesisValidatorWeight,
+		nodeID4: ts.GenesisValidatorWeight,
 		nodeID5: vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)

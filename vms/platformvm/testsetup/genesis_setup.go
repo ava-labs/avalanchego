@@ -46,9 +46,8 @@ var (
 	MinValidatorStake = 5 * units.MilliAvax
 	MaxValidatorStake = 500 * units.MilliAvax
 
-	// amount all genesis validators have in defaultVM
-	Balance = 100 * MinValidatorStake
-	Weight  = MinValidatorStake
+	GenesisUTXOBalance     = 100 * MinValidatorStake // amount in each genesis utxos
+	GenesisValidatorWeight = MinValidatorStake       // weight of each genesis validator
 )
 
 // [BuildGenesis] is a good default to build genesis for platformVM unit tests
@@ -64,7 +63,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 				},
 				Asset: avax.Asset{ID: AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: Balance,
+					Amt: GenesisUTXOBalance,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -84,7 +83,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 		utxo := &avax.TransferableOutput{
 			Asset: avax.Asset{ID: AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: Weight,
+				Amt: GenesisValidatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,

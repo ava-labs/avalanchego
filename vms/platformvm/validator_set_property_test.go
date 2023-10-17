@@ -760,8 +760,8 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{ts.Keys[len(ts.Keys)-1]}, // pays tx fee
-		ts.Keys[0].PublicKey().Address(),                 // change addr
+		[]*secp256k1.PrivateKey{ts.Keys[4]}, // pays tx fee
+		ts.Keys[4].PublicKey().Address(),    // change addr
 	)
 	if err != nil {
 		return nil, ids.Empty, err
@@ -796,7 +796,7 @@ func buildCustomGenesis() ([]byte, error) {
 			return nil, err
 		}
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(ts.Balance),
+			Amount:  json.Uint64(ts.GenesisUTXOBalance),
 			Address: addr,
 		}
 	}
@@ -824,7 +824,7 @@ func buildCustomGenesis() ([]byte, error) {
 			Addresses: []string{addr},
 		},
 		Staked: []api.UTXO{{
-			Amount:  json.Uint64(ts.Weight),
+			Amount:  json.Uint64(ts.GenesisValidatorWeight),
 			Address: addr,
 		}},
 		DelegationFee: reward.PercentDenominator,

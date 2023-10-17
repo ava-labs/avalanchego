@@ -297,7 +297,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(ts.ValidateStartTime.Unix())+1,
 			uint64(ts.ValidateEndTime.Unix())+1,
 			ids.NodeID(nodeID),
@@ -329,7 +329,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// primary network validation period
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(ts.ValidateStartTime.Unix())+1,
 			uint64(ts.ValidateEndTime.Unix()),
 			ids.NodeID(nodeID),
@@ -378,7 +378,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(dsStartTime.Unix()), // start validating subnet before primary network
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
@@ -423,7 +423,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but starts validating subnet before primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(dsStartTime.Unix())-1, // start validating subnet before primary network
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
@@ -453,7 +453,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but stops validating subnet after primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(dsStartTime.Unix()),
 			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
 			pendingDSValidatorID,
@@ -483,7 +483,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network and
 		// period validating subnet is subset of time validating primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,
+			ts.GenesisValidatorWeight,
 			uint64(dsStartTime.Unix()), // same start time as for primary network
 			uint64(dsEndTime.Unix()),   // same end time as for primary network
 			pendingDSValidatorID,
@@ -515,11 +515,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,                   // weight
-			uint64(newTimestamp.Unix()), // start time
+			ts.GenesisValidatorWeight,                              // weight
+			uint64(newTimestamp.Unix()),                            // start time
 			uint64(newTimestamp.Add(ts.MinStakingDuration).Unix()), // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.NodeID(nodeID),                                     // node ID
+			testSubnet1.ID(),                                       // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -547,7 +547,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
 	subnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		ts.Weight,                           // weight
+		ts.GenesisValidatorWeight,           // weight
 		uint64(ts.ValidateStartTime.Unix()), // start time
 		uint64(ts.ValidateEndTime.Unix()),   // end time
 		ids.NodeID(nodeID),                  // node ID
@@ -572,7 +572,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,                             // weight
+			ts.GenesisValidatorWeight,             // weight
 			uint64(ts.ValidateStartTime.Unix())+1, // start time
 			uint64(ts.ValidateEndTime.Unix()),     // end time
 			ids.NodeID(nodeID),                    // node ID
@@ -605,11 +605,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Too few signatures
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,                       // weight
-			uint64(ts.GenesisTime.Unix())+1, // start time
+			ts.GenesisValidatorWeight,                                  // weight
+			uint64(ts.GenesisTime.Unix())+1,                            // start time
 			uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.NodeID(nodeID),                                         // node ID
+			testSubnet1.ID(),                                           // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
@@ -641,11 +641,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,                       // weight
-			uint64(ts.GenesisTime.Unix())+1, // start time
+			ts.GenesisValidatorWeight,                                  // weight
+			uint64(ts.GenesisTime.Unix())+1,                            // start time
 			uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.NodeID(nodeID),                                         // node ID
+			testSubnet1.ID(),                                           // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], ts.Keys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -676,11 +676,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			ts.Weight,                       // weight
-			uint64(ts.GenesisTime.Unix())+1, // start time
+			ts.GenesisValidatorWeight,                                  // weight
+			uint64(ts.GenesisTime.Unix())+1,                            // start time
 			uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			ids.NodeID(nodeID),                                         // node ID
+			testSubnet1.ID(),                                           // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)

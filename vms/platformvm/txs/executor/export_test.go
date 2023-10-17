@@ -52,9 +52,8 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			amountToExport := ts.Balance - ts.TxFee
 			tx, err := env.txBuilder.NewExportTx(
-				amountToExport,
+				ts.GenesisUTXOBalance-ts.TxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,

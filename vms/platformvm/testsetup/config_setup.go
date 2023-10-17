@@ -27,6 +27,8 @@ var (
 	CreateSubnetTxFee = 100 * TxFee
 )
 
+// [Config] assumes forkTime is not before GenesisTime. This ensures
+// that forks are lined up in time as they happened (Apricot, Banff, Cortina,...)
 func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime

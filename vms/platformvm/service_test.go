@@ -413,11 +413,11 @@ func TestGetBalance(t *testing.T) {
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
 
-		balance := ts.Balance
+		balance := ts.GenesisUTXOBalance
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = ts.Balance - ts.CreateSubnetTxFee
+			balance = ts.GenesisUTXOBalance - ts.CreateSubnetTxFee
 		}
 		require.Equal(json.Uint64(balance), reply.Balance)
 		require.Equal(json.Uint64(balance), reply.Unlocked)
@@ -451,7 +451,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.Equal(ts.Weight, uint64(response.Staked))
+		require.Equal(ts.GenesisValidatorWeight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -463,7 +463,7 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(ts.Weight, out.Amount())
+		require.Equal(ts.GenesisValidatorWeight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
 		require.Equal(ts.Keys[i].PublicKey().Address(), out.Addrs[0])
@@ -479,7 +479,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.Equal(len(g.Validators)*int(ts.Weight), int(response.Staked))
+	require.Equal(len(g.Validators)*int(ts.GenesisValidatorWeight), int(response.Staked))
 	require.Len(response.Outputs, len(g.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -491,13 +491,13 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(ts.Weight, out.Amount())
+		require.Equal(ts.GenesisValidatorWeight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := ts.Weight
+	oldStake := ts.GenesisValidatorWeight
 
 	service.vm.ctx.Lock.Lock()
 

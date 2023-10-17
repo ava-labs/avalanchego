@@ -87,7 +87,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(ts.Balance),
+			Amount:  json.Uint64(ts.GenesisUTXOBalance),
 			Address: addr,
 		}
 	}
@@ -108,7 +108,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(ts.Weight),
+				Amount:  json.Uint64(ts.GenesisValidatorWeight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
@@ -155,7 +155,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 		require.NoError(err)
 
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(ts.Balance),
+			Amount:  json.Uint64(ts.GenesisUTXOBalance),
 			Address: addr,
 		}
 	}
@@ -177,7 +177,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(ts.Weight),
+				Amount:  json.Uint64(ts.GenesisValidatorWeight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
@@ -526,7 +526,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that test.Keys[0]
 	// validates primary network ([test.ValidateStartTime, test.ValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.Weight,
+		ts.GenesisValidatorWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
@@ -572,7 +572,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that test.Keys[0]
 	// validates primary network ([test.ValidateStartTime, test.ValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.Weight,
+		ts.GenesisValidatorWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
@@ -863,7 +863,7 @@ func TestCreateSubnet(t *testing.T) {
 	endTime := startTime.Add(ts.MinStakingDuration)
 	// [startTime, endTime] is subset of time test.Keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.Weight,
+		ts.GenesisValidatorWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
@@ -1654,7 +1654,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			require.NoError(err)
-			require.Equal(ts.Weight, amount)
+			require.Equal(ts.GenesisValidatorWeight, amount)
 		})
 	}
 }
