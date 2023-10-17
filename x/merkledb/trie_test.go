@@ -1201,7 +1201,7 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 // Assumes this node has exactly one child.
 func getSingleChildPath(n *node) Path {
 	for index, entry := range n.children {
-		return n.key.Append(index).Extend(entry.compressedPath)
+		return n.key.AppendExtend(index, entry.compressedPath)
 	}
 	return Path{}
 }
