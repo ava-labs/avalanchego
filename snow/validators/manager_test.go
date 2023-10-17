@@ -20,9 +20,10 @@ import (
 func TestAddZeroWeight(t *testing.T) {
 	require := require.New(t)
 
-	m := NewManager()
+	m := NewManager().(*manager)
 	err := m.AddStaker(ids.GenerateTestID(), ids.GenerateTestNodeID(), nil, ids.Empty, 0)
-	require.ErrorIs(err, errZeroWeight)
+	require.ErrorIs(err, ErrZeroWeight)
+	require.Empty(m.subnetToVdrs)
 }
 
 func TestAddDuplicate(t *testing.T) {
@@ -69,7 +70,7 @@ func TestAddWeightZeroWeight(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
 	err := m.AddWeight(subnetID, nodeID, 0)
-	require.ErrorIs(err, errZeroWeight)
+	require.ErrorIs(err, ErrZeroWeight)
 }
 
 func TestAddWeightOverflow(t *testing.T) {
@@ -141,7 +142,7 @@ func TestRemoveWeightZeroWeight(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
 	err := m.RemoveWeight(subnetID, nodeID, 0)
-	require.ErrorIs(err, errZeroWeight)
+	require.ErrorIs(err, ErrZeroWeight)
 }
 
 func TestRemoveWeightMissingValidator(t *testing.T) {

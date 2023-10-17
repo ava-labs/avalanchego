@@ -17,14 +17,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func TestSetAddZeroWeight(t *testing.T) {
-	require := require.New(t)
-
-	s := newSet()
-	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 0)
-	require.ErrorIs(err, errZeroWeight)
-}
-
 func TestSetAddDuplicate(t *testing.T) {
 	require := require.New(t)
 
@@ -47,18 +39,6 @@ func TestSetAddOverflow(t *testing.T) {
 
 	_, err := s.TotalWeight()
 	require.ErrorIs(err, errTotalWeightNotUint64)
-}
-
-func TestSetAddWeightZeroWeight(t *testing.T) {
-	require := require.New(t)
-
-	s := newSet()
-
-	nodeID := ids.GenerateTestNodeID()
-	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
-
-	err := s.AddWeight(nodeID, 0)
-	require.ErrorIs(err, errZeroWeight)
 }
 
 func TestSetAddWeightOverflow(t *testing.T) {
@@ -113,18 +93,6 @@ func TestSetSubsetWeight(t *testing.T) {
 	subsetWeight, err := s.SubsetWeight(subset)
 	require.NoError(err)
 	require.Equal(expectedWeight, subsetWeight)
-}
-
-func TestSetRemoveWeightZeroWeight(t *testing.T) {
-	require := require.New(t)
-
-	s := newSet()
-
-	nodeID := ids.GenerateTestNodeID()
-	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
-
-	err := s.RemoveWeight(nodeID, 0)
-	require.ErrorIs(err, errZeroWeight)
 }
 
 func TestSetRemoveWeightMissingValidator(t *testing.T) {

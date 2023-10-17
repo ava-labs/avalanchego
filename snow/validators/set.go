@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	errZeroWeight           = errors.New("weight must be non-zero")
 	errDuplicateValidator   = errors.New("duplicate validator")
 	errMissingValidator     = errors.New("missing validator")
 	errTotalWeightNotUint64 = errors.New("total weight is not a uint64")
@@ -48,10 +47,6 @@ type vdrSet struct {
 }
 
 func (s *vdrSet) Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
-	if weight == 0 {
-		return errZeroWeight
-	}
-
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -82,10 +77,6 @@ func (s *vdrSet) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight u
 }
 
 func (s *vdrSet) AddWeight(nodeID ids.NodeID, weight uint64) error {
-	if weight == 0 {
-		return errZeroWeight
-	}
-
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -146,10 +137,6 @@ func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) (uint64, error) {
 }
 
 func (s *vdrSet) RemoveWeight(nodeID ids.NodeID, weight uint64) error {
-	if weight == 0 {
-		return errZeroWeight
-	}
-
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

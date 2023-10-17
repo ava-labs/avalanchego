@@ -20,6 +20,7 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
+	ErrZeroWeight        = errors.New("weight must be non-zero")
 	ErrMissingValidators = errors.New("missing validators")
 )
 
@@ -112,6 +113,10 @@ type manager struct {
 }
 
 func (m *manager) AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
+	if weight == 0 {
+		return ErrZeroWeight
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -125,6 +130,10 @@ func (m *manager) AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKe
 }
 
 func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+	if weight == 0 {
+		return ErrZeroWeight
+	}
+
 	// We do not need to grab a write lock here because we never modify the
 	// subnetToVdrs map. However, we must hold the read lock during the entirity
 	// of this function to ensure that errors are returned consistently.
@@ -187,6 +196,10 @@ func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]
 }
 
 func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+	if weight == 0 {
+		return ErrZeroWeight
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
