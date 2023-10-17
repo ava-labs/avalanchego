@@ -44,8 +44,6 @@ import (
 	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
-var banffForkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
-
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
@@ -170,6 +168,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
+	banffForkTime := ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
+
 	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := ts.MaxValidatorStake / 5
@@ -374,9 +374,9 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		nil,
 	))
 
-	// set time to post Banff fork
-	vm.clock.Set(banffForkTime.Add(time.Second))
-	vm.state.SetTimestamp(banffForkTime.Add(time.Second))
+	// set time to post fork
+	vm.clock.Set(forkTime.Add(time.Second))
+	vm.state.SetTimestamp(forkTime.Add(time.Second))
 
 	key0 := ts.Keys[0]
 	key1 := ts.Keys[1]
@@ -1129,7 +1129,14 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := ts.MaxValidatorStake / 5
 
@@ -1140,15 +1147,6 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2StartTime := delegator1EndTime
 	delegator2EndTime := delegator2StartTime.Add(3 * ts.MinStakingDuration)
 	delegator2Stake := ts.MaxValidatorStake - validatorStake
-
-	vm, _, _ := defaultVM(t)
-
-	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-
-		vm.ctx.Lock.Unlock()
-	}()
 
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
@@ -1222,17 +1220,15 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-
 	vm, _, _ := defaultVM(t)
-
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
@@ -1339,17 +1335,15 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-
 	vm, _, _ := defaultVM(t)
-
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
