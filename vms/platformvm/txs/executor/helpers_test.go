@@ -287,11 +287,10 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
 
-	vdrs := validators.NewManager()
 	return config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
