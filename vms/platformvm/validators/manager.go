@@ -48,8 +48,8 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
-	// ApplyCurrentValidators adds all the current
-	// validators and delegators of [subnetID] into [vdrs].
+	// ApplyCurrentValidators adds all the current validators and delegators of
+	// [subnetID] into [vdrs].
 	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
@@ -284,8 +284,9 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return m.cfg.Validators.GetMap(constants.PrimaryNetworkID), currentHeight, err
+	return primaryMap, currentHeight, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
@@ -346,21 +347,23 @@ func (m *manager) getCurrentValidatorSets(
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetManager := m.cfg.Validators
-	if m.cfg.Validators.Count(subnetID) == 0 {
-		// If there are no validators in the subnet, we need to add the current
-		// validators to the subnet validator manager to get map. But we don't want to modify
-		// the existing manager ([m.cfg.Validators]) as it would reapply weights. So we create a new
-		// manager and add the current validators to it.
-		// TODO: remove this once we guarantee all subnets are included in the
-		// validator manager.
+	if subnetManager.Count(subnetID) == 0 {
+		// If this subnet isn't tracked, there will not be any registered
+		// validators. To calculate the current validators we need to first
+		// fetch them from state. We generate a new manager as we don't want to
+		// modify that long-lived reference.
+		//
+		// TODO: remove this once all subnets are included in the validator
+		// manager.
 		subnetManager = validators.NewManager()
 		if err := m.state.ApplyCurrentValidators(subnetID, subnetManager); err != nil {
 			return nil, nil, 0, err
 		}
 	}
-	currentHeight, err := m.getCurrentHeight(ctx)
+
 	subnetMap := subnetManager.GetMap(subnetID)
 	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	currentHeight, err := m.getCurrentHeight(ctx)
 	return subnetMap, primaryMap, currentHeight, err
 }
 
