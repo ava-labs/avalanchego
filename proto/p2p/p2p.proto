@@ -63,7 +63,7 @@ message Message {
 
 // Ping reports a peer's perceived uptime percentage.
 //
-// Upon reception of a Ping, peers should respond with a Pong message.
+// Peers should respond to Ping with a Pong.
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
@@ -71,11 +71,11 @@ message Ping {
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
-// SubnetUptime is a descriptor for a peer's uptime on a subnet.
+// SubnetUptime is a descriptor for a peer's perceived uptime on a subnet.
 message SubnetUptime {
   // Subnet the peer is validating
   bytes subnet_id = 1;
-  // Uptime on the subnet [0, 100]
+  // Uptime percentage on the subnet [0, 100]
   uint32 uptime = 2;
 }
 
@@ -96,8 +96,7 @@ message Pong {
 // Peers must respond to a Version message with a PeerList message to allow the
 // peer to connect to other peers in the network.
 //
-// Peers will close a connection with a peer that sends it an incompatible
-// Version message.
+// Peers should drop connections to peers with incompatible versions.
 message Version {
   // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
@@ -135,14 +134,13 @@ message ClaimedIpPort {
 
 // PeerList contains network-level metadata for a set of validators.
 //
-// A Peer should periodically send PeerList messages to other peers so that
-// they can discover validators in the network. PeerList must be sent in
-// response to an inbound Version message from a remote peer a peer wants to
-// connect to. Once a PeerList is received after a version message, the p2p
-// handshake is complete and the connection is established.
-//
-// Upon receiving a PeerList, a peer should attempt to connect to the peers in
-// the message.
+// PeerList must be sent in response to an inbound Version message from a
+// remote peer a peer wants to connect to. Once a PeerList is received after
+// a version message, the p2p handshake is complete and the connection is
+// established.
+
+// Peers should periodically broadcast PeerList messages to allow peers to
+// discover each other.
 //
 // PeerListAck should be sent in response to a PeerList.
 message PeerList {
@@ -324,8 +322,6 @@ message Get {
 }
 
 // Put is sent in response to Get with the requested block.
-//
-// Upon receiving a Put message the container should be issued to consensus.
 message Put {
   // Chain being responded from
   bytes chain_id = 1;
