@@ -92,7 +92,7 @@ type failureStreak struct {
 
 type benchlist struct {
 	lock sync.RWMutex
-	// This is the benchlist for chain [chainID]
+	// Context of the chain this is the benchlist for
 	ctx     *snow.ConsensusContext
 	metrics metrics
 
