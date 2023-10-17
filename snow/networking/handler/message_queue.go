@@ -216,21 +216,25 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
 	nodeID := msg.NodeID()
 	weight := m.vdrs.GetWeight(m.ctx.SubnetID, nodeID)
-	// The sum of validator weights should never be 0, but handle
-	// that case for completeness here to avoid divide by 0.
-	portionWeight := float64(0)
-	totalVdrsWeight, err := m.vdrs.TotalWeight(m.ctx.SubnetID)
-	if err != nil {
+
+	var portionWeight float64
+	if totalVdrsWeight, err := m.vdrs.TotalWeight(m.ctx.SubnetID); err != nil {
+		// The sum of validator weights should never overflow, but if they do,
+		// we treat portionWeight as 0.
 		m.ctx.Log.Error("failed to get total weight of validators",
 			zap.Stringer("subnetID", m.ctx.SubnetID),
 			zap.Error(err),
 		)
-		return false
-	}
-
-	if totalVdrsWeight != 0 {
+	} else if totalVdrsWeight == 0 {
+		// The sum of validator weights should never be 0, but handle that case
+		// for completeness here to avoid divide by 0.
+		m.ctx.Log.Warn("validator set is empty",
+			zap.Stringer("subnetID", m.ctx.SubnetID),
+		)
+	} else {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
+
 	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
 	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
