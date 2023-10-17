@@ -725,7 +725,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	h := handler.NewMockHandler(ctrl)
 
