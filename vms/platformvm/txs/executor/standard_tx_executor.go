@@ -491,11 +491,10 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
-// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
-// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
-// This transaction will result in [tx.NodeID] being removed as a validator of
-// [tx.SubnetID].
-// Note: [tx.NodeID] may be either a current or pending validator.
+// Verifies a [*txs.TransferSubnetOwnershipTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [verifyTransferSubnetOwnershipTx].
+// This transaction will result in the ownership of [tx.Subnet] being transferred
+// to [tx.Owner].
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
