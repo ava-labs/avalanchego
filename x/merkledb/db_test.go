@@ -96,7 +96,7 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
-	for _, bf := range tokenConfigurations {
+	for _, bf := range validTokenConfigurations {
 		for _, test := range database.Tests {
 			db, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(t, err)
@@ -108,7 +108,7 @@ func Test_MerkleDB_DB_Interface(t *testing.T) {
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bf := range tokenConfigurations {
+		for _, bf := range validTokenConfigurations {
 			for _, bench := range database.Benchmarks {
 				db, err := getBasicDBWithBranchFactor(bf)
 				require.NoError(b, err)
@@ -785,7 +785,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			}
 			require := require.New(t)
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			for _, bf := range tokenConfigurations {
+			for _, bf := range validTokenConfigurations {
 				runRandDBTest(
 					require,
 					r,
@@ -813,7 +813,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		}
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-		for _, bf := range tokenConfigurations {
+		for _, bf := range validTokenConfigurations {
 			runRandDBTest(
 				require,
 				r,
