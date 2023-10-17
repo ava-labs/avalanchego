@@ -665,6 +665,10 @@ func (t *trieView) remove(key Path) error {
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
+		if nodeToDelete.key == t.root.key {
+			t.root = nil // TODO how to handle empty trie?
+			return nil
+		}
 		return t.deleteEmptyNodes(nodePath)
 	}
 
