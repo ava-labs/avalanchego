@@ -213,7 +213,7 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	}
 	// If this was the last validator in the subnet and no callback listeners
 	// are registered, remove the subnet
-	if set.Len() == 0 && !set.hasCallbackRegistered() {
+	if set.Len() == 0 && !set.HasCallbackRegistered() {
 		delete(m.subnetToVdrs, subnetID)
 	}
 
