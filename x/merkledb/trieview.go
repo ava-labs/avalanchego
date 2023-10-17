@@ -351,7 +351,9 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, err
 	}
 
-	// TODO handle len(proofPath) == 0
+	if len(proofPath) == 0 {
+		return proof, nil
+	}
 
 	// From root --> node from left --> right.
 	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
@@ -856,7 +858,6 @@ func (t *trieView) insert(
 		return nil, err
 	}
 
-	// TODO handle new root creation
 	if len(pathToNode) == 0 {
 		// [t.root.key] isn't a prefix of [key].
 		commonPrefixLength := getLengthOfCommonPrefix(t.root.key, key, 0 /*offset*/)

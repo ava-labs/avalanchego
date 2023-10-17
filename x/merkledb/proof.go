@@ -127,7 +127,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 type Proof struct {
 	// Nodes in the proof path from root --> target key
 	// (or node that would be where key is if it doesn't exist).
-	// Must always be non-empty (i.e. have the root node).
+	// Must always be non-empty (i.e. have the root node). TODO remove
 	Path []ProofNode
 	// This is a proof that [key] exists/doesn't exist.
 	Key Path
