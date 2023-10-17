@@ -125,8 +125,10 @@ func (s *vdrSet) SubsetWeight(subset set.Set[ids.NodeID]) (uint64, error) {
 }
 
 func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) (uint64, error) {
-	var totalWeight uint64
-	var err error
+	var (
+		totalWeight uint64
+		err         error
+	)
 	for nodeID := range subset {
 		totalWeight, err = math.Add64(totalWeight, s.getWeight(nodeID))
 		if err != nil {
