@@ -1280,18 +1280,17 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	// Set up validators
-	ctx := snow.DefaultConsensusContextTest()
-	vdrs := validators.NewManager()
-	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
-
-	// Create bootstrapper, engine and handler
 	requester := snow.DefaultConsensusContextTest()
 	requester.ChainID = ids.GenerateTestID()
 	requester.Registerer = prometheus.NewRegistry()
 	requester.Metrics = metrics.NewOptionalGatherer()
 	requester.Executing.Set(false)
 
+	// Set up validators
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(requester.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+
+	// Create bootstrapper, engine and handler
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -1313,7 +1312,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	responder := ctx
+	responder := snow.DefaultConsensusContextTest()
 	responder.ChainID = ids.GenerateTestID()
 	responder.Registerer = prometheus.NewRegistry()
 	responder.Metrics = metrics.NewOptionalGatherer()
