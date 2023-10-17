@@ -699,7 +699,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		nodeID0,
 		ids.ShortID(nodeID0),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -1039,7 +1039,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID5,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.GenerateTestShortID(),
 	)
 	require.NoError(err)

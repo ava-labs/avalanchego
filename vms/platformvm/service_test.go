@@ -414,7 +414,7 @@ func TestGetBalance(t *testing.T) {
 		require.NoError(service.GetBalance(nil, &request, &reply))
 
 		balance := ts.GenesisUTXOBalance
-		if idx == 0 {
+		if idx == 4 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			balance = ts.GenesisUTXOBalance - ts.CreateSubnetTxFee

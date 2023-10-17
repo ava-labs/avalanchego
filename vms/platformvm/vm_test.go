@@ -258,8 +258,8 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 		2, // threshold; 2 sigs from test.Keys[0], test.Keys[1], test.Keys[2] needed to add validator to this subnet
 		// control test.Keys are test.Keys[0], test.Keys[1], test.Keys[2]
 		[]ids.ShortID{ts.Keys[0].PublicKey().Address(), ts.Keys[1].PublicKey().Address(), ts.Keys[2].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{ts.Keys[0]}, // pays tx fee
-		ts.Keys[0].PublicKey().Address(),    // change addr
+		[]*secp256k1.PrivateKey{ts.Keys[4]}, // pays tx fee
+		ts.Keys[4].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 	require.NoError(vm.Builder.AddUnverifiedTx(testSubnet1))
@@ -306,7 +306,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := ts.Keys[0].PublicKey().Address()
+			id := ts.Keys[4].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
