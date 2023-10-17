@@ -219,8 +219,8 @@ type Node struct {
  */
 
 // Initialize the networking layer.
-// Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(vdrs validators.Manager) error {
+// Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
+func (n *Node) initNetworking() error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
@@ -300,7 +300,7 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
-		err := vdrs.AddStaker(
+		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
@@ -314,7 +314,7 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 		consensusRouter = &insecureValidatorManager{
 			log:    n.Log,
 			Router: consensusRouter,
-			vdrs:   vdrs,
+			vdrs:   n.vdrs,
 			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
@@ -354,7 +354,7 @@ func (n *Node) initNetworking(vdrs validators.Manager) error {
 	}
 
 	// keep gossip tracker synchronized with the validator set
-	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
+	n.vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
 		Log:           n.Log,
 		GossipTracker: gossipTracker,
 	})
@@ -1404,7 +1404,7 @@ func (n *Node) Initialize(
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
 	n.initDiskTargeter(&config.DiskTargeterConfig)
-	if err := n.initNetworking(n.vdrs); err != nil { // Set up networking layer.
+	if err := n.initNetworking(); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
