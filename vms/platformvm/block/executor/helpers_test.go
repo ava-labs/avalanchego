@@ -106,10 +106,15 @@ func (*environment) ResetBlockTimer() {
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	r := require.New(t)
 
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(ts.LatestFork),
-		clk:            ts.Clock(ts.LatestFork),
+		config:         ts.Config(fork, forkTime),
+		clk:            ts.Clock(forkTime),
 	}
 	res.isBootstrapped.Set(true)
 

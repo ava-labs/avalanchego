@@ -706,10 +706,14 @@ func TestTimestampListGenerator(t *testing.T) {
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	require := require.New(t)
 
+	var (
+		fork     = ts.CortinaFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
-	vm.clock.Set(vm.CortinaTime.Add(time.Second))
+	vm.clock.Set(forkTime)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})

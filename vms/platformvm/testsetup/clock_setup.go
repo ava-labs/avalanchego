@@ -9,15 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// useDefault is just an attempt to set clock time the way it is currently
-// in different packages. TODO drop it and find common, meaningfull times
-func Clock(fork ActiveFork) *mockable.Clock {
-	now := GenesisTime
-	if fork == BanffFork || fork == CortinaFork || fork == DFork {
-		// 1 second after Banff fork
-		now = ValidateEndTime.Add(-2 * time.Second)
-	}
+func Clock(forkTime time.Time) *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(now)
+	clk.Set(forkTime)
 	return clk
 }

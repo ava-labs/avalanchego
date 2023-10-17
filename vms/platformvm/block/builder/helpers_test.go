@@ -5,6 +5,7 @@ package builder
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -75,10 +76,15 @@ type environment struct {
 func newEnvironment(t *testing.T) *environment {
 	r := require.New(t)
 
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(ts.LatestFork),
-		clk:            ts.Clock(ts.LatestFork),
+		config:         ts.Config(fork, forkTime),
+		clk:            ts.Clock(forkTime),
 	}
 	res.isBootstrapped.Set(true)
 

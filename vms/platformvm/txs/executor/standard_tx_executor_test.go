@@ -145,7 +145,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			newValidatorID,                  // node ID
 			rewardAddress,                   // Reward Address
 			reward.PercentDenominator,       // Shared
-			[]*secp256k1.PrivateKey{ts.Keys[0]},
+			[]*secp256k1.PrivateKey{ts.Keys[4]},
 			ids.ShortEmpty,
 		)
 		require.NoError(t, err)

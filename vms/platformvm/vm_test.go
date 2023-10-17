@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -33,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -51,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -69,8 +66,6 @@ import (
 )
 
 var (
-	banffForkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
-
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are test.Keys[0], test.Keys[1], test.Keys[2]
 	// Its threshold is 2
@@ -217,17 +212,18 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	require := require.New(t)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
+	)
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 
-	vm.clock.Set(banffForkTime.Add(time.Second))
+	vm.clock.Set(forkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
 	ctx, msm := ts.Context(require, baseDBManager.Current().Database)
 
@@ -315,7 +311,7 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.TxFee, out.Amount())
+			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
 		}
 	}
 
@@ -491,7 +487,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
 
-	startTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(ts.MinStakingDuration)
 
 	// create valid tx
@@ -1046,10 +1042,11 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewApricotAtomicBlock(
+	statelessBlk, err := block.NewBanffStandardBlock(
+		vm.state.GetTimestamp(),
 		preferredID,
 		preferredHeight+1,
-		tx,
+		[]*txs.Tx{tx},
 	)
 	require.NoError(err)
 
@@ -1079,17 +1076,19 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
+
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
 	firstVM := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
@@ -1154,11 +1153,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -1201,15 +1197,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
+
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
+
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 
 	consensusCtx := snow.DefaultConsensusContextTest()
@@ -1512,12 +1511,19 @@ func TestUnverifiedParent(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateStartTime
+	)
+
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
+
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
 	ctx.Lock.Lock()
 	defer func() {
@@ -1662,15 +1668,19 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
 	firstDB := baseDBManager.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 
-	firstUptimePercentage := 20 // 20%
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateStartTime
+		cfg      = ts.Config(fork, forkTime)
+
+		firstUptimePercentage = 20 // 20%
+	)
+	cfg.UptimePercentage = float64(firstUptimePercentage) / 100
+
 	firstVM := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *cfg,
 	}
 
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -1689,8 +1699,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		nil,
 	))
 
-	initialClkTime := ts.ValidateStartTime
-	firstVM.clock.Set(initialClkTime)
+	firstVM.clock.Set(forkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
@@ -1707,18 +1716,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Restart the VM with a larger uptime requirement
 	secondDB := baseDBManager.NewPrefixDBManager([]byte{})
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 
+	// Reset vm config for the second VM
+	cfg = ts.Config(fork, forkTime)
 	secondUptimePercentage := 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       float64(secondUptimePercentage) / 100,
-		Validators:             secondVdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-	}}
+	cfg.UptimePercentage = float64(secondUptimePercentage) / 100
+	secondVM := &VM{Config: *cfg}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	secondCtx.Lock.Lock()
@@ -1807,7 +1810,13 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	cfg := ts.Config(ts.LatestFork)
+
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateStartTime
+	)
+
+	cfg := ts.Config(fork, forkTime)
 	cfg.UptimePercentage = .2
 	vm := &VM{
 		Config: *cfg,
@@ -1835,8 +1844,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	initialClkTime := ts.ValidateStartTime
-	vm.clock.Set(initialClkTime)
+	vm.clock.Set(forkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1897,17 +1905,16 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-
 	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
+	validatorStartTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
@@ -1915,7 +1922,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	id := key.PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		ts.MaxValidatorStake,
+		ts.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.NodeID(id),

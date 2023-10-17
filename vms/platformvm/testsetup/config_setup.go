@@ -5,6 +5,7 @@ package testsetup
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -16,9 +17,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-var TxFee = uint64(100) // a default Tx Fee
+var (
+	TxFee = uint64(100) // a default Tx Fee
 
-func Config(fork ActiveFork) *config.Config {
+	// Many tests add a subnet as soon as they build test env/VM
+	// We single out the fee required to create the subnet to ease up
+	// balance checks. CreateSubnetTxFee will be subtracted from the
+	// initial balance of the key used to create the subnet
+	CreateSubnetTxFee = 100 * TxFee
+)
+
+func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
@@ -29,25 +38,25 @@ func Config(fork ActiveFork) *config.Config {
 
 	switch fork {
 	case ApricotPhase3Fork:
-		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+		apricotPhase3Time = forkTime
 	case ApricotPhase5Fork:
-		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
-		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+		apricotPhase5Time = forkTime
+		apricotPhase3Time = GenesisTime
 	case BanffFork:
-		banffTime = forkTimes[BanffFork]
-		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
-		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+		banffTime = forkTime
+		apricotPhase5Time = GenesisTime
+		apricotPhase3Time = GenesisTime
 	case CortinaFork:
-		cortinaTime = forkTimes[CortinaFork]
-		banffTime = forkTimes[BanffFork]
-		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
-		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+		cortinaTime = forkTime
+		banffTime = GenesisTime
+		apricotPhase5Time = GenesisTime
+		apricotPhase3Time = GenesisTime
 	case DFork:
-		dTime = forkTimes[DFork]
-		cortinaTime = forkTimes[CortinaFork]
-		banffTime = forkTimes[BanffFork]
-		apricotPhase5Time = forkTimes[ApricotPhase5Fork]
-		apricotPhase3Time = forkTimes[ApricotPhase3Fork]
+		dTime = forkTime
+		cortinaTime = GenesisTime
+		banffTime = GenesisTime
+		apricotPhase5Time = GenesisTime
+		apricotPhase3Time = GenesisTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}

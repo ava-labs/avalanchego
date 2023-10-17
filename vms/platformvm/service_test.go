@@ -403,7 +403,7 @@ func TestGetBalance(t *testing.T) {
 
 	// Ensure GetStake is correct for each of the genesis validators
 	g, _ := defaultGenesis(t)
-	for _, utxo := range g.UTXOs {
+	for idx, utxo := range g.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
 				fmt.Sprintf("P-%s", utxo.Address),
@@ -413,8 +413,14 @@ func TestGetBalance(t *testing.T) {
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
 
-		require.Equal(json.Uint64(ts.Balance), reply.Balance)
-		require.Equal(json.Uint64(ts.Balance), reply.Unlocked)
+		balance := ts.Balance
+		if idx == 0 {
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			balance = ts.Balance - ts.CreateSubnetTxFee
+		}
+		require.Equal(json.Uint64(balance), reply.Balance)
+		require.Equal(json.Uint64(balance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
 		require.Equal(json.Uint64(0), reply.LockedNotStakeable)
 	}

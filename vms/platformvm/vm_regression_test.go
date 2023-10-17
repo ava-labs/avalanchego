@@ -44,6 +44,8 @@ import (
 	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
+var banffForkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
+
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
@@ -344,8 +346,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
+	var (
+		fork     = ts.LatestFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	)
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork),
+		Config: *ts.Config(fork, forkTime),
 	}
 
 	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
@@ -693,7 +699,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		nodeID0,
 		ids.ShortID(nodeID0),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -1033,7 +1039,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID5,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ids.GenerateTestShortID(),
 	)
 	require.NoError(err)
