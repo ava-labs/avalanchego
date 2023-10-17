@@ -1669,10 +1669,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		fork     = ts.LatestFork
 		forkTime = ts.ValidateStartTime
 		cfg      = ts.Config(fork, forkTime)
-
-		firstUptimePercentage = 20 // 20%
 	)
-	cfg.UptimePercentage = float64(firstUptimePercentage) / 100
+
+	const firstUptimePercentage = 20 // 20%
+	cfg.UptimePercentage = firstUptimePercentage / 100.
 
 	firstVM := &VM{
 		Config: *cfg,
@@ -1701,7 +1701,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
-	durationForReward := ts.ValidateEndTime.Sub(ts.ValidateStartTime) * time.Duration(firstUptimePercentage) / 100
+	durationForReward := ts.ValidateEndTime.Sub(ts.ValidateStartTime) * firstUptimePercentage / 100
 	firstVM.clock.Set(ts.ValidateStartTime.Add(durationForReward))
 
 	// Shutdown VM to stop all genesis validator uptime.
@@ -1714,8 +1714,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Reset vm config for the second VM
 	cfg = ts.Config(fork, forkTime)
-	secondUptimePercentage := 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	cfg.UptimePercentage = float64(secondUptimePercentage) / 100
+	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
+	cfg.UptimePercentage = secondUptimePercentage / 100.
 	secondVM := &VM{Config: *cfg}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
