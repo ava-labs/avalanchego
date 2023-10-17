@@ -84,7 +84,6 @@ type handler struct {
 	clock mockable.Clock
 
 	ctx *snow.ConsensusContext
-	// The validator set that validates this chain
 	// TODO: consider using peerTracker instead of validators
 	// since peerTracker is already tracking validators
 	validators validators.Manager
