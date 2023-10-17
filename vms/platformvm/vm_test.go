@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -33,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -51,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -217,9 +214,6 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	require := require.New(t)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
@@ -1079,9 +1073,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
@@ -1154,9 +1145,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
@@ -1201,9 +1189,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
@@ -1509,9 +1494,6 @@ func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
@@ -1662,16 +1644,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
 	firstDB := baseDBManager.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 
-	firstUptimePercentage := 20 // 20%
-	firstVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
-	}
+	const firstUptimePercentage = 20 // 20%
+	firstCfg := ts.Config(true /*postBanff*/, true /*postCortina*/)
+	firstCfg.UptimePercentage = firstUptimePercentage / 100.
+	firstVM := &VM{Config: *firstCfg}
 
 	firstCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	firstCtx.Lock.Lock()
@@ -1697,7 +1675,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
-	durationForReward := ts.ValidateEndTime.Sub(ts.ValidateStartTime) * time.Duration(firstUptimePercentage) / 100
+	durationForReward := ts.ValidateEndTime.Sub(ts.ValidateStartTime) * firstUptimePercentage / 100
 	firstVM.clock.Set(ts.ValidateStartTime.Add(durationForReward))
 
 	// Shutdown VM to stop all genesis validator uptime.
@@ -1707,18 +1685,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Restart the VM with a larger uptime requirement
 	secondDB := baseDBManager.NewPrefixDBManager([]byte{})
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 
-	secondUptimePercentage := 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       float64(secondUptimePercentage) / 100,
-		Validators:             secondVdrs,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-	}}
+	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
+	secondCfg := ts.Config(true /*postBanff*/, true /*postCortina*/)
+	secondCfg.UptimePercentage = secondUptimePercentage / 100.
+	secondVM := &VM{Config: *secondCfg}
 
 	secondCtx, _ := ts.Context(require, baseDBManager.Current().Database)
 	secondCtx.Lock.Lock()
@@ -1804,9 +1775,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	cfg := ts.Config(true /*postBanff*/, true /*postCortina*/)
 	cfg.UptimePercentage = .2
 	vm := &VM{
