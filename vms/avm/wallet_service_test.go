@@ -25,6 +25,8 @@ func TestWalletService_SendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
+			env.vm.ctx.Lock.Unlock()
+
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
@@ -64,6 +66,8 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			reply := &api.JSONTxIDChangeAddr{}
 			require.NoError(env.walletService.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
+
+			env.vm.ctx.Lock.Lock()
 
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 
