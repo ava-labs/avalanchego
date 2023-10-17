@@ -1810,10 +1810,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 
-	firstUptimePercentage := 20 // 20%
+	const firstUptimePercentage = 20 // 20%
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		UptimePercentage:       float64(firstUptimePercentage) / 100,
+		UptimePercentage:       firstUptimePercentage / 100.,
 		RewardConfig:           defaultRewardConfig,
 		Validators:             firstVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -1844,7 +1844,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
-	durationForReward := defaultValidateEndTime.Sub(defaultValidateStartTime) * time.Duration(firstUptimePercentage) / 100
+	durationForReward := defaultValidateEndTime.Sub(defaultValidateStartTime) * firstUptimePercentage / 100
 	firstVM.clock.Set(defaultValidateStartTime.Add(durationForReward))
 
 	// Shutdown VM to stop all genesis validator uptime.
@@ -1858,10 +1858,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 
-	secondUptimePercentage := 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
+	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		UptimePercentage:       float64(secondUptimePercentage) / 100,
+		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
