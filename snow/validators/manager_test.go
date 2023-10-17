@@ -4,17 +4,17 @@
 package validators
 
 import (
+	"math"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestAddZeroWeight(t *testing.T) {
@@ -48,14 +48,14 @@ func TestAddOverflow(t *testing.T) {
 	nodeID2 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
 
-	require.NoError(m.AddStaker(subnetID, nodeID2, nil, ids.Empty, stdmath.MaxUint64))
+	require.NoError(m.AddStaker(subnetID, nodeID2, nil, ids.Empty, math.MaxUint64))
 
 	_, err := m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
 
 	set := set.Of(nodeID1, nodeID2)
 	_, err = m.SubsetWeight(subnetID, set)
-	require.ErrorIs(err, math.ErrOverflow)
+	require.ErrorIs(err, safemath.ErrOverflow)
 }
 
 func TestAddWeightZeroWeight(t *testing.T) {
@@ -81,7 +81,7 @@ func TestAddWeightOverflow(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
-	require.NoError(m.AddWeight(subnetID, nodeID, stdmath.MaxUint64-1))
+	require.NoError(m.AddWeight(subnetID, nodeID, math.MaxUint64-1))
 
 	_, err := m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
@@ -165,7 +165,7 @@ func TestRemoveWeightUnderflow(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
 	err := m.RemoveWeight(subnetID, nodeID, 2)
-	require.ErrorIs(err, math.ErrUnderflow)
+	require.ErrorIs(err, safemath.ErrUnderflow)
 
 	totalWeight, err := m.TotalWeight(subnetID)
 	require.NoError(err)
@@ -378,7 +378,7 @@ func TestSample(t *testing.T) {
 	require.ErrorIs(err, sampler.ErrOutOfRange)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
+	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, math.MaxInt64-1))
 
 	sampled, err = m.Sample(subnetID, 1)
 	require.NoError(err)
@@ -407,7 +407,7 @@ func TestString(t *testing.T) {
 
 	m := NewManager()
 	require.NoError(m.AddStaker(subnetID0, nodeID0, nil, ids.Empty, 1))
-	require.NoError(m.AddStaker(subnetID0, nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
+	require.NoError(m.AddStaker(subnetID0, nodeID1, nil, ids.Empty, math.MaxInt64-1))
 	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 1))
 
 	expected := "Validator Manager: (Size = 2)\n" +
