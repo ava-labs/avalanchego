@@ -862,7 +862,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
 			}
-			childPath := keyPath.Append(index).Extend(compressedPath)
+			childPath := keyPath.AppendExtend(index, compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
