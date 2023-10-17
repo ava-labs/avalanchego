@@ -629,8 +629,8 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
-// A vertex is less than another vertex if it is unknown. Ties are broken by prioritizing vertices that have a greater
-// height.
+// A vertex is less than another vertex if it is unknown. Ties are broken by
+// prioritizing vertices that have a greater height.
 func vertexLess(i, j avalanche.Vertex) bool {
 	if !i.Status().Fetched() {
 		return true
