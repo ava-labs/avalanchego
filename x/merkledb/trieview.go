@@ -663,18 +663,40 @@ func (t *trieView) remove(key Path) error {
 		return err
 	}
 
-	// if the removed node has no children, the node can be removed from the trie
-	if len(nodeToDelete.children) == 0 {
-		if nodeToDelete.key == t.root.key {
+	if nodeToDelete.key == t.root.key {
+		// We're deleting the root.
+		switch len(nodeToDelete.children) {
+		case 0:
+			// The trie is empty now.
 			t.root = nil // TODO how to handle empty trie?
+			return t.recordNodeDeleted(nodeToDelete)
+		case 1:
+			// The root has one child, so make that child the new root.
+			var (
+				childIndex byte
+				child      child
+			)
+			for childIndex, child = range nodeToDelete.children {
+				break
+			}
+			childKey := nodeToDelete.key.AppendExtend(childIndex, child.compressedPath)
+			newRoot, err := t.getNodeWithID(child.id, childKey, child.hasValue)
+			if err != nil {
+				return err
+			}
+			t.root = newRoot
+			return nil
+		default:
+			// The root has multiple children so we can't delete it.
 			return nil
 		}
+	}
+
+	// if the removed node has no children, the node can be removed from the trie
+	if len(nodeToDelete.children) == 0 {
 		return t.deleteEmptyNodes(nodePath)
 	}
 
-	if len(nodePath) == 1 {
-		return nil
-	}
 	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
