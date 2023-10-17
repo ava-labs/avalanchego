@@ -269,7 +269,7 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	)
 
 	for childIndex, child := range n.children {
-		childPath := n.key.Append(childIndex).Extend(child.compressedPath)
+		childPath := n.key.AppendExtend(childIndex, child.compressedPath)
 		childNodeChange, ok := t.changes.nodes[childPath]
 		if !ok {
 			// This child wasn't changed.
@@ -367,7 +367,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	childNode, err := t.getNodeWithID(
 		child.id,
-		closestNode.key.Append(nextIndex).Extend(child.compressedPath),
+		closestNode.key.AppendExtend(nextIndex, child.compressedPath),
 		child.hasValue,
 	)
 	if err != nil {
@@ -694,7 +694,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		// "Cycle" over the key/values to find the only child.
 		// Note this iteration once because len(node.children) == 1.
 		for index, entry := range node.children {
-			childPath = node.key.Append(index).Extend(entry.compressedPath)
+			childPath = node.key.AppendExtend(index, entry.compressedPath)
 			childEntry = entry
 		}
 
@@ -768,7 +768,7 @@ func (t *trieView) getPathTo(key Path) ([]*node, error) {
 		// the current token for the child entry has now been handled, so increment the matchedPathIndex
 		matchedPathIndex += 1
 
-		if !hasChild || !key.Skip(matchedPathIndex).HasPrefix(nextChildEntry.compressedPath) {
+		if !hasChild || !key.iteratedHasPrefix(matchedPathIndex, nextChildEntry.compressedPath) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nodes, nil
 		}
