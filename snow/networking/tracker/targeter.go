@@ -67,9 +67,12 @@ func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	baseAlloc = math.Min(baseAlloc, t.maxNonVdrNodeUsage)
 
 	// This node gets a stake-weighted portion of the validator allocation.
-	subnetID := constants.PrimaryNetworkID
-	weight := t.vdrs.GetWeight(subnetID, nodeID)
-	totalWeight, err := t.vdrs.TotalWeight(subnetID)
+	weight := t.vdrs.GetWeight(constants.PrimaryNetworkID, nodeID)
+	if weight == 0 {
+		return baseAlloc
+	}
+
+	totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		t.log.Error("couldn't get total weight of primary network",
 			zap.Error(err),

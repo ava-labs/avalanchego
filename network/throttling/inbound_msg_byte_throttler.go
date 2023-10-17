@@ -132,10 +132,9 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	subnetID := constants.PrimaryNetworkID
-	weight := t.vdrs.GetWeight(subnetID, nodeID)
+	weight := t.vdrs.GetWeight(constants.PrimaryNetworkID, nodeID)
 	if weight != 0 {
-		totalWeight, err := t.vdrs.TotalWeight(subnetID)
+		totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
 		if err != nil {
 			t.log.Error("couldn't get total weight of primary network",
 				zap.Error(err),
