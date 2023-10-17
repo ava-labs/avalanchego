@@ -54,14 +54,14 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	// The ID of the trie after these changes.
-	rootID ids.ID
-	nodes  map[Path]*change[*node]
-	values map[Path]*change[maybe.Maybe[[]byte]]
+	rootID     ids.ID
+	rootChange *change[*node]
+	nodes      map[Path]*change[*node]
+	values     map[Path]*change[maybe.Maybe[[]byte]]
 }
 
-func newChangeSummary(estimatedSize int, rootID ids.ID) *changeSummary {
+func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		rootID: rootID,
 		nodes:  make(map[Path]*change[*node], estimatedSize),
 		values: make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
@@ -104,7 +104,7 @@ func (th *trieHistory) getValueChanges(
 	}
 
 	if startRoot == endRoot {
-		return newChangeSummary(maxLength, endRoot), nil
+		return newChangeSummary(maxLength), nil
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -167,7 +167,7 @@ func (th *trieHistory) getValueChanges(
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 		// add the changes to keys in [start, end] to [combinedChanges].
 		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-		combinedChanges = newChangeSummary(maxLength, endRoot)
+		combinedChanges = newChangeSummary(maxLength)
 
 		// The difference between the index of [startRootChanges] and [endRootChanges] in [th.history].
 		startToEndOffset = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
@@ -241,7 +241,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	var (
 		startPath                    = maybe.Bind(start, th.newPath)
 		endPath                      = maybe.Bind(end, th.newPath)
-		combinedChanges              = newChangeSummary(defaultPreallocationSize, rootID)
+		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
 		offset                       = int(mostRecentChangeInsertNumber - lastRootChange.insertNumber)
@@ -251,8 +251,21 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// Go backward from the most recent change in the history up to but
 	// not including the last change resulting in [rootID].
 	// Record each change in [combinedChanges].
+	var endRootKey Path
 	for i := mostRecentChangeIndex; i > lastRootChangeIndex; i-- {
 		changes, _ := th.history.Index(i)
+
+		if i == mostRecentChangeIndex {
+			combinedChanges.rootChange = &change[*node]{
+				after: changes.rootChange.after,
+			}
+			endRootKey = changes.rootChange.after.key
+		}
+		if i == lastRootChangeIndex+1 {
+			if rootBefore, ok := changes.nodes[endRootKey]; ok {
+				combinedChanges.rootChange.before = rootBefore.before
+			}
+		}
 
 		for key, changedNode := range changes.nodes {
 			combinedChanges.nodes[key] = &change[*node]{

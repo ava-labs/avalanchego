@@ -269,22 +269,20 @@ func Test_Proof(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.Len(proof.Path, 3)
+	require.Len(proof.Path, 2)
 
-	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.Path[2].KeyPath)
-	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
+	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.Path[1].KeyPath)
+	require.Equal(maybe.Some([]byte("value1")), proof.Path[1].ValueOrHash)
 
-	require.Equal(NewPath([]byte{}, BranchFactor16), proof.Path[0].KeyPath)
-	require.True(proof.Path[0].ValueOrHash.IsNothing())
+	require.Equal(NewPath([]byte("key1"), BranchFactor16).Take(7), proof.Path[0].KeyPath)
+	require.False(proof.Path[0].ValueOrHash.HasValue())
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.NoError(proof.Verify(context.Background(), expectedRootID))
 
-	proof.Path[0].ValueOrHash = maybe.Some([]byte("value2"))
-
-	err = proof.Verify(context.Background(), expectedRootID)
-	require.ErrorIs(err, ErrInvalidProof)
+	proof.Path[0].KeyPath = NewPath([]byte("key1"), BranchFactor16)
+	require.Error(proof.Verify(context.Background(), expectedRootID))
 }
 
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
@@ -525,9 +523,10 @@ func Test_RangeProof(t *testing.T) {
 	require.Equal([]byte{2}, proof.KeyValues[1].Value)
 	require.Equal([]byte{3}, proof.KeyValues[2].Value)
 
-	require.Nil(proof.EndProof[0].KeyPath.Bytes())
-	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Bytes())
-	require.Equal([]byte{3}, proof.EndProof[2].KeyPath.Bytes())
+	require.Len(proof.EndProof, 2)
+	require.Equal([]byte{0}, proof.EndProof[0].KeyPath.Bytes())
+	require.Len(proof.EndProof[0].Children, 5) // 0,1,2,3,4
+	require.Equal([]byte{3}, proof.EndProof[1].KeyPath.Bytes())
 
 	// only a single node here since others are duplicates in endproof
 	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Bytes())
@@ -580,9 +579,8 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value1"), proof.KeyValues[0].Value)
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
-	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[2].KeyPath, BranchFactor16)
-	require.Equal(NewPath([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[1].KeyPath)
-	require.Equal(NewPath([]byte(""), BranchFactor16), proof.EndProof[0].KeyPath, BranchFactor16)
+	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[1].KeyPath, BranchFactor16)
+	require.Equal(NewPath([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[0].KeyPath)
 
 	require.NoError(proof.Verify(
 		context.Background(),

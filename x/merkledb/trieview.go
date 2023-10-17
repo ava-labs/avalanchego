@@ -155,21 +155,13 @@ func newTrieView(
 	root := parentTrie.getRoot()
 	if root.HasValue() {
 		root = maybe.Some(root.Value().clone()) // TODO better way of doing this?
-	} else {
-		root = maybe.Nothing[*node]() // TODO is this right?
-	}
-
-	var rootID ids.ID
-	if root.HasValue() {
-		rootValue := root.Value()
-		rootID = rootValue.id
 	}
 
 	newView := &trieView{
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps)+len(changes.MapOps), rootID /*TODO fix*/),
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -209,14 +201,11 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
+	// TODO is this right?
 	root := maybe.Nothing[*node]()
-	for _, node := range changes.nodes {
-		if node.after.id == changes.rootID {
-			root = maybe.Some(node.after.clone()) // todo is this right?
-			break
-		}
+	if changes.rootChange.after != nil {
+		root = maybe.Some(changes.rootChange.after.clone())
 	}
-
 	newView := &trieView{
 		root:       root,
 		db:         db,
@@ -251,6 +240,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
+		oldRoot := t.root
+
 		// add all the changed key/values to the nodes of the trie
 		for key, change := range t.changes.values {
 			if change.after.IsNothing() {
@@ -264,15 +255,20 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		if t.root.IsNothing() {
-			return // TODO is this right?
+		if !t.root.IsNothing() {
+			_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+			root := t.root.Value()
+			t.calculateNodeIDsHelper(root)
+			t.db.calculateNodeIDsSema.Release(1)
+			t.changes.rootID = root.id
+			t.changes.rootChange = t.changes.nodes[root.key]
+		} else {
+			t.changes.rootID = ids.Empty
+			t.changes.rootChange = &change[*node]{
+				before: oldRoot.Value(),
+				after:  t.root.Value(),
+			}
 		}
-
-		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		root := t.root.Value()
-		t.calculateNodeIDsHelper(root)
-		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = root.id
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -677,9 +673,6 @@ func (t *trieView) remove(key Path) error {
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
 
 	if nodeToDelete.key == t.root.Value().key { // TODO is this right?
 		// We're deleting the root.
@@ -702,10 +695,14 @@ func (t *trieView) remove(key Path) error {
 			if err != nil {
 				return err
 			}
+			if err := t.recordNodeDeleted(t.root.Value()); err != nil {
+				return err
+			}
 			t.root = maybe.Some(newRoot)
 			return nil
 		default:
 			// The root has multiple children so we can't delete it.
+			t.recordNodeChange(nodeToDelete)
 			return nil
 		}
 	}
@@ -918,8 +915,8 @@ func (t *trieView) insert(
 	}
 
 	if len(pathToNode) == 0 {
-		oldRoot := t.root.Value()
 		// [t.root.key] isn't a prefix of [key].
+		oldRoot := t.root.Value()
 		commonPrefixLength := getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/)
 		commonPrefix := oldRoot.key.Take(commonPrefixLength)
 		newRoot := newNode(nil, commonPrefix)

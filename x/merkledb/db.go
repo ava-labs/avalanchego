@@ -55,8 +55,7 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot  = errors.New("start and end root are the same")
-	errNoNewRoot = errors.New("there was no updated root in change list")
+	errSameRoot = errors.New("start and end root are the same")
 )
 
 type ChangeProofer interface {
@@ -264,6 +263,10 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
+		rootChange: &change[*node]{ // TODO is this right
+			before: nil,
+			after:  trieDB.root.Value(),
+		},
 		values: map[Path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Path]*change[*node]{},
 	})
@@ -971,7 +974,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	if changes.rootID == ids.Empty {
+	if changes.rootChange.after == nil {
 		db.root = maybe.Nothing[*node]()
 		if err := db.baseDB.Delete(rootDBKey); err != nil {
 			return err

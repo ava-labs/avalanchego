@@ -32,6 +32,9 @@ func getNodeValueWithBranchFactor(t ReadOnlyTrie, key string, bf BranchFactor) (
 		if err != nil {
 			return nil, err
 		}
+		if len(nodePath) == 0 {
+			return nil, database.ErrNotFound
+		}
 		closestNode := nodePath[len(nodePath)-1]
 		if closestNode.key != path || closestNode == nil {
 			return nil, database.ErrNotFound
@@ -130,9 +133,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err := trie.getPathTo(NewPath(nil, BranchFactor16))
 	require.NoError(err)
 
-	// Just the root
-	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Empty(nodePath)
 
 	// Insert a key
 	key1 := []byte{0}
@@ -152,10 +153,9 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key1, BranchFactor16))
 	require.NoError(err)
 
-	// Root and 1 value
-	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
+	// 1 value
+	require.Len(nodePath, 1)
+	require.Equal(NewPath(key1, BranchFactor16), nodePath[0].key)
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
@@ -174,11 +174,14 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
 	require.NoError(err)
-	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
-	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
+	require.Len(nodePath, 2)
+	require.Equal(trie.root.Value(), nodePath[0])
+	require.Equal(NewPath(key2, BranchFactor16), nodePath[1].key)
 
+	// Trie is:
+	// [0]
+	//  |
+	// [0,1]
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
 	trieIntf, err = trie.NewView(
@@ -194,17 +197,23 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
+	// Trie is:
+	//    []
+	//   /  \
+	// [0]  [255]
+	//  |
+	// [0,1]
 	nodePath, err = trie.getPathTo(NewPath(key3, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.root.Value(), nodePath[0])
+	require.Equal(0, trie.root.Value().key.tokensLength)
 	require.Equal(NewPath(key3, BranchFactor16), nodePath[1].key)
 
-	// Other key path not affected
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.root.Value(), nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
 
@@ -213,7 +222,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key4, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.root.Value(), nodePath[0])
 	require.Equal(NewPath(key1, BranchFactor16), nodePath[1].key)
 	require.Equal(NewPath(key2, BranchFactor16), nodePath[2].key)
 
@@ -222,7 +231,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	nodePath, err = trie.getPathTo(NewPath(key5, BranchFactor16))
 	require.NoError(err)
 	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.root.Value(), nodePath[0])
 }
 
 func Test_Trie_ViewOnCommitedView(t *testing.T) {
