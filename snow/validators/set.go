@@ -291,7 +291,7 @@ func (s *vdrSet) TotalWeight() (uint64, error) {
 	defer s.lock.RUnlock()
 
 	if !s.totalWeight.IsUint64() {
-		return 0, fmt.Errorf("%w, total weight: %s", errTotalWeightNotUint64, s.totalWeight.String())
+		return 0, fmt.Errorf("%w, total weight: %s", errTotalWeightNotUint64, s.totalWeight)
 	}
 
 	return s.totalWeight.Uint64(), nil

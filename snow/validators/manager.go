@@ -114,15 +114,34 @@ type manager struct {
 func (m *manager) AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
 		set = newSet()
 		m.subnetToVdrs[subnetID] = set
 	}
+
 	return set.Add(nodeID, pk, txID, weight)
 }
 
 func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+	// We do not need to grab a write lock here because we never modify the
+	// subnetToVdrs map. However, we must hold the read lock during the entirity
+	// of this function to ensure that errors are returned consistently.
+	//
+	// Consider the case that:
+	//	AddStaker(subnetID, nodeID, 1)
+	//	go func() {
+	//		AddWeight(subnetID, nodeID, 1)
+	//	}
+	//	go func() {
+	//		RemoveWeight(subnetID, nodeID, 1)
+	//	}
+	//
+	// In this case, after both goroutines have finished, either AddWeight
+	// should have errored, or the weight of the node should equal 1. It would
+	// be unexpected to not have received an error from AddWeight but for the
+	// node to no longer be tracked as a validator.
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -136,9 +155,8 @@ func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) e
 
 func (m *manager) GetWeight(subnetID ids.ID, nodeID ids.NodeID) uint64 {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return 0
 	}
@@ -148,9 +166,8 @@ func (m *manager) GetWeight(subnetID ids.ID, nodeID ids.NodeID) uint64 {
 
 func (m *manager) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Validator, bool) {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return nil, false
 	}
@@ -160,9 +177,8 @@ func (m *manager) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Validator, 
 
 func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error) {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return 0, nil
 	}
@@ -173,6 +189,7 @@ func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]
 func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
 		return errMissingValidator
@@ -181,8 +198,8 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	if err := set.RemoveWeight(nodeID, weight); err != nil {
 		return err
 	}
-	// If this was the last validator in the subnet
-	// and no callback listeners are registered, remove the subnet
+	// If this was the last validator in the subnet and no callback listeners
+	// are registered, remove the subnet
 	if set.Len() == 0 && !set.hasCallbackRegistered() {
 		delete(m.subnetToVdrs, subnetID)
 	}
@@ -192,9 +209,8 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 
 func (m *manager) Contains(subnetID ids.ID, nodeID ids.NodeID) bool {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return false
 	}
@@ -204,9 +220,8 @@ func (m *manager) Contains(subnetID ids.ID, nodeID ids.NodeID) bool {
 
 func (m *manager) Count(subnetID ids.ID) int {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return 0
 	}
@@ -216,9 +231,8 @@ func (m *manager) Count(subnetID ids.ID) int {
 
 func (m *manager) TotalWeight(subnetID ids.ID) (uint64, error) {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return 0, nil
 	}
@@ -232,9 +246,8 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	}
 
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return nil, ErrMissingValidators
 	}
@@ -244,9 +257,8 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 
 func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	set, exists := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exists {
 		return make(map[ids.NodeID]*GetValidatorOutput)
 	}
@@ -255,18 +267,14 @@ func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
 }
 
 func (m *manager) RegisterCallbackListener(subnetID ids.ID, listener SetCallbackListener) {
-	// Use write lock in case we need to create a new set
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
 		set = newSet()
 		m.subnetToVdrs[subnetID] = set
 	}
-	m.lock.Unlock()
-
-	// Use read lock for all other operations
-	m.lock.RLock()
-	defer m.lock.RUnlock()
 
 	set.RegisterCallbackListener(listener)
 }
@@ -298,10 +306,10 @@ func (m *manager) String() string {
 func (m *manager) GetValidatorIDs(subnetID ids.ID) []ids.NodeID {
 	m.lock.RLock()
 	vdrs, exist := m.subnetToVdrs[subnetID]
+	m.lock.RUnlock()
 	if !exist {
 		return nil
 	}
-	m.lock.RUnlock()
 
 	return vdrs.GetValidatorIDs()
 }
