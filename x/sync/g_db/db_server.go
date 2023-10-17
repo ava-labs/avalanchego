@@ -19,18 +19,18 @@ import (
 
 var _ pb.DBServer = (*DBServer)(nil)
 
-func NewDBServer(db sync.DB, branchFactor merkledb.BranchFactor) *DBServer {
+func NewDBServer(db sync.DB, tokenConfig merkledb.TokenConfiguration) *DBServer {
 	return &DBServer{
-		db:           db,
-		branchFactor: branchFactor,
+		db:          db,
+		tokenConfig: tokenConfig,
 	}
 }
 
 type DBServer struct {
 	pb.UnsafeDBServer
 
-	db           sync.DB
-	branchFactor merkledb.BranchFactor
+	db          sync.DB
+	tokenConfig merkledb.TokenConfiguration
 }
 
 func (s *DBServer) GetMerkleRoot(
@@ -98,7 +98,7 @@ func (s *DBServer) VerifyChangeProof(
 	req *pb.VerifyChangeProofRequest,
 ) (*pb.VerifyChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof, s.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(s.tokenConfig, req.Proof); err != nil {
 		return nil, err
 	}
 
@@ -130,7 +130,7 @@ func (s *DBServer) CommitChangeProof(
 	req *pb.CommitChangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(req.Proof, s.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(s.tokenConfig, req.Proof); err != nil {
 		return nil, err
 	}
 
@@ -201,7 +201,7 @@ func (s *DBServer) CommitRangeProof(
 	req *pb.CommitRangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(req.RangeProof, s.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(s.tokenConfig, req.RangeProof); err != nil {
 		return nil, err
 	}
 

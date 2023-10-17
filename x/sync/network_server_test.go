@@ -114,7 +114,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 						require.NoError(proto.Unmarshal(responseBytes, &proofProto))
 
 						var p merkledb.RangeProof
-						require.NoError(p.UnmarshalProto(&proofProto, merkledb.BranchFactor16))
+						require.NoError(p.UnmarshalProto(merkledb.BranchFactor16TokenConfig, &proofProto))
 						proof = &p
 					}
 					return nil

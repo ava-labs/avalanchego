@@ -80,24 +80,22 @@ func FuzzCodecKey(f *testing.F) {
 			b []byte,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range branchFactors {
-				codec := codec.(*codecImpl)
-				reader := bytes.NewReader(b)
-				startLen := reader.Len()
-				got, err := codec.decodeKey(reader, branchFactor)
-				if err != nil {
-					t.SkipNow()
-				}
-				endLen := reader.Len()
-				numRead := startLen - endLen
-
-				// Encoding [got] should be the same as [b].
-				var buf bytes.Buffer
-				codec.encodeKey(&buf, got)
-				bufBytes := buf.Bytes()
-				require.Len(bufBytes, numRead)
-				require.Equal(b[:numRead], bufBytes)
+			codec := codec.(*codecImpl)
+			reader := bytes.NewReader(b)
+			startLen := reader.Len()
+			got, err := codec.decodeKey(reader)
+			if err != nil {
+				t.SkipNow()
 			}
+			endLen := reader.Len()
+			numRead := startLen - endLen
+
+			// Encoding [got] should be the same as [b].
+			var buf bytes.Buffer
+			codec.encodeKey(&buf, got)
+			bufBytes := buf.Bytes()
+			require.Len(bufBytes, numRead)
+			require.Equal(b[:numRead], bufBytes)
 		},
 	)
 }
@@ -109,15 +107,15 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			b []byte,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range branchFactors {
+			for _, branchFactor := range tokenConfigurations {
 				codec := codec.(*codecImpl)
 				node := &dbNode{}
-				if err := codec.decodeDBNode(b, node, branchFactor); err != nil {
+				if err := codec.decodeDBNode(branchFactor, b, node); err != nil {
 					t.SkipNow()
 				}
 
 				// Encoding [node] should be the same as [b].
-				buf := codec.encodeDBNode(node, branchFactor)
+				buf := codec.encodeDBNode(node)
 				require.Equal(b, buf)
 			}
 		},
@@ -133,7 +131,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			valueBytes []byte,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range branchFactors {
+			for _, tokenConfig := range tokenConfigurations {
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				value := maybe.Nothing[[]byte]()
@@ -148,7 +146,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					value = maybe.Some(valueBytes)
 				}
 
-				numChildren := r.Intn(int(branchFactor)) // #nosec G404
+				numChildren := r.Intn(tokenConfig.BranchFactor()) // #nosec G404
 
 				children := map[byte]child{}
 				for i := 0; i < numChildren; i++ {
@@ -159,7 +157,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					_, _ = r.Read(childKeyBytes)              // #nosec G404
 
 					children[byte(i)] = child{
-						compressedKey: ToKey(childKeyBytes, branchFactor),
+						compressedKey: ToKey(childKeyBytes),
 						id:            childID,
 					}
 				}
@@ -168,13 +166,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					children: children,
 				}
 
-				nodeBytes := codec.encodeDBNode(&node, branchFactor)
+				nodeBytes := codec.encodeDBNode(&node)
 
 				var gotNode dbNode
-				require.NoError(codec.decodeDBNode(nodeBytes, &gotNode, branchFactor))
+				require.NoError(codec.decodeDBNode(tokenConfig, nodeBytes, &gotNode))
 				require.Equal(node, gotNode)
 
-				nodeBytes2 := codec.encodeDBNode(&gotNode, branchFactor)
+				nodeBytes2 := codec.encodeDBNode(&gotNode)
 				require.Equal(nodeBytes, nodeBytes2)
 			}
 		},
@@ -188,7 +186,7 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode, BranchFactor16)
+	err := codec.decodeDBNode(BranchFactor16TokenConfig, tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
@@ -196,15 +194,15 @@ func TestCodecDecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes := codec.encodeDBNode(&proof, BranchFactor16)
+	nodeBytes := codec.encodeDBNode(&proof)
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
 
 	// Put num children > branch factor
-	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(BranchFactor16+1))
+	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(17))
 
-	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
+	err = codec.decodeDBNode(BranchFactor16TokenConfig, proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
 }
 
@@ -219,18 +217,18 @@ func FuzzEncodeHashValues(f *testing.F) {
 			randSeed int,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range branchFactors { // Create a random *hashValues
+			for _, tokenConfig := range tokenConfigurations { // Create a random *hashValues
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				children := map[byte]child{}
-				numChildren := r.Intn(int(branchFactor)) // #nosec G404
+				numChildren := r.Intn(tokenConfig.BranchFactor()) // #nosec G404
 				for i := 0; i < numChildren; i++ {
 					compressedKeyLen := r.Intn(32) // #nosec G404
 					compressedKeyBytes := make([]byte, compressedKeyLen)
 					_, _ = r.Read(compressedKeyBytes) // #nosec G404
 
 					children[byte(i)] = child{
-						compressedKey: ToKey(compressedKeyBytes, branchFactor),
+						compressedKey: ToKey(compressedKeyBytes),
 						id:            ids.GenerateTestID(),
 						hasValue:      r.Intn(2) == 1, // #nosec G404
 					}
@@ -247,10 +245,12 @@ func FuzzEncodeHashValues(f *testing.F) {
 				key := make([]byte, r.Intn(32)) // #nosec G404
 				_, _ = r.Read(key)              // #nosec G404
 
-				hv := &hashValues{
-					Children: children,
-					Value:    value,
-					Key:      ToKey(key, branchFactor),
+				hv := &node{
+					key: ToKey(key),
+					dbNode: dbNode{
+						children: children,
+						value:    value,
+					},
 				}
 
 				// Serialize the *hashValues with both codecs
@@ -267,6 +267,6 @@ func FuzzEncodeHashValues(f *testing.F) {
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	codec := codec.(*codecImpl)
 	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
-	_, err := codec.decodeKey(bytes, BranchFactor16)
+	_, err := codec.decodeKey(bytes)
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }

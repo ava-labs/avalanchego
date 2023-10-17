@@ -38,7 +38,7 @@ func newDefaultDBConfig() merkledb.Config {
 		IntermediateNodeCacheSize: defaultRequestKeyLimit,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
-		BranchFactor:              merkledb.BranchFactor16,
+		TokenConfig:               merkledb.BranchFactor16TokenConfig,
 	}
 }
 
@@ -94,7 +94,7 @@ func sendRangeProofRequest(
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
-		BranchFactor:  merkledb.BranchFactor16,
+		TokenConfig:   merkledb.BranchFactor16TokenConfig,
 	})
 	require.NoError(err)
 
@@ -138,7 +138,7 @@ func sendRangeProofRequest(
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 			var response merkledb.RangeProof
-			require.NoError(response.UnmarshalProto(&responseProto, merkledb.BranchFactor16))
+			require.NoError(response.UnmarshalProto(merkledb.BranchFactor16TokenConfig, &responseProto))
 
 			// modify if needed
 			if modifyResponse != nil {
@@ -411,7 +411,7 @@ func sendChangeProofRequest(
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
-		BranchFactor:  merkledb.BranchFactor16,
+		TokenConfig:   merkledb.BranchFactor16TokenConfig,
 	})
 	require.NoError(err)
 
@@ -456,7 +456,7 @@ func sendChangeProofRequest(
 			if responseProto.GetChangeProof() != nil {
 				// Server responded with a change proof
 				var changeProof merkledb.ChangeProof
-				require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof(), merkledb.BranchFactor16))
+				require.NoError(changeProof.UnmarshalProto(merkledb.BranchFactor16TokenConfig, responseProto.GetChangeProof()))
 
 				// modify if needed
 				if modifyChangeProof != nil {
@@ -478,7 +478,7 @@ func sendChangeProofRequest(
 
 			// Server responded with a range proof
 			var rangeProof merkledb.RangeProof
-			require.NoError(rangeProof.UnmarshalProto(responseProto.GetRangeProof(), merkledb.BranchFactor16))
+			require.NoError(rangeProof.UnmarshalProto(merkledb.BranchFactor16TokenConfig, responseProto.GetRangeProof()))
 
 			// modify if needed
 			if modifyRangeProof != nil {
@@ -802,7 +802,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 			NetworkClient: networkClient,
 			Log:           logging.NoLog{},
 			Metrics:       &mockMetrics{},
-			BranchFactor:  merkledb.BranchFactor16,
+			TokenConfig:   merkledb.BranchFactor16TokenConfig,
 		},
 	)
 	require.NoError(err)
