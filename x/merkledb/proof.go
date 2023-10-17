@@ -289,11 +289,8 @@ func (proof *RangeProof) Verify(
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	// TODO remove
-	case end.IsNothing() && len(proof.KeyValues) == 0 && /*len(proof.StartProof) > 0 &&*/ len(proof.EndProof) != 0:
+	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 0:
 		return ErrUnexpectedEndProof
-	//case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
-	//	return ErrShouldJustBeRoot
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
 		return ErrNoEndProof
 	}
