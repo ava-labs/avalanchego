@@ -26,7 +26,7 @@ import (
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
-	rewardAddress := ts.Keys[4].PublicKey().Address()
+	rewardAddress := ts.Keys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
 	newValidatorID := ids.GenerateTestNodeID()
@@ -43,7 +43,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			newValidatorID,                  // node ID
 			rewardAddress,                   // Reward Address
 			reward.PercentDenominator,       // Shares
-			[]*secp256k1.PrivateKey{ts.Keys[4]},
+			[]*secp256k1.PrivateKey{ts.Keys[0]},
 			ids.ShortEmpty,
 		)
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			newValidatorID,                  // node ID
 			rewardAddress,                   // Reward Address
 			reward.PercentDenominator,       // Shared
-			[]*secp256k1.PrivateKey{ts.Keys[4]},
+			[]*secp256k1.PrivateKey{ts.Keys[0]},
 			ids.ShortEmpty,
 		)
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(ts.ValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         nil,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrPeriodMismatch,
@@ -125,7 +125,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + ts.MinStakingDuration + time.Second).Unix()),
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         nil,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrFutureStakeTime,
@@ -137,7 +137,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(ts.ValidateEndTime.Add(-5 * time.Second).Unix()),
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         nil,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   database.ErrNotFound,
@@ -149,7 +149,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrPeriodMismatch,
@@ -161,7 +161,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrPeriodMismatch,
@@ -173,7 +173,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   nil,
@@ -185,7 +185,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(ts.ValidateEndTime.Unix()),   // end time
 			nodeID:        nodeID,                              // node ID
 			rewardAddress: rewardAddress,                       // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]}, // tx fee payer
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]}, // tx fee payer
 			setup:         nil,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrTimestampNotBeforeStartTime,
@@ -221,7 +221,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       ts.ValidateEndTime,
 			expectedErr:   nil,
@@ -233,7 +233,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[4]},
+			feeKeys:       []*secp256k1.PrivateKey{ts.Keys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       ts.GenesisTime,
 			expectedErr:   ErrOverDelegated,

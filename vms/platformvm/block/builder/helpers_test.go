@@ -173,8 +173,8 @@ func addSubnet(t *testing.T, env *environment) {
 			ts.Keys[1].PublicKey().Address(),
 			ts.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[4]},
+		ts.Keys[4].PublicKey().Address(),
 	)
 	require.NoError(err)
 
