@@ -62,6 +62,7 @@ message Message {
 }
 
 // Ping reports a peer's perceived uptime percentage.
+//
 // Upon reception of a Ping, peers should respond with a Pong message.
 message Ping {
   // Uptime percentage on the primary network [0, 100]
