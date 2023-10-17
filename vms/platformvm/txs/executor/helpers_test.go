@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -89,13 +88,9 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	var (
-		forkTime       = ts.ValidateStartTime.Add(-1 * time.Second)
-		initialClkTime = forkTime.Add(time.Second)
-	)
-
+	forkTime := ts.ValidateStartTime
 	config := ts.Config(fork, forkTime)
-	clk := ts.Clock(initialClkTime)
+	clk := ts.Clock(forkTime)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -105,9 +100,6 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
-
-	// align chain time with local clock
-	baseState.SetTimestamp(clk.Time())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)

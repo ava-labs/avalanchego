@@ -100,9 +100,6 @@ func newEnvironment(t *testing.T) *environment {
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	// align chain time with local clock
-	res.state.SetTimestamp(res.clk.Time())
-
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
