@@ -20,8 +20,8 @@ import (
 const DefaultTagName = "serialize"
 
 var (
-	MagicBytesPtrNil        = []byte{0xff, 0x32, 0x31, 0x36, 0x98}
-	MagicBytesPtr           = []byte{0xc3, 0xa1, 0x00, 0x33, 0x25}
+	MagicBytesPtrNil        = []byte{0xff}
+	MagicBytesPtr           = []byte{0x00}
 	magicBytesPtrPrefixSize = len(MagicBytesPtrNil)
 )
 
