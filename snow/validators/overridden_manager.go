@@ -5,18 +5,16 @@ package validators
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Manager = (*overriddenManager)(nil)
 
-// NewOverriddenManager returns a Manager that overrides of all calls to the underlying Manager
-// to only operate on the validators in [subnetID].
+// NewOverriddenManager returns a Manager that overrides of all calls to the
+// underlying Manager to only operate on the validators in [subnetID].
 func NewOverriddenManager(subnetID ids.ID, manager Manager) Manager {
 	return &overriddenManager{
 		subnetID: subnetID,
@@ -24,9 +22,10 @@ func NewOverriddenManager(subnetID ids.ID, manager Manager) Manager {
 	}
 }
 
-// overriddenManager is a wrapper around a Manager that overrides of all calls to the underlying Manager
-// to only operate on the validators in [subnetID].
-// subnetID here is typically the primary network ID, as it has the superset of all subnet validators.
+// overriddenManager is a wrapper around a Manager that overrides of all calls
+// to the underlying Manager to only operate on the validators in [subnetID].
+// subnetID here is typically the primary network ID, as it has the superset of
+// all subnet validators.
 type overriddenManager struct {
 	manager  Manager
 	subnetID ids.ID
@@ -81,29 +80,7 @@ func (o *overriddenManager) RegisterCallbackListener(_ ids.ID, listener SetCallb
 }
 
 func (o *overriddenManager) String() string {
-	sb := strings.Builder{}
-
-	sb.WriteString(fmt.Sprintf("Overridden Validator Manager: (Size = 1, SubnetID = %s)", o.subnetID))
-
-	vdrMap := o.manager.GetMap(o.subnetID)
-	weight, err := o.manager.TotalWeight(o.subnetID)
-	if err != nil {
-		sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, Weight: Error: %s)", len(vdrMap), err))
-	} else {
-		sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, Weight: %d)", len(vdrMap), weight))
-	}
-
-	format := fmt.Sprintf("\n    Validator[%s]: %%33s, %%d", formatting.IntFormat(len(vdrMap)-1))
-	for i, vdr := range vdrMap {
-		sb.WriteString(fmt.Sprintf(
-			format,
-			i,
-			vdr.NodeID,
-			vdr.Weight,
-		))
-	}
-
-	return sb.String()
+	return fmt.Sprintf("Overridden Validator Manager (SubnetID = %s): %s", o.subnetID, o.manager)
 }
 
 func (o *overriddenManager) GetValidatorIDs(ids.ID) []ids.NodeID {
