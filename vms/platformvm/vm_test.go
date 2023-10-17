@@ -298,12 +298,11 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 
-	vdrs := validators.NewManager()
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
@@ -1311,10 +1310,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             firstVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1397,10 +1395,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVdrs := validators.NewManager()
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             secondVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1449,10 +1446,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1770,10 +1766,9 @@ func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1929,12 +1924,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
-		Validators:             firstVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
@@ -1968,11 +1962,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondDB := db.NewPrefixDBManager([]byte{})
-	secondVdrs := validators.NewManager()
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .21,
-		Validators:             secondVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
@@ -2095,12 +2088,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
