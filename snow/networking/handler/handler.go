@@ -216,15 +216,12 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 	}
 
 	// drop bootstrap state from previous runs before starting state sync
-	return engines.StateSyncer, engines.Bootstrapper.Clear()
+	return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
 }
 
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
-	h.ctx.Lock.Lock()
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
-		h.ctx.Lock.Unlock()
-
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
 		)
@@ -232,6 +229,7 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
+	h.ctx.Lock.Lock()
 	err = gear.Start(ctx, 0)
 	h.ctx.Lock.Unlock()
 	if err != nil {
