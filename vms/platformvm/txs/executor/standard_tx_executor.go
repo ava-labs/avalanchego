@@ -497,7 +497,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -507,13 +507,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 		return err
 	}
 
-	if isCurrentValidator {
-		e.State.DeleteCurrentValidator(staker)
-	} else {
-		e.State.DeletePendingValidator(staker)
-	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
+	e.State.SetSubnetOwner(tx.SubnetID(), tx.Owner)
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
