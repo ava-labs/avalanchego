@@ -140,10 +140,8 @@ type State interface {
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
-	// ApplyCurrentValidators adds all the current
-	// validators and delegators of [subnetID] into [vdrs].
-	// Should not be called repeatedly on the same [subnetID], as it will
-	// repeatedly add the same validators and delegators.
+	// ApplyCurrentValidators adds all the current validators and delegators of
+	// [subnetID] into [vdrs].
 	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
