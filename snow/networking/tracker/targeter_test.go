@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -46,13 +47,12 @@ func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	vdr := ids.NodeID{1}
-	subnetID := ids.Empty
 	vdrWeight := uint64(1)
 	totalVdrWeight := uint64(10)
 	nonVdr := ids.NodeID{2}
 	vdrs := validators.NewManager()
-	require.NoError(t, vdrs.AddStaker(subnetID, vdr, nil, ids.Empty, 1))
-	require.NoError(t, vdrs.AddStaker(subnetID, ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, vdr, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{
