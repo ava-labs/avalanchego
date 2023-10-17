@@ -127,8 +127,8 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-	if config.TokenConfig == nil {
-		return nil, merkledb.ErrNilTokenConfig
+	if err := config.TokenConfig.Valid(); err != nil {
+		return nil, err
 	}
 
 	m := &Manager{

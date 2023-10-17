@@ -10,15 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var tokenConfigurations = []TokenConfiguration{
-	BranchFactor2TokenConfig,
-	BranchFactor4TokenConfig,
-	BranchFactor16TokenConfig,
-	BranchFactor256TokenConfig,
-}
-
 func TestHasPartialByte(t *testing.T) {
-	for _, branchFactor := range tokenConfigurations {
+	for _, branchFactor := range validTokenConfigurations {
 		t.Run(fmt.Sprint(branchFactor), func(t *testing.T) {
 			require := require.New(t)
 
@@ -36,7 +29,7 @@ func TestHasPartialByte(t *testing.T) {
 			}
 
 			// Fill all but the last token of the first byte.
-			for i := 0; i < branchFactor.TokensPerByte()-1; i++ {
+			for i := 0; i < branchFactor.tokensPerByte-1; i++ {
 				key = key.Append(branchFactor, 1)
 				require.True(key.hasPartialByte())
 			}
@@ -75,7 +68,7 @@ func Test_Key_Has_Prefix(t *testing.T) {
 			name: "one key has one fewer token",
 			keyA: func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
 			keyB: func(bf TokenConfiguration) Key {
-				return ToKey([]byte(key)).Take(bf, len(key)*bf.TokensPerByte()-1)
+				return ToKey([]byte(key)).Take(bf, len(key)*bf.tokensPerByte-1)
 			},
 			isPrefix:       true,
 			isStrictPrefix: true,
@@ -83,10 +76,10 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		{
 			name: "equal keys, both have one fewer token",
 			keyA: func(bf TokenConfiguration) Key {
-				return ToKey([]byte(key)).Take(bf, len(key)*bf.TokensPerByte()-1)
+				return ToKey([]byte(key)).Take(bf, len(key)*bf.tokensPerByte-1)
 			},
 			keyB: func(bf TokenConfiguration) Key {
-				return ToKey([]byte(key)).Take(bf, len(key)*bf.TokensPerByte()-1)
+				return ToKey([]byte(key)).Take(bf, len(key)*bf.tokensPerByte-1)
 			},
 			isPrefix:       true,
 			isStrictPrefix: false,
@@ -112,7 +105,7 @@ func Test_Key_Has_Prefix(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, bf := range tokenConfigurations {
+		for _, bf := range validTokenConfigurations {
 			t.Run(tt.name+" bf "+fmt.Sprint(bf), func(t *testing.T) {
 				require := require.New(t)
 				keyA := tt.keyA(bf)
@@ -129,15 +122,15 @@ func Test_Key_Has_Prefix(t *testing.T) {
 func Test_Key_Skip(t *testing.T) {
 	require := require.New(t)
 
-	for _, bf := range tokenConfigurations {
+	for _, bf := range validTokenConfigurations {
 		empty := Key{}
-		require.Equal(ToKey([]byte{0}).Skip(bf, bf.TokensPerByte()), empty)
+		require.Equal(ToKey([]byte{0}).Skip(bf, bf.tokensPerByte), empty)
 		if bf == BranchFactor256TokenConfig {
 			continue
 		}
 		shortKey := ToKey([]byte{0b0101_0101})
 		longKey := ToKey([]byte{0b0101_0101, 0b0101_0101})
-		for i := 0; i < bf.TokensPerByte(); i++ {
+		for i := 0; i < bf.tokensPerByte; i++ {
 			shift := bf.BitLength(i)
 			skipKey := shortKey.Skip(bf, i)
 			require.Equal(byte(0b0101_0101<<shift), skipKey.value[0])
@@ -161,14 +154,14 @@ func Test_Key_Skip(t *testing.T) {
 func Test_Key_Take(t *testing.T) {
 	require := require.New(t)
 
-	for _, bf := range tokenConfigurations {
+	for _, bf := range validTokenConfigurations {
 		require.Equal(ToKey([]byte{0}).Take(bf, 0), Key{})
 		if bf == BranchFactor256TokenConfig {
 			continue
 		}
 		key := ToKey([]byte{0b0101_0101})
-		for i := 1; i <= bf.TokensPerByte(); i++ {
-			shift := 8 - (i * bf.TokenBitSize())
+		for i := 1; i <= bf.tokensPerByte; i++ {
+			shift := 8 - (i * bf.tokenBitSize)
 			take := key.Take(bf, i)
 			require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
 		}
@@ -272,8 +265,8 @@ func Test_Key_Append(t *testing.T) {
 	require := require.New(t)
 
 	key := ToKey([]byte{})
-	for _, bf := range tokenConfigurations {
-		for i := 0; i < bf.BranchFactor(); i++ {
+	for _, bf := range validTokenConfigurations {
+		for i := 0; i < bf.branchFactor; i++ {
 			appendedKey := key.Append(bf, byte(i)).Append(bf, byte(i/2))
 			require.Equal(byte(i), appendedKey.Token(bf, 0))
 			require.Equal(byte(i/2), appendedKey.Token(bf, 1))
@@ -397,28 +390,28 @@ func FuzzKeyAppendExtend(f *testing.F) {
 		forceSecondOdd bool,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range tokenConfigurations {
+		for _, tokenConfig := range validTokenConfigurations {
 			key1 := ToKey(first)
-			tokenLength := branchFactor.TokensPerByte() * len(first)
-			if forceFirstOdd && key1.bitLength > branchFactor.TokenBitSize() {
-				key1 = key1.Take(branchFactor, tokenLength-1)
+			tokenLength := tokenConfig.tokensPerByte * len(first)
+			if forceFirstOdd && key1.bitLength > tokenConfig.tokenBitSize {
+				key1 = key1.Take(tokenConfig, tokenLength-1)
 			}
 			key2 := ToKey(second)
-			tokenLength = branchFactor.TokensPerByte() * len(second)
-			if forceSecondOdd && key2.bitLength > branchFactor.TokenBitSize() {
-				key2 = key2.Take(branchFactor, tokenLength-1)
+			tokenLength = tokenConfig.tokensPerByte * len(second)
+			if forceSecondOdd && key2.bitLength > tokenConfig.tokenBitSize {
+				key2 = key2.Take(tokenConfig, tokenLength-1)
 			}
-			token := byte(int(tokenByte) % branchFactor.BranchFactor())
-			extendedP := key1.AppendExtend(branchFactor, token, key2)
-			require.Equal(key1.bitLength+key2.bitLength+branchFactor.TokenBitSize(), extendedP.bitLength)
+			token := byte(int(tokenByte) % tokenConfig.branchFactor)
+			extendedP := key1.AppendExtend(tokenConfig, token, key2)
+			require.Equal(key1.bitLength+key2.bitLength+tokenConfig.tokenBitSize, extendedP.bitLength)
 			totalIndex := 0
-			for ; totalIndex < key1.bitLength; totalIndex += branchFactor.TokenBitSize() {
-				require.Equal(key1.Token(branchFactor, totalIndex), extendedP.Token(branchFactor, totalIndex))
+			for ; totalIndex < key1.bitLength; totalIndex += tokenConfig.tokenBitSize {
+				require.Equal(key1.Token(tokenConfig, totalIndex), extendedP.Token(tokenConfig, totalIndex))
 			}
-			require.Equal(token, extendedP.Token(branchFactor, totalIndex))
-			totalIndex += branchFactor.TokenBitSize()
-			for secondIndex := 0; secondIndex < key2.bitLength; secondIndex += branchFactor.TokenBitSize() {
-				require.Equal(key2.Token(branchFactor, totalIndex), extendedP.Token(branchFactor, totalIndex+secondIndex))
+			require.Equal(token, extendedP.Token(tokenConfig, totalIndex))
+			totalIndex += tokenConfig.tokenBitSize
+			for secondIndex := 0; secondIndex < key2.bitLength; secondIndex += tokenConfig.tokenBitSize {
+				require.Equal(key2.Token(tokenConfig, totalIndex), extendedP.Token(tokenConfig, totalIndex+secondIndex))
 			}
 		}
 	})
@@ -432,16 +425,16 @@ func FuzzKeySkip(f *testing.F) {
 	) {
 		require := require.New(t)
 		key1 := ToKey(first)
-		for _, branchFactor := range tokenConfigurations {
-			bitsToSkip := branchFactor.BitLength(int(tokensToSkip))
+		for _, tokenConfig := range validTokenConfigurations {
+			bitsToSkip := tokenConfig.BitLength(int(tokensToSkip))
 			if bitsToSkip >= key1.bitLength {
 				t.SkipNow()
 			}
-			key2 := key1.Skip(branchFactor, int(tokensToSkip))
+			key2 := key1.Skip(tokenConfig, int(tokensToSkip))
 			require.Equal(key1.bitLength-bitsToSkip, key2.bitLength)
-			tokenLength := key2.bitLength / branchFactor.TokenBitSize()
+			tokenLength := key2.bitLength / tokenConfig.tokenBitSize
 			for i := 0; i < tokenLength; i++ {
-				require.Equal(key1.Token(branchFactor, int(tokensToSkip)+i), key2.Token(branchFactor, i))
+				require.Equal(key1.Token(tokenConfig, int(tokensToSkip)+i), key2.Token(tokenConfig, i))
 			}
 		}
 	})
@@ -454,14 +447,14 @@ func FuzzKeyTake(f *testing.F) {
 		tokensToTake uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range tokenConfigurations {
+		for _, branchFactor := range validTokenConfigurations {
 			key1 := ToKey(first)
 			bitsToTake := branchFactor.BitLength(int(tokensToTake))
 			if bitsToTake >= key1.bitLength {
 				t.SkipNow()
 			}
 			key2 := key1.Take(branchFactor, int(tokensToTake))
-			tokenLength := key2.bitLength / branchFactor.TokensPerByte()
+			tokenLength := key2.bitLength / branchFactor.tokensPerByte
 			require.Equal(int(tokensToTake), tokenLength)
 
 			for i := 0; i < tokenLength; i++ {

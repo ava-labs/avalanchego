@@ -107,7 +107,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			b []byte,
 		) {
 			require := require.New(t)
-			for _, branchFactor := range tokenConfigurations {
+			for _, branchFactor := range validTokenConfigurations {
 				codec := codec.(*codecImpl)
 				node := &dbNode{}
 				if err := codec.decodeDBNode(branchFactor, b, node); err != nil {
@@ -131,7 +131,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			valueBytes []byte,
 		) {
 			require := require.New(t)
-			for _, tokenConfig := range tokenConfigurations {
+			for _, tokenConfig := range validTokenConfigurations {
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				value := maybe.Nothing[[]byte]()
@@ -217,7 +217,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			randSeed int,
 		) {
 			require := require.New(t)
-			for _, tokenConfig := range tokenConfigurations { // Create a random *hashValues
+			for _, tokenConfig := range validTokenConfigurations { // Create a random *hashValues
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				children := map[byte]child{}

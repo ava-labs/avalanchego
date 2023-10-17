@@ -222,8 +222,8 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	if config.TokenConfig == nil {
-		return nil, ErrNilTokenConfig
+	if err := config.TokenConfig.Valid(); err != nil {
+		return nil, err
 	}
 
 	rootGenConcurrency := uint(runtime.NumCPU())

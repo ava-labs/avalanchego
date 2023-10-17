@@ -142,7 +142,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		tokenLength uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range tokenConfigurations {
+		for _, branchFactor := range validTokenConfigurations {
 			db := newIntermediateNodeDB(
 				baseDB,
 				&sync.Pool{

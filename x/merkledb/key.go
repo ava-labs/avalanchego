@@ -5,76 +5,83 @@ package merkledb
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"unsafe"
 )
 
 var (
-	ErrNilTokenConfig = errors.New("token configuration cannot be nil")
+	ErrInvalidTokenConfig = errors.New("token configuration must match one of the predefined configurations ")
 
-	BranchFactor2TokenConfig TokenConfiguration = tokenConfig{
+	BranchFactor2TokenConfig = TokenConfiguration{
 		branchFactor:    2,
 		tokenBitSize:    1,
 		tokensPerByte:   8,
 		singleTokenMask: 0b0000_0001,
 	}
-	BranchFactor4TokenConfig TokenConfiguration = tokenConfig{
+	BranchFactor4TokenConfig = TokenConfiguration{
 		branchFactor:    4,
 		tokenBitSize:    2,
 		tokensPerByte:   4,
 		singleTokenMask: 0b0000_0011,
 	}
-	BranchFactor16TokenConfig TokenConfiguration = tokenConfig{
+	BranchFactor16TokenConfig = TokenConfiguration{
 		branchFactor:    16,
 		tokenBitSize:    4,
 		tokensPerByte:   2,
 		singleTokenMask: 0b0000_1111,
 	}
-	BranchFactor256TokenConfig TokenConfiguration = tokenConfig{
+	BranchFactor256TokenConfig = TokenConfiguration{
 		branchFactor:    256,
 		tokenBitSize:    8,
 		tokensPerByte:   1,
 		singleTokenMask: 0b1111_1111,
 	}
+	validTokenConfigurations = []TokenConfiguration{
+		BranchFactor2TokenConfig,
+		BranchFactor4TokenConfig,
+		BranchFactor16TokenConfig,
+		BranchFactor256TokenConfig,
+	}
 )
 
-type TokenConfiguration interface {
-	BranchFactor() int
-	TokensPerByte() int
-	TokenBitSize() int
-	SingleTokenMask() byte
-	TokenLength(k Key) int
-	BitLength(tokens int) int
-}
-
-type tokenConfig struct {
+type TokenConfiguration struct {
 	branchFactor    int
 	tokensPerByte   int
 	tokenBitSize    int
 	singleTokenMask byte
 }
 
-func (t tokenConfig) BranchFactor() int {
+func (t TokenConfiguration) Valid() error {
+	for _, validConfig := range validTokenConfigurations {
+		if validConfig == t {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
+}
+
+func (t TokenConfiguration) BranchFactor() int {
 	return t.branchFactor
 }
 
-func (t tokenConfig) TokensPerByte() int {
+func (t TokenConfiguration) TokensPerByte() int {
 	return t.tokensPerByte
 }
 
-func (t tokenConfig) TokenBitSize() int {
+func (t TokenConfiguration) TokenBitSize() int {
 	return t.tokenBitSize
 }
 
-func (t tokenConfig) SingleTokenMask() byte {
+func (t TokenConfiguration) SingleTokenMask() byte {
 	return t.singleTokenMask
 }
 
-func (t tokenConfig) TokenLength(k Key) int {
+func (t TokenConfiguration) TokenLength(k Key) int {
 	return k.bitLength / t.tokenBitSize
 }
 
-func (t tokenConfig) BitLength(tokens int) int {
+func (t TokenConfiguration) BitLength(tokens int) int {
 	return tokens * t.tokenBitSize
 }
 

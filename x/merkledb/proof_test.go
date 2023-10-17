@@ -1224,7 +1224,7 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, tc := range tokenConfigurations {
+			for _, tc := range validTokenConfigurations {
 				err := verifyProofPath(tc, tt.path, tt.proofKey)
 				require.ErrorIs(t, err, tt.expectedErr)
 			}
