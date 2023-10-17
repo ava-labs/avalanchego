@@ -1156,7 +1156,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 
 	sample, err := s.vm.Validators.Sample(args.SubnetID, int(args.Size))
 	if err != nil {
-		return fmt.Errorf("sampling errored with %w", err)
+		return fmt.Errorf("sampling %s errored with %w", args.SubnetID, err)
 	}
 
 	if sample == nil {
