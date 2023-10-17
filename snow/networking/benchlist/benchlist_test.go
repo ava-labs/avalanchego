@@ -20,13 +20,14 @@ var minimumFailingDuration = 5 * time.Minute
 func TestBenchlistAdd(t *testing.T) {
 	require := require.New(t)
 
+	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
 	vdrID2 := ids.GenerateTestNodeID()
 	vdrID3 := ids.GenerateTestNodeID()
 	vdrID4 := ids.GenerateTestNodeID()
-	ctx := snow.DefaultConsensusContextTest()
+
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID0, nil, ids.Empty, 50))
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID1, nil, ids.Empty, 50))
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID2, nil, ids.Empty, 50))
