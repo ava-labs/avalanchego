@@ -697,6 +697,7 @@ func (t *trieView) remove(key Path) error {
 		return t.deleteEmptyNodes(nodePath)
 	}
 
+	// Note len(nodePath) >= 2 since [nodeToDelete.key] != [t.root.key].
 	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
