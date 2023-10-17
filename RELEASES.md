@@ -9,7 +9,7 @@ The plugin version is updated to `29` all plugins must update to be compatible.
 ### Fixes
 
 - Added `Prefetcher` to the `merkledb` interface
-- Fixed json marshalling of `TrackedSubnets` and `AllowedNodes` to use the custom json marshaller
+- Fixed json marshalling of `TrackedSubnets` and `AllowedNodes`
 
 ### What's Changed
 
