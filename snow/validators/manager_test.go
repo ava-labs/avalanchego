@@ -53,9 +53,7 @@ func TestAddOverflow(t *testing.T) {
 	_, err := m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
 
-	set := set.Set[ids.NodeID]{}
-	set.Add(nodeID1)
-	set.Add(nodeID2)
+	set := set.Of(nodeID1, nodeID2)
 	_, err = m.SubsetWeight(subnetID, set)
 	require.ErrorIs(err, math.ErrOverflow)
 }
@@ -116,9 +114,7 @@ func TestSubsetWeight(t *testing.T) {
 	weight1 := uint64(123)
 	weight2 := uint64(810)
 
-	subset := set.Set[ids.NodeID]{}
-	subset.Add(nodeID0)
-	subset.Add(nodeID1)
+	subset := set.Of(nodeID0, nodeID1)
 
 	m := NewManager()
 	subnetID := ids.GenerateTestID()
