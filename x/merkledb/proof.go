@@ -98,10 +98,11 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	case pbNode.Key == nil:
 		return ErrNilKey
 	}
+	node.Key = ToKey(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
+
 	if len(pbNode.Key.Value) != node.Key.bytesNeeded(node.Key.tokenLength) {
 		return ErrInvalidKeyLength
 	}
-	node.Key = ToKey(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
