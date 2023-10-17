@@ -857,8 +857,30 @@ func (t *trieView) insert(
 	}
 
 	// TODO handle new root creation
-	//if len(pathToNode) == 0 {
-	//}
+	if len(pathToNode) == 0 {
+		// [t.root.key] isn't a prefix of [key].
+		commonPrefixLength := getLengthOfCommonPrefix(t.root.key, key, 0 /*offset*/)
+		commonPrefix := t.root.key.Take(commonPrefixLength)
+		oldRoot := t.root
+		t.root = newNode(nil, commonPrefix)
+		t.root.addChild(oldRoot)
+
+		if commonPrefix == key {
+			// [key] is a prefix of [t.root.key] so it should be the new root.
+			t.root.setValue(value)
+			t.recordNewNode(t.root)
+			return t.root, nil
+		}
+
+		// Neither [key] nor [t.root.key] is a prefix of the other.
+		// Make a new root whose children are the old root and the new node.
+		t.root.addChild(oldRoot)
+		newValueNode := newNode(t.root, key)
+		newValueNode.setValue(value)
+		t.recordNewNode(t.root)
+		t.recordNewNode(newValueNode)
+		return newValueNode, nil
+	}
 
 	// We're inserting a node whose ancestry is [pathToNode]
 	// so we'll need to recalculate their IDs.
@@ -961,10 +983,11 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
+	// TODO remove
 	// don't delete the root.
-	if after.key.tokensLength == 0 {
-		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
-	}
+	//if after.key.tokensLength == 0 {
+	//	return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
+	//}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
