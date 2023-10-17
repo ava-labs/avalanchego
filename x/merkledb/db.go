@@ -972,6 +972,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
 	db.root = rootChange.after
+	rootKeyAndNodeBytes := codec.encodeKeyAndNode(db.root.key, &db.root.dbNode, db.valueNodeDB.branchFactor)
+	if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {
+		return err
+	}
 	db.history.record(changes)
 	return nil
 }
@@ -1155,10 +1159,16 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
 	if err == nil {
 		// Root is on disk.
-		db.root, err = codec.decodeKeyAndNode(rootBytes, db.valueNodeDB.branchFactor)
+		var rootDBNode dbNode
+		rootKey, err := codec.decodeKeyAndNode(rootBytes, &rootDBNode, db.valueNodeDB.branchFactor)
 		if err != nil {
 			return ids.ID{}, err
 		}
+		db.root = &node{
+			dbNode: rootDBNode,
+			key:    rootKey,
+		}
+		db.root.setValueDigest()
 		db.root.calculateID(db.metrics)
 		return db.root.id, nil
 	}

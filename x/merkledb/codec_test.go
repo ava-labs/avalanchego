@@ -270,3 +270,29 @@ func TestCodecDecodePathLengthOverflowRegression(t *testing.T) {
 	_, err := codec.decodePath(bytes, BranchFactor16)
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
+
+// TODO make fuzz test
+func TestEncodeDecodeKeyAndNode(t *testing.T) {
+	require := require.New(t)
+	codec := newCodec()
+
+	for _, branchFactor := range branchFactors {
+		key := NewPath([]byte{1, 2, 3}, branchFactor)
+		expectedNode := &dbNode{
+			value: maybe.Some([]byte{1}),
+			children: map[byte]child{
+				0: {
+					compressedPath: NewPath([]byte{2, 3}, branchFactor),
+					id:             ids.GenerateTestID(),
+					hasValue:       true,
+				},
+			},
+		}
+		b := codec.encodeKeyAndNode(key, expectedNode, branchFactor)
+		var gotNode dbNode
+		gotKey, err := codec.decodeKeyAndNode(b, &gotNode, branchFactor)
+		require.NoError(err)
+		require.Equal(expectedNode, &gotNode)
+		require.Equal(key, gotKey)
+	}
+}

@@ -290,8 +290,8 @@ func (proof *RangeProof) Verify(
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
 	// TODO remove
-	//case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
-	//	return ErrUnexpectedEndProof
+	case end.IsNothing() && len(proof.KeyValues) == 0 && /*len(proof.StartProof) > 0 &&*/ len(proof.EndProof) != 0:
+		return ErrUnexpectedEndProof
 	//case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
 	//	return ErrShouldJustBeRoot
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
@@ -307,6 +307,7 @@ func (proof *RangeProof) Verify(
 		branchFactor = proof.EndProof[0].KeyPath.branchFactor
 	default:
 		// TODO Get branch factor
+		branchFactor = BranchFactor16
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].

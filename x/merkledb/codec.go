@@ -68,7 +68,7 @@ type encoder interface {
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndNode(bytes []byte, factor BranchFactor) (*node, error)
+	decodeKeyAndNode(bytes []byte, n *dbNode, factor BranchFactor) (Path, error) // TODO should this return a Path?
 }
 
 func newCodec() encoderDecoder {
@@ -148,12 +148,10 @@ func (c *codecImpl) encodeKeyAndNode(key Path, n *dbNode, factor BranchFactor) [
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
-	if minDBNodeLen > len(b) {
+func (c *codecImpl) decodeDBNodeFromReader(src *bytes.Reader, n *dbNode, branchFactor BranchFactor) error {
+	if minDBNodeLen > src.Len() {
 		return io.ErrUnexpectedEOF
 	}
-
-	src := bytes.NewReader(b)
 
 	value, err := c.decodeMaybeByteSlice(src)
 	if err != nil {
@@ -207,27 +205,26 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	return nil
 }
 
-func (c *codecImpl) decodeKeyAndNode(b []byte, branchFactor BranchFactor) (*node, error) {
-	if ids.IDLen+minDBNodeLen > len(b) {
-		return nil, io.ErrUnexpectedEOF
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
+	return c.decodeDBNodeFromReader(bytes.NewReader(b), n, branchFactor)
+}
+
+func (c *codecImpl) decodeKeyAndNode(b []byte, n *dbNode, branchFactor BranchFactor) (Path, error) {
+	if minPathLen+minDBNodeLen > len(b) {
+		return Path{}, io.ErrUnexpectedEOF
 	}
 
 	src := bytes.NewReader(b)
 
 	key, err := c.decodePath(src, branchFactor)
 	if err != nil {
-		return nil, err
+		return Path{}, err
 	}
 
-	nodeBytes, err := c.decodeByteSlice(src)
-	if err != nil {
-		return nil, err
+	if err := c.decodeDBNodeFromReader(src, n, branchFactor); err != nil {
+		return Path{}, err
 	}
-	node, err := parseNode(key, nodeBytes)
-	if err != nil {
-		return nil, err
-	}
-	return node, nil
+	return key, nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {

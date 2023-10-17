@@ -150,7 +150,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 
 	require.NoError(db.Close())
 
-	// reloading the db, should set the root back to the one that was saved to [baseDB]
+	// reloading the db should set the root back to the one that was saved to [baseDB]
 	db, err = New(
 		context.Background(),
 		baseDB,
