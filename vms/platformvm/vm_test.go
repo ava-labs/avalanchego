@@ -1074,7 +1074,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 	db := manager.NewMemDB(version.Semantic1_0_0)
-
 	firstDB := db.NewPrefixDBManager([]byte{})
 
 	var (
@@ -1508,10 +1507,6 @@ func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	var (
 		fork     = ts.LatestFork
 		forkTime = ts.ValidateStartTime
@@ -1806,10 +1801,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	var (
 		fork     = ts.LatestFork

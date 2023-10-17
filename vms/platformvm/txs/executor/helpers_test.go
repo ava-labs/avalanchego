@@ -52,22 +52,6 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory secp256k1.Factory
-
-	// TODO cleanup
-	forkTimes = map[ts.ActiveFork]time.Time{
-		ts.ApricotPhase3Fork: ts.ValidateEndTime.Add(-2 * time.Second),   // GenesisTime.Add(1 * time.Second),
-		ts.ApricotPhase5Fork: ts.ValidateEndTime.Add(-2 * time.Second),   // GenesisTime.Add(2 * time.Second),
-		ts.BanffFork:         ts.ValidateEndTime.Add(-2 * time.Second),   // GenesisTime.Add(3 * time.Second),
-		ts.CortinaFork:       ts.ValidateStartTime.Add(-2 * time.Second), // GenesisTime.Add(4 * time.Second),
-		ts.DFork:             mockable.MaxTime,                           // GenesisTime.Add(5 * time.Second),
-	}
-	initialClockTimes = map[ts.ActiveFork]time.Time{
-		ts.ApricotPhase3Fork: ts.GenesisTime,
-		ts.ApricotPhase5Fork: ts.GenesisTime,
-		ts.BanffFork:         ts.ValidateEndTime.Add(-2 * time.Second),
-		ts.CortinaFork:       ts.ValidateEndTime.Add(-2 * time.Second),
-		ts.DFork:             ts.ValidateEndTime.Add(-2 * time.Second),
-	}
 )
 
 type environment struct {
@@ -105,8 +89,13 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := ts.Config(fork, forkTimes[fork])
-	clk := ts.Clock(initialClockTimes[fork])
+	var (
+		forkTime       = ts.ValidateStartTime.Add(-1 * time.Second)
+		initialClkTime = forkTime.Add(time.Second)
+	)
+
+	config := ts.Config(fork, forkTime)
+	clk := ts.Clock(initialClkTime)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
