@@ -20,12 +20,6 @@ import (
 const DefaultTagName = "serialize"
 
 var (
-	MagicBytesPtrNil        = []byte{0xff}
-	MagicBytesPtr           = []byte{0x00}
-	magicBytesPtrPrefixSize = len(MagicBytesPtrNil)
-)
-
-var (
 	_ codec.Codec = (*genericCodec)(nil)
 
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
@@ -126,13 +120,13 @@ func (c *genericCodec) size(value reflect.Value, omitEmpty bool) (int, bool, err
 	case reflect.Ptr:
 		if omitEmpty {
 			if value.IsNil() {
-				return magicBytesPtrPrefixSize, false, nil
+				return wrappers.BoolLen, false, nil
 			}
 			size, _, err := c.size(value.Elem(), omitEmpty)
 			if err != nil {
 				return 0, false, err
 			}
-			return magicBytesPtrPrefixSize + size, false, nil
+			return wrappers.BoolLen + size, false, nil
 		}
 
 		if value.IsNil() { // Can't marshal nil (except nil slices *or* if omitEmpty)
@@ -344,16 +338,13 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Ptr:
+		isNil := value.IsNil()
 		if omitEmpty {
-			if value.IsNil() {
-				p.PackFixedBytes(MagicBytesPtrNil)
+			p.PackBool(isNil)
+			if isNil {
 				return p.Err
 			}
-			p.PackFixedBytes(MagicBytesPtr)
-			if p.Err != nil {
-				return p.Err
-			}
-		} else if value.IsNil() {
+		} else if isNil {
 			return errMarshalNil
 		}
 
@@ -680,7 +671,7 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		v := reflect.New(t)
 		// Fill the value
 		if omitEmpty {
-			if bytes.Equal(MagicBytesPtrNil, p.UnpackIfMatches(MagicBytesPtrNil, MagicBytesPtr)) {
+			if p.UnpackBool() {
 				// Nil
 				return nil
 			}
