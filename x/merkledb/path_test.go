@@ -114,6 +114,7 @@ func Test_Path_Has_Prefix(t *testing.T) {
 				pathB := tt.pathB(bf)
 
 				require.Equal(tt.isPrefix, pathA.HasPrefix(pathB))
+				require.Equal(tt.isPrefix, pathA.iteratedHasPrefix(0, pathB))
 				require.Equal(tt.isStrictPrefix, pathA.HasStrictPrefix(pathB))
 			})
 		}
@@ -275,70 +276,76 @@ func Test_Path_Append(t *testing.T) {
 	}
 }
 
-func Test_Path_Extend(t *testing.T) {
+func Test_Path_AppendExtend(t *testing.T) {
 	require := require.New(t)
 
 	path2 := NewPath([]byte{0b1000_0000}, BranchFactor2).Take(1)
 	p := NewPath([]byte{0b01010101}, BranchFactor2)
-	extendedP := path2.Extend(p)
-	require.Equal([]byte{0b10101010, 0b1000_0000}, extendedP.Bytes())
+	extendedP := path2.AppendExtend(0, p)
+	require.Equal([]byte{0b10010101, 0b01000_000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
 	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
-	require.Equal(byte(0), extendedP.Token(3))
-	require.Equal(byte(1), extendedP.Token(4))
-	require.Equal(byte(0), extendedP.Token(5))
-	require.Equal(byte(1), extendedP.Token(6))
-	require.Equal(byte(0), extendedP.Token(7))
-	require.Equal(byte(1), extendedP.Token(8))
-
-	p = NewPath([]byte{0b01010101, 0b1000_0000}, BranchFactor2).Take(9)
-	extendedP = path2.Extend(p)
-	require.Equal([]byte{0b10101010, 0b1100_0000}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
-	require.Equal(byte(0), extendedP.Token(3))
-	require.Equal(byte(1), extendedP.Token(4))
-	require.Equal(byte(0), extendedP.Token(5))
-	require.Equal(byte(1), extendedP.Token(6))
-	require.Equal(byte(0), extendedP.Token(7))
-	require.Equal(byte(1), extendedP.Token(8))
+	require.Equal(byte(0), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(3))
+	require.Equal(byte(0), extendedP.Token(4))
+	require.Equal(byte(1), extendedP.Token(5))
+	require.Equal(byte(0), extendedP.Token(6))
+	require.Equal(byte(1), extendedP.Token(7))
+	require.Equal(byte(0), extendedP.Token(8))
 	require.Equal(byte(1), extendedP.Token(9))
+
+	p = NewPath([]byte{0b0101_0101, 0b1000_0000}, BranchFactor2).Take(9)
+	extendedP = path2.AppendExtend(0, p)
+	require.Equal([]byte{0b1001_0101, 0b0110_0000}, extendedP.Bytes())
+	require.Equal(byte(1), extendedP.Token(0))
+	require.Equal(byte(0), extendedP.Token(1))
+	require.Equal(byte(0), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(3))
+	require.Equal(byte(0), extendedP.Token(4))
+	require.Equal(byte(1), extendedP.Token(5))
+	require.Equal(byte(0), extendedP.Token(6))
+	require.Equal(byte(1), extendedP.Token(7))
+	require.Equal(byte(0), extendedP.Token(8))
+	require.Equal(byte(1), extendedP.Token(9))
+	require.Equal(byte(1), extendedP.Token(10))
 
 	path4 := NewPath([]byte{0b0100_0000}, BranchFactor4).Take(1)
 	p = NewPath([]byte{0b0101_0101}, BranchFactor4)
-	extendedP = path4.Extend(p)
-	require.Equal([]byte{0b0101_0101, 0b0100_0000}, extendedP.Bytes())
+	extendedP = path4.AppendExtend(0, p)
+	require.Equal([]byte{0b0100_0101, 0b0101_0000}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(0), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
 	require.Equal(byte(1), extendedP.Token(3))
 	require.Equal(byte(1), extendedP.Token(4))
+	require.Equal(byte(1), extendedP.Token(5))
 
 	path16 := NewPath([]byte{0b0001_0000}, BranchFactor16).Take(1)
 	p = NewPath([]byte{0b0001_0001}, BranchFactor16)
-	extendedP = path16.Extend(p)
-	require.Equal([]byte{0b0001_0001, 0b0001_0000}, extendedP.Bytes())
+	extendedP = path16.AppendExtend(0, p)
+	require.Equal([]byte{0b0001_0000, 0b0001_0001}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(0), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(3))
 
 	p = NewPath([]byte{0b0001_0001, 0b0001_0001}, BranchFactor16)
-	extendedP = path16.Extend(p)
-	require.Equal([]byte{0b0001_0001, 0b0001_0001, 0b0001_0000}, extendedP.Bytes())
+	extendedP = path16.AppendExtend(0, p)
+	require.Equal([]byte{0b0001_0000, 0b0001_0001, 0b0001_0001}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(0), extendedP.Token(1))
 	require.Equal(byte(1), extendedP.Token(2))
 	require.Equal(byte(1), extendedP.Token(3))
 	require.Equal(byte(1), extendedP.Token(4))
+	require.Equal(byte(1), extendedP.Token(5))
 
 	path256 := NewPath([]byte{0b0000_0001}, BranchFactor256)
 	p = NewPath([]byte{0b0000_0001}, BranchFactor256)
-	extendedP = path256.Extend(p)
-	require.Equal([]byte{0b0000_0001, 0b0000_0001}, extendedP.Bytes())
+	extendedP = path256.AppendExtend(0, p)
+	require.Equal([]byte{0b0000_0001, 0b0000_0000, 0b0000_0001}, extendedP.Bytes())
 	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(1), extendedP.Token(1))
+	require.Equal(byte(0), extendedP.Token(1))
+	require.Equal(byte(1), extendedP.Token(2))
 }
 
 func TestPathBytesNeeded(t *testing.T) {
@@ -458,11 +465,12 @@ func TestPathBytesNeeded(t *testing.T) {
 	}
 }
 
-func FuzzPathExtend(f *testing.F) {
+func FuzzPathAppendExtend(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
 		second []byte,
+		token byte,
 		forceFirstOdd bool,
 		forceSecondOdd bool,
 	) {
@@ -476,13 +484,15 @@ func FuzzPathExtend(f *testing.F) {
 			if forceSecondOdd && path2.tokensLength > 0 {
 				path2 = path2.Take(path2.tokensLength - 1)
 			}
-			extendedP := path1.Extend(path2)
-			require.Equal(path1.tokensLength+path2.tokensLength, extendedP.tokensLength)
+			token = byte(int(token) % int(branchFactor))
+			extendedP := path1.AppendExtend(token, path2)
+			require.Equal(path1.tokensLength+path2.tokensLength+1, extendedP.tokensLength)
 			for i := 0; i < path1.tokensLength; i++ {
 				require.Equal(path1.Token(i), extendedP.Token(i))
 			}
+			require.Equal(token, extendedP.Token(path1.tokensLength))
 			for i := 0; i < path2.tokensLength; i++ {
-				require.Equal(path2.Token(i), extendedP.Token(i+path1.tokensLength))
+				require.Equal(path2.Token(i), extendedP.Token(i+1+path1.tokensLength))
 			}
 		}
 	})

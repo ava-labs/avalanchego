@@ -358,12 +358,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 }
 
 // Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
-// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
-// This transaction will result in [tx.NodeID] being removed as a validator of
+// [e.State]. For verification rules, see [verifyRemoveSubnetValidatorTx]. This
+// transaction will result in [tx.NodeID] being removed as a validator of
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
