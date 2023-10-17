@@ -22,8 +22,6 @@ var (
 type TransferSubnetOwnershipTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
-	// Describes the validator
-	Validator `serialize:"true" json:"validator"`
 	// ID of the subnet this tx is modifying
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Proves that the issuer has the right to remove the node from the subnet.
