@@ -1001,6 +1001,7 @@ func (h *handler) popUnexpiredMsg(
 	}
 }
 
+// Invariant: if closeDispatcher is called, Stop has already been called.
 func (h *handler) closeDispatcher(ctx context.Context) {
 	if h.numDispatchersClosed.Add(1) < numDispatchersToClose {
 		return
