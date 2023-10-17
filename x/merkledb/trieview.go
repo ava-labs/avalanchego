@@ -338,6 +338,7 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 }
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
+// TODO find places broken by this returning proofs with empty paths
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
@@ -472,14 +473,15 @@ func (t *trieView) GetRangeProof(
 		result.StartProof = result.StartProof[i:]
 	}
 
-	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, emptyKey)
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = rootProof.Path
-	}
+	// TODO remove
+	// if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
+	// 	// If the range is empty, return the root proof.
+	// 	rootProof, err := t.getProof(ctx, emptyKey)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	result.EndProof = rootProof.Path
+	// }
 
 	if t.isInvalid() {
 		return nil, ErrInvalid

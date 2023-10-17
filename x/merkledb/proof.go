@@ -255,16 +255,12 @@ type RangeProof struct {
 	// they are also in [EndProof].
 	StartProof []ProofNode
 
-	// If no upper range bound was given, [KeyValues] is empty,
-	// and [StartProof] is non-empty, this is empty.
+	// If no upper range bound was given and [KeyValues] is empty, this is empty.
 	//
-	// If no upper range bound was given, [KeyValues] is empty,
-	// and [StartProof] is empty, this is the root.
+	// If no upper range bound was given and [KeyValues] is non-empty, this is
+	// a proof for the largest key in [KeyValues].
 	//
-	// If an upper range bound was given and [KeyValues] is empty,
-	// this is a proof for the upper range bound.
-	//
-	// Otherwise, this is a proof for the largest key in [KeyValues].
+	// Otherwise this is a proof for the upper range bound.
 	EndProof []ProofNode
 
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
@@ -293,21 +289,24 @@ func (proof *RangeProof) Verify(
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
-		return ErrUnexpectedEndProof
-	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
-		return ErrShouldJustBeRoot
+	// TODO remove
+	//case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
+	//	return ErrUnexpectedEndProof
+	//case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
+	//	return ErrShouldJustBeRoot
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
 		return ErrNoEndProof
 	}
 
 	// determine branch factor based on proof paths
 	var branchFactor BranchFactor
-	if len(proof.StartProof) > 0 {
+	switch {
+	case len(proof.StartProof) > 0:
 		branchFactor = proof.StartProof[0].KeyPath.branchFactor
-	} else {
-		// safe because invariants prevent both start proof and end proof from being empty at the same time
+	case len(proof.EndProof) > 0:
 		branchFactor = proof.EndProof[0].KeyPath.branchFactor
+	default:
+		// TODO Get branch factor
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
