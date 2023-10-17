@@ -194,6 +194,5 @@ pub mod storage;
 pub mod api;
 pub(crate) mod config;
 pub mod nibbles;
-pub mod service;
 
 pub mod v2;

@@ -82,33 +82,3 @@ where
         Ok(proposal)
     }
 }
-
-#[derive(Debug, Default)]
-pub struct DbView;
-
-#[async_trait]
-impl api::DbView for DbView {
-    async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
-        todo!()
-    }
-
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, api::Error> {
-        todo!()
-    }
-
-    async fn single_key_proof<K: KeyType>(
-        &self,
-        _key: K,
-    ) -> Result<Option<api::Proof<Vec<u8>>>, api::Error> {
-        todo!()
-    }
-
-    async fn range_proof<K: KeyType, V, N>(
-        &self,
-        _first_key: Option<K>,
-        _last_key: Option<K>,
-        _limit: usize,
-    ) -> Result<Option<api::RangeProof<K, V, N>>, api::Error> {
-        todo!()
-    }
-}
