@@ -426,12 +426,16 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	vtxHeightSet := set.Set[ids.ID]{}
 	prevHeight := uint64(0)
 
-	for toProcess.Len() > 0 {
+	for {
+		vtxID, vtx, ok := toProcess.Pop()
+		if !ok {
+			break
+		}
+
 		if b.Halted() {
 			return nil
 		}
 
-		vtxID, vtx, _ := toProcess.Pop()
 		switch vtx.Status() {
 		case choices.Unknown:
 			b.VtxBlocked.AddMissingID(vtxID)
