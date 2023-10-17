@@ -162,14 +162,12 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
-	vdrs := validators.NewManager()
-
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
-			Validators: vdrs,
+			Validators: validators.NewManager(),
 		},
 		execCfg,
 		&snow.Context{},
