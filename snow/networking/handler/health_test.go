@@ -37,7 +37,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 		"custom consensus params": {
 			func() snowball.Parameters {
 				params := snowball.DefaultParameters
-				params.K = params.Alpha
+				params.K = params.AlphaConfidence
 				return params
 			}(),
 		},

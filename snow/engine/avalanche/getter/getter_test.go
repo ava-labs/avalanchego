@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
@@ -136,12 +135,7 @@ func TestFilterAccepted(t *testing.T) {
 
 	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs))
 
-	acceptedSet := set.Set[ids.ID]{}
-	acceptedSet.Add(accepted...)
-
-	manager.GetVtxF = nil
-
-	require.Contains(acceptedSet, vtxID0)
-	require.Contains(acceptedSet, vtxID1)
-	require.NotContains(acceptedSet, vtxID2)
+	require.Contains(accepted, vtxID0)
+	require.Contains(accepted, vtxID1)
+	require.NotContains(accepted, vtxID2)
 }

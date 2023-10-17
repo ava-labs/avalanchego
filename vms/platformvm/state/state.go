@@ -7,10 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
-
-	stdmath "math"
 
 	"github.com/google/btree"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -46,6 +44,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -400,14 +400,14 @@ type ValidatorWeightDiff struct {
 func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
 	if v.Decrease == negative {
 		var err error
-		v.Amount, err = math.Add64(v.Amount, amount)
+		v.Amount, err = safemath.Add64(v.Amount, amount)
 		return err
 	}
 
 	if v.Amount > amount {
 		v.Amount -= amount
 	} else {
-		v.Amount = math.AbsDiff(v.Amount, amount)
+		v.Amount = safemath.AbsDiff(v.Amount, amount)
 		v.Decrease = negative
 	}
 	return nil
@@ -1268,11 +1268,11 @@ func applyWeightDiff(
 	if weightDiff.Decrease {
 		// The validator's weight was decreased at this block, so in the
 		// prior block it was higher.
-		vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
+		vdr.Weight, err = safemath.Add64(vdr.Weight, weightDiff.Amount)
 	} else {
 		// The validator's weight was increased at this block, so in the
 		// prior block it was lower.
-		vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
+		vdr.Weight, err = safemath.Sub(vdr.Weight, weightDiff.Amount)
 	}
 	if err != nil {
 		return err
@@ -1367,7 +1367,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			stakeAmount,
 			currentSupply,
 		)
-		newCurrentSupply, err := math.Add64(currentSupply, potentialReward)
+		newCurrentSupply, err := safemath.Add64(currentSupply, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -2555,7 +2555,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 				eta := timer.EstimateETA(
 					startTime,
 					progress,
-					stdmath.MaxUint64,
+					math.MaxUint64,
 				)
 
 				log.Info("committing state pruning and indexing",
@@ -2570,7 +2570,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// could take an extremely long period of time; which we should not
 			// delay processing for.
 			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := math.Min(
+			sleepDuration := safemath.Min(
 				pruneCommitSleepMultiplier*pruneDuration,
 				pruneCommitSleepCap,
 			)

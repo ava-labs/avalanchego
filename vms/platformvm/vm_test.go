@@ -405,8 +405,7 @@ func TestGenesis(t *testing.T) {
 		addr, err := ids.ToShortID(addrBytes)
 		require.NoError(err)
 
-		addrs := set.Set[ids.ShortID]{}
-		addrs.Add(addr)
+		addrs := set.Of(addr)
 		utxos, err := avax.GetAllUTXOs(vm.state, addrs)
 		require.NoError(err)
 		require.Len(utxos, 1)
@@ -1676,7 +1675,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Validators:    beacons,
 		Params: snowball.Parameters{
 			K:                     1,
-			Alpha:                 1,
+			AlphaPreference:       1,
+			AlphaConfidence:       1,
 			BetaVirtuous:          20,
 			BetaRogue:             20,
 			ConcurrentRepolls:     1,

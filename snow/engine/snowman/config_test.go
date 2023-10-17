@@ -20,7 +20,8 @@ func DefaultConfigs() Config {
 		VM:         &block.TestVM{},
 		Params: snowball.Parameters{
 			K:                     1,
-			Alpha:                 1,
+			AlphaPreference:       1,
+			AlphaConfidence:       1,
 			BetaVirtuous:          1,
 			BetaRogue:             2,
 			ConcurrentRepolls:     1,

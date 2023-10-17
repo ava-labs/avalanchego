@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -72,8 +73,6 @@ type VM interface {
 	//
 	// Returns a mapping from [extension]s to HTTP handlers.
 	//
-	// Each extension can specify how locking is managed for convenience.
-	//
 	// For example, it might make sense to have an extension for creating
 	// genesis bytes this VM can interpret.
 	//
@@ -81,7 +80,7 @@ type VM interface {
 	// Each registered VM will have a single instance created to handle static
 	// APIs. This instance will be handled separately from instances created to
 	// service an instance of a chain.
-	CreateStaticHandlers(context.Context) (map[string]*HTTPHandler, error)
+	CreateStaticHandlers(context.Context) (map[string]http.Handler, error)
 
 	// Creates the HTTP handlers for custom chain network calls.
 	//
@@ -91,10 +90,8 @@ type VM interface {
 	//
 	// Returns a mapping from [extension]s to HTTP handlers.
 	//
-	// Each extension can specify how locking is managed for convenience.
-	//
 	// For example, if this VM implements an account-based payments system,
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
-	CreateHandlers(context.Context) (map[string]*HTTPHandler, error)
+	CreateHandlers(context.Context) (map[string]http.Handler, error)
 }

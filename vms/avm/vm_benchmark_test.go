@@ -97,8 +97,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	}
 	require.NoError(env.vm.state.Commit())
 
-	addrsSet := set.Set[ids.ShortID]{}
-	addrsSet.Add(addr)
+	addrsSet := set.Of(addr)
 
 	b.ResetTimer()
 

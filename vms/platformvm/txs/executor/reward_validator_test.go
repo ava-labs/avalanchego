@@ -307,10 +307,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	expectedReward := uint64(1000000)
 
@@ -410,10 +408,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
@@ -627,10 +623,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
@@ -804,10 +798,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	expectedReward := uint64(1000000)
 
