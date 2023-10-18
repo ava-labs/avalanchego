@@ -232,7 +232,9 @@ func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
 	require := require.New(t)
 	numKeys := 10
 	cChainID := ids.GenerateTestID()
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, cChainID, []byte{1, 2, 3})
+	addressedCall, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(100))
+	require.NoError(err)
+	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, cChainID, addressedCall.Bytes())
 	require.NoError(err)
 
 	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
@@ -393,18 +395,19 @@ func TestInvalidAddressedPayload(t *testing.T) {
 		},
 		StorageSlots: [][]byte{predicateBytes},
 		Gas:          GasCostPerSignatureVerification + uint64(len(predicateBytes))*GasCostPerWarpMessageBytes + uint64(numKeys)*GasCostPerWarpSigner,
-		GasErr:       nil,
-		PredicateRes: set.NewBits(0).Bytes(),
+		GasErr:       errInvalidWarpMsgPayload,
 	}
 
 	test.Run(t)
 }
 
 func TestInvalidBitSet(t *testing.T) {
+	addressedCall, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(100))
+	require.NoError(t, err)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(
 		networkID,
 		sourceChainID,
-		[]byte{1, 2, 3},
+		addressedCall.Bytes(),
 	)
 	require.NoError(t, err)
 

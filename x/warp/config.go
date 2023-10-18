@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
@@ -29,6 +30,7 @@ var (
 	errOverflowSignersGasCost  = errors.New("overflow calculating warp signers gas cost")
 	errInvalidPredicateBytes   = errors.New("cannot unpack predicate bytes")
 	errInvalidWarpMsg          = errors.New("cannot unpack warp message")
+	errInvalidWarpMsgPayload   = errors.New("cannot unpack warp message payload")
 	errInvalidAddressedPayload = errors.New("cannot unpack addressed payload")
 	errInvalidBlockHashPayload = errors.New("cannot unpack block hash payload")
 	errCannotGetNumSigners     = errors.New("cannot fetch num signers from warp message")
@@ -147,6 +149,8 @@ func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.PredicateC
 // 2. Size of the message
 // 3. Number of signers
 // 4. TODO: Lookup of the validator set
+//
+// If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
 func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 	totalGas := GasCostPerSignatureVerification
 	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageBytes, uint64(len(predicateBytes)))
@@ -165,6 +169,10 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 	warpMessage, err := warp.ParseMessage(unpackedPredicateBytes)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %s", errInvalidWarpMsg, err)
+	}
+	_, err = payload.Parse(warpMessage.Payload)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %s", errInvalidWarpMsgPayload, err)
 	}
 
 	numSigners, err := warpMessage.Signature.NumSigners()
