@@ -145,7 +145,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	rootNode, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
+	root, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -154,7 +154,7 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:       rootNode,
+		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),

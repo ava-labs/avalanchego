@@ -41,7 +41,8 @@ const (
 )
 
 var (
-	_ MerkleDB = (*merkleDB)(nil)
+	rootKey []byte
+	_       MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
@@ -239,7 +240,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		newPath:              newPath,
-		rootPath:             emptyPath(config.BranchFactor),
+		rootPath:             newPath(rootKey),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
