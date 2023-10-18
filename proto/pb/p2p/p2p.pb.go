@@ -786,12 +786,15 @@ func (x *Version) GetClient() *Client {
 	return nil
 }
 
+// Metadata about a peer's P2P client used to determine compatibility
 type Client struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Name  string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Client name (e.g avalanchego)
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Client semantic version
 	Major uint32 `protobuf:"varint,2,opt,name=major,proto3" json:"major,omitempty"`
 	Minor uint32 `protobuf:"varint,3,opt,name=minor,proto3" json:"minor,omitempty"`
 	Patch uint32 `protobuf:"varint,4,opt,name=patch,proto3" json:"patch,omitempty"`
