@@ -54,7 +54,7 @@ var (
 	didNotHaveCleanShutdown = []byte{0}
 
 	errSameRoot  = errors.New("start and end root are the same")
-	errNoNewRoot = errors.New("there was no updated root node in change list")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
 
 type ChangeProofer interface {
@@ -929,7 +929,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	sentinelChange, ok := changes.nodes[db.rootPath]
+	rootChange, ok := changes.nodes[db.rootPath]
 	if !ok {
 		return errNoNewRoot
 	}
@@ -973,7 +973,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	db.root = sentinelChange.after
+	db.root = rootChange.after
 	db.history.record(changes)
 	return nil
 }
@@ -1154,15 +1154,14 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 }
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// not sure if the  sentinel node exists or if it had a value
-	// check under both prefixes
+	// not sure if the root exists or had a value or not
 	var err error
 	db.root, err = db.intermediateNodeDB.Get(db.rootPath)
 	if err == database.ErrNotFound {
 		db.root, err = db.valueNodeDB.Get(db.rootPath)
 	}
 	if err == nil {
-		// sentinel node already exists, so calculate the root ID of the trie
+		// root already exists, so calculate the root ID of the trie
 		db.root.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
@@ -1170,7 +1169,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	// sentinel node doesn't exist; make a new one.
+	// root doesn't exist; make a new one.
 	db.root = newNode(nil, db.rootPath)
 
 	// update its ID
