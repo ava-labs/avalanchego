@@ -351,7 +351,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	// if there are no nodes in the proof path, add the root to serve as an exclusion proof
 	if len(proofPath) == 0 {
-		proof.Path = []ProofNode{t.getRoot().asProofNode()}
+		proof.Path = []ProofNode{root.asProofNode()}
 		return proof, nil
 	}
 
