@@ -376,7 +376,7 @@ message Chits {
   bytes chain_id = 1;
   // Request id of the original PushQuery/PullQuery request
   uint32 request_id = 2;
-  // Currently preferred bl ock
+  // Currently preferred block
   bytes preferred_id = 3;
   // Last accepted block
   bytes accepted_id = 4;
