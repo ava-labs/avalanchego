@@ -767,7 +767,7 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // Always returns at least the root node.
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
-		// all node paths start at the root since its nil key is a prefix of all keys
+		// all node paths start at the root
 		currentNode      = t.root
 		matchedPathIndex = 0
 		nodes            = []*node{t.root}
