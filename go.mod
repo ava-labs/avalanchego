@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
-go 1.20
+go 1.21
 
 require (
 	github.com/DataDog/zstd v1.5.2
@@ -57,7 +57,7 @@ require (
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.14.0
-	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.13.0

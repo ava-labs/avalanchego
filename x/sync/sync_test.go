@@ -695,8 +695,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}
 
 		// Sort in ascending order by key prefix.
-		serializedPathLess := func(i, j keyAndID) bool {
-			return i.key.Less(j.key)
+		serializedPathLess := func(i, j keyAndID) int {
+			if i.key.Less(j.key) {
+				return -1
+			}
+			return 1
 		}
 		slices.SortFunc(remoteKeyIDs, serializedPathLess)
 		slices.SortFunc(localKeyIDs, serializedPathLess)
@@ -737,7 +740,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
 			// See if the keys are different.
 			smaller, bigger := remoteKeyIDs[i], localKeyIDs[i]
-			if serializedPathLess(localKeyIDs[i], remoteKeyIDs[i]) {
+			if serializedPathLess(localKeyIDs[i], remoteKeyIDs[i]) < 0 {
 				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
 
@@ -1193,8 +1196,8 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		}
 		i++
 	}
-	slices.SortFunc(allKeys, func(a, b []byte) bool {
-		return bytes.Compare(a, b) < 0
+	slices.SortFunc(allKeys, func(a, b []byte) int {
+		return bytes.Compare(a, b)
 	})
 	return db, allKeys, batch.Write()
 }
