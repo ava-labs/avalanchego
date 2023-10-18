@@ -145,13 +145,6 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	// root, err := parentTrie.getEditableNode(parentTrie.getRootKey(), false /* hasValue */)
-	// if err != nil {
-	// 	if err == database.ErrNotFound {
-	// 		return nil, ErrNoValidRoot
-	// 	}
-	// 	return nil, err
-	// }
 	root := parentTrie.getRoot()
 	if root.HasValue() {
 		root = maybe.Some(root.Value().clone()) // TODO better way of doing this?
@@ -201,10 +194,9 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	// TODO is this right?
 	root := maybe.Nothing[*node]()
 	if changes.rootChange.after != nil {
-		root = maybe.Some(changes.rootChange.after.clone()) // TODO clone needed?
+		root = maybe.Some(changes.rootChange.after)
 	}
 	newView := &trieView{
 		root:       root,
@@ -236,7 +228,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 		oldRoot := t.root.Value()
 		if oldRoot != nil {
-			// TODO is this right?
 			oldRoot = oldRoot.clone()
 		}
 
@@ -579,7 +570,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, err
 	}
 	if t.root.IsNothing() {
-		return ids.Empty, nil // TODO document/handle
+		return ids.Empty, nil
 	}
 	return t.root.Value().id, nil
 }
@@ -660,6 +651,7 @@ func (t *trieView) remove(key Path) error {
 		// the key wasn't in the trie
 		return nil
 	}
+	// [t.root] has a value.
 
 	nodeToDelete := nodePath[len(nodePath)-1]
 
@@ -678,7 +670,7 @@ func (t *trieView) remove(key Path) error {
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
 
-	if nodeToDelete.key == t.root.Value().key { // TODO is this right?
+	if nodeToDelete.key == t.root.Value().key {
 		// We're deleting the root.
 		switch len(nodeToDelete.children) {
 		case 0:
@@ -730,7 +722,8 @@ func (t *trieView) remove(key Path) error {
 // Merges together nodes in the inclusive descendnnts of [n] that
 // have no value and a single child into one node with a compressed
 // path until a node that doesn't meet those criteria is reached.
-// [parent] is [n]'s parent.
+// [parent] is [n]'s parent. If [parent] is nil, [n] is the root
+// node and [t.root] is updated to [n].
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.

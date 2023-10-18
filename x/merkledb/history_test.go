@@ -686,23 +686,23 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 	}
 
 	tests := []test{
-		// {
-		// 	name:        "unknown root ID",
-		// 	rootID:      ids.GenerateTestID(),
-		// 	expectedErr: ErrInsufficientHistory,
-		// },
-		// {
-		// 	name:   "most recent change",
-		// 	rootID: changes[maxHistoryLen-1].rootID,
-		// 	validateFunc: func(require *require.Assertions, got *changeSummary) {
-		// 		expected := newChangeSummary(defaultPreallocationSize)
-		// 		require.Equal(expected, got)
-		// 	},
-		// },
+		{
+			name:        "unknown root ID",
+			rootID:      ids.GenerateTestID(),
+			expectedErr: ErrInsufficientHistory,
+		},
+		{
+			name:   "most recent change",
+			rootID: changes[maxHistoryLen-1].rootID,
+			validateFunc: func(require *require.Assertions, got *changeSummary) {
+				expected := newChangeSummary(defaultPreallocationSize)
+				require.Equal(expected, got)
+			},
+		},
 		{
 			name:   "second most recent change",
 			rootID: changes[maxHistoryLen-2].rootID,
-			validateFunc: func(require *require.Assertions, got *changeSummary) { // TODO add assertions for rootChange
+			validateFunc: func(require *require.Assertions, got *changeSummary) {
 				// Ensure this is the reverse of the most recent change
 				require.Len(got.nodes, 1)
 				require.Len(got.values, 1)
