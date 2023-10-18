@@ -1150,6 +1150,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
+	// check under both prefixes
 	var err error
 	db.root, err = db.intermediateNodeDB.Get(db.rootPath)
 	if err == database.ErrNotFound {
