@@ -1570,7 +1570,9 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			metadata := &delegatorMetadata{}
+			metadata := &delegatorMetadata{
+				txID: txID,
+			}
 			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
@@ -2177,7 +2179,11 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to increase node weight diff: %w", err)
 		}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
+		metadata := &delegatorMetadata{
+			txID:            staker.TxID,
+			PotentialReward: staker.PotentialReward,
+		}
+		if err := writeDelegatorMetadata(currentDelegatorList, metadata); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
