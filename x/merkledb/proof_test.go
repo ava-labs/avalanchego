@@ -62,7 +62,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "odd length key path with value",
 			malform: func(proof *Proof) {
-				proof.Path[1].ValueOrHash = maybe.Some([]byte{1, 2})
+				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
@@ -187,7 +187,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "EndProof: odd length key path with value",
 			malform: func(proof *RangeProof) {
-				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
+				proof.EndProof[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
