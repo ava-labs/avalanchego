@@ -8,8 +8,8 @@
 package server
 
 import (
+	http "net/http"
 	reflect "reflect"
-	sync "sync"
 
 	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -78,31 +78,31 @@ func (mr *MockServerMockRecorder) AddAliasesWithReadLock(arg0 interface{}, arg1 
 }
 
 // AddRoute mocks base method.
-func (m *MockServer) AddRoute(arg0 *common.HTTPHandler, arg1 *sync.RWMutex, arg2, arg3 string) error {
+func (m *MockServer) AddRoute(arg0 http.Handler, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRoute", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AddRoute", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRoute indicates an expected call of AddRoute.
-func (mr *MockServerMockRecorder) AddRoute(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRoute(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), arg0, arg1, arg2)
 }
 
 // AddRouteWithReadLock mocks base method.
-func (m *MockServer) AddRouteWithReadLock(arg0 *common.HTTPHandler, arg1 *sync.RWMutex, arg2, arg3 string) error {
+func (m *MockServer) AddRouteWithReadLock(arg0 http.Handler, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRouteWithReadLock", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AddRouteWithReadLock", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRouteWithReadLock indicates an expected call of AddRouteWithReadLock.
-func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), arg0, arg1, arg2)
 }
 
 // Dispatch mocks base method.
