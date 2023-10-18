@@ -2146,7 +2146,6 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.state.SetTimestamp(vm.DTime.Add(time.Second)) // Activate D-upgrade
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
