@@ -9,6 +9,12 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
         "indexed": false,
         "internalType": "bytes",
         "name": "message",
@@ -117,7 +123,13 @@
       }
     ],
     "name": "sendWarpMessage",
-    "outputs": [],
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "messageID",
+        "type": "bytes32"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   }

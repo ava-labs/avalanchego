@@ -66,6 +66,17 @@ func TestSendWarpMessage(t *testing.T) {
 
 	warpSendMessageInput, err := warp.PackSendWarpMessage(payloadData)
 	require.NoError(err)
+	addressedPayload, err := payload.NewAddressedCall(
+		testEthAddrs[0].Bytes(),
+		payloadData,
+	)
+	require.NoError(err)
+	expectedUnsignedMessage, err := avalancheWarp.NewUnsignedMessage(
+		vm.ctx.NetworkID,
+		vm.ctx.ChainID,
+		addressedPayload.Bytes(),
+	)
+	require.NoError(err)
 
 	// Submit a transaction to trigger sending a warp message
 	tx0 := types.NewTransaction(uint64(0), warp.ContractAddress, big.NewInt(1), 100_000, big.NewInt(testMinGasPrice), warpSendMessageInput)
@@ -93,6 +104,7 @@ func TestSendWarpMessage(t *testing.T) {
 	expectedTopics := []common.Hash{
 		warp.WarpABI.Events["SendWarpMessage"].ID,
 		testEthAddrs[0].Hash(),
+		common.Hash(expectedUnsignedMessage.ID()),
 	}
 	require.Equal(expectedTopics, receipts[0].Logs[0].Topics)
 	logData := receipts[0].Logs[0].Data

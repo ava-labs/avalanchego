@@ -44,13 +44,14 @@ The Warp Precompile is broken down into three functions defined in the Solidity 
 
 Calling this function will issue a `SendWarpMessage` event from the Warp Precompile. Since the EVM limits the number of topics to 4 including the EventID, this message includes only the topics that would be expected to help filter messages emitted from the Warp Precompile the most.
 
-Specifically, the `payload` is not emitted as a topic because each topic must be encoded as a hash. It could include the warp `messageID` as a topic, but that would not add more information. Therefore, we opt to take advantage of each possible topic to maximize the possible filtering for emitted Warp Messages.
+Specifically, the `payload` is not emitted as a topic because each topic must be encoded as a hash. Therefore, we opt to take advantage of each possible topic to maximize the possible filtering for emitted Warp Messages.
 
 Additionally, the `SourceChainID` is excluded because anyone parsing the chain can be expected to already know the blockchainID. Therefore, the `SendWarpMessage` event includes the indexable attributes:
 
 - `sender`
+- The `messageID` of the unsigned message (sha256 of the unsigned message)
 
-The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including the Subnet-EVM [Addressed Payload](../../../warp/payload/payload.go).
+The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including the Subnet-EVM [Addressed Payload](../../../warp/payload/payload.go). This is emitted as the unindexed data in the log.
 
 #### getVerifiedMessage
 

@@ -204,6 +204,23 @@ func PackSendWarpMessage(payloadData []byte) ([]byte, error) {
 	return WarpABI.Pack("sendWarpMessage", payloadData)
 }
 
+// PackSendWarpMessageOutput attempts to pack given messageID of type common.Hash
+// to conform the ABI outputs.
+func PackSendWarpMessageOutput(messageID common.Hash) ([]byte, error) {
+	return WarpABI.PackOutput("sendWarpMessage", messageID)
+}
+
+// UnpackSendWarpMessageOutput attempts to unpack given [output] into the common.Hash type output
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func UnpackSendWarpMessageOutput(output []byte) (common.Hash, error) {
+	res, err := WarpABI.Unpack("sendWarpMessage", output)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	unpacked := *abi.ConvertType(res[0], new(common.Hash)).(*common.Hash)
+	return unpacked, nil
+}
+
 // sendWarpMessage constructs an Avalanche Warp Message containing an AddressedPayload and emits a log to signal validators that they should
 // be willing to sign this message.
 func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
@@ -252,6 +269,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	// Add a log to be handled if this action is finalized.
 	topics, data, err := PackSendWarpMessageEvent(
 		sourceAddress,
+		common.Hash(unsignedWarpMessage.ID()),
 		unsignedWarpMessage.Bytes(),
 	)
 	if err != nil {
@@ -264,13 +282,18 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 		accessibleState.GetBlockContext().Number().Uint64(),
 	)
 
-	// Return an empty output and the remaining gas
-	return []byte{}, remainingGas, nil
+	packed, err := PackSendWarpMessageOutput(common.Hash(unsignedWarpMessage.ID()))
+	if err != nil {
+		return nil, remainingGas, err
+	}
+
+	// Return the packed message ID and the remaining gas
+	return packed, remainingGas, nil
 }
 
 // PackSendWarpMessageEvent packs the given arguments into SendWarpMessage events including topics and data.
-func PackSendWarpMessageEvent(sourceAddress common.Address, unsignedMessageBytes []byte) ([]common.Hash, []byte, error) {
-	return WarpABI.PackEvent("SendWarpMessage", sourceAddress, unsignedMessageBytes)
+func PackSendWarpMessageEvent(sourceAddress common.Address, unsignedMessageID common.Hash, unsignedMessageBytes []byte) ([]common.Hash, []byte, error) {
+	return WarpABI.PackEvent("SendWarpMessage", sourceAddress, unsignedMessageID, unsignedMessageBytes)
 }
 
 // UnpackSendWarpEventDataToMessage attempts to unpack event [data] as warp.UnsignedMessage.

@@ -91,6 +91,17 @@ func TestSendWarpMessage(t *testing.T) {
 
 	sendWarpMessageInput, err := PackSendWarpMessage(sendWarpMessagePayload)
 	require.NoError(t, err)
+	sendWarpMessageAddressedPayload, err := payload.NewAddressedCall(
+		callerAddr.Bytes(),
+		sendWarpMessagePayload,
+	)
+	require.NoError(t, err)
+	unsignedWarpMessage, err := warp.NewUnsignedMessage(
+		defaultSnowCtx.NetworkID,
+		blockchainID,
+		sendWarpMessageAddressedPayload.Bytes(),
+	)
+	require.NoError(t, err)
 
 	tests := map[string]testutils.PrecompileTest{
 		"send warp message readOnly": {
@@ -128,7 +139,13 @@ func TestSendWarpMessage(t *testing.T) {
 			InputFn:     func(t testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: SendWarpMessageGasCost + uint64(len(sendWarpMessageInput[4:])*int(SendWarpMessageGasCostPerByte)),
 			ReadOnly:    false,
-			ExpectedRes: []byte{},
+			ExpectedRes: func() []byte {
+				bytes, err := PackSendWarpMessageOutput(common.Hash(unsignedWarpMessage.ID()))
+				if err != nil {
+					panic(err)
+				}
+				return bytes
+			}(),
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				logsData := state.GetLogData()
 				require.Len(t, logsData, 1)
@@ -733,6 +750,7 @@ func TestPackEvents(t *testing.T) {
 
 	_, data, err := PackSendWarpMessageEvent(
 		sourceAddress,
+		common.Hash(unsignedMsg.ID()),
 		unsignedWarpMessage.Bytes(),
 	)
 	require.NoError(t, err)
