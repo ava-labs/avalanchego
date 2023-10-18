@@ -132,7 +132,7 @@ func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *
 
 	// If Warp is enabled, add the block hash as an unsigned message to the warp backend.
 	if rules.IsPrecompileEnabled(warp.ContractAddress) {
-		blockHashPayload, err := payload.NewHash(ids.ID(b.ethBlock.Hash().Bytes()))
+		blockHashPayload, err := payload.NewHash(ids.ID(b.ethBlock.Hash()))
 		if err != nil {
 			return fmt.Errorf("failed to create block hash payload: %w", err)
 		}
