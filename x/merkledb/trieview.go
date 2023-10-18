@@ -146,7 +146,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	sentinelNode, err := parentTrie.getEditableNode(db.sentinelPath, false /* hasValue */)
+	sentinelNode, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -198,7 +198,7 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedSentinelChange, ok := changes.nodes[db.sentinelPath]
+	passedSentinelChange, ok := changes.nodes[db.rootPath]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
@@ -768,7 +768,7 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // Always returns at least the root node.
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
-		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
+		// all node paths start at the root since its nil key is a prefix of all keys
 		currentNode      = t.sentinelNode
 		matchedPathIndex = 0
 		nodes            = []*node{t.sentinelNode}
@@ -959,7 +959,7 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 
 func (t *trieView) getRoot() *node {
 	if !isSentinelNodeTheRoot(t.sentinelNode) {
-		// sentinelNode has one child, which is the root
+		// root has one child, which is the root
 		for index, childEntry := range t.sentinelNode.children {
 			childPath := t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath)
 			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
