@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -24,6 +26,9 @@ var (
 
 	ErrUnknownValidator = errors.New("unknown validator")
 	ErrWeightOverflow   = errors.New("weight overflowed")
+
+	canonicalValidatorSetTimeSlowdownSeconds            = 2 * time.Second
+	canonicalValidatorSetSlowdownProbabilityDenominator = 5
 )
 
 // ValidatorState defines the functions that must be implemented to get
@@ -52,6 +57,13 @@ func GetCanonicalValidatorSet(
 	pChainHeight uint64,
 	subnetID ids.ID,
 ) ([]*Validator, uint64, error) {
+	// There is a ~(1/canonicalValidatorSetSlowdownProbabilityDenominator) chance that we will output a 0 when calling this random number generator
+	// If we do we can implement a slowdown for canonicalValidatorSetTimeSlowdownSeconds
+	// This will introduce real world conditions needed for the warp load test.
+	randomNum := rand.Intn(canonicalValidatorSetSlowdownProbabilityDenominator)
+	if randomNum == 0 {
+		time.Sleep(canonicalValidatorSetTimeSlowdownSeconds)
+	}
 	// Get the validator set at the given height.
 	vdrSet, err := pChainState.GetValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
