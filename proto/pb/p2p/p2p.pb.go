@@ -25,8 +25,7 @@ type EngineType int32
 
 const (
 	EngineType_ENGINE_TYPE_UNSPECIFIED EngineType = 0
-	// Only the X-Chain uses avalanche consensus. Post linearization, this is
-	// no longer used.
+	// Only the X-Chain uses avalanche consensus
 	EngineType_ENGINE_TYPE_AVALANCHE EngineType = 1
 	EngineType_ENGINE_TYPE_SNOWMAN   EngineType = 2
 )
@@ -883,7 +882,7 @@ func (x *ClaimedIpPort) GetTxId() []byte {
 	return nil
 }
 
-// Peers should periodically broadcast PeerList messages to allow peers to
+// Peers should periodically send PeerList messages to allow peers to
 // discover each other.
 //
 // PeerListAck should be sent in response to a PeerList.
@@ -2150,7 +2149,7 @@ type Chits struct {
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// Request id of the original PushQuery/PullQuery request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// Currently preferred bl ock
+	// Currently preferred block
 	PreferredId []byte `protobuf:"bytes,3,opt,name=preferred_id,json=preferredId,proto3" json:"preferred_id,omitempty"`
 	// Last accepted block
 	AcceptedId []byte `protobuf:"bytes,4,opt,name=accepted_id,json=acceptedId,proto3" json:"accepted_id,omitempty"`
