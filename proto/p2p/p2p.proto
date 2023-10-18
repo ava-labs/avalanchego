@@ -139,7 +139,7 @@ message ClaimedIpPort {
 // a version message, the p2p handshake is complete and the connection is
 // established.
 
-// Peers should periodically broadcast PeerList messages to allow peers to
+// Peers should periodically send PeerList messages to allow peers to
 // discover each other.
 //
 // PeerListAck should be sent in response to a PeerList.
