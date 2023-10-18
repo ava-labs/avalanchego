@@ -53,8 +53,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot      = errors.New("start and end root are the same")
-	errNoNewSentinel = errors.New("there was no updated sentinel node in change list")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root node in change list")
 )
 
 type ChangeProofer interface {
@@ -933,7 +933,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	sentinelChange, ok := changes.nodes[db.rootPath]
 	if !ok {
-		return errNoNewSentinel
+		return errNoNewRoot
 	}
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
