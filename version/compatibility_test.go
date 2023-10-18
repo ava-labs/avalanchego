@@ -19,12 +19,14 @@ func TestCompatibility(t *testing.T) {
 		Patch: 3,
 	}
 	minCompatable := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 4,
 		Patch: 0,
 	}
 	minCompatableTime := time.Unix(9000, 0)
 	prevMinCompatable := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 3,
 		Patch: 0,
@@ -45,6 +47,7 @@ func TestCompatibility(t *testing.T) {
 	}{
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 5,
 				Patch: 0,
@@ -53,6 +56,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 5,
@@ -61,6 +65,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 0,
 				Minor: 1,
 				Patch: 0,
@@ -70,6 +75,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 5,
@@ -79,6 +85,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 5,
@@ -88,6 +95,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 1,
 				Patch: 5,
