@@ -595,10 +595,16 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
+
 	writeBasicBatch(t, db)
 	require.NoError(err)
 
-	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte{1}), maybe.Nothing[[]byte](), 2)
+	proof, err := db.GetRangeProof( // Should have keys [1], [2]
+		context.Background(),
+		maybe.Some([]byte{1}),
+		maybe.Nothing[[]byte](),
+		2,
+	)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -612,9 +618,8 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 
 	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Bytes())
 
-	require.Nil(proof.EndProof[0].KeyPath.Bytes())
-	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Bytes())
-	require.Equal([]byte{2}, proof.EndProof[2].KeyPath.Bytes())
+	require.Equal(db.root.Value().key, proof.EndProof[0].KeyPath)
+	require.Equal([]byte{2}, proof.EndProof[1].KeyPath.Bytes())
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -654,9 +659,9 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Len(proof.StartProof, 1)
 	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.StartProof[0].KeyPath, BranchFactor16)
 
-	require.Len(proof.EndProof, 3)
-	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[2].KeyPath, BranchFactor16)
-	require.Equal(NewPath([]byte{}, BranchFactor16), proof.EndProof[0].KeyPath, BranchFactor16)
+	require.Len(proof.EndProof, 2)
+	require.Equal(NewPath([]byte("key1"), BranchFactor16).Take(7), proof.EndProof[0].KeyPath, BranchFactor16)
+	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[1].KeyPath, BranchFactor16)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -668,13 +673,31 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 
 func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require := require.New(t)
+	seed := time.Now().UnixNano()
+	t.Logf("Seed: %d", seed)
+	rand := rand.New(rand.NewSource(seed))
 
 	db, err := getBasicDB()
 	require.NoError(err)
-	startRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
 
-	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
+	roots := []ids.ID{}
+	for i := 0; i < defaultHistoryLength+1; i++ {
+		key := make([]byte, 16)
+		_, _ = rand.Read(key)
+		require.NoError(db.Put(key, nil))
+		root, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+		roots = append(roots, root)
+	}
+
+	_, err = db.GetChangeProof(
+		context.Background(),
+		roots[0],
+		roots[len(roots)-1],
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		50,
+	)
 	require.ErrorIs(err, ErrInsufficientHistory)
 }
 
@@ -797,7 +820,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "odd length key path with value",
 			malform: func(proof *ChangeProof) {
-				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
+				proof.EndProof[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
@@ -836,13 +859,26 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			dbClone, err := getBasicDB()
 			require.NoError(err)
 
-			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), 50)
+			proof, err := db.GetChangeProof(
+				context.Background(),
+				startRoot,
+				endRoot,
+				maybe.Some([]byte{2}),
+				maybe.Some([]byte{3, 0}),
+				50,
+			)
 			require.NoError(err)
 			require.NotNil(proof)
 
 			tt.malform(proof)
 
-			err = dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(
+				context.Background(),
+				proof,
+				maybe.Some([]byte{2}),
+				maybe.Some([]byte{3, 0}),
+				db.getMerkleRoot(),
+			)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}

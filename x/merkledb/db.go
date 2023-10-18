@@ -263,10 +263,7 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		rootChange: &change[*node]{ // TODO is this right
-			before: nil,
-			after:  trieDB.root.Value(),
-		},
+		root:   trieDB.root.Value(), // TODO is this right?
 		values: map[Path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Path]*change[*node]{},
 	})
@@ -932,13 +929,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	var root *node
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
-		if nodeChange.after != nil && nodeChange.after.id == changes.rootID {
-			root = nodeChange.after
-		}
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
 		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
 
@@ -974,16 +967,16 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	if changes.rootChange.after == nil {
+	if changes.rootID == ids.Empty {
 		db.root = maybe.Nothing[*node]()
 		if err := db.baseDB.Delete(rootDBKey); err != nil {
 			return err
 		}
 	} else {
-		db.root = maybe.Some(root)
+		db.root = maybe.Some(changes.root)
 		rootKeyAndNodeBytes := codec.encodeKeyAndNode(
-			root.key,
-			&root.dbNode,
+			changes.root.key,
+			&changes.root.dbNode,
 			db.valueNodeDB.branchFactor,
 		)
 		if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {

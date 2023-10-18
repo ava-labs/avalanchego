@@ -203,8 +203,8 @@ func newHistoricalTrieView(
 
 	// TODO is this right?
 	root := maybe.Nothing[*node]()
-	if changes.rootChange.after != nil {
-		root = maybe.Some(changes.rootChange.after.clone())
+	if changes.root != nil {
+		root = maybe.Some(changes.root.clone()) // TODO clone needed?
 	}
 	newView := &trieView{
 		root:       root,
@@ -240,8 +240,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
-		oldRoot := t.root
-
 		// add all the changed key/values to the nodes of the trie
 		for key, change := range t.changes.values {
 			if change.after.IsNothing() {
@@ -261,13 +259,10 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			t.calculateNodeIDsHelper(root)
 			t.db.calculateNodeIDsSema.Release(1)
 			t.changes.rootID = root.id
-			t.changes.rootChange = t.changes.nodes[root.key]
+			t.changes.root = t.root.Value()
 		} else {
 			t.changes.rootID = ids.Empty
-			t.changes.rootChange = &change[*node]{
-				before: oldRoot.Value(),
-				after:  t.root.Value(),
-			}
+			t.changes.root = nil
 		}
 
 		// ensure no ancestor changes occurred during execution

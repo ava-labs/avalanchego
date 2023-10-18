@@ -612,12 +612,12 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// Make sure the branch node with the common prefix was created.
 	// Note it's only created on call to GetMerkleRoot, not in NewView.
-	_, err = view2.getEditableNode(NewPath(keyPrefix, BranchFactor16), false)
+	gotRoot, err := view2.getEditableNode(NewPath(keyPrefix, BranchFactor16), false)
 	require.NoError(err)
+	require.Equal(view2.getRoot().Value(), gotRoot)
 
-	// only hashes the new branch node, the new child node, and root
-	// shouldn't hash the existing node
-	require.Equal(int64(3), dbTrie.metrics.(*mockMetrics).hashCount)
+	// Had to hash new root and new child of root.
+	require.Equal(int64(2), dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_HashCountOnDelete(t *testing.T) {
@@ -658,8 +658,8 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
-	// the root is the only updated node so only one new hash
-	require.Equal(oldCount+1, dbTrie.metrics.(*mockMetrics).hashCount)
+	// The new root is key1; it didn't change so no need to do more hashes
+	require.Equal(oldCount, dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_NoExistingResidual(t *testing.T) {
@@ -753,9 +753,11 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(emptyPath(BranchFactor16), false)
+	maybeRoot := newTrie.getRoot()
 	require.NoError(err)
-	require.Len(root.children, 1)
+	require.True(maybeRoot.HasValue())
+	require.Equal([]byte("value0"), maybeRoot.Value().value.Value())
+	require.Len(maybeRoot.Value().children, 1)
 
 	newTrie, err = newTrie.NewView(
 		context.Background(),
@@ -770,10 +772,10 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(emptyPath(BranchFactor16), false)
-	require.NoError(err)
-	// since all values have been deleted, the nodes should have been cleaned up
-	require.Empty(root.children)
+
+	// trie should be empty
+	root := newTrie.getRoot()
+	require.False(root.HasValue())
 }
 
 func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
@@ -820,54 +822,64 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
+	kvs := []database.BatchOp{
+		{Key: []byte("k"), Value: []byte("value0")},
+		{Key: []byte("ke"), Value: []byte("value1")},
+		{Key: []byte("key"), Value: []byte("value2")},
+		{Key: []byte("key1"), Value: []byte("value3")},
+		{Key: []byte("key2"), Value: []byte("value4")},
+	}
+
 	trie, err := dbTrie.NewView(
 		context.Background(),
 		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("k"), Value: []byte("value0")},
-				{Key: []byte("ke"), Value: []byte("value1")},
-				{Key: []byte("key"), Value: []byte("value2")},
-				{Key: []byte("key1"), Value: []byte("value3")},
-				{Key: []byte("key2"), Value: []byte("value4")},
-			},
+			BatchOps: kvs,
 		},
 	)
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(emptyPath(BranchFactor16), false)
-	require.NoError(err)
-	require.Len(root.children, 1)
 
-	root, err = trie.getEditableNode(emptyPath(BranchFactor16), false)
-	require.NoError(err)
-	require.Len(root.children, 1)
+	for _, kv := range kvs {
+		node, err := trie.getEditableNode(dbTrie.newPath(kv.Key), true)
+		require.NoError(err)
 
-	firstNode, err := trie.getEditableNode(getSingleChildPath(root), true)
-	require.NoError(err)
-	require.Len(firstNode.children, 1)
+		require.Equal(kv.Value, node.value.Value())
+	}
 
-	// delete the middle values
+	// delete some values
+	deletedKVs, remainingKVs := kvs[:3], kvs[3:]
+	deleteOps := make([]database.BatchOp, len(deletedKVs))
+	for i, kv := range deletedKVs {
+		deleteOps[i] = database.BatchOp{
+			Key:    kv.Key,
+			Delete: true,
+		}
+	}
+
 	trie, err = trie.NewView(
 		context.Background(),
 		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("k"), Delete: true},
-				{Key: []byte("ke"), Delete: true},
-				{Key: []byte("key"), Delete: true},
-			},
+			BatchOps: deleteOps,
 		},
 	)
 	require.NoError(err)
+
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(emptyPath(BranchFactor16), false)
-	require.NoError(err)
-	require.Len(root.children, 1)
+	for _, kv := range deletedKVs {
+		_, err := trie.getEditableNode(dbTrie.newPath(kv.Key), true)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 
-	firstNode, err = trie.getEditableNode(getSingleChildPath(root), true)
-	require.NoError(err)
-	require.Len(firstNode.children, 2)
+	// make sure the other values are still there
+	for _, kv := range remainingKVs {
+		node, err := trie.getEditableNode(dbTrie.newPath(kv.Key), true)
+		require.NoError(err)
+
+		require.Equal(kv.Value, node.value.Value())
+	}
+
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {
