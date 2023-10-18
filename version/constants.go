@@ -4,9 +4,10 @@
 package version
 
 import (
-	_ "embed"
 	"encoding/json"
 	"time"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
