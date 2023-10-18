@@ -179,9 +179,7 @@ type merkleDB struct {
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
 
-	// The sentinel node of this trie.
-	// It is the node with a nil key and is the ancestor of all nodes in the trie.
-	// If it has a value or has multiple children, it is also the root of the trie.
+	// The root of this trie.
 	root *node
 
 	// Valid children of this trie.
