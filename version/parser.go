@@ -46,6 +46,7 @@ func ParseApplication(s string) (*Application, error) {
 	}
 
 	return &Application{
+		Name:  Client,
 		Major: major,
 		Minor: minor,
 		Patch: patch,

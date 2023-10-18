@@ -13,6 +13,7 @@ import (
 
 func TestCompatibility(t *testing.T) {
 	v := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 4,
 		Patch: 3,

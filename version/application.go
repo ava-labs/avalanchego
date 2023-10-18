@@ -16,9 +16,10 @@ var (
 )
 
 type Application struct {
-	Major int `json:"major" yaml:"major"`
-	Minor int `json:"minor" yaml:"minor"`
-	Patch int `json:"patch" yaml:"patch"`
+	Name  string `json:"name" yaml:"major"`
+	Major int    `json:"major" yaml:"major"`
+	Minor int    `json:"minor" yaml:"minor"`
+	Patch int    `json:"patch" yaml:"patch"`
 
 	str atomic.Value
 }
@@ -32,7 +33,8 @@ func (a *Application) String() string {
 	}
 
 	str := fmt.Sprintf(
-		"avalanche/%d.%d.%d",
+		"%s/%d.%d.%d",
+		a.Name,
 		a.Major,
 		a.Minor,
 		a.Patch,

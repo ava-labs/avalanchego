@@ -106,6 +106,14 @@ message Version {
   uint64 my_version_time = 6;
   bytes sig = 7;
   repeated bytes tracked_subnets = 8;
+  Client client = 9;
+}
+
+message Client {
+  string name = 1;
+  uint32 major = 2;
+  uint32 minor = 3;
+  uint32 patch = 4;
 }
 
 // ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/utils/ips#ClaimedIPPort
