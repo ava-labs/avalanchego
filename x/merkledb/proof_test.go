@@ -282,7 +282,8 @@ func Test_Proof(t *testing.T) {
 	require.NoError(proof.Verify(context.Background(), expectedRootID))
 
 	proof.Path[0].KeyPath = NewPath([]byte("key1"), BranchFactor16)
-	require.Error(proof.Verify(context.Background(), expectedRootID))
+	err = proof.Verify(context.Background(), expectedRootID)
+	require.ErrorIs(err, ErrProofNodeNotForKey)
 }
 
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
@@ -675,7 +676,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require := require.New(t)
 	seed := time.Now().UnixNano()
 	t.Logf("Seed: %d", seed)
-	rand := rand.New(rand.NewSource(seed))
+	rand := rand.New(rand.NewSource(seed)) // #nosec G404
 
 	db, err := getBasicDB()
 	require.NoError(err)

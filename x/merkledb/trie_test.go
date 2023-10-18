@@ -879,7 +879,6 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 
 		require.Equal(kv.Value, node.value.Value())
 	}
-
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {

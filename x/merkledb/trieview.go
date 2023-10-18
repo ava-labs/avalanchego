@@ -698,8 +698,7 @@ func (t *trieView) remove(key Path) error {
 			return nil
 		default:
 			// The root has multiple children so we can't delete it.
-			t.recordNodeChange(nodeToDelete)
-			return nil
+			return t.recordNodeChange(nodeToDelete)
 		}
 	}
 

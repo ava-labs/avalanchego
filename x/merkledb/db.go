@@ -41,8 +41,7 @@ const (
 )
 
 var (
-	emptyKey []byte
-	_        MerkleDB = (*merkleDB)(nil)
+	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
