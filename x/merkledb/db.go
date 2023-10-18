@@ -968,7 +968,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	if changes.rootID == ids.Empty {
+	if changes.rootChange.after == nil {
 		db.root = maybe.Nothing[*node]()
 		if err := db.baseDB.Delete(rootDBKey); err != nil {
 			return err
