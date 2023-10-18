@@ -1161,7 +1161,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		db.root, err = db.valueNodeDB.Get(db.rootPath)
 	}
 	if err == nil {
-		// root already exists, so calculate the root ID of the trie
+		// Root already exists, so calculate its id
 		db.root.calculateID(db.metrics)
 		return db.getMerkleRoot(), nil
 	}
@@ -1169,7 +1169,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	// root doesn't exist; make a new one.
+	// Root doesn't exist; make a new one.
 	db.root = newNode(nil, db.rootPath)
 
 	// update its ID

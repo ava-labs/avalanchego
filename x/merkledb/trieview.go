@@ -96,9 +96,8 @@ type trieView struct {
 
 	db *merkleDB
 
-	// The nil key node
-	// It is either the root of the trie or the root of the trie is its single child node
-	rootNode *node
+	// The root of the trie represented by this view.
+	root *node
 }
 
 // NewView returns a new view on top of this Trie where the passed changes
@@ -155,7 +154,7 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		rootNode:   rootNode,
+		root:       rootNode,
 		db:         db,
 		parentTrie: parentTrie,
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
@@ -204,7 +203,7 @@ func newHistoricalTrieView(
 	}
 
 	newView := &trieView{
-		rootNode:   passedRootChange.after,
+		root:       passedRootChange.after,
 		db:         db,
 		parentTrie: db,
 		changes:    changes,
@@ -247,9 +246,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.rootNode)
+		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = getMerkleRoot(t.rootNode)
+		t.changes.rootID = getMerkleRoot(t.root)
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -562,7 +561,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return getMerkleRoot(t.rootNode), nil
+	return getMerkleRoot(t.root), nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -769,9 +768,9 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
 		// all node paths start at the root since its nil key is a prefix of all keys
-		currentNode      = t.rootNode
+		currentNode      = t.root
 		matchedPathIndex = 0
-		nodes            = []*node{t.rootNode}
+		nodes            = []*node{t.root}
 	)
 
 	// while the entire path hasn't been matched
@@ -958,16 +957,16 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 }
 
 func (t *trieView) getRoot() *node {
-	if !isSentinelNodeTheRoot(t.rootNode) {
+	if !isSentinelNodeTheRoot(t.root) {
 		// root has one child, which is the root
-		for index, childEntry := range t.rootNode.children {
-			childPath := t.rootNode.key.Append(index).Extend(childEntry.compressedPath)
+		for index, childEntry := range t.root.children {
+			childPath := t.root.key.Append(index).Extend(childEntry.compressedPath)
 			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 			return root
 		}
 	}
 
-	return t.rootNode
+	return t.root
 }
 
 // Records that the node associated with the given key has been changed.
