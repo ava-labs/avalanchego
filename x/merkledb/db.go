@@ -581,7 +581,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
 	if db.root.IsNothing() {
-		return ids.Empty // TODO document this
+		return ids.Empty
 	}
 	return db.root.Value().id
 }
@@ -1169,7 +1169,7 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 			return err
 		}
 		// Root isn't on disk.
-		return nil // TODO document empty ID meaning empty trie
+		return nil
 	}
 
 	// Root is on disk.

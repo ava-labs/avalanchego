@@ -54,7 +54,9 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	// The ID of the trie after these changes.
-	rootID     ids.ID
+	rootID ids.ID
+	// The root before/after this change.
+	// If the trie is empty, its root is nil here.
 	rootChange *change[*node]
 	nodes      map[Path]*change[*node]
 	values     map[Path]*change[maybe.Maybe[[]byte]]
