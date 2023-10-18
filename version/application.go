@@ -16,7 +16,7 @@ var (
 )
 
 type Application struct {
-	Name  string `json:"name" yaml:"name"`
+	Name  string `json:"name"  yaml:"name"`
 	Major int    `json:"major" yaml:"major"`
 	Minor int    `json:"minor" yaml:"minor"`
 	Patch int    `json:"patch" yaml:"patch"`
