@@ -33,10 +33,12 @@ run_simulator() {
     ./cmd/simulator/simulator \
         --endpoints=$RPC_ENDPOINTS \
         --key-dir=./cmd/simulator/.simulator/keys \
-        --timeout=30s \
+        --timeout=300s \
         --workers=1 \
-        --max-fee-cap=300 \
-        --max-tip-cap=100
+        --txs-per-worker=50000 \
+        --batch-size=50000 \
+        --max-fee-cap=1000000 \
+        --max-tip-cap=10000
 }
 
 run_simulator
