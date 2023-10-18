@@ -211,8 +211,7 @@ message AcceptedStateSummary {
 // The consensus engine that should be used when handling a consensus request.
 enum EngineType {
   ENGINE_TYPE_UNSPECIFIED = 0;
-  // Only the X-Chain uses avalanche consensus. Post linearization, this is
-  // no longer used.
+  // Only the X-Chain uses avalanche consensus
   ENGINE_TYPE_AVALANCHE = 1;
   ENGINE_TYPE_SNOWMAN = 2;
 }
