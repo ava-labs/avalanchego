@@ -86,8 +86,8 @@ type ClientConfig struct {
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
-	if config.TokenConfig == nil {
-		return nil, merkledb.ErrNilTokenConfig
+	if err := config.TokenConfig.Valid(); err != nil {
+		return nil, err
 	}
 	return &client{
 		networkClient:       config.NetworkClient,
