@@ -109,8 +109,11 @@ message Version {
   Client client = 9;
 }
 
+// Metadata about a peer's P2P client used to determine compatibility
 message Client {
+  // Client name (e.g avalanchego)
   string name = 1;
+  // Client semantic version
   uint32 major = 2;
   uint32 minor = 3;
   uint32 patch = 4;

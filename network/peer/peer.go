@@ -882,6 +882,8 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			Patch: int(msg.Client.Patch),
 		}
 	} else {
+		// Handle legacy version field
+		// TODO deprecate after D upgrade
 		peerVersion, err := version.ParseApplication(msg.MyVersion)
 		if err != nil {
 			p.Log.Debug("failed to parse peer version",
