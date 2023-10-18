@@ -58,7 +58,7 @@ func GetCanonicalValidatorSet(
 	subnetID ids.ID,
 ) ([]*Validator, uint64, error) {
 	// There is a ~(1/canonicalValidatorSetSlowdownProbabilityDenominator) chance that we will output a 0 when calling this random number generator
-	// If we do we can implement a slowdown for canonicalValidatorSetTimeSlowdownSeconds
+	// We can implement a slowdown for canonicalValidatorSetTimeSlowdownSeconds that occur randomly
 	// This will introduce real world conditions needed for the warp load test.
 	randomNum := rand.Intn(canonicalValidatorSetSlowdownProbabilityDenominator)
 	if randomNum == 0 {
