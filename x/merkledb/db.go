@@ -565,7 +565,13 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return getMerkleRoot(db.root)
+	if !isSentinelNodeTheRoot(db.root) {
+		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
+		for _, childEntry := range db.root.children {
+			return childEntry.id
+		}
+	}
+	return db.root.id
 }
 
 // isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
@@ -573,17 +579,6 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 // When this is false, the root of the trie is the sentinel node's single child
 func isSentinelNodeTheRoot(sentinel *node) bool {
 	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
-}
-
-// getMerkleRoot returns the id of either the passed in root or the id of the node's only child based on [shouldUseChildAsRoot]
-func getMerkleRoot(sentinel *node) ids.ID {
-	if !isSentinelNodeTheRoot(sentinel) {
-		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
-		for _, childEntry := range sentinel.children {
-			return childEntry.id
-		}
-	}
-	return sentinel.id
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
