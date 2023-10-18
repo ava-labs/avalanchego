@@ -255,16 +255,15 @@ func newDatabase(
 		newPath:              newPath,
 	}
 
-	root, err := trieDB.initializeRootIfNeeded()
-	if err != nil {
+	if err := trieDB.initializeRootIfNeeded(); err != nil {
 		return nil, err
 	}
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootID: root,
+		rootID: trieDB.getMerkleRoot(),
 		rootChange: &change[*node]{
-			after: trieDB.root.Value(), // TODO is this right?
+			after: trieDB.root.Value(),
 		},
 		values: map[Path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Path]*change[*node]{},
@@ -1163,21 +1162,21 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
+func (db *merkleDB) initializeRootIfNeeded() error {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
-			return ids.ID{}, err
+			return err
 		}
 		// Root isn't on disk.
-		return ids.Empty, nil // TODO document empty ID meaning empty trie
+		return nil // TODO document empty ID meaning empty trie
 	}
 
 	// Root is on disk.
 	var rootDBNode dbNode
 	rootKey, err := codec.decodeKeyAndNode(rootBytes, &rootDBNode, db.valueNodeDB.branchFactor)
 	if err != nil {
-		return ids.ID{}, err
+		return err
 	}
 	root := &node{
 		dbNode: rootDBNode,
@@ -1186,7 +1185,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	root.setValueDigest()
 	root.calculateID(db.metrics)
 	db.root = maybe.Some(root)
-	return root.id, nil
+	return nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
