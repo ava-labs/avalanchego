@@ -293,8 +293,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	rootPath := NewPath(emptyKey, db.valueNodeDB.branchFactor)
-	db.root = maybe.Some(newNode(nil, rootPath)) // todo what to do here?
+	db.root = maybe.Nothing[*node]()
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
