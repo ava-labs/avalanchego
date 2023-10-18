@@ -263,7 +263,9 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		root:   trieDB.root.Value(), // TODO is this right?
+		rootChange: &change[*node]{
+			after: trieDB.root.Value(), // TODO is this right?
+		},
 		values: map[Path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Path]*change[*node]{},
 	})
@@ -973,10 +975,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			return err
 		}
 	} else {
-		db.root = maybe.Some(changes.root)
+		db.root = maybe.Some(changes.rootChange.after)
 		rootKeyAndNodeBytes := codec.encodeKeyAndNode(
-			changes.root.key,
-			&changes.root.dbNode,
+			changes.rootChange.after.key,
+			&changes.rootChange.after.dbNode,
 			db.valueNodeDB.branchFactor,
 		)
 		if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {

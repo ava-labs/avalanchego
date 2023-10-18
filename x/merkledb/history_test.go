@@ -655,7 +655,11 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 	for i := 0; i < maxHistoryLen; i++ { // Fill the history
 		changes = append(changes, &changeSummary{
 			rootID: ids.GenerateTestID(),
-			root:   &node{id: ids.GenerateTestID()},
+			rootChange: &change[*node]{
+				before: &node{
+					id: ids.GenerateTestID(),
+				},
+			},
 			nodes: map[Path]*change[*node]{
 				history.newPath([]byte{byte(i)}): {
 					before: &node{id: ids.GenerateTestID()},

@@ -203,8 +203,8 @@ func newHistoricalTrieView(
 
 	// TODO is this right?
 	root := maybe.Nothing[*node]()
-	if changes.root != nil {
-		root = maybe.Some(changes.root.clone()) // TODO clone needed?
+	if changes.rootChange.after != nil {
+		root = maybe.Some(changes.rootChange.after.clone()) // TODO clone needed?
 	}
 	newView := &trieView{
 		root:       root,
@@ -234,6 +234,12 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 		defer t.nodesAlreadyCalculated.Set(true)
 
+		oldRoot := t.root.Value()
+		if oldRoot != nil {
+			// TODO is this right?
+			oldRoot = oldRoot.clone()
+		}
+
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
 		// per key modified even though IDs are not re-calculated).
@@ -259,10 +265,13 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			t.calculateNodeIDsHelper(root)
 			t.db.calculateNodeIDsSema.Release(1)
 			t.changes.rootID = root.id
-			t.changes.root = t.root.Value()
 		} else {
 			t.changes.rootID = ids.Empty
-			t.changes.root = nil
+		}
+
+		t.changes.rootChange = &change[*node]{
+			before: oldRoot,
+			after:  t.root.Value(),
 		}
 
 		// ensure no ancestor changes occurred during execution
@@ -718,27 +727,27 @@ func (t *trieView) remove(key Path) error {
 	return nil
 }
 
-// Merges together nodes in the inclusive descendants of [node] that
+// Merges together nodes in the inclusive descendnnts of [n] that
 // have no value and a single child into one node with a compressed
 // path until a node that doesn't meet those criteria is reached.
-// [parent] is [node]'s parent.
+// [parent] is [n]'s parent.
 // Assumes at least one of the following is true:
-// * [node] has a value.
-// * [node] has children.
+// * [n] has a value.
+// * [n] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent, node *node) error {
+func (t *trieView) compressNodePath(parent, n *node) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
-	if len(node.children) != 1 || node.hasValue() {
+	if len(n.children) != 1 || n.hasValue() {
 		return nil
 	}
 
-	// delete all empty nodes with a single child under [node]
-	for len(node.children) == 1 && !node.hasValue() {
-		if err := t.recordNodeDeleted(node); err != nil {
+	// delete all empty nodes with a single child under [n]
+	for len(n.children) == 1 && !n.hasValue() {
+		if err := t.recordNodeDeleted(n); err != nil {
 			return err
 		}
 
@@ -748,9 +757,9 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		)
 		// There is only one child, but we don't know the index.
 		// "Cycle" over the key/values to find the only child.
-		// Note this iteration once because len(node.children) == 1.
-		for index, entry := range node.children {
-			childPath = node.key.AppendExtend(index, entry.compressedPath)
+		// Note this iteration once because len(n.children) == 1.
+		for index, entry := range n.children {
+			childPath = n.key.AppendExtend(index, entry.compressedPath)
 			childEntry = entry
 		}
 
@@ -758,12 +767,16 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		if err != nil {
 			return err
 		}
-		node = nextNode
+		n = nextNode
 	}
 
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
-	parent.addChild(node)
+	if parent == nil {
+		t.root = maybe.Some[*node](n)
+		return nil
+	}
+	parent.addChild(n)
 	return t.recordNodeChange(parent)
 }
 
@@ -777,30 +790,30 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	node := nodePath[len(nodePath)-1]
+	n := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
-	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		if err := t.recordNodeDeleted(node); err != nil {
+	for ; nextParentIndex >= 0 && len(n.children) == 0 && !n.hasValue(); nextParentIndex-- {
+		if err := t.recordNodeDeleted(n); err != nil {
 			return err
 		}
 
 		parent := nodePath[nextParentIndex]
 
-		parent.removeChild(node)
+		parent.removeChild(n)
 		if err := t.recordNodeChange(parent); err != nil {
 			return err
 		}
 
-		node = parent
+		n = parent
 	}
 
-	if nextParentIndex < 0 {
-		return nil
+	var parent *node
+	if nextParentIndex >= 0 {
+		parent = nodePath[nextParentIndex]
 	}
-	parent := nodePath[nextParentIndex]
 
-	return t.compressNodePath(parent, node)
+	return t.compressNodePath(parent, n)
 }
 
 // Returns the nodes along the path to [key].

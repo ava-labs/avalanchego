@@ -54,16 +54,17 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	// The ID of the trie after these changes.
-	rootID ids.ID
-	root   *node
-	nodes  map[Path]*change[*node]
-	values map[Path]*change[maybe.Maybe[[]byte]]
+	rootID     ids.ID
+	rootChange *change[*node]
+	nodes      map[Path]*change[*node]
+	values     map[Path]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[Path]*change[*node], estimatedSize),
-		values: make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
+		nodes:      make(map[Path]*change[*node], estimatedSize),
+		values:     make(map[Path]*change[maybe.Maybe[[]byte]], estimatedSize),
+		rootChange: &change[*node]{},
 	}
 }
 
@@ -255,7 +256,10 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		changes, _ := th.history.Index(i)
 
 		if i == mostRecentChangeIndex {
-			combinedChanges.root = changes.root
+			combinedChanges.rootChange.before = changes.rootChange.after
+		}
+		if i == lastRootChangeIndex+1 {
+			combinedChanges.rootChange.after = changes.rootChange.before
 		}
 
 		for key, changedNode := range changes.nodes {
