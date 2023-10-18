@@ -12,7 +12,8 @@ import (
 )
 
 type MerkleRootGetter interface {
-	// GetMerkleRoot returns the merkle root of the Trie
+	// GetMerkleRoot returns the merkle root of the trie.
+	// Returns ids.Empty if the trie is empty.
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 }
 
