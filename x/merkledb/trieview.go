@@ -98,7 +98,7 @@ type trieView struct {
 
 	// The nil key node
 	// It is either the root of the trie or the root of the trie is its single child node
-	sentinelNode *node
+	rootNode *node
 }
 
 // NewView returns a new view on top of this Trie where the passed changes
@@ -146,7 +146,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	sentinelNode, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
+	rootNode, err := parentTrie.getEditableNode(db.rootPath, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -155,10 +155,10 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		sentinelNode: sentinelNode,
-		db:           db,
-		parentTrie:   parentTrie,
-		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		rootNode:   rootNode,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -198,16 +198,16 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedSentinelChange, ok := changes.nodes[db.rootPath]
+	passedRootChange, ok := changes.nodes[db.rootPath]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
 
 	newView := &trieView{
-		sentinelNode: passedSentinelChange.after,
-		db:           db,
-		parentTrie:   db,
-		changes:      changes,
+		rootNode:   passedRootChange.after,
+		db:         db,
+		parentTrie: db,
+		changes:    changes,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
@@ -247,9 +247,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.sentinelNode)
+		t.calculateNodeIDsHelper(t.rootNode)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = getMerkleRoot(t.sentinelNode)
+		t.changes.rootID = getMerkleRoot(t.rootNode)
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -344,8 +344,8 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 	root := t.getRoot()
 
-	// The sentinel node is always the first node in the path.
-	// If the sentinel node is not the root, remove it from the proofPath.
+	// The root node is always the first node in the path.
+	// If the root node is not the root, remove it from the proofPath.
 	if proofPath[0] != root {
 		proofPath = proofPath[1:]
 	}
@@ -562,7 +562,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return getMerkleRoot(t.sentinelNode), nil
+	return getMerkleRoot(t.rootNode), nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -769,9 +769,9 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key Path) ([]*node, error) {
 	var (
 		// all node paths start at the root since its nil key is a prefix of all keys
-		currentNode      = t.sentinelNode
+		currentNode      = t.rootNode
 		matchedPathIndex = 0
-		nodes            = []*node{t.sentinelNode}
+		nodes            = []*node{t.rootNode}
 	)
 
 	// while the entire path hasn't been matched
@@ -958,16 +958,16 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 }
 
 func (t *trieView) getRoot() *node {
-	if !isSentinelNodeTheRoot(t.sentinelNode) {
+	if !isSentinelNodeTheRoot(t.rootNode) {
 		// root has one child, which is the root
-		for index, childEntry := range t.sentinelNode.children {
-			childPath := t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath)
+		for index, childEntry := range t.rootNode.children {
+			childPath := t.rootNode.key.Append(index).Extend(childEntry.compressedPath)
 			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 			return root
 		}
 	}
 
-	return t.sentinelNode
+	return t.rootNode
 }
 
 // Records that the node associated with the given key has been changed.
