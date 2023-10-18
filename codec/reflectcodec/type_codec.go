@@ -136,6 +136,9 @@ func (c *genericCodec) size(value reflect.Value, omitEmpty bool) (int, bool, err
 		return c.size(value.Elem(), omitEmpty)
 	case reflect.Interface:
 		if value.IsNil() {
+			if omitEmpty {
+				return wrappers.BoolLen, false, nil
+			}
 			// Can't marshal nil interfaces (but nil slices are fine)
 			return 0, false, errMarshalNil
 		}
@@ -145,6 +148,9 @@ func (c *genericCodec) size(value reflect.Value, omitEmpty bool) (int, bool, err
 		valueSize, _, err := c.size(value.Elem(), omitEmpty)
 		if err != nil {
 			return 0, false, err
+		}
+		if omitEmpty {
+			prefixSize += 1
 		}
 		return prefixSize + valueSize, false, nil
 
@@ -350,7 +356,13 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 
 		return c.marshal(value.Elem(), p, c.maxSliceLen, omitEmpty)
 	case reflect.Interface:
-		if value.IsNil() { // Can't marshal nil (except nil slices)
+		isNil := value.IsNil()
+		if omitEmpty {
+			p.PackBool(isNil)
+			if isNil {
+				return p.Err
+			}
+		} else if isNil {
 			return errMarshalNil
 		}
 		underlyingValue := value.Interface()
@@ -640,6 +652,11 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		}
 		return nil
 	case reflect.Interface:
+		if omitEmpty {
+			if p.UnpackBool() {
+				return p.Err
+			}
+		}
 		intfImplementor, err := c.typer.UnpackPrefix(p, value.Type())
 		if err != nil {
 			return err
@@ -672,8 +689,7 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		// Fill the value
 		if omitEmpty {
 			if p.UnpackBool() {
-				// Nil
-				return nil
+				return p.Err
 			}
 		}
 		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen, omitEmpty); err != nil {

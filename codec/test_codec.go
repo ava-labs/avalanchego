@@ -117,7 +117,7 @@ type myStruct struct {
 	MyMap4       map[int32]*int32            `serialize:"true,omitempty"`
 	MyMap5       map[int32]int32             `serialize:"true"`
 	MyMap6       map[[5]int32]int32          `serialize:"true"`
-	MyMap7       map[interface{}]interface{} `serialize:"true"`
+	MyMap7       map[interface{}]interface{} `serialize:"true,omitempty"`
 	Uint8        uint8                       `serialize:"true"`
 	Int8         int8                        `serialize:"true"`
 	Uint16       uint16                      `serialize:"true"`
@@ -152,6 +152,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	myMap7 := make(map[interface{}]interface{})
 	myMap7["key"] = "value"
 	myMap7[int32(1)] = int32(2)
+	myMap7[int32(44)] = nil
 
 	number := int32(8)
 
