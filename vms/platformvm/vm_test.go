@@ -2142,3 +2142,69 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeID(id))
 	require.ErrorIs(err, database.ErrNotFound)
 }
+
+func TestTransferSubnetOwnershipTx(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t)
+	vm.state.SetTimestamp(vm.DTime.Add(time.Second)) // Activate D-upgrade
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// Create a subnet
+	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{keys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{keys[0]},
+		keys[0].Address(),
+	)
+	require.NoError(err)
+	subnetID := createSubnetTx.ID()
+
+	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
+	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(createSubnetBlock.Verify(context.Background()))
+	require.NoError(createSubnetBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	subnetOwner, err := vm.state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	expectedOwner := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			keys[0].PublicKey().Address(),
+		},
+	}
+	require.Equal(expectedOwner, subnetOwner)
+
+	tx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
+		subnetID,
+		1,
+		[]ids.ShortID{keys[1].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{keys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(transferSubnetOwnershipBlock.Verify(context.Background()))
+	require.NoError(transferSubnetOwnershipBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	subnetOwner, err = vm.state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	expectedOwner = &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			keys[1].PublicKey().Address(),
+		},
+	}
+	require.Equal(expectedOwner, subnetOwner)
+}
