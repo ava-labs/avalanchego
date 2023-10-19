@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestBanffBlockSerialization(t *testing.T) {
