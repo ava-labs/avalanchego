@@ -4,7 +4,7 @@
 package sync
 
 import (
-	stdmath "math"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -16,10 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 // information we track on a given peer
 type peerInfo struct {
 	version   *version.Application
-	bandwidth math.Averager
+	bandwidth safemath.Averager
 }
 
 // Tracks the bandwidth of responses coming from peers,
@@ -55,8 +56,8 @@ type peerTracker struct {
 	// Peers that we're connected to that responded to the last request they were sent.
 	responsivePeers set.Set[ids.NodeID]
 	// Max heap that contains the average bandwidth of peers.
-	bandwidthHeap          heap.Map[ids.NodeID, math.Averager]
-	averageBandwidth       math.Averager
+	bandwidthHeap          heap.Map[ids.NodeID, safemath.Averager]
+	averageBandwidth       safemath.Averager
 	log                    logging.Logger
 	numTrackedPeers        prometheus.Gauge
 	numResponsivePeers     prometheus.Gauge
@@ -72,10 +73,10 @@ func newPeerTracker(
 		peers:           make(map[ids.NodeID]*peerInfo),
 		trackedPeers:    make(set.Set[ids.NodeID]),
 		responsivePeers: make(set.Set[ids.NodeID]),
-		bandwidthHeap: heap.NewMap[ids.NodeID, math.Averager](func(a, b math.Averager) bool {
+		bandwidthHeap: heap.NewMap[ids.NodeID, safemath.Averager](func(a, b safemath.Averager) bool {
 			return a.Read() > b.Read()
 		}),
-		averageBandwidth: math.NewAverager(0, bandwidthHalflife, time.Now()),
+		averageBandwidth: safemath.NewAverager(0, bandwidthHalflife, time.Now()),
 		log:              log,
 		numTrackedPeers: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -133,7 +134,7 @@ func (p *peerTracker) shouldTrackNewPeer() bool {
 	// 5000               | 7.124576406741286e-218
 	//
 	// In other words, the probability drops off extremely quickly.
-	newPeerProbability := stdmath.Exp(-float64(numResponsivePeers) * newPeerConnectFactor)
+	newPeerProbability := math.Exp(-float64(numResponsivePeers) * newPeerConnectFactor)
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
@@ -210,7 +211,7 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 
 	now := time.Now()
 	if peer.bandwidth == nil {
-		peer.bandwidth = math.NewAverager(bandwidth, bandwidthHalflife, now)
+		peer.bandwidth = safemath.NewAverager(bandwidth, bandwidthHalflife, now)
 	} else {
 		peer.bandwidth.Observe(bandwidth, now)
 	}

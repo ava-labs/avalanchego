@@ -410,9 +410,10 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 
 // Process the vertices in [vtxs].
 func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
-	// Vertices that we need to process prioritized by vertices that are unknown or the furthest down the DAG.
-	// Unknown vertices are prioritized to ensure that once we have made it below a certain height in DAG traversal we
-	// do not need to reset and repeat DAG traversals.
+	// Vertices that we need to process prioritized by vertices that are unknown
+	// or the furthest down the DAG. Unknown vertices are prioritized to ensure
+	// that once we have made it below a certain height in DAG traversal we do
+	// not need to reset and repeat DAG traversals.
 	toProcess := heap.NewMap[ids.ID, avalanche.Vertex](vertexLess)
 	for _, vtx := range vtxs {
 		vtxID := vtx.ID()
@@ -427,13 +428,13 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	prevHeight := uint64(0)
 
 	for {
+		if b.Halted() {
+			return nil
+		}
+
 		vtxID, vtx, ok := toProcess.Pop()
 		if !ok {
 			break
-		}
-
-		if b.Halted() {
-			return nil
 		}
 
 		switch vtx.Status() {
@@ -506,7 +507,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 				parentID := parent.ID()
 				if _, ok := b.processedCache.Get(parentID); !ok { // But only if we haven't processed the parent
 					if !vtxHeightSet.Contains(parentID) {
-						toProcess.Push(parent.ID(), parent)
+						toProcess.Push(parentID, parent)
 					}
 				}
 			}

@@ -43,14 +43,12 @@ func (h *txHeap) Add(tx *txs.Tx) {
 }
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
-	if got, ok := h.heap.Get(txID); ok {
-		return got.tx
-	}
-	return nil
+	got, _ := h.heap.Get(txID)
+	return got.tx
 }
 
 func (h *txHeap) List() []*txs.Tx {
-	heapTxs := heap.MapToList(h.heap)
+	heapTxs := heap.MapValues(h.heap)
 	res := make([]*txs.Tx, 0, len(heapTxs))
 	for _, tx := range heapTxs {
 		res = append(res, tx.tx)
@@ -59,17 +57,11 @@ func (h *txHeap) List() []*txs.Tx {
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
-	if removed, ok := h.heap.Remove(txID); ok {
-		return removed.tx
-	}
-	return nil
+	removed, _ := h.heap.Remove(txID)
+	return removed.tx
 }
 
 func (h *txHeap) Peek() *txs.Tx {
-	if h.heap.Len() == 0 {
-		return nil
-	}
-
 	_, peeked, _ := h.heap.Peek()
 	return peeked.tx
 }
@@ -81,9 +73,4 @@ func (h *txHeap) RemoveTop() *txs.Tx {
 
 func (h *txHeap) Len() int {
 	return h.heap.Len()
-}
-
-func (h *txHeap) Pop() interface{} {
-	_, tx, _ := h.heap.Pop()
-	return tx
 }

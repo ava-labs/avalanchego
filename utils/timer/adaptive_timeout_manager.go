@@ -198,18 +198,16 @@ func (tm *adaptiveTimeoutManager) Remove(id ids.RequestID) {
 // Assumes [tm.lock] is held
 func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
 	// Observe the response time to update average network response time.
-	timeout, exists := tm.timeoutHeap.Get(id)
+	timeout, exists := tm.timeoutHeap.Remove(id)
 	if !exists {
 		return
 	}
+
 	if timeout.measureLatency {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 		latency := now.Sub(timeoutRegisteredAt)
 		tm.observeLatencyAndUpdateTimeout(latency, now)
 	}
-
-	// Remove the timeout from the queue
-	tm.timeoutHeap.Remove(id)
 	tm.numPendingTimeouts.Set(float64(tm.timeoutHeap.Len()))
 }
 
@@ -262,11 +260,10 @@ func (tm *adaptiveTimeoutManager) observeLatencyAndUpdateTimeout(latency time.Du
 // returns nil.
 // Assumes [tm.lock] is held
 func (tm *adaptiveTimeoutManager) getNextTimeoutHandler(now time.Time) func() {
-	if tm.timeoutHeap.Len() == 0 {
+	_, nextTimeout, ok := tm.timeoutHeap.Peek()
+	if !ok {
 		return nil
 	}
-
-	_, nextTimeout, _ := tm.timeoutHeap.Peek()
 	if nextTimeout.deadline.After(now) {
 		return nil
 	}
@@ -277,14 +274,14 @@ func (tm *adaptiveTimeoutManager) getNextTimeoutHandler(now time.Time) func() {
 // Calculate the time of the next timeout and set
 // the timer to fire at that time.
 func (tm *adaptiveTimeoutManager) setNextTimeoutTime() {
-	if tm.timeoutHeap.Len() == 0 {
+	_, nextTimeout, ok := tm.timeoutHeap.Peek()
+	if !ok {
 		// There are no pending timeouts
 		tm.timer.Cancel()
 		return
 	}
 
 	now := tm.clock.Time()
-	_, nextTimeout, _ := tm.timeoutHeap.Peek()
 	timeToNextTimeout := nextTimeout.deadline.Sub(now)
 	tm.timer.SetTimeoutIn(timeToNextTimeout)
 }

@@ -11,13 +11,11 @@ import (
 
 var _ heap.Interface = (*indexedQueue[int, int])(nil)
 
-func MapToList[K comparable, V any](m Map[K, V]) []V {
+func MapValues[K comparable, V any](m Map[K, V]) []V {
 	result := make([]V, 0, m.Len())
-
 	for _, e := range m.queue.entries {
 		result = append(result, e.v)
 	}
-
 	return result
 }
 
@@ -26,7 +24,6 @@ func NewMap[K comparable, V any](less func(a, b V) bool) Map[K, V] {
 	return Map[K, V]{
 		queue: &indexedQueue[K, V]{
 			queue: queue[entry[K, V]]{
-				entries: make([]entry[K, V], 0),
 				less: func(a, b entry[K, V]) bool {
 					return less(a.v, b.v)
 				},
@@ -129,7 +126,7 @@ func (h *indexedQueue[K, V]) Pop() any {
 	return popped
 }
 
-type entry[K comparable, V any] struct {
+type entry[K any, V any] struct {
 	k K
 	v V
 }

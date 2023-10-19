@@ -111,14 +111,12 @@ func NewBenchlist(
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
-		chainID:        chainID,
-		log:            log,
-		failureStreaks: make(map[ids.NodeID]failureStreak),
-		benchlistSet:   set.Set[ids.NodeID]{},
-		benchable:      benchable,
-		benchedHeap: heap.NewMap[ids.NodeID, time.Time](func(a, b time.Time) bool {
-			return a.Before(b)
-		}),
+		chainID:                chainID,
+		log:                    log,
+		failureStreaks:         make(map[ids.NodeID]failureStreak),
+		benchlistSet:           set.Set[ids.NodeID]{},
+		benchable:              benchable,
+		benchedHeap:            heap.NewMap[ids.NodeID, time.Time](time.Time.Before),
 		vdrs:                   validators,
 		threshold:              threshold,
 		minimumFailingDuration: minimumFailingDuration,
@@ -166,23 +164,22 @@ func (b *benchlist) remove() {
 // False if no validator should.
 // Assumes [b.lock] is held
 func (b *benchlist) canUnbench(now time.Time) bool {
-	if b.benchedHeap.Len() == 0 {
+	_, next, ok := b.benchedHeap.Peek()
+	if !ok {
 		return false
 	}
-
-	_, next, _ := b.benchedHeap.Peek()
 	return now.After(next)
 }
 
 // Set [b.timer] to fire when the next validator should leave the bench
 // Assumes [b.lock] is held
 func (b *benchlist) setNextLeaveTime() {
-	if b.benchedHeap.Len() == 0 {
+	_, next, ok := b.benchedHeap.Peek()
+	if !ok {
 		b.timer.Cancel()
 		return
 	}
 	now := b.clock.Time()
-	_, next, _ := b.benchedHeap.Peek()
 	nextLeave := next.Sub(now)
 	b.timer.SetTimeoutIn(nextLeave)
 }

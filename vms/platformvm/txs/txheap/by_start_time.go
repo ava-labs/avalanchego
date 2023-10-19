@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
-
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -28,7 +27,9 @@ func NewByStartTime() TimedHeap {
 	return &byStartTime{
 		txHeap: txHeap{
 			heap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
-				return a.tx.Unsigned.(txs.Staker).StartTime().Before(b.tx.Unsigned.(txs.Staker).StartTime())
+				aTime := a.tx.Unsigned.(txs.Staker).StartTime()
+				bTime := b.tx.Unsigned.(txs.Staker).StartTime()
+				return aTime.Before(bTime)
 			}),
 		},
 	}
