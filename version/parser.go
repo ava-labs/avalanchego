@@ -8,14 +8,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
-	errMissingDelimiter     = errors.New("missing delimiter")
-	errMissingVersionPrefix = errors.New("missing required version prefix")
-	errMissingVersions      = errors.New("missing version numbers")
+	errMissingVersionPrefix     = errors.New("missing required version prefix")
+	errMissingApplicationPrefix = errors.New("missing required application prefix")
+	errMissingVersions          = errors.New("missing version numbers")
 )
 
 func Parse(s string) (*Semantic, error) {
@@ -37,20 +35,19 @@ func Parse(s string) (*Semantic, error) {
 }
 
 func ParseApplication(s string) (*Application, error) {
-	delimiter := strings.Index(s, "/")
-	if delimiter == -1 {
-		return nil, fmt.Errorf("failed to parse %s: %w", s, errMissingDelimiter)
+	prefix := fmt.Sprintf("%s/", LegacyAppName)
+	if !strings.HasPrefix(s, prefix) {
+		return nil, fmt.Errorf("%w: %q", errMissingApplicationPrefix, s)
 	}
 
-	client := s[:delimiter]
-	versionIndex := math.Min(delimiter+1, len(s)-1)
-	major, minor, patch, err := parseVersions(s[versionIndex:])
+	s = s[len(prefix):]
+	major, minor, patch, err := parseVersions(s)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Application{
-		Name:  client,
+		Name:  LegacyAppName,
 		Major: major,
 		Minor: minor,
 		Patch: patch,

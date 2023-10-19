@@ -47,6 +47,15 @@ func TestCompatibility(t *testing.T) {
 	}{
 		{
 			peer: &Application{
+				Name:  LegacyAppName,
+				Major: 1,
+				Minor: 5,
+				Patch: 0,
+			},
+			time: minCompatableTime,
+		},
+		{
+			peer: &Application{
 				Name:  Client,
 				Major: 1,
 				Minor: 5,

@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 )
 
+const LegacyAppName = "avalanche"
+
 var (
 	errDifferentMajor = errors.New("different major version")
 
@@ -25,7 +27,7 @@ type Application struct {
 }
 
 // The only difference here between Application and Semantic is that Application
-// prepends "avalanchego/" rather than "v".
+// prepends "avalanche/" rather than "v".
 func (a *Application) String() string {
 	strIntf := a.str.Load()
 	if strIntf != nil {

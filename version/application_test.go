@@ -14,13 +14,13 @@ func TestNewDefaultApplication(t *testing.T) {
 	require := require.New(t)
 
 	v := &Application{
-		Name:  Client,
+		Name:  LegacyAppName,
 		Major: 1,
 		Minor: 2,
 		Patch: 3,
 	}
 
-	require.Equal("avalanchego/1.2.3", v.String())
+	require.Equal("avalanche/1.2.3", v.String())
 	require.NoError(v.Compatible(v))
 	require.False(v.Before(v))
 }

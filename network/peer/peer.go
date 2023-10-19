@@ -497,11 +497,18 @@ func (p *peer) writeMessages() {
 		return
 	}
 
+	legacyApplication := &version.Application{
+		Name:  version.LegacyAppName,
+		Major: p.VersionCompatibility.Version().Major,
+		Minor: p.VersionCompatibility.Version().Minor,
+		Patch: p.VersionCompatibility.Version().Patch,
+	}
+
 	msg, err := p.MessageCreator.Version(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
-		p.VersionCompatibility.Version().String(),
+		legacyApplication.String(),
 		p.VersionCompatibility.Version().Name,
 		uint32(p.VersionCompatibility.Version().Major),
 		uint32(p.VersionCompatibility.Version().Minor),
