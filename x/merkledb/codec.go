@@ -90,26 +90,26 @@ type codecImpl struct {
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
+	// Estimate size of [n] to prevent memory allocations
+	estimatedLen := estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n.children)
+	buf := bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	return c.encodeDBNodeToBuffer(buf, n, branchFactor)
+}
 
-	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint(buf, uint64(numChildren))
+func (c *codecImpl) encodeDBNodeToBuffer(dst *bytes.Buffer, n *dbNode, branchFactor BranchFactor) []byte {
+	c.encodeMaybeByteSlice(dst, n.value)
+	c.encodeUint(dst, uint64(len(n.children)))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	for index := 0; BranchFactor(index) < branchFactor; index++ {
 		if entry, ok := n.children[byte(index)]; ok {
-			c.encodeUint(buf, uint64(index))
-			c.encodePath(buf, entry.compressedPath)
-			_, _ = buf.Write(entry.id[:])
-			c.encodeBool(buf, entry.hasValue)
+			c.encodeUint(dst, uint64(index))
+			c.encodePath(dst, entry.compressedPath)
+			_, _ = dst.Write(entry.id[:])
+			c.encodeBool(dst, entry.hasValue)
 		}
 	}
-	return buf.Bytes()
+	return dst.Bytes()
 }
 
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
@@ -144,7 +144,7 @@ func (c *codecImpl) encodeKeyAndNode(key Path, n *dbNode, factor BranchFactor) [
 	)
 
 	c.encodePath(buf, key)
-	_, _ = buf.Write(c.encodeDBNode(n, factor)) // TODO improve
+	c.encodeDBNodeToBuffer(buf, n, factor)
 	return buf.Bytes()
 }
 
