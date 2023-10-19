@@ -220,7 +220,7 @@ func (s *DBServer) CommitRangeProof(
 }
 
 func (s *DBServer) ClearRange(
-	ctx context.Context,
+	_ context.Context,
 	req *pb.ClearRangeRequest,
 ) (*emptypb.Empty, error) {
 	start := maybe.Nothing[[]byte]()
