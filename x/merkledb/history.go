@@ -98,6 +98,10 @@ func (th *trieHistory) getValueChanges(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
+	if startRoot == endRoot {
+		return newChangeSummary(maxLength), nil
+	}
+
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	// TODO when we update to minimum go version 1.20.X, make this return another
 	// wrapped error ErrNoEndRoot. In NetworkServer.HandleChangeProofRequest, if we return
@@ -106,10 +110,6 @@ func (th *trieHistory) getValueChanges(
 	endRootChanges, ok := th.lastChanges[endRoot]
 	if !ok {
 		return nil, fmt.Errorf("%w: end root %s not found", ErrInsufficientHistory, endRoot)
-	}
-
-	if startRoot == endRoot {
-		return newChangeSummary(maxLength), nil
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
