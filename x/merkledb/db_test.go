@@ -892,11 +892,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
 
-			if root == ids.Empty {
-				// Don't generate a proof for an empty trie.
-				continue
-			}
-
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -907,6 +902,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 			}
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
+			if root == ids.Empty {
+				require.ErrorIs(err, ErrEmptyRootID)
+				continue
+			}
 			require.NoError(err)
 			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
 
@@ -924,11 +923,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
 
-			if root == ids.Empty {
-				// Don't generate a proof for an empty trie.
-				continue
-			}
-
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -942,6 +936,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
+				continue
+			}
+			if root == ids.Empty {
+				require.ErrorIs(err, ErrEmptyRootID)
 				continue
 			}
 			require.NoError(err)
