@@ -1,4 +1,4 @@
-name: Build + Unit Tests
+name: Unit Tests
 
 on:
   push:
@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  run_build_unit_tests:
-    name: build_unit_test
+  unit_tests:
+    name: unit_tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -32,16 +32,13 @@ jobs:
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
-        run: |
-          echo "TIMEOUT=240s" >> $GITHUB_ENV
+        run: echo "TIMEOUT=240s" >> $GITHUB_ENV
       - name: build_test
         shell: bash
-        run: .github/workflows/build_and_test.sh
+        run: ./scripts/build_test.sh
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
       - name: fuzz_test
         shell: bash
         if: matrix.os == 'ubuntu-22.04' # Only run on Ubuntu 22.04
-        run: | # Run each fuzz test 15 seconds
-          cd ${{ github.workspace }}
-          ./scripts/build_fuzz.sh 15
+        run: ./scripts/build_fuzz.sh 15 # Run each fuzz test 15 seconds
