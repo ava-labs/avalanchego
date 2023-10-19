@@ -967,10 +967,12 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	db.history.record(changes)
 
+	// Update root in database.
 	if changes.rootChange.after == nil {
 		db.root = maybe.Nothing[*node]()
 		return db.baseDB.Delete(rootDBKey)
 	}
+
 	db.root = maybe.Some(changes.rootChange.after)
 	rootKeyAndNodeBytes := codec.encodeKeyAndNode(
 		changes.rootChange.after.key,
