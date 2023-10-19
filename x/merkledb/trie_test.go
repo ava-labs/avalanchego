@@ -52,6 +52,9 @@ func getNodeValueWithBranchFactor(t ReadOnlyTrie, key string, bf BranchFactor) (
 		if err != nil {
 			return nil, err
 		}
+		if len(nodePath) == 0 {
+			return nil, database.ErrNotFound
+		}
 		closestNode := nodePath[len(nodePath)-1]
 		if closestNode.key != path || closestNode == nil {
 			return nil, database.ErrNotFound
