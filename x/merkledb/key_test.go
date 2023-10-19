@@ -459,7 +459,7 @@ func FuzzKeyTake(f *testing.F) {
 			tokenLength := branchFactor.TokenLength(key2)
 			require.Equal(int(tokensToTake), tokenLength)
 			if key2.hasPartialByte() {
-				paddingMask := byte(0xFF >> (key2.bitLength % 8))
+				paddingMask := byte(0xFF >> key2.remainderBitCount())
 				require.Zero(key2.value[len(key2.value)-1] & paddingMask)
 			}
 			for i := 0; i < tokenLength; i++ {

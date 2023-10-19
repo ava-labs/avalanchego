@@ -121,7 +121,7 @@ func (k Key) HasPrefix(prefix Key) bool {
 
 	// The number of tokens in the last byte of [prefix], or zero
 	// if [prefix] fits into a whole number of bytes.
-	remainderBitCount := prefix.getRemainderBits()
+	remainderBitCount := prefix.remainderBitCount()
 	if remainderBitCount == 0 {
 		return strings.HasPrefix(k.value, prefix.value)
 	}
@@ -149,7 +149,7 @@ func (k Key) HasStrictPrefix(prefix Key) bool {
 	return k != prefix && k.HasPrefix(prefix)
 }
 
-func (k Key) getRemainderBits() int {
+func (k Key) remainderBitCount() int {
 	return k.bitLength % 8
 }
 
@@ -162,7 +162,7 @@ func (k Key) Token(tc TokenConfiguration, index int) byte {
 	bitIndex := index * tc.TokenBitSize()
 	storageByte := k.value[bitIndex/8]
 	// Shift the byte right to get the token to the rightmost position.
-	storageByte >>= k.bitsToShift(tc, bitIndex)
+	storageByte >>= bitsToShift(tc, bitIndex)
 	// Apply a mask to remove any other tokens in the byte.
 	return storageByte & (0xFF >> (8 - tc.TokenBitSize()))
 }
@@ -205,7 +205,7 @@ func (k Key) Less(other Key) bool {
 // * Token at index 1 (0b0010) needs to be shifted by 0 bits
 // * Token at index 2 (0b0011) needs to be shifted by 4 bits
 // * Token at index 3 (0b0100) needs to be shifted by 0 bits
-func (k Key) bitsToShift(tc TokenConfiguration, bitIndex int) byte {
+func bitsToShift(tc TokenConfiguration, bitIndex int) byte {
 	// [tokenIndex] is the index of the token in the byte.
 	// For example, if the branch factor is 16, then each byte contains 2 tokens.
 	// The first is at index 0, and the second is at index 1, by this definition.
@@ -256,7 +256,7 @@ func (k Key) AppendExtend(tc TokenConfiguration, token byte, extensionKey Key) K
 
 func (k Key) appendIntoBuffer(tc TokenConfiguration, buffer []byte, token byte) {
 	copy(buffer, k.value)
-	buffer[len(buffer)-1] |= token << k.bitsToShift(tc, k.bitLength)
+	buffer[len(buffer)-1] |= token << bitsToShift(tc, k.bitLength)
 }
 
 // Treats [src] as a bit array and copies it into [dst] shifted by [shift] bits.
@@ -316,7 +316,7 @@ func (k Key) Take(tc TokenConfiguration, tokensToTake int) Key {
 		bitLength: bitsToTake,
 	}
 
-	remainderBits := result.getRemainderBits()
+	remainderBits := result.remainderBitCount()
 	if remainderBits == 0 {
 		result.value = k.value[:bitsToTake/8]
 		return result
@@ -328,7 +328,7 @@ func (k Key) Take(tc TokenConfiguration, tokensToTake int) Key {
 	copy(buffer, k.value)
 
 	// We want to zero out everything to the right of the last token, which is at index [tokensToTake] - 1
-	// Mask will be (8-bitsToShift) number of 1's followed by (bitsToShift) number of 0's
+	// Mask will be (8-remainderBits) number of 1's followed by (remainderBits) number of 0's
 	buffer[len(buffer)-1] &= byte(0xFF << (8 - remainderBits))
 
 	result.value = byteSliceToString(buffer)

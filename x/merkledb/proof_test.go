@@ -1228,7 +1228,6 @@ func TestVerifyProofPath(t *testing.T) {
 				err := verifyProofPath(tc, tt.path, tt.proofKey)
 				require.ErrorIs(t, err, tt.expectedErr)
 			}
-
 		})
 	}
 }

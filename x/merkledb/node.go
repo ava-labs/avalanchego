@@ -14,13 +14,6 @@ import (
 
 const HashLength = 32
 
-// the values that go into the node's id
-type hashValues struct {
-	Children map[byte]child
-	Value    maybe.Maybe[[]byte]
-	Key      Key
-}
-
 // Representation of a node stored in the database.
 type dbNode struct {
 	value    maybe.Maybe[[]byte]
