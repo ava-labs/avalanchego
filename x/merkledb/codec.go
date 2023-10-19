@@ -68,7 +68,7 @@ type encoder interface {
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndNode(bytes []byte, n *dbNode, factor BranchFactor) (Path, error) // TODO should this return a Path?
+	decodeKeyAndNode(bytes []byte, key *Path, n *dbNode, factor BranchFactor) error
 }
 
 func newCodec() encoderDecoder {
@@ -209,22 +209,20 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	return c.decodeDBNodeFromReader(bytes.NewReader(b), n, branchFactor)
 }
 
-func (c *codecImpl) decodeKeyAndNode(b []byte, n *dbNode, branchFactor BranchFactor) (Path, error) {
+func (c *codecImpl) decodeKeyAndNode(b []byte, key *Path, n *dbNode, branchFactor BranchFactor) error {
 	if minPathLen+minDBNodeLen > len(b) {
-		return Path{}, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	src := bytes.NewReader(b)
 
-	key, err := c.decodePath(src, branchFactor)
+	var err error
+	*key, err = c.decodePath(src, branchFactor)
 	if err != nil {
-		return Path{}, err
+		return err
 	}
 
-	if err := c.decodeDBNodeFromReader(src, n, branchFactor); err != nil {
-		return Path{}, err
-	}
-	return key, nil
+	return c.decodeDBNodeFromReader(src, n, branchFactor)
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {

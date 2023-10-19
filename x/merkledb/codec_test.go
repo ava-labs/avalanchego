@@ -289,8 +289,11 @@ func TestEncodeDecodeKeyAndNode(t *testing.T) {
 			},
 		}
 		b := codec.encodeKeyAndNode(key, expectedNode, branchFactor)
-		var gotNode dbNode
-		gotKey, err := codec.decodeKeyAndNode(b, &gotNode, branchFactor)
+		var (
+			gotNode dbNode
+			gotKey  Path
+		)
+		err := codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor)
 		require.NoError(err)
 		require.Equal(expectedNode, &gotNode)
 		require.Equal(key, gotKey)

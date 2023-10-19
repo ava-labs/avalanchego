@@ -1172,11 +1172,19 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	}
 
 	// Root is on disk.
-	var rootDBNode dbNode
-	rootKey, err := codec.decodeKeyAndNode(rootBytes, &rootDBNode, db.valueNodeDB.branchFactor)
-	if err != nil {
+	var (
+		rootDBNode dbNode
+		rootKey    Path
+	)
+	if err := codec.decodeKeyAndNode(
+		rootBytes,
+		&rootKey,
+		&rootDBNode,
+		db.valueNodeDB.branchFactor,
+	); err != nil {
 		return err
 	}
+	newNode(nil, rootKey)
 	root := &node{
 		dbNode: rootDBNode,
 		key:    rootKey,
