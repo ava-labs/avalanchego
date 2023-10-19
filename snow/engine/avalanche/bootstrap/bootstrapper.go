@@ -283,6 +283,10 @@ func (*bootstrapper) Gossip(context.Context) error {
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
+
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	return b.VM.Shutdown(ctx)
 }
 
