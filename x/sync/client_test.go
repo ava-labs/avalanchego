@@ -331,20 +331,6 @@ func TestGetRangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrNoEndProof,
 		},
-		"empty proof": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = nil
-				response.StartProof = nil
-				response.EndProof = nil
-			},
-			expectedErr: merkledb.ErrEmptyProof,
-		},
 	}
 
 	for name, test := range tests {

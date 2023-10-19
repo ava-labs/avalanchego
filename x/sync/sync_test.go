@@ -102,14 +102,17 @@ func Test_Completion(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
 	emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
+
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
 		Client:                newCallthroughSyncClient(ctrl, emptyDB),
@@ -120,8 +123,10 @@ func Test_Completion(t *testing.T) {
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
+
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
+
 	syncer.workLock.Lock()
 	require.Zero(syncer.unprocessedWork.Len())
 	require.Equal(1, syncer.processedWork.Len())

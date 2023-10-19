@@ -3,9 +3,13 @@
 
 package sync
 
-import "github.com/ava-labs/avalanchego/x/merkledb"
+import (
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/x/merkledb"
+)
 
 type DB interface {
+	database.ClearRanger
 	merkledb.MerkleRootGetter
 	merkledb.ProofGetter
 	merkledb.ChangeProofer

@@ -21,6 +21,8 @@ message Request {
 service DB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
+  rpc ClearRange(ClearRangeRequest) returns (google.protobuf.Empty);
+
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
@@ -33,6 +35,11 @@ service DB {
 
 message GetMerkleRootResponse {
   bytes root_hash = 1;
+}
+
+message ClearRangeRequest {
+  MaybeBytes start_key = 1;
+  MaybeBytes end_key = 2;
 }
 
 message GetProofRequest {

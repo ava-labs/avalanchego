@@ -263,6 +263,17 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	if targetRootID == ids.Empty {
+		// The trie is empty after this change.
+		// Delete all the key-value pairs in the range.
+		if err := m.config.DB.ClearRange(work.start, work.end); err != nil {
+			m.setError(err)
+			return
+		}
+		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		return
+	}
+
 	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
@@ -329,6 +340,16 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
+
+	if targetRootID == ids.Empty {
+		if err := m.config.DB.ClearRange(work.start, work.end); err != nil {
+			m.setError(err)
+			return
+		}
+		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		return
+	}
+
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
 			RootHash: targetRootID[:],

@@ -5,14 +5,14 @@
 package merkledb
 
 import (
-        database "github.com/ava-labs/avalanchego/database"
-        ids "github.com/ava-labs/avalanchego/ids"
         maybe "github.com/ava-labs/avalanchego/utils/maybe"
         gomock "go.uber.org/mock/gomock"
         reflect "reflect"
         context "context"
+        database "github.com/ava-labs/avalanchego/database"
+        ids "github.com/ava-labs/avalanchego/ids"
 )
- 
+
 // MockMerkleDB is a mock of MerkleDB interface.
 type MockMerkleDB struct {
         ctrl     *gomock.Controller
@@ -34,6 +34,20 @@ func NewMockMerkleDB(ctrl *gomock.Controller) *MockMerkleDB {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockMerkleDB) EXPECT() *MockMerkleDBMockRecorder {
         return m.recorder
+}
+
+// ClearRange mocks base method.
+func (m *MockMerkleDB) ClearRange(arg0, arg1 maybe.Maybe[[]uint8]) error {
+        m.ctrl.T.Helper()
+        ret := m.ctrl.Call(m, "ClearRange", arg0, arg1)
+        ret0, _ := ret[0].(error)
+        return ret0
+}
+
+// ClearRange indicates an expected call of ClearRange.
+func (mr *MockMerkleDBMockRecorder) ClearRange(arg0, arg1 interface{}) *gomock.Call {
+        mr.mock.ctrl.T.Helper()
+        return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearRange", reflect.TypeOf((*MockMerkleDB)(nil).ClearRange), arg0, arg1)
 }
 
 // Close mocks base method.

@@ -218,3 +218,21 @@ func (s *DBServer) CommitRangeProof(
 	err := s.db.CommitRangeProof(ctx, start, end, &proof)
 	return &emptypb.Empty{}, err
 }
+
+func (s *DBServer) ClearRange(
+	ctx context.Context,
+	req *pb.ClearRangeRequest,
+) (*emptypb.Empty, error) {
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+
+	err := s.db.ClearRange(start, end)
+	return &emptypb.Empty{}, err
+}

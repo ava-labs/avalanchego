@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -186,6 +187,13 @@ func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []by
 		}
 	}
 	return iterator.Error()
+}
+
+type ClearRanger interface {
+	// Deletes all key-value pairs with keys in the range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	ClearRange(start, end maybe.Maybe[[]byte]) error
 }
 
 // Remove all key-value pairs from [db].

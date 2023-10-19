@@ -135,6 +135,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
+	database.ClearRanger
 	Trie
 	MerkleRootGetter
 	ProofGetter
@@ -1284,6 +1285,33 @@ func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
 
 func (db *merkleDB) getRoot() maybe.Maybe[*node] {
 	return db.root
+}
+
+func (db *merkleDB) ClearRange(start, end maybe.Maybe[[]byte]) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	keysToDelete, err := db.getKeysNotInSet(start, end, set.Set[string]{})
+	if err != nil {
+		return err
+	}
+
+	ops := make([]database.BatchOp, len(keysToDelete))
+	for i, keyToDelete := range keysToDelete {
+		keyToDelete := keyToDelete
+		ops[i] = database.BatchOp{
+			Key:    keyToDelete,
+			Delete: true,
+		}
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
+	if err != nil {
+		return err
+	}
+
+	return view.commitToDB(context.TODO())
 }
 
 // Returns [key] prefixed by [prefix].
