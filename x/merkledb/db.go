@@ -1015,7 +1015,7 @@ func (db *merkleDB) VerifyChangeProof(
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case proof.Empty():
-		return ErrNoMerkleProof
+		return ErrEmptyProof
 	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof

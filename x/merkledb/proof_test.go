@@ -309,7 +309,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		// 	start:       maybe.Some([]byte{1}),
 		// 	end:         maybe.Nothing[[]byte](),
 		// 	proof:       &RangeProof{},
-		// 	expectedErr: ErrNoMerkleProof,
+		// 	expectedErr: ErrEmptyProof,
 		// },
 		{
 			name:  "unexpected end proof",
@@ -907,7 +907,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof:       &ChangeProof{},
 			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
-			expectedErr: ErrNoMerkleProof,
+			expectedErr: ErrEmptyProof,
 		},
 		{
 			name: "no end proof",

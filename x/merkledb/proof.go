@@ -33,7 +33,7 @@ var (
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
 	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
 	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
-	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
+	ErrEmptyProof                  = errors.New("proof is empty")
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
@@ -289,7 +289,7 @@ func (proof *RangeProof) Verify(
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
-		return ErrNoMerkleProof
+		return ErrNoProof
 	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 0:
 		return ErrUnexpectedEndProof
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):

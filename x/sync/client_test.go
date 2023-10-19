@@ -343,7 +343,7 @@ func TestGetRangeProof(t *testing.T) {
 				response.StartProof = nil
 				response.EndProof = nil
 			},
-			expectedErr: merkledb.ErrNoMerkleProof,
+			expectedErr: merkledb.ErrEmptyProof,
 		},
 	}
 
