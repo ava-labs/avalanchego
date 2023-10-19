@@ -342,6 +342,9 @@ func (*Transitive) Timeout(context.Context) error {
 }
 
 func (t *Transitive) Gossip(ctx context.Context) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	blkID, err := t.VM.LastAccepted(ctx)
 	if err != nil {
 		return err
@@ -373,6 +376,9 @@ func (t *Transitive) Shutdown(ctx context.Context) error {
 func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
+		t.Ctx.Lock.Lock()
+		defer t.Ctx.Lock.Unlock()
+
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)

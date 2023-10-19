@@ -910,19 +910,15 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 			zap.Stringer("messageOp", op),
 		)
 	}
-	h.ctx.Lock.Lock()
-	lockAcquiredTime := h.clock.Time()
 	defer func() {
-		h.ctx.Lock.Unlock()
-
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			processingTime    = endTime.Sub(startTime)
-			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
+		// There is no lock grabbed here, so both metrics are identical
 		messageHistograms.processingTime.Observe(float64(processingTime))
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),
@@ -930,7 +926,6 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling chan message took longer than expected",
 				zap.Duration("processingTime", processingTime),
-				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("messageOp", op),
 				zap.Any("message", body),
 			)

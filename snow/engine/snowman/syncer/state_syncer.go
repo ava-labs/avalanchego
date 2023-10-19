@@ -555,6 +555,9 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		return nil
 	}
 
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	ss.Ctx.StateSyncing.Set(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }

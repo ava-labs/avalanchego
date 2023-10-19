@@ -277,6 +277,9 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 }
 
 func (b *bootstrapper) Timeout(ctx context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
