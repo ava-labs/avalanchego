@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -780,20 +779,4 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			tt.validateFunc(require, got)
 		})
 	}
-}
-
-func TestGenerateBLSSig(t *testing.T) {
-	require := require.New(t)
-
-	// Generate a key
-	key, err := bls.NewSecretKey()
-	require.NoError(err)
-
-	// Generate a message
-	message := []byte("hello world")
-
-	// Generate a signature
-	sig := bls.Sign(key, message)
-
-	t.Log("Signature:", sig)
 }
