@@ -194,6 +194,7 @@ type merkleDB struct {
 	infoTracer  trace.Tracer
 
 	// The root of this trie.
+	// Nothing if the trie is empty.
 	root maybe.Maybe[*node]
 
 	// Valid children of this trie.
@@ -964,26 +965,19 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return err
 	}
 
-	// Only modify in-memory state after the commit succeeds
-	// so that we don't need to clean up on error.
+	db.history.record(changes)
+
 	if changes.rootChange.after == nil {
 		db.root = maybe.Nothing[*node]()
-		if err := db.baseDB.Delete(rootDBKey); err != nil {
-			return err
-		}
-	} else {
-		db.root = maybe.Some(changes.rootChange.after)
-		rootKeyAndNodeBytes := codec.encodeKeyAndNode(
-			changes.rootChange.after.key,
-			&changes.rootChange.after.dbNode,
-			db.valueNodeDB.branchFactor,
-		)
-		if err := db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes); err != nil {
-			return err
-		}
+		return db.baseDB.Delete(rootDBKey)
 	}
-	db.history.record(changes)
-	return nil
+	db.root = maybe.Some(changes.rootChange.after)
+	rootKeyAndNodeBytes := codec.encodeKeyAndNode(
+		changes.rootChange.after.key,
+		&changes.rootChange.after.dbNode,
+		db.valueNodeDB.branchFactor,
+	)
+	return db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes)
 }
 
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
