@@ -12,7 +12,7 @@ import (
         reflect "reflect"
         context "context"
 )
-
+ 
 // MockMerkleDB is a mock of MerkleDB interface.
 type MockMerkleDB struct {
         ctrl     *gomock.Controller
