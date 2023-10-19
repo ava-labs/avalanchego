@@ -364,7 +364,7 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 		// Confirm that the padding bits in the partial byte are 0.
 		// We want to only look at the bits to the right of the last token, which is at index length-1.
 		// Generate a mask with (8-bitsToShift) 0s followed by bitsToShift 1s.
-		paddingMask := byte(0xFF >> (8 - result.bitLength%8))
+		paddingMask := byte(0xFF >> (result.bitLength % 8))
 		if buffer[keyBytesLen-1]&paddingMask != 0 {
 			return Key{}, errNonZeroKeyPadding
 		}

@@ -161,8 +161,10 @@ func Test_Key_Take(t *testing.T) {
 		}
 		key := ToKey([]byte{0b0101_0101})
 		for i := 1; i <= bf.tokensPerByte; i++ {
-			shift := 8 - (i * bf.tokenBitSize)
 			take := key.Take(bf, i)
+			length := i * bf.tokenBitSize
+			require.Equal(length, take.bitLength)
+			shift := 8 - length
 			require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
 		}
 	}
@@ -454,9 +456,12 @@ func FuzzKeyTake(f *testing.F) {
 				t.SkipNow()
 			}
 			key2 := key1.Take(branchFactor, int(tokensToTake))
-			tokenLength := key2.bitLength / branchFactor.tokensPerByte
+			tokenLength := branchFactor.TokenLength(key2)
 			require.Equal(int(tokensToTake), tokenLength)
-
+			if key2.hasPartialByte() {
+				paddingMask := byte(0xFF >> (key2.bitLength % 8))
+				require.Zero(key2.value[len(key2.value)-1] & paddingMask)
+			}
 			for i := 0; i < tokenLength; i++ {
 				require.Equal(key1.Token(branchFactor, i), key2.Token(branchFactor, i))
 			}
