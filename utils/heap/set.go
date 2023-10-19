@@ -33,9 +33,9 @@ func (s Set[T]) Len() int {
 	return s.set.Len()
 }
 
-func (s Set[T]) Remove(t T) (T, bool) {
-	remove, _, existed := s.set.Remove(t)
-	return remove, existed
+func (s Set[T]) Remove(t T) bool {
+	_, existed := s.set.Remove(t)
+	return existed
 }
 
 func (s Set[T]) Fix(t T) {
@@ -44,9 +44,4 @@ func (s Set[T]) Fix(t T) {
 
 func (s Set[T]) Contains(t T) bool {
 	return s.set.Contains(t)
-}
-
-func (s Set[T]) Get(t T) (T, bool) {
-	key, _, ok := s.set.Get(t)
-	return key, ok
 }
