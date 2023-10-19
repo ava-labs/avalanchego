@@ -271,30 +271,59 @@ func TestCodecDecodePathLengthOverflowRegression(t *testing.T) {
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
-// TODO make fuzz test
-func TestEncodeDecodeKeyAndNode(t *testing.T) {
-	require := require.New(t)
+func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
+	require := require.New(f)
 	codec := newCodec()
 
-	for _, branchFactor := range branchFactors {
-		key := NewPath([]byte{1, 2, 3}, branchFactor)
-		expectedNode := &dbNode{
-			value: maybe.Some([]byte{1}),
-			children: map[byte]child{
-				0: {
-					compressedPath: NewPath([]byte{2, 3}, branchFactor),
-					id:             ids.GenerateTestID(),
-					hasValue:       true,
-				},
-			},
-		}
-		b := codec.encodeKeyAndNode(key, expectedNode, branchFactor)
-		var (
-			gotNode dbNode
-			gotKey  Path
-		)
-		require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
-		require.Equal(expectedNode, &gotNode)
-		require.Equal(key, gotKey)
-	}
+	f.Fuzz(
+		func(
+			t *testing.T,
+			keyBytes []byte,
+			hasValue bool,
+			value []byte,
+			removeToken bool,
+			numChildren int,
+		) {
+			for _, branchFactor := range branchFactors {
+				key := NewPath(keyBytes, branchFactor)
+
+				if removeToken && key.tokensLength > 0 {
+					key = key.Skip(1)
+				}
+
+				val := maybe.Nothing[[]byte]()
+				if hasValue {
+					val = maybe.Some(value)
+				}
+
+				if numChildren > int(branchFactor) {
+					numChildren = int(branchFactor)
+				}
+
+				children := map[byte]child{}
+				for i := 0; i < numChildren; i++ {
+					compressedPathBytes := make([]byte, 32)
+					_, _ = rand.Read(compressedPathBytes) // #nosec G404
+					children[byte(i)] = child{
+						compressedPath: NewPath(compressedPathBytes, branchFactor),
+						id:             ids.GenerateTestID(),
+						hasValue:       true,
+					}
+				}
+
+				expectedNode := &dbNode{
+					value:    val,
+					children: children,
+				}
+				b := codec.encodeKeyAndNode(key, expectedNode, branchFactor)
+				var (
+					gotNode dbNode
+					gotKey  Path
+				)
+				require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
+				require.Equal(expectedNode, &gotNode)
+				require.Equal(key, gotKey)
+			}
+		},
+	)
 }
