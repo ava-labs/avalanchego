@@ -157,6 +157,10 @@ func Test_Key_Take(t *testing.T) {
 	require := require.New(t)
 
 	for _, bf := range branchFactors {
+		// take more tokens than the key has
+		require.Equal(ToKey([]byte{0}, bf).Take(1000), ToKey([]byte{0}, bf))
+
+		// take no tokens
 		require.Equal(ToKey([]byte{0}, bf).Take(0), emptyKey(bf))
 		if bf == BranchFactor256 {
 			continue

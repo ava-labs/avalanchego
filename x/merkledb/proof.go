@@ -45,8 +45,8 @@ var (
 	ErrInvalidChildIndex           = errors.New("child index must be less than branch factor")
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
-	ErrNilPath                     = errors.New("path is nil")
-	ErrInvalidPathLength           = errors.New("path length doesn't match bytes length, check specified branchFactor")
+	ErrNilKey                      = errors.New("key is nil")
+	ErrInvalidKeyLength            = errors.New("key length doesn't match bytes length, check specified branchFactor")
 	ErrNilRangeProof               = errors.New("range proof is nil")
 	ErrNilChangeProof              = errors.New("change proof is nil")
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
@@ -96,12 +96,12 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode, bf BranchFactor) err
 	case pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0:
 		return ErrInvalidMaybe
 	case pbNode.Key == nil:
-		return ErrNilPath
+		return ErrNilKey
 	}
 	node.Key = ToKey(pbNode.Key.Value, bf).Take(int(pbNode.Key.Length))
 
-	if len(node.Key.value) != node.Key.bytesNeeded(node.Key.tokenLength) {
-		return ErrInvalidPathLength
+	if len(pbNode.Key.Value) != node.Key.bytesNeeded(node.Key.tokenLength) {
+		return ErrInvalidKeyLength
 	}
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))

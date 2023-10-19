@@ -309,7 +309,7 @@ func (k Key) Skip(tokensToSkip int) Key {
 
 // Take returns a new Key that contains the first tokensToTake tokens of the current Key
 func (k Key) Take(tokensToTake int) Key {
-	if k.tokenLength == tokensToTake {
+	if k.tokenLength <= tokensToTake {
 		return k
 	}
 

@@ -20,12 +20,14 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The consensus engine that should be used when handling a consensus request.
 type EngineType int32
 
 const (
 	EngineType_ENGINE_TYPE_UNSPECIFIED EngineType = 0
-	EngineType_ENGINE_TYPE_AVALANCHE   EngineType = 1
-	EngineType_ENGINE_TYPE_SNOWMAN     EngineType = 2
+	// Only the X-Chain uses avalanche consensus
+	EngineType_ENGINE_TYPE_AVALANCHE EngineType = 1
+	EngineType_ENGINE_TYPE_SNOWMAN   EngineType = 2
 )
 
 // Enum value maps for EngineType.
@@ -489,18 +491,17 @@ func (*Message_AppGossip) isMessage_Message() {}
 
 func (*Message_PeerListAck) isMessage_Message() {}
 
-// Message that a node sends to its peers in order to periodically check
-// responsivness and report the local node's uptime measurements of the peer.
+// Ping reports a peer's perceived uptime percentage.
 //
-// On receiving a "ping", the peer should respond with a "pong".
+// Peers should respond to Ping with a Pong.
 type Ping struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// uptime is the primary network uptime percentage.
+	// Uptime percentage on the primary network [0, 100]
 	Uptime uint32 `protobuf:"varint,1,opt,name=uptime,proto3" json:"uptime,omitempty"`
-	// subnet_uptimes contains subnet uptime percentages.
+	// Uptime percentage on subnets
 	SubnetUptimes []*SubnetUptime `protobuf:"bytes,2,rep,name=subnet_uptimes,json=subnetUptimes,proto3" json:"subnet_uptimes,omitempty"`
 }
 
@@ -550,15 +551,16 @@ func (x *Ping) GetSubnetUptimes() []*SubnetUptime {
 	return nil
 }
 
-// Contains subnet id and the related observed subnet uptime of the message
-// receiver (remote peer).
+// SubnetUptime is a descriptor for a peer's perceived uptime on a subnet.
 type SubnetUptime struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Subnet the peer is validating
 	SubnetId []byte `protobuf:"bytes,1,opt,name=subnet_id,json=subnetId,proto3" json:"subnet_id,omitempty"`
-	Uptime   uint32 `protobuf:"varint,2,opt,name=uptime,proto3" json:"uptime,omitempty"`
+	// Uptime percentage on the subnet [0, 100]
+	Uptime uint32 `protobuf:"varint,2,opt,name=uptime,proto3" json:"uptime,omitempty"`
 }
 
 func (x *SubnetUptime) Reset() {
@@ -607,18 +609,18 @@ func (x *SubnetUptime) GetUptime() uint32 {
 	return 0
 }
 
-// Contains the uptime percentage of the message receiver (remote peer)
-// from the sender's point of view, in response to "ping" message.
-// Uptimes are expected to be provided as integers ranging in [0, 100].
+// Pong is sent in response to a Ping with the perceived uptime of the
+// peer.
 type Pong struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Deprecated: remove all these fields in the future, but keep the message.
-	// uptime is the primary network uptime percentage.
+	// Deprecated: uptime is now sent in Ping
+	// Uptime percentage on the primary network [0, 100]
 	Uptime uint32 `protobuf:"varint,1,opt,name=uptime,proto3" json:"uptime,omitempty"`
-	// subnet_uptimes contains subnet uptime percentages.
+	// Deprecated: uptime is now sent in Ping
+	// Uptime percentage on subnets
 	SubnetUptimes []*SubnetUptime `protobuf:"bytes,2,rep,name=subnet_uptimes,json=subnetUptimes,proto3" json:"subnet_uptimes,omitempty"`
 }
 
@@ -668,25 +670,33 @@ func (x *Pong) GetSubnetUptimes() []*SubnetUptime {
 	return nil
 }
 
-// The first outbound message that the local node sends to its remote peer
-// when the connection is established. In order for the local node to be
-// tracked as a valid peer by the remote peer, the fields must be valid.
-// For instance, the network ID must be matched and timestamp should be in-sync.
-// Otherwise, the remote peer closes the connection.
-// ref. "avalanchego/network/peer#handleVersion"
-// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/network#Network "Dispatch"
+// Version is the first outbound message sent to a peer when a connection is
+// established to start the p2p handshake.
+//
+// Peers must respond to a Version message with a PeerList message to allow the
+// peer to connect to other peers in the network.
+//
+// Peers should drop connections to peers with incompatible versions.
 type Version struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	NetworkId      uint32   `protobuf:"varint,1,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`
-	MyTime         uint64   `protobuf:"varint,2,opt,name=my_time,json=myTime,proto3" json:"my_time,omitempty"`
-	IpAddr         []byte   `protobuf:"bytes,3,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
-	IpPort         uint32   `protobuf:"varint,4,opt,name=ip_port,json=ipPort,proto3" json:"ip_port,omitempty"`
-	MyVersion      string   `protobuf:"bytes,5,opt,name=my_version,json=myVersion,proto3" json:"my_version,omitempty"`
-	MyVersionTime  uint64   `protobuf:"varint,6,opt,name=my_version_time,json=myVersionTime,proto3" json:"my_version_time,omitempty"`
-	Sig            []byte   `protobuf:"bytes,7,opt,name=sig,proto3" json:"sig,omitempty"`
+	// Network the peer is running on (e.g local, testnet, mainnet)
+	NetworkId uint32 `protobuf:"varint,1,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`
+	// Unix timestamp when this Version message was created
+	MyTime uint64 `protobuf:"varint,2,opt,name=my_time,json=myTime,proto3" json:"my_time,omitempty"`
+	// IP address of the peer
+	IpAddr []byte `protobuf:"bytes,3,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
+	// IP port of the peer
+	IpPort uint32 `protobuf:"varint,4,opt,name=ip_port,json=ipPort,proto3" json:"ip_port,omitempty"`
+	// Avalanche client version
+	MyVersion string `protobuf:"bytes,5,opt,name=my_version,json=myVersion,proto3" json:"my_version,omitempty"`
+	// Timestamp of the IP
+	MyVersionTime uint64 `protobuf:"varint,6,opt,name=my_version_time,json=myVersionTime,proto3" json:"my_version_time,omitempty"`
+	// Signature of the peer IP port pair at a provided timestamp
+	Sig []byte `protobuf:"bytes,7,opt,name=sig,proto3" json:"sig,omitempty"`
+	// Subnets the peer is tracking
 	TrackedSubnets [][]byte `protobuf:"bytes,8,rep,name=tracked_subnets,json=trackedSubnets,proto3" json:"tracked_subnets,omitempty"`
 }
 
@@ -778,18 +788,24 @@ func (x *Version) GetTrackedSubnets() [][]byte {
 	return nil
 }
 
-// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/utils/ips#ClaimedIPPort
+// ClaimedIpPort contains metadata needed to connect to a peer
 type ClaimedIpPort struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// X509 certificate of the peer
 	X509Certificate []byte `protobuf:"bytes,1,opt,name=x509_certificate,json=x509Certificate,proto3" json:"x509_certificate,omitempty"`
-	IpAddr          []byte `protobuf:"bytes,2,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
-	IpPort          uint32 `protobuf:"varint,3,opt,name=ip_port,json=ipPort,proto3" json:"ip_port,omitempty"`
-	Timestamp       uint64 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Signature       []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
-	TxId            []byte `protobuf:"bytes,6,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
+	// IP address of the peer
+	IpAddr []byte `protobuf:"bytes,2,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
+	// IP port of the peer
+	IpPort uint32 `protobuf:"varint,3,opt,name=ip_port,json=ipPort,proto3" json:"ip_port,omitempty"`
+	// Timestamp of the IP address + port pair
+	Timestamp uint64 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	// Signature of the IP port pair at a provided timestamp
+	Signature []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
+	// P-Chain transaction that added this peer to the validator set
+	TxId []byte `protobuf:"bytes,6,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 }
 
 func (x *ClaimedIpPort) Reset() {
@@ -866,13 +882,10 @@ func (x *ClaimedIpPort) GetTxId() []byte {
 	return nil
 }
 
-// Message that contains a list of peer information (IP, certs, etc.)
-// in response to "version" message, and sent periodically to a set of
-// validators.
-// ref. "avalanchego/network/network#Dispatch.runtTimers"
+// Peers should periodically send PeerList messages to allow peers to
+// discover each other.
 //
-// On receiving "peer_list", the engine starts/updates the tracking information
-// of the remote peer.
+// PeerListAck should be sent in response to a PeerList.
 type PeerList struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -920,19 +933,17 @@ func (x *PeerList) GetClaimedIpPorts() []*ClaimedIpPort {
 	return nil
 }
 
-// "peer_ack" is sent in response to a "peer_list" message. The "tx_id" should
-// correspond to a "tx_id" in the "peer_list" message. The sender should set
-// "timestamp" to be the latest known timestamp of a signed IP corresponding to
-// the nodeID of "tx_id".
-//
-// Upon receipt, the "tx_id" and "timestamp" will determine if the receiptent
-// can forgo future gossip of the node's IP to the sender of this message.
+// PeerAck acknowledges that a gossiped peer in a PeerList message will be
+// tracked by the remote peer.
 type PeerAck struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	TxId      []byte `protobuf:"bytes,1,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
+	// P-Chain transaction that added the acknowledged peer to the validator
+	// set
+	TxId []byte `protobuf:"bytes,1,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
+	// Timestamp of the signed ip of the peer
 	Timestamp uint64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
@@ -982,8 +993,8 @@ func (x *PeerAck) GetTimestamp() uint64 {
 	return 0
 }
 
-// Message that responds to a peer_list message containing the AddValidatorTxIDs
-// from the peer_list message that we currently have in our validator set.
+// PeerListAck is sent in response to PeerList to acknowledge the subset of
+// peers that the peer will attempt to connect to.
 type PeerListAck struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1031,14 +1042,19 @@ func (x *PeerListAck) GetPeerAcks() []*PeerAck {
 	return nil
 }
 
+// GetStateSummaryFrontier requests a peer's most recently accepted state
+// summary
 type GetStateSummaryFrontier struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline  uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
 }
 
 func (x *GetStateSummaryFrontier) Reset() {
@@ -1094,14 +1110,18 @@ func (x *GetStateSummaryFrontier) GetDeadline() uint64 {
 	return 0
 }
 
+// StateSummaryFrontier is sent in response to a GetStateSummaryFrontier request
 type StateSummaryFrontier struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original GetStateSummaryFrontier request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Summary   []byte `protobuf:"bytes,3,opt,name=summary,proto3" json:"summary,omitempty"`
+	// The requested state summary
+	Summary []byte `protobuf:"bytes,3,opt,name=summary,proto3" json:"summary,omitempty"`
 }
 
 func (x *StateSummaryFrontier) Reset() {
@@ -1157,15 +1177,21 @@ func (x *StateSummaryFrontier) GetSummary() []byte {
 	return nil
 }
 
+// GetAcceptedStateSummary requests a set of state summaries at a set of
+// block heights
 type GetAcceptedStateSummary struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte   `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId uint32   `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline  uint64   `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	Heights   []uint64 `protobuf:"varint,4,rep,packed,name=heights,proto3" json:"heights,omitempty"`
+	// Chain bein requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Heights being requested
+	Heights []uint64 `protobuf:"varint,4,rep,packed,name=heights,proto3" json:"heights,omitempty"`
 }
 
 func (x *GetAcceptedStateSummary) Reset() {
@@ -1228,13 +1254,17 @@ func (x *GetAcceptedStateSummary) GetHeights() []uint64 {
 	return nil
 }
 
+// AcceptedStateSummary is sent in response to GetAcceptedStateSummary
 type AcceptedStateSummary struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId    []byte   `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId  uint32   `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original GetAcceptedStateSummary request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// State summary ids
 	SummaryIds [][]byte `protobuf:"bytes,3,rep,name=summary_ids,json=summaryIds,proto3" json:"summary_ids,omitempty"`
 }
 
@@ -1291,23 +1321,21 @@ func (x *AcceptedStateSummary) GetSummaryIds() [][]byte {
 	return nil
 }
 
-// Message to request for the accepted frontier of the "remote" peer.
-// For instance, the accepted frontier of X-chain DAG is the set of
-// accepted vertices that do not have any accepted descendants (i.e., frontier).
+// GetAcceptedFrontier requests the accepted frontier from a peer.
 //
-// During bootstrap, the local node sends out "get_accepted_frontier" to validators
-// (see "avalanchego/snow/engine/common/bootstrapper.Startup").
-// And the expected response is "accepted_frontier".
-//
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// Peers should respond to GetAcceptedFrontier with AcceptedFrontier.
 type GetAcceptedFrontier struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId    []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId  uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline   uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Consensus type the remote peer should use to handle this message
 	EngineType EngineType `protobuf:"varint,4,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
 }
 
@@ -1371,18 +1399,19 @@ func (x *GetAcceptedFrontier) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains the list of accepted frontier in response to
-// "get_accepted_frontier". For instance, on receiving "get_accepted_frontier",
-// the X-chain engine responds with the accepted frontier of X-chain DAG.
+// AcceptedFrontier contains the remote peer's last accepted frontier.
 //
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// AcceptedFrontier is sent in response to GetAcceptedFrontier.
 type AcceptedFrontier struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId     []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId   uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original GetAcceptedFrontier request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// The id of the last accepted frontier
 	ContainerId []byte `protobuf:"bytes,3,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
@@ -1439,23 +1468,25 @@ func (x *AcceptedFrontier) GetContainerId() []byte {
 	return nil
 }
 
-// Message to request for the accepted blocks/vertices of the "remote" peer.
-// The local node sends out this message during bootstrap, following "get_accepted_frontier".
-// Basically, sending the list of the accepted frontier and expects the response of
-// the accepted IDs from the remote peer.
+// GetAccepted sends a request with the sender's accepted frontier to a remote
+// peer.
 //
-// See "avalanchego/snow/engine/common/bootstrapper.Startup" and "sendGetAccepted".
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// Peers should respond to GetAccepted with an Accepted message.
 type GetAccepted struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId      []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId    uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline     uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	ContainerIds [][]byte   `protobuf:"bytes,4,rep,name=container_ids,json=containerIds,proto3" json:"container_ids,omitempty"`
-	EngineType   EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this message
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// The sender's accepted frontier
+	ContainerIds [][]byte `protobuf:"bytes,4,rep,name=container_ids,json=containerIds,proto3" json:"container_ids,omitempty"`
+	// Consensus type to handle this message
+	EngineType EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
 }
 
 func (x *GetAccepted) Reset() {
@@ -1525,20 +1556,20 @@ func (x *GetAccepted) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains the list of accepted block/vertex IDs in response to
-// "get_accepted". For instance, on receiving "get_accepted" that contains
-// the sender's accepted frontier IDs, the X-chain engine responds only with
-// the accepted vertex IDs of the X-chain DAG.
-//
-// See "snow/engine/avalanche#GetAccepted" and "SendAccepted".
-// See "snow/engine/common/bootstrapper.go#Accepted".
+// Accepted is sent in response to GetAccepted. The sending peer responds with
+// a subset of container ids from the GetAccepted request that the sending peer
+// has accepted.
 type Accepted struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId      []byte   `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId    uint32   `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original GetAccepted request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Subset of container ids from the GetAccepted request that the sender has
+	// accepted
 	ContainerIds [][]byte `protobuf:"bytes,3,rep,name=container_ids,json=containerIds,proto3" json:"container_ids,omitempty"`
 }
 
@@ -1595,22 +1626,24 @@ func (x *Accepted) GetContainerIds() [][]byte {
 	return nil
 }
 
-// Message that requests for the ancestors (parents) of the specified container ID.
-// The engine bootstrapper sends this message to fetch all accepted containers
-// in its transitive path.
+// GetAncestors requests the ancestors for a given container.
 //
-// On receiving "get_ancestors", it responds with the ancestors' container bytes
-// in "ancestors" message.
+// The remote peer should respond with an Ancestors message.
 type GetAncestors struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId     []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId   uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline    uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	ContainerId []byte     `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	EngineType  EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Container for which ancestors are being requested
+	ContainerId []byte `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	// Consensus type to handle this message
+	EngineType EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
 }
 
 func (x *GetAncestors) Reset() {
@@ -1680,18 +1713,20 @@ func (x *GetAncestors) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains the container bytes of the ancestors
-// in response to "get_ancestors".
+// Ancestors is sent in response to GetAncestors.
 //
-// On receiving "ancestors", the engine parses the containers and queues them
-// to be accepted once we've received the entire chain history.
+// Ancestors contains a contiguous ancestry of containers for the requested
+// container in order of increasing block height.
 type Ancestors struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId    []byte   `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId  uint32   `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original GetAncestors request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Ancestry for the requested container
 	Containers [][]byte `protobuf:"bytes,3,rep,name=containers,proto3" json:"containers,omitempty"`
 }
 
@@ -1748,20 +1783,24 @@ func (x *Ancestors) GetContainers() [][]byte {
 	return nil
 }
 
-// Message that requests for the container data.
+// Get requests a container from a remote peer.
 //
-// On receiving "get", the engine looks up the container from the storage.
-// If the container is found, it sends out the container data in "put" message.
+// Remote peers should respond with a Put message if they have the container.
 type Get struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId     []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId   uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline    uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	ContainerId []byte     `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	EngineType  EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Container being requested
+	ContainerId []byte `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	// Consensus type to handle this message
+	EngineType EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
 }
 
 func (x *Get) Reset() {
@@ -1831,17 +1870,19 @@ func (x *Get) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains the container ID and its bytes in response to "get".
-//
-// On receiving "put", the engine parses the container and tries to issue it to consensus.
+// Put is sent in response to Get with the requested block.
 type Put struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId    []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId  uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Container  []byte     `protobuf:"bytes,3,opt,name=container,proto3" json:"container,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original Get request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Requested container
+	Container []byte `protobuf:"bytes,3,opt,name=container,proto3" json:"container,omitempty"`
+	// Consensus type to handle this message
 	EngineType EngineType `protobuf:"varint,4,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
 }
 
@@ -1905,26 +1946,26 @@ func (x *Put) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains a preferred container ID and its container bytes
-// in order to query other peers for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
+// PushQuery requests the preferences of a remote peer given a container.
 //
-// On receiving the "push_query", the engine parses the incoming container
-// and tries to issue the container and all of its parents to the consensus,
-// and calls "pull_query" handler to send "chits" for voting.
+// Remote peers should respond to a PushQuery with a Chits message
 type PushQuery struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId         []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId       uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline        uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	Container       []byte     `protobuf:"bytes,4,opt,name=container,proto3" json:"container,omitempty"`
-	EngineType      EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
-	RequestedHeight uint64     `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Container being gossiped
+	Container []byte `protobuf:"bytes,4,opt,name=container,proto3" json:"container,omitempty"`
+	// Consensus type to handle this message
+	EngineType EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
+	// Requesting peer's last accepted height
+	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 }
 
 func (x *PushQuery) Reset() {
@@ -2001,22 +2042,26 @@ func (x *PushQuery) GetRequestedHeight() uint64 {
 	return 0
 }
 
-// Message that contains a preferred container ID to query other peers
-// for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
+// PullQuery requests the preferences of a remote peer given a container id.
+//
+// Remote peers should respond to a PullQuery with a Chits message
 type PullQuery struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId         []byte     `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	RequestId       uint32     `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline        uint64     `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	ContainerId     []byte     `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	EngineType      EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
-	RequestedHeight uint64     `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
+	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Container id being gossiped
+	ContainerId []byte `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	// Consensus type to handle this message
+	EngineType EngineType `protobuf:"varint,5,opt,name=engine_type,json=engineType,proto3,enum=p2p.EngineType" json:"engine_type,omitempty"`
+	// Requesting peer's last accepted height
+	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 }
 
 func (x *PullQuery) Reset() {
@@ -2093,25 +2138,22 @@ func (x *PullQuery) GetRequestedHeight() uint64 {
 	return 0
 }
 
-// Message that contains the votes/preferences of the node. It is sent in
-// response to a "push_query" or "pull_query" request.
-//
-// Upon receiving "chits", the engine will attempt to issue the preferred block
-// into consensus. If the referenced block is not locally available, the engine
-// will respond with a "get" message to fetch the missing block from the remote
-// peer.
+// Chits contains the preferences of a peer in response to a PushQuery or
+// PullQuery message.
 type Chits struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original PushQuery/PullQuery request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// Represents the current preferred block.
+	// Currently preferred block
 	PreferredId []byte `protobuf:"bytes,3,opt,name=preferred_id,json=preferredId,proto3" json:"preferred_id,omitempty"`
-	// Represents the last accepted block.
+	// Last accepted block
 	AcceptedId []byte `protobuf:"bytes,4,opt,name=accepted_id,json=acceptedId,proto3" json:"accepted_id,omitempty"`
-	// Represents the current preferred block at the requested height.
+	// Currently preferred block at the requested height
 	PreferredIdAtHeight []byte `protobuf:"bytes,5,opt,name=preferred_id_at_height,json=preferredIdAtHeight,proto3" json:"preferred_id_at_height,omitempty"`
 }
 
@@ -2182,15 +2224,22 @@ func (x *Chits) GetPreferredIdAtHeight() []byte {
 	return nil
 }
 
+// AppRequest is a VM-defined request.
+//
+// Remote peers must respond to AppRequest with corresponding AppResponse
 type AppRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain being requested from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Unique identifier for this request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Deadline  uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	AppBytes  []byte `protobuf:"bytes,4,opt,name=app_bytes,json=appBytes,proto3" json:"app_bytes,omitempty"`
+	// Timeout (ns) for this request
+	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	// Request body
+	AppBytes []byte `protobuf:"bytes,4,opt,name=app_bytes,json=appBytes,proto3" json:"app_bytes,omitempty"`
 }
 
 func (x *AppRequest) Reset() {
@@ -2253,14 +2302,18 @@ func (x *AppRequest) GetAppBytes() []byte {
 	return nil
 }
 
+// AppResponse is a VM-defined response sent in response to AppRequest
 type AppResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain being responded from
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Request id of the original AppRequest
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	AppBytes  []byte `protobuf:"bytes,3,opt,name=app_bytes,json=appBytes,proto3" json:"app_bytes,omitempty"`
+	// Response body
+	AppBytes []byte `protobuf:"bytes,3,opt,name=app_bytes,json=appBytes,proto3" json:"app_bytes,omitempty"`
 }
 
 func (x *AppResponse) Reset() {
@@ -2316,12 +2369,15 @@ func (x *AppResponse) GetAppBytes() []byte {
 	return nil
 }
 
+// AppGossip is a VM-defined message
 type AppGossip struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId  []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Chain the message is for
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Message body
 	AppBytes []byte `protobuf:"bytes,2,opt,name=app_bytes,json=appBytes,proto3" json:"app_bytes,omitempty"`
 }
 

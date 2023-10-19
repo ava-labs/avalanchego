@@ -1314,7 +1314,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 				protoNode.Key = nil
 				return protoNode
 			},
-			expectedErr: ErrNilPath,
+			expectedErr: ErrNilKey,
 		},
 	}
 
