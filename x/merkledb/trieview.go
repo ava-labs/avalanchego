@@ -352,12 +352,21 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		Key: t.db.newPath(key),
 	}
 
+	if t.root.IsNothing() {
+		return proof, nil
+	}
+
 	proofPath, err := t.getPathTo(proof.Key)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(proofPath) == 0 {
+		// No key in [t] is a prefix of [key].
+		// The root alone proves that [key] isn't in [t].
+		proof.Path = []ProofNode{
+			t.root.Value().asProofNode(),
+		}
 		return proof, nil
 	}
 
