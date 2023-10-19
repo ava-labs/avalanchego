@@ -152,7 +152,6 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	myMap7 := make(map[interface{}]interface{})
 	myMap7["key"] = "value"
 	myMap7[int32(1)] = int32(2)
-	myMap7[int32(44)] = nil
 
 	number := int32(8)
 
