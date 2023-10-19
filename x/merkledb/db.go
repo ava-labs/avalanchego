@@ -1180,7 +1180,6 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	); err != nil {
 		return err
 	}
-	newNode(nil, rootKey)
 	root := &node{
 		dbNode: rootDBNode,
 		key:    rootKey,

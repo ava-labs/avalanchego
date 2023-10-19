@@ -319,7 +319,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					gotNode dbNode
 					gotKey  Path
 				)
-				require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
+				require.NoError(f, codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
 				require.Equal(f, expectedNode, &gotNode)
 				require.Equal(f, key, gotKey)
 			}
