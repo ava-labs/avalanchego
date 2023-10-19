@@ -110,8 +110,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	queue[0] = vertex
 	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
 	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := set.Set[ids.ID]{}                                           // IDs of vertices that have been in queue before
-	visited.Add(vertex.ID())
+	visited := set.Of(vertex.ID())                                         // IDs of vertices that have been in queue before
 
 	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
 		var vtx avalanche.Vertex
