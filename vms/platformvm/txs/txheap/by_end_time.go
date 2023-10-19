@@ -21,7 +21,9 @@ func NewByEndTime() TimedHeap {
 	return &byEndTime{
 		txHeap: txHeap{
 			heap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
-				return a.tx.Unsigned.(txs.Staker).EndTime().Before(b.tx.Unsigned.(txs.Staker).EndTime())
+				aTime := a.tx.Unsigned.(txs.Staker).EndTime()
+				bTime := b.tx.Unsigned.(txs.Staker).EndTime()
+				return aTime.Before(bTime)
 			}),
 		},
 	}

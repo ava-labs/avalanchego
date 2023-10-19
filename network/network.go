@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/pires/go-proxyproto"
 
@@ -37,11 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -143,7 +143,7 @@ type network struct {
 	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
 	onCloseCtxCancel func()
 
-	sendFailRateCalculator math.Averager
+	sendFailRateCalculator safemath.Averager
 
 	// Tracks which peers know about which peers
 	gossipTracker peer.GossipTracker
@@ -289,7 +289,7 @@ func NewNetwork(
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
 
-		sendFailRateCalculator: math.NewSyncAverager(math.NewAverager(
+		sendFailRateCalculator: safemath.NewSyncAverager(safemath.NewAverager(
 			0,
 			config.SendFailRateHalflife,
 			time.Now(),
@@ -1388,8 +1388,8 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 	}
 
 	return UptimeResult{
-		WeightedAveragePercentage: gomath.Abs(totalWeightedPercent / totalWeight),
-		RewardingStakePercentage:  gomath.Abs(100 * rewardingStake / totalWeight),
+		WeightedAveragePercentage: math.Abs(totalWeightedPercent / totalWeight),
+		RewardingStakePercentage:  math.Abs(100 * rewardingStake / totalWeight),
 	}, nil
 }
 

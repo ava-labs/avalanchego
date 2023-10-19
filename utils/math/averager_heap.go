@@ -31,49 +31,33 @@ type AveragerHeap interface {
 }
 
 type averagerHeap struct {
-	heap heap.Map[ids.NodeID, *Averager]
+	heap heap.Map[ids.NodeID, Averager]
 }
 
 // NewMaxAveragerHeap returns a new empty max heap. The returned heap is not
 // thread safe.
 func NewMaxAveragerHeap() AveragerHeap {
 	return averagerHeap{
-		heap: heap.NewMap[ids.NodeID, *Averager](func(a, b *Averager) bool {
-			return (*a).Read() > (*b).Read()
+		heap: heap.NewMap[ids.NodeID, Averager](func(a, b Averager) bool {
+			return a.Read() > b.Read()
 		}),
 	}
 }
 
 func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool) {
-	if prev, ok := h.heap.Push(nodeID, &averager); ok {
-		return *prev, true
-	}
-	return nil, false
+	return h.heap.Push(nodeID, averager)
 }
 
 func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {
-	if _, averager, ok := h.heap.Remove(nodeID); ok {
-		return *averager, ok
-	}
-	return nil, false
+	return h.heap.Remove(nodeID)
 }
 
 func (h averagerHeap) Pop() (ids.NodeID, Averager, bool) {
-	if h.heap.Len() == 0 {
-		return ids.EmptyNodeID, nil, false
-	}
-
-	nodeID, averagerPtr, _ := h.heap.Pop()
-	return nodeID, *averagerPtr, true
+	return h.heap.Pop()
 }
 
 func (h averagerHeap) Peek() (ids.NodeID, Averager, bool) {
-	if h.heap.Len() == 0 {
-		return ids.EmptyNodeID, nil, false
-	}
-
-	nodeID, averagerPtr, _ := h.heap.Peek()
-	return nodeID, *averagerPtr, true
+	return h.heap.Peek()
 }
 
 func (h averagerHeap) Len() int {

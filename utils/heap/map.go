@@ -11,13 +11,11 @@ import (
 
 var _ heap.Interface = (*indexedQueue[int, int])(nil)
 
-func MapToList[K comparable, V any](m Map[K, V]) []V {
+func MapValues[K comparable, V any](m Map[K, V]) []V {
 	result := make([]V, 0, m.Len())
-
 	for _, e := range m.queue.entries {
 		result = append(result, e.v)
 	}
-
 	return result
 }
 
@@ -26,7 +24,6 @@ func NewMap[K comparable, V any](less func(a, b V) bool) Map[K, V] {
 	return Map[K, V]{
 		queue: &indexedQueue[K, V]{
 			queue: queue[entry[K, V]]{
-				entries: make([]entry[K, V], 0),
 				less: func(a, b entry[K, V]) bool {
 					return less(a.v, b.v)
 				},
@@ -75,12 +72,12 @@ func (m *Map[K, V]) Len() int {
 	return m.queue.Len()
 }
 
-func (m *Map[K, V]) Remove(k K) (K, V, bool) {
+func (m *Map[K, V]) Remove(k K) (V, bool) {
 	if i, ok := m.queue.index[k]; ok {
 		removed := heap.Remove(m.queue, i).(entry[K, V])
-		return removed.k, removed.v, true
+		return removed.v, true
 	}
-	return utils.Zero[K](), utils.Zero[V](), false
+	return utils.Zero[V](), false
 }
 
 func (m *Map[K, V]) Contains(k K) bool {
@@ -88,12 +85,12 @@ func (m *Map[K, V]) Contains(k K) bool {
 	return ok
 }
 
-func (m *Map[K, V]) Get(k K) (K, V, bool) {
+func (m *Map[K, V]) Get(k K) (V, bool) {
 	if i, ok := m.queue.index[k]; ok {
 		got := m.queue.entries[i]
-		return got.k, got.v, true
+		return got.v, true
 	}
-	return utils.Zero[K](), utils.Zero[V](), false
+	return utils.Zero[V](), false
 }
 
 func (m *Map[K, V]) Fix(k K) {
@@ -129,7 +126,7 @@ func (h *indexedQueue[K, V]) Pop() any {
 	return popped
 }
 
-type entry[K comparable, V any] struct {
+type entry[K any, V any] struct {
 	k K
 	v V
 }

@@ -19,7 +19,10 @@ Hash:
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `typeID` is the payload type identifier and is `0x00000000` for `Hash`
-- `hash` is a hash from the `sourceChainID`. As an example, this may be the hash of a block that was accepted on the source chain
+- `hash` is a hash from the `sourceChainID`. The format of the expected preimage is chain specific. Some examples for valid hash values are:
+  - root of a merkle tree
+  - accepted block hash on the source chain
+  - accepted transaction hash on the source chain
 
 ## AddressedCall
 
