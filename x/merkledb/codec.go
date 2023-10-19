@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"golang.org/x/exp/maps"
 	"io"
 	"math"
-	"slices"
 	"sync"
+
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
