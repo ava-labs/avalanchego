@@ -747,48 +747,6 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	return t.compressNodePath(parent, node)
 }
 
-// Returns the nodes along the path to [key].
-// The first node is the root, and the last node is either the node with the
-// given [key], if it's in the trie, or the node with the largest prefix of
-// the [key] if it isn't in the trie.
-// Always returns at least the root node.
-func (t *trieView) getPathTo(key Key) ([]*node, error) {
-	var (
-		// all node paths start at the root
-		currentNode      = t.root
-		matchedPathIndex = 0
-		nodes            = []*node{t.root}
-	)
-
-	// while the entire path hasn't been matched
-	for matchedPathIndex < key.tokenLength {
-		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathIndex)]
-
-		// the current token for the child entry has now been handled, so increment the matchedPathIndex
-		matchedPathIndex += 1
-
-		if !hasChild || !key.iteratedHasPrefix(matchedPathIndex, nextChildEntry.compressedKey) {
-			// there was no child along the path or the child that was there doesn't match the remaining path
-			return nodes, nil
-		}
-
-		// the compressed path of the entry there matched the path, so increment the matched index
-		matchedPathIndex += nextChildEntry.compressedKey.tokenLength
-
-		// grab the next node along the path
-		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
-		if err != nil {
-			return nil, err
-		}
-
-		// add node to path
-		nodes = append(nodes, currentNode)
-	}
-	return nodes, nil
-}
-
 func getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
 	commonIndex := 0
 	for first.tokenLength > commonIndex && second.tokenLength > (commonIndex+secondOffset) && first.Token(commonIndex) == second.Token(commonIndex+secondOffset) {
@@ -829,22 +787,13 @@ func (t *trieView) insert(
 		return nil, ErrNodesAlreadyCalculated
 	}
 
-	// find the node that most closely matches [key]
-	pathToNode, err := t.getPathTo(key)
+	closestNode, err := t.getClosetNodeForInsert(key)
 	if err != nil {
 		return nil, err
 	}
-
-	// We're inserting a node whose ancestry is [pathToNode]
-	// so we'll need to recalculate their IDs.
-	for _, node := range pathToNode {
-		if err := t.recordNodeChange(node); err != nil {
-			return nil, err
-		}
+	if err := t.recordNodeChange(closestNode); err != nil {
+		return nil, err
 	}
-
-	closestNode := pathToNode[len(pathToNode)-1]
-
 	// a node with that exact path already exists so update its value
 	if closestNode.key == key {
 		closestNode.setValue(value)
@@ -919,6 +868,67 @@ func (t *trieView) insert(
 		})
 
 	return nodeWithValue, t.recordNewNode(branchNode)
+}
+
+func (t *trieView) getClosetNodeForInsert(key Key) (*node, error) {
+	closestNode := t.root
+	// while the entire path hasn't been matched
+	for closestNode.key.tokenLength < key.tokenLength {
+		if err := t.recordNodeChange(closestNode); err != nil {
+			return nil, err
+		}
+		nextNode, err := t.getNextNode(key, closestNode)
+		if err != nil {
+			return nil, err
+		}
+		if nextNode == nil {
+			return closestNode, nil
+		}
+		closestNode = nextNode
+	}
+	return closestNode, nil
+}
+
+// Returns the nodes along the path to [key].
+// The first node is the root, and the last node is either the node with the
+// given [key], if it's in the trie, or the node with the largest prefix of
+// the [key] if it isn't in the trie.
+// Always returns at least the root node.
+func (t *trieView) getPathTo(key Key) ([]*node, error) {
+	var (
+		// all node paths start at the root
+		currentNode = t.root
+		err         error
+		nodes       = []*node{t.root}
+	)
+
+	// while the entire path hasn't been matched
+	for currentNode.key.tokenLength < key.tokenLength {
+		currentNode, err = t.getNextNode(key, currentNode)
+		if err != nil {
+			return nil, err
+		}
+		if currentNode == nil {
+			return nodes, nil
+		}
+
+		// add node to path
+		nodes = append(nodes, currentNode)
+	}
+	return nodes, nil
+}
+
+func (t *trieView) getNextNode(key Key, currentNode *node) (*node, error) {
+	// confirm that a child exists and grab its ID before attempting to load it
+	nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.tokenLength)]
+
+	if !hasChild || !key.iteratedHasPrefix(currentNode.key.tokenLength+1, nextChildEntry.compressedKey) {
+		// there was no child along the path or the child that was there doesn't match the remaining path
+		return nil, nil
+	}
+
+	// grab the next node along the path
+	return t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.tokenLength+1+nextChildEntry.compressedKey.tokenLength), nextChildEntry.hasValue)
 }
 
 // Records that a node has been created.
