@@ -210,7 +210,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	require.NoError(err)
 	require.Len(nodePath, 2)
 	require.Equal(trie.root.Value(), nodePath[0])
-	require.Equal(0, trie.root.Value().key.tokensLength)
+	require.Zero(trie.root.Value().key.tokensLength)
 	require.Equal(NewPath(key3, BranchFactor16), nodePath[1].key)
 
 	nodePath, err = trie.getPathTo(NewPath(key2, BranchFactor16))
