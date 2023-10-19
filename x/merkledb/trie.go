@@ -40,6 +40,7 @@ type ReadOnlyTrie interface {
 	getValue(key Path) ([]byte, error)
 
 	// If this trie is non-empty, returns the root node.
+	// Must be copied before modification.
 	// Otherwise returns Nothing.
 	getRoot() maybe.Maybe[*node]
 

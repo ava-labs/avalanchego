@@ -145,10 +145,9 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root := parentTrie.getRoot()
-	if root.HasValue() {
-		root = maybe.Some(root.Value().clone()) // TODO better way of doing this?
-	}
+	root := maybe.Bind(parentTrie.getRoot(), func(n *node) *node {
+		return n.clone()
+	})
 
 	newView := &trieView{
 		root:       root,
