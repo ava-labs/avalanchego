@@ -43,6 +43,8 @@ const (
 var (
 	_ MerkleDB = (*merkleDB)(nil)
 
+	ErrEmptyRootID = errors.New("rootID is empty")
+
 	codec = newCodec()
 
 	metadataPrefix         = []byte{0}
@@ -63,6 +65,8 @@ type ChangeProofer interface {
 	// Returns at most [maxLength] key/value pairs.
 	// Returns [ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
+	// Returns ErrEmptyRootID if [endRootID] is ids.Empty.
+	// Note that [endRootID] == ids.Empty means the trie is empty.
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
@@ -99,6 +103,9 @@ type RangeProofer interface {
 	// [start, end] when the root of the trie was [rootID].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
+	// Returns ErrEmptyRootID if [rootID] is ids.Empty.
+	// Note that [rootID] == ids.Empty means the trie is empty, and there's no notion
+	// of proofs for empty tries.
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
@@ -642,11 +649,13 @@ func (db *merkleDB) getRangeProofAtRoot(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	if db.closed {
+	switch {
+	case db.closed:
 		return nil, database.ErrClosed
-	}
-	if maxLength <= 0 {
+	case maxLength <= 0:
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	case rootID == ids.Empty:
+		return nil, ErrEmptyRootID
 	}
 
 	historicalView, err := db.getHistoricalViewForRange(rootID, start, end)
@@ -664,11 +673,13 @@ func (db *merkleDB) GetChangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
+	switch {
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
 		return nil, ErrStartAfterEnd
-	}
-	if startRootID == endRootID {
+	case startRootID == endRootID:
 		return nil, errSameRoot
+	case endRootID == ids.Empty:
+		return nil, ErrEmptyRootID
 	}
 
 	db.commitLock.RLock()

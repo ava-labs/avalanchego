@@ -892,6 +892,11 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
 
+			if root == ids.Empty {
+				// Don't generate a proof for an empty trie.
+				continue
+			}
+
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -917,6 +922,11 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 
 			if len(pastRoots) > 1 {
 				root = pastRoots[r.Intn(len(pastRoots))]
+			}
+
+			if root == ids.Empty {
+				// Don't generate a proof for an empty trie.
+				continue
 			}
 
 			start := maybe.Nothing[[]byte]()
@@ -1194,4 +1204,41 @@ func insertRandomKeyValues(
 			}
 		}
 	}
+}
+
+func TestGetRangeProofAtRootEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	_, err = db.getRangeProofAtRoot(
+		context.Background(),
+		ids.Empty,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyRootID)
+}
+
+func TestGetChangeProofEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	require.NoError(db.Put([]byte("key"), []byte("value")))
+
+	rootID := db.getMerkleRoot()
+
+	_, err = db.GetChangeProof(
+		context.Background(),
+		rootID,
+		ids.Empty,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyRootID)
 }

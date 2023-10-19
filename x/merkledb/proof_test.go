@@ -546,6 +546,8 @@ func Test_RangeProof_BadBounds(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
+	require.NoError(db.Put(nil, nil))
+
 	// non-nil start/end
 	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte{4}), maybe.Some([]byte{3}), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
