@@ -85,12 +85,7 @@ func (c *genericCodec) Size(value interface{}) (int, error) {
 		return 0, errMarshalNil // can't marshal nil
 	}
 
-	metaValue := reflect.ValueOf(value)
-	if metaValue.Kind() == reflect.Ptr {
-		metaValue = metaValue.Elem()
-	}
-
-	size, _, err := c.size(metaValue, false)
+	size, _, err := c.size(reflect.ValueOf(value), false)
 	return size, err
 }
 
@@ -300,12 +295,7 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 		return errMarshalNil // can't marshal nil
 	}
 
-	metaValue := reflect.ValueOf(value)
-	if metaValue.Kind() == reflect.Ptr {
-		metaValue = metaValue.Elem()
-	}
-
-	return c.marshal(metaValue, p, c.maxSliceLen, false)
+	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen, false)
 }
 
 // marshal writes the byte representation of [value] to [p]
