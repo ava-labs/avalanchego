@@ -30,6 +30,10 @@ type GetAcceptedFrontReply struct {
 // GetAcceptedFront returns the last accepted block's hash and height
 func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontReply, error) {
 	blk := api.vm.blockChain.LastConsensusAcceptedBlock()
+
+	api.vm.ctx.Lock.Lock()
+	defer api.vm.ctx.Lock.Unlock()
+
 	return &GetAcceptedFrontReply{
 		Hash:   blk.Hash(),
 		Number: blk.Number(),
@@ -39,6 +43,9 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 // IssueBlock to the chain
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
+
+	api.vm.ctx.Lock.Lock()
+	defer api.vm.ctx.Lock.Unlock()
 
 	api.vm.builder.signalTxsReady()
 	return nil
