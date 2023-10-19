@@ -56,7 +56,8 @@ type changeSummary struct {
 	// The ID of the trie after these changes.
 	rootID ids.ID
 	// The root before/after this change.
-	// If the trie is empty, its root is nil here.
+	// If the trie is empty before (after) this change, its root
+	// is nil for the before (after) field.
 	// Set in [calculateNodeIDs].
 	rootChange *change[*node]
 	nodes      map[Path]*change[*node]
