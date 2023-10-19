@@ -107,7 +107,7 @@ func TestBanffBlockSerialization(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			require := require.New(t)
 
-			bytes, err := Codec.Marshal(Version, &test.block)
+			bytes, err := Codec.Marshal(Version, &test.block) //nolint:gosec
 			require.NoError(err)
 
 			require.Equal(test.bytes, bytes)
