@@ -83,7 +83,7 @@ func TestParseApplication(t *testing.T) {
 	}{
 		{
 			version:     "",
-			expectedErr: errMissingApplicationPrefix,
+			expectedErr: errMissingDelimiter,
 		},
 		{
 			version:     "avalanche/",
@@ -104,6 +104,12 @@ func TestParseApplication(t *testing.T) {
 		{
 			version:     "avalanche/0.0.0.0",
 			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			version: "avalanchego/1.2.3",
+		},
+		{
+			version: "avalanche/1.2.3",
 		},
 	}
 	for _, test := range tests {
