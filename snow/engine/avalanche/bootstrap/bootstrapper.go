@@ -283,6 +283,10 @@ func (*bootstrapper) Gossip(context.Context) error {
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
+
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	return b.VM.Shutdown(ctx)
 }
 
@@ -364,6 +368,9 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
