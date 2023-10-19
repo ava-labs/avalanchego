@@ -272,7 +272,6 @@ func TestCodecDecodePathLengthOverflowRegression(t *testing.T) {
 }
 
 func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
-	require := require.New(f)
 	codec := newCodec()
 
 	f.Fuzz(
@@ -321,8 +320,8 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					gotKey  Path
 				)
 				require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
-				require.Equal(expectedNode, &gotNode)
-				require.Equal(key, gotKey)
+				require.Equal(f, expectedNode, &gotNode)
+				require.Equal(f, key, gotKey)
 			}
 		},
 	)
