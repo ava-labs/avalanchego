@@ -66,11 +66,11 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseApplication(t *testing.T) {
-	v, err := ParseApplication("avalanche/1.2.3")
+	v, err := ParseApplication("avalanchego/1.2.3")
 
 	require.NoError(t, err)
 	require.NotNil(t, v)
-	require.Equal(t, "avalanche/1.2.3", v.String())
+	require.Equal(t, "avalanchego/1.2.3", v.String())
 	require.Equal(t, 1, v.Major)
 	require.Equal(t, 2, v.Minor)
 	require.Equal(t, 3, v.Patch)
@@ -86,23 +86,23 @@ func TestParseApplication(t *testing.T) {
 			expectedErr: errMissingDelimiter,
 		},
 		{
-			version:     "avalanche/",
+			version:     "avalanchego/",
 			expectedErr: errMissingVersions,
 		},
 		{
-			version:     "avalanche/z.0.0",
+			version:     "avalanchego/z.0.0",
 			expectedErr: strconv.ErrSyntax,
 		},
 		{
-			version:     "avalanche/0.z.0",
+			version:     "avalanchego/0.z.0",
 			expectedErr: strconv.ErrSyntax,
 		},
 		{
-			version:     "avalanche/0.0.z",
+			version:     "avalanchego/0.0.z",
 			expectedErr: strconv.ErrSyntax,
 		},
 		{
-			version:     "avalanche/0.0.0.0",
+			version:     "avalanchego/0.0.0.0",
 			expectedErr: strconv.ErrSyntax,
 		},
 		{

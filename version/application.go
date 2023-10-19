@@ -25,7 +25,7 @@ type Application struct {
 }
 
 // The only difference here between Application and Semantic is that Application
-// prepends "avalanche/" rather than "v".
+// prepends "avalanchego/" rather than "v".
 func (a *Application) String() string {
 	strIntf := a.str.Load()
 	if strIntf != nil {
