@@ -114,7 +114,7 @@ async fn verify_keys(
         let hash = db.root_hash().await?;
         let revision = db.revision(hash).await?;
         for (key, value) in verify {
-            assert_eq!(*value, revision.val(key).await?.unwrap());
+            assert_eq!(Some(value), revision.val(key).await?);
         }
     }
     Ok(())
