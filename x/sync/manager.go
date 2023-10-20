@@ -404,16 +404,16 @@ func (m *Manager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.NewPath(lastReceivedKey, m.branchFactor)
+	proofKeyPath := merkledb.ToKey(lastReceivedKey, m.branchFactor)
 
 	// If the received proof is an exclusion proof, the last node may be for a
 	// key that is after the [lastReceivedKey].
 	// If the last received node's key is after the [lastReceivedKey], it can
 	// be removed to obtain a valid proof for a prefix of the [lastReceivedKey].
-	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].KeyPath) {
+	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].Key) {
 		endProof = endProof[:len(endProof)-1]
 		// update the proofKeyPath to be for the prefix
-		proofKeyPath = endProof[len(endProof)-1].KeyPath
+		proofKeyPath = endProof[len(endProof)-1].Key
 	}
 
 	// get a proof for the same key as the received proof from the local db
@@ -425,7 +425,7 @@ func (m *Manager) findNextKey(
 
 	// The local proof may also be an exclusion proof with an extra node.
 	// Remove this extra node if it exists to get a proof of the same key as the received proof
-	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].KeyPath) {
+	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].Key) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
@@ -447,7 +447,7 @@ func (m *Manager) findNextKey(
 
 		// select the deepest proof node from the two proofs
 		switch {
-		case receivedProofNode.KeyPath.TokensLength() > localProofNode.KeyPath.TokensLength():
+		case receivedProofNode.Key.TokensLength() > localProofNode.Key.TokensLength():
 			// there was a branch node in the received proof that isn't in the local proof
 			// see if the received proof node has children not present in the local proof
 			deepestNode = &receivedProofNode
@@ -455,7 +455,7 @@ func (m *Manager) findNextKey(
 			// we have dealt with this received node, so move on to the next received node
 			receivedProofNodeIndex--
 
-		case localProofNode.KeyPath.TokensLength() > receivedProofNode.KeyPath.TokensLength():
+		case localProofNode.Key.TokensLength() > receivedProofNode.Key.TokensLength():
 			// there was a branch node in the local proof that isn't in the received proof
 			// see if the local proof node has children not present in the received proof
 			deepestNode = &localProofNode
@@ -489,13 +489,13 @@ func (m *Manager) findNextKey(
 		// node's children have keys larger than [proofKeyPath].
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
-		if deepestNode.KeyPath.TokensLength() < proofKeyPath.TokensLength() {
-			startingChildToken = proofKeyPath.Token(deepestNode.KeyPath.TokensLength()) + 1
+		if deepestNode.Key.TokensLength() < proofKeyPath.TokensLength() {
+			startingChildToken = proofKeyPath.Token(deepestNode.Key.TokensLength()) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.branchFactor); hasDifference {
-			nextKey = maybe.Some(deepestNode.KeyPath.Append(childIndex).Bytes())
+			nextKey = maybe.Some(deepestNode.Key.Append(childIndex).Bytes())
 			break
 		}
 	}

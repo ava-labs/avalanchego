@@ -139,7 +139,7 @@ message RangeProof {
 }
 
 message ProofNode {
-  Path key = 1;
+  Key key = 1;
   MaybeBytes value_or_hash = 2;
   map<uint32, bytes> children = 3;
 }
@@ -149,7 +149,7 @@ message KeyChange {
   MaybeBytes value = 2;
 }
 
-message Path {
+message Key {
   uint64 length = 1;
   bytes value = 2;
 }
