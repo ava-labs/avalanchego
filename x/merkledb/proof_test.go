@@ -1833,7 +1833,7 @@ func FuzzProofVerification(f *testing.F) {
 		require.NoError(err)
 
 		err = proof.Verify(context.Background(), rootID)
-		if numKeyValues == 0 {
+		if rootID == ids.Empty {
 			require.ErrorIs(err, ErrEmptyProof)
 			return
 		}
