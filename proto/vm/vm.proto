@@ -171,10 +171,9 @@ message CreateStaticHandlersResponse {
 
 message Handler {
   string prefix = 1;
-  uint32 lock_options = 2;
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
-  string server_addr = 3;
+  string server_addr = 2;
 }
 
 message BuildBlockRequest {

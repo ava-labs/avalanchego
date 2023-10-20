@@ -337,8 +337,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.Set[ids.NodeID]{}
-	toSend.Add(nodeIDs[1])
+	toSend := set.Of(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
 	require.Equal(toSend, sentTo)
 
@@ -638,7 +637,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 // causes dial to return immediately.
 func TestDialContext(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
-	defer wg.Done()
 
 	dialer := newTestDialer()
 	network := networks[0]
@@ -689,4 +687,7 @@ func TestDialContext(t *testing.T) {
 		require.FailNow(t, "unexpectedly connected to peer")
 	default:
 	}
+
+	network.StartClose()
+	wg.Wait()
 }

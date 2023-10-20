@@ -28,8 +28,7 @@ func TestBlocker(t *testing.T) {
 	a.dependencies = func() set.Set[ids.ID] {
 		*calledDep = true
 
-		s := set.Set[ids.ID]{}
-		s.Add(id0, id1)
+		s := set.Of(id0, id1)
 		return s
 	}
 	calledFill := new(bool)
