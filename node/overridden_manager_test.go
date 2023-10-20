@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validators
+package node
 
 import (
 	"math"
@@ -10,7 +10,32 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
+
+func TestOverriddenManager(t *testing.T) {
+	require := require.New(t)
+
+	nodeID0 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
+	subnetID0 := ids.GenerateTestID()
+	subnetID1 := ids.GenerateTestID()
+
+	m := validators.NewManager()
+	require.NoError(m.AddStaker(subnetID0, nodeID0, nil, ids.Empty, 1))
+	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 1))
+
+	om := newOverriddenManager(subnetID0, m)
+	require.True(om.Contains(subnetID0, nodeID0))
+	require.False(om.Contains(subnetID0, nodeID1))
+	require.True(om.Contains(subnetID1, nodeID0))
+	require.False(om.Contains(subnetID1, nodeID1))
+
+	om.RemoveWeight(subnetID1, nodeID0, 1)
+	require.False(om.Contains(subnetID0, nodeID0))
+	require.False(m.Contains(subnetID0, nodeID0))
+	require.True(m.Contains(subnetID1, nodeID1))
+}
 
 func TestOverriddenString(t *testing.T) {
 	require := require.New(t)
@@ -24,12 +49,12 @@ func TestOverriddenString(t *testing.T) {
 	subnetID1, err := ids.FromString("2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w")
 	require.NoError(err)
 
-	m := NewManager()
+	m := validators.NewManager()
 	require.NoError(m.AddStaker(subnetID0, nodeID0, nil, ids.Empty, 1))
 	require.NoError(m.AddStaker(subnetID0, nodeID1, nil, ids.Empty, math.MaxInt64-1))
 	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 1))
 
-	om := NewOverriddenManager(subnetID0, m)
+	om := newOverriddenManager(subnetID0, m)
 	expected := "Overridden Validator Manager (SubnetID = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES): Validator Manager: (Size = 2)\n" +
 		"    Subnet[TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES]: Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
 		"        Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +

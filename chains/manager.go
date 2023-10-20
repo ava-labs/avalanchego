@@ -532,10 +532,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	vdrs := m.Validators
-	if !m.SybilProtectionEnabled {
-		// If sybil protection is disabled, everyone validates every chain
-		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
-	}
 
 	var chain *chain
 	switch vm := vm.(type) {

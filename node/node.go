@@ -1398,7 +1398,11 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
-	n.vdrs = validators.NewManager()
+	vdrs := validators.NewManager()
+	if !n.Config.SybilProtectionEnabled {
+		vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
+	}
+	n.vdrs = vdrs
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
