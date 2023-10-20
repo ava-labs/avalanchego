@@ -415,9 +415,9 @@ message AppRequestFailed {
   bytes chain_id = 1;
   // Request id of the original AppRequest
   uint32 request_id = 2;
-  // Application defined error code
+  // VM defined error code
   uint32 error_code = 3;
-  // Application defined error message
+  // VM defined error message
   string error_message = 4;
 }
 

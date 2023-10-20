@@ -266,9 +266,9 @@ message AppRequestFailedMsg {
   bytes node_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
-  // An application-defined error code
+  // VM defined error code
   string error_code = 3;
-  // An an application-defined error message
+  // VM defined error message
   string error_message = 4;
 }
 
@@ -304,9 +304,9 @@ message CrossChainAppRequestFailedMsg {
   bytes chain_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
-  // An application-defined error code
+  // VM defined error code
   string error_code = 3;
-  // An application-defined error message
+  // VM defined error message
   string error_message = 4;
 }
 
