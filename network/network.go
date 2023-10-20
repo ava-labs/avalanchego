@@ -459,9 +459,12 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
-	return !n.config.RequireValidatorToConnect ||
-		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
-		n.WantsConnection(nodeID)
+	if !n.config.RequireValidatorToConnect {
+		return true
+	}
+	_, ok := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+
+	return ok || n.WantsConnection(nodeID)
 }
 
 func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
@@ -799,8 +802,8 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
-		n.manuallyTrackedIDs.Contains(nodeID)
+	_, ok := n.config.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
+	return ok || n.manuallyTrackedIDs.Contains(nodeID)
 }
 
 func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
@@ -854,7 +857,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		isValidator := n.config.Validators.Contains(subnetID, nodeID)
+		_, isValidator := n.config.Validators.GetValidator(subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
 		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
@@ -893,7 +896,7 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			isValidator := n.config.Validators.Contains(subnetID, peerID)
+			_, isValidator := n.config.Validators.GetValidator(subnetID, peerID)
 			// check if the peer is allowed to connect to the subnet
 			if !allower.IsAllowed(peerID, isValidator) {
 				return false

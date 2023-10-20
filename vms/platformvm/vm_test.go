@@ -425,7 +425,8 @@ func TestGenesis(t *testing.T) {
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		require.True(vm.Validators.Contains(constants.PrimaryNetworkID, nodeID))
+		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
+		require.True(ok)
 	}
 
 	// Ensure the new subnet we created exists

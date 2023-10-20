@@ -471,7 +471,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 
 	ss.frontierSeeders = validators.NewManager()
 	for _, nodeID := range beaconIDs {
-		if !ss.frontierSeeders.Contains(ss.Ctx.SubnetID, nodeID) {
+		if _, ok := ss.frontierSeeders.GetValidator(ss.Ctx.SubnetID, nodeID); !ok {
 			// Invariant: We never use the TxID or BLS keys populated here.
 			err = ss.frontierSeeders.AddStaker(ss.Ctx.SubnetID, nodeID, nil, ids.Empty, 1)
 		} else {

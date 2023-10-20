@@ -74,10 +74,6 @@ type Manager interface {
 	// If an error is returned, the set will be unmodified.
 	RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
 
-	// Contains returns true if there is a validator with the specified ID
-	// currently in the subnet.
-	Contains(subnetID ids.ID, nodeID ids.NodeID) bool
-
 	// Count returns the number of validators currently in the subnet.
 	Count(subnetID ids.ID) int
 
@@ -218,17 +214,6 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	}
 
 	return nil
-}
-
-func (m *manager) Contains(subnetID ids.ID, nodeID ids.NodeID) bool {
-	m.lock.RLock()
-	set, exists := m.subnetToVdrs[subnetID]
-	m.lock.RUnlock()
-	if !exists {
-		return false
-	}
-
-	return set.Contains(nodeID)
 }
 
 func (m *manager) Count(subnetID ids.ID) int {
