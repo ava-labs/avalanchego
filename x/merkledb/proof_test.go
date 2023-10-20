@@ -303,14 +303,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			proof:       &RangeProof{},
 			expectedErr: ErrStartAfterEnd,
 		},
-		// TODO remove
-		// {
-		// 	name:        "empty", // Also tests start can be > end if end is nil
-		// 	start:       maybe.Some([]byte{1}),
-		// 	end:         maybe.Nothing[[]byte](),
-		// 	proof:       &RangeProof{},
-		// 	expectedErr: ErrEmptyProof,
-		// },
+		{
+			name:        "empty",
+			start:       maybe.Some([]byte{1}),
+			end:         maybe.Nothing[[]byte](),
+			proof:       &RangeProof{},
+			expectedErr: ErrEmptyProof,
+		},
 		{
 			name:  "unexpected end proof",
 			start: maybe.Some([]byte{1}),
@@ -321,16 +320,6 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			},
 			expectedErr: ErrUnexpectedEndProof,
 		},
-		// TODO remove
-		// {
-		// 	name:  "should just be root",
-		// 	start: maybe.Nothing[[]byte](),
-		// 	end:   maybe.Nothing[[]byte](),
-		// 	proof: &RangeProof{
-		// 		EndProof: []ProofNode{{}, {}},
-		// 	},
-		// 	expectedErr: ErrShouldJustBeRoot,
-		// },
 		{
 			name:  "no end proof; has end bound",
 			start: maybe.Some([]byte{1}),
