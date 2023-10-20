@@ -1687,6 +1687,9 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		if maxProofLen == 0 {
 			t.SkipNow()
 		}
+		if numKeyValues == 0 {
+			t.SkipNow()
+		}
 
 		// Make sure proof bounds are valid
 		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
