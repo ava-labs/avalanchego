@@ -294,6 +294,9 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 
 				val := maybe.Nothing[[]byte]()
 				if hasValue {
+					if len(value) == 0 {
+						value = nil
+					}
 					val = maybe.Some(value)
 				}
 
