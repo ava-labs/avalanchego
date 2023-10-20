@@ -60,7 +60,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "odd length key path with value",
+			name: "odd length key with value",
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
@@ -185,7 +185,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: ErrProofValueDoesntMatch,
 		},
 		{
-			name: "EndProof: odd length key path with value",
+			name: "EndProof: odd length key with value",
 			malform: func(proof *RangeProof) {
 				proof.EndProof[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
@@ -271,17 +271,17 @@ func Test_Proof(t *testing.T) {
 
 	require.Len(proof.Path, 2)
 
-	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.Path[1].KeyPath)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16), proof.Path[1].Key)
 	require.Equal(maybe.Some([]byte("value1")), proof.Path[1].ValueOrHash)
 
-	require.Equal(NewPath([]byte("key1"), BranchFactor16).Take(7), proof.Path[0].KeyPath)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16).Take(7), proof.Path[0].Key)
 	require.False(proof.Path[0].ValueOrHash.HasValue())
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.NoError(proof.Verify(context.Background(), expectedRootID))
 
-	proof.Path[0].KeyPath = NewPath([]byte("key1"), BranchFactor16)
+	proof.Path[0].Key = ToKey([]byte("key1"), BranchFactor16)
 	err = proof.Verify(context.Background(), expectedRootID)
 	require.ErrorIs(err, ErrProofNodeNotForKey)
 }
@@ -358,7 +358,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{KeyPath: emptyPath(BranchFactor16)}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -370,7 +370,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{KeyPath: emptyPath(BranchFactor16)}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -382,7 +382,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{2}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{KeyPath: emptyPath(BranchFactor16)}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -396,13 +396,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{2}, BranchFactor16),
+						Key: ToKey([]byte{2}, BranchFactor16),
 					},
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor16),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 				},
-				EndProof: []ProofNode{{KeyPath: emptyPath(BranchFactor16)}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -416,16 +416,16 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor16),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
+						Key: ToKey([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2, 3, 4}, BranchFactor16),
+						Key: ToKey([]byte{1, 2, 3, 4}, BranchFactor16),
 					},
 				},
-				EndProof: []ProofNode{{KeyPath: emptyPath(BranchFactor16)}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -439,10 +439,10 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{2}, BranchFactor16),
+						Key: ToKey([]byte{2}, BranchFactor16),
 					},
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor16),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 				},
 			},
@@ -455,18 +455,18 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &RangeProof{
 				StartProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor16),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2}, BranchFactor16),
+						Key: ToKey([]byte{1, 2}, BranchFactor16),
 					},
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor4),
+						Key: ToKey([]byte{1}, BranchFactor4),
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2}, BranchFactor4),
+						Key: ToKey([]byte{1, 2}, BranchFactor4),
 					},
 				},
 			},
@@ -482,13 +482,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: NewPath([]byte{1}, BranchFactor16),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
+						Key: ToKey([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: NewPath([]byte{1, 2, 3, 4}, BranchFactor16),
+						Key: ToKey([]byte{1, 2, 3, 4}, BranchFactor16),
 					},
 				},
 			},
@@ -525,12 +525,12 @@ func Test_RangeProof(t *testing.T) {
 	require.Equal([]byte{3}, proof.KeyValues[2].Value)
 
 	require.Len(proof.EndProof, 2)
-	require.Equal([]byte{0}, proof.EndProof[0].KeyPath.Bytes())
+	require.Equal([]byte{0}, proof.EndProof[0].Key.Bytes())
 	require.Len(proof.EndProof[0].Children, 5) // 0,1,2,3,4
-	require.Equal([]byte{3}, proof.EndProof[1].KeyPath.Bytes())
+	require.Equal([]byte{3}, proof.EndProof[1].Key.Bytes())
 
 	// only a single node here since others are duplicates in endproof
-	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Bytes())
+	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -582,8 +582,8 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value1"), proof.KeyValues[0].Value)
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
-	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[1].KeyPath, BranchFactor16)
-	require.Equal(NewPath([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[0].KeyPath)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16), proof.EndProof[1].Key, BranchFactor16)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[0].Key)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -619,10 +619,10 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.Equal([]byte{1}, proof.KeyValues[0].Value)
 	require.Equal([]byte{2}, proof.KeyValues[1].Value)
 
-	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Bytes())
+	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
-	require.Equal(db.root.Value().key, proof.EndProof[0].KeyPath)
-	require.Equal([]byte{2}, proof.EndProof[1].KeyPath.Bytes())
+	require.Equal(db.root.Value().key, proof.EndProof[0].Key)
+	require.Equal([]byte{2}, proof.EndProof[1].Key.Bytes())
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -660,11 +660,11 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Empty(proof.KeyValues[2].Value)
 
 	require.Len(proof.StartProof, 1)
-	require.Equal(NewPath([]byte("key1"), BranchFactor16), proof.StartProof[0].KeyPath, BranchFactor16)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16), proof.StartProof[0].Key, BranchFactor16)
 
 	require.Len(proof.EndProof, 2)
-	require.Equal(NewPath([]byte("key1"), BranchFactor16).Take(7), proof.EndProof[0].KeyPath, BranchFactor16)
-	require.Equal(NewPath([]byte("key2"), BranchFactor16), proof.EndProof[1].KeyPath, BranchFactor16)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16).Take(7), proof.EndProof[0].Key, BranchFactor16)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16), proof.EndProof[1].Key, BranchFactor16)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -981,8 +981,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "start proof node has wrong prefix",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{
-					{KeyPath: NewPath([]byte{2}, BranchFactor16)},
-					{KeyPath: NewPath([]byte{2, 3}, BranchFactor16)},
+					{Key: ToKey([]byte{2}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Some([]byte{1, 2, 3}),
@@ -993,8 +993,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "start proof non-increasing",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{
-					{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-					{KeyPath: NewPath([]byte{2, 3}, BranchFactor16)},
+					{Key: ToKey([]byte{1}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Some([]byte{1, 2, 3}),
@@ -1008,8 +1008,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2}, Value: maybe.Some([]byte{0})},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: NewPath([]byte{2}, BranchFactor16)},
-					{KeyPath: NewPath([]byte{2, 3}, BranchFactor16)},
+					{Key: ToKey([]byte{2}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1023,8 +1023,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2, 3}},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-					{KeyPath: NewPath([]byte{2, 3}, BranchFactor16)},
+					{Key: ToKey([]byte{1}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1126,7 +1126,7 @@ func TestVerifyProofPath(t *testing.T) {
 	type test struct {
 		name        string
 		path        []ProofNode
-		proofKey    maybe.Maybe[Path]
+		proofKey    maybe.Maybe[Key]
 		expectedErr error
 	}
 
@@ -1134,124 +1134,124 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name:        "empty",
 			path:        nil,
-			proofKey:    maybe.Nothing[Path](),
+			proofKey:    maybe.Nothing[Key](),
 			expectedErr: nil,
 		},
 		{
 			name:        "1 element",
-			path:        []ProofNode{{KeyPath: NewPath([]byte{1}, BranchFactor16)}},
-			proofKey:    maybe.Nothing[Path](),
+			path:        []ProofNode{{Key: ToKey([]byte{1}, BranchFactor16)}},
+			proofKey:    maybe.Nothing[Key](),
 			expectedErr: nil,
 		},
 		{
 			name: "non-increasing keys",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "invalid key",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 4}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 4}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "extra node inclusion proof",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "extra node exclusion proof",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 3}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 3, 4}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3, 4}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "happy path exclusion proof",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 4}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 4}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
 			name: "happy path inclusion proof",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
 			name: "repeat nodes",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "repeat nodes 2",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "repeat nodes 3",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "oddLength key with value",
 			path: []ProofNode{
-				{KeyPath: NewPath([]byte{1}, BranchFactor16)},
-				{KeyPath: NewPath([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
 				{
-					KeyPath: Path{
-						value:        string([]byte{1, 2, 240}),
-						tokensLength: 5,
-						pathConfig:   branchFactorToPathConfig[BranchFactor16],
+					Key: Key{
+						value:       string([]byte{1, 2, 240}),
+						tokenLength: 5,
+						tokenConfig: branchFactorToTokenConfig[BranchFactor16],
 					},
 					ValueOrHash: maybe.Some([]byte{1}),
 				},
 			},
-			proofKey:    maybe.Some(NewPath([]byte{1, 2, 3}, BranchFactor16)),
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
 	}
@@ -1353,7 +1353,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 				protoNode.Key = nil
 				return protoNode
 			},
-			expectedErr: ErrNilPath,
+			expectedErr: ErrNilKey,
 		},
 	}
 
@@ -1614,7 +1614,7 @@ func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
 		}
 
 		proof := Proof{
-			Key:   NewPath(key, BranchFactor16),
+			Key:   ToKey(key, BranchFactor16),
 			Value: value,
 			Path:  proofPath,
 		}
@@ -1737,13 +1737,13 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		// Make sure the start proof doesn't contain any nodes
 		// that are in the end proof.
-		endProofKeys := set.Set[Path]{}
+		endProofKeys := set.Set[Key]{}
 		for _, node := range rangeProof.EndProof {
-			endProofKeys.Add(node.KeyPath)
+			endProofKeys.Add(node.Key)
 		}
 
 		for _, node := range rangeProof.StartProof {
-			require.NotContains(endProofKeys, node.KeyPath)
+			require.NotContains(endProofKeys, node.Key)
 		}
 
 		// Make sure the EndProof invariant is maintained
@@ -1752,7 +1752,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
-					require.Empty(rangeProof.EndProof[0].KeyPath.Bytes())
+					require.Empty(rangeProof.EndProof[0].Key.Bytes())
 				} else {
 					require.Empty(rangeProof.EndProof)
 				}
@@ -1771,7 +1771,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   NewPath(endBytes, BranchFactor16),
+				Key:   ToKey(endBytes, BranchFactor16),
 				Value: value,
 			}
 
@@ -1786,7 +1786,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			// EndProof should be a proof for largest key-value.
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   NewPath(greatestKV.Key, BranchFactor16),
+				Key:   ToKey(greatestKV.Key, BranchFactor16),
 				Value: maybe.Some(greatestKV.Value),
 			}
 

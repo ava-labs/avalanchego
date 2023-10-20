@@ -213,7 +213,7 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	newPath func(p []byte) Path
+	toKey func(p []byte) Key
 }
 
 // New returns a new merkle database.
@@ -240,8 +240,8 @@ func newDatabase(
 		return nil, err
 	}
 
-	newPath := func(b []byte) Path {
-		return NewPath(b, config.BranchFactor)
+	toKey := func(b []byte) Key {
+		return ToKey(b, config.BranchFactor)
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
@@ -256,12 +256,12 @@ func newDatabase(
 		baseDB:               db,
 		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.BranchFactor),
 		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
-		history:              newTrieHistory(int(config.HistoryLength), newPath),
+		history:              newTrieHistory(int(config.HistoryLength), toKey),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		newPath:              newPath,
+		toKey:                toKey,
 	}
 
 	if err := trieDB.initializeRootIfNeeded(); err != nil {
@@ -274,8 +274,8 @@ func newDatabase(
 		rootChange: &change[*node]{
 			after: trieDB.root.Value(),
 		},
-		values: map[Path]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Path]*change[*node]{},
+		values: map[Key]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Key]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -482,8 +482,8 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 	return db.prefetchPath(tempView, key)
 }
 
-func (db *merkleDB) prefetchPath(view *trieView, key []byte) error {
-	pathToKey, err := view.getPathTo(db.newPath(key))
+func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
+	pathToKey, err := view.getPathTo(db.toKey(keyBytes))
 	if err != nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(db.newPath(key))
+		values[i], errors[i] = db.getValueCopy(db.toKey(key))
 	}
 	return values, errors
 }
@@ -531,13 +531,13 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(db.newPath(key))
+	return db.getValueCopy(db.toKey(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueCopy(key Path) ([]byte, error) {
+func (db *merkleDB) getValueCopy(key Key) ([]byte, error) {
 	val, err := db.getValueWithoutLock(key)
 	if err != nil {
 		return nil, err
@@ -548,7 +548,7 @@ func (db *merkleDB) getValueCopy(key Path) ([]byte, error) {
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getValue(key Path) ([]byte, error) {
+func (db *merkleDB) getValue(key Key) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -558,7 +558,7 @@ func (db *merkleDB) getValue(key Path) ([]byte, error) {
 // getValueWithoutLock returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueWithoutLock(key Path) ([]byte, error) {
+func (db *merkleDB) getValueWithoutLock(key Key) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -747,7 +747,7 @@ func (db *merkleDB) GetChangeProof(
 		commonNodeIndex := 0
 		for ; commonNodeIndex < len(result.StartProof) &&
 			commonNodeIndex < len(result.EndProof) &&
-			result.StartProof[commonNodeIndex].KeyPath == result.EndProof[commonNodeIndex].KeyPath; commonNodeIndex++ {
+			result.StartProof[commonNodeIndex].Key == result.EndProof[commonNodeIndex].Key; commonNodeIndex++ {
 		}
 		result.StartProof = result.StartProof[commonNodeIndex:]
 	}
@@ -804,7 +804,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(db.newPath(k))
+	_, err := db.getValueWithoutLock(db.toKey(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -1045,32 +1045,32 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestPath := maybe.Bind(start, db.newPath)
+	smallestKey := maybe.Bind(start, db.toKey)
 
 	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestKey); err != nil {
 		return err
 	}
 
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
-	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := maybe.Bind(end, db.newPath)
+	// [largestKey] is also used when we add children of proof nodes to [trie] below.
+	largestKey := maybe.Bind(end, db.toKey)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestPath = maybe.Some(db.newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+		largestKey = maybe.Some(db.toKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestKey); err != nil {
 		return err
 	}
 
-	keyValues := make(map[Path]maybe.Maybe[[]byte], len(proof.KeyChanges))
+	keyValues := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[db.newPath(keyValue.Key)] = keyValue.Value
+		keyValues[db.toKey(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads
@@ -1085,8 +1085,8 @@ func (db *merkleDB) VerifyChangeProof(
 		ctx,
 		db,
 		proof.StartProof,
-		smallestPath,
-		largestPath,
+		smallestKey,
+		largestKey,
 		keyValues,
 	); err != nil {
 		return err
@@ -1096,8 +1096,8 @@ func (db *merkleDB) VerifyChangeProof(
 		ctx,
 		db,
 		proof.EndProof,
-		smallestPath,
-		largestPath,
+		smallestKey,
+		largestKey,
 		keyValues,
 	); err != nil {
 		return err
@@ -1126,16 +1126,16 @@ func (db *merkleDB) VerifyChangeProof(
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		smallestPath,
-		largestPath,
+		smallestKey,
+		largestKey,
 	); err != nil {
 		return err
 	}
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		smallestPath,
-		largestPath,
+		smallestKey,
+		largestKey,
 	); err != nil {
 		return err
 	}
@@ -1183,7 +1183,7 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	// Root is on disk.
 	var (
 		rootDBNode dbNode
-		rootKey    Path
+		rootKey    Key
 	)
 	if err := codec.decodeKeyAndNode(
 		rootBytes,
@@ -1256,7 +1256,7 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key Path, hasValue bool) (*node, error) {
+func (db *merkleDB) getEditableNode(key Key, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -1272,7 +1272,7 @@ func (db *merkleDB) getEditableNode(key Path, hasValue bool) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key Path, hasValue bool) (*node, error) {
+func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
@@ -1343,11 +1343,11 @@ func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
 	return buffer
 }
 
-// cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
-func cacheEntrySize(p Path, n *node) int {
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the key and node
+func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
-		return len(p.Bytes())
+		return len(key.Bytes())
 	}
 	// nodes cache their bytes representation so the total memory consumed is roughly twice that
-	return len(p.Bytes()) + 2*len(n.bytes())
+	return len(key.Bytes()) + 2*len(n.bytes())
 }

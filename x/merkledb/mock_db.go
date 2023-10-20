@@ -412,12 +412,12 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 }
 
 // getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 Path, arg1 bool) (*node, error) {
-        m.ctrl.T.Helper()
-        ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
-        ret0, _ := ret[0].(*node)
-        ret1, _ := ret[1].(error)
-        return ret0, ret1
+func (m *MockMerkleDB) getEditableNode(arg0 Key, arg1 bool) (*node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
+	ret0, _ := ret[0].(*node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // getEditableNode indicates an expected call of getEditableNode.
@@ -441,12 +441,12 @@ func (mr *MockMerkleDBMockRecorder) getRoot() *gomock.Call {
 }
 
 // getValue mocks base method.
-func (m *MockMerkleDB) getValue(arg0 Path) ([]byte, error) {
-        m.ctrl.T.Helper()
-        ret := m.ctrl.Call(m, "getValue", arg0)
-        ret0, _ := ret[0].([]byte)
-        ret1, _ := ret[1].(error)
-        return ret0, ret1
+func (m *MockMerkleDB) getValue(arg0 Key) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getValue", arg0)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // getValue indicates an expected call of getValue.
