@@ -18,7 +18,7 @@ const (
 var metadataCodec codec.Manager
 
 func init() {
-	c := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
+	c := linearcodec.New([]string{v0tag}, math.MaxInt32)
 	metadataCodec = codec.NewManager(math.MaxInt32)
 
 	err := metadataCodec.RegisterCodec(v0, c)
