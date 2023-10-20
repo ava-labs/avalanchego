@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -116,7 +117,7 @@ type handler struct {
 	startClosingTime     time.Time
 	totalClosingTime     time.Duration
 	closingChan          chan struct{}
-	numDispatchersClosed int
+	numDispatchersClosed atomic.Uint32
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 
@@ -220,22 +221,24 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
+		h.ctx.Lock.Unlock()
+
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
 		)
-		h.shutdown(ctx)
+		h.shutdown(ctx, h.clock.Time())
 		return
 	}
 
-	if err := gear.Start(ctx, 0); err != nil {
+	err = gear.Start(ctx, 0)
+	h.ctx.Lock.Unlock()
+	if err != nil {
 		h.ctx.Log.Error("chain failed to start",
 			zap.Error(err),
 		)
-		h.shutdown(ctx)
+		h.shutdown(ctx, h.clock.Time())
 		return
 	}
 
@@ -326,7 +329,7 @@ func (h *handler) Stop(ctx context.Context) {
 		state := h.ctx.State.Get()
 		bootstrapper, ok := h.engineManager.Get(state.Type).Get(snow.Bootstrapping)
 		if !ok {
-			h.ctx.Log.Error("bootstrapping engine doesn't exists",
+			h.ctx.Log.Error("bootstrapping engine doesn't exist",
 				zap.Stringer("type", state.Type),
 			)
 			return
@@ -998,34 +1001,26 @@ func (h *handler) popUnexpiredMsg(
 	}
 }
 
+// Invariant: if closeDispatcher is called, Stop has already been called.
 func (h *handler) closeDispatcher(ctx context.Context) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
-	h.numDispatchersClosed++
-	if h.numDispatchersClosed < numDispatchersToClose {
+	if h.numDispatchersClosed.Add(1) < numDispatchersToClose {
 		return
 	}
 
-	h.shutdown(ctx)
+	h.shutdown(ctx, h.startClosingTime)
 }
 
-// Note: shutdown is only called after all message dispatchers have exited.
-func (h *handler) shutdown(ctx context.Context) {
+// Note: shutdown is only called after all message dispatchers have exited or if
+// no message dispatchers ever started.
+func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
 	defer func() {
 		if h.onStopped != nil {
 			go h.onStopped()
 		}
 
-		h.totalClosingTime = h.clock.Time().Sub(h.startClosingTime)
+		h.totalClosingTime = h.clock.Time().Sub(startClosingTime)
 		close(h.closed)
 	}()
-
-	// shutdown may be called during Start, so we populate the start closing
-	// time here in case Stop was never called.
-	if h.startClosingTime.IsZero() {
-		h.startClosingTime = h.clock.Time()
-	}
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)

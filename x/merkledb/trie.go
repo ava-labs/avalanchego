@@ -19,7 +19,7 @@ type MerkleRootGetter interface {
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
-	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
+	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
 }
 
 type ReadOnlyTrie interface {
@@ -36,11 +36,11 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key Path) ([]byte, error)
+	getValue(key Key) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
-	getEditableNode(key Path, hasValue bool) (*node, error)
+	getEditableNode(key Key, hasValue bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].
