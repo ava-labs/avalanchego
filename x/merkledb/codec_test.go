@@ -283,6 +283,8 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 			removeToken bool,
 			numChildren int,
 		) {
+			require := require.New(t)
+
 			for _, branchFactor := range branchFactors {
 				key := ToKey(keyBytes, branchFactor)
 
@@ -319,9 +321,9 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					gotNode dbNode
 					gotKey  Key
 				)
-				require.NoError(f, codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
-				require.Equal(f, expectedNode, &gotNode)
-				require.Equal(f, key, gotKey)
+				require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
+				require.Equal(expectedNode, &gotNode)
+				require.Equal(key, gotKey)
 			}
 		},
 	)
