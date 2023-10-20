@@ -66,7 +66,7 @@ type ChangeProofer interface {
 	// Returns [ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
 	// Returns ErrEmptyRootID if [endRootID] is ids.Empty.
-	// Note that [endRootID] == ids.Empty means the trie is empty.
+	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
 	GetChangeProof(
 		ctx context.Context,
