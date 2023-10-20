@@ -104,8 +104,7 @@ type RangeProofer interface {
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
 	// Returns ErrEmptyRootID if [rootID] is ids.Empty.
-	// Note that [rootID] == ids.Empty means the trie is empty, and there's no notion
-	// of proofs for empty tries.
+	// Note that [rootID] == ids.Empty means the trie is empty.
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
