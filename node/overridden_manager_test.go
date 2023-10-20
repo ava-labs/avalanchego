@@ -31,8 +31,7 @@ func TestOverriddenManager(t *testing.T) {
 	require.True(om.Contains(subnetID1, nodeID0))
 	require.False(om.Contains(subnetID1, nodeID1))
 
-	err := om.RemoveWeight(subnetID1, nodeID0, 1)
-	require.NoError(err)
+	require.NoError(om.RemoveWeight(subnetID1, nodeID0, 1))
 	require.False(om.Contains(subnetID0, nodeID0))
 	require.False(m.Contains(subnetID0, nodeID0))
 	require.True(m.Contains(subnetID1, nodeID1))
