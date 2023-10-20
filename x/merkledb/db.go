@@ -1310,7 +1310,7 @@ func (db *merkleDB) ClearRange(start, end maybe.Maybe[[]byte]) error {
 		return err
 	}
 
-	return view.commitToDB(context.TODO())
+	return view.commitToDB(context.Background())
 }
 
 // Returns [key] prefixed by [prefix].
