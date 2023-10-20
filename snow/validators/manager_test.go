@@ -205,9 +205,7 @@ func TestGet(t *testing.T) {
 	require.Equal(pk, vdr1.PublicKey)
 	require.Equal(uint64(2), vdr1.Weight)
 
-	_, ok = m.GetValidator(subnetID, nodeID)
-	require.True(ok)
-	require.NoError(m.RemoveWeight(subnetID, nodeID, 1))
+	require.NoError(m.RemoveWeight(subnetID, nodeID, 2))
 	_, ok = m.GetValidator(subnetID, nodeID)
 	require.False(ok)
 }

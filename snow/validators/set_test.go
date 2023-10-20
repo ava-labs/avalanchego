@@ -156,7 +156,7 @@ func TestSetGet(t *testing.T) {
 	require.Equal(pk, vdr1.PublicKey)
 	require.Equal(uint64(2), vdr1.Weight)
 
-	require.NoError(s.RemoveWeight(nodeID, 1))
+	require.NoError(s.RemoveWeight(nodeID, 2))
 	_, ok = s.Get(nodeID)
 	require.False(ok)
 }
