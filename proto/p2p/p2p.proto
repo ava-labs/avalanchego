@@ -386,7 +386,8 @@ message Chits {
 
 // AppRequest is a VM-defined request.
 //
-// Remote peers must respond to AppRequest with corresponding AppResponse
+// Remote peers must respond to AppRequest with a corresponding AppResponse or
+// AppRequestFailed
 message AppRequest {
   // Chain being requested from
   bytes chain_id = 1;
@@ -414,9 +415,9 @@ message AppRequestFailed {
   bytes chain_id = 1;
   // Request id of the original AppRequest
   uint32 request_id = 2;
-  // VM-defined error code
+  // Application defined error code
   uint32 error_code = 3;
-  // VM-defined error message
+  // Application defined error message
   string error_message = 4;
 }
 
