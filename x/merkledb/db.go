@@ -67,7 +67,7 @@ type ChangeProofer interface {
 	// to generate the proof.
 	// Returns ErrEmptyRootID if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty.
-	// (i.e. we don't need a range proof.)
+	// (i.e. we don't need a change proof.)
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
