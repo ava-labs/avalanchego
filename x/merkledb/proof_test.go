@@ -24,7 +24,7 @@ import (
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
 	err := proof.Verify(context.Background(), ids.Empty)
-	require.ErrorIs(t, err, ErrNoProof)
+	require.ErrorIs(t, err, ErrEmptyProof)
 }
 
 func Test_Proof_Simple(t *testing.T) {
@@ -1832,7 +1832,12 @@ func FuzzProofVerification(f *testing.F) {
 		rootID, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		require.NoError(proof.Verify(context.Background(), rootID))
+		err = proof.Verify(context.Background(), rootID)
+		if numKeyValues == 0 {
+			require.ErrorIs(err, ErrEmptyProof)
+			return
+		}
+		require.NoError(err)
 
 		// Insert a new key-value pair
 		newKey := make([]byte, 32)

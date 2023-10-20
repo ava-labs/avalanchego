@@ -20,6 +20,7 @@ type MerkleRootGetter interface {
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
+	// The returned proof's [Path] is non-empty iff the trie is non-empty.
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
 }
 

@@ -37,7 +37,6 @@ var (
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
-	ErrNoProof                     = errors.New("proof has no nodes")
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
@@ -144,7 +143,7 @@ type Proof struct {
 func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
-		return ErrNoProof
+		return ErrEmptyProof
 	}
 
 	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
@@ -290,7 +289,7 @@ func (proof *RangeProof) Verify(
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
-		return ErrNoProof
+		return ErrEmptyProof
 	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 0:
 		return ErrUnexpectedEndProof
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
