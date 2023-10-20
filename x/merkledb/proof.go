@@ -860,9 +860,9 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
-			childPath := key.AppendExtend(index, compressedKey)
-			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
-				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
+			childKey := key.AppendExtend(index, compressedKey)
+			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
+				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
 				// We only need the IDs to be correct so that the calculated hash is correct.
 				n.setChildEntry(
