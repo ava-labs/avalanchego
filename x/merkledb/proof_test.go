@@ -151,6 +151,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
@@ -160,6 +161,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	)
 	require.ErrorIs(err, ErrInvalidProof)
 }
@@ -221,7 +223,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.valueNodeDB.branchFactor)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -487,7 +489,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty)
+			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, BranchFactor16)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -526,6 +528,7 @@ func Test_RangeProof(t *testing.T) {
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{3, 5}),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	))
 }
 
@@ -579,6 +582,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		maybe.Some([]byte("key35")),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	))
 }
 
@@ -618,6 +622,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 		maybe.Some([]byte{1}),
 		maybe.Nothing[[]byte](),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	))
 }
 
@@ -660,6 +665,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		maybe.Some([]byte("key1")),
 		maybe.Some([]byte("key2")),
 		db.root.Value().id,
+		db.valueNodeDB.branchFactor,
 	))
 }
 
@@ -1725,6 +1731,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			start,
 			end,
 			rootID,
+			BranchFactor16,
 		)
 		if rootID == ids.Empty {
 			require.ErrorIs(err, ErrEmptyRootID)

@@ -914,6 +914,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				start,
 				end,
 				root,
+				bf,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())

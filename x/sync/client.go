@@ -171,6 +171,7 @@ func (c *client) GetChangeProof(
 				startKey,
 				endKey,
 				req.EndRootHash,
+				c.branchFactor,
 			)
 			if err != nil {
 				return nil, err
@@ -208,6 +209,7 @@ func verifyRangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
+	branchFactor merkledb.BranchFactor,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -227,6 +229,7 @@ func verifyRangeProof(
 		start,
 		end,
 		root,
+		branchFactor,
 	); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
@@ -268,6 +271,7 @@ func (c *client) GetRangeProof(
 			startKey,
 			endKey,
 			req.RootHash,
+			c.branchFactor,
 		); err != nil {
 			return nil, err
 		}

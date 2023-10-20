@@ -284,6 +284,7 @@ func (proof *RangeProof) Verify(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
+	branchFactor BranchFactor,
 ) error {
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
@@ -294,18 +295,6 @@ func (proof *RangeProof) Verify(
 		return ErrUnexpectedEndProof
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
 		return ErrNoEndProof
-	}
-
-	// determine branch factor based on proof paths
-	var branchFactor BranchFactor
-	switch {
-	case len(proof.StartProof) > 0:
-		branchFactor = proof.StartProof[0].Key.branchFactor
-	case len(proof.EndProof) > 0:
-		branchFactor = proof.EndProof[0].Key.branchFactor
-	default:
-		// TODO Get branch factor
-		branchFactor = BranchFactor16
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
