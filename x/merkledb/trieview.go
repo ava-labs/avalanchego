@@ -146,7 +146,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
+	sentinelNode, err := parentTrie.getEditableNode(db.sentinelKey, false /* hasValue */)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -198,7 +198,7 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedSentinelChange, ok := changes.nodes[Key{}]
+	passedSentinelChange, ok := changes.nodes[db.sentinelKey]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
@@ -249,7 +249,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = getMerkleRoot(t.sentinelNode)
+		t.changes.rootID = t.getMerkleRoot()
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -562,7 +562,11 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return getMerkleRoot(t.sentinelNode), nil
+	return t.getRoot().id, nil
+}
+
+func (t *trieView) getMerkleRoot() ids.ID {
+	return t.getRoot().id
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -961,7 +965,7 @@ func (t *trieView) getRoot() *node {
 	if !isSentinelNodeTheRoot(t.sentinelNode) {
 		// sentinelNode has one child, which is the root
 		for index, childEntry := range t.sentinelNode.children {
-			childPath := t.sentinelNode.key.Append(index).Extend(childEntry.compressedPath)
+			childPath := t.sentinelNode.key.AppendExtend(index, childEntry.compressedKey)
 			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 			return root
 		}
