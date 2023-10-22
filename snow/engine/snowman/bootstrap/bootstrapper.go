@@ -412,7 +412,10 @@ func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	}
 }
 
-func (b *bootstrapper) Clear() error {
+func (b *bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.Config.Blocked.Clear(); err != nil {
 		return err
 	}

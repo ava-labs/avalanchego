@@ -625,5 +625,8 @@ func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	return ss.stateSyncVM.StateSyncEnabled(ctx)
 }
