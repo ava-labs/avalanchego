@@ -112,7 +112,10 @@ func newTransitive(config Config) (*Transitive, error) {
 	acceptedFrontiers := tracker.NewAccepted()
 	config.Validators.RegisterCallbackListener(acceptedFrontiers)
 
-	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
+	factory := poll.NewEarlyTermNoTraversalFactory(
+		config.Params.AlphaPreference,
+		config.Params.AlphaConfidence,
+	)
 	t := &Transitive{
 		Config:                      config,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -126,7 +129,8 @@ func newTransitive(config Config) (*Transitive, error) {
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
-		polls: poll.NewSet(factory,
+		polls: poll.NewSet(
+			factory,
 			config.Ctx.Log,
 			"",
 			config.Ctx.Registerer,
@@ -363,6 +367,10 @@ func (*Transitive) Halt(context.Context) {}
 
 func (t *Transitive) Shutdown(ctx context.Context) error {
 	t.Ctx.Log.Info("shutting down consensus engine")
+
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	return t.VM.Shutdown(ctx)
 }
 
@@ -449,6 +457,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{

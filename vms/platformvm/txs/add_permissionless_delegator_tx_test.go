@@ -5,9 +5,8 @@ package txs
 
 import (
 	"errors"
+	"math"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,13 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var errCustom = errors.New("custom error")
@@ -1443,7 +1443,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 								ID: assetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
-								Amt: stdmath.MaxUint64,
+								Amt: math.MaxUint64,
 							},
 						},
 						{
@@ -1458,7 +1458,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "weight mismatch",
