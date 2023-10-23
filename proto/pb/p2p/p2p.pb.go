@@ -2240,7 +2240,8 @@ func (x *Chits) GetPreferredIdAtHeight() []byte {
 
 // AppRequest is a VM-defined request.
 //
-// Remote peers must respond to AppRequest with corresponding AppResponse
+// Remote peers must respond to AppRequest with a corresponding AppResponse or
+// AppRequestFailed
 type AppRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2393,9 +2394,9 @@ type AppRequestFailed struct {
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// Request id of the original AppRequest
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// VM-defined error code
+	// VM defined error code
 	ErrorCode uint32 `protobuf:"varint,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
-	// VM-defined error message
+	// VM defined error message
 	ErrorMessage string `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 }
 

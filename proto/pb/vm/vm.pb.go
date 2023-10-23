@@ -1639,9 +1639,9 @@ type AppRequestFailedMsg struct {
 	NodeId []byte `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	// The ID of the request we sent and didn't get a response to
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// An application-defined error code
+	// VM defined error code
 	ErrorCode string `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
-	// An an application-defined error message
+	// VM defined error message
 	ErrorMessage string `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 }
 
@@ -1912,9 +1912,9 @@ type CrossChainAppRequestFailedMsg struct {
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// The ID of the request we sent and didn't get a response to
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// An application-defined error code
+	// VM defined error code
 	ErrorCode string `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
-	// An application-defined error message
+	// VM defined error message
 	ErrorMessage string `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 }
 
