@@ -89,7 +89,10 @@ type bootstrapper struct {
 	processedCache *cache.LRU[ids.ID, struct{}]
 }
 
-func (b *bootstrapper) Clear() error {
+func (b *bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VtxBlocked.Clear(); err != nil {
 		return err
 	}
@@ -402,7 +405,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validatorIDs, err := b.Config.Beacons.Sample(1) // validator to send request to
+		validatorIDs, err := b.Config.Beacons.Sample(b.Ctx.SubnetID, 1) // validator to send request to
 		if err != nil {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}

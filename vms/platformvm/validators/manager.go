@@ -5,11 +5,8 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
-
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -33,11 +30,7 @@ const (
 	recentlyAcceptedWindowTTL     = 2 * time.Minute
 )
 
-var (
-	_ validators.State = (*manager)(nil)
-
-	ErrMissingValidatorSet = errors.New("missing validator set")
-)
+var _ validators.State = (*manager)(nil)
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
 // interface.
@@ -55,9 +48,9 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+	// ApplyCurrentValidators adds all the current validators and delegators of
+	// [subnetID] into [vdrs].
+	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -291,17 +284,9 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, 0, ErrMissingValidatorSet
-	}
-
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentValidators.Map(), currentHeight, err
+	return primaryMap, currentHeight, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
@@ -361,28 +346,25 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
-	if !ok {
-		// TODO: Require that the current validator set for all subnets is
-		// included in the validator manager.
-		currentSubnetValidators = validators.NewSet()
-		err := m.state.ValidatorSet(subnetID, currentSubnetValidators)
-		if err != nil {
+	subnetManager := m.cfg.Validators
+	if subnetManager.Count(subnetID) == 0 {
+		// If this subnet isn't tracked, there will not be any registered
+		// validators. To calculate the current validators we need to first
+		// fetch them from state. We generate a new manager as we don't want to
+		// modify that long-lived reference.
+		//
+		// TODO: remove this once all subnets are included in the validator
+		// manager.
+		subnetManager = validators.NewManager()
+		if err := m.state.ApplyCurrentValidators(subnetID, subnetManager); err != nil {
 			return nil, nil, 0, err
 		}
 	}
 
-	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, nil, 0, ErrMissingValidatorSet
-	}
-
+	subnetMap := subnetManager.GetMap(subnetID)
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
+	return subnetMap, primaryMap, currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
