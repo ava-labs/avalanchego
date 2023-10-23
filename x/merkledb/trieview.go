@@ -337,7 +337,13 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		Key: t.db.toKey(key),
 	}
 
-	proofPath, err := t.getPathTo(proof.Key)
+	var proofPath []*node
+	err := t.visitPathToKey(
+		proof.Key,
+		func(n *node) error {
+			proofPath = append(proofPath, n)
+			return nil
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -619,24 +625,26 @@ func (t *trieView) remove(key Key) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	nodePath, err := t.getPathTo(key)
+	nodeToDelete, err := t.getNodeWithID(ids.Empty, key, true)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// key didn't exist or didn't have a value
+			return nil
+		}
 		return err
 	}
 
-	nodeToDelete := nodePath[len(nodePath)-1]
-
-	if nodeToDelete.key != key || !nodeToDelete.hasValue() {
-		// the key wasn't in the trie or doesn't have a value so there's nothing to do
-		return nil
-	}
-
-	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
-	// all the nodes in this path.
-	for _, node := range nodePath {
-		if err := t.recordNodeChange(node); err != nil {
-			return err
-		}
+	var grandParent, parent, current *node
+	err = t.visitPathToKey(
+		key,
+		func(n *node) error {
+			grandParent = parent
+			parent = current
+			current = n
+			return t.recordNodeChange(n)
+		})
+	if err != nil {
+		return err
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
@@ -646,20 +654,12 @@ func (t *trieView) remove(key Key) error {
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
-		return t.deleteEmptyNodes(nodePath)
+		parent.removeChild(nodeToDelete)
+		return t.compressNodePath(grandParent, parent)
 	}
 
-	if len(nodePath) == 1 {
-		return nil
-	}
-	parent := nodePath[len(nodePath)-2]
-
-	// merge this node and its descendants into a single node if possible
-	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
-		return err
-	}
-
-	return nil
+	// merge this node into its parent if possible
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Merges together nodes in the inclusive descendants of [node] that
@@ -676,75 +676,37 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	}
 
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
-	if len(node.children) != 1 || node.hasValue() {
+	if parent == nil || len(node.children) != 1 || node.hasValue() {
 		return nil
 	}
 
-	// delete all empty nodes with a single child under [node]
-	for len(node.children) == 1 && !node.hasValue() {
-		if err := t.recordNodeDeleted(node); err != nil {
-			return err
-		}
+	if err := t.recordNodeDeleted(node); err != nil {
+		return err
+	}
 
-		var (
-			childEntry child
-			childPath  Key
-		)
-		// There is only one child, but we don't know the index.
-		// "Cycle" over the key/values to find the only child.
-		// Note this iteration once because len(node.children) == 1.
-		for index, entry := range node.children {
-			childPath = node.key.AppendExtend(index, entry.compressedKey)
-			childEntry = entry
-		}
-
-		nextNode, err := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
-		if err != nil {
-			return err
-		}
-		node = nextNode
+	var (
+		childEntry child
+		childPath  Key
+	)
+	// There is only one child, but we don't know the index.
+	// "Cycle" over the key/values to find the only child.
+	// Note this iteration once because len(node.children) == 1.
+	for index, entry := range node.children {
+		childPath = node.key.AppendExtend(index, entry.compressedKey)
+		childEntry = entry
 	}
 
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
-	parent.addChild(node)
+	parent.setChildEntry(
+		childPath.Token(parent.key.tokenLength),
+		child{
+			compressedKey: childPath.Skip(parent.key.tokenLength + 1),
+			id:            childEntry.id,
+			hasValue:      childEntry.hasValue,
+		},
+	)
 	return t.recordNodeChange(parent)
-}
-
-// Starting from the last node in [nodePath], traverses toward the root
-// and deletes each node that has no value and no children.
-// Stops when a node with a value or children is reached.
-// Assumes [nodePath] is a path from the root to a node.
-// Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
-	if t.nodesAlreadyCalculated.Get() {
-		return ErrNodesAlreadyCalculated
-	}
-
-	node := nodePath[len(nodePath)-1]
-	nextParentIndex := len(nodePath) - 2
-
-	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		if err := t.recordNodeDeleted(node); err != nil {
-			return err
-		}
-
-		parent := nodePath[nextParentIndex]
-
-		parent.removeChild(node)
-		if err := t.recordNodeChange(parent); err != nil {
-			return err
-		}
-
-		node = parent
-	}
-
-	if nextParentIndex < 0 {
-		return nil
-	}
-	parent := nodePath[nextParentIndex]
-
-	return t.compressNodePath(parent, node)
 }
 
 func getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
@@ -786,14 +748,17 @@ func (t *trieView) insert(
 	if t.nodesAlreadyCalculated.Get() {
 		return nil, ErrNodesAlreadyCalculated
 	}
-
-	closestNode, err := t.getClosetNodeForInsert(key)
+	var closestNode *node
+	err := t.visitPathToKey(
+		key,
+		func(n *node) error {
+			closestNode = n
+			return t.recordNodeChange(n)
+		})
 	if err != nil {
 		return nil, err
 	}
-	if err := t.recordNodeChange(closestNode); err != nil {
-		return nil, err
-	}
+
 	// a node with that exact path already exists so update its value
 	if closestNode.key == key {
 		closestNode.setValue(value)
@@ -870,52 +835,35 @@ func (t *trieView) insert(
 	return nodeWithValue, t.recordNewNode(branchNode)
 }
 
-func (t *trieView) getClosetNodeForInsert(key Key) (*node, error) {
-	closestNode := t.root
-	// while the entire path hasn't been matched
-	for closestNode.key.tokenLength < key.tokenLength {
-		if err := t.recordNodeChange(closestNode); err != nil {
-			return nil, err
-		}
-		nextNode, err := t.getNextNode(key, closestNode)
-		if err != nil {
-			return nil, err
-		}
-		if nextNode == nil {
-			return closestNode, nil
-		}
-		closestNode = nextNode
-	}
-	return closestNode, nil
-}
-
 // Returns the nodes along the path to [key].
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func (t *trieView) getPathTo(key Key) ([]*node, error) {
+func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 	var (
 		// all node paths start at the root
 		currentNode = t.root
 		err         error
-		nodes       = []*node{t.root}
 	)
-
+	if err := visitNode(currentNode); err != nil {
+		return err
+	}
 	// while the entire path hasn't been matched
 	for currentNode.key.tokenLength < key.tokenLength {
 		currentNode, err = t.getNextNode(key, currentNode)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if currentNode == nil {
-			return nodes, nil
+			return nil
 		}
 
-		// add node to path
-		nodes = append(nodes, currentNode)
+		if err := visitNode(currentNode); err != nil {
+			return err
+		}
 	}
-	return nodes, nil
+	return nil
 }
 
 func (t *trieView) getNextNode(key Key, currentNode *node) (*node, error) {
