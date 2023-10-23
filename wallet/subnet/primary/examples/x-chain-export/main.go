@@ -19,7 +19,7 @@ import (
 
 func main() {
 	key := genesis.EWOQKey
-	uri := primary.FujiAPIURI
+	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	assetIDStr := "tWt78T4XYdCSfqXoyhf9WGgbjf9i4GzqTwB9stje2bd6G5kSC"
 	addr := key.Address()
