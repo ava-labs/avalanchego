@@ -903,7 +903,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
 			if root == ids.Empty {
-				require.ErrorIs(err, ErrEmptyRootID)
+				require.ErrorIs(err, ErrEmptyProof)
 				continue
 			}
 			require.NoError(err)
@@ -940,7 +940,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				continue
 			}
 			if root == ids.Empty {
-				require.ErrorIs(err, ErrEmptyRootID)
+				require.ErrorIs(err, ErrEmptyProof)
 				continue
 			}
 			require.NoError(err)
@@ -1218,7 +1218,7 @@ func TestGetRangeProofAtRootEmptyRootID(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		10,
 	)
-	require.ErrorIs(err, ErrEmptyRootID)
+	require.ErrorIs(err, ErrEmptyProof)
 }
 
 func TestGetChangeProofEmptyRootID(t *testing.T) {
@@ -1239,5 +1239,5 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		10,
 	)
-	require.ErrorIs(err, ErrEmptyRootID)
+	require.ErrorIs(err, ErrEmptyProof)
 }

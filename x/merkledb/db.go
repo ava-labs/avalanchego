@@ -43,8 +43,6 @@ const (
 var (
 	_ MerkleDB = (*merkleDB)(nil)
 
-	ErrEmptyRootID = errors.New("rootID is empty")
-
 	codec = newCodec()
 
 	metadataPrefix         = []byte{0}
@@ -65,7 +63,7 @@ type ChangeProofer interface {
 	// Returns at most [maxLength] key/value pairs.
 	// Returns [ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
-	// Returns ErrEmptyRootID if [endRootID] is ids.Empty.
+	// Returns ErrEmptyProof if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
 	GetChangeProof(
@@ -104,7 +102,7 @@ type RangeProofer interface {
 	// [start, end] when the root of the trie was [rootID].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
-	// Returns ErrEmptyRootID if [rootID] is ids.Empty.
+	// Returns ErrEmptyProof if [rootID] is ids.Empty.
 	// Note that [rootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a range proof.)
 	GetRangeProofAtRoot(
@@ -657,7 +655,7 @@ func (db *merkleDB) getRangeProofAtRoot(
 	case maxLength <= 0:
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	case rootID == ids.Empty:
-		return nil, ErrEmptyRootID
+		return nil, ErrEmptyProof
 	}
 
 	historicalView, err := db.getHistoricalViewForRange(rootID, start, end)
@@ -681,7 +679,7 @@ func (db *merkleDB) GetChangeProof(
 	case startRootID == endRootID:
 		return nil, errSameRoot
 	case endRootID == ids.Empty:
-		return nil, ErrEmptyRootID
+		return nil, ErrEmptyProof
 	}
 
 	db.commitLock.RLock()
@@ -1170,6 +1168,8 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
+// If the root is on disk, set [db.root] to it.
+// Otherwise leave [db.root] as Nothing.
 func (db *merkleDB) initializeRootIfNeeded() error {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
 	if err != nil {
@@ -1276,12 +1276,11 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
-	case db.root.HasValue() && key == db.root.Value().key:
-		return db.root.Value(), nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)
+	default:
+		return db.intermediateNodeDB.Get(key)
 	}
-	return db.intermediateNodeDB.Get(key)
 }
 
 func (db *merkleDB) getRoot() maybe.Maybe[*node] {

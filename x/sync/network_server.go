@@ -391,6 +391,8 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 		return errInvalidStartRootHash
 	case len(req.EndRootHash) != hashing.HashLen:
 		return errInvalidEndRootHash
+	case bytes.Equal(req.EndRootHash, ids.Empty[:]):
+		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
@@ -412,6 +414,8 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidKeyLimit
 	case len(req.RootHash) != ids.IDLen:
 		return errInvalidRootHash
+	case bytes.Equal(req.RootHash, ids.Empty[:]):
+		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:

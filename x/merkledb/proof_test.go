@@ -1734,7 +1734,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			BranchFactor16,
 		)
 		if rootID == ids.Empty {
-			require.ErrorIs(err, ErrEmptyRootID)
+			require.ErrorIs(err, ErrEmptyProof)
 			return
 		}
 		require.NoError(err)

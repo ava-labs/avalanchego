@@ -20,7 +20,7 @@ type MerkleRootGetter interface {
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
-	// The returned proof's [Path] is non-empty iff the trie is non-empty.
+	// Returns ErrEmptyTrie if the trie is empty.
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
 }
 
@@ -53,6 +53,7 @@ type ReadOnlyTrie interface {
 	// keys in range [start, end].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
+	// Returns ErrEmptyProof if the trie is empty.
 	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee

@@ -343,10 +343,13 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 }
 
 // Returns a proof that [key] is in or not in [t].
-// The returned proof's [Path] is non-empty iff [t] is non-empty.
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
+
+	if t.root.IsNothing() {
+		return nil, ErrEmptyProof
+	}
 
 	proof := &Proof{
 		Key: t.db.toKey(key),
@@ -430,6 +433,10 @@ func (t *trieView) GetRangeProof(
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
+	}
+
+	if t.root.IsNothing() {
+		return nil, ErrEmptyProof
 	}
 
 	var result RangeProof
