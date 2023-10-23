@@ -634,6 +634,10 @@ func (t *trieView) remove(key Key) error {
 		return err
 	}
 
+	// remove the value from the node
+	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+
+	// find the ancestors of the deleted node and mark that they are changed
 	var grandParent, parent, current *node
 	err = t.visitPathToKey(
 		key,
@@ -647,43 +651,39 @@ func (t *trieView) remove(key Key) error {
 		return err
 	}
 
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
-
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
+		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
+			return err
+		}
 		parent.removeChild(nodeToDelete)
-		return t.compressNodePath(grandParent, parent)
+
+		// with one of its children removed, parent might need to be combined with its only child
+		return t.combineNode(grandParent, parent)
 	}
 
-	// merge this node into its parent if possible
-	return t.compressNodePath(parent, nodeToDelete)
+	// combine this node's child with the node if possible
+	return t.combineNode(parent, nodeToDelete)
 }
 
-// Merges together nodes in the inclusive descendants of [node] that
-// have no value and a single child into one node with a compressed
-// path until a node that doesn't meet those criteria is reached.
-// [parent] is [node]'s parent.
-// Assumes at least one of the following is true:
-// * [node] has a value.
-// * [node] has children.
+// combineNode will combine node and its child into a single node if the node has no value and only a single child
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent, node *node) error {
+func (t *trieView) combineNode(parent, notToCombine *node) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
-	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
-	if parent == nil || len(node.children) != 1 || node.hasValue() {
+	// cannot remove the node if it has no parent, doesn't have 1 child, or has a value
+	if parent == nil || len(notToCombine.children) != 1 || notToCombine.hasValue() {
 		return nil
 	}
 
-	if err := t.recordNodeDeleted(node); err != nil {
+	// the node isn't necessary since it stores no value and doesn't have multiple children
+	if err := t.recordNodeDeleted(notToCombine); err != nil {
 		return err
 	}
 
+	// grab the information about the single child of the node
 	var (
 		childEntry child
 		childPath  Key
@@ -691,13 +691,12 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// There is only one child, but we don't know the index.
 	// "Cycle" over the key/values to find the only child.
 	// Note this iteration once because len(node.children) == 1.
-	for index, entry := range node.children {
-		childPath = node.key.AppendExtend(index, entry.compressedKey)
+	for index, entry := range notToCombine.children {
+		childPath = notToCombine.key.AppendExtend(index, entry.compressedKey)
 		childEntry = entry
 	}
 
-	// [node] is the first node with multiple children.
-	// combine it with the [node] passed in.
+	// add that child to the parent
 	parent.setChildEntry(
 		childPath.Token(parent.key.tokenLength),
 		child{
