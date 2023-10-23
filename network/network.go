@@ -459,9 +459,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
-	return !n.config.RequireValidatorToConnect ||
-		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
-		n.WantsConnection(nodeID)
+	return !n.config.RequireValidatorToConnect || n.WantsConnection(nodeID)
 }
 
 func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
