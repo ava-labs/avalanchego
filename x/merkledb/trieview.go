@@ -337,24 +337,17 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		Key: t.db.toKey(key),
 	}
 
-	var proofPath []*node
+	var closestNode *node
 	err := t.visitPathToKey(
 		proof.Key,
 		func(n *node) error {
-			proofPath = append(proofPath, n)
+			closestNode = n
+			proof.Path = append(proof.Path, n.asProofNode())
 			return nil
 		})
 	if err != nil {
 		return nil, err
 	}
-
-	// From root --> node from left --> right.
-	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
-	for i, node := range proofPath {
-		proof.Path[i] = node.asProofNode()
-	}
-
-	closestNode := proofPath[len(proofPath)-1]
 
 	if closestNode.key == proof.Key {
 		// There is a node with the given [key].
