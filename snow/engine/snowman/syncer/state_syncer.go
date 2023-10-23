@@ -609,6 +609,10 @@ func (*stateSyncer) Gossip(context.Context) error {
 
 func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 	ss.Config.Ctx.Log.Info("shutting down state syncer")
+
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	return ss.VM.Shutdown(ctx)
 }
 
@@ -619,6 +623,9 @@ func (*stateSyncer) Timeout(context.Context) error {
 }
 
 func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
@@ -636,6 +643,9 @@ func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
 		// state sync is not implemented
 		return false, nil
 	}
+
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
 
 	return ss.stateSyncVM.StateSyncEnabled(ctx)
 }

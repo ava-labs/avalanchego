@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestByStopTime(t *testing.T) {
+func TestByEndTime(t *testing.T) {
 	require := require.New(t)
 
 	txHeap := NewByEndTime()

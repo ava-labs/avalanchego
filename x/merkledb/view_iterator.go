@@ -25,17 +25,17 @@ func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	var (
-		changes    = make([]KeyChange, 0, len(t.changes.values))
-		startPath  = t.db.newPath(start)
-		prefixPath = t.db.newPath(prefix)
+		changes   = make([]KeyChange, 0, len(t.changes.values))
+		startKey  = t.db.toKey(start)
+		prefixKey = t.db.toKey(prefix)
 	)
 
-	for path, change := range t.changes.values {
-		if len(start) > 0 && startPath.Greater(path) || !path.HasPrefix(prefixPath) {
+	for key, change := range t.changes.values {
+		if len(start) > 0 && startKey.Greater(key) || !key.HasPrefix(prefixKey) {
 			continue
 		}
 		changes = append(changes, KeyChange{
-			Key:   path.Bytes(),
+			Key:   key.Bytes(),
 			Value: change.after,
 		})
 	}
