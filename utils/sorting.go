@@ -27,7 +27,7 @@ func LessInt[T Sortable[T]](s T, f T) int {
 
 // Sorts the elements of [s].
 func Sort[T Sortable[T]](s []T) {
-	slices.SortFunc(s, LessInt)
+	slices.SortFunc(s, LessInt[T])
 }
 
 // Sorts the elements of [s] based on their hashes.
