@@ -618,9 +618,26 @@ func (t *trieView) remove(key Key) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	// find the ancestors of the deleted node and mark that they are changed
+	// confirm a node exists with a value
+	keyNode, err := t.getNodeWithID(ids.Empty, key, true)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// key didn't exist
+			return nil
+		}
+		return err
+	}
+
+	// node doesn't contain a value
+	if !keyNode.hasValue() {
+		return nil
+	}
+
+	// if the node exists and contains a value
+	// mark all ancestor for change
+	// grab parent and grandparent nodes for path compression
 	var grandParent, parent, nodeToDelete *node
-	err := t.visitPathToKey(
+	err = t.visitPathToKey(
 		key,
 		func(n *node) error {
 			grandParent = parent
@@ -632,16 +649,7 @@ func (t *trieView) remove(key Key) error {
 		return err
 	}
 
-	if nodeToDelete.key != key || !nodeToDelete.hasValue() {
-		// the key wasn't in the trie or doesn't have a value so there's nothing to do
-		return nil
-	}
-
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
-
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
 		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
@@ -650,14 +658,14 @@ func (t *trieView) remove(key Key) error {
 		if parent != nil {
 			parent.removeChild(nodeToDelete)
 
-			if err := t.recordNodeChange(parent); err != nil {
-				return err
-			}
+			// merge the parent node and its child into a single node if possible
 			return t.compressNodePath(grandParent, parent)
 		}
+
+		return nil
 	}
 
-	// merge this node and its descendants into a single node if possible
+	// merge this node and its child into a single node if possible
 	return t.compressNodePath(parent, nodeToDelete)
 }
 
