@@ -7,7 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ethereum/go-ethereum/ethclient"
+
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ethereum/go-ethereum/common"

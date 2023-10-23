@@ -10,7 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/core/types"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/ids"

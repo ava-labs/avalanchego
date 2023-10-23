@@ -20,9 +20,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
@@ -246,7 +246,7 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 	Eventually(func() bool {
 		var err error
 		receipt, err = ethClient.TransactionReceipt(DefaultContext(), txID)
-		if errors.Is(err, interfaces.NotFound) {
+		if errors.Is(err, ethereum.NotFound) {
 			return false // Transaction is still pending
 		}
 		require.NoError(err)

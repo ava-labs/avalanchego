@@ -15,8 +15,9 @@ import (
 
 	"github.com/spf13/cast"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/config"

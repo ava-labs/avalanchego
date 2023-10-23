@@ -8,7 +8,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ethereum/go-ethereum/ethclient"
+
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
