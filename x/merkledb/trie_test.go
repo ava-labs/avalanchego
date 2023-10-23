@@ -123,11 +123,10 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie := trieIntf.(*trieView)
 
 	var nodePath []*node
-	err = trie.visitPathToKey(ToKey(nil, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(nil, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 
 	// Just the root
 	require.Len(nodePath, 1)
@@ -149,11 +148,10 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	err = trie.visitPathToKey(ToKey(key1, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key1, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 
 	// Root and 1 value
 	require.Len(nodePath, 2)
@@ -176,11 +174,10 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 3)
-	err = trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
 	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
@@ -202,22 +199,20 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	err = trie.visitPathToKey(ToKey(key3, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key3, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 	require.Len(nodePath, 2)
 	require.Equal(trie.root, nodePath[0])
 	require.Equal(ToKey(key3, BranchFactor16), nodePath[1].key)
 
 	// Other key path not affected
 	nodePath = make([]*node, 0, 3)
-	err = trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
 	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
@@ -226,11 +221,10 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
 	nodePath = make([]*node, 0, 3)
-	err = trie.visitPathToKey(ToKey(key4, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key4, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
 	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
@@ -239,11 +233,10 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
 	nodePath = make([]*node, 0, 1)
-	err = trie.visitPathToKey(ToKey(key5, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key5, BranchFactor16), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
-	})
-	require.NoError(err)
+	}))
 	require.Len(nodePath, 1)
 	require.Equal(trie.root, nodePath[0])
 }
