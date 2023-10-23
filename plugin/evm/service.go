@@ -234,7 +234,7 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 	}
 
 	response.TxID = tx.ID()
-	return service.vm.issueTx(tx, true /*=local*/)
+	return service.vm.mempool.AddLocalTx(tx)
 }
 
 // ExportAVAXArgs are the arguments to ExportAVAX
@@ -343,7 +343,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 	}
 
 	response.TxID = tx.ID()
-	return service.vm.issueTx(tx, true /*=local*/)
+	return service.vm.mempool.AddLocalTx(tx)
 }
 
 // GetUTXOs gets all utxos for passed in addresses
@@ -449,7 +449,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 
-	return service.vm.issueTx(tx, true /*=local*/)
+	return service.vm.mempool.AddLocalTx(tx)
 }
 
 // GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API

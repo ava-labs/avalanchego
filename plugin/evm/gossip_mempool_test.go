@@ -92,7 +92,7 @@ func TestAtomicMempoolIterate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			m, err := NewMempool(ids.Empty, 10)
+			m, err := NewMempool(ids.Empty, 10, nil)
 			require.NoError(err)
 
 			for _, add := range tt.add {

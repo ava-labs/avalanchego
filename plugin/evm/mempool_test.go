@@ -12,7 +12,7 @@ import (
 
 func TestMempoolAddTx(t *testing.T) {
 	require := require.New(t)
-	m, err := NewMempool(ids.Empty, 5_000)
+	m, err := NewMempool(ids.Empty, 5_000, nil)
 	require.NoError(err)
 
 	txs := make([]*GossipAtomicTx, 0)

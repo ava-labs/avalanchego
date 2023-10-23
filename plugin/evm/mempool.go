@@ -75,10 +75,12 @@ type Mempool struct {
 	bloom *gossip.BloomFilter
 
 	metrics *mempoolMetrics
+
+	verify func(tx *Tx) error
 }
 
 // NewMempool returns a Mempool with [maxSize]
-func NewMempool(AVAXAssetID ids.ID, maxSize int) (*Mempool, error) {
+func NewMempool(AVAXAssetID ids.ID, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
 	bloom, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
@@ -95,6 +97,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) (*Mempool, error) {
 		utxoSpenders: make(map[ids.ID]*Tx),
 		bloom:        bloom,
 		metrics:      newMempoolMetrics(),
+		verify:       verify,
 	}, nil
 }
 
@@ -142,6 +145,24 @@ func (m *Mempool) Add(tx *GossipAtomicTx) error {
 // Add attempts to add [tx] to the mempool and returns an error if
 // it could not be addeed to the mempool.
 func (m *Mempool) AddTx(tx *Tx) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	err := m.addTx(tx, false)
+	if err != nil {
+		// unlike local txs, invalid remote txs are recorded as discarded
+		// so that they won't be requested again
+		txID := tx.ID()
+		m.discardedTxs.Put(tx.ID(), tx)
+		log.Debug("failed to issue remote tx to mempool",
+			"txID", txID,
+			"err", err,
+		)
+	}
+	return err
+}
+
+func (m *Mempool) AddLocalTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -202,6 +223,11 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	}
 	if _, exists := m.txHeap.Get(txID); exists {
 		return nil
+	}
+	if !force && m.verify != nil {
+		if err := m.verify(tx); err != nil {
+			return err
+		}
 	}
 
 	utxoSet := tx.InputUTXOs()
