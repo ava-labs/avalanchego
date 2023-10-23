@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -55,7 +56,7 @@ type peerTracker struct {
 	// Peers that we're connected to that responded to the last request they were sent.
 	responsivePeers set.Set[ids.NodeID]
 	// Max heap that contains the average bandwidth of peers.
-	bandwidthHeap          safemath.AveragerHeap
+	bandwidthHeap          heap.Map[ids.NodeID, safemath.Averager]
 	averageBandwidth       safemath.Averager
 	log                    logging.Logger
 	numTrackedPeers        prometheus.Gauge
@@ -69,10 +70,12 @@ func newPeerTracker(
 	registerer prometheus.Registerer,
 ) (*peerTracker, error) {
 	t := &peerTracker{
-		peers:            make(map[ids.NodeID]*peerInfo),
-		trackedPeers:     make(set.Set[ids.NodeID]),
-		responsivePeers:  make(set.Set[ids.NodeID]),
-		bandwidthHeap:    safemath.NewMaxAveragerHeap(),
+		peers:           make(map[ids.NodeID]*peerInfo),
+		trackedPeers:    make(set.Set[ids.NodeID]),
+		responsivePeers: make(set.Set[ids.NodeID]),
+		bandwidthHeap: heap.NewMap[ids.NodeID, safemath.Averager](func(a, b safemath.Averager) bool {
+			return a.Read() > b.Read()
+		}),
 		averageBandwidth: safemath.NewAverager(0, bandwidthHalflife, time.Now()),
 		log:              log,
 		numTrackedPeers: prometheus.NewGauge(
@@ -212,7 +215,7 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	} else {
 		peer.bandwidth.Observe(bandwidth, now)
 	}
-	p.bandwidthHeap.Add(nodeID, peer.bandwidth)
+	p.bandwidthHeap.Push(nodeID, peer.bandwidth)
 
 	if bandwidth == 0 {
 		p.responsivePeers.Remove(nodeID)
