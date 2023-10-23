@@ -1,5 +1,45 @@
 # Release Notes
 
+## [v1.10.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.13)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is updated to `29` all plugins must update to be compatible.
+
+### Fixes
+
+- Added `Prefetcher` to the `merkledb` interface
+- Fixed json marshalling of `TrackedSubnets` and `AllowedNodes`
+
+### What's Changed
+
+- Fix typo in block formation logic documentation by @kyoshisuki in https://github.com/ava-labs/avalanchego/pull/2158
+- Marshal blocks and transactions inside API calls by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2153
+- Remove lock options from the info api by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2149
+- Remove write lock option from the avm static API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2154
+- Remove write lock option from the avm wallet API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2155
+- Fix json marshalling of Sets by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2161
+- Rename `removeSubnetValidatorValidation` to `verifyRemoveSubnetValidatorTx` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2162
+- Remove lock options from the IPCs api by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2151
+- Remove write lock option from the xsvm API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2152
+- Remove lock options from the admin API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2150
+- Remove aliasing of `math` standard lib by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2163
+- Remove write lock option from the platformvm API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2157
+- Remove write lock option from the avm rpc API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2156
+- Remove context lock from API VM interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2165
+- Use set.Of rather than set.Add by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2164
+- Bump google.golang.org/grpc from 1.55.0 to 1.58.3 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2159
+- [x/merkledb] `Prefetcher` interface by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/2167
+- Validator Diffs: docs and UTs cleanup by @abi87 in https://github.com/ava-labs/avalanchego/pull/2037
+- MerkleDB Reduce buffer creation/memcopy on path construction by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2124
+- Fix some P-chain UTs by @abi87 in https://github.com/ava-labs/avalanchego/pull/2117
+
+### New Contributors
+
+- @kyoshisuki made their first contribution in https://github.com/ava-labs/avalanchego/pull/2158
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.12...v1.10.13
+
 ## [v1.10.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.12)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.

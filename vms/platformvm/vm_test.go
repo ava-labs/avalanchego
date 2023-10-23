@@ -1411,6 +1411,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	go timeoutManager.Dispatch()
+	defer timeoutManager.Stop()
 
 	chainRouter := &router.ChainRouter{}
 
