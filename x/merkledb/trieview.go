@@ -618,29 +618,27 @@ func (t *trieView) remove(key Key) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	nodeToDelete, err := t.getNodeWithID(ids.Empty, key, true)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			// key didn't exist or didn't have a value
-			return nil
-		}
-		return err
-	}
-
-	// remove the value from the node
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-
 	// find the ancestors of the deleted node and mark that they are changed
-	var grandParent, parent, current *node
-	err = t.visitPathToKey(
+	var grandParent, parent, nodeToDelete *node
+	err := t.visitPathToKey(
 		key,
 		func(n *node) error {
 			grandParent = parent
-			parent = current
-			current = n
+			parent = nodeToDelete
+			nodeToDelete = n
 			return t.recordNodeChange(n)
 		})
 	if err != nil {
+		return err
+	}
+
+	if nodeToDelete.key != key || !nodeToDelete.hasValue() {
+		// the key wasn't in the trie or doesn't have a value so there's nothing to do
+		return nil
+	}
+
+	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	if err := t.recordNodeChange(nodeToDelete); err != nil {
 		return err
 	}
 
@@ -649,56 +647,141 @@ func (t *trieView) remove(key Key) error {
 		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
 			return err
 		}
-		parent.removeChild(nodeToDelete)
+		if parent != nil {
+			parent.removeChild(nodeToDelete)
 
-		// with one of its children removed, parent might need to be combined with its only child
-		return t.combineNode(grandParent, parent)
+			if err := t.recordNodeChange(parent); err != nil {
+				return err
+			}
+			return t.compressNodePath(grandParent, parent)
+		}
 	}
 
-	// combine this node's child with the node if possible
-	return t.combineNode(parent, nodeToDelete)
+	// merge this node and its descendants into a single node if possible
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
-// combineNode will combine node and its child into a single node if the node has no value and only a single child
+// Merges together nodes in the inclusive descendants of [node] that
+// have no value and a single child into one node with a compressed
+// path until a node that doesn't meet those criteria is reached.
+// [parent] is [node]'s parent.
+// Assumes at least one of the following is true:
+// * [node] has a value.
+// * [node] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) combineNode(parent, notToCombine *node) error {
+func (t *trieView) compressNodePath(parent, node *node) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
-	// cannot remove the node if it has no parent, doesn't have 1 child, or has a value
-	if parent == nil || len(notToCombine.children) != 1 || notToCombine.hasValue() {
+	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
+	if parent == nil || len(node.children) != 1 || node.hasValue() {
 		return nil
 	}
 
-	// the node isn't necessary since it stores no value and doesn't have multiple children
-	if err := t.recordNodeDeleted(notToCombine); err != nil {
+	if err := t.recordNodeDeleted(node); err != nil {
 		return err
 	}
 
-	// grab the information about the single child of the node
 	var (
 		childEntry child
-		childPath  Key
+		childKey   Key
 	)
 	// There is only one child, but we don't know the index.
 	// "Cycle" over the key/values to find the only child.
 	// Note this iteration once because len(node.children) == 1.
-	for index, entry := range notToCombine.children {
-		childPath = notToCombine.key.AppendExtend(index, entry.compressedKey)
+	for index, entry := range node.children {
+		childKey = node.key.AppendExtend(index, entry.compressedKey)
 		childEntry = entry
 	}
 
-	// add that child to the parent
-	parent.setChildEntry(
-		childPath.Token(parent.key.tokenLength),
+	// [node] is the first node with multiple children.
+	// combine it with the [node] passed in.
+	parent.setChildEntry(childKey.Token(parent.key.tokenLength),
 		child{
-			compressedKey: childPath.Skip(parent.key.tokenLength + 1),
+			compressedKey: childKey.Skip(parent.key.tokenLength + 1),
 			id:            childEntry.id,
 			hasValue:      childEntry.hasValue,
-		},
-	)
+		})
 	return t.recordNodeChange(parent)
+}
+
+// Returns the nodes along the path to [key].
+// The first node is the root, and the last node is either the node with the
+// given [key], if it's in the trie, or the node with the largest prefix of
+// the [key] if it isn't in the trie.
+// Always returns at least the root node.
+func (t *trieView) getPathTo(key Key) ([]*node, error) {
+	var (
+		// all node paths start at the root
+		currentNode      = t.root
+		matchedPathIndex = 0
+		nodes            = []*node{t.root}
+	)
+
+	// while the entire path hasn't been matched
+	for matchedPathIndex < key.tokenLength {
+		// confirm that a child exists and grab its ID before attempting to load it
+		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathIndex)]
+
+		// the current token for the child entry has now been handled, so increment the matchedPathIndex
+		matchedPathIndex += 1
+
+		if !hasChild || !key.iteratedHasPrefix(matchedPathIndex, nextChildEntry.compressedKey) {
+			// there was no child along the path or the child that was there doesn't match the remaining path
+			return nodes, nil
+		}
+
+		// the compressed path of the entry there matched the path, so increment the matched index
+		matchedPathIndex += nextChildEntry.compressedKey.tokenLength
+
+		// grab the next node along the path
+		var err error
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
+		if err != nil {
+			return nil, err
+		}
+
+		// add node to path
+		nodes = append(nodes, currentNode)
+	}
+	return nodes, nil
+}
+
+// Returns the nodes along the path to [key].
+// The first node is the root, and the last node is either the node with the
+// given [key], if it's in the trie, or the node with the largest prefix of
+// the [key] if it isn't in the trie.
+// Always returns at least the root node.
+func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
+	var (
+		// all node paths start at the root
+		currentNode = t.root
+		err         error
+	)
+	if err := visitNode(currentNode); err != nil {
+		return err
+	}
+	// while the entire path hasn't been matched
+	for currentNode.key.tokenLength < key.tokenLength {
+		// confirm that a child exists and grab its ID before attempting to load it
+		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.tokenLength)]
+
+		if !hasChild || !key.iteratedHasPrefix(currentNode.key.tokenLength+1, nextChildEntry.compressedKey) {
+			// there was no child along the path or the child that was there doesn't match the remaining path
+			return nil
+		}
+
+		// grab the next node along the path
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.tokenLength+1+nextChildEntry.compressedKey.tokenLength), nextChildEntry.hasValue)
+		if err != nil {
+			return err
+		}
+		if err := visitNode(currentNode); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
@@ -740,6 +823,7 @@ func (t *trieView) insert(
 	if t.nodesAlreadyCalculated.Get() {
 		return nil, ErrNodesAlreadyCalculated
 	}
+
 	var closestNode *node
 	err := t.visitPathToKey(
 		key,
@@ -825,42 +909,6 @@ func (t *trieView) insert(
 		})
 
 	return nodeWithValue, t.recordNewNode(branchNode)
-}
-
-// Returns the nodes along the path to [key].
-// The first node is the root, and the last node is either the node with the
-// given [key], if it's in the trie, or the node with the largest prefix of
-// the [key] if it isn't in the trie.
-// Always returns at least the root node.
-func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
-	var (
-		// all node paths start at the root
-		currentNode = t.root
-		err         error
-	)
-	if err := visitNode(currentNode); err != nil {
-		return err
-	}
-	// while the entire path hasn't been matched
-	for currentNode.key.tokenLength < key.tokenLength {
-		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.tokenLength)]
-
-		if !hasChild || !key.iteratedHasPrefix(currentNode.key.tokenLength+1, nextChildEntry.compressedKey) {
-			// there was no child along the path or the child that was there doesn't match the remaining path
-			return nil
-		}
-
-		// grab the next node along the path
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.tokenLength+1+nextChildEntry.compressedKey.tokenLength), nextChildEntry.hasValue)
-		if err != nil {
-			return err
-		}
-		if err := visitNode(currentNode); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Records that a node has been created.
