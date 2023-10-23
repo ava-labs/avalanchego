@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -103,7 +104,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 		// Codec version
 		0x00, 0x00,
 		// RemoveSubnetValidatorTx Type ID
-		0x00, 0x00, 0x00, 0x1d,
+		0x00, 0x00, 0x00, 0x21,
 		// Mainnet network ID
 		0x00, 0x00, 0x00, 0x01,
 		// P-chain blockchain ID
@@ -285,7 +286,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 		// Codec version
 		0x00, 0x00,
 		// TransferSubnetOwnershipTx Type ID
-		0x00, 0x00, 0x00, 0x1d,
+		0x00, 0x00, 0x00, 0x21,
 		// Mainnet network ID
 		0x00, 0x00, 0x00, 0x01,
 		// P-chain blockchain ID
@@ -440,6 +441,105 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 	unsignedComplexTransferSubnetOwnershipTxBytes, err := Codec.Marshal(Version, &unsignedComplexTransferSubnetOwnershipTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexTransferSubnetOwnershipTxBytes, unsignedComplexTransferSubnetOwnershipTxBytes)
+
+	aliaser := ids.NewAliaser()
+	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
+
+	unsignedComplexTransferSubnetOwnershipTx.InitCtx(&snow.Context{
+		NetworkID:   1,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: avaxAssetID,
+		BCLookup:    aliaser,
+	})
+
+	unsignedComplexTransferSubnetOwnershipTxJSONBytes, err := json.MarshalIndent(unsignedComplexTransferSubnetOwnershipTx, "", "\t")
+	require.NoError(err)
+	require.Equal(`{
+	"networkID": 1,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+					],
+					"amount": 18446744073709551615,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"subnetAuthorization": {
+		"signatureIndices": []
+	},
+	"newOwner": {
+		"addresses": [
+			"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+		],
+		"locktime": 876543210,
+		"threshold": 1
+	}
+}`, string(unsignedComplexTransferSubnetOwnershipTxJSONBytes))
 }
 
 func TestTransferSubnetOwnershipTxSyntacticVerify(t *testing.T) {

@@ -41,6 +41,10 @@ func init() {
 		c.SkipRegistrations(5)
 
 		errs.Add(RegisterUnsignedTxsTypes(c))
+
+		c.SkipRegistrations(4)
+
+		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
 	errs.Add(
 		Codec.RegisterCodec(Version, c),
