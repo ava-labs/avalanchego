@@ -18,7 +18,7 @@ const HashLength = 32
 type hashValues struct {
 	Children map[byte]child
 	Value    maybe.Maybe[[]byte]
-	Key      Path
+	Key      Key
 }
 
 // Representation of a node stored in the database.
@@ -28,23 +28,23 @@ type dbNode struct {
 }
 
 type child struct {
-	compressedPath Path
-	id             ids.ID
-	hasValue       bool
+	compressedKey Key
+	id            ids.ID
+	hasValue      bool
 }
 
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
 	id          ids.ID
-	key         Path
+	key         Key
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key Path) *node {
+func newNode(parent *node, key Key) *node {
 	newNode := &node{
 		dbNode: dbNode{
 			children: make(map[byte]child, key.branchFactor),
@@ -58,7 +58,7 @@ func newNode(parent *node, key Path) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key Path, nodeBytes []byte) (*node, error) {
+func parseNode(key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if err := codec.decodeDBNode(nodeBytes, &n, key.branchFactor); err != nil {
 		return nil, err
@@ -129,11 +129,11 @@ func (n *node) setValueDigest() {
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(childNode *node) {
 	n.setChildEntry(
-		childNode.key.Token(n.key.tokensLength),
+		childNode.key.Token(n.key.tokenLength),
 		child{
-			compressedPath: childNode.key.Skip(n.key.tokensLength + 1),
-			id:             childNode.id,
-			hasValue:       childNode.hasValue(),
+			compressedKey: childNode.key.Skip(n.key.tokenLength + 1),
+			id:            childNode.id,
+			hasValue:      childNode.hasValue(),
 		},
 	)
 }
@@ -147,7 +147,7 @@ func (n *node) setChildEntry(index byte, childEntry child) {
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node) {
 	n.onNodeChanged()
-	delete(n.children, child.key.Token(n.key.tokensLength))
+	delete(n.children, child.key.Token(n.key.tokenLength))
 }
 
 // clone Returns a copy of [n].
@@ -170,7 +170,7 @@ func (n *node) clone() *node {
 // Returns the ProofNode representation of this node.
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
-		KeyPath:     n.key,
+		Key:         n.key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
 		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
