@@ -41,7 +41,8 @@ func init() {
 		c.RegisterType(CodeResponse{}),
 
 		// Warp request types
-		c.RegisterType(SignatureRequest{}),
+		c.RegisterType(MessageSignatureRequest{}),
+		c.RegisterType(BlockSignatureRequest{}),
 		c.RegisterType(SignatureResponse{}),
 
 		Codec.RegisterCodec(Version, c),

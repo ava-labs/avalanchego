@@ -13,27 +13,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMarshalSignatureRequest asserts that the structure or serialization logic hasn't changed, primarily to
+// TestMarshalMessageSignatureRequest asserts that the structure or serialization logic hasn't changed, primarily to
 // ensure compatibility with the network.
-func TestMarshalSignatureRequest(t *testing.T) {
-	messageIDBytes, err := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
-	require.NoError(t, err)
-	messageID, err := ids.ToID(messageIDBytes)
-	require.NoError(t, err)
-
-	signatureRequest := SignatureRequest{
-		MessageID: messageID,
+func TestMarshalMessageSignatureRequest(t *testing.T) {
+	signatureRequest := MessageSignatureRequest{
+		MessageID: ids.ID{68, 79, 70, 65, 72, 73, 64, 107},
 	}
 
-	base64SignatureRequest := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+	base64MessageSignatureRequest := "AABET0ZBSElAawAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 	signatureRequestBytes, err := Codec.Marshal(Version, signatureRequest)
 	require.NoError(t, err)
-	require.Equal(t, base64SignatureRequest, base64.StdEncoding.EncodeToString(signatureRequestBytes))
+	require.Equal(t, base64MessageSignatureRequest, base64.StdEncoding.EncodeToString(signatureRequestBytes))
 
-	var s SignatureRequest
+	var s MessageSignatureRequest
 	_, err = Codec.Unmarshal(signatureRequestBytes, &s)
 	require.NoError(t, err)
 	require.Equal(t, signatureRequest.MessageID, s.MessageID)
+}
+
+// TestMarshalBlockSignatureRequest asserts that the structure or serialization logic hasn't changed, primarily to
+// ensure compatibility with the network.
+func TestMarshalBlockSignatureRequest(t *testing.T) {
+	signatureRequest := BlockSignatureRequest{
+		BlockID: ids.ID{68, 79, 70, 65, 72, 73, 64, 107},
+	}
+
+	base64BlockSignatureRequest := "AABET0ZBSElAawAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+	signatureRequestBytes, err := Codec.Marshal(Version, signatureRequest)
+	require.NoError(t, err)
+	require.Equal(t, base64BlockSignatureRequest, base64.StdEncoding.EncodeToString(signatureRequestBytes))
+
+	var s BlockSignatureRequest
+	_, err = Codec.Unmarshal(signatureRequestBytes, &s)
+	require.NoError(t, err)
+	require.Equal(t, signatureRequest.BlockID, s.BlockID)
 }
 
 // TestMarshalSignatureResponse asserts that the structure or serialization logic hasn't changed, primarily to

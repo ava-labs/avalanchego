@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
@@ -38,17 +39,39 @@ type NetworkSignatureGetter struct {
 	Client NetworkClient
 }
 
+func NewSignatureGetter(client NetworkClient) *NetworkSignatureGetter {
+	return &NetworkSignatureGetter{
+		Client: client,
+	}
+}
+
 // GetSignature attempts to fetch a BLS Signature of [unsignedWarpMessage] from [nodeID] until it succeeds or receives an invalid response
 //
 // Note: this function will continue attempting to fetch the signature from [nodeID] until it receives an invalid value or [ctx] is cancelled.
 // The caller is responsible to cancel [ctx] if it no longer needs to fetch this signature.
 func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
-	signatureReq := message.SignatureRequest{
-		MessageID: unsignedWarpMessage.ID(),
-	}
-	signatureReqBytes, err := message.RequestToBytes(message.Codec, signatureReq)
+	var signatureReqBytes []byte
+	parsedPayload, err := payload.Parse(unsignedWarpMessage.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal signature request: %w", err)
+		return nil, fmt.Errorf("failed to parse unsigned message payload: %w", err)
+	}
+	switch p := parsedPayload.(type) {
+	case *payload.AddressedCall:
+		signatureReq := message.MessageSignatureRequest{
+			MessageID: unsignedWarpMessage.ID(),
+		}
+		signatureReqBytes, err = message.RequestToBytes(message.Codec, signatureReq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
+		}
+	case *payload.Hash:
+		signatureReq := message.BlockSignatureRequest{
+			BlockID: p.Hash,
+		}
+		signatureReqBytes, err = message.RequestToBytes(message.Codec, signatureReq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
+		}
 	}
 
 	delay := initialRetryFetchSignatureDelay

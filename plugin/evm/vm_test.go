@@ -3273,7 +3273,7 @@ func TestCrossChainMessagestoVM(t *testing.T) {
 	require.True(calledSendCrossChainAppResponseFn, "sendCrossChainAppResponseFn was not called")
 }
 
-func TestSignatureRequestsToVM(t *testing.T) {
+func TestMessageSignatureRequestsToVM(t *testing.T) {
 	_, vm, _, appSender := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
@@ -3288,7 +3288,7 @@ func TestSignatureRequestsToVM(t *testing.T) {
 	// Add the known message and get its signature to confirm.
 	err = vm.warpBackend.AddMessage(warpMessage)
 	require.NoError(t, err)
-	signature, err := vm.warpBackend.GetSignature(warpMessage.ID())
+	signature, err := vm.warpBackend.GetMessageSignature(warpMessage.ID())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -3317,8 +3317,64 @@ func TestSignatureRequestsToVM(t *testing.T) {
 			return nil
 		}
 		t.Run(name, func(t *testing.T) {
-			var signatureRequest message.Request = message.SignatureRequest{
+			var signatureRequest message.Request = message.MessageSignatureRequest{
 				MessageID: test.messageID,
+			}
+
+			requestBytes, err := message.Codec.Marshal(message.Version, &signatureRequest)
+			require.NoError(t, err)
+
+			// Send the app request and make sure we called SendAppResponseFn
+			deadline := time.Now().Add(60 * time.Second)
+			err = vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, deadline, requestBytes)
+			require.NoError(t, err)
+			require.True(t, calledSendAppResponseFn)
+		})
+	}
+}
+
+func TestBlockSignatureRequestsToVM(t *testing.T) {
+	_, vm, _, appSender := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+
+	defer func() {
+		err := vm.Shutdown(context.Background())
+		require.NoError(t, err)
+	}()
+
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(t, err)
+
+	signature, err := vm.warpBackend.GetBlockSignature(lastAcceptedID)
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		blockID          ids.ID
+		expectedResponse [bls.SignatureLen]byte
+	}{
+		"known": {
+			blockID:          lastAcceptedID,
+			expectedResponse: signature,
+		},
+		"unknown": {
+			blockID:          ids.GenerateTestID(),
+			expectedResponse: [bls.SignatureLen]byte{},
+		},
+	}
+
+	for name, test := range tests {
+		calledSendAppResponseFn := false
+		appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
+			calledSendAppResponseFn = true
+			var response message.SignatureResponse
+			_, err := message.Codec.Unmarshal(responseBytes, &response)
+			require.NoError(t, err)
+			require.Equal(t, test.expectedResponse, response.Signature)
+
+			return nil
+		}
+		t.Run(name, func(t *testing.T) {
+			var signatureRequest message.Request = message.BlockSignatureRequest{
+				BlockID: test.blockID,
 			}
 
 			requestBytes, err := message.Codec.Marshal(message.Version, &signatureRequest)

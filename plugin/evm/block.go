@@ -13,20 +13,17 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
-	"github.com/ava-labs/subnet-evm/x/warp"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
@@ -127,21 +124,6 @@ func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *
 			if err := accepter.Accept(acceptCtx, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
 				return err
 			}
-		}
-	}
-
-	// If Warp is enabled, add the block hash as an unsigned message to the warp backend.
-	if rules.IsPrecompileEnabled(warp.ContractAddress) {
-		blockHashPayload, err := payload.NewHash(ids.ID(b.ethBlock.Hash()))
-		if err != nil {
-			return fmt.Errorf("failed to create block hash payload: %w", err)
-		}
-		unsignedMessage, err := avalancheWarp.NewUnsignedMessage(b.vm.ctx.NetworkID, b.vm.ctx.ChainID, blockHashPayload.Bytes())
-		if err != nil {
-			return fmt.Errorf("failed to create unsigned message for block hash payload: %w", err)
-		}
-		if err := b.vm.warpBackend.AddMessage(unsignedMessage); err != nil {
-			return fmt.Errorf("failed to add block hash payload unsigned message: %w", err)
 		}
 	}
 
