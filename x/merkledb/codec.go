@@ -89,9 +89,13 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
+func estimateDBNodeSize(numChildren int) int {
+	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+}
+
 func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	// Estimate size of [n] to prevent memory allocations
-	estimatedLen := estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n.children)
+	estimatedLen := estimateDBNodeSize(len(n.children))
 	buf := bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	return c.encodeDBNodeToBuffer(buf, n, branchFactor)
 }
@@ -138,8 +142,8 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 func (c *codecImpl) encodeKeyAndNode(key Key, n *dbNode, factor BranchFactor) []byte {
 	var (
 		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+		// Estimate size to prevent memory allocations
+		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + estimateDBNodeSize(numChildren)
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	)
 
