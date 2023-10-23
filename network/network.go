@@ -160,8 +160,8 @@ type network struct {
 	closing         bool
 
 	// Tracks special peers that the network should always track
-	manuallyTrackedLock sync.RWMutex
-	manuallyTrackedIDs  set.Set[ids.NodeID]
+	manuallyTrackedIDsLock sync.RWMutex
+	manuallyTrackedIDs     set.Set[ids.NodeID]
 
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
@@ -797,16 +797,16 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 		return true
 	}
 
-	n.manuallyTrackedLock.RLock()
-	defer n.manuallyTrackedLock.RUnlock()
+	n.manuallyTrackedIDsLock.RLock()
+	defer n.manuallyTrackedIDsLock.RUnlock()
 
 	return n.manuallyTrackedIDs.Contains(nodeID)
 }
 
 func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
-	n.manuallyTrackedLock.Lock()
+	n.manuallyTrackedIDsLock.Lock()
 	n.manuallyTrackedIDs.Add(nodeID)
-	n.manuallyTrackedLock.Unlock()
+	n.manuallyTrackedIDsLock.Unlock()
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
