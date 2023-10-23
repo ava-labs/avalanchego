@@ -60,7 +60,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Optimistically gossip raw tx
-	assert.NoError(vm.issueTx(tx, true /*=local*/))
+	assert.NoError(vm.mempool.AddLocalTx(tx))
 	time.Sleep(500 * time.Millisecond)
 	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
@@ -74,7 +74,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	gossipedLock.Unlock()
 
 	// Attempt to gossip conflicting tx
-	assert.ErrorIs(vm.issueTx(conflictingTx, true /*=local*/), errConflictingAtomicTx)
+	assert.ErrorIs(vm.mempool.AddLocalTx(conflictingTx), errConflictingAtomicTx)
 	gossipedLock.Lock()
 	assert.Equal(1, gossiped)
 	gossipedLock.Unlock()

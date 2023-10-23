@@ -287,7 +287,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 			// spend the UTXOs from shared memory
 			importTx, err = serverVM.newImportTx(serverVM.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			require.NoError(err)
-			require.NoError(serverVM.issueTx(importTx, true /*=local*/))
+			require.NoError(serverVM.mempool.AddLocalTx(importTx))
 		case 1:
 			// export some of the imported UTXOs to test exportTx is properly synced
 			exportTx, err = serverVM.newExportTx(
@@ -299,7 +299,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 				[]*secp256k1.PrivateKey{testKeys[0]},
 			)
 			require.NoError(err)
-			require.NoError(serverVM.issueTx(exportTx, true /*=local*/))
+			require.NoError(serverVM.mempool.AddLocalTx(exportTx))
 		default: // Generate simple transfer transactions.
 			pk := testKeys[0].ToECDSA()
 			tx := types.NewTransaction(gen.TxNonce(testEthAddrs[0]), testEthAddrs[1], common.Big1, params.TxGas, initialBaseFee, nil)

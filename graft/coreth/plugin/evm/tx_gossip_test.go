@@ -49,7 +49,7 @@ func TestEthTxGossip(t *testing.T) {
 
 	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(err)
-	require.NoError(vm.issueTx(importTx, true))
+	require.NoError(vm.mempool.AddLocalTx(importTx))
 	<-issuer
 
 	blk, err := vm.BuildBlock(context.Background())
@@ -228,7 +228,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(err)
 
-	require.NoError(vm.issueTx(importTx, true /*=local*/))
+	require.NoError(vm.mempool.AddLocalTx(importTx))
 	<-issuer
 
 	// wait so we aren't throttled by the vm

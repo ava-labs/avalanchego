@@ -155,7 +155,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		}
 	}
 
-	if err := vm.issueTx(tx, true /*=local*/); err != nil {
+	if err := vm.mempool.AddLocalTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer

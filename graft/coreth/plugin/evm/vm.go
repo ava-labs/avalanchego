@@ -542,7 +542,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	// TODO: read size from settings
-	vm.mempool, err = NewMempool(chainCtx.AVAXAssetID, defaultMempoolSize)
+	vm.mempool, err = NewMempool(chainCtx.AVAXAssetID, defaultMempoolSize, vm.verifyTxAtTip)
 	if err != nil {
 		return fmt.Errorf("failed to initialize mempool: %w", err)
 	}
@@ -1449,44 +1449,19 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	return chainID, addr, nil
 }
 
-// issueTx verifies [tx] as valid to be issued on top of the currently preferred block
-// and then issues [tx] into the mempool if valid.
-func (vm *VM) issueTx(tx *Tx, local bool) error {
-	if err := vm.verifyTxAtTip(tx); err != nil {
-		if !local {
-			// unlike local txs, invalid remote txs are recorded as discarded
-			// so that they won't be requested again
-			txID := tx.ID()
-			vm.mempool.discardedTxs.Put(txID, tx)
-			log.Debug("failed to verify remote tx being issued to the mempool",
-				"txID", txID,
-				"err", err,
-			)
-			return nil
-		}
-		return err
-	}
-	// add to mempool and possibly re-gossip
-	if err := vm.mempool.AddTx(tx); err != nil {
-		if !local {
-			// unlike local txs, invalid remote txs are recorded as discarded
-			// so that they won't be requested again
-			txID := tx.ID()
-			vm.mempool.discardedTxs.Put(tx.ID(), tx)
-			log.Debug("failed to issue remote tx to mempool",
-				"txID", txID,
-				"err", err,
-			)
-			return nil
-		}
-		return err
-	}
-
-	return nil
-}
-
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
 func (vm *VM) verifyTxAtTip(tx *Tx) error {
+	if txByteLen := len(tx.SignedBytes()); txByteLen > targetAtomicTxsSize {
+		return fmt.Errorf("tx size (%d) exceeds total atomic txs size target (%d)", txByteLen, targetAtomicTxsSize)
+	}
+	gasUsed, err := tx.GasUsed(true)
+	if err != nil {
+		return err
+	}
+	if new(big.Int).SetUint64(gasUsed).Cmp(params.AtomicGasLimit) > 0 {
+		return fmt.Errorf("tx gas usage (%d) exceeds atomic gas limit (%d)", gasUsed, params.AtomicGasLimit.Uint64())
+	}
+
 	// Note: we fetch the current block and then the state at that block instead of the current state directly
 	// since we need the header of the current block below.
 	preferredBlock := vm.blockChain.CurrentBlock()
