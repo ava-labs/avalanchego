@@ -59,12 +59,20 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 	ipResolutionTimeout  = 30 * time.Second
+
+	ipcDeprecationMsg      = "IPC API is deprecated"
+	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		IpcAPIEnabledKey:      ipcDeprecationMsg,
+		IpcsChainIDsKey:       ipcDeprecationMsg,
+		IpcsPathKey:           ipcDeprecationMsg,
+		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+	}
 
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")

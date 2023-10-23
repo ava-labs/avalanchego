@@ -63,7 +63,7 @@ func TestBenchlistAdd(t *testing.T) {
 	require.False(b.isBenched(vdrID3))
 	require.False(b.isBenched(vdrID4))
 	require.Empty(b.failureStreaks)
-	require.Empty(b.benchedQueue)
+	require.Zero(b.benchedHeap.Len())
 	require.Empty(b.benchlistSet)
 	b.lock.Unlock()
 
@@ -74,7 +74,7 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Still shouldn't be benched due to not enough consecutive failure
 	require.False(b.isBenched(vdrID0))
-	require.Empty(b.benchedQueue)
+	require.Zero(b.benchedHeap.Len())
 	require.Empty(b.benchlistSet)
 	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID0]
@@ -88,7 +88,7 @@ func TestBenchlistAdd(t *testing.T) {
 	// has passed since the first failure
 	b.lock.Lock()
 	require.False(b.isBenched(vdrID0))
-	require.Empty(b.benchedQueue)
+	require.Zero(b.benchedHeap.Len())
 	require.Empty(b.benchlistSet)
 	b.lock.Unlock()
 
@@ -109,13 +109,14 @@ func TestBenchlistAdd(t *testing.T) {
 	// Now this validator should be benched
 	b.lock.Lock()
 	require.True(b.isBenched(vdrID0))
-	require.Equal(b.benchedQueue.Len(), 1)
+	require.Equal(b.benchedHeap.Len(), 1)
 	require.Equal(b.benchlistSet.Len(), 1)
 
-	next := b.benchedQueue[0]
-	require.Equal(vdrID0, next.nodeID)
-	require.False(next.benchedUntil.After(now.Add(duration)))
-	require.False(next.benchedUntil.Before(now.Add(duration / 2)))
+	nodeID, benchedUntil, ok := b.benchedHeap.Peek()
+	require.True(ok)
+	require.Equal(vdrID0, nodeID)
+	require.False(benchedUntil.After(now.Add(duration)))
+	require.False(benchedUntil.Before(now.Add(duration / 2)))
 	require.Empty(b.failureStreaks)
 	require.True(benched)
 	benchable.BenchedF = nil
@@ -134,7 +135,7 @@ func TestBenchlistAdd(t *testing.T) {
 	b.lock.Lock()
 	require.True(b.isBenched(vdrID0))
 	require.False(b.isBenched(vdrID1))
-	require.Equal(b.benchedQueue.Len(), 1)
+	require.Equal(b.benchedHeap.Len(), 1)
 	require.Equal(b.benchlistSet.Len(), 1)
 	require.Empty(b.failureStreaks)
 	b.lock.Unlock()
@@ -211,7 +212,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	require.True(b.isBenched(vdrID0))
 	require.True(b.isBenched(vdrID1))
 	require.False(b.isBenched(vdrID2))
-	require.Equal(b.benchedQueue.Len(), 2)
+	require.Equal(b.benchedHeap.Len(), 2)
 	require.Equal(b.benchlistSet.Len(), 2)
 	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID2]
@@ -238,7 +239,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	require.True(b.isBenched(vdrID0))
 	require.True(b.isBenched(vdrID1))
 	require.True(b.isBenched(vdrID4))
-	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Contains(b.benchlistSet, vdrID0)
 	require.Contains(b.benchlistSet, vdrID1)
@@ -257,19 +258,10 @@ func TestBenchlistMaxStake(t *testing.T) {
 	require.True(b.isBenched(vdrID1))
 	require.True(b.isBenched(vdrID4))
 	require.False(b.isBenched(vdrID2))
-	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Len(b.failureStreaks, 1)
 	require.Contains(b.failureStreaks, vdrID2)
-
-	// Ensure the benched queue root has the min end time
-	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID4}
-	for _, benchedVdr := range b.benchedQueue {
-		require.Contains(benchedIDs, benchedVdr.nodeID)
-		require.False(benchedVdr.benchedUntil.Before(minEndTime))
-	}
-
 	b.lock.Unlock()
 }
 
@@ -343,17 +335,9 @@ func TestBenchlistRemove(t *testing.T) {
 	require.True(b.isBenched(vdrID0))
 	require.True(b.isBenched(vdrID1))
 	require.True(b.isBenched(vdrID2))
-	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Empty(b.failureStreaks)
-
-	// Ensure the benched queue root has the min end time
-	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID2}
-	for _, benchedVdr := range b.benchedQueue {
-		require.Contains(benchedIDs, benchedVdr.nodeID)
-		require.False(benchedVdr.benchedUntil.Before(minEndTime))
-	}
 
 	// Set the benchlist's clock past when all validators should be unbenched
 	// so that when its timer fires, it can remove them
