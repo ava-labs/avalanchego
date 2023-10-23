@@ -719,48 +719,6 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func (t *trieView) getPathTo(key Key) ([]*node, error) {
-	var (
-		// all node paths start at the root
-		currentNode      = t.root
-		matchedPathIndex = 0
-		nodes            = []*node{t.root}
-	)
-
-	// while the entire path hasn't been matched
-	for matchedPathIndex < key.tokenLength {
-		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathIndex)]
-
-		// the current token for the child entry has now been handled, so increment the matchedPathIndex
-		matchedPathIndex += 1
-
-		if !hasChild || !key.iteratedHasPrefix(matchedPathIndex, nextChildEntry.compressedKey) {
-			// there was no child along the path or the child that was there doesn't match the remaining path
-			return nodes, nil
-		}
-
-		// the compressed path of the entry there matched the path, so increment the matched index
-		matchedPathIndex += nextChildEntry.compressedKey.tokenLength
-
-		// grab the next node along the path
-		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathIndex), nextChildEntry.hasValue)
-		if err != nil {
-			return nil, err
-		}
-
-		// add node to path
-		nodes = append(nodes, currentNode)
-	}
-	return nodes, nil
-}
-
-// Returns the nodes along the path to [key].
-// The first node is the root, and the last node is either the node with the
-// given [key], if it's in the trie, or the node with the largest prefix of
-// the [key] if it isn't in the trie.
-// Always returns at least the root node.
 func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 	var (
 		// all node paths start at the root
