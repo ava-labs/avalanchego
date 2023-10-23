@@ -21,16 +21,16 @@ const (
 	falseByte            = 0
 	minVarIntLen         = 1
 	minMaybeByteSliceLen = boolLen
-	minPathLen           = minVarIntLen
+	minKeyLen            = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minPathLen + ids.IDLen + boolLen
+	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
-	estimatedKeyLen            = 64
-	estimatedValueLen          = 64
-	estimatedCompressedPathLen = 8
-	// Child index, child compressed path, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + boolLen
+	estimatedKeyLen           = 64
+	estimatedValueLen         = 64
+	estimatedCompressedKeyLen = 8
+	// Child index, child compressed key, child ID, child has value
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -45,7 +45,7 @@ var (
 	errChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
 	errLeadingZeroes      = errors.New("varint has leading zeroes")
 	errInvalidBool        = errors.New("decoded bool is neither true nor false")
-	errNonZeroPathPadding = errors.New("path partial byte should be padded with 0s")
+	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
 	errExtraSpace         = errors.New("trailing buffer space")
 	errIntOverflow        = errors.New("value overflows int")
 )
@@ -102,7 +102,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	for index := 0; BranchFactor(index) < branchFactor; index++ {
 		if entry, ok := n.children[byte(index)]; ok {
 			c.encodeUint(buf, uint64(index))
-			c.encodePath(buf, entry.compressedPath)
+			c.encodeKey(buf, entry.compressedKey)
 			_, _ = buf.Write(entry.id[:])
 			c.encodeBool(buf, entry.hasValue)
 		}
@@ -128,7 +128,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 		}
 	}
 	c.encodeMaybeByteSlice(buf, hv.Value)
-	c.encodePath(buf, hv.Key)
+	c.encodeKey(buf, hv.Key)
 
 	return buf.Bytes()
 }
@@ -168,7 +168,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 		}
 		previousChild = index
 
-		compressedPath, err := c.decodePath(src, branchFactor)
+		compressedKey, err := c.decodeKey(src, branchFactor)
 		if err != nil {
 			return err
 		}
@@ -181,9 +181,9 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 			return err
 		}
 		n.children[byte(index)] = child{
-			compressedPath: compressedPath,
-			id:             childID,
-			hasValue:       hasValue,
+			compressedKey: compressedKey,
+			id:            childID,
+			hasValue:      hasValue,
 		}
 	}
 	if src.Len() != 0 {
@@ -326,43 +326,43 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodePath(dst *bytes.Buffer, p Path) {
-	c.encodeUint(dst, uint64(p.tokensLength))
-	_, _ = dst.Write(p.Bytes())
+func (c *codecImpl) encodeKey(dst *bytes.Buffer, key Key) {
+	c.encodeUint(dst, uint64(key.tokenLength))
+	_, _ = dst.Write(key.Bytes())
 }
 
-func (c *codecImpl) decodePath(src *bytes.Reader, branchFactor BranchFactor) (Path, error) {
-	if minPathLen > src.Len() {
-		return Path{}, io.ErrUnexpectedEOF
+func (c *codecImpl) decodeKey(src *bytes.Reader, branchFactor BranchFactor) (Key, error) {
+	if minKeyLen > src.Len() {
+		return Key{}, io.ErrUnexpectedEOF
 	}
 
 	length, err := c.decodeUint(src)
 	if err != nil {
-		return Path{}, err
+		return Key{}, err
 	}
 	if length > math.MaxInt {
-		return Path{}, errIntOverflow
+		return Key{}, errIntOverflow
 	}
-	result := emptyPath(branchFactor)
-	result.tokensLength = int(length)
-	pathBytesLen := result.bytesNeeded(result.tokensLength)
-	if pathBytesLen > src.Len() {
-		return Path{}, io.ErrUnexpectedEOF
+	result := emptyKey(branchFactor)
+	result.tokenLength = int(length)
+	keyBytesLen := result.bytesNeeded(result.tokenLength)
+	if keyBytesLen > src.Len() {
+		return Key{}, io.ErrUnexpectedEOF
 	}
-	buffer := make([]byte, pathBytesLen)
+	buffer := make([]byte, keyBytesLen)
 	if _, err := io.ReadFull(src, buffer); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return Path{}, err
+		return Key{}, err
 	}
 	if result.hasPartialByte() {
 		// Confirm that the padding bits in the partial byte are 0.
 		// We want to only look at the bits to the right of the last token, which is at index length-1.
 		// Generate a mask with (8-bitsToShift) 0s followed by bitsToShift 1s.
-		paddingMask := byte(0xFF >> (8 - result.bitsToShift(result.tokensLength-1)))
-		if buffer[pathBytesLen-1]&paddingMask != 0 {
-			return Path{}, errNonZeroPathPadding
+		paddingMask := byte(0xFF >> (8 - result.bitsToShift(result.tokenLength-1)))
+		if buffer[keyBytesLen-1]&paddingMask != 0 {
+			return Key{}, errNonZeroKeyPadding
 		}
 	}
 	result.value = string(buffer)
