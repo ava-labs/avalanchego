@@ -300,9 +300,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					val = maybe.Some(value)
 				}
 
-				if numChildren > int(branchFactor) {
-					numChildren = int(branchFactor)
-				}
+				numChildren %= int(branchFactor)
 
 				children := map[byte]child{}
 				for i := 0; i < numChildren; i++ {
@@ -311,7 +309,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					children[byte(i)] = child{
 						compressedKey: ToKey(compressedKeyBytes, branchFactor),
 						id:            ids.GenerateTestID(),
-						hasValue:      true,
+						hasValue:      val.HasValue(),
 					}
 				}
 
