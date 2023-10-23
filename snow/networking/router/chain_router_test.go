@@ -364,7 +364,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	// Create bootstrapper, engine and handler
 	var (
@@ -858,7 +858,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
@@ -1150,7 +1150,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1304,7 +1304,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	// Set up validators
 	vdrs := validators.NewSet()
@@ -1597,7 +1597,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.TODO())
+	defer chainRouter.Shutdown(context.Background())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
