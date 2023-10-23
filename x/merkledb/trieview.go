@@ -843,32 +843,24 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 	}
 	// while the entire path hasn't been matched
 	for currentNode.key.tokenLength < key.tokenLength {
-		currentNode, err = t.getNextNode(key, currentNode)
-		if err != nil {
-			return err
-		}
-		if currentNode == nil {
+		// confirm that a child exists and grab its ID before attempting to load it
+		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.tokenLength)]
+
+		if !hasChild || !key.iteratedHasPrefix(currentNode.key.tokenLength+1, nextChildEntry.compressedKey) {
+			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nil
 		}
 
+		// grab the next node along the path
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.tokenLength+1+nextChildEntry.compressedKey.tokenLength), nextChildEntry.hasValue)
+		if err != nil {
+			return err
+		}
 		if err := visitNode(currentNode); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func (t *trieView) getNextNode(key Key, currentNode *node) (*node, error) {
-	// confirm that a child exists and grab its ID before attempting to load it
-	nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.tokenLength)]
-
-	if !hasChild || !key.iteratedHasPrefix(currentNode.key.tokenLength+1, nextChildEntry.compressedKey) {
-		// there was no child along the path or the child that was there doesn't match the remaining path
-		return nil, nil
-	}
-
-	// grab the next node along the path
-	return t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.tokenLength+1+nextChildEntry.compressedKey.tokenLength), nextChildEntry.hasValue)
 }
 
 // Records that a node has been created.
