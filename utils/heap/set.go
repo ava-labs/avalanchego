@@ -14,9 +14,10 @@ type Set[T comparable] struct {
 	set Map[T, T]
 }
 
-// Push returns the evicted previous value if present
-func (s Set[T]) Push(t T) (T, bool) {
-	return s.set.Push(t, t)
+// Push returns if the entry was added
+func (s Set[T]) Push(t T) bool {
+	_, hadValue := s.set.Push(t, t)
+	return !hadValue
 }
 
 func (s Set[T]) Pop() (T, bool) {
