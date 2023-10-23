@@ -89,7 +89,10 @@ type bootstrapper struct {
 	processedCache *cache.LRU[ids.ID, struct{}]
 }
 
-func (b *bootstrapper) Clear() error {
+func (b *bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VtxBlocked.Clear(); err != nil {
 		return err
 	}
