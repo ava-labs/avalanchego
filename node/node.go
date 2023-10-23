@@ -160,7 +160,7 @@ type Node struct {
 	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
-	bootstrappers validators.Set
+	bootstrappers validators.Manager
 
 	// current validators of the network
 	vdrs validators.Manager
@@ -222,8 +222,8 @@ type Node struct {
  */
 
 // Initialize the networking layer.
-// Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
+// Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
+func (n *Node) initNetworking() error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
@@ -303,7 +303,8 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
-		err := primaryNetVdrs.Add(
+		err := n.vdrs.AddStaker(
+			constants.PrimaryNetworkID,
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
@@ -314,13 +315,14 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 
 		consensusRouter = &insecureValidatorManager{
+			log:    n.Log,
 			Router: consensusRouter,
-			vdrs:   primaryNetVdrs,
+			vdrs:   n.vdrs,
 			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
-	numBootstrappers := n.bootstrappers.Len()
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
@@ -355,7 +357,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	}
 
 	// keep gossip tracker synchronized with the validator set
-	primaryNetVdrs.RegisterCallbackListener(&peer.GossipTrackerCallback{
+	n.vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
 		Log:           n.Log,
 		GossipTracker: gossipTracker,
 	})
@@ -560,12 +562,12 @@ func (n *Node) initDatabase() error {
 
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBootstrappers() error {
-	n.bootstrappers = validators.NewSet()
+	n.bootstrappers = validators.NewManager()
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.AddStaker(constants.PrimaryNetworkID, bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -864,8 +866,6 @@ func (n *Node) initVMs() error {
 	// allows the node's validator sets to be determined by network connections.
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
-		primaryVdrs := validators.NewSet()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
@@ -1075,7 +1075,6 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
@@ -1098,7 +1097,6 @@ func (n *Node) initInfoAPI() error {
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
-		primaryValidators,
 		n.benchlistManager,
 	)
 	if err != nil {
@@ -1270,14 +1268,6 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	return nil
 }
 
-// Initializes [n.vdrs] and returns the Primary Network validator set.
-func (n *Node) initVdrs() validators.Set {
-	n.vdrs = validators.NewManager()
-	vdrSet := validators.NewSet()
-	_ = n.vdrs.Add(constants.PrimaryNetworkID, vdrSet)
-	return vdrSet
-}
-
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	resourceManager, err := resource.NewManager(
@@ -1302,11 +1292,11 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.cpuTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.CPUTracker(),
 	)
 }
@@ -1315,11 +1305,11 @@ func (n *Node) initCPUTargeter(
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initDiskTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.diskTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.DiskTracker(),
 	)
 }
@@ -1410,13 +1400,13 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
-	primaryNetVdrs := n.initVdrs()
+	n.vdrs = validators.NewManager()
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
-	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
-	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
-	if err := n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
+	n.initCPUTargeter(&config.CPUTargeterConfig)
+	n.initDiskTargeter(&config.DiskTargeterConfig)
+	if err := n.initNetworking(); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 

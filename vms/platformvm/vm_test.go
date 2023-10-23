@@ -298,14 +298,11 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
@@ -424,13 +421,11 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	require.Len(genesisState.Validators, vdrSet.Len())
+	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		require.True(vdrSet.Contains(nodeID))
+		require.True(vm.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 	}
 
 	// Ensure the new subnet we created exists
@@ -1182,12 +1177,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             firstVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1270,12 +1262,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             secondVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1324,12 +1313,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1406,8 +1392,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	beacons := validators.NewSet()
-	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
+	beacons := validators.NewManager()
+	require.NoError(beacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1493,17 +1479,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	peers := tracker.NewPeers()
-	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
-	beacons.RegisterCallbackListener(startup)
+	totalWeight, err := beacons.TotalWeight(ctx.SubnetID)
+	require.NoError(err)
+	startup := tracker.NewStartup(peers, (totalWeight+1)/2)
+	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Len(),
+		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Alpha:                          (beacons.Weight() + 1) / 2,
+		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersSent:     2000,
@@ -1646,12 +1634,9 @@ func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1807,16 +1792,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
-
 	const firstUptimePercentage = 20 // 20%
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       firstUptimePercentage / 100.,
 		RewardConfig:           defaultRewardConfig,
-		Validators:             firstVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
@@ -1855,15 +1836,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Restart the VM with a larger uptime requirement
 	secondDB := db.NewPrefixDBManager([]byte{})
-	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
-
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       secondUptimePercentage / 100.,
-		Validators:             secondVdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
@@ -1952,14 +1929,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
 	}}
