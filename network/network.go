@@ -154,11 +154,14 @@ type network struct {
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
-	trackedIPs         map[ids.NodeID]*trackedIP
-	manuallyTrackedIDs set.Set[ids.NodeID]
-	connectingPeers    peer.Set
-	connectedPeers     peer.Set
-	closing            bool
+	trackedIPs      map[ids.NodeID]*trackedIP
+	connectingPeers peer.Set
+	connectedPeers  peer.Set
+	closing         bool
+
+	// Tracks special peers that the network should always track
+	manuallyTrackedLock sync.RWMutex
+	manuallyTrackedIDs  set.Set[ids.NodeID]
 
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
@@ -790,22 +793,23 @@ func (n *network) Dispatch() error {
 }
 
 func (n *network) WantsConnection(nodeID ids.NodeID) bool {
-	n.peersLock.RLock()
-	defer n.peersLock.RUnlock()
+	if n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) {
+		return true
+	}
 
-	return n.wantsConnection(nodeID)
-}
+	n.manuallyTrackedLock.RLock()
+	defer n.manuallyTrackedLock.RUnlock()
 
-func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
-		n.manuallyTrackedIDs.Contains(nodeID)
+	return n.manuallyTrackedIDs.Contains(nodeID)
 }
 
 func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
+	n.manuallyTrackedLock.Lock()
+	n.manuallyTrackedIDs.Add(nodeID)
+	n.manuallyTrackedLock.Unlock()
+
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
-
-	n.manuallyTrackedIDs.Add(nodeID)
 
 	_, connected := n.connectedPeers.GetByID(nodeID)
 	if connected {
@@ -947,7 +951,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.wantsConnection(nodeID) {
+		if n.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(nodeID, tracked)
@@ -970,7 +974,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.wantsConnection(nodeID) {
+	if n.WantsConnection(nodeID) {
 		prevIP := n.peerIPs[nodeID]
 		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked
@@ -1026,7 +1030,7 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
 	prevIP, previouslyTracked := n.peerIPs[nodeID]
 	shouldUpdateOurIP := previouslyTracked && prevIP.Timestamp < ip.Timestamp
-	shouldDial := !previouslyTracked && n.wantsConnection(nodeID)
+	shouldDial := !previouslyTracked && n.WantsConnection(nodeID)
 	return prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial
 }
 
@@ -1072,7 +1076,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// trackedIPs and this goroutine. This prevents a memory leak when
 			// the tracked nodeID leaves the validator set and is never able to
 			// be connected to.
-			if !n.wantsConnection(nodeID) {
+			if !n.WantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
