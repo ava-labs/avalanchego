@@ -26,15 +26,24 @@ func TestOverriddenManager(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 1))
 
 	om := newOverriddenManager(subnetID0, m)
-	require.True(om.Contains(subnetID0, nodeID0))
-	require.False(om.Contains(subnetID0, nodeID1))
-	require.True(om.Contains(subnetID1, nodeID0))
-	require.False(om.Contains(subnetID1, nodeID1))
+	_, ok := om.GetValidator(subnetID0, nodeID0)
+	require.True(ok)
+	_, ok = om.GetValidator(subnetID0, nodeID1)
+	require.False(ok)
+	_, ok = om.GetValidator(subnetID1, nodeID0)
+	require.True(ok)
+	_, ok = om.GetValidator(subnetID1, nodeID1)
+	require.False(ok)
 
 	require.NoError(om.RemoveWeight(subnetID1, nodeID0, 1))
-	require.False(om.Contains(subnetID0, nodeID0))
-	require.False(m.Contains(subnetID0, nodeID0))
-	require.True(m.Contains(subnetID1, nodeID1))
+	_, ok = om.GetValidator(subnetID0, nodeID0)
+	require.False(ok)
+	_, ok = om.GetValidator(subnetID0, nodeID1)
+	require.False(ok)
+	_, ok = om.GetValidator(subnetID1, nodeID0)
+	require.False(ok)
+	_, ok = om.GetValidator(subnetID1, nodeID1)
+	require.False(ok)
 }
 
 func TestOverriddenString(t *testing.T) {
