@@ -811,6 +811,7 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
+// Returns nil if there's no node with a prefix of [key].
 func (t *trieView) getPathTo(key Key) ([]*node, error) {
 	if t.root.IsNothing() {
 		return nil, nil
