@@ -30,7 +30,6 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 		constants.PrimaryNetworkID == subnetID &&
 		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
 		b.timer.Cancel()
-
 	}
 	b.Router.Connected(nodeID, nodeVersion, subnetID)
 }
