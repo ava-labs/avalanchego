@@ -717,7 +717,7 @@ func (t *trieView) remove(key Key) error {
 	return t.compressNodePath(parent, nodeToDelete)
 }
 
-// Merges together nodes in the inclusive descendnnts of [n] that
+// Merges together nodes in the inclusive descendants of [n] that
 // have no value and a single child into one node with a compressed
 // path until a node that doesn't meet those criteria is reached.
 // [parent] is [n]'s parent. If [parent] is nil, [n] is the root
