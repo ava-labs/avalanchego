@@ -332,7 +332,7 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func (c *codecImpl) encodeKey(dst *bytes.Buffer, key Key) {
-	c.encodeUint(dst, uint64(key.bitLength))
+	c.encodeUint(dst, uint64(key.length))
 	_, _ = dst.Write(key.Bytes())
 }
 
@@ -348,9 +348,10 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 	if length > math.MaxInt {
 		return Key{}, errIntOverflow
 	}
-	result := Key{}
-	result.bitLength = int(length)
-	keyBytesLen := bytesNeeded(result.bitLength)
+	result := Key{
+		length: int(length),
+	}
+	keyBytesLen := bytesNeeded(result.length)
 	if keyBytesLen > src.Len() {
 		return Key{}, io.ErrUnexpectedEOF
 	}

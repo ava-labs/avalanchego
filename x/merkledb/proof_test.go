@@ -582,7 +582,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[2].Key)
-	require.Equal(ToKey([]byte("key2")).Take(7*BranchFactor16TokenConfig.tokenBitSize), proof.EndProof[1].Key)
+	require.Equal(ToKey([]byte("key2")).Take(7*BranchFactor16TokenConfig.bitsPerToken), proof.EndProof[1].Key)
 	require.Equal(ToKey([]byte("")), proof.EndProof[0].Key)
 
 	require.NoError(proof.Verify(
@@ -1211,8 +1211,8 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{
 					Key: Key{
-						value:     string([]byte{1, 2, 240}),
-						bitLength: 20,
+						value:  string([]byte{1, 2, 240}),
+						length: 20,
 					},
 					ValueOrHash: maybe.Some([]byte{1}),
 				},

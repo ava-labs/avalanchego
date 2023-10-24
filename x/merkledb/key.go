@@ -15,19 +15,19 @@ var (
 
 	BranchFactor2TokenConfig = TokenConfiguration{
 		branchFactor: 2,
-		tokenBitSize: 1,
+		bitsPerToken: 1,
 	}
 	BranchFactor4TokenConfig = TokenConfiguration{
 		branchFactor: 4,
-		tokenBitSize: 2,
+		bitsPerToken: 2,
 	}
 	BranchFactor16TokenConfig = TokenConfiguration{
 		branchFactor: 16,
-		tokenBitSize: 4,
+		bitsPerToken: 4,
 	}
 	BranchFactor256TokenConfig = TokenConfiguration{
 		branchFactor: 256,
-		tokenBitSize: 8,
+		bitsPerToken: 8,
 	}
 	validTokenConfigurations = []TokenConfiguration{
 		BranchFactor2TokenConfig,
@@ -39,7 +39,7 @@ var (
 
 type TokenConfiguration struct {
 	branchFactor int
-	tokenBitSize int
+	bitsPerToken int
 }
 
 type Token struct {
@@ -62,28 +62,28 @@ func (t TokenConfiguration) Valid() error {
 }
 
 func (t TokenConfiguration) ToToken(val byte) Token {
-	return Token{value: val, bitLength: t.tokenBitSize}
+	return Token{value: val, bitLength: t.bitsPerToken}
 }
 
 func (t TokenConfiguration) BranchFactor() int {
 	return t.branchFactor
 }
 
-func (t TokenConfiguration) TokenBitSize() int {
-	return t.tokenBitSize
+func (t TokenConfiguration) BitsPerToken() int {
+	return t.bitsPerToken
 }
 
 type Key struct {
-	bitLength int
-	value     string
+	length int
+	value  string
 }
 
 // ToKey returns [keyBytes] as a new key with the given [branchFactor].
 // Assumes [branchFactor] is valid.
 func ToKey(keyBytes []byte) Key {
 	return Key{
-		value:     byteSliceToString(keyBytes),
-		bitLength: len(keyBytes) * 8,
+		value:  byteSliceToString(keyBytes),
+		length: len(keyBytes) * 8,
 	}
 }
 
@@ -97,13 +97,13 @@ func bytesNeeded(bits int) int {
 
 // hasPartialByte returns true iff the key fits into a non-whole number of bytes
 func (k Key) hasPartialByte() bool {
-	return k.bitLength%8 > 0
+	return k.length%8 > 0
 }
 
 // HasPrefix returns true iff [prefix] is a prefix of [k] or equal to it.
 func (k Key) HasPrefix(prefix Key) bool {
 	// [prefix] must be shorter than [k] to be a prefix.
-	if k.bitLength < prefix.bitLength {
+	if k.length < prefix.length {
 		return false
 	}
 
@@ -138,11 +138,11 @@ func (k Key) HasStrictPrefix(prefix Key) bool {
 }
 
 func (k Key) remainderBitCount() int {
-	return k.bitLength % 8
+	return k.length % 8
 }
 
 func (k Key) BitLength() int {
-	return k.bitLength
+	return k.length
 }
 
 // Token returns the token at the specified index,
@@ -157,40 +157,40 @@ func (k Key) Token(bitIndex int, tokenBitSize int) byte {
 // Append returns a new Path that equals the current
 // Path with [token] appended to the end.
 func (k Key) Append(token Token) Key {
-	buffer := make([]byte, bytesNeeded(k.bitLength+token.bitLength))
+	buffer := make([]byte, bytesNeeded(k.length+token.bitLength))
 	k.appendIntoBuffer(buffer, token)
 	return Key{
-		value:     byteSliceToString(buffer),
-		bitLength: k.bitLength + token.bitLength,
+		value:  byteSliceToString(buffer),
+		length: k.length + token.bitLength,
 	}
 }
 
 // Greater returns true if current Key is greater than other Key
 func (k Key) Greater(other Key) bool {
-	return k.value > other.value || (k.value == other.value && k.bitLength > other.bitLength)
+	return k.value > other.value || (k.value == other.value && k.length > other.length)
 }
 
 // Less returns true if current Key is less than other Key
 func (k Key) Less(other Key) bool {
-	return k.value < other.value || (k.value == other.value && k.bitLength < other.bitLength)
+	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }
 
 func (k Key) AppendExtend(token Token, extensionKey Key) Key {
-	appendBytes := bytesNeeded(k.bitLength + token.bitLength)
-	totalBitLength := k.bitLength + token.bitLength + extensionKey.bitLength
+	appendBytes := bytesNeeded(k.length + token.bitLength)
+	totalBitLength := k.length + token.bitLength + extensionKey.length
 	buffer := make([]byte, bytesNeeded(totalBitLength))
 	k.appendIntoBuffer(buffer[:appendBytes], token)
 
 	result := Key{
-		value:     byteSliceToString(buffer),
-		bitLength: totalBitLength,
+		value:  byteSliceToString(buffer),
+		length: totalBitLength,
 	}
 
 	// the extension path will be shifted based on the number of tokens in the partial byte
-	bitsRemainder := (k.bitLength + token.bitLength) % 8
+	bitsRemainder := (k.length + token.bitLength) % 8
 
 	extensionBuffer := buffer[appendBytes-1:]
-	if extensionKey.bitLength == 0 {
+	if extensionKey.length == 0 {
 		return result
 	}
 
@@ -213,7 +213,7 @@ func (k Key) AppendExtend(token Token, extensionKey Key) Key {
 
 func (k Key) appendIntoBuffer(buffer []byte, token Token) {
 	copy(buffer, k.value)
-	buffer[len(buffer)-1] |= token.value << dualBitIndex((k.bitLength+token.bitLength)%8)
+	buffer[len(buffer)-1] |= token.value << dualBitIndex((k.length+token.bitLength)%8)
 }
 
 // dualBitIndex gets the dual of the bit index
@@ -244,12 +244,12 @@ func shiftCopy(dst []byte, src string, shift int) {
 // Skip returns a new Key that contains the last
 // k.length-tokensToSkip tokens of [k].
 func (k Key) Skip(bitsToSkip int) Key {
-	if k.bitLength <= bitsToSkip {
+	if k.length <= bitsToSkip {
 		return Key{}
 	}
 	result := Key{
-		value:     k.value[bitsToSkip/8:],
-		bitLength: k.bitLength - bitsToSkip,
+		value:  k.value[bitsToSkip/8:],
+		length: k.length - bitsToSkip,
 	}
 
 	// if the tokens to skip is a whole number of bytes,
@@ -260,7 +260,7 @@ func (k Key) Skip(bitsToSkip int) Key {
 
 	// tokensToSkip does not remove a whole number of bytes.
 	// copy the remaining shifted bytes into a new buffer.
-	buffer := make([]byte, bytesNeeded(result.bitLength))
+	buffer := make([]byte, bytesNeeded(result.length))
 	bitsRemovedFromFirstRemainingByte := bitsToSkip % 8
 	shiftCopy(buffer, result.value, bitsRemovedFromFirstRemainingByte)
 
@@ -270,12 +270,12 @@ func (k Key) Skip(bitsToSkip int) Key {
 
 // Take returns a new Key that contains the first tokensToTake tokens of the current Key
 func (k Key) Take(bitsToTake int) Key {
-	if k.bitLength <= bitsToTake {
+	if k.length <= bitsToTake {
 		return k
 	}
 
 	result := Key{
-		bitLength: bitsToTake,
+		length: bitsToTake,
 	}
 
 	remainderBits := result.remainderBitCount()
@@ -308,10 +308,10 @@ func (k Key) Bytes() []byte {
 // iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
 // this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
 func (k Key) iteratedHasPrefix(prefix Key, bitsToSkip int, tokenBitSize int) bool {
-	if k.bitLength-bitsToSkip < prefix.bitLength {
+	if k.length-bitsToSkip < prefix.length {
 		return false
 	}
-	for i := 0; i < prefix.bitLength; i += tokenBitSize {
+	for i := 0; i < prefix.length; i += tokenBitSize {
 		if k.Token(bitsToSkip+i, tokenBitSize) != prefix.Token(i, tokenBitSize) {
 			return false
 		}

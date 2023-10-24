@@ -69,7 +69,7 @@ type ProofNode struct {
 func (node *ProofNode) ToProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
 		Key: &pb.Key{
-			Length: uint64(node.Key.bitLength),
+			Length: uint64(node.Key.length),
 			Value:  node.Key.Bytes(),
 		},
 		ValueOrHash: &pb.MaybeBytes{
@@ -100,7 +100,7 @@ func (node *ProofNode) UnmarshalProto(tc TokenConfiguration, pbNode *pb.ProofNod
 	}
 	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
 
-	if len(node.Key.value) != bytesNeeded(node.Key.bitLength) {
+	if len(node.Key.value) != bytesNeeded(node.Key.length) {
 		return ErrInvalidKeyLength
 	}
 
@@ -744,7 +744,7 @@ func verifyProofPath(tc TokenConfiguration, proof []ProofNode, key maybe.Maybe[K
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].Key
-		if key.HasValue() && nodeKey.bitLength%tc.TokenBitSize() != 0 {
+		if key.HasValue() && nodeKey.length%tc.BitsPerToken() != 0 {
 			return ErrInconsistentBranchFactor
 		}
 

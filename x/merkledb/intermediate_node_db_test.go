@@ -155,7 +155,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			)
 
 			p := ToKey(key)
-			if p.bitLength <= int(bitLength) {
+			if p.length <= int(bitLength) {
 				t.SkipNow()
 			}
 			p = p.Take(int(bitLength))
@@ -206,7 +206,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 	}
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	p := ToKey([]byte{0xF0}).Take(BranchFactor16TokenConfig.tokenBitSize)
+	p := ToKey([]byte{0xF0}).Take(BranchFactor16TokenConfig.bitsPerToken)
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
