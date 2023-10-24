@@ -139,7 +139,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
-		bitLength uint,
+		tokenLength uint,
 	) {
 		require := require.New(t)
 		for _, branchFactor := range validTokenConfigurations {
@@ -155,10 +155,11 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			)
 
 			p := ToKey(key)
-			if p.length <= int(bitLength) {
+			uBitLength := tokenLength * uint(branchFactor.bitsPerToken)
+			if uBitLength >= uint(p.length) {
 				t.SkipNow()
 			}
-			p = p.Take(int(bitLength))
+			p = p.Take(int(uBitLength))
 			constructedKey := db.constructDBKey(p)
 			baseLength := len(p.value) + len(intermediateNodePrefix)
 			require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
