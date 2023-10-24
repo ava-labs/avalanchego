@@ -272,6 +272,16 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 			proofNil:                 true,
 		},
+		"empt proof": {
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: fakeRootID[:],
+				EndRootHash:   ids.Empty[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
+			proofNil:                 true,
+		},
 	}
 
 	for name, test := range tests {
