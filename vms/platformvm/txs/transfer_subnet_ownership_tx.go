@@ -38,10 +38,6 @@ func (tx *TransferSubnetOwnershipTx) InitCtx(ctx *snow.Context) {
 	tx.Owner.InitCtx(ctx)
 }
 
-func (tx *TransferSubnetOwnershipTx) SubnetID() ids.ID {
-	return tx.Subnet
-}
-
 func (tx *TransferSubnetOwnershipTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
@@ -56,10 +52,7 @@ func (tx *TransferSubnetOwnershipTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
-	if err := tx.SubnetAuth.Verify(); err != nil {
-		return err
-	}
-	if err := tx.Owner.Verify(); err != nil {
+	if err := verify.All(tx.SubnetAuth, tx.Owner); err != nil {
 		return err
 	}
 
