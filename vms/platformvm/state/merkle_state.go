@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -491,7 +492,7 @@ func (ms *merkleState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 
 func (ms *merkleState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
 	var (
-		prefix = merkleUtxoIndexPrefix(addr)
+		prefix = slices.Clone(addr)
 		key    = merkleUtxoIndexKey(addr, start)
 	)
 
