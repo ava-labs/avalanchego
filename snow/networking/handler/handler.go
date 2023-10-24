@@ -85,10 +85,9 @@ type handler struct {
 	clock mockable.Clock
 
 	ctx *snow.ConsensusContext
-	// The validator set that validates this chain
 	// TODO: consider using peerTracker instead of validators
 	// since peerTracker is already tracking validators
-	validators validators.Set
+	validators validators.Manager
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
 	preemptTimeouts chan struct{}
@@ -133,7 +132,7 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
-	validators validators.Set,
+	validators validators.Manager,
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
@@ -165,11 +164,11 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "handler", message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "handler_async", message.AsynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
@@ -181,7 +180,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
+	return h.subnet.IsAllowed(nodeID, h.validators.Contains(h.ctx.SubnetID, nodeID))
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {

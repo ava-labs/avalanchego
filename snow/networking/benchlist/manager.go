@@ -4,7 +4,6 @@
 package benchlist
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -14,11 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	errUnknownValidators = errors.New("unknown validator set for provided chain")
-
-	_ Manager = (*manager)(nil)
-)
+var _ Manager = (*manager)(nil)
 
 // Manager provides an interface for a benchlist to register whether
 // queries have been successful or unsuccessful and place validators with
@@ -115,30 +110,20 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
-	var (
-		vdrs validators.Set
-		ok   bool
-	)
-	if m.config.SybilProtectionEnabled {
-		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
-	} else {
+	vdrs := m.config.Validators
+	if !m.config.SybilProtectionEnabled {
 		// If sybil protection is disabled, everyone validates every chain
-		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
-	}
-	if !ok {
-		return errUnknownValidators
+		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
 	}
 
 	benchlist, err := NewBenchlist(
-		ctx.ChainID,
-		ctx.Log,
+		ctx,
 		m.config.Benchable,
 		vdrs,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
 		m.config.Duration,
 		m.config.MaxPortion,
-		ctx.Registerer,
 	)
 	if err != nil {
 		return err

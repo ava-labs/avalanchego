@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -570,7 +569,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
-			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
 				tx, err := env.txBuilder.NewAddValidatorTx(
@@ -687,20 +685,20 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.False(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
 				case current:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
+					require.True(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					require.False(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
+					require.False(env.config.Validators.Contains(subnetID, stakerNodeID))
 				case current:
-					require.True(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
+					require.True(env.config.Validators.Contains(subnetID, stakerNodeID))
 				}
 			}
 		})
@@ -717,7 +715,6 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
-	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
@@ -839,8 +836,8 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Check VM Validators are removed successfully
 	require.NoError(propBlk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
-	require.False(validators.Contains(env.config.Validators, subnetID, subnetVdr2NodeID))
-	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
+	require.False(env.config.Validators.Contains(subnetID, subnetVdr2NodeID))
+	require.False(env.config.Validators.Contains(subnetID, subnetValidatorNodeID))
 }
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
@@ -856,7 +853,6 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			subnetID := testSubnet1.ID()
 			if tracked {
 				env.config.TrackedSubnets.Add(subnetID)
-				env.config.Validators.Add(subnetID, validators.NewSet())
 			}
 
 			// Add a subnet validator to the staker set
@@ -944,7 +940,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
+			require.Equal(tracked, env.config.Validators.Contains(subnetID, subnetValidatorNodeID))
 		})
 	}
 }
@@ -1032,9 +1028,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	vdrWeight := primarySet.GetWeight(nodeID)
+	vdrWeight := env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
@@ -1126,7 +1120,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight after delegation
-	vdrWeight = primarySet.GetWeight(nodeID)
+	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
@@ -1216,9 +1210,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	vdrWeight := primarySet.GetWeight(nodeID)
+	vdrWeight := env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
@@ -1308,6 +1300,6 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(commitBlk.Accept(context.Background()))
 
 	// Test validator weight after delegation
-	vdrWeight = primarySet.GetWeight(nodeID)
+	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
