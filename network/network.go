@@ -115,6 +115,14 @@ type UptimeResult struct {
 	WeightedAveragePercentage float64
 }
 
+// To avoid potential deadlocks, we maintain that locks must be grabbed in the
+// following order:
+//
+// 1. peersLock
+// 2. manuallyTrackedIDsLock
+//
+// If a higher lock (e.g. manuallyTrackedIDsLock) is held when trying to grab a
+// lower lock (e.g. peersLock) a deadlock could occur.
 type network struct {
 	config     *Config
 	peerConfig *peer.Config
