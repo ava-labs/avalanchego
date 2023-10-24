@@ -88,7 +88,7 @@ func NewMerkleState(
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
-	res, err := newMerklsState(
+	res, err := newMerkleState(
 		rawDB,
 		metrics,
 		cfg,
@@ -111,7 +111,7 @@ func NewMerkleState(
 	return res, nil
 }
 
-func newMerklsState(
+func newMerkleState(
 	rawDB database.Database,
 	metrics metrics.Metrics,
 	cfg *config.Config,
@@ -134,13 +134,12 @@ func newMerklsState(
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 	)
 
-	traceCtx := context.TODO()
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating noOpTraces: %w", err)
 	}
 
-	merkleDB, err := merkledb.New(traceCtx, baseMerkleDB, merkledb.Config{
+	merkleDB, err := merkledb.New(context.TODO(), baseMerkleDB, merkledb.Config{
 		HistoryLength:             HistoryLength,
 		ValueNodeCacheSize:        valueNodeCacheSize,
 		IntermediateNodeCacheSize: intermediateNodeCacheSize,
@@ -1262,12 +1261,11 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		return nil
 	}
 
-	ctx := context.TODO()
-	view, err := ms.merkleDB.NewView(ctx, merkledb.ViewChanges{BatchOps: batchOps})
+	view, err := ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
-	if err := view.CommitToDB(ctx); err != nil {
+	if err := view.CommitToDB(context.TODO()); err != nil {
 		return fmt.Errorf("failed committing merkleDB view: %w", err)
 	}
 	return ms.logMerkleRoot(len(batchOps) != 0)
@@ -1690,12 +1688,11 @@ func (ms *merkleState) logMerkleRoot(hasChanges bool) error {
 		return nil
 	}
 
-	ctx := context.TODO()
-	view, err := ms.merkleDB.NewView(ctx, merkledb.ViewChanges{})
+	view, err := ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
-	root, err := view.GetMerkleRoot(ctx)
+	root, err := view.GetMerkleRoot(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed pulling merkle root: %w", err)
 	}

@@ -83,9 +83,9 @@ func merkleUtxoIDKey(utxoID ids.ID) []byte {
 }
 
 func merkleRewardUtxosIDPrefix(txID ids.ID) []byte {
-	prefix := make([]byte, len(rewardUtxosSectionPrefix), len(rewardUtxosSectionPrefix)+len(txID))
+	prefix := make([]byte, len(rewardUtxosSectionPrefix)+len(txID))
 	copy(prefix, rewardUtxosSectionPrefix)
-	prefix = append(prefix, txID[:]...)
+	copy(prefix[len(rewardUtxosSectionPrefix):], txID[:])
 	return prefix
 }
 
@@ -103,38 +103,39 @@ func merkleUtxoIndexKey(address []byte, utxoID ids.ID) []byte {
 }
 
 func splitUtxoIndexKey(b []byte) ([]byte, ids.ID) {
-	utxoID := ids.Empty
-	address := make([]byte, len(b)-len(utxoID))
+	address := make([]byte, len(b)-ids.IDLen)
 	copy(address, b[:len(address)])
+
+	utxoID := ids.Empty
 	copy(utxoID[:], b[len(address):])
 	return address, utxoID
 }
 
 func merkleLocalUptimesKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
-	key := make([]byte, len(nodeID), len(nodeID)+len(subnetID))
+	key := make([]byte, len(nodeID)+len(subnetID))
 	copy(key, nodeID[:])
-	key = append(key, subnetID[:]...)
+	copy(key[ids.NodeIDLen:], subnetID[:])
 	return key
 }
 
 func merkleCurrentStakersKey(txID ids.ID) []byte {
-	key := make([]byte, len(currentStakersSectionPrefix), len(currentStakersSectionPrefix)+len(txID))
+	key := make([]byte, len(currentStakersSectionPrefix)+len(txID))
 	copy(key, currentStakersSectionPrefix)
-	key = append(key, txID[:]...)
+	copy(key[len(currentStakersSectionPrefix):], txID[:])
 	return key
 }
 
 func merklePendingStakersKey(txID ids.ID) []byte {
-	key := make([]byte, len(pendingStakersSectionPrefix), len(pendingStakersSectionPrefix)+len(txID))
+	key := make([]byte, len(pendingStakersSectionPrefix)+len(txID))
 	copy(key, pendingStakersSectionPrefix)
-	key = append(key, txID[:]...)
+	copy(key[len(pendingStakersSectionPrefix):], txID[:])
 	return key
 }
 
 func merkleDelegateeRewardsKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
-	key := make([]byte, len(delegateeRewardsPrefix), len(delegateeRewardsPrefix)+len(nodeID)+len(subnetID))
+	key := make([]byte, len(delegateeRewardsPrefix)+len(nodeID)+len(subnetID))
 	copy(key, delegateeRewardsPrefix)
-	key = append(key, nodeID[:]...)
-	key = append(key, subnetID[:]...)
+	copy(key[len(delegateeRewardsPrefix):], nodeID[:])
+	copy(key[len(delegateeRewardsPrefix)+ids.NodeIDLen:], subnetID[:])
 	return key
 }

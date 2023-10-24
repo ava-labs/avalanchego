@@ -164,7 +164,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
-	state, err := newMerklsState(
+	state, err := newMerkleState(
 		db,
 		metrics.Noop,
 		&config.Config{
