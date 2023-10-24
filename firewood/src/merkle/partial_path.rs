@@ -71,3 +71,21 @@ impl PartialPath {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(&[1, 2, 3, 4], true)]
+    #[test_case(&[1, 2, 3], false)]
+    #[test_case(&[0, 1, 2], false)]
+    #[test_case(&[1, 2], true)]
+    #[test_case(&[1], true)]
+    fn test_encoding(steps: &[u8], term: bool) {
+        let path = PartialPath(steps.to_vec()).encode(term);
+        let (decoded, decoded_term) = PartialPath::decode(&path);
+        assert_eq!(&decoded.0, &steps);
+        assert_eq!(decoded_term, term);
+    }
+}

@@ -449,7 +449,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     ) -> Result<(DiskAddress, Option<SubProof>, usize), ProofError> {
         let node = NodeType::decode(buf)?;
         let new_node = merkle
-            .put_node(Node::new(node))
+            .put_node(Node::from(node))
             .map_err(ProofError::InvalidNode)?;
         let addr = new_node.as_ptr();
         match new_node.inner() {

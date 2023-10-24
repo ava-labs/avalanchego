@@ -79,11 +79,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn init_root(&self) -> Result<DiskAddress, MerkleError> {
         self.store
             .put_item(
-                Node::new(NodeType::Branch(BranchNode {
+                Node::branch(BranchNode {
                     children: [None; NBRANCH],
                     value: None,
                     children_encoded: Default::default(),
-                })),
+                }),
                 Node::max_branch_node_size(),
             )
             .map_err(MerkleError::Shale)
@@ -219,7 +219,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             let new_branch_address = self.put_node(new_branch)?.as_ptr();
 
             if idx > 0 {
-                self.put_node(Node::new(NodeType::Extension(ExtNode {
+                self.put_node(Node::from(NodeType::Extension(ExtNode {
                     path: PartialPath(matching_path[..idx].to_vec()),
                     child: new_branch_address,
                     child_encoded: None,
@@ -347,7 +347,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 .as_ptr();
 
             if !prefix.is_empty() {
-                self.put_node(Node::new(NodeType::Extension(ExtNode {
+                self.put_node(Node::from(NodeType::Extension(ExtNode {
                     path: PartialPath(prefix.to_vec()),
                     child: branch_address,
                     child_encoded: None,
@@ -427,10 +427,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         // insert the leaf to the empty slot
                         // create a new leaf
                         let leaf_ptr = self
-                            .put_node(Node::new(NodeType::Leaf(LeafNode(
-                                PartialPath(key_nibbles.collect()),
-                                Data(val),
-                            ))))?
+                            .put_node(Node::leaf(PartialPath(key_nibbles.collect()), Data(val)))?
                             .as_ptr();
                         // set the current child to point to this leaf
                         node.write(|u| {
@@ -565,11 +562,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 chd[idx as usize] = Some(c_ptr);
 
                 let branch = self
-                    .put_node(Node::new(NodeType::Branch(BranchNode {
+                    .put_node(Node::branch(BranchNode {
                         children: chd,
                         value: Some(Data(val)),
                         children_encoded: Default::default(),
-                    })))?
+                    }))?
                     .as_ptr();
 
                 set_parent(branch, &mut parents);
@@ -609,10 +606,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // from: [p: Branch] -> [b (v)]x -> [Leaf]x
                     // to: [p: Branch] -> [Leaf (v)]
                     let leaf = self
-                        .put_node(Node::new(NodeType::Leaf(LeafNode(
-                            PartialPath(Vec::new()),
-                            val,
-                        ))))?
+                        .put_node(Node::leaf(PartialPath(Vec::new()), val))?
                         .as_ptr();
                     p_ref
                         .write(|p| {
@@ -625,10 +619,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // from: P -> [p: Ext]x -> [b (v)]x -> [leaf]x
                     // to: P -> [Leaf (v)]
                     let leaf = self
-                        .put_node(Node::new(NodeType::Leaf(LeafNode(
-                            PartialPath(n.path.clone().into_inner()),
-                            val,
-                        ))))?
+                        .put_node(Node::leaf(PartialPath(n.path.clone().into_inner()), val))?
                         .as_ptr();
                     deleted.push(p_ptr);
                     set_parent(leaf, parents);
@@ -649,7 +640,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Ext] -> [Branch]
                             let ext = self
-                                .put_node(Node::new(NodeType::Extension(ExtNode {
+                                .put_node(Node::from(NodeType::Extension(ExtNode {
                                     path: PartialPath(vec![idx]),
                                     child: c_ptr,
                                     child_encoded: None,
@@ -778,7 +769,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                     // from: [Branch] -> [Branch]x -> [Branch]
                                     // to: [Branch] -> [Ext] -> [Branch]
                                     n.children[b_idx as usize] = Some(
-                                        self.put_node(Node::new(NodeType::Extension(ExtNode {
+                                        self.put_node(Node::from(NodeType::Extension(ExtNode {
                                             path: PartialPath(vec![idx]),
                                             child: c_ptr,
                                             child_encoded: None,
@@ -1308,136 +1299,21 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use shale::cached::{DynamicMem, PlainMem};
-    use shale::{CachedStore, Storable};
-    use std::ops::Deref;
+    use node::tests::{extension, leaf};
+    use shale::{cached::DynamicMem, compact::CompactSpace, CachedStore};
     use std::sync::Arc;
     use test_case::test_case;
 
     #[test_case(vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
     #[test_case(vec![0xc0, 0xff], vec![0xc, 0x0, 0xf, 0xf])]
-    fn test_to_nibbles(bytes: Vec<u8>, nibbles: Vec<u8>) {
+    fn to_nibbles(bytes: Vec<u8>, nibbles: Vec<u8>) {
         let n: Vec<_> = bytes.into_iter().flat_map(to_nibble_array).collect();
         assert_eq!(n, nibbles);
     }
 
-    const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
-
-    #[test]
-    fn test_hash_len() {
-        assert_eq!(TRIE_HASH_LEN, ZERO_HASH.dehydrated_len() as usize);
-    }
-    #[test]
-    fn test_dehydrate() {
-        let mut to = [1u8; TRIE_HASH_LEN];
-        assert_eq!(
-            {
-                ZERO_HASH.dehydrate(&mut to).unwrap();
-                &to
-            },
-            ZERO_HASH.deref()
-        );
-    }
-
-    #[test]
-    fn test_hydrate() {
-        let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
-        store.write(0, ZERO_HASH.deref());
-        assert_eq!(TrieHash::hydrate(0, &store).unwrap(), ZERO_HASH);
-    }
-    #[test]
-    fn test_partial_path_encoding() {
-        let check = |steps: &[u8], term| {
-            let (d, t) = PartialPath::decode(&PartialPath(steps.to_vec()).encode(term));
-            assert_eq!(d.0, steps);
-            assert_eq!(t, term);
-        };
-        for steps in [
-            vec![0x1, 0x2, 0x3, 0x4],
-            vec![0x1, 0x2, 0x3],
-            vec![0x0, 0x1, 0x2],
-            vec![0x1, 0x2],
-            vec![0x1],
-        ] {
-            for term in [true, false] {
-                check(&steps, term)
-            }
-        }
-    }
-    #[test]
-    fn test_merkle_node_encoding() {
-        let check = |node: Node| {
-            let mut bytes = vec![0; node.dehydrated_len() as usize];
-            node.dehydrate(&mut bytes).unwrap();
-
-            let mut mem = PlainMem::new(bytes.len() as u64, 0x0);
-            mem.write(0, &bytes);
-            println!("{bytes:?}");
-            let node_ = Node::hydrate(0, &mem).unwrap();
-            assert!(node == node_);
-        };
-        let chd0 = [None; NBRANCH];
-        let mut chd1 = chd0;
-        for node in chd1.iter_mut().take(NBRANCH / 2) {
-            *node = Some(DiskAddress::from(0xa));
-        }
-        let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
-        for encoded in chd_encoded.iter_mut().take(NBRANCH / 2) {
-            *encoded = Some(vec![0x1, 0x2, 0x3]);
-        }
-        for node in [
-            Node::new_from_hash(
-                None,
-                None,
-                NodeType::Leaf(LeafNode(
-                    PartialPath(vec![0x1, 0x2, 0x3]),
-                    Data(vec![0x4, 0x5]),
-                )),
-            ),
-            Node::new_from_hash(
-                None,
-                None,
-                NodeType::Extension(ExtNode {
-                    path: PartialPath(vec![0x1, 0x2, 0x3]),
-                    child: DiskAddress::from(0x42),
-                    child_encoded: None,
-                }),
-            ),
-            Node::new_from_hash(
-                None,
-                None,
-                NodeType::Extension(ExtNode {
-                    path: PartialPath(vec![0x1, 0x2, 0x3]),
-                    child: DiskAddress::null(),
-                    child_encoded: Some(vec![0x1, 0x2, 0x3]),
-                }),
-            ),
-            Node::new_from_hash(
-                None,
-                None,
-                NodeType::Branch(BranchNode {
-                    children: chd0,
-                    value: Some(Data("hello, world!".as_bytes().to_vec())),
-                    children_encoded: Default::default(),
-                }),
-            ),
-            Node::new_from_hash(
-                None,
-                None,
-                NodeType::Branch(BranchNode {
-                    children: chd1,
-                    value: None,
-                    children_encoded: chd_encoded,
-                }),
-            ),
-        ] {
-            check(node);
-        }
-    }
-    #[test]
-    fn test_encode() {
+    fn create_test_merkle() -> Merkle<CompactSpace<Node, DynamicMem>> {
         const RESERVED: usize = 0x1000;
 
         let mut dm = shale::cached::DynamicMem::new(0x10000, 0);
@@ -1465,58 +1341,81 @@ mod test {
                 .expect("CompactSpace init fail");
 
         let store = Box::new(space);
-        let merkle = Merkle::new(store);
+        Merkle::new(store)
+    }
 
-        {
-            let chd = Node::new(NodeType::Leaf(LeafNode(
-                PartialPath(vec![0x1, 0x2, 0x3]),
-                Data(vec![0x4, 0x5]),
-            )));
-            let chd_ref = merkle.put_node(chd.clone()).unwrap();
-            let chd_encoded = chd_ref.get_encoded(merkle.store.as_ref());
-            let new_chd = Node::new(NodeType::decode(chd_encoded).unwrap());
-            let new_chd_encoded = new_chd.get_encoded(merkle.store.as_ref());
-            assert_eq!(chd_encoded, new_chd_encoded);
+    fn branch(value: Vec<u8>, encoded_child: Option<Vec<u8>>) -> Node {
+        let children = Default::default();
+        let value = Some(value).map(Data);
+        let mut children_encoded = <[Option<Vec<u8>>; NBRANCH]>::default();
 
-            let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
-            chd_encoded[0] = Some(new_chd_encoded.to_vec());
-            let node = Node::new(NodeType::Branch(BranchNode {
-                children: [None; NBRANCH],
-                value: Some(Data("value1".as_bytes().to_vec())),
-                children_encoded: chd_encoded,
-            }));
-
-            let node_ref = merkle.put_node(node.clone()).unwrap();
-
-            let r = node_ref.get_encoded(merkle.store.as_ref());
-            let new_node = Node::new(NodeType::decode(r).unwrap());
-            let new_encoded = new_node.get_encoded(merkle.store.as_ref());
-            assert_eq!(r, new_encoded);
+        if let Some(child) = encoded_child {
+            children_encoded[0] = Some(child);
         }
 
-        {
-            let chd = Node::new(NodeType::Branch(BranchNode {
-                children: [None; NBRANCH],
-                value: Some(Data("value1".as_bytes().to_vec())),
-                children_encoded: Default::default(),
-            }));
-            let chd_ref = merkle.put_node(chd.clone()).unwrap();
-            let chd_encoded = chd_ref.get_encoded(merkle.store.as_ref());
-            let new_chd = Node::new(NodeType::decode(chd_encoded).unwrap());
-            let new_chd_encoded = new_chd.get_encoded(merkle.store.as_ref());
-            assert_eq!(chd_encoded, new_chd_encoded);
+        Node::branch(BranchNode {
+            children,
+            value,
+            children_encoded,
+        })
+    }
 
-            let node = Node::new(NodeType::Extension(ExtNode {
-                path: PartialPath(vec![0x1, 0x2, 0x3]),
-                child: DiskAddress::null(),
-                child_encoded: Some(chd_encoded.to_vec()),
-            }));
-            let node_ref = merkle.put_node(node.clone()).unwrap();
+    #[test_case(leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding")]
+    #[test_case(branch(b"value".to_vec(), vec![1, 2, 3].into()) ; "branch with value")]
+    #[test_case(branch(b"value".to_vec(), None); "branch without value")]
+    #[test_case(extension(vec![1, 2, 3], DiskAddress::null(), vec![4, 5].into()) ; "extension without child address")]
+    fn encode_(node: Node) {
+        let merkle = create_test_merkle();
 
-            let r = node_ref.get_encoded(merkle.store.as_ref());
-            let new_node = Node::new(NodeType::decode(r).unwrap());
-            let new_encoded = new_node.get_encoded(merkle.store.as_ref());
-            assert_eq!(r, new_encoded);
+        let node_ref = merkle.put_node(node).unwrap();
+        let encoded = node_ref.get_encoded(merkle.store.as_ref());
+        let new_node = Node::from(NodeType::decode(encoded).unwrap());
+        let new_node_encoded = new_node.get_encoded(merkle.store.as_ref());
+
+        assert_eq!(encoded, new_node_encoded);
+    }
+
+    #[test]
+    fn insert_and_retrieve() {
+        let key = b"hello";
+        let val = b"world";
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        merkle.insert(key, val.to_vec(), root).unwrap();
+
+        let fetched_val = merkle.get(key, root).unwrap();
+
+        assert_eq!(fetched_val.as_deref(), val.as_slice().into());
+    }
+
+    #[test]
+    fn insert_and_retrieve_multiple() {
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        // insert values
+        for key_val in u8::MIN..=u8::MAX {
+            let key = vec![key_val];
+            let val = vec![key_val];
+
+            merkle.insert(&key, val.clone(), root).unwrap();
+
+            let fetched_val = merkle.get(&key, root).unwrap();
+
+            // make sure the value was inserted
+            assert_eq!(fetched_val.as_deref(), val.as_slice().into());
+        }
+
+        // make sure none of the previous values were forgotten after initial insert
+        for key_val in u8::MIN..=u8::MAX {
+            let key = vec![key_val];
+            let val = vec![key_val];
+
+            let fetched_val = merkle.get(&key, root).unwrap();
+
+            assert_eq!(fetched_val.as_deref(), val.as_slice().into());
         }
     }
 }
