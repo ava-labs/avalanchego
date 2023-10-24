@@ -713,11 +713,7 @@ func (t *trieView) remove(key Key) error {
 	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
-	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
-		return err
-	}
-
-	return nil
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Merges together nodes in the inclusive descendnnts of [n] that
