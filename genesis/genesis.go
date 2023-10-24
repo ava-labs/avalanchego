@@ -341,8 +341,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't calculate the initial supply: %w", err)
 	}
 
-	initiallyStaked := set.Set[ids.ShortID]{}
-	initiallyStaked.Add(config.InitialStakedFunds...)
+	initiallyStaked := set.Of(config.InitialStakedFunds...)
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain

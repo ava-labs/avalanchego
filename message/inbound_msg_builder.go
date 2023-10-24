@@ -199,6 +199,7 @@ func InboundPushQuery(
 	requestID uint32,
 	deadline time.Duration,
 	container []byte,
+	requestedHeight uint64,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
@@ -206,11 +207,12 @@ func InboundPushQuery(
 		nodeID: nodeID,
 		op:     PushQueryOp,
 		message: &p2p.PushQuery{
-			ChainId:    chainID[:],
-			RequestId:  requestID,
-			Deadline:   uint64(deadline),
-			Container:  container,
-			EngineType: engineType,
+			ChainId:         chainID[:],
+			RequestId:       requestID,
+			Deadline:        uint64(deadline),
+			Container:       container,
+			RequestedHeight: requestedHeight,
+			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -221,6 +223,7 @@ func InboundPullQuery(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
+	requestedHeight uint64,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
@@ -228,11 +231,12 @@ func InboundPullQuery(
 		nodeID: nodeID,
 		op:     PullQueryOp,
 		message: &p2p.PullQuery{
-			ChainId:     chainID[:],
-			RequestId:   requestID,
-			Deadline:    uint64(deadline),
-			ContainerId: containerID[:],
-			EngineType:  engineType,
+			ChainId:         chainID[:],
+			RequestId:       requestID,
+			Deadline:        uint64(deadline),
+			ContainerId:     containerID[:],
+			RequestedHeight: requestedHeight,
+			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -242,6 +246,7 @@ func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
 	preferredID ids.ID,
+	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
 	nodeID ids.NodeID,
 ) InboundMessage {
@@ -249,10 +254,11 @@ func InboundChits(
 		nodeID: nodeID,
 		op:     ChitsOp,
 		message: &p2p.Chits{
-			ChainId:     chainID[:],
-			RequestId:   requestID,
-			PreferredId: preferredID[:],
-			AcceptedId:  acceptedID[:],
+			ChainId:             chainID[:],
+			RequestId:           requestID,
+			PreferredId:         preferredID[:],
+			PreferredIdAtHeight: preferredIDAtHeight[:],
+			AcceptedId:          acceptedID[:],
 		},
 		expiration: mockable.MaxTime,
 	}

@@ -5,10 +5,9 @@ package state
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
-
-	stdmath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -37,6 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -162,16 +162,12 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
-			Validators: vdrs,
+			Validators: validators.NewManager(),
 		},
 		execCfg,
 		&snow.Context{},
@@ -224,14 +220,14 @@ func TestValidatorWeightDiff(t *testing.T) {
 			name: "decrease overflow",
 			ops: []func(*ValidatorWeightDiff) error{
 				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, stdmath.MaxUint64)
+					return d.Add(true, math.MaxUint64)
 				},
 				func(d *ValidatorWeightDiff) error {
 					return d.Add(true, 1)
 				},
 			},
 			expected:    &ValidatorWeightDiff{},
-			expectedErr: math.ErrOverflow,
+			expectedErr: safemath.ErrOverflow,
 		},
 		{
 			name: "simple increase",
@@ -253,14 +249,14 @@ func TestValidatorWeightDiff(t *testing.T) {
 			name: "increase overflow",
 			ops: []func(*ValidatorWeightDiff) error{
 				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, stdmath.MaxUint64)
+					return d.Add(false, math.MaxUint64)
 				},
 				func(d *ValidatorWeightDiff) error {
 					return d.Add(false, 1)
 				},
 			},
 			expected:    &ValidatorWeightDiff{},
-			expectedErr: math.ErrOverflow,
+			expectedErr: safemath.ErrOverflow,
 		},
 		{
 			name: "varied use",

@@ -221,38 +221,41 @@ func (e *tracedEngine) GetFailed(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.GetFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *tracedEngine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.PullQuery", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("containerID", containerID),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	return e.engine.PullQuery(ctx, nodeID, requestID, containerID)
+	return e.engine.PullQuery(ctx, nodeID, requestID, containerID, requestedHeight)
 }
 
-func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error {
+func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.PushQuery", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("containerLen", len(container)),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	return e.engine.PushQuery(ctx, nodeID, requestID, container)
+	return e.engine.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
 }
 
-func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) error {
+func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Chits", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("preferredID", preferredID),
+		attribute.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		attribute.Stringer("acceptedID", acceptedID),
 	))
 	defer span.End()
 
-	return e.engine.Chits(ctx, nodeID, requestID, preferredID, acceptedID)
+	return e.engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
 }
 
 func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {

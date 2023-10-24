@@ -4,10 +4,9 @@
 package executor
 
 import (
+	"math"
 	"strings"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,13 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -274,7 +274,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -292,7 +292,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
@@ -305,7 +305,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 
 				output1 := output
 				output1.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -322,7 +322,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -767,7 +767,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -785,7 +785,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
@@ -798,7 +798,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 
 				output1 := output
 				output1.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -815,7 +815,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -1286,7 +1286,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -1304,14 +1304,14 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -1327,7 +1327,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -1773,7 +1773,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -1791,14 +1791,14 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -1814,7 +1814,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -2183,7 +2183,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -2201,14 +2201,14 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -2224,7 +2224,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",

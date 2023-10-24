@@ -22,7 +22,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.20.8
+- [Go](https://golang.org/doc/install) version >= 1.20.10
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -131,7 +131,12 @@ To connect to the Fuji Testnet, run:
 
 ### Creating a Local Testnet
 
-See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a-local-test-network/)
+The [avalanche-cli](https://github.com/ava-labs/avalanche-cli) is the easiest way to start a local network.
+
+```sh
+avalanche network start
+avalanche network status
+```
 
 ## Bootstrapping
 
