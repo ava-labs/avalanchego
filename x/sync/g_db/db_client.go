@@ -47,6 +47,10 @@ func (c *DBClient) GetChangeProof(
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
+	if endRootID == ids.Empty {
+		return nil, merkledb.ErrEmptyProof
+	}
+
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
