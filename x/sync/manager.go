@@ -482,7 +482,7 @@ func (m *Manager) findNextKey(
 		// If the deepest node has the same key as [proofKeyPath],
 		// then all of its children have keys greater than the proof key,
 		// so we can start at the 0 token.
-		startingChildToken := 0
+		startingChildToken := byte(0)
 
 		// If the deepest node has a key shorter than the key being proven,
 		// we can look at the next token index of the proof key to determine which of that
@@ -490,11 +490,11 @@ func (m *Manager) findNextKey(
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
 		if deepestNode.Key.BitLength() < proofKeyPath.BitLength() {
-			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.BitLength(), m.tokenConfig.BitsPerToken())) + 1
+			startingChildToken = byte(proofKeyPath.Token(deepestNode.Key.BitLength(), m.tokenConfig.BitsPerToken())) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(m.tokenConfig, deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.tokenConfig.BranchFactor()); hasDifference {
 			nextKey = maybe.Some(deepestNode.Key.Append(m.tokenConfig.ToToken(childIndex)).Bytes())
 			break
 		}
@@ -794,22 +794,22 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(tokenConfig merkledb.TokenConfiguration, node1, node2 *merkledb.ProofNode, startIndex int) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte, branchFactor int) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < tokenConfig.BranchFactor(); childIndex++ {
+	for childIndex := startIndex; int(childIndex) <= branchFactor-1; childIndex++ {
 		if node1 != nil {
-			child1, ok1 = node1.Children[byte(childIndex)]
+			child1, ok1 = node1.Children[childIndex]
 		}
 		if node2 != nil {
-			child2, ok2 = node2.Children[byte(childIndex)]
+			child2, ok2 = node2.Children[childIndex]
 		}
 		// if one node has a child and the other doesn't or the children ids don't match,
 		// return the current child index as the first difference
 		if (ok1 || ok2) && child1 != child2 {
-			return byte(childIndex), true
+			return childIndex, true
 		}
 	}
 	// there were no differences found
