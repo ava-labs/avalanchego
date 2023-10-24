@@ -58,9 +58,7 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 	errIsNotSubnet                  = errors.New("is not a subnet")
 
 	blockIDPrefix                       = []byte("blockID")
@@ -142,9 +140,9 @@ type State interface {
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+	// ApplyCurrentValidators adds all the current validators and delegators of
+	// [subnetID] into [vdrs].
+	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -1141,17 +1139,17 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+func (s *state) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+		if err := vdrs.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
 			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+			if err := vdrs.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
 				return err
 			}
@@ -1570,8 +1568,10 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			potentialRewardBytes := delegatorIt.Value()
-			potentialReward, err := database.ParseUInt64(potentialRewardBytes)
+			metadata := &delegatorMetadata{
+				txID: txID,
+			}
+			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
 			}
@@ -1581,7 +1581,7 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, potentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}
@@ -1695,38 +1695,37 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
-	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return errMissingValidatorSet
-	}
-	if primaryValidators.Len() != 0 {
+	if s.cfg.Validators.Count(constants.PrimaryNetworkID) != 0 {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := s.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
+	err := s.ApplyCurrentValidators(constants.PrimaryNetworkID, s.cfg.Validators)
 	if err != nil {
 		return err
 	}
 
 	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
-	primaryValidators.RegisterCallbackListener(vl)
+	s.cfg.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
 
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
-	s.metrics.SetTotalStake(primaryValidators.Weight())
+	s.metrics.SetLocalStake(s.cfg.Validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	totalWeight, err := s.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
+	}
+	s.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range s.cfg.TrackedSubnets {
-		subnetValidators := validators.NewSet()
-		err := s.ValidatorSet(subnetID, subnetValidators)
+		if s.cfg.Validators.Count(subnetID) != 0 {
+			// Enforce the invariant that the validator set is empty here.
+			return errValidatorSetAlreadyPopulated
+		}
+		err := s.ApplyCurrentValidators(subnetID, s.cfg.Validators)
 		if err != nil {
 			return err
 		}
 
-		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
-			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
-		}
-
 		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
-		subnetValidators.RegisterCallbackListener(vl)
+		s.cfg.Validators.RegisterCallbackListener(subnetID, vl)
 	}
 	return nil
 }
@@ -2035,7 +2034,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := block.GenesisCodec.Marshal(block.Version, metadata)
+				metadataBytes, err := metadataCodec.Marshal(v0, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -2126,12 +2125,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			if weightDiff.Decrease {
-				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+				err = s.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 			} else {
 				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
-					err = validators.Add(
-						s.cfg.Validators,
+					err = s.cfg.Validators.AddStaker(
 						subnetID,
 						nodeID,
 						staker.PublicKey,
@@ -2139,7 +2137,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 						weightDiff.Amount,
 					)
 				} else {
-					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+					err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 				}
 			}
 			if err != nil {
@@ -2154,12 +2152,14 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 	if !updateValidators {
 		return nil
 	}
-	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return nil
+
+	totalWeight, err := s.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of primary network: %w", err)
 	}
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
-	s.metrics.SetTotalStake(primaryValidators.Weight())
+
+	s.metrics.SetLocalStake(s.cfg.Validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }
 
@@ -2177,7 +2177,11 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to increase node weight diff: %w", err)
 		}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
+		metadata := &delegatorMetadata{
+			txID:            staker.TxID,
+			PotentialReward: staker.PotentialReward,
+		}
+		if err := writeDelegatorMetadata(currentDelegatorList, metadata); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}

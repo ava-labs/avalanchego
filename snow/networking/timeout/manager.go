@@ -5,6 +5,7 @@ package timeout
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -62,6 +63,9 @@ type Manager interface {
 	// Mark that we no longer expect a response to this request we sent.
 	// Does not modify the timeout.
 	RemoveRequest(requestID ids.RequestID)
+
+	// Stops the manager.
+	Stop()
 }
 
 func NewManager(
@@ -88,6 +92,7 @@ type manager struct {
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
+	stopOnce     sync.Once
 }
 
 func (m *manager) Dispatch() {
@@ -155,4 +160,10 @@ func (m *manager) RemoveRequest(requestID ids.RequestID) {
 
 func (m *manager) RegisterRequestToUnreachableValidator() {
 	m.tm.ObserveLatency(m.TimeoutDuration())
+}
+
+func (m *manager) Stop() {
+	m.stopOnce.Do(func() {
+		m.tm.Stop()
+	})
 }
