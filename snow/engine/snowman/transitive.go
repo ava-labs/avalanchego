@@ -110,7 +110,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	}
 
 	acceptedFrontiers := tracker.NewAccepted()
-	config.Validators.RegisterCallbackListener(acceptedFrontiers)
+	config.Validators.RegisterCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
@@ -367,6 +367,10 @@ func (*Transitive) Halt(context.Context) {}
 
 func (t *Transitive) Shutdown(ctx context.Context) error {
 	t.Ctx.Log.Info("shutting down consensus engine")
+
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	return t.VM.Shutdown(ctx)
 }
 
@@ -453,6 +457,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
@@ -784,7 +791,7 @@ func (t *Transitive) sendQuery(
 		zap.Stringer("validators", t.Validators),
 	)
 
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),

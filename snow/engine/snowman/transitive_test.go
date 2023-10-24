@@ -32,14 +32,14 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(commonCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -86,7 +86,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	return vdr, vals, sender, vm, te, gBlk
 }
 
-func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	commonCfg := common.DefaultConfigTest()
 	engCfg := DefaultConfigs()
 	return setup(t, commonCfg, engCfg)
@@ -331,16 +331,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -726,16 +726,16 @@ func TestVoteCanceling(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1313,7 +1313,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(secondVdr, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(te.Ctx.SubnetID, secondVdr, nil, ids.Empty, 1))
 
 	sender.Default(true)
 
@@ -1499,11 +1499,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params.ConcurrentRepolls = 2
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1597,14 +1597,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1694,11 +1694,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Params.AlphaConfidence = 1
 	engCfg.Params.OptimalProcessing = 1
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -2723,11 +2723,11 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
