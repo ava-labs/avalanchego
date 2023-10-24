@@ -1094,7 +1094,7 @@ func generateRandTestWithKeys(
 			step.value = genEnd(step.key)
 		case opCheckhash:
 			// this gets really expensive so control how often it happens
-			if r.Float64() < checkHashProbability {
+			if r.Float64() > checkHashProbability {
 				continue
 			}
 		}
