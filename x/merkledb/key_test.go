@@ -398,7 +398,7 @@ func FuzzKeyAppendExtend(f *testing.F) {
 			}
 			key2 := ToKey(second)
 			if forceSecondOdd && key2.length > tokenConfig.bitsPerToken {
-				key2 = key2.Take(key1.length - tokenConfig.bitsPerToken)
+				key2 = key2.Take(key2.length - tokenConfig.bitsPerToken)
 			}
 			token := byte(int(tokenByte) % tokenConfig.branchFactor)
 			extendedP := key1.AppendExtend(tokenConfig.ToToken(token), key2)
@@ -408,7 +408,7 @@ func FuzzKeyAppendExtend(f *testing.F) {
 				require.Equal(key1.Token(firstIndex, tokenConfig.bitsPerToken), extendedP.Token(firstIndex, tokenConfig.bitsPerToken))
 			}
 			require.Equal(token, extendedP.Token(firstIndex, tokenConfig.bitsPerToken))
-			firstIndex++
+			firstIndex += tokenConfig.bitsPerToken
 			for secondIndex := 0; secondIndex < key2.length; secondIndex += tokenConfig.bitsPerToken {
 				require.Equal(key2.Token(secondIndex, tokenConfig.bitsPerToken), extendedP.Token(firstIndex+secondIndex, tokenConfig.bitsPerToken))
 			}
