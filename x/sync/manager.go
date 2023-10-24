@@ -433,17 +433,17 @@ func (m *Manager) findNextKey(
 
 	// Add sentinel node back into the localProofNodes, if it is missing.
 	// Required to ensure that a common node exists in both proofs
-	if len(localProofNodes) > 0 && localProofNodes[0].KeyPath.TokensLength() != 0 {
+	if len(localProofNodes) > 0 && localProofNodes[0].Key.TokensLength() != 0 {
 		localProofNodes = append(
-			[]merkledb.ProofNode{{Children: map[byte]ids.ID{localProofNodes[0].KeyPath.Token(0): ids.Empty}}},
+			[]merkledb.ProofNode{{Children: map[byte]ids.ID{localProofNodes[0].Key.Token(0): ids.Empty}}},
 			localProofNodes...)
 	}
 
 	// Add sentinel node back into the endProof, if it is missing.
 	// Required to ensure that a common node exists in both proofs
-	if len(endProof) > 0 && endProof[0].KeyPath.TokensLength() != 0 {
+	if len(endProof) > 0 && endProof[0].Key.TokensLength() != 0 {
 		endProof = append(
-			[]merkledb.ProofNode{{Children: map[byte]ids.ID{endProof[0].KeyPath.Token(0): ids.Empty}}},
+			[]merkledb.ProofNode{{Children: map[byte]ids.ID{endProof[0].Key.Token(0): ids.Empty}}},
 			endProof...)
 	}
 
