@@ -152,12 +152,19 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 		return prefixSize + valueSize, false, nil
 
 	case reflect.Slice:
+		prefixSize := 0
+		if omitEmpty {
+			prefixSize += wrappers.BoolLen
+			if value.IsNil() {
+				return prefixSize, false, nil
+			}
+		}
 		numElts := value.Len()
 		if numElts == 0 {
-			return wrappers.IntLen, false, nil
+			return wrappers.IntLen + prefixSize, false, nil
 		}
 
-		size, constSize, err := c.size(value.Index(0))
+		size, constSize, err := c.sizeWithOmitEmpty(value.Index(0), omitEmpty)
 		if err != nil {
 			return 0, false, err
 		}
@@ -165,17 +172,17 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 		// For fixed-size types we manually calculate lengths rather than
 		// processing each element separately to improve performance.
 		if constSize {
-			return wrappers.IntLen + numElts*size, false, nil
+			return wrappers.IntLen + prefixSize + numElts*size, false, nil
 		}
 
 		for i := 1; i < numElts; i++ {
-			innerSize, _, err := c.size(value.Index(i))
+			innerSize, _, err := c.sizeWithOmitEmpty(value.Index(i), omitEmpty)
 			if err != nil {
 				return 0, false, err
 			}
 			size += innerSize
 		}
-		return wrappers.IntLen + size, false, nil
+		return wrappers.IntLen + size + prefixSize, false, nil
 
 	case reflect.Array:
 		numElts := value.Len()
@@ -183,7 +190,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 			return 0, true, nil
 		}
 
-		size, constSize, err := c.size(value.Index(0))
+		size, constSize, err := c.sizeWithOmitEmpty(value.Index(0), omitEmpty)
 		if err != nil {
 			return 0, false, err
 		}
@@ -195,7 +202,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 		}
 
 		for i := 1; i < numElts; i++ {
-			innerSize, _, err := c.size(value.Index(i))
+			innerSize, _, err := c.sizeWithOmitEmpty(value.Index(i), omitEmpty)
 			if err != nil {
 				return 0, false, err
 			}
@@ -379,6 +386,12 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 				maxSliceLen,
 			)
 		}
+		if omitEmpty {
+			p.PackBool(value.IsNil())
+			if value.IsNil() {
+				return p.Err
+			}
+		}
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
 			return p.Err
@@ -396,7 +409,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
-			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
+			if err := c.marshalWithOmitEmpty(value.Index(i), p, c.maxSliceLen, omitEmpty); err != nil {
 				return err
 			}
 		}
@@ -416,7 +429,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			)
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the array
-			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
+			if err := c.marshalWithOmitEmpty(value.Index(i), p, c.maxSliceLen, omitEmpty); err != nil {
 				return err
 			}
 		}
@@ -592,6 +605,11 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		}
 		return nil
 	case reflect.Slice:
+		if omitEmpty {
+			if p.UnpackBool() {
+				return p.Err
+			}
+		}
 		numElts32 := p.UnpackInt()
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
@@ -622,7 +640,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
+			if err := c.unmarshalWithOmitEmpty(p, value.Index(i), c.maxSliceLen, omitEmpty); err != nil {
 				return fmt.Errorf("couldn't unmarshal slice element: %w", err)
 			}
 		}
@@ -640,7 +658,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 			return nil
 		}
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
+			if err := c.unmarshalWithOmitEmpty(p, value.Index(i), c.maxSliceLen, omitEmpty); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %w", err)
 			}
 		}

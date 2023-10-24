@@ -90,34 +90,35 @@ type MyInnerStruct3 struct {
 }
 
 type MyStructWithPtr struct {
-	N1 *int32 `serialize:"true,omitempty"`
-	N2 *int64 `serialize:"true,omitempty"`
+	N1 *int32   `serialize:"true,omitempty"`
+	N2 *int64   `serialize:"true,omitempty"`
+	N3 []*int32 `serialize:"true,omitempty"`
 }
 
 type myStruct struct {
-	InnerStruct  MyInnerStruct               `serialize:"true,omitempty"`
+	InnerStruct  MyInnerStruct               `serialize:"true"`
 	InnerStruct2 *MyInnerStruct              `serialize:"true"`
 	Member1      int64                       `serialize:"true"`
 	Member2      uint16                      `serialize:"true"`
 	MyArray2     [5]string                   `serialize:"true"`
 	MyArray3     [3]MyInnerStruct            `serialize:"true"`
-	MyArray4     [2]*MyInnerStruct2          `serialize:"true,omitempty"`
+	MyArray4     [2]*MyInnerStruct2          `serialize:"true"`
 	MySlice      []byte                      `serialize:"true"`
 	MySlice2     []string                    `serialize:"true"`
 	MySlice3     []MyInnerStruct             `serialize:"true"`
-	MySlice4     []*MyInnerStruct2           `serialize:"true,omitempty"`
+	MySlice4     []*MyInnerStruct2           `serialize:"true"`
 	MyArray      [4]byte                     `serialize:"true"`
 	MyInterface  Foo                         `serialize:"true"`
 	MySlice5     []Foo                       `serialize:"true"`
 	InnerStruct3 MyInnerStruct3              `serialize:"true"`
-	MyPointer    *Foo                        `serialize:"true,omitempty"`
+	MyPointer    *Foo                        `serialize:"true"`
 	MyMap1       map[string]string           `serialize:"true"`
 	MyMap2       map[int32][]MyInnerStruct3  `serialize:"true"`
 	MyMap3       map[MyInnerStruct2][]int32  `serialize:"true"`
-	MyMap4       map[int32]*int32            `serialize:"true,omitempty"`
+	MyMap4       map[int32]*int32            `serialize:"true"`
 	MyMap5       map[int32]int32             `serialize:"true"`
 	MyMap6       map[[5]int32]int32          `serialize:"true"`
-	MyMap7       map[interface{}]interface{} `serialize:"true,omitempty"`
+	MyMap7       map[interface{}]interface{} `serialize:"true"`
 	Uint8        uint8                       `serialize:"true"`
 	Int8         int8                        `serialize:"true"`
 	Uint16       uint16                      `serialize:"true"`
@@ -431,6 +432,11 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 	struct1 := MyStructWithPtr{
 		N1: &n1,
 		N2: &n2,
+		N3: []*int32{
+			nil,
+			nil,
+			&n1,
+		},
 	}
 
 	require.NoError(codec.RegisterType(&MyStructWithPtr{}))
