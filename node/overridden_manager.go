@@ -16,7 +16,7 @@ var _ validators.Manager = (*overriddenManager)(nil)
 
 // newOverriddenManager returns a Manager that overrides of all calls to the
 // underlying Manager to only operate on the validators in [subnetID].
-func newOverriddenManager(subnetID ids.ID, manager validators.Manager) validators.Manager {
+func newOverriddenManager(subnetID ids.ID, manager validators.Manager) *overriddenManager {
 	return &overriddenManager{
 		subnetID: subnetID,
 		manager:  manager,
