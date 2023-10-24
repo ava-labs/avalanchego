@@ -1068,7 +1068,7 @@ func (ms *merkleState) write(updateValidators bool, height uint64) error {
 	errs.Add(
 		ms.writeMerkleState(currentData, pendingData),
 		ms.writeBlocks(),
-		ms.writeTXs(),
+		ms.writeTxs(),
 		ms.writeLocalUptimes(),
 		ms.writeWeightDiffs(height, weightDiffs),
 		ms.writeBlsKeyDiffs(height, blsKeyDiffs),
@@ -1511,7 +1511,7 @@ func (ms *merkleState) writeBlocks() error {
 	return nil
 }
 
-func (ms *merkleState) writeTXs() error {
+func (ms *merkleState) writeTxs() error {
 	for txID, txStatus := range ms.addedTxs {
 		txID := txID
 
