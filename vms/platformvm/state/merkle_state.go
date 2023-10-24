@@ -40,11 +40,11 @@ import (
 )
 
 const (
-	HistoryLength             = int(256)
-	valueNodeCacheSize        = 2 * units.GiB
-	intermediateNodeCacheSize = 2 * units.GiB
+	HistoryLength = int(256)
 
-	utxoCacheSize = 8192 // from avax/utxo_state.go
+	valueNodeCacheSize        = 512 * units.MiB
+	intermediateNodeCacheSize = 512 * units.MiB
+	utxoCacheSize             = 8192 // from avax/utxo_state.go
 )
 
 var (
