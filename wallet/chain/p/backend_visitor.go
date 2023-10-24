@@ -54,6 +54,7 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 }
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	// TODO: Correctly track subnet owners in [getSubnetSigners]
 	return b.baseTx(&tx.BaseTx)
 }
 
