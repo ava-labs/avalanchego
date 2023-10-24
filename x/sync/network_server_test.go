@@ -93,6 +93,14 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
+		"empty proof": {
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   ids.Empty[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			proofNil: true,
+		},
 	}
 
 	for name, test := range tests {
