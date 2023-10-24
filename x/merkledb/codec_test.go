@@ -292,14 +292,6 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					key = key.Skip(1)
 				}
 
-				val := maybe.Nothing[[]byte]()
-				if hasValue {
-					if len(value) == 0 {
-						value = nil
-					}
-					val = maybe.Some(value)
-				}
-
 				hasValue := rand.Intn(2) == 1 // #nosec G404
 				b := codec.encodeKeyAndHasValue(key, hasValue)
 				var (
@@ -308,7 +300,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 				)
 				require.NoError(codec.decodeKeyAndHasValue(b, branchFactor, &gotKey, &gotHasValue))
 				require.Equal(key, gotKey)
-				require.Equal(hasValue, val.HasValue())
+				require.Equal(hasValue, gotHasValue)
 			}
 		},
 	)

@@ -205,13 +205,15 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 }
 
 func (c *codecImpl) decodeKeyAndHasValue(b []byte, branchFactor BranchFactor, key *Key, hasValue *bool) error {
-	if minKeyLen+minDBNodeLen > len(b) {
+	if minKeyLen+boolLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
 
-	src := bytes.NewReader(b)
+	var (
+		src = bytes.NewReader(b)
+		err error
+	)
 
-	var err error
 	*key, err = c.decodeKey(src, branchFactor)
 	if err != nil {
 		return err

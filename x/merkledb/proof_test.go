@@ -1731,29 +1731,28 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			end = maybe.Some(endBytes)
 		}
 
+		rootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
 		rangeProof, err := db.GetRangeProof(
 			context.Background(),
 			start,
 			end,
 			int(maxProofLen),
 		)
-		require.NoError(err)
-
-		rootID, err := db.GetMerkleRoot(context.Background())
-		require.NoError(err)
-
-		err = rangeProof.Verify(
-			context.Background(),
-			start,
-			end,
-			rootID,
-			BranchFactor16,
-		)
 		if rootID == ids.Empty {
 			require.ErrorIs(err, ErrEmptyProof)
 			return
 		}
 		require.NoError(err)
+
+		require.NoError(rangeProof.Verify(
+			context.Background(),
+			start,
+			end,
+			rootID,
+			BranchFactor16,
+		))
 
 		// Make sure the start proof doesn't contain any nodes
 		// that are in the end proof.
