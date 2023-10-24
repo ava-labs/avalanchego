@@ -338,14 +338,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	var closestNode *node
-	err := t.visitPathToKey(
-		proof.Key,
-		func(n *node) error {
-			closestNode = n
-			proof.Path = append(proof.Path, n.asProofNode())
-			return nil
-		})
-	if err != nil {
+	if err := t.visitPathToKey(proof.Key, func(n *node) error {
+		closestNode = n
+		proof.Path = append(proof.Path, n.asProofNode())
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -637,36 +634,32 @@ func (t *trieView) remove(key Key) error {
 	// mark all ancestor for change
 	// grab parent and grandparent nodes for path compression
 	var grandParent, parent, nodeToDelete *node
-	err = t.visitPathToKey(
-		key,
-		func(n *node) error {
-			grandParent = parent
-			parent = nodeToDelete
-			nodeToDelete = n
-			return t.recordNodeChange(n)
-		})
-	if err != nil {
+	if err := t.visitPathToKey(key, func(n *node) error {
+		grandParent = parent
+		parent = nodeToDelete
+		nodeToDelete = n
+		return t.recordNodeChange(n)
+	}); err != nil {
 		return err
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	// if the removed node has no children, the node can be removed from the trie
-	if len(nodeToDelete.children) == 0 {
-		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
-			return err
-		}
-		if parent != nil {
-			parent.removeChild(nodeToDelete)
-
-			// merge the parent node and its child into a single node if possible
-			return t.compressNodePath(grandParent, parent)
-		}
-
-		return nil
+	if len(nodeToDelete.children) != 0 {
+		// merge this node and its child into a single node if possible
+		return t.compressNodePath(parent, nodeToDelete)
 	}
 
-	// merge this node and its child into a single node if possible
-	return t.compressNodePath(parent, nodeToDelete)
+	// if the removed node has no children, the node can be removed from the trie
+	if err := t.recordNodeDeleted(nodeToDelete); err != nil {
+		return err
+	}
+	if parent != nil {
+		parent.removeChild(nodeToDelete)
+
+		// merge the parent node and its child into a single node if possible
+		return t.compressNodePath(grandParent, parent)
+	}
+	return nil
 }
 
 // Merges together nodes in the inclusive descendants of [node] that
@@ -791,13 +784,10 @@ func (t *trieView) insert(
 	}
 
 	var closestNode *node
-	err := t.visitPathToKey(
-		key,
-		func(n *node) error {
-			closestNode = n
-			return t.recordNodeChange(n)
-		})
-	if err != nil {
+	if err := t.visitPathToKey(key, func(n *node) error {
+		closestNode = n
+		return t.recordNodeChange(n)
+	}); err != nil {
 		return nil, err
 	}
 
