@@ -251,7 +251,7 @@ func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 		return err
 	}
 	// Ensure fetchFrom reflects proper validator list
-	if b.Beacons.Contains(b.Ctx.SubnetID, nodeID) {
+	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
 		b.fetchFrom.Add(nodeID)
 	}
 

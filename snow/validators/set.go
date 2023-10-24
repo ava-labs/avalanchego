@@ -203,18 +203,6 @@ func (s *vdrSet) get(nodeID ids.NodeID) (*Validator, bool) {
 	return &copiedVdr, true
 }
 
-func (s *vdrSet) Contains(nodeID ids.NodeID) bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.contains(nodeID)
-}
-
-func (s *vdrSet) contains(nodeID ids.NodeID) bool {
-	_, contains := s.vdrs[nodeID]
-	return contains
-}
-
 func (s *vdrSet) Len() int {
 	s.lock.RLock()
 	defer s.lock.RUnlock()

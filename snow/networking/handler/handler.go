@@ -180,7 +180,8 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnet.IsAllowed(nodeID, h.validators.Contains(h.ctx.SubnetID, nodeID))
+	_, ok := h.validators.GetValidator(h.ctx.SubnetID, nodeID)
+	return h.subnet.IsAllowed(nodeID, ok)
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
