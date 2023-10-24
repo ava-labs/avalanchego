@@ -62,13 +62,13 @@ type encoder interface {
 	encodeDBNode(n *dbNode, factor BranchFactor) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
-	encodeKeyAndNode(key Key, n *dbNode, factor BranchFactor) []byte
+	encodeKeyAndHasValue(key Key, hasValue bool, factor BranchFactor) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndNode(bytes []byte, key *Key, n *dbNode, factor BranchFactor) error
+	decodeKeyAndHasValue(bytes []byte, key *Key, hasValue *bool, factor BranchFactor) error
 }
 
 func newCodec() encoderDecoder {
@@ -89,31 +89,26 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func estimateDBNodeSize(numChildren int) int {
-	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-}
-
 func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
-	// Estimate size of [n] to prevent memory allocations
-	estimatedLen := estimateDBNodeSize(len(n.children))
-	buf := bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	return c.encodeDBNodeToBuffer(buf, n, branchFactor)
-}
-
-func (c *codecImpl) encodeDBNodeToBuffer(dst *bytes.Buffer, n *dbNode, branchFactor BranchFactor) []byte {
-	c.encodeMaybeByteSlice(dst, n.value)
-	c.encodeUint(dst, uint64(len(n.children)))
+	var (
+		numChildren = len(n.children)
+		// Estimate size of [n] to prevent memory allocations
+		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
+	c.encodeMaybeByteSlice(buf, n.value)
+	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	for index := 0; BranchFactor(index) < branchFactor; index++ {
 		if entry, ok := n.children[byte(index)]; ok {
-			c.encodeUint(dst, uint64(index))
-			c.encodeKey(dst, entry.compressedKey)
-			_, _ = dst.Write(entry.id[:])
-			c.encodeBool(dst, entry.hasValue)
+			c.encodeUint(buf, uint64(index))
+			c.encodeKey(buf, entry.compressedKey)
+			_, _ = buf.Write(entry.id[:])
+			c.encodeBool(buf, entry.hasValue)
 		}
 	}
-	return dst.Bytes()
+	return buf.Bytes()
 }
 
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
@@ -139,23 +134,23 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeKeyAndNode(key Key, n *dbNode, factor BranchFactor) []byte {
+func (c *codecImpl) encodeKeyAndHasValue(key Key, hasValue bool, factor BranchFactor) []byte {
 	var (
-		numChildren = len(n.children)
-		// Estimate size to prevent memory allocations
-		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + estimateDBNodeSize(numChildren)
+		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + boolLen
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	)
 
 	c.encodeKey(buf, key)
-	c.encodeDBNodeToBuffer(buf, n, factor)
+	c.encodeBool(buf, hasValue)
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNodeFromReader(src *bytes.Reader, n *dbNode, branchFactor BranchFactor) error {
-	if minDBNodeLen > src.Len() {
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
+	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
+
+	src := bytes.NewReader(b)
 
 	value, err := c.decodeMaybeByteSlice(src)
 	if err != nil {
@@ -209,11 +204,7 @@ func (c *codecImpl) decodeDBNodeFromReader(src *bytes.Reader, n *dbNode, branchF
 	return nil
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor) error {
-	return c.decodeDBNodeFromReader(bytes.NewReader(b), n, branchFactor)
-}
-
-func (c *codecImpl) decodeKeyAndNode(b []byte, key *Key, n *dbNode, branchFactor BranchFactor) error {
+func (c *codecImpl) decodeKeyAndHasValue(b []byte, key *Key, hasValue *bool, branchFactor BranchFactor) error {
 	if minKeyLen+minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -226,7 +217,8 @@ func (c *codecImpl) decodeKeyAndNode(b []byte, key *Key, n *dbNode, branchFactor
 		return err
 	}
 
-	return c.decodeDBNodeFromReader(src, n, branchFactor)
+	*hasValue, err = c.decodeBool(src)
+	return err
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {

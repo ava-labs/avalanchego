@@ -992,9 +992,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 
 	db.root = maybe.Some(changes.rootChange.after)
-	rootKeyAndNodeBytes := codec.encodeKeyAndNode(
+	rootKeyAndNodeBytes := codec.encodeKeyAndHasValue(
 		changes.rootChange.after.key,
-		&changes.rootChange.after.dbNode,
+		changes.rootChange.after.value.HasValue(),
 		db.valueNodeDB.branchFactor,
 	)
 	return db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes)
@@ -1189,22 +1189,21 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 
 	// Root is on disk.
 	var (
-		rootDBNode dbNode
-		rootKey    Key
+		rootKey      Key
+		rootHasValue bool
 	)
-	if err := codec.decodeKeyAndNode(
+	if err := codec.decodeKeyAndHasValue(
 		rootBytes,
 		&rootKey,
-		&rootDBNode,
+		&rootHasValue,
 		db.valueNodeDB.branchFactor,
 	); err != nil {
 		return err
 	}
-	root := &node{
-		dbNode: rootDBNode,
-		key:    rootKey,
+	root, err := db.getEditableNode(rootKey, rootHasValue)
+	if err != nil {
+		return err
 	}
-	root.setValueDigest()
 	root.calculateID(db.metrics)
 	db.root = maybe.Some(root)
 	return nil

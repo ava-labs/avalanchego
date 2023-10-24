@@ -313,18 +313,16 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					}
 				}
 
-				expectedNode := &dbNode{
-					value:    val,
-					children: children,
-				}
-				b := codec.encodeKeyAndNode(key, expectedNode, branchFactor)
+				hasValue := rand.Intn(2) == 1 // #nosec G404
+				b := codec.encodeKeyAndHasValue(key, hasValue, branchFactor)
 				var (
-					gotNode dbNode
-					gotKey  Key
+					gotKey      Key
+					gotHasValue bool
 				)
-				require.NoError(codec.decodeKeyAndNode(b, &gotKey, &gotNode, branchFactor))
-				require.Equal(expectedNode, &gotNode)
+				err := codec.decodeKeyAndHasValue(b, &gotKey, &gotHasValue, branchFactor)
+				require.NoError(err)
 				require.Equal(key, gotKey)
+				require.Equal(hasValue, val.HasValue())
 			}
 		},
 	)
