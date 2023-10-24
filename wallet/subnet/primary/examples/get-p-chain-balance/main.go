@@ -19,7 +19,7 @@ import (
 
 func main() {
 	// Use the Fuji Testnet public api server as the uri
-	uri := "https://api.avax-test.network/"
+	uri := primary.FujiAPIURI
 
 	// or
 	// Define the URI of the local Avalanche API (Assuming it's running on default port 9650)
