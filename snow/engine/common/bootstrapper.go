@@ -304,7 +304,7 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	b.sampledBeacons = validators.NewManager()
 	b.pendingSendAcceptedFrontier.Clear()
 	for _, nodeID := range beaconIDs {
-		if !b.sampledBeacons.Contains(b.Ctx.SubnetID, nodeID) {
+		if _, ok := b.sampledBeacons.GetValidator(b.Ctx.SubnetID, nodeID); !ok {
 			// Invariant: We never use the TxID or BLS keys populated here.
 			err = b.sampledBeacons.AddStaker(b.Ctx.SubnetID, nodeID, nil, ids.Empty, 1)
 		} else {

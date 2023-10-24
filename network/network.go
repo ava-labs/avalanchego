@@ -801,7 +801,7 @@ func (n *network) Dispatch() error {
 }
 
 func (n *network) WantsConnection(nodeID ids.NodeID) bool {
-	if n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) {
+	if _, ok := n.config.Validators.GetValidator(constants.PrimaryNetworkID, nodeID); ok {
 		return true
 	}
 
@@ -864,7 +864,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		isValidator := n.config.Validators.Contains(subnetID, nodeID)
+		_, isValidator := n.config.Validators.GetValidator(subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
 		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
@@ -903,7 +903,7 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			isValidator := n.config.Validators.Contains(subnetID, peerID)
+			_, isValidator := n.config.Validators.GetValidator(subnetID, peerID)
 			// check if the peer is allowed to connect to the subnet
 			if !allower.IsAllowed(peerID, isValidator) {
 				return false
