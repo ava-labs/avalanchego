@@ -119,6 +119,13 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
+type ClearRanger interface {
+	// Deletes all key-value pairs with keys in the range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	ClearRange(start, end maybe.Maybe[[]byte]) error
+}
+
 type Prefetcher interface {
 	// PrefetchPath attempts to load all trie nodes on the path of [key]
 	// into the cache.
@@ -134,7 +141,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
-	database.ClearRanger
+	ClearRanger
 	Trie
 	MerkleRootGetter
 	ProofGetter
