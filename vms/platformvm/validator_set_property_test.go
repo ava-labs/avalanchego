@@ -725,16 +725,12 @@ func TestTimestampListGenerator(t *testing.T) {
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
