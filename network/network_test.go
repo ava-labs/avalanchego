@@ -649,8 +649,8 @@ func TestDialContext(t *testing.T) {
 		}
 	)
 
-	network.manuallyTrackedIDs.Add(neverDialedNodeID)
-	network.manuallyTrackedIDs.Add(dialedNodeID)
+	network.ManuallyTrack(neverDialedNodeID, neverDialedIP.ip)
+	network.ManuallyTrack(dialedNodeID, dialedIP.ip)
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
