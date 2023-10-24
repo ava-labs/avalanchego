@@ -41,7 +41,6 @@ type Manager interface {
 type Config struct {
 	Benchable              Benchable          `json:"-"`
 	Validators             validators.Manager `json:"-"`
-	SybilProtectionEnabled bool               `json:"-"`
 	Threshold              int                `json:"threshold"`
 	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
 	Duration               time.Duration      `json:"duration"`
