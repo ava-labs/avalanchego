@@ -1193,9 +1193,9 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	)
 	if err := codec.decodeKeyAndHasValue(
 		rootBytes,
-		db.valueNodeDB.branchFactor,
 		&rootKey,
 		&rootHasValue,
+		db.valueNodeDB.branchFactor,
 	); err != nil {
 		return err
 	}

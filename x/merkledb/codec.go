@@ -68,7 +68,7 @@ type encoder interface {
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndHasValue(bytes []byte, factor BranchFactor, key *Key, hasValue *bool) error
+	decodeKeyAndHasValue(bytes []byte, key *Key, hasValue *bool, factor BranchFactor) error
 }
 
 func newCodec() encoderDecoder {
@@ -204,7 +204,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	return nil
 }
 
-func (c *codecImpl) decodeKeyAndHasValue(b []byte, branchFactor BranchFactor, key *Key, hasValue *bool) error {
+func (c *codecImpl) decodeKeyAndHasValue(b []byte, key *Key, hasValue *bool, branchFactor BranchFactor) error {
 	if minKeyLen+boolLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
