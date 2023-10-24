@@ -43,13 +43,8 @@ type TokenConfiguration struct {
 }
 
 type Token struct {
-	bitLength int
-	value     byte
-}
-
-type TokenIndex struct {
-	tokenBitLength int
-	bitIndex       int
+	length int
+	value  byte
 }
 
 func (t TokenConfiguration) Valid() error {
@@ -62,7 +57,7 @@ func (t TokenConfiguration) Valid() error {
 }
 
 func (t TokenConfiguration) ToToken(val byte) Token {
-	return Token{value: val, bitLength: t.bitsPerToken}
+	return Token{value: val, length: t.bitsPerToken}
 }
 
 func (t TokenConfiguration) BranchFactor() int {
@@ -141,7 +136,7 @@ func (k Key) remainderBitCount() int {
 	return k.length % 8
 }
 
-func (k Key) BitLength() int {
+func (k Key) Length() int {
 	return k.length
 }
 
@@ -157,11 +152,11 @@ func (k Key) Token(bitIndex int, tokenBitSize int) byte {
 // Append returns a new Path that equals the current
 // Path with [token] appended to the end.
 func (k Key) Append(token Token) Key {
-	buffer := make([]byte, bytesNeeded(k.length+token.bitLength))
+	buffer := make([]byte, bytesNeeded(k.length+token.length))
 	k.appendIntoBuffer(buffer, token)
 	return Key{
 		value:  byteSliceToString(buffer),
-		length: k.length + token.bitLength,
+		length: k.length + token.length,
 	}
 }
 
@@ -176,8 +171,8 @@ func (k Key) Less(other Key) bool {
 }
 
 func (k Key) AppendExtend(token Token, extensionKey Key) Key {
-	appendBytes := bytesNeeded(k.length + token.bitLength)
-	totalBitLength := k.length + token.bitLength + extensionKey.length
+	appendBytes := bytesNeeded(k.length + token.length)
+	totalBitLength := k.length + token.length + extensionKey.length
 	buffer := make([]byte, bytesNeeded(totalBitLength))
 	k.appendIntoBuffer(buffer[:appendBytes], token)
 
@@ -187,7 +182,7 @@ func (k Key) AppendExtend(token Token, extensionKey Key) Key {
 	}
 
 	// the extension path will be shifted based on the number of tokens in the partial byte
-	bitsRemainder := (k.length + token.bitLength) % 8
+	bitsRemainder := (k.length + token.length) % 8
 
 	extensionBuffer := buffer[appendBytes-1:]
 	if extensionKey.length == 0 {
@@ -213,7 +208,7 @@ func (k Key) AppendExtend(token Token, extensionKey Key) Key {
 
 func (k Key) appendIntoBuffer(buffer []byte, token Token) {
 	copy(buffer, k.value)
-	buffer[len(buffer)-1] |= token.value << dualBitIndex((k.length+token.bitLength)%8)
+	buffer[len(buffer)-1] |= token.value << dualBitIndex((k.length+token.length)%8)
 }
 
 // dualBitIndex gets the dual of the bit index
