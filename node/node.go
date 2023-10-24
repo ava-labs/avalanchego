@@ -290,7 +290,6 @@ func (n *Node) initNetworking() error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
@@ -1401,6 +1400,9 @@ func (n *Node) Initialize(
 	}
 
 	n.vdrs = validators.NewManager()
+	if !n.Config.SybilProtectionEnabled {
+		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
+	}
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
