@@ -444,11 +444,12 @@ func FuzzKeyTake(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
-		uBitsToTake uint,
+		uTokensToTake uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range validTokenConfigurations {
+		for _, tokenConfig := range validTokenConfigurations {
 			key1 := ToKey(first)
+			uBitsToTake := uTokensToTake * uint(tokenConfig.bitsPerToken)
 			if uBitsToTake >= uint(key1.length) {
 				t.SkipNow()
 			}
@@ -459,8 +460,8 @@ func FuzzKeyTake(f *testing.F) {
 				paddingMask := byte(0xFF >> key2.remainderBitCount())
 				require.Zero(key2.value[len(key2.value)-1] & paddingMask)
 			}
-			for i := 0; i < bitsToTake; i += branchFactor.bitsPerToken {
-				require.Equal(key1.Token(i, branchFactor.bitsPerToken), key2.Token(i, branchFactor.bitsPerToken))
+			for i := 0; i < bitsToTake; i += tokenConfig.bitsPerToken {
+				require.Equal(key1.Token(i, tokenConfig.bitsPerToken), key2.Token(i, tokenConfig.bitsPerToken))
 			}
 		}
 	})
