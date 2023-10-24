@@ -306,8 +306,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					gotKey      Key
 					gotHasValue bool
 				)
-				err := codec.decodeKeyAndHasValue(b, branchFactor, &gotKey, &gotHasValue)
-				require.NoError(err)
+				require.NoError(codec.decodeKeyAndHasValue(b, branchFactor, &gotKey, &gotHasValue))
 				require.Equal(key, gotKey)
 				require.Equal(hasValue, val.HasValue())
 			}
