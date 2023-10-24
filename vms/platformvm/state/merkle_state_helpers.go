@@ -28,15 +28,10 @@ type weightDiffKey struct {
 	nodeID   ids.NodeID
 }
 
-func merkleSuppliesKeyPrefix() []byte {
-	prefix := make([]byte, len(merkleSuppliesPrefix))
-	copy(prefix, merkleSuppliesPrefix)
-	return prefix
-}
-
 func merkleSuppliesKey(subnetID ids.ID) []byte {
-	key := merkleSuppliesKeyPrefix()
-	key = append(key, subnetID[:]...)
+	key := make([]byte, len(merkleSuppliesPrefix)+ids.IDLen)
+	copy(key, merkleSuppliesPrefix)
+	copy(key[len(merkleSuppliesPrefix):], subnetID[:])
 	return key
 }
 
