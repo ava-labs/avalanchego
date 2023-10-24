@@ -50,30 +50,30 @@ const (
 var (
 	_ State = (*merkleState)(nil)
 
-	merkleStatePrefix      = []byte{0x0}
-	merkleSingletonPrefix  = []byte{0x1}
-	merkleBlockPrefix      = []byte{0x2}
-	merkleBlockIDsPrefix   = []byte{0x3}
-	merkleTxPrefix         = []byte{0x4}
-	merkleIndexUTXOsPrefix = []byte{0x5} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x6} // locally measured uptimes
-	merkleWeightDiffPrefix = []byte{0x7} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix = []byte{0x8}
+	merkleStatePrefix      = []byte{0x00}
+	merkleSingletonPrefix  = []byte{0x01}
+	merkleBlockPrefix      = []byte{0x02}
+	merkleBlockIDsPrefix   = []byte{0x03}
+	merkleTxPrefix         = []byte{0x04}
+	merkleIndexUTXOsPrefix = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix    = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix = []byte{0x08}
 
 	// merkle db sections
-	metadataSectionPrefix      = []byte{0x0}
-	merkleChainTimeKey         = append(metadataSectionPrefix, []byte{0x0}...)
-	merkleLastAcceptedBlkIDKey = append(metadataSectionPrefix, []byte{0x1}...)
-	merkleSuppliesPrefix       = append(metadataSectionPrefix, []byte{0x2}...)
+	metadataSectionPrefix      = byte(0x00)
+	merkleChainTimeKey         = []byte{metadataSectionPrefix, 0x00}
+	merkleLastAcceptedBlkIDKey = []byte{metadataSectionPrefix, 0x01}
+	merkleSuppliesPrefix       = []byte{metadataSectionPrefix, 0x02}
 
-	permissionedSubnetSectionPrefix = []byte{0x1}
-	elasticSubnetSectionPrefix      = []byte{0x2}
-	chainsSectionPrefix             = []byte{0x3}
-	utxosSectionPrefix              = []byte{0x4}
-	rewardUtxosSectionPrefix        = []byte{0x5}
-	currentStakersSectionPrefix     = []byte{0x6}
-	pendingStakersSectionPrefix     = []byte{0x7}
-	delegateeRewardsPrefix          = []byte{0x8}
+	permissionedSubnetSectionPrefix = []byte{0x01}
+	elasticSubnetSectionPrefix      = []byte{0x02}
+	chainsSectionPrefix             = []byte{0x03}
+	utxosSectionPrefix              = []byte{0x04}
+	rewardUtxosSectionPrefix        = []byte{0x05}
+	currentStakersSectionPrefix     = []byte{0x06}
+	pendingStakersSectionPrefix     = []byte{0x07}
+	delegateeRewardsPrefix          = []byte{0x08}
 )
 
 func NewMerkleState(
