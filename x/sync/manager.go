@@ -794,22 +794,22 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte, branchFactor int) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int, branchFactor int) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; int(childIndex) <= branchFactor-1; childIndex++ {
+	for childIndex := startIndex; childIndex < branchFactor; childIndex++ {
 		if node1 != nil {
-			child1, ok1 = node1.Children[childIndex]
+			child1, ok1 = node1.Children[byte(childIndex)]
 		}
 		if node2 != nil {
-			child2, ok2 = node2.Children[childIndex]
+			child2, ok2 = node2.Children[byte(childIndex)]
 		}
 		// if one node has a child and the other doesn't or the children ids don't match,
 		// return the current child index as the first difference
 		if (ok1 || ok2) && child1 != child2 {
-			return childIndex, true
+			return byte(childIndex), true
 		}
 	}
 	// there were no differences found
