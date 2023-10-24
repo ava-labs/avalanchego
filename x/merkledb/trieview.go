@@ -710,6 +710,7 @@ func (t *trieView) remove(key Key) error {
 	}
 
 	// Note len(nodePath) >= 2 since [nodeToDelete.key] != [t.root.key].
+	// i.e. [nodePath] has the root and [nodeToDelete] at a minimum.
 	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
