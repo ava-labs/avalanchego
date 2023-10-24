@@ -37,7 +37,7 @@ var (
 	)
 	ErrGetPathToFailure       = errors.New("GetPathTo failed to return the closest node")
 	ErrStartAfterEnd          = errors.New("start key > end key")
-	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
+	ErrNoChanges              = errors.New("no changes provided")
 	ErrParentNotDatabase      = errors.New("parent trie is not database")
 	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
 )
@@ -184,13 +184,14 @@ func newTrieView(
 	return newView, nil
 }
 
-// Creates a view of the db at a historical root using the provided changes
+// Creates a view of the db at a historical root using the provided [changes].
+// Returns ErrNoChanges if [changes] is empty.
 func newHistoricalTrieView(
 	db *merkleDB,
 	changes *changeSummary,
 ) (*trieView, error) {
 	if changes == nil {
-		return nil, ErrNoValidRoot
+		return nil, ErrNoChanges
 	}
 
 	root := maybe.Nothing[*node]()
