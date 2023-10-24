@@ -117,22 +117,20 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 	case reflect.String:
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
+		prefixSize := 0
 		if omitEmpty {
 			if value.IsNil() {
 				return wrappers.BoolLen, false, nil
 			}
-			size, _, err := c.size(value.Elem())
-			if err != nil {
-				return 0, false, err
-			}
-			return wrappers.BoolLen + size, false, nil
+			prefixSize += wrappers.BoolLen
 		}
 
-		if value.IsNil() { // Can't marshal nil (except nil slices *or* if omitEmpty)
-			return 0, false, errMarshalNil
+		size, _, err := c.size(value.Elem())
+		if err != nil {
+			return 0, false, err
 		}
+		return prefixSize + size, false, nil
 
-		return c.size(value.Elem())
 	case reflect.Interface:
 		if value.IsNil() {
 			if omitEmpty {
@@ -149,7 +147,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 			return 0, false, err
 		}
 		if omitEmpty {
-			prefixSize += 1
+			prefixSize += wrappers.BoolLen
 		}
 		return prefixSize + valueSize, false, nil
 
