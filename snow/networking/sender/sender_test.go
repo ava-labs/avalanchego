@@ -53,8 +53,9 @@ var defaultSubnetConfig = subnets.Config{
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -97,7 +98,6 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
@@ -310,8 +310,9 @@ func TestTimeout(t *testing.T) {
 func TestReliableMessages(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.NodeID{1}, nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -354,8 +355,6 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-
-	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -460,8 +459,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require := require.New(t)
 
 	benchlist := benchlist.NewNoBenchlist()
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -503,8 +503,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-
-	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
