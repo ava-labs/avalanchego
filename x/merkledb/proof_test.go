@@ -187,6 +187,15 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name: "empty",
+			malform: func(proof *RangeProof) {
+				proof.KeyValues = nil
+				proof.StartProof = nil
+				proof.EndProof = nil
+			},
+			expectedErr: ErrEmptyProof,
+		},
+		{
 			name: "StartProof: last proof node has missing value",
 			malform: func(proof *RangeProof) {
 				proof.StartProof[len(proof.StartProof)-1].ValueOrHash = maybe.Nothing[[]byte]()

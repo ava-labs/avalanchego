@@ -135,6 +135,10 @@ func (c *DBClient) GetRangeProofAtRoot(
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
+	if rootID == ids.Empty {
+		return nil, merkledb.ErrEmptyProof
+	}
+
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
 		StartKey: &pb.MaybeBytes{
