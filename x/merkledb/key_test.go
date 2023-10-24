@@ -420,11 +420,13 @@ func FuzzKeySkip(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
-		ubitsToSkip uint,
+		tokensToSkip uint,
 	) {
 		require := require.New(t)
 		key1 := ToKey(first)
 		for _, tokenConfig := range validTokenConfigurations {
+			// need bits to be a multiple of token size
+			ubitsToSkip := tokensToSkip * uint(tokenConfig.bitsPerToken)
 			if ubitsToSkip >= uint(key1.length) {
 				t.SkipNow()
 			}
