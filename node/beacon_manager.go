@@ -19,14 +19,14 @@ var _ router.Router = (*beaconManager)(nil)
 type beaconManager struct {
 	router.Router
 	timer         *timer.Timer
-	beacons       validators.Set
+	beacons       validators.Manager
 	requiredConns int64
 	numConns      int64
 }
 
 func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID &&
-		b.beacons.Contains(nodeID) &&
+		b.beacons.Contains(constants.PrimaryNetworkID, nodeID) &&
 		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
 		b.timer.Cancel()
 	}
@@ -34,7 +34,7 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 }
 
 func (b *beaconManager) Disconnected(nodeID ids.NodeID) {
-	if b.beacons.Contains(nodeID) {
+	if b.beacons.Contains(constants.PrimaryNetworkID, nodeID) {
 		atomic.AddInt64(&b.numConns, -1)
 	}
 	b.Router.Disconnected(nodeID)

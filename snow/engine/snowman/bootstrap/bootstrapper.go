@@ -251,7 +251,7 @@ func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 		return err
 	}
 	// Ensure fetchFrom reflects proper validator list
-	if b.Beacons.Contains(nodeID) {
+	if b.Beacons.Contains(b.Ctx.SubnetID, nodeID) {
 		b.fetchFrom.Add(nodeID)
 	}
 
@@ -412,7 +412,10 @@ func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	}
 }
 
-func (b *bootstrapper) Clear() error {
+func (b *bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.Config.Blocked.Clear(); err != nil {
 		return err
 	}
