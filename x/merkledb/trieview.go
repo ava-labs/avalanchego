@@ -355,10 +355,6 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		Key: t.db.toKey(key),
 	}
 
-	if t.root.IsNothing() {
-		return proof, nil
-	}
-
 	proofPath, err := t.getPathTo(proof.Key)
 	if err != nil {
 		return nil, err

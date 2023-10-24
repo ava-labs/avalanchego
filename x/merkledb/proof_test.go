@@ -60,6 +60,13 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name: "empty",
+			malform: func(proof *Proof) {
+				proof.Path = nil
+			},
+			expectedErr: ErrEmptyProof,
+		},
+		{
 			name: "odd length key with value",
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
