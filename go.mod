@@ -14,7 +14,7 @@ require (
 	github.com/ava-labs/coreth v0.12.6-rc.2
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/cockroachdb/pebble v0.0.0-20230906160148-46873a6a7a06
+	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/ethereum/go-ethereum v1.12.0
 	github.com/golang-jwt/jwt/v4 v4.3.0
@@ -58,7 +58,7 @@ require (
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.14.0
-	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.13.0
