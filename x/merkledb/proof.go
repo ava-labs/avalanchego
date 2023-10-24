@@ -98,7 +98,7 @@ func (node *ProofNode) UnmarshalProto(tc TokenConfiguration, pbNode *pb.ProofNod
 	case pbNode.Key == nil:
 		return ErrNilKey
 	}
-	node.Key = ToKey(pbNode.Key.Value).Take(tc, int(pbNode.Key.Length/uint64(tc.TokenBitSize())))
+	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
 
 	if len(node.Key.value) != bytesNeeded(node.Key.bitLength) {
 		return ErrInvalidKeyLength
@@ -106,7 +106,7 @@ func (node *ProofNode) UnmarshalProto(tc TokenConfiguration, pbNode *pb.ProofNod
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
-		if childIndex >= uint32(tc.BranchFactor()) {
+		if childIndex >= uint32(tc.branchFactor) {
 			return ErrInvalidChildIndex
 		}
 		childID, err := ids.ToID(childIDBytes)
@@ -848,7 +848,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
-			childPath := key.AppendExtend(t.tokenConfig, index, compressedPath)
+			childPath := key.AppendExtend(t.tokenConfig.ToToken(index), compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.

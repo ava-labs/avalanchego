@@ -113,11 +113,10 @@ func (n *node) setValueDigest() {
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(tc TokenConfiguration, childNode *node) {
-	tokenLength := tc.TokenLength(n.key)
 	n.setChildEntry(
-		childNode.key.Token(tc, tokenLength),
+		childNode.key.Token(n.key.bitLength, tc.tokenBitSize),
 		child{
-			compressedKey: childNode.key.Skip(tc, tokenLength+1),
+			compressedKey: childNode.key.Skip(n.key.bitLength + tc.tokenBitSize),
 			id:            childNode.id,
 			hasValue:      childNode.hasValue(),
 		},
@@ -133,7 +132,7 @@ func (n *node) setChildEntry(index byte, childEntry child) {
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(tc TokenConfiguration, child *node) {
 	n.onNodeChanged()
-	delete(n.children, child.key.Token(tc, tc.TokenLength(n.key)))
+	delete(n.children, child.key.Token(n.key.bitLength, tc.tokenBitSize))
 }
 
 // clone Returns a copy of [n].

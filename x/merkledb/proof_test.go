@@ -456,10 +456,10 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &RangeProof{
 				StartProof: []ProofNode{
 					{
-						Key: ToKey([]byte{1}).Take(BranchFactor4TokenConfig, 3),
+						Key: ToKey([]byte{1}).Take(6),
 					},
 					{
-						Key: ToKey([]byte{1, 2}).Take(BranchFactor256TokenConfig, 2),
+						Key: ToKey([]byte{1, 2}).Take(16),
 					},
 				},
 				EndProof: []ProofNode{
@@ -582,7 +582,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[2].Key)
-	require.Equal(ToKey([]byte("key2")).Take(BranchFactor16TokenConfig, 7), proof.EndProof[1].Key)
+	require.Equal(ToKey([]byte("key2")).Take(7*BranchFactor16TokenConfig.tokenBitSize), proof.EndProof[1].Key)
 	require.Equal(ToKey([]byte("")), proof.EndProof[0].Key)
 
 	require.NoError(proof.Verify(

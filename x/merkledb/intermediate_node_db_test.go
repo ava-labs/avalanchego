@@ -139,7 +139,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
-		tokenLength uint,
+		bitLength uint,
 	) {
 		require := require.New(t)
 		for _, branchFactor := range validTokenConfigurations {
@@ -155,10 +155,10 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			)
 
 			p := ToKey(key)
-			if branchFactor.TokenLength(p) <= int(tokenLength) {
+			if p.bitLength <= int(bitLength) {
 				t.SkipNow()
 			}
-			p = p.Take(branchFactor, int(tokenLength))
+			p = p.Take(int(bitLength))
 			constructedKey := db.constructDBKey(p)
 			baseLength := len(p.value) + len(intermediateNodePrefix)
 			require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
@@ -168,11 +168,11 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
 				require.Len(constructedKey, baseLength)
-				require.Equal(p.Append(branchFactor, 1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Append(branchFactor.ToToken(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
 				require.Len(constructedKey, baseLength+1)
-				require.Equal(p.Append(branchFactor, 1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Append(branchFactor.ToToken(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			}
 		}
 	})
@@ -206,9 +206,9 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 	}
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	p := ToKey([]byte{0xF0}).Take(BranchFactor16TokenConfig, 1)
+	p := ToKey([]byte{0xF0}).Take(BranchFactor16TokenConfig.tokenBitSize)
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(p.Append(BranchFactor16TokenConfig, 1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+	require.Equal(p.Append(BranchFactor16TokenConfig.ToToken(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 }

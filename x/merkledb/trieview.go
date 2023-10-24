@@ -273,7 +273,7 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	)
 
 	for childIndex, child := range n.children {
-		childPath := n.key.AppendExtend(t.tokenConfig, childIndex, child.compressedKey)
+		childPath := n.key.AppendExtend(t.tokenConfig.ToToken(childIndex), child.compressedKey)
 		childNodeChange, ok := t.changes.nodes[childPath]
 		if !ok {
 			// This child wasn't changed.
@@ -306,9 +306,8 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	wg.Wait()
 	close(updatedChildren)
 
-	keyLength := t.tokenConfig.TokenLength(n.key)
 	for updatedChild := range updatedChildren {
-		index := updatedChild.key.Token(t.tokenConfig, keyLength)
+		index := updatedChild.key.Token(n.key.bitLength, t.tokenConfig.tokenBitSize)
 		n.setChildEntry(index, child{
 			compressedKey: n.children[index].compressedKey,
 			id:            updatedChild.id,
@@ -363,7 +362,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// There is no node with the given [key].
 	// If there is a child at the index where the node would be
 	// if it existed, include that child in the proof.
-	nextIndex := proof.Key.Token(t.tokenConfig, t.tokenConfig.TokenLength(closestNode.key))
+	nextIndex := proof.Key.Token(closestNode.key.bitLength, t.tokenConfig.tokenBitSize)
 	child, ok := closestNode.children[nextIndex]
 	if !ok {
 		return proof, nil
@@ -371,7 +370,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	childNode, err := t.getNodeWithID(
 		child.id,
-		closestNode.key.AppendExtend(t.tokenConfig, nextIndex, child.compressedKey),
+		closestNode.key.AppendExtend(t.tokenConfig.ToToken(nextIndex), child.compressedKey),
 		child.hasValue,
 	)
 	if err != nil {
@@ -698,7 +697,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		// "Cycle" over the key/values to find the only child.
 		// Note this iteration once because len(node.children) == 1.
 		for index, entry := range node.children {
-			childPath = node.key.AppendExtend(t.tokenConfig, index, entry.compressedKey)
+			childPath = node.key.AppendExtend(t.tokenConfig.ToToken(index), entry.compressedKey)
 			childEntry = entry
 		}
 
@@ -759,31 +758,30 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 func (t *trieView) getPathTo(key Key) ([]*node, error) {
 	var (
 		// all node paths start at the root
-		currentNode      = t.root
-		matchedPathIndex = 0
-		nodes            = []*node{t.root}
-		tokenLength      = t.tokenConfig.TokenLength(key)
+		currentNode     = t.root
+		matchedPathBits = 0
+		nodes           = []*node{t.root}
 	)
 
 	// while the entire path hasn't been matched
-	for matchedPathIndex < tokenLength {
+	for matchedPathBits < key.bitLength {
 		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(t.tokenConfig, matchedPathIndex)]
+		nextChildEntry, hasChild := currentNode.children[key.Token(matchedPathBits, t.tokenConfig.tokenBitSize)]
 
 		// the current token for the child entry has now been handled, so increment the matchedPathIndex
-		matchedPathIndex += 1
+		matchedPathBits += t.tokenConfig.tokenBitSize
 
-		if !hasChild || !key.iteratedHasPrefix(t.tokenConfig, matchedPathIndex, nextChildEntry.compressedKey) {
+		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, matchedPathBits, t.tokenConfig.tokenBitSize) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nodes, nil
 		}
 
 		// the compressed path of the entry there matched the path, so increment the matched index
-		matchedPathIndex += t.tokenConfig.TokenLength(nextChildEntry.compressedKey)
+		matchedPathBits += nextChildEntry.compressedKey.bitLength
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(t.tokenConfig, matchedPathIndex), nextChildEntry.hasValue)
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(matchedPathBits), nextChildEntry.hasValue)
 		if err != nil {
 			return nil, err
 		}
@@ -794,11 +792,11 @@ func (t *trieView) getPathTo(key Key) ([]*node, error) {
 	return nodes, nil
 }
 
-func (t *trieView) getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
+func getLengthOfCommonPrefix(first, second Key, secondOffset int, tokenBitSize int) int {
 	commonIndex := 0
-	for t.tokenConfig.TokenLength(first) > commonIndex && t.tokenConfig.TokenLength(second) > (commonIndex+secondOffset) &&
-		first.Token(t.tokenConfig, commonIndex) == second.Token(t.tokenConfig, commonIndex+secondOffset) {
-		commonIndex++
+	for first.bitLength > commonIndex && second.bitLength > commonIndex+secondOffset &&
+		first.Token(commonIndex, tokenBitSize) == second.Token(commonIndex+secondOffset, tokenBitSize) {
+		commonIndex += tokenBitSize
 	}
 	return commonIndex
 }
@@ -858,13 +856,11 @@ func (t *trieView) insert(
 		return closestNode, nil
 	}
 
-	closestNodeKeyLength := t.tokenConfig.TokenLength(closestNode.key)
-
 	// A node with the exact key doesn't exist so determine the portion of the
 	// key that hasn't been matched yet
 	// Note that [key] has prefix [closestNodeFullPath] but exactMatch was false,
 	// so [key] must be longer than [closestNodeFullPath] and the following index and slice won't OOB.
-	existingChildEntry, hasChild := closestNode.children[key.Token(t.tokenConfig, closestNodeKeyLength)]
+	existingChildEntry, hasChild := closestNode.children[key.Token(closestNode.key.bitLength, t.tokenConfig.tokenBitSize)]
 	if !hasChild {
 		// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
 		newNode := newNode(key)
@@ -882,15 +878,15 @@ func (t *trieView) insert(
 	// find how many tokens are common between the existing child's compressed path and
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
-	commonPrefixLength := t.getLengthOfCommonPrefix(existingChildEntry.compressedKey, key, closestNodeKeyLength+1)
+	commonPrefixLength := getLengthOfCommonPrefix(existingChildEntry.compressedKey, key, closestNode.key.bitLength+t.tokenConfig.tokenBitSize, t.tokenConfig.tokenBitSize)
 
 	// If the length of the existing child's compressed path is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
 	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
-	if t.tokenConfig.TokenLength(existingChildEntry.compressedKey) <= commonPrefixLength {
+	if existingChildEntry.compressedKey.bitLength <= commonPrefixLength {
 		return nil, ErrGetPathToFailure
 	}
 
-	branchNode := newNode(key.Take(t.tokenConfig, closestNodeKeyLength+1+commonPrefixLength))
+	branchNode := newNode(key.Take(closestNode.key.bitLength + t.tokenConfig.tokenBitSize + commonPrefixLength))
 	closestNode.addChild(t.tokenConfig, branchNode)
 	nodeWithValue := branchNode
 
@@ -911,9 +907,9 @@ func (t *trieView) insert(
 
 	// add the existing child onto the branch node
 	branchNode.setChildEntry(
-		existingChildEntry.compressedKey.Token(t.tokenConfig, commonPrefixLength),
+		existingChildEntry.compressedKey.Token(commonPrefixLength, t.tokenConfig.tokenBitSize),
 		child{
-			compressedKey: existingChildEntry.compressedKey.Skip(t.tokenConfig, commonPrefixLength+1),
+			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenConfig.tokenBitSize),
 			id:            existingChildEntry.id,
 			hasValue:      existingChildEntry.hasValue,
 		})

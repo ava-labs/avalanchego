@@ -132,7 +132,7 @@ func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(db.tc, 1).Bytes())
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(db.tc.ToToken(1)).Bytes())
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {
