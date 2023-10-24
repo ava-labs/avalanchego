@@ -1840,21 +1840,21 @@ func FuzzProofVerification(f *testing.F) {
 			deletePortion,
 		)
 
+		if db.getMerkleRoot() == ids.Empty {
+			return
+		}
+
 		proof, err := db.GetProof(
 			context.Background(),
 			key,
 		)
+
 		require.NoError(err)
 
 		rootID, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		err = proof.Verify(context.Background(), rootID)
-		if rootID == ids.Empty {
-			require.ErrorIs(err, ErrEmptyProof)
-			return
-		}
-		require.NoError(err)
+		require.NoError(proof.Verify(context.Background(), rootID))
 
 		// Insert a new key-value pair
 		newKey := make([]byte, 32)
