@@ -853,7 +853,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
-		if p.Beacons.Contains(p.id) {
+		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
@@ -882,7 +882,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	p.version = peerVersion
 
 	if p.VersionCompatibility.Version().Before(peerVersion) {
-		if p.Beacons.Contains(p.id) {
+		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			p.Log.Info("beacon attempting to connect with newer version. You may want to update your client",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("beaconVersion", peerVersion),
