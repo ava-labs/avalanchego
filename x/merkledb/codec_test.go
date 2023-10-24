@@ -300,26 +300,13 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					val = maybe.Some(value)
 				}
 
-				numChildren %= int(branchFactor)
-
-				children := map[byte]child{}
-				for i := 0; i < numChildren; i++ {
-					compressedKeyBytes := make([]byte, 32)
-					_, _ = rand.Read(compressedKeyBytes) // #nosec G404
-					children[byte(i)] = child{
-						compressedKey: ToKey(compressedKeyBytes, branchFactor),
-						id:            ids.GenerateTestID(),
-						hasValue:      val.HasValue(),
-					}
-				}
-
 				hasValue := rand.Intn(2) == 1 // #nosec G404
-				b := codec.encodeKeyAndHasValue(key, hasValue, branchFactor)
+				b := codec.encodeKeyAndHasValue(key, hasValue)
 				var (
 					gotKey      Key
 					gotHasValue bool
 				)
-				err := codec.decodeKeyAndHasValue(b, &gotKey, &gotHasValue, branchFactor)
+				err := codec.decodeKeyAndHasValue(b, branchFactor, &gotKey, &gotHasValue)
 				require.NoError(err)
 				require.Equal(key, gotKey)
 				require.Equal(hasValue, val.HasValue())

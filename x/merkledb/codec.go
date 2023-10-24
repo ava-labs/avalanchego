@@ -62,13 +62,13 @@ type encoder interface {
 	encodeDBNode(n *dbNode, factor BranchFactor) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
-	encodeKeyAndHasValue(key Key, hasValue bool, factor BranchFactor) []byte
+	encodeKeyAndHasValue(key Key, hasValue bool) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode, factor BranchFactor) error
-	decodeKeyAndHasValue(bytes []byte, key *Key, hasValue *bool, factor BranchFactor) error
+	decodeKeyAndHasValue(bytes []byte, factor BranchFactor, key *Key, hasValue *bool) error
 }
 
 func newCodec() encoderDecoder {
@@ -134,7 +134,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeKeyAndHasValue(key Key, hasValue bool, factor BranchFactor) []byte {
+func (c *codecImpl) encodeKeyAndHasValue(key Key, hasValue bool) []byte {
 	var (
 		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + boolLen
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
@@ -204,7 +204,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode, branchFactor BranchFactor)
 	return nil
 }
 
-func (c *codecImpl) decodeKeyAndHasValue(b []byte, key *Key, hasValue *bool, branchFactor BranchFactor) error {
+func (c *codecImpl) decodeKeyAndHasValue(b []byte, branchFactor BranchFactor, key *Key, hasValue *bool) error {
 	if minKeyLen+minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}

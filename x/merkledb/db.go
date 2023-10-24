@@ -995,7 +995,6 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	rootKeyAndNodeBytes := codec.encodeKeyAndHasValue(
 		changes.rootChange.after.key,
 		changes.rootChange.after.value.HasValue(),
-		db.valueNodeDB.branchFactor,
 	)
 	return db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes)
 }
@@ -1194,9 +1193,9 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	)
 	if err := codec.decodeKeyAndHasValue(
 		rootBytes,
+		db.valueNodeDB.branchFactor,
 		&rootKey,
 		&rootHasValue,
-		db.valueNodeDB.branchFactor,
 	); err != nil {
 		return err
 	}
