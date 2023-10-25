@@ -19,7 +19,7 @@ type Config struct {
 	Ctx         *snow.ConsensusContext
 	VM          block.ChainVM
 	Sender      common.Sender
-	Validators  validators.Set
+	Validators  validators.Manager
 	Params      snowball.Parameters
 	Consensus   snowman.Consensus
 	PartialSync bool
