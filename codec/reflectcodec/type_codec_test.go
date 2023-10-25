@@ -1,0 +1,24 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package reflectcodec
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestSizeWithNil(t *testing.T) {
+	require := require.New(t)
+	var x *int32
+	c := genericCodec{}
+	_, _, err := c.size(reflect.ValueOf(x))
+	require.ErrorIs(err, errMarshalNil)
+	_, _, err = c.sizeWithOmitEmpty(reflect.ValueOf(x), false)
+	require.ErrorIs(err, errMarshalNil)
+	len, _, err := c.sizeWithOmitEmpty(reflect.ValueOf(x), true)
+	require.Empty(err)
+	require.Equal(1, len)
+}
