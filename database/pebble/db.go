@@ -256,7 +256,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 	iter := &iter{
 		db:   db,
-		iter: db.pebbleDB.NewIter(prefixBounds(prefix)),
+		iter: db.pebbleDB.NewIter(keyRange(nil, prefix)),
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -274,21 +274,15 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
-	iterRange := prefixBounds(prefix)
-	if bytes.Compare(start, prefix) == 1 {
-		iterRange.LowerBound = start
-	}
-
 	iter := &iter{
 		db:   db,
-		iter: db.pebbleDB.NewIter(iterRange),
+		iter: db.pebbleDB.NewIter(keyRange(start, prefix)),
 	}
 	db.openIterators.Add(iter)
 	return iter
 }
 
-// Converts a pebble-specific error to its
-// Avalanche equivalent, if applicable.
+// Converts a pebble-specific error to its Avalanche equivalent, if applicable.
 func updateError(err error) error {
 	switch err {
 	case pebble.ErrClosed:
@@ -300,22 +294,28 @@ func updateError(err error) error {
 	}
 }
 
-// Returns a key range that covers all keys with the given [prefix].
-// Assumes the Database uses bytes.Compare for key comparison and
-// not a custom comparer.
-func prefixBounds(prefix []byte) *pebble.IterOptions {
-	var upperBound []byte
+func keyRange(start, prefix []byte) *pebble.IterOptions {
+	opt := &pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: prefixToUpperBound(prefix),
+	}
+	if bytes.Compare(start, prefix) == 1 {
+		opt.LowerBound = start
+	}
+	return opt
+}
+
+// Returns an upper bound that stops after all keys with the given [prefix].
+// Assumes the Database uses bytes.Compare for key comparison and not a custom
+// comparer.
+func prefixToUpperBound(prefix []byte) []byte {
 	for i := len(prefix) - 1; i >= 0; i-- {
-		if prefix[i] == 0xFF {
-			continue
+		if prefix[i] != 0xFF {
+			upperBound := make([]byte, i+1)
+			copy(upperBound, prefix)
+			upperBound[i]++
+			return upperBound
 		}
-		upperBound = make([]byte, i+1)
-		copy(upperBound, prefix)
-		upperBound[i] = prefix[i] + 1
-		break
 	}
-	return &pebble.IterOptions{
-		LowerBound: prefix,     // Note this bound is inclusive.
-		UpperBound: upperBound, // Note this bound is exclusive.
-	}
+	return nil
 }
