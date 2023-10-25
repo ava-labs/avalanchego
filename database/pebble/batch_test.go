@@ -17,8 +17,7 @@ import (
 // Note: TestInterface tests other batch functionality.
 func TestBatch(t *testing.T) {
 	require := require.New(t)
-	dirName, err := os.MkdirTemp("", "pebbleTestBatch*")
-	require.NoError(err)
+	dirName := t.TempDir()
 	defer os.Remove(dirName)
 
 	db, err := New(dirName, DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
