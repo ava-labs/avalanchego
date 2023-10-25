@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+const Name = "pebble"
+
 var _ database.Batch = (*batch)(nil)
 
 // Not safe for concurrent use.

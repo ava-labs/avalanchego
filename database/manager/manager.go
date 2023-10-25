@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -87,6 +88,29 @@ func NewLevelDB(
 ) (Manager, error) {
 	return new(
 		leveldb.New,
+		dbDirPath,
+		dbConfig,
+		log,
+		currentVersion,
+		namespace,
+		reg,
+	)
+}
+
+// NewLevelDB creates a database manager of levelDBs at [filePath] by creating a
+// database instance from each directory with a version <= [currentVersion]. If
+// [includePreviousVersions], opens previous database versions and includes them
+// in the returned Manager.
+func NewPebbleDB(
+	dbDirPath string,
+	dbConfig []byte,
+	log logging.Logger,
+	currentVersion *version.Semantic,
+	namespace string,
+	reg prometheus.Registerer,
+) (Manager, error) {
+	return new(
+		pebble.New,
 		dbDirPath,
 		dbConfig,
 		log,

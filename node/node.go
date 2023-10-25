@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -505,15 +506,32 @@ func (n *Node) initDatabase() error {
 	)
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+		dbManager, err = manager.NewLevelDB(
+			n.Config.DatabaseConfig.Path,
+			n.Config.DatabaseConfig.Config,
+			n.Log,
+			version.CurrentDatabase,
+			"db_internal",
+			n.MetricsRegisterer,
+		)
+	case pebble.Name:
+		dbManager, err = manager.NewPebbleDB(
+			n.Config.DatabaseConfig.Path,
+			n.Config.DatabaseConfig.Config,
+			n.Log,
+			version.CurrentDatabase,
+			"db_internal",
+			n.MetricsRegisterer,
+		)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
+			"db-type was %q but should have been one of {%s, %s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
+			pebble.Name,
 		)
 	}
 	if err != nil {
