@@ -34,12 +34,12 @@ type Iterator interface {
 
 	// Key returns the key of the current key/value pair, or nil if done.
 	// If the database is closed, must still report the current contents.
-	// Behavior is underfined after Release is called.
+	// Behavior is undefined after Release is called.
 	Key() []byte
 
 	// Value returns the value of the current key/value pair, or nil if done.
 	// If the database is closed, must still report the current contents.
-	// Behavior is underfined after Release is called.
+	// Behavior is undefined after Release is called.
 	Value() []byte
 
 	// Release releases associated resources. Release should always succeed and
