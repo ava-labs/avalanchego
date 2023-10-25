@@ -37,9 +37,9 @@ jobs:
             ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
             ${{ runner.os }}-deps-
       - name: Check
-        run: cargo check --workspace --tests --examples --benches
+        run: cargo check --workspace --tests --examples --benches --all-features
       - name: Build
-        run: cargo build --workspace --tests --examples --benches
+        run: cargo build --workspace --tests --examples --benches --all-features
         # Always update the cache
       - name: Cleanup
         run: |
@@ -100,7 +100,7 @@ jobs:
       - name: Format
         run: cargo fmt -- --check
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --tests --examples --benches --all-features -- -D warnings
 
   test:
     needs: build
@@ -122,7 +122,7 @@ jobs:
             target/
           key: ${{ needs.build.outputs.cache-key }}
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --all-features --verbose
 
   examples:
     needs: build

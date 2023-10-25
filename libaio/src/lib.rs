@@ -334,7 +334,7 @@ impl AioBuilder {
             waiting: Mutex::new(HashMap::new()),
             npending: AtomicUsize::new(0),
             #[cfg(feature = "emulated-failure")]
-            emul_fail: self.emul_fail.as_ref().map(|ef| ef.clone()),
+            emul_fail: self.emul_fail.as_ref().cloned(),
         });
         let mut aiomgr = AioManager {
             notifier,
@@ -433,7 +433,7 @@ impl AioManager {
                                 res = e
                             }
                         }
-                        n.finish(ev.data as u64, res);
+                        n.finish(ev.data, res);
                     }
                 }
             }
