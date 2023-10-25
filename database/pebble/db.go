@@ -172,8 +172,8 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	switch {
 	case db.closed:
