@@ -506,7 +506,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 		return err
 	}
 
-	e.State.SetSubnetOwner(tx.SubnetID(), tx.Owner)
+	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
