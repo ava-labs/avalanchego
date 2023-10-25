@@ -40,6 +40,7 @@ var (
 		MemTableStopWritesThreshold: 8,
 		MemTableSize:                defaultCacheSize / 4,
 		MaxOpenFiles:                4096,
+		MaxConcurrentCompactions:    1,
 	}
 )
 
@@ -175,14 +176,15 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	switch {
-	case db.closed:
+	if db.closed {
 		return database.ErrClosed
-	case pebble.DefaultComparer.Compare(start, limit) >= 0:
-		// pebble's Compact will no-op & error if start >= limit
-		// according to pebble's comparer.
-		return nil
-	case limit != nil:
+	}
+
+	if limit != nil {
+		if pebble.DefaultComparer.Compare(start, limit) >= 0 {
+			// pebbleDB.Compact requires start < limit or it panics.
+			return nil
+		}
 		return updateError(db.pebbleDB.Compact(start, limit, true /* parallelize */))
 	}
 
@@ -190,9 +192,11 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	// but pebble treats a nil [limit] as a key before all keys in Compact.
 	// Use the greatest key in the database as the [limit] to get the desired behavior.
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
+	defer it.Close()
+
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
-			if bytes.Compare(start, lastkey) >= 0 {
+			if pebble.DefaultComparer.Compare(start, lastkey) >= 0 {
 				// pebbleDB.Compact requires start < limit or it panics.
 				return nil
 			}
@@ -207,9 +211,11 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
+
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
+
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }

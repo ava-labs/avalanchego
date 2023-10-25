@@ -934,6 +934,11 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	require.NoError(db.Put(key3, value3))
 
 	require.NoError(db.Compact(nil, nil))
+
+	require.NoError(db.Compact([]byte{2}, []byte{1}))
+
+	require.NoError(db.Compact([]byte{255}, nil))
+
 	require.NoError(db.Close())
 	err := db.Compact(nil, nil)
 	require.ErrorIs(err, ErrClosed)
