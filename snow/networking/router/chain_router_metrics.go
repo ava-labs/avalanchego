@@ -6,7 +6,7 @@ package router
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // routerMetrics about router messages
@@ -40,7 +40,7 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 		},
 	)
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(rMetrics.outstandingRequests),
 		registerer.Register(rMetrics.longestRunningRequest),
 		registerer.Register(rMetrics.droppedRequests),

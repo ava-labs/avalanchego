@@ -6,7 +6,7 @@ package resource
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -60,7 +60,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 			[]string{"processID"},
 		),
 	}
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(m.numCPUCycles),
 		registerer.Register(m.numDiskReads),
 		registerer.Register(m.numDiskReadBytes),

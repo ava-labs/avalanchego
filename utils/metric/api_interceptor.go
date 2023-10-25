@@ -12,7 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type APIInterceptor interface {
@@ -55,7 +55,7 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 		[]string{"method"},
 	)
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(requestDurationCount),
 		registerer.Register(requestDurationSum),
 		registerer.Register(requestErrors),

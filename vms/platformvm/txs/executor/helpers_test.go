@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -444,7 +443,7 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	return verify.Err(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)

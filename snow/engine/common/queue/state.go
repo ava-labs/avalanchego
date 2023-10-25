@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const (
@@ -152,7 +152,7 @@ func (s *state) Clear() error {
 		return err
 	}
 
-	return verify.Err(
+	return utils.Err(
 		runJobsIter.Error(),
 		jobsIter.Error(),
 		depsIter.Error(),

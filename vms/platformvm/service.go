@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -1283,7 +1282,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1393,7 +1392,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1499,7 +1498,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1575,7 +1574,7 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1671,7 +1670,7 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1756,7 +1755,7 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
@@ -1880,7 +1879,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	return verify.Err(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),

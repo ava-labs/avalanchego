@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -1405,7 +1404,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
-	return verify.Err(
+	return utils.Err(
 		s.loadMetadata(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
@@ -1595,7 +1594,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 	}
 
-	return verify.Err(
+	return utils.Err(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1679,7 +1678,7 @@ func (s *state) loadPendingValidators() error {
 		}
 	}
 
-	return verify.Err(
+	return utils.Err(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1726,7 +1725,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	return verify.Err(
+	return utils.Err(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1744,7 +1743,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 }
 
 func (s *state) Close() error {
-	return verify.Err(
+	return utils.Err(
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2528,7 +2527,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			err := verify.Err(
+			err := utils.Err(
 				s.Commit(),
 				blockIterator.Error(),
 			)

@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 type metrics struct {
@@ -147,7 +147,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		peerConnectedStartTimes: make(map[ids.NodeID]float64),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(m.numTracked),
 		registerer.Register(m.numPeers),
 		registerer.Register(m.numSubnetPeers),

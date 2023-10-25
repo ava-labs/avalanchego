@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -74,7 +74,7 @@ func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error
 			Help:      "cumulative amount of proof requests that were successful",
 		}),
 	}
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(m.requestsFailed),
 		reg.Register(m.requestsMade),
 		reg.Register(m.requestsSucceeded),

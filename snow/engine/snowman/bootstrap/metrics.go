@@ -6,7 +6,7 @@ package bootstrap
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -38,7 +38,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 		}),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(m.numFetched),
 		registerer.Register(m.numDropped),
 		registerer.Register(m.numAccepted),

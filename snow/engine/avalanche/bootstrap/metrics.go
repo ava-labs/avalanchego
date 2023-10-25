@@ -6,7 +6,7 @@ package bootstrap
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -50,7 +50,7 @@ func (m *metrics) Initialize(
 		Help:      "Number of transactions accepted during bootstrapping",
 	})
 
-	return verify.Err(
+	return utils.Err(
 		registerer.Register(m.numFetchedVts),
 		registerer.Register(m.numDroppedVts),
 		registerer.Register(m.numAcceptedVts),

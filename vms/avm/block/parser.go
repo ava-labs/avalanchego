@@ -8,11 +8,11 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 // CodecVersion is the current default codec version
@@ -42,7 +42,7 @@ func NewParser(fxs []fxs.Fx) (Parser, error) {
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	err := verify.Err(
+	err = utils.Err(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)
@@ -64,7 +64,7 @@ func NewCustomParser(
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	err = verify.Err(
+	err = utils.Err(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -28,7 +28,7 @@ func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	LegacyCodec = codec.NewManager(math.MaxInt32)
 
-	err := verify.Err(
+	err := utils.Err(
 		Codec.RegisterCodec(CodecVersion, c),
 		LegacyCodec.RegisterCodec(CodecVersion, lc),
 	)

@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -83,7 +83,7 @@ func NewPullGossiper[T any, U GossipableAny[T]](
 		}),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		metrics.Register(p.receivedN),
 		metrics.Register(p.receivedBytes),
 	)

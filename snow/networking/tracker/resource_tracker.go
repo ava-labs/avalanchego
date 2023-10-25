@@ -11,10 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const epsilon = 1e-9
@@ -321,7 +321,7 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 			Help:      "Available space remaining (bytes) on the database volume",
 		}),
 	}
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(m.processingTimeMetric),
 		reg.Register(m.cpuMetric),
 		reg.Register(m.diskReadsMetric),

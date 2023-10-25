@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 // Maximum number of containers IDs that can be fetched at a time in a call to
@@ -114,7 +114,7 @@ func newIndex(
 
 // Close this index
 func (i *index) Close() error {
-	return verify.Err(
+	return utils.Err(
 		i.indexToContainer.Close(),
 		i.containerToIndex.Close(),
 		i.vDB.Close(),

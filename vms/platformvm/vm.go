@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -364,7 +363,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		}
 	}
 
-	return verify.Err(
+	return utils.Err(
 		vm.state.Close(),
 		vm.dbManager.Close(),
 	)

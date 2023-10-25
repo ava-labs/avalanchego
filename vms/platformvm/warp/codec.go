@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const codecVersion = 0
@@ -20,7 +20,7 @@ func init() {
 	c = codec.NewManager(math.MaxInt)
 	lc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 
-	err := verify.Err(
+	err := utils.Err(
 		lc.RegisterType(&BitSetSignature{}),
 		c.RegisterCodec(codecVersion, lc),
 	)

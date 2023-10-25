@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -45,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
@@ -308,7 +308,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	return verify.Err(
+	return utils.Err(
 		vm.state.Close(),
 		vm.baseDB.Close(),
 	)

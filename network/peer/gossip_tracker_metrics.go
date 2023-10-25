@@ -6,7 +6,7 @@ package peer
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type gossipTrackerMetrics struct {
@@ -32,7 +32,7 @@ func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string)
 		),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(m.trackedPeersSize),
 		registerer.Register(m.validatorsSize),
 	)

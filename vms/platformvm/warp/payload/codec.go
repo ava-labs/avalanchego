@@ -6,8 +6,8 @@ package payload
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const (
@@ -27,7 +27,7 @@ func init() {
 	c = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewCustomMaxLength(MaxSliceLen)
 
-	err := verify.Err(
+	err := utils.Err(
 		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
 		c.RegisterCodec(codecVersion, lc),

@@ -22,12 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -522,7 +522,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) Close() error {
-	return verify.Err(
+	return utils.Err(
 		s.utxoDB.Close(),
 		s.statusDB.Close(),
 		s.txDB.Close(),
@@ -534,7 +534,7 @@ func (s *state) Close() error {
 }
 
 func (s *state) write() error {
-	return verify.Err(
+	return utils.Err(
 		s.writeUTXOs(),
 		s.writeTxs(),
 		s.writeBlockIDs(),
@@ -687,7 +687,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			err := verify.Err(
+			err := utils.Err(
 				s.Commit(),
 				statusIter.Error(),
 				txIter.Error(),
@@ -746,7 +746,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	err := verify.Err(
+	err := utils.Err(
 		s.Commit(),
 		statusIter.Error(),
 		txIter.Error(),
@@ -885,7 +885,7 @@ func (s *state) initTxChecksum() error {
 		return errStatusWithoutTx
 	}
 
-	return verify.Err(
+	return utils.Err(
 		txIt.Error(),
 		statusIt.Error(),
 	)

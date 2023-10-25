@@ -10,7 +10,7 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var levelLabels = []string{"level"}
@@ -180,7 +180,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 		currentStats: &leveldb.DBStats{},
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(m.writesDelayedCount),
 		reg.Register(m.writesDelayedDuration),
 		reg.Register(m.writeIsDelayed),

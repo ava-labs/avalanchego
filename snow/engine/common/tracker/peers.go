@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -139,7 +139,7 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 		Name:      "num_validators",
 		Help:      "Total number of validators",
 	})
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(percentConnected),
 		reg.Register(totalWeight),
 		reg.Register(numValidators),

@@ -6,7 +6,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var _ Polls = (*polls)(nil)
@@ -38,7 +38,7 @@ func NewPolls(namespace string, reg prometheus.Registerer) (Polls, error) {
 			Help:      "Number of failed polls",
 		}),
 	}
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(p.numFailedPolls),
 		reg.Register(p.numSuccessfulPolls),
 	)

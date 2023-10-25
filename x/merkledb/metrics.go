@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -198,7 +198,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 			Help:      "cumulative amount of misses on the view value cache",
 		}),
 	}
-	err := verify.Err(
+	err := utils.Err(
 		reg.Register(m.ioKeyWrite),
 		reg.Register(m.ioKeyRead),
 		reg.Register(m.hashCount),

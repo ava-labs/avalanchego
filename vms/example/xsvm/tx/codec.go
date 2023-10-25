@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // Version is the current default codec version
@@ -20,7 +20,7 @@ func init() {
 	c := linearcodec.NewCustomMaxLength(math.MaxInt32)
 	Codec = codec.NewManager(math.MaxInt32)
 
-	err := verify.Err(
+	err := utils.Err(
 		c.RegisterType(&Transfer{}),
 		c.RegisterType(&Export{}),
 		c.RegisterType(&Import{}),

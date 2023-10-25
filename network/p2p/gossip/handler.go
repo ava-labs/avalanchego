@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -52,7 +52,7 @@ func NewHandler[T Gossipable](
 		}),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		metrics.Register(h.sentN),
 		metrics.Register(h.sentBytes),
 	)

@@ -14,11 +14,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -101,7 +101,7 @@ func newPeerTracker(
 		),
 	}
 
-	err := verify.Err(
+	err := utils.Err(
 		registerer.Register(t.numTrackedPeers),
 		registerer.Register(t.numResponsivePeers),
 		registerer.Register(t.averageBandwidthMetric),
