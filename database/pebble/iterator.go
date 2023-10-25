@@ -19,7 +19,6 @@ var (
 	_ database.Iterator = (*iter)(nil)
 
 	errCouldntGetValue = errors.New("couldnt get iterator value")
-	errNoPointKey      = errors.New("iterator has no point key")
 )
 
 type iter struct {
