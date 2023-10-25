@@ -4,8 +4,9 @@
 package resource
 
 import (
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 type metrics struct {
