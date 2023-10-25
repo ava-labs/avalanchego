@@ -123,6 +123,8 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 				return wrappers.BoolLen, false, nil
 			}
 			prefixSize += wrappers.BoolLen
+		} else if value.IsNil() {
+			return 0, false, errMarshalNil
 		}
 
 		size, _, err := c.size(value.Elem())
