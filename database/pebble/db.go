@@ -80,14 +80,10 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	)
 
 	db, err := pebble.Open(file, opts)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Database{
 		pebbleDB:      db,
 		openIterators: set.Set[*iter]{},
-	}, nil
+	}, err
 }
 
 func (db *Database) Close() error {
