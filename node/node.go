@@ -588,6 +588,7 @@ func (n *Node) initDatabase() error {
 	session := session{
 		Timestamp: time.Now(),
 	}
+
 	sessionBytes, err := json.Marshal(session)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session metadata: %w", err)
