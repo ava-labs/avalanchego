@@ -72,10 +72,12 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		MaxOpenFiles:                cfg.MaxOpenFiles,
 		MaxConcurrentCompactions:    func() int { return cfg.MaxConcurrentCompactions },
 	}
-	opts.Experimental.ReadSamplingMultiplier = -1 // explicitly disable seek compaction
+	opts.Experimental.ReadSamplingMultiplier = -1 // Disable seek compaction
 
-	log.Info("opening pebble")
-	log.Debug("config", zap.Any("config", opts))
+	log.Info(
+		"opening pebble",
+		zap.Reflect("config", cfg),
+	)
 
 	db, err := pebble.Open(file, opts)
 	if err != nil {
