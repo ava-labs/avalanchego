@@ -42,10 +42,6 @@ type iter struct {
 
 // Must not be called with [db.lock] held.
 func (it *iter) Next() bool {
-	it.db.lock.RLock()
-	dbClosed := it.db.closed
-	it.db.lock.RUnlock()
-
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
@@ -53,7 +49,7 @@ func (it *iter) Next() bool {
 	case it.err != nil:
 		it.hasNext = false
 		return false
-	case it.closed || dbClosed:
+	case it.closed:
 		it.hasNext = false
 		it.err = database.ErrClosed
 		return false
