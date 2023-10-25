@@ -201,65 +201,13 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 }
 
 func (db *Database) NewIterator() database.Iterator {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	if db.closed {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    database.ErrClosed,
-		}
-	}
-
-	iter := &iter{
-		db:   db,
-		iter: db.pebbleDB.NewIter(&pebble.IterOptions{}),
-	}
-	db.openIterators.Add(iter)
-	return iter
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
-
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	if db.closed {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    database.ErrClosed,
-		}
-	}
-
-	iter := &iter{
-		db: db,
-		iter: db.pebbleDB.NewIter(&pebble.IterOptions{
-			LowerBound: start,
-		}),
-	}
-	db.openIterators.Add(iter)
-	return iter
+	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
-
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	if db.closed {
-		return &iter{
-			db:     db,
-			closed: true,
-			err:    database.ErrClosed,
-		}
-	}
-
-	iter := &iter{
-		db:   db,
-		iter: db.pebbleDB.NewIter(keyRange(nil, prefix)),
-	}
-	db.openIterators.Add(iter)
-	return iter
+	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
