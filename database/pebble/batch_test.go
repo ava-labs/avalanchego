@@ -21,7 +21,7 @@ func TestBatch(t *testing.T) {
 	require.NoError(err)
 	defer os.Remove(dirName)
 
-	db, err := New(dirName, DefaultConfig, logging.NoLog{}, "", prometheus.NewRegistry())
+	db, err := New(dirName, DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
 
 	batchIntf := db.NewBatch()

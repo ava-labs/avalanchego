@@ -6,6 +6,7 @@ package pebble
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -42,7 +43,17 @@ var (
 		MaxOpenFiles:                4096,
 		MaxConcurrentCompactions:    1,
 	}
+
+	DefaultConfigBytes []byte
 )
+
+func init() {
+	var err error
+	DefaultConfigBytes, err = json.Marshal(DefaultConfig)
+	if err != nil {
+		panic(err)
+	}
+}
 
 type Database struct {
 	lock          sync.RWMutex
@@ -52,17 +63,22 @@ type Database struct {
 }
 
 type Config struct {
-	CacheSize                   int
-	BytesPerSync                int
-	WALBytesPerSync             int // 0 means no background syncing
-	MemTableStopWritesThreshold int
-	MemTableSize                int
-	MaxOpenFiles                int
-	MaxConcurrentCompactions    int
+	CacheSize                   int `json:"cacheSize"`
+	BytesPerSync                int `json:"bytesPerSync"`
+	WALBytesPerSync             int `json:"walBytesPerSync"` // 0 means no background syncing
+	MemTableStopWritesThreshold int `json:"memTableStopWritesThreshold"`
+	MemTableSize                int `json:"memTableSize"`
+	MaxOpenFiles                int `json:"maxOpenFiles"`
+	MaxConcurrentCompactions    int `json:"maxConcurrentCompactions"`
 }
 
 // TODO: Add metrics
-func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
+	var cfg Config
+	if err := json.Unmarshal(configBytes, &cfg); err != nil {
+		return nil, err
+	}
+
 	opts := &pebble.Options{
 		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync:                cfg.BytesPerSync,

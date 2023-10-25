@@ -16,8 +16,7 @@ import (
 
 func newDB(t testing.TB) *Database {
 	folder := t.TempDir()
-	cfg := DefaultConfig
-	db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
+	db, err := New(folder, DefaultConfigBytes, logging.NoLog{}, "pebble", prometheus.NewRegistry())
 	require.NoError(t, err)
 	return db
 }
