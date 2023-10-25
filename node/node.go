@@ -563,16 +563,9 @@ func (n *Node) initDatabase() error {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 
-	ok, err := n.DB.Has(sessionKey)
-	if err != nil {
-		return err
-	}
-
-	if ok {
-		sessionBytes, err := n.DB.Get(sessionKey)
-		if err != nil {
-			return err
-		}
+	sessionBytes, err := n.DB.Get(sessionKey)
+	switch err {
+	case nil:
 		session := session{}
 		if err := json.Unmarshal(sessionBytes, &session); err != nil {
 			return fmt.Errorf("failed to unmarshal session metadata: %w", err)
@@ -582,13 +575,15 @@ func (n *Node) initDatabase() error {
 			"detected previous ungraceful shutdown",
 			zap.Time("timestamp", session.Timestamp),
 		)
+	case database.ErrNotFound:
+	default:
+		return fmt.Errorf("failed to read session metadata: %w", err)
 	}
 
 	session := session{
 		Timestamp: time.Now(),
 	}
-
-	sessionBytes, err := json.Marshal(session)
+	sessionBytes, err = json.Marshal(session)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session metadata: %w", err)
 	}
