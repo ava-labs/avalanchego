@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package verify
+package subnets
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 
 var errMissing = errors.New("missing")
 
-func TestSameSubnet(t *testing.T) {
+func TestSame(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 	chainID0 := ids.GenerateTestID()
@@ -92,7 +92,7 @@ func TestSameSubnet(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			ctx := test.ctxF(ctrl)
 
-			result := SameSubnet(context.Background(), ctx, test.chainID)
+			result := Same(context.Background(), ctx, test.chainID)
 			require.ErrorIs(t, result, test.result)
 		})
 	}
