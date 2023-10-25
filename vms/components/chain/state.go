@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
+
+var errSetAcceptedWithProcessing = errors.New("cannot set last accepted block with blocks processing")
 
 func cachedBlockSize(_ ids.ID, bw *BlockWrapper) int {
 	return ids.IDLen + len(bw.Bytes()) + 2*constants.PointerOverhead
@@ -49,9 +52,12 @@ type State struct {
 	// getStatus returns the status of the block
 	getStatus func(context.Context, snowman.Block) (choices.Status, error)
 
+	lock              sync.RWMutex
+	lastAcceptedBlock *BlockWrapper
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
+
 	// decidedBlocks is an LRU cache of decided blocks.
 	decidedBlocks cache.Cacher[ids.ID, *BlockWrapper]
 	// unverifiedBlocks is an LRU cache of blocks with status processing
@@ -60,8 +66,7 @@ type State struct {
 	// missingBlocks is an LRU cache of missing blocks
 	missingBlocks cache.Cacher[ids.ID, struct{}]
 	// string([byte repr. of block]) --> the block's ID
-	bytesToIDCache    cache.Cacher[string, ids.ID]
-	lastAcceptedBlock *BlockWrapper
+	bytesToIDCache cache.Cacher[string, ids.ID]
 }
 
 // Config defines all of the parameters necessary to initialize State
@@ -96,9 +101,17 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64)
 		if !ok {
 			return choices.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
 		}
+
 		lastAcceptedHeight := s.lastAcceptedBlock.Height()
 		blkHeight := internalBlk.Height()
 		if blkHeight > lastAcceptedHeight {
+			// TODO: This is not guaranteed to maintain the consensus engine
+			// invariant that calling Status() on a block reference that had
+			// Reject called on it will return Rejected.
+			//
+			// This is only broken if the block reference in the consensus
+			// engine is the same as this reference and the block wrapper was
+			// already evicted from the caches.
 			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		}
@@ -222,8 +235,6 @@ func NewMeteredState(
 	return c, nil
 }
 
-var errSetAcceptedWithProcessing = errors.New("cannot set last accepted block with blocks processing")
-
 // SetLastAcceptedBlock sets the last accepted block to [lastAcceptedBlock].
 // This should be called with an internal block - not a wrapped block returned
 // from state.
@@ -231,6 +242,9 @@ var errSetAcceptedWithProcessing = errors.New("cannot set last accepted block wi
 // This also flushes [lastAcceptedBlock] from missingBlocks and unverifiedBlocks
 // to ensure that their contents stay valid.
 func (s *State) SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if len(s.verifiedBlocks) != 0 {
 		return fmt.Errorf("%w: %d", errSetAcceptedWithProcessing, len(s.verifiedBlocks))
 	}
@@ -262,6 +276,9 @@ func (s *State) Flush() {
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
 func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	if blk, ok := s.getCachedBlock(blkID); ok {
 		return blk, nil
 	}
@@ -295,12 +312,7 @@ func (s *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 	if blk, ok := s.decidedBlocks.Get(blkID); ok {
 		return blk, true
 	}
-
-	if blk, ok := s.unverifiedBlocks.Get(blkID); ok {
-		return blk, true
-	}
-
-	return nil, false
+	return s.unverifiedBlocks.Get(blkID)
 }
 
 // GetBlockInternal returns the internal representation of [blkID]
@@ -316,6 +328,9 @@ func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Blo
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the
 // appropriate caching layer if successful.
 func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	// See if we've cached this block's ID by its byte repr.
 	cachedBlkID, blkIDCached := s.bytesToIDCache.Get(string(b))
 	if blkIDCached {
@@ -356,6 +371,9 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 // performs at most one call to the underlying VM if [batchedUnmarshalBlock] was
 // provided.
 func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	blks := make([]snowman.Block, len(blksBytes))
 	idWasCached := make([]bool, len(blksBytes))
 	unparsedBlksBytes := make([][]byte, 0, len(blksBytes))
@@ -440,6 +458,9 @@ func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Conte
 		return s.BuildBlock(ctx)
 	}
 
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	blk, err := s.buildBlockWithContext(ctx, blockCtx)
 	if err != nil {
 		return nil, err
@@ -451,6 +472,9 @@ func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Conte
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
 // to the appropriate caching layer if successful.
 func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	blk, err := s.buildBlock(ctx)
 	if err != nil {
 		return nil, err
@@ -503,11 +527,17 @@ func (s *State) addBlockOutsideConsensus(ctx context.Context, blk snowman.Block)
 }
 
 func (s *State) LastAccepted(context.Context) (ids.ID, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	return s.lastAcceptedBlock.ID(), nil
 }
 
 // LastAcceptedBlock returns the last accepted wrapped block
 func (s *State) LastAcceptedBlock() *BlockWrapper {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	return s.lastAcceptedBlock
 }
 
@@ -518,6 +548,9 @@ func (s *State) LastAcceptedBlockInternal() snowman.Block {
 
 // IsProcessing returns whether [blkID] is processing in consensus
 func (s *State) IsProcessing(blkID ids.ID) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	_, ok := s.verifiedBlocks[blkID]
 	return ok
 }

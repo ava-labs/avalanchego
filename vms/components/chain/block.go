@@ -33,6 +33,11 @@ type BlockWrapper struct {
 // consensus and eventually be decided ie. either Accept/Reject will be called
 // on [bw] removing it from [verifiedBlocks].
 func (bw *BlockWrapper) Verify(ctx context.Context) error {
+	// TODO: We should avoid holding the write lock when calling Verify so that
+	// it's possible to verify blocks concurrently.
+	bw.state.lock.Lock()
+	defer bw.state.lock.Unlock()
+
 	if err := bw.Block.Verify(ctx); err != nil {
 		// Note: we cannot cache blocks failing verification in case
 		// the error is temporary and the block could become valid in
@@ -75,6 +80,11 @@ func (bw *BlockWrapper) VerifyWithContext(ctx context.Context, blockCtx *block.C
 		return fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, bw.Block)
 	}
 
+	// TODO: We should avoid holding the write lock when calling
+	// VerifyWithContext so that it's possible to verify blocks concurrently.
+	bw.state.lock.Lock()
+	defer bw.state.lock.Unlock()
+
 	if err := blkWithCtx.VerifyWithContext(ctx, blockCtx); err != nil {
 		// Note: we cannot cache blocks failing verification in case
 		// the error is temporary and the block could become valid in
@@ -91,6 +101,9 @@ func (bw *BlockWrapper) VerifyWithContext(ctx context.Context, blockCtx *block.C
 // Accept accepts the underlying block, removes it from verifiedBlocks, caches it as a decided
 // block, and updates the last accepted block.
 func (bw *BlockWrapper) Accept(ctx context.Context) error {
+	bw.state.lock.Lock()
+	defer bw.state.lock.Unlock()
+
 	blkID := bw.ID()
 	delete(bw.state.verifiedBlocks, blkID)
 	bw.state.decidedBlocks.Put(blkID, bw)
@@ -102,6 +115,9 @@ func (bw *BlockWrapper) Accept(ctx context.Context) error {
 // Reject rejects the underlying block, removes it from processing blocks, and caches it as a
 // decided block.
 func (bw *BlockWrapper) Reject(ctx context.Context) error {
+	bw.state.lock.Lock()
+	defer bw.state.lock.Unlock()
+
 	blkID := bw.ID()
 	delete(bw.state.verifiedBlocks, blkID)
 	bw.state.decidedBlocks.Put(blkID, bw)
