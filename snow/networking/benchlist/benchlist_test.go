@@ -7,13 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var minimumFailingDuration = 5 * time.Minute
@@ -22,18 +20,19 @@ var minimumFailingDuration = 5 * time.Minute
 func TestBenchlistAdd(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
 	vdrID2 := ids.GenerateTestNodeID()
 	vdrID3 := ids.GenerateTestNodeID()
 	vdrID4 := ids.GenerateTestNodeID()
 
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 50))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 50))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID0, nil, ids.Empty, 50))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID1, nil, ids.Empty, 50))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID2, nil, ids.Empty, 50))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID3, nil, ids.Empty, 50))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID4, nil, ids.Empty, 50))
 
 	benchable := &TestBenchable{T: t}
 	benchable.Default(true)
@@ -42,15 +41,13 @@ func TestBenchlistAdd(t *testing.T) {
 	duration := time.Minute
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
-		ids.Empty,
-		logging.NoLog{},
+		ctx,
 		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
@@ -156,7 +153,8 @@ func TestBenchlistAdd(t *testing.T) {
 func TestBenchlistMaxStake(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
 	vdrID2 := ids.GenerateTestNodeID()
@@ -164,26 +162,24 @@ func TestBenchlistMaxStake(t *testing.T) {
 	vdrID4 := ids.GenerateTestNodeID()
 
 	// Total weight is 5100
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 2000))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 100))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID0, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID1, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID2, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID3, nil, ids.Empty, 2000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID4, nil, ids.Empty, 100))
 
 	threshold := 3
 	duration := 1 * time.Hour
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
-		ids.Empty,
-		logging.NoLog{},
+		ctx,
 		&TestBenchable{T: t},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
@@ -273,7 +269,8 @@ func TestBenchlistMaxStake(t *testing.T) {
 func TestBenchlistRemove(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
 	vdrID2 := ids.GenerateTestNodeID()
@@ -281,11 +278,11 @@ func TestBenchlistRemove(t *testing.T) {
 	vdrID4 := ids.GenerateTestNodeID()
 
 	// Total weight is 5000
-	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 1000))
-	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID0, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID1, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID2, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID3, nil, ids.Empty, 1000))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID4, nil, ids.Empty, 1000))
 
 	count := 0
 	benchable := &TestBenchable{
@@ -300,15 +297,13 @@ func TestBenchlistRemove(t *testing.T) {
 	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
 	benchIntf, err := NewBenchlist(
-		ids.Empty,
-		logging.NoLog{},
+		ctx,
 		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
