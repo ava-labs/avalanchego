@@ -42,4 +42,6 @@ func TestBatch(t *testing.T) {
 	batch.Reset()
 	require.False(batch.written)
 	require.Zero(batch.Size())
+
+	require.NoError(db.Close())
 }
