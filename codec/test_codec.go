@@ -24,7 +24,6 @@ var (
 		TestPointerToStruct,
 		TestSliceOfStruct,
 		TestStructWithPtr,
-		TestStructWithPtrNil,
 		TestInterface,
 		TestSliceOfInterface,
 		TestArrayOfInterface,
@@ -455,28 +454,20 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 	require.Zero(version)
 	require.Equal(struct1, struct1Unmarshaled)
-}
 
-func TestStructWithPtrNil(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-	struct1 := MyStructWithPtr{}
-
-	require.NoError(codec.RegisterType(&MyStructWithPtr{}))
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	bytes, err := manager.Marshal(0, struct1)
+	struct1 = MyStructWithPtr{}
+	bytes, err = manager.Marshal(0, struct1)
 	require.NoError(err)
 
-	bytesLen, err := manager.Size(0, struct1)
+	bytesLen, err = manager.Size(0, struct1)
 	require.NoError(err)
 	require.Len(bytes, bytesLen)
 
-	var struct1Unmarshaled MyStructWithPtr
-	version, err := manager.Unmarshal(bytes, &struct1Unmarshaled)
+	var struct1Unmarshaled2 MyStructWithPtr
+	version, err = manager.Unmarshal(bytes, &struct1Unmarshaled2)
 	require.NoError(err)
 	require.Zero(version)
-	require.Equal(struct1, struct1Unmarshaled)
+	require.Equal(struct1, struct1Unmarshaled2)
 }
 
 // Test marshalling a slice of structs
