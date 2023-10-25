@@ -69,7 +69,6 @@ func (it *iter) Next() bool {
 		return false
 	}
 
-	// Set the next key.
 	it.nextKey = it.iter.Key()
 
 	// Set the next value.
@@ -104,11 +103,8 @@ func (it *iter) Error() error {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
-	if it.err != nil {
+	if it.err != nil || it.closed {
 		return it.err
-	}
-	if it.closed {
-		return nil
 	}
 	return updateError(it.iter.Error())
 }
