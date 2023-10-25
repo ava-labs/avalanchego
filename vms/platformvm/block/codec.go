@@ -37,6 +37,7 @@ func init() {
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
 			RegisterBanffBlockTypes(c),
+			txs.RegisterDUnsignedTxsTypes(c),
 		)
 	}
 	errs.Add(
