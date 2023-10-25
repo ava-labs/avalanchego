@@ -172,7 +172,7 @@ func (db *Database) Delete(key []byte) error {
 	return updateError(db.pebbleDB.Delete(key, pebble.Sync))
 }
 
-func (db *Database) Compact(start []byte, limit []byte) error {
+func (db *Database) Compact(start []byte, end []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -180,32 +180,29 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		return database.ErrClosed
 	}
 
-	if limit != nil {
-		if pebble.DefaultComparer.Compare(start, limit) >= 0 {
-			// pebbleDB.Compact requires start < limit or it panics.
-			return nil
+	if end == nil {
+		// The database.Database spec treats a nil [limit] as a key after all keys
+		// but pebble treats a nil [limit] as a key before all keys in Compact.
+		// Use the greatest key in the database as the [limit] to get the desired behavior.
+		it := db.pebbleDB.NewIter(&pebble.IterOptions{})
+
+		if !it.Last() {
+			// The database is empty.
+			return it.Close()
 		}
-		return updateError(db.pebbleDB.Compact(start, limit, true /* parallelize */))
-	}
 
-	// The database.Database spec treats a nil [limit] as a key after all keys
-	// but pebble treats a nil [limit] as a key before all keys in Compact.
-	// Use the greatest key in the database as the [limit] to get the desired behavior.
-	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
-	defer it.Close()
-
-	if it.Last() {
-		if lastkey := it.Key(); lastkey != nil {
-			if pebble.DefaultComparer.Compare(start, lastkey) >= 0 {
-				// pebbleDB.Compact requires start < limit or it panics.
-				return nil
-			}
-			return updateError(db.pebbleDB.Compact(start, lastkey, true /* parallelize */))
+		end = it.Key()
+		if err := it.Close(); err != nil {
+			return err
 		}
 	}
 
-	// Either this database is empty or the only key in it is nil.
-	return nil
+	if pebble.DefaultComparer.Compare(start, end) >= 1 {
+		// pebble requires [start] < [end]
+		return nil
+	}
+
+	return updateError(db.pebbleDB.Compact(start, end, true /* parallelize */))
 }
 
 func (db *Database) NewIterator() database.Iterator {
