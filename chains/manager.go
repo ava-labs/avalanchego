@@ -531,19 +531,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	}
 
-	vdrs := m.Validators
-	if !m.SybilProtectionEnabled {
-		// If sybil protection is disabled, everyone validates every chain
-		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
-	}
-
 	var chain *chain
 	switch vm := vm.(type) {
 	case vertex.LinearizableVMWithEngine:
 		chain, err = m.createAvalancheChain(
 			ctx,
 			chainParams.GenesisData,
-			vdrs,
+			m.Validators,
 			vm,
 			fxs,
 			sb,
@@ -552,7 +546,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
-		beacons := vdrs
+		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
 		}
@@ -560,7 +554,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
-			vdrs,
+			m.Validators,
 			beacons,
 			vm,
 			fxs,
