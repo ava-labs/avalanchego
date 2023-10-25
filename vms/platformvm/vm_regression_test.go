@@ -639,7 +639,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -949,7 +948,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -1390,10 +1388,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.TrackedSubnets.Add(createSubnetTx.ID())
-	subnetValidators := validators.NewSet()
-	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
-
-	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
+	require.NoError(vm.state.ApplyCurrentValidators(createSubnetTx.ID(), vm.Validators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		ts.MaxValidatorStake,

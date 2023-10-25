@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -29,15 +28,11 @@ func Config(postBanff, postCortina bool) *config.Config {
 		cortinaTime = ValidateStartTime.Add(-2 * time.Second)
 	}
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  TxFee,
 		CreateSubnetTxFee:      100 * TxFee,
 		TransformSubnetTxFee:   100 * TxFee,

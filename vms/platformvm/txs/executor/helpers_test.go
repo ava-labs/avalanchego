@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"errors"
 	"math"
 	"testing"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -269,23 +267,14 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs, err := validators.NodeIDs(env.config.Validators, subnetID)
-			if errors.Is(err, validators.ErrMissingValidators) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+			validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
 
 			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
 				return err

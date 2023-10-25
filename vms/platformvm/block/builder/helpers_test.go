@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -258,11 +257,10 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 }
 
 func shutdownEnvironment(env *environment) error {
+	env.Builder.Shutdown()
+
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
