@@ -2141,6 +2141,11 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+
+	createSubnetRawBlock := createSubnetBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, createSubnetRawBlock)
+	require.Contains(createSubnetRawBlock.Txs(), createSubnetTx)
+
 	require.NoError(createSubnetBlock.Verify(context.Background()))
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
@@ -2156,7 +2161,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	}
 	require.Equal(expectedOwner, subnetOwner)
 
-	tx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
+	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		1,
 		[]ids.ShortID{keys[1].PublicKey().Address()},
@@ -2165,9 +2170,14 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.AddUnverifiedTx(transferSubnetOwnershipTx))
 	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+
+	transferSubnetOwnershipRawBlock := transferSubnetOwnershipBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, transferSubnetOwnershipRawBlock)
+	require.Contains(transferSubnetOwnershipRawBlock.Txs(), transferSubnetOwnershipTx)
+
 	require.NoError(transferSubnetOwnershipBlock.Verify(context.Background()))
 	require.NoError(transferSubnetOwnershipBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
