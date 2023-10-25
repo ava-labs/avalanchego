@@ -89,12 +89,18 @@ import (
 )
 
 var (
-	genesisHashKey  = []byte("genesisID")
+	genesisHashKey = []byte("genesisID")
+	sessionKey     = []byte("session")
+
 	indexerDBPrefix = []byte{0x00}
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
 )
+
+type session struct {
+	Timestamp time.Time `json:"timestamp"`
+}
 
 // Node is an instance of an Avalanche node.
 type Node struct {
@@ -557,6 +563,49 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	ok, err := n.DB.Has(sessionKey)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		sessionBytes, err := n.DB.Get(sessionKey)
+		if err != nil {
+			return err
+		}
+		session := session{}
+		if err := json.Unmarshal(sessionBytes, &session); err != nil {
+			return fmt.Errorf("failed to unmarshal session metadata: %w", err)
+		}
+
+		n.Log.Warn(
+			"detected previous ungraceful shutdown",
+			zap.Time("timestamp", session.Timestamp),
+		)
+	}
+
+	session := session{
+		Timestamp: time.Now(),
+	}
+	sessionBytes, err := json.Marshal(session)
+	if err != nil {
+		return fmt.Errorf("failed to marshal session metadata: %w", err)
+	}
+
+	if err := n.DB.Put(sessionKey, sessionBytes); err != nil {
+		return fmt.Errorf(
+			"failed to write session metadata at %s: %w",
+			session.Timestamp,
+			err,
+		)
+	}
+
+	n.Log.Info(
+		"initialized database",
+		zap.Time("timestamp", session.Timestamp),
+	)
+
 	return nil
 }
 
@@ -1528,6 +1577,10 @@ func (n *Node) shutdown() {
 	n.runtimeManager.Stop(context.TODO())
 
 	if n.DBManager != nil {
+		if err := n.DB.Delete(sessionKey); err != nil {
+			n.Log.Error("failed to delete session metadata", zap.Error(err))
+		}
+
 		if err := n.DBManager.Close(); err != nil {
 			n.Log.Warn("error during DB shutdown",
 				zap.Error(err),
