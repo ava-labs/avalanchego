@@ -316,13 +316,12 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	require.Len(genesisState.Validators, vdrSet.Len())
+	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
 	for _, key := range ts.Keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		require.True(vdrSet.Contains(nodeID))
+		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
+		require.True(ok)
 	}
 
 	// Ensure the new subnet we created exists
@@ -1268,8 +1267,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	beacons := validators.NewSet()
-	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
+	beacons := validators.NewManager()
+	require.NoError(beacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1287,6 +1286,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	go timeoutManager.Dispatch()
+	defer timeoutManager.Stop()
 
 	chainRouter := &router.ChainRouter{}
 
@@ -1354,17 +1354,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	peers := tracker.NewPeers()
-	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
-	beacons.RegisterCallbackListener(startup)
+	totalWeight, err := beacons.TotalWeight(ctx.SubnetID)
+	require.NoError(err)
+	startup := tracker.NewStartup(peers, (totalWeight+1)/2)
+	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Len(),
+		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Alpha:                          (beacons.Weight() + 1) / 2,
+		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersSent:     2000,
