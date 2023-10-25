@@ -4,7 +4,6 @@
 package pebble
 
 import (
-	"os"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,7 +17,6 @@ import (
 func TestBatch(t *testing.T) {
 	require := require.New(t)
 	dirName := t.TempDir()
-	defer os.Remove(dirName)
 
 	db, err := New(dirName, DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
