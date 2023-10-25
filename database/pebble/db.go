@@ -150,8 +150,8 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 }
 
 func (db *Database) Put(key []byte, value []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
@@ -161,8 +161,8 @@ func (db *Database) Put(key []byte, value []byte) error {
 }
 
 func (db *Database) Delete(key []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
@@ -263,8 +263,8 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 }
 
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
 	if db.closed {
 		return &iter{
