@@ -15,7 +15,7 @@ import (
 // engine
 type Config struct {
 	Ctx     *snow.ConsensusContext
-	Beacons validators.Set
+	Beacons validators.Manager
 
 	SampleK          int
 	Alpha            uint64
