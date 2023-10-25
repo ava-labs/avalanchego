@@ -50,12 +50,12 @@ func (it *iter) Next() bool {
 	defer it.lock.Unlock()
 
 	switch {
+	case it.err != nil:
+		it.hasNext = false
+		return false
 	case it.closed || dbClosed:
 		it.hasNext = false
 		it.err = database.ErrClosed
-		return false
-	case it.err != nil:
-		it.hasNext = false
 		return false
 	case !it.initialized:
 		it.hasNext = it.iter.First()
