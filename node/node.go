@@ -89,8 +89,8 @@ import (
 )
 
 var (
-	genesisHashKey = []byte("genesisID")
-	sessionKey     = []byte("session")
+	genesisHashKey     = []byte("genesisID")
+	ungracefulShutdown = []byte("ungracefulShutdown")
 
 	indexerDBPrefix = []byte{0x00}
 
@@ -559,17 +559,20 @@ func (n *Node) initDatabase() error {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 
-	ok, err := n.DB.Has(sessionKey)
+	ok, err := n.DB.Has(ungracefulShutdown)
 	if err != nil {
-		return fmt.Errorf("failed to read session key: %w", err)
+		return fmt.Errorf("failed to read ungraceful shutdown key: %w", err)
 	}
 
 	if ok {
 		n.Log.Warn("detected previous ungraceful shutdown")
 	}
 
-	if err := n.DB.Put(sessionKey, nil); err != nil {
-		return fmt.Errorf("failed to write session key at: %w", err)
+	if err := n.DB.Put(ungracefulShutdown, nil); err != nil {
+		return fmt.Errorf(
+			"failed to write ungraceful shutdown key at: %w",
+			err,
+		)
 	}
 
 	return nil
@@ -1546,8 +1549,11 @@ func (n *Node) shutdown() {
 	n.runtimeManager.Stop(context.TODO())
 
 	if n.DBManager != nil {
-		if err := n.DB.Delete(sessionKey); err != nil {
-			n.Log.Error("failed to delete session metadata", zap.Error(err))
+		if err := n.DB.Delete(ungracefulShutdown); err != nil {
+			n.Log.Error(
+				"failed to delete ungraceful shutdown key",
+				zap.Error(err),
+			)
 		}
 
 		if err := n.DBManager.Close(); err != nil {
