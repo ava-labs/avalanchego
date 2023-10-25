@@ -82,14 +82,6 @@ func ToKey(keyBytes []byte) Key {
 	}
 }
 
-func bytesNeeded(bits int) int {
-	size := bits / 8
-	if bits%8 != 0 {
-		size++
-	}
-	return size
-}
-
 // hasPartialByte returns true iff the key fits into a non-whole number of bytes
 func (k Key) hasPartialByte() bool {
 	return k.length%8 > 0
@@ -328,4 +320,13 @@ func stringToByteSlice(value string) []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the []byte
 	return unsafe.Slice(unsafe.StringData(value), len(value))
+}
+
+// Returns the number of bytes needed to store [bits] bits.
+func bytesNeeded(bits int) int {
+	size := bits / 8
+	if bits%8 != 0 {
+		size++
+	}
+	return size
 }
