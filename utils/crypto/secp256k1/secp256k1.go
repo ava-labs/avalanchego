@@ -58,12 +58,12 @@ type Factory struct {
 	Cache cache.LRU[ids.ID, *PublicKey]
 }
 
-func (*Factory) NewPrivateKey() (*PrivateKey, error) {
+func NewPrivateKey() (*PrivateKey, error) {
 	k, err := secp256k1.GeneratePrivateKey()
 	return &PrivateKey{sk: k}, err
 }
 
-func (*Factory) ToPublicKey(b []byte) (*PublicKey, error) {
+func ToPublicKey(b []byte) (*PublicKey, error) {
 	if len(b) != PublicKeyLen {
 		return nil, errInvalidPublicKeyLength
 	}
@@ -75,7 +75,7 @@ func (*Factory) ToPublicKey(b []byte) (*PublicKey, error) {
 	}, err
 }
 
-func (*Factory) ToPrivateKey(b []byte) (*PrivateKey, error) {
+func ToPrivateKey(b []byte) (*PrivateKey, error) {
 	if len(b) != PrivateKeyLen {
 		return nil, errInvalidPrivateKeyLength
 	}

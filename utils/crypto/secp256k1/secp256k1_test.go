@@ -20,7 +20,7 @@ func TestRecover(t *testing.T) {
 	require := require.New(t)
 
 	f := Factory{}
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
@@ -38,7 +38,7 @@ func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
 	f := Factory{Cache: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
@@ -56,10 +56,9 @@ func TestCachedRecover(t *testing.T) {
 func TestExtensive(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	hash := hashing.ComputeHash256([]byte{1, 2, 3})
 	for i := 0; i < 1000; i++ {
-		key, err := f.NewPrivateKey()
+		key, err := NewPrivateKey()
 		require.NoError(err)
 
 		_, err = key.SignHash(hash)
@@ -70,13 +69,12 @@ func TestExtensive(t *testing.T) {
 func TestGenRecreate(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	for i := 0; i < 1000; i++ {
-		sk, err := f.NewPrivateKey()
+		sk, err := NewPrivateKey()
 		require.NoError(err)
 
 		skBytes := sk.Bytes()
-		recoveredSk, err := f.ToPrivateKey(skBytes)
+		recoveredSk, err := ToPrivateKey(skBytes)
 		require.NoError(err)
 
 		require.Equal(sk.PublicKey(), recoveredSk.PublicKey())
@@ -87,7 +85,7 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	require := require.New(t)
 
 	f := Factory{}
-	sk, err := f.NewPrivateKey()
+	sk, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{'h', 'e', 'l', 'l', 'o'}
@@ -106,9 +104,8 @@ func TestVerifyMutatedSignature(t *testing.T) {
 
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
-	f := Factory{}
 
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	keyJSON, err := key.MarshalJSON()
@@ -245,7 +242,7 @@ func FuzzVerifySignature(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
-		privateKey, err := factory.NewPrivateKey()
+		privateKey, err := NewPrivateKey()
 		require.NoError(err)
 
 		publicKey := privateKey.PublicKey()
