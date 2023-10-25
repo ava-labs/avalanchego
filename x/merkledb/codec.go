@@ -63,7 +63,7 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
-	// Assumes [hv] is non-nil.
+	// Assumes [n] is non-nil.
 	encodeHashValues(n *node) []byte
 }
 
