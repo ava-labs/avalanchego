@@ -685,20 +685,24 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					_, ok := env.config.Validators.GetValidator(constants.PrimaryNetworkID, stakerNodeID)
+					require.False(ok)
 				case current:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					_, ok := env.config.Validators.GetValidator(constants.PrimaryNetworkID, stakerNodeID)
+					require.True(ok)
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					require.False(env.config.Validators.Contains(subnetID, stakerNodeID))
+					_, ok := env.config.Validators.GetValidator(subnetID, stakerNodeID)
+					require.False(ok)
 				case current:
-					require.True(env.config.Validators.Contains(subnetID, stakerNodeID))
+					_, ok := env.config.Validators.GetValidator(subnetID, stakerNodeID)
+					require.True(ok)
 				}
 			}
 		})
@@ -836,8 +840,10 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Check VM Validators are removed successfully
 	require.NoError(propBlk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
-	require.False(env.config.Validators.Contains(subnetID, subnetVdr2NodeID))
-	require.False(env.config.Validators.Contains(subnetID, subnetValidatorNodeID))
+	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
+	require.False(ok)
+	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+	require.False(ok)
 }
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
@@ -940,7 +946,8 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			require.Equal(tracked, env.config.Validators.Contains(subnetID, subnetValidatorNodeID))
+			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+			require.Equal(tracked, ok)
 		})
 	}
 }
