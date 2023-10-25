@@ -192,6 +192,10 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
+			if bytes.Compare(start, lastkey) >= 0 {
+				// pebbleDB.Compact requires start < limit or it panics.
+				return nil
+			}
 			return updateError(db.pebbleDB.Compact(start, lastkey, true /* parallelize */))
 		}
 	}
