@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 // CodecVersion is the current default codec version
@@ -64,8 +64,7 @@ func NewCustomParser(
 	gcm := codec.NewManager(math.MaxInt32)
 	cm := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
@@ -80,8 +79,8 @@ func NewCustomParser(
 		gc.RegisterType(&ExportTx{}),
 		gcm.RegisterCodec(CodecVersion, gc),
 	)
-	if errs.Errored() {
-		return nil, errs.Err
+	if err != nil {
+		return nil, err
 	}
 
 	vm := &fxVM{

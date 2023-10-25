@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const progressUpdateFrequency = 30 * time.Second
@@ -425,10 +425,8 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return verify.Err(
 		runnableJobsIter.Error(),
 		jm.Commit(),
 	)
-	return errs.Err
 }

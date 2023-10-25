@@ -24,10 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -522,8 +522,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) Close() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return verify.Err(
 		s.utxoDB.Close(),
 		s.statusDB.Close(),
 		s.txDB.Close(),
@@ -532,19 +531,16 @@ func (s *state) Close() error {
 		s.singletonDB.Close(),
 		s.db.Close(),
 	)
-	return errs.Err
 }
 
 func (s *state) write() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return verify.Err(
 		s.writeUTXOs(),
 		s.writeTxs(),
 		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeMetadata(),
 	)
-	return errs.Err
 }
 
 func (s *state) writeUTXOs() error {
@@ -691,15 +687,14 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			errs := wrappers.Errs{}
-			errs.Add(
+			err := verify.Err(
 				s.Commit(),
 				statusIter.Error(),
 				txIter.Error(),
 			)
 			lock.Unlock()
-			if errs.Errored() {
-				return errs.Err
+			if err != nil {
+				return err
 			}
 
 			// We release the iterators here to allow the underlying database to
@@ -751,8 +746,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		s.Commit(),
 		statusIter.Error(),
 		txIter.Error(),
@@ -769,7 +763,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
-	return errs.Err
+	return err
 }
 
 // Assumes [lock] is unlocked.
@@ -891,12 +885,10 @@ func (s *state) initTxChecksum() error {
 		return errStatusWithoutTx
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return verify.Err(
 		txIt.Error(),
 		statusIt.Error(),
 	)
-	return errs.Err
 }
 
 func (s *state) updateTxChecksum(modifiedID ids.ID) {

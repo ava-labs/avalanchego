@@ -728,7 +728,6 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 func (n *network) Dispatch() error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
-	errs := wrappers.Errs{}
 	for { // Continuously accept new connections
 		if n.onCloseCtx.Err() != nil {
 			break
@@ -794,6 +793,7 @@ func (n *network) Dispatch() error {
 	connected := n.connectedPeers.Sample(n.connectedPeers.Len(), peer.NoPrecondition)
 	n.peersLock.RUnlock()
 
+	errs := wrappers.Errs{}
 	for _, peer := range append(connecting, connected...) {
 		errs.Add(peer.AwaitClosed(context.TODO()))
 	}

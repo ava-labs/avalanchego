@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const epsilon = time.Millisecond
@@ -80,13 +80,12 @@ func newSystemThrottlerMetrics(namespace string, reg prometheus.Registerer) (*sy
 			Help:      "Number of nodes we're waiting to read a message from because their usage is too high",
 		}),
 	}
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		reg.Register(m.totalWaits),
 		reg.Register(m.totalNoWaits),
 		reg.Register(m.awaitingAcquire),
 	)
-	return m, errs.Err
+	return m, err
 }
 
 func NewSystemThrottler(

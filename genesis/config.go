@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -172,31 +172,32 @@ func init() {
 	unparsedFujiConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		json.Unmarshal(mainnetGenesisConfigJSON, &unparsedMainnetConfig),
 		json.Unmarshal(fujiGenesisConfigJSON, &unparsedFujiConfig),
 		json.Unmarshal(localGenesisConfigJSON, &unparsedLocalConfig),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 
 	mainnetConfig, err := unparsedMainnetConfig.Parse()
-	errs.Add(err)
+	if err != nil {
+		panic(err)
+	}
 	MainnetConfig = mainnetConfig
 
 	fujiConfig, err := unparsedFujiConfig.Parse()
-	errs.Add(err)
+	if err != nil {
+		panic(err)
+	}
 	FujiConfig = fujiConfig
 
 	localConfig, err := unparsedLocalConfig.Parse()
-	errs.Add(err)
-	LocalConfig = localConfig
-
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
+	LocalConfig = localConfig
 }
 
 func GetConfig(networkID uint32) *Config {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const codecVersion = 0
@@ -24,13 +24,12 @@ func init() {
 	linearCodec := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	c = codec.NewManager(math.MaxInt)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		linearCodec.RegisterType(&statelessBlock{}),
 		linearCodec.RegisterType(&option{}),
 		c.RegisterCodec(codecVersion, linearCodec),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

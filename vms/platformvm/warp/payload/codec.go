@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const (
@@ -27,13 +27,12 @@ func init() {
 	c = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewCustomMaxLength(MaxSliceLen)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := verify.Err(
 		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

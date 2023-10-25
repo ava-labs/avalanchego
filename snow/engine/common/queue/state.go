@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 const (
@@ -152,14 +152,12 @@ func (s *state) Clear() error {
 		return err
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return verify.Err(
 		runJobsIter.Error(),
 		jobsIter.Error(),
 		depsIter.Error(),
 		missJobsIter.Error(),
 	)
-	return errs.Err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue
