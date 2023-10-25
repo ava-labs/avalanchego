@@ -142,7 +142,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	assetID := ids.GenerateTestID()
 	validatorWeight := uint64(2022)
-	inputs := []*avGax.TransferableInput{{
+	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
 			OutputIndex: 2,
