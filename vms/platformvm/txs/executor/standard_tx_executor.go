@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -142,7 +141,13 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
 	if e.Bootstrapped.Get() && !e.Config.PartialSyncPrimaryNetwork {
-		if err := subnets.Same(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
+		if err := atomic.SameSubnet(
+			context.TODO(),
+			e.Ctx.ValidatorState,
+			e.Ctx.SubnetID,
+			e.Ctx.ChainID,
+			tx.SourceChain,
+		); err != nil {
 			return err
 		}
 
@@ -213,7 +218,13 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if e.Bootstrapped.Get() {
-		if err := subnets.Same(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
+		if err := atomic.SameSubnet(
+			context.TODO(),
+			e.Ctx.ValidatorState,
+			e.Ctx.SubnetID,
+			e.Ctx.ChainID,
+			tx.DestinationChain,
+		); err != nil {
 			return err
 		}
 	}

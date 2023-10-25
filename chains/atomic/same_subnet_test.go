@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package subnets
+package atomic
 
 import (
 	"context"
@@ -13,75 +13,62 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var errMissing = errors.New("missing")
 
-func TestSame(t *testing.T) {
+func TestSameSubnet(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
 
 	tests := []struct {
-		name    string
-		ctxF    func(*gomock.Controller) *snow.Context
+		name string
+		ctxF func(*gomock.Controller) (
+			validatorState validators.State,
+			subnetID ids.ID,
+			chainID ids.ID,
+		)
 		chainID ids.ID
 		result  error
 	}{
 		{
 			name: "same chain",
-			ctxF: func(ctrl *gomock.Controller) *snow.Context {
+			ctxF: func(ctrl *gomock.Controller) (validators.State, ids.ID, ids.ID) {
 				state := validators.NewMockState(ctrl)
-				return &snow.Context{
-					SubnetID:       subnetID0,
-					ChainID:        chainID0,
-					ValidatorState: state,
-				}
+				return state, subnetID0, chainID0
 			},
 			chainID: chainID0,
 			result:  ErrSameChainID,
 		},
 		{
 			name: "unknown chain",
-			ctxF: func(ctrl *gomock.Controller) *snow.Context {
+			ctxF: func(ctrl *gomock.Controller) (validators.State, ids.ID, ids.ID) {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID1, errMissing)
-				return &snow.Context{
-					SubnetID:       subnetID0,
-					ChainID:        chainID0,
-					ValidatorState: state,
-				}
+				return state, subnetID0, chainID0
 			},
 			chainID: chainID1,
 			result:  errMissing,
 		},
 		{
 			name: "wrong subnet",
-			ctxF: func(ctrl *gomock.Controller) *snow.Context {
+			ctxF: func(ctrl *gomock.Controller) (validators.State, ids.ID, ids.ID) {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID1, nil)
-				return &snow.Context{
-					SubnetID:       subnetID0,
-					ChainID:        chainID0,
-					ValidatorState: state,
-				}
+				return state, subnetID0, chainID0
 			},
 			chainID: chainID1,
 			result:  ErrMismatchedSubnetIDs,
 		},
 		{
 			name: "same subnet",
-			ctxF: func(ctrl *gomock.Controller) *snow.Context {
+			ctxF: func(ctrl *gomock.Controller) (validators.State, ids.ID, ids.ID) {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID0, nil)
-				return &snow.Context{
-					SubnetID:       subnetID0,
-					ChainID:        chainID0,
-					ValidatorState: state,
-				}
+				return state, subnetID0, chainID0
 			},
 			chainID: chainID1,
 			result:  nil,
@@ -90,9 +77,9 @@ func TestSame(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			ctx := test.ctxF(ctrl)
+			ctxValidatorState, ctxSubnetID, ctxChainID := test.ctxF(ctrl)
 
-			result := Same(context.Background(), ctx, test.chainID)
+			result := SameSubnet(context.Background(), ctxValidatorState, ctxSubnetID, ctxChainID, test.chainID)
 			require.ErrorIs(t, result, test.result)
 		})
 	}

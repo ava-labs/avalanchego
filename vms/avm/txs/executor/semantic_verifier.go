@@ -8,8 +8,8 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -90,7 +90,13 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return nil
 	}
 
-	if err := subnets.Same(context.TODO(), v.Ctx, tx.SourceChain); err != nil {
+	if err := atomic.SameSubnet(
+		context.TODO(),
+		v.Ctx.ValidatorState,
+		v.Ctx.SubnetID,
+		v.Ctx.ChainID,
+		tx.SourceChain,
+	); err != nil {
 		return err
 	}
 
@@ -128,7 +134,13 @@ func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	if v.Bootstrapped {
-		if err := subnets.Same(context.TODO(), v.Ctx, tx.DestinationChain); err != nil {
+		if err := atomic.SameSubnet(
+			context.TODO(),
+			v.Ctx.ValidatorState,
+			v.Ctx.SubnetID,
+			v.Ctx.ChainID,
+			tx.DestinationChain,
+		); err != nil {
 			return err
 		}
 	}
