@@ -287,13 +287,10 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
@@ -428,23 +425,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs, err := validators.NodeIDs(env.config.Validators, subnetID)
-			if errors.Is(err, validators.ErrMissingValidators) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+			validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
 
 			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
 				return err

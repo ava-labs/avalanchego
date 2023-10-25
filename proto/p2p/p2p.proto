@@ -61,297 +61,356 @@ message Message {
   }
 }
 
-// Message that a node sends to its peers in order to periodically check
-// responsivness and report the local node's uptime measurements of the peer.
+// Ping reports a peer's perceived uptime percentage.
 //
-// On receiving a "ping", the peer should respond with a "pong".
+// Peers should respond to Ping with a Pong.
 message Ping {
-  // uptime is the primary network uptime percentage.
+  // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // subnet_uptimes contains subnet uptime percentages.
+  // Uptime percentage on subnets
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
-// Contains subnet id and the related observed subnet uptime of the message
-// receiver (remote peer).
+// SubnetUptime is a descriptor for a peer's perceived uptime on a subnet.
 message SubnetUptime {
+  // Subnet the peer is validating
   bytes subnet_id = 1;
+  // Uptime percentage on the subnet [0, 100]
   uint32 uptime = 2;
 }
 
-// Contains the uptime percentage of the message receiver (remote peer)
-// from the sender's point of view, in response to "ping" message.
-// Uptimes are expected to be provided as integers ranging in [0, 100].
+// Pong is sent in response to a Ping with the perceived uptime of the
+// peer.
 message Pong {
-  // Deprecated: remove all these fields in the future, but keep the message.
-  // uptime is the primary network uptime percentage.
+  // Deprecated: uptime is now sent in Ping
+  // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // subnet_uptimes contains subnet uptime percentages.
+  // Deprecated: uptime is now sent in Ping
+  // Uptime percentage on subnets
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
-// The first outbound message that the local node sends to its remote peer
-// when the connection is established. In order for the local node to be
-// tracked as a valid peer by the remote peer, the fields must be valid.
-// For instance, the network ID must be matched and timestamp should be in-sync.
-// Otherwise, the remote peer closes the connection.
-// ref. "avalanchego/network/peer#handleVersion"
-// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/network#Network "Dispatch"
+// Version is the first outbound message sent to a peer when a connection is
+// established to start the p2p handshake.
+//
+// Peers must respond to a Version message with a PeerList message to allow the
+// peer to connect to other peers in the network.
+//
+// Peers should drop connections to peers with incompatible versions.
 message Version {
+  // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
+  // Unix timestamp when this Version message was created
   uint64 my_time = 2;
+  // IP address of the peer
   bytes ip_addr = 3;
+  // IP port of the peer
   uint32 ip_port = 4;
+  // Avalanche client version
   string my_version = 5;
+  // Timestamp of the IP
   uint64 my_version_time = 6;
+  // Signature of the peer IP port pair at a provided timestamp
   bytes sig = 7;
+  // Subnets the peer is tracking
   repeated bytes tracked_subnets = 8;
 }
 
-// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/utils/ips#ClaimedIPPort
+// ClaimedIpPort contains metadata needed to connect to a peer
 message ClaimedIpPort {
+  // X509 certificate of the peer
   bytes x509_certificate = 1;
+  // IP address of the peer
   bytes ip_addr = 2;
+  // IP port of the peer
   uint32 ip_port = 3;
+  // Timestamp of the IP address + port pair
   uint64 timestamp = 4;
+  // Signature of the IP port pair at a provided timestamp
   bytes signature = 5;
+  // P-Chain transaction that added this peer to the validator set
   bytes tx_id = 6;
 }
 
-// Message that contains a list of peer information (IP, certs, etc.)
-// in response to "version" message, and sent periodically to a set of
-// validators.
-// ref. "avalanchego/network/network#Dispatch.runtTimers"
+// PeerList contains network-level metadata for a set of validators.
 //
-// On receiving "peer_list", the engine starts/updates the tracking information
-// of the remote peer.
+// PeerList must be sent in response to an inbound Version message from a
+// remote peer a peer wants to connect to. Once a PeerList is received after
+// a version message, the p2p handshake is complete and the connection is
+// established.
+
+// Peers should periodically send PeerList messages to allow peers to
+// discover each other.
+//
+// PeerListAck should be sent in response to a PeerList.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
 }
 
-// "peer_ack" is sent in response to a "peer_list" message. The "tx_id" should
-// correspond to a "tx_id" in the "peer_list" message. The sender should set
-// "timestamp" to be the latest known timestamp of a signed IP corresponding to
-// the nodeID of "tx_id".
-//
-// Upon receipt, the "tx_id" and "timestamp" will determine if the receiptent
-// can forgo future gossip of the node's IP to the sender of this message.
+// PeerAck acknowledges that a gossiped peer in a PeerList message will be
+// tracked by the remote peer.
 message PeerAck {
+  // P-Chain transaction that added the acknowledged peer to the validator
+  // set
   bytes tx_id = 1;
+  // Timestamp of the signed ip of the peer
   uint64 timestamp = 2;
 }
 
-// Message that responds to a peer_list message containing the AddValidatorTxIDs
-// from the peer_list message that we currently have in our validator set.
+// PeerListAck is sent in response to PeerList to acknowledge the subset of
+// peers that the peer will attempt to connect to.
 message PeerListAck {
   reserved 1; // deprecated; used to be tx_ids
-
   repeated PeerAck peer_acks = 2;
 }
 
+// GetStateSummaryFrontier requests a peer's most recently accepted state
+// summary
 message GetStateSummaryFrontier {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
 }
 
+// StateSummaryFrontier is sent in response to a GetStateSummaryFrontier request
 message StateSummaryFrontier {
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original GetStateSummaryFrontier request
   uint32 request_id = 2;
+  // The requested state summary
   bytes summary = 3;
 }
 
+// GetAcceptedStateSummary requests a set of state summaries at a set of
+// block heights
 message GetAcceptedStateSummary {
+  // Chain bein requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Heights being requested
   repeated uint64 heights = 4;
 }
 
+// AcceptedStateSummary is sent in response to GetAcceptedStateSummary
 message AcceptedStateSummary {
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original GetAcceptedStateSummary request
   uint32 request_id = 2;
+  // State summary ids
   repeated bytes summary_ids = 3;
 }
 
+// The consensus engine that should be used when handling a consensus request.
 enum EngineType {
   ENGINE_TYPE_UNSPECIFIED = 0;
+  // Only the X-Chain uses avalanche consensus
   ENGINE_TYPE_AVALANCHE = 1;
   ENGINE_TYPE_SNOWMAN = 2;
 }
 
-// Message to request for the accepted frontier of the "remote" peer.
-// For instance, the accepted frontier of X-chain DAG is the set of
-// accepted vertices that do not have any accepted descendants (i.e., frontier).
+// GetAcceptedFrontier requests the accepted frontier from a peer.
 //
-// During bootstrap, the local node sends out "get_accepted_frontier" to validators
-// (see "avalanchego/snow/engine/common/bootstrapper.Startup").
-// And the expected response is "accepted_frontier".
-//
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// Peers should respond to GetAcceptedFrontier with AcceptedFrontier.
 message GetAcceptedFrontier {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Consensus type the remote peer should use to handle this message
   EngineType engine_type = 4;
 }
 
-// Message that contains the list of accepted frontier in response to
-// "get_accepted_frontier". For instance, on receiving "get_accepted_frontier",
-// the X-chain engine responds with the accepted frontier of X-chain DAG.
+// AcceptedFrontier contains the remote peer's last accepted frontier.
 //
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// AcceptedFrontier is sent in response to GetAcceptedFrontier.
 message AcceptedFrontier {
   reserved 4; // Until Cortina upgrade is activated
-
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original GetAcceptedFrontier request
   uint32 request_id = 2;
+  // The id of the last accepted frontier
   bytes container_id = 3;
 }
 
-// Message to request for the accepted blocks/vertices of the "remote" peer.
-// The local node sends out this message during bootstrap, following "get_accepted_frontier".
-// Basically, sending the list of the accepted frontier and expects the response of
-// the accepted IDs from the remote peer.
+// GetAccepted sends a request with the sender's accepted frontier to a remote
+// peer.
 //
-// See "avalanchego/snow/engine/common/bootstrapper.Startup" and "sendGetAccepted".
-// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+// Peers should respond to GetAccepted with an Accepted message.
 message GetAccepted {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this message
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // The sender's accepted frontier
   repeated bytes container_ids = 4;
+  // Consensus type to handle this message
   EngineType engine_type = 5;
 }
 
-// Message that contains the list of accepted block/vertex IDs in response to
-// "get_accepted". For instance, on receiving "get_accepted" that contains
-// the sender's accepted frontier IDs, the X-chain engine responds only with
-// the accepted vertex IDs of the X-chain DAG.
-//
-// See "snow/engine/avalanche#GetAccepted" and "SendAccepted".
-// See "snow/engine/common/bootstrapper.go#Accepted".
+// Accepted is sent in response to GetAccepted. The sending peer responds with
+// a subset of container ids from the GetAccepted request that the sending peer
+// has accepted.
 message Accepted {
   reserved 4; // Until Cortina upgrade is activated
-
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original GetAccepted request
   uint32 request_id = 2;
+  // Subset of container ids from the GetAccepted request that the sender has
+  // accepted
   repeated bytes container_ids = 3;
 }
 
-// Message that requests for the ancestors (parents) of the specified container ID.
-// The engine bootstrapper sends this message to fetch all accepted containers
-// in its transitive path.
+// GetAncestors requests the ancestors for a given container.
 //
-// On receiving "get_ancestors", it responds with the ancestors' container bytes
-// in "ancestors" message.
+// The remote peer should respond with an Ancestors message.
 message GetAncestors {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Container for which ancestors are being requested
   bytes container_id = 4;
+  // Consensus type to handle this message
   EngineType engine_type = 5;
 }
 
-// Message that contains the container bytes of the ancestors
-// in response to "get_ancestors".
+// Ancestors is sent in response to GetAncestors.
 //
-// On receiving "ancestors", the engine parses the containers and queues them
-// to be accepted once we've received the entire chain history.
+// Ancestors contains a contiguous ancestry of containers for the requested
+// container in order of increasing block height.
 message Ancestors {
   reserved 4; // Until Cortina upgrade is activated
-
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original GetAncestors request
   uint32 request_id = 2;
+  // Ancestry for the requested container
   repeated bytes containers = 3;
 }
 
-// Message that requests for the container data.
+// Get requests a container from a remote peer.
 //
-// On receiving "get", the engine looks up the container from the storage.
-// If the container is found, it sends out the container data in "put" message.
+// Remote peers should respond with a Put message if they have the container.
 message Get {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Container being requested
   bytes container_id = 4;
+  // Consensus type to handle this message
   EngineType engine_type = 5;
 }
 
-// Message that contains the container ID and its bytes in response to "get".
-//
-// On receiving "put", the engine parses the container and tries to issue it to consensus.
+// Put is sent in response to Get with the requested block.
 message Put {
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original Get request
   uint32 request_id = 2;
+  // Requested container
   bytes container = 3;
+  // Consensus type to handle this message
   EngineType engine_type = 4;
 }
 
-// Message that contains a preferred container ID and its container bytes
-// in order to query other peers for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
+// PushQuery requests the preferences of a remote peer given a container.
 //
-// On receiving the "push_query", the engine parses the incoming container
-// and tries to issue the container and all of its parents to the consensus,
-// and calls "pull_query" handler to send "chits" for voting.
+// Remote peers should respond to a PushQuery with a Chits message
 message PushQuery {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Container being gossiped
   bytes container = 4;
+  // Consensus type to handle this message
   EngineType engine_type = 5;
+  // Requesting peer's last accepted height
   uint64 requested_height = 6;
 }
 
-// Message that contains a preferred container ID to query other peers
-// for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
-message PullQuery {
-  bytes chain_id = 1;
-  uint32 request_id = 2;
-  uint64 deadline = 3;
-  bytes container_id = 4;
-  EngineType engine_type = 5;
-  uint64 requested_height = 6;
-}
-
-// Message that contains the votes/preferences of the node. It is sent in
-// response to a "push_query" or "pull_query" request.
+// PullQuery requests the preferences of a remote peer given a container id.
 //
-// Upon receiving "chits", the engine will attempt to issue the preferred block
-// into consensus. If the referenced block is not locally available, the engine
-// will respond with a "get" message to fetch the missing block from the remote
-// peer.
-message Chits {
+// Remote peers should respond to a PullQuery with a Chits message
+message PullQuery {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
-  // Represents the current preferred block.
+  // Timeout (ns) for this request
+  uint64 deadline = 3;
+  // Container id being gossiped
+  bytes container_id = 4;
+  // Consensus type to handle this message
+  EngineType engine_type = 5;
+  // Requesting peer's last accepted height
+  uint64 requested_height = 6;
+}
+
+// Chits contains the preferences of a peer in response to a PushQuery or
+// PullQuery message.
+message Chits {
+  // Chain being responded from
+  bytes chain_id = 1;
+  // Request id of the original PushQuery/PullQuery request
+  uint32 request_id = 2;
+  // Currently preferred block
   bytes preferred_id = 3;
-  // Represents the last accepted block.
+  // Last accepted block
   bytes accepted_id = 4;
-  // Represents the current preferred block at the requested height.
+  // Currently preferred block at the requested height
   bytes preferred_id_at_height = 5;
 }
 
+// AppRequest is a VM-defined request.
+//
+// Remote peers must respond to AppRequest with corresponding AppResponse
 message AppRequest {
+  // Chain being requested from
   bytes chain_id = 1;
+  // Unique identifier for this request
   uint32 request_id = 2;
+  // Timeout (ns) for this request
   uint64 deadline = 3;
+  // Request body
   bytes app_bytes = 4;
 }
 
+// AppResponse is a VM-defined response sent in response to AppRequest
 message AppResponse {
+  // Chain being responded from
   bytes chain_id = 1;
+  // Request id of the original AppRequest
   uint32 request_id = 2;
+  // Response body
   bytes app_bytes = 3;
 }
 
+// AppGossip is a VM-defined message
 message AppGossip {
+  // Chain the message is for
   bytes chain_id = 1;
+  // Message body
   bytes app_bytes = 2;
 }
