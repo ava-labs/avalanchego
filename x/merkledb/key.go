@@ -69,12 +69,14 @@ func (t TokenConfiguration) BitsPerToken() int {
 }
 
 type Key struct {
+	// The number of bits in the key.
 	length int
 	value  string
 }
 
 // ToKey returns [keyBytes] as a new key with the given [branchFactor].
 // Assumes [branchFactor] is valid.
+// Caller must not modify [keyBytes] after this call.
 func ToKey(keyBytes []byte) Key {
 	return Key{
 		value:  byteSliceToString(keyBytes),
