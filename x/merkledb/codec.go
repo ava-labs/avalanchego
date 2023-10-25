@@ -63,6 +63,8 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
+
+	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
 	encodeHashValues(n *node) []byte
 }
