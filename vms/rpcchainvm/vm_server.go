@@ -821,14 +821,30 @@ func (vm *VMServer) GetStateSummary(
 	}, nil
 }
 
-var errNotYetImplemented = errors.New("backfilling not yet implemented")
+func (vm *VMServer) BackfillBlocksEnabled(ctx context.Context, _ *emptypb.Empty) (*vmpb.BackfillBlocksEnabledResponse, error) {
+	var (
+		blkID = ids.Empty
+		err   error
+	)
+	if vm.ssVM != nil {
+		blkID, err = vm.ssVM.BackfillBlocksEnabled(ctx)
+	}
 
-func (*VMServer) BackfillBlocksEnabled(context.Context, *emptypb.Empty) (*vmpb.BackfillBlocksEnabledResponse, error) {
-	return &vmpb.BackfillBlocksEnabledResponse{}, errNotYetImplemented
+	return &vmpb.BackfillBlocksEnabledResponse{
+		Id:  blkID[:],
+		Err: errorToErrEnum[err],
+	}, errorToRPCError(err)
 }
 
-func (*VMServer) BackfillBlocks(context.Context, *vmpb.BackfillBlocksRequest) (*vmpb.BackfillBlocksResponse, error) {
-	return &vmpb.BackfillBlocksResponse{}, errNotYetImplemented
+func (vm *VMServer) BackfillBlocks(ctx context.Context, req *vmpb.BackfillBlocksRequest) (*vmpb.BackfillBlocksResponse, error) {
+	var err error
+	if vm.ssVM != nil {
+		err = vm.ssVM.BackfillBlocks(ctx, req.BlksBytes)
+	}
+
+	return &vmpb.BackfillBlocksResponse{
+		Err: errorToErrEnum[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) BlockVerify(ctx context.Context, req *vmpb.BlockVerifyRequest) (*vmpb.BlockVerifyResponse, error) {
