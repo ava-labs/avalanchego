@@ -5,7 +5,7 @@
 ARG AVALANCHE_VERSION
 
 # ============= Compilation Stage ================
-FROM golang:1.20.8-bullseye AS builder
+FROM golang:1.20.10-bullseye AS builder
 
 WORKDIR /build
 

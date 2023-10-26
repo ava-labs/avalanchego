@@ -365,7 +365,7 @@ func RegisterFiveNodeSubnetRun() func() *Subnet {
 		gomega.Expect(err).Should(gomega.BeNil())
 	})
 
-	var _ = ginkgo.AfterSuite(func() {
+	_ = ginkgo.AfterSuite(func() {
 		gomega.Expect(manager).ShouldNot(gomega.BeNil())
 		gomega.Expect(manager.TeardownNetwork()).Should(gomega.BeNil())
 		// TODO: bootstrap an additional node to ensure that we can bootstrap the test data correctly
