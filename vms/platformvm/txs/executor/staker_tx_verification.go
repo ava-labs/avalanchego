@@ -37,6 +37,7 @@ var (
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
+	ErrDUpgradeNotActive               = errors.New("attempting to use a D-upgrade feature prior to activation")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -710,6 +711,53 @@ func verifyAddPermissionlessDelegatorTx(
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return ErrFutureStakeTime
+	}
+
+	return nil
+}
+
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * [sTx]'s creds authorize it to spend the stated inputs.
+// * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
+// * The flow checker passes.
+func verifyTransferSubnetOwnershipTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.TransferSubnetOwnershipTx,
+) error {
+	if !backend.Config.IsDActivated(chainState.GetTimestamp()) {
+		return ErrDUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
+	}
+
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return nil
