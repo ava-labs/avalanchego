@@ -74,10 +74,8 @@ type manager struct {
 	databases []*VersionedDatabase
 }
 
-// NewLevelDB creates a database manager of levelDBs at [filePath] by creating a
-// database instance from each directory with a version <= [currentVersion]. If
-// [includePreviousVersions], opens previous database versions and includes them
-// in the returned Manager.
+// NewLevelDB creates a database manager of levelDBs at [dbDirPath] by creating a
+// database instance from each directory with a version <= [currentVersion].
 func NewLevelDB(
 	dbDirPath string,
 	dbConfig []byte,
@@ -97,10 +95,8 @@ func NewLevelDB(
 	)
 }
 
-// NewLevelDB creates a database manager of levelDBs at [filePath] by creating a
-// database instance from each directory with a version <= [currentVersion]. If
-// [includePreviousVersions], opens previous database versions and includes them
-// in the returned Manager.
+// NewPebbleDB creates a database manager of pebble instances at [dbDirPath] by creating a
+// database instance from each directory with a version <= [currentVersion].
 func NewPebbleDB(
 	dbDirPath string,
 	dbConfig []byte,
