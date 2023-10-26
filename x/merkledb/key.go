@@ -113,9 +113,9 @@ func (k Key) HasPrefix(prefix Key) bool {
 
 	// check that the tokens in the partially filled final byte of [prefix] are
 	// equal to the tokens in the final byte of [k].
-	remainderBitsMask := byte(0xFF << (8 - remainderTokensCount*int(k.tokenBitSize)))
-	prefixRemainderTokens := prefix.value[len(prefix.value)-1] & remainderBitsMask
-	remainderTokens := k.value[len(prefix.value)-1] & remainderBitsMask
+	remainderBitsMask := byte(0xFF >> (remainderTokensCount * int(k.tokenBitSize)))
+	prefixRemainderTokens := prefix.value[len(prefix.value)-1] | remainderBitsMask
+	remainderTokens := k.value[len(prefix.value)-1] | remainderBitsMask
 
 	if prefixRemainderTokens != remainderTokens {
 		return false
