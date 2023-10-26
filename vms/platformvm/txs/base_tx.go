@@ -96,3 +96,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	}
 }
+
+func (tx *BaseTx) Visit(visitor Visitor) error {
+	return visitor.BaseTx(tx)
+}
