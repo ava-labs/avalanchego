@@ -2104,9 +2104,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	// Create a subnet
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1,
-		[]ids.ShortID{keys[0].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
+		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].Address(),
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -2129,7 +2129,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			keys[0].PublicKey().Address(),
+			ts.Keys[0].PublicKey().Address(),
 		},
 	}
 	require.Equal(expectedOwner, subnetOwner)
@@ -2137,8 +2137,8 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		1,
-		[]ids.ShortID{keys[1].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]ids.ShortID{ts.Keys[1].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -2161,7 +2161,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			keys[1].PublicKey().Address(),
+			ts.Keys[1].PublicKey().Address(),
 		},
 	}
 	require.Equal(expectedOwner, subnetOwner)
