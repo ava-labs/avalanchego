@@ -32,12 +32,3 @@ func All(verifiables ...Verifiable) error {
 	}
 	return nil
 }
-
-func Err(errors ...error) error {
-	for _, err := range errors {
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}

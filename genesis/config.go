@@ -180,23 +180,20 @@ func init() {
 		panic(err)
 	}
 
-	mainnetConfig, err := unparsedMainnetConfig.Parse()
+	MainnetConfig, err = unparsedMainnetConfig.Parse()
 	if err != nil {
 		panic(err)
 	}
-	MainnetConfig = mainnetConfig
 
-	fujiConfig, err := unparsedFujiConfig.Parse()
+	FujiConfig, err = unparsedFujiConfig.Parse()
 	if err != nil {
 		panic(err)
 	}
-	FujiConfig = fujiConfig
 
-	localConfig, err := unparsedLocalConfig.Parse()
+	LocalConfig, err = unparsedLocalConfig.Parse()
 	if err != nil {
 		panic(err)
 	}
-	LocalConfig = localConfig
 }
 
 func GetConfig(networkID uint32) *Config {
