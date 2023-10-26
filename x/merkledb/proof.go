@@ -763,7 +763,7 @@ func verifyProofPath(bf BranchFactor, proof []ProofNode, key maybe.Maybe[Key]) e
 			return ErrProofNodeNotForKey
 		}
 
-		// each node should have a key that has a matching TokenConfig and is a prefix of the next node's key
+		// each node should have a key that is a prefix of the next node's key
 		nextKey := proof[i+1].Key
 		if !nextKey.HasStrictPrefix(nodeKey) {
 			return ErrNonIncreasingProofNodes

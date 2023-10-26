@@ -30,8 +30,8 @@ func Test_Node_Marshal(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
-	rootIndex := getSingleChildKey(BranchFactor16, root).Token(0, BranchFactor16TokenConfig.bitsPerToken)
-	parsedIndex := getSingleChildKey(BranchFactor16, rootParsed).Token(0, BranchFactor16TokenConfig.bitsPerToken)
+	rootIndex := getSingleChildKey(BranchFactor16, root).Token(0, BranchFactor16.BitsPerToken())
+	parsedIndex := getSingleChildKey(BranchFactor16, rootParsed).Token(0, BranchFactor16.BitsPerToken())
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
 	require.Equal(t, rootChildEntry.id, parseChildEntry.id)

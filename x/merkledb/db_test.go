@@ -96,7 +96,7 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
-	for _, bf := range validTokenConfigurations {
+	for _, bf := range validBranchFactors {
 		for _, test := range database.Tests {
 			db, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(t, err)
@@ -108,7 +108,7 @@ func Test_MerkleDB_DB_Interface(t *testing.T) {
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bf := range validTokenConfigurations {
+		for _, bf := range validBranchFactors {
 			for _, bench := range database.Benchmarks {
 				db, err := getBasicDBWithBranchFactor(bf)
 				require.NoError(b, err)
@@ -785,7 +785,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			}
 			require := require.New(t)
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			for _, bf := range validTokenConfigurations {
+			for _, bf := range validBranchFactors {
 				runRandDBTest(
 					require,
 					r,
@@ -813,7 +813,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		}
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-		for _, bf := range validTokenConfigurations {
+		for _, bf := range validBranchFactors {
 			runRandDBTest(
 				require,
 				r,
@@ -851,8 +851,8 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc tokenConfiguration) {
-	db, err := getBasicDBWithBranchFactor(tc)
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf BranchFactor) {
+	db, err := getBasicDBWithBranchFactor(bf)
 	require.NoError(err)
 
 	const (
@@ -938,7 +938,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc to
 			require.NoError(err)
 			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
-			changeProofDB, err := getBasicDBWithBranchFactor(tc)
+			changeProofDB, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
@@ -996,7 +996,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc to
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
 			// Create a view with the same key-values as [db]
-			newDB, err := getBasicDBWithBranchFactor(tc)
+			newDB, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(err)
 
 			ops := make([]database.BatchOp, 0, len(values))

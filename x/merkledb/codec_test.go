@@ -129,7 +129,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			valueBytes []byte,
 		) {
 			require := require.New(t)
-			for _, tokenConfig := range validTokenConfigurations {
+			for _, branchFactor := range validBranchFactors {
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				value := maybe.Nothing[[]byte]()
@@ -144,7 +144,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					value = maybe.Some(valueBytes)
 				}
 
-				numChildren := r.Intn(tokenConfig.BranchFactor()) // #nosec G404
+				numChildren := r.Intn(int(branchFactor)) // #nosec G404
 
 				children := map[byte]child{}
 				for i := 0; i < numChildren; i++ {
@@ -199,11 +199,11 @@ func FuzzEncodeHashValues(f *testing.F) {
 			randSeed int,
 		) {
 			require := require.New(t)
-			for _, tokenConfig := range validTokenConfigurations { // Create a random *hashValues
+			for _, branchFactor := range validBranchFactors { // Create a random *hashValues
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				children := map[byte]child{}
-				numChildren := r.Intn(tokenConfig.BranchFactor()) // #nosec G404
+				numChildren := r.Intn(int(branchFactor)) // #nosec G404
 				for i := 0; i < numChildren; i++ {
 					compressedKeyLen := r.Intn(32) // #nosec G404
 					compressedKeyBytes := make([]byte, compressedKeyLen)

@@ -13,29 +13,13 @@ import (
 )
 
 var (
-	ErrInvalidTokenConfig = errors.New("token configuration must match one of the predefined configurations ")
+	ErrInvalidBranchFactor = errors.New("invalid branch factor")
 
-	BranchFactor2TokenConfig = tokenConfiguration{
-		branchFactor: 2,
-		bitsPerToken: 1,
-	}
-	BranchFactor4TokenConfig = tokenConfiguration{
-		branchFactor: 4,
-		bitsPerToken: 2,
-	}
-	BranchFactor16TokenConfig = tokenConfiguration{
-		branchFactor: 16,
-		bitsPerToken: 4,
-	}
-	BranchFactor256TokenConfig = tokenConfiguration{
-		branchFactor: 256,
-		bitsPerToken: 8,
-	}
-	validTokenConfigurations = []tokenConfiguration{
-		BranchFactor2TokenConfig,
-		BranchFactor4TokenConfig,
-		BranchFactor16TokenConfig,
-		BranchFactor256TokenConfig,
+	validBranchFactors = []BranchFactor{
+		BranchFactor2,
+		BranchFactor4,
+		BranchFactor16,
+		BranchFactor256,
 	}
 )
 
@@ -53,7 +37,7 @@ func (bf BranchFactor) Valid() error {
 	case BranchFactor2, BranchFactor4, BranchFactor16, BranchFactor256:
 		return nil
 	default:
-		return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, bf) // TODO fix error
+		return fmt.Errorf("%w: %d", ErrInvalidBranchFactor, bf)
 	}
 }
 
@@ -73,11 +57,6 @@ func (bf BranchFactor) BitsPerToken() int {
 	}
 }
 
-type tokenConfiguration struct {
-	branchFactor int
-	bitsPerToken int
-}
-
 func NewToken(val byte, branchFactor BranchFactor) Token {
 	return Token{
 		value:  val,
@@ -88,30 +67,6 @@ func NewToken(val byte, branchFactor BranchFactor) Token {
 type Token struct {
 	length int
 	value  byte
-}
-
-func (t tokenConfiguration) ToToken(val byte) Token {
-	return Token{
-		value:  val,
-		length: t.bitsPerToken,
-	}
-}
-
-func (t tokenConfiguration) Valid() error {
-	for _, validConfig := range validTokenConfigurations {
-		if validConfig == t {
-			return nil
-		}
-	}
-	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
-}
-
-func (t tokenConfiguration) BranchFactor() int {
-	return t.branchFactor
-}
-
-func (t tokenConfiguration) BitsPerToken() int {
-	return t.bitsPerToken
 }
 
 type Key struct {

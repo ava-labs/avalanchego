@@ -128,7 +128,7 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 	if db.branchFactor == BranchFactor256 {
-		// For BranchFactor256TokenConfig, no padding is needed since byte length == token length
+		// For BranchFactor256, no padding is needed since byte length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
