@@ -1,8 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
+use firewood::v2::api;
 
 pub mod create;
 pub mod delete;
@@ -46,7 +46,8 @@ enum Commands {
     Dump(dump::Options),
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<(), api::Error> {
     let cli = Cli::parse();
 
     env_logger::init_from_env(
@@ -55,11 +56,11 @@ fn main() -> Result<()> {
     );
 
     match &cli.command {
-        Commands::Create(opts) => create::run(opts),
-        Commands::Insert(opts) => insert::run(opts),
-        Commands::Get(opts) => get::run(opts),
-        Commands::Delete(opts) => delete::run(opts),
-        Commands::Root(opts) => root::run(opts),
-        Commands::Dump(opts) => dump::run(opts),
+        Commands::Create(opts) => create::run(opts).await,
+        Commands::Insert(opts) => insert::run(opts).await,
+        Commands::Get(opts) => get::run(opts).await,
+        Commands::Delete(opts) => delete::run(opts).await,
+        Commands::Root(opts) => root::run(opts).await,
+        Commands::Dump(opts) => dump::run(opts).await,
     }
 }

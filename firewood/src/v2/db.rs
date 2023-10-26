@@ -49,6 +49,7 @@ where
     T: api::DbView,
     T: Send + Sync,
     T: Default,
+    T: 'static,
 {
     type Historical = T;
 

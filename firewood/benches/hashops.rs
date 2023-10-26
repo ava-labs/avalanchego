@@ -5,9 +5,10 @@
 
 use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
 use firewood::{
-    db::{BatchOp, Db, DbConfig},
+    db::{BatchOp, DbConfig},
     merkle::{Merkle, TrieHash, TRIE_HASH_LEN},
     storage::WalConfig,
+    v2::api::{Db, Proposal},
 };
 use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
@@ -17,7 +18,7 @@ use shale::{
     disk_address::DiskAddress,
     CachedStore, ObjCache, Storable, StoredView,
 };
-use std::{fs::File, iter::repeat_with, ops::Deref, os::raw::c_int, path::Path};
+use std::{fs::File, iter::repeat_with, ops::Deref, os::raw::c_int, path::Path, sync::Arc};
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
@@ -134,36 +135,41 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
         .benchmark_group("Db")
         .sample_size(30)
         .bench_function("commit", |b| {
-            b.iter_batched(
-                || {
-                    let cfg =
-                        DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+            b.to_async(tokio::runtime::Runtime::new().unwrap())
+                .iter_batched(
+                    || {
+                        let batch_ops: Vec<_> = repeat_with(|| {
+                            (&mut rng)
+                                .sample_iter(&Alphanumeric)
+                                .take(KEY_LEN)
+                                .collect()
+                        })
+                        .map(|key: Vec<_>| BatchOp::Put {
+                            key,
+                            value: vec![b'v'],
+                        })
+                        .take(N)
+                        .collect();
+                        batch_ops
+                    },
+                    |batch_ops| async {
+                        let db_path = dbg!(std::env::temp_dir());
+                        let db_path = db_path.join("benchmark_db");
+                        let cfg =
+                            DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
 
-                    let batch_ops: Vec<_> = repeat_with(|| {
-                        (&mut rng)
-                            .sample_iter(&Alphanumeric)
-                            .take(KEY_LEN)
-                            .collect()
-                    })
-                    .map(|key: Vec<_>| BatchOp::Put {
-                        key,
-                        value: vec![b'v'],
-                    })
-                    .take(N)
-                    .collect();
-                    let db_path = dbg!(std::env::temp_dir());
-                    let db_path = db_path.join("benchmark_db");
+                        let db =
+                            firewood::db::Db::new(db_path, &cfg.clone().truncate(true).build())
+                                .await
+                                .unwrap();
 
-                    let db = Db::new(db_path, &cfg.clone().truncate(true).build()).unwrap();
-
-                    (db, batch_ops)
-                },
-                |(db, batch_ops)| {
-                    let proposal = db.new_proposal(batch_ops).unwrap();
-                    proposal.commit_sync().unwrap();
-                },
-                BatchSize::SmallInput,
-            );
+                        Arc::new(db.propose(batch_ops).await.unwrap())
+                            .commit()
+                            .await
+                            .unwrap()
+                    },
+                    BatchSize::SmallInput,
+                );
         });
 }
 

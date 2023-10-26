@@ -618,6 +618,7 @@ impl DiskBufferRequester {
 mod tests {
     use sha3::Digest;
     use std::path::{Path, PathBuf};
+    use tokio::task::block_in_place;
 
     use super::*;
     use crate::{
@@ -657,9 +658,9 @@ mod tests {
         .into()
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
-    fn test_buffer_with_undo() {
+    async fn test_buffer_with_undo() {
         let temp_dir = get_tmp_dir();
 
         let buf_cfg = DiskBufferConfig::builder().build();
@@ -734,9 +735,9 @@ mod tests {
         assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
-    fn test_buffer_with_redo() {
+    async fn test_buffer_with_redo() {
         let buf_cfg = DiskBufferConfig::builder().build();
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
@@ -808,8 +809,8 @@ mod tests {
         assert_eq!(view.as_deref(), hash);
     }
 
-    #[test]
-    fn test_multi_stores() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_multi_stores() {
         let buf_cfg = DiskBufferConfig::builder().build();
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
@@ -849,7 +850,7 @@ mod tests {
         // mutate the in memory buffer.
         let data = b"this is a test";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
-        store.write(0, &hash);
+        block_in_place(|| store.write(0, &hash));
         assert_eq!(store.id(), STATE_SPACE);
 
         let another_data = b"this is another test";
@@ -857,11 +858,13 @@ mod tests {
 
         // mutate the in memory buffer in another StoreRev new from the above.
         let mut another_store = StoreRevMut::new_from_other(&store);
-        another_store.write(32, &another_hash);
+        block_in_place(|| another_store.write(32, &another_hash));
         assert_eq!(another_store.id(), STATE_SPACE);
 
         // wal should have no records.
-        assert!(disk_requester.collect_ash(1).unwrap().is_empty());
+        assert!(block_in_place(|| disk_requester.collect_ash(1))
+            .unwrap()
+            .is_empty());
 
         // get RO view of the buffer from the beginning. Both stores should have the same view.
         let view = store.get_view(0, HASH_SIZE as u64).unwrap();
@@ -904,7 +907,7 @@ mod tests {
         let another_store = StoreRevMut::new(state_cache);
         let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), another_hash);
-        disk_requester.shutdown();
+        block_in_place(|| disk_requester.shutdown());
     }
 
     fn get_file_path(path: &Path, file: &str, line: u32) -> PathBuf {

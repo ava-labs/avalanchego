@@ -172,7 +172,7 @@ pub trait DbView {
 /// [DbView], which means you can fetch values from it or
 /// obtain proofs.
 #[async_trait]
-pub trait Proposal: DbView {
+pub trait Proposal: DbView + Send + Sync {
     type Proposal: DbView + Proposal;
 
     /// Commit this revision

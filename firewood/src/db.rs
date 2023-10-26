@@ -4,6 +4,7 @@
 pub use crate::{
     config::{DbConfig, DbRevConfig},
     storage::{buffer::DiskBufferConfig, WalConfig},
+    v2::api::{Batch, BatchOp, Proposal},
 };
 use crate::{
     file,
@@ -18,7 +19,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytemuck::{cast_slice, AnyBitPattern};
-use metered::{metered, HitCount};
+use metered::metered;
 use parking_lot::{Mutex, RwLock};
 use shale::{
     compact::{CompactSpace, CompactSpaceHeader},
@@ -41,8 +42,6 @@ use std::{
 use tokio::task::block_in_place;
 
 mod proposal;
-
-pub use proposal::{Batch, BatchOp, Proposal};
 
 use self::proposal::ProposalBase;
 
@@ -278,8 +277,7 @@ pub struct DbRev<S> {
 #[async_trait]
 impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
-        self.merkle
-            .root_hash(self.header.kv_root)
+        block_in_place(|| self.merkle.root_hash(self.header.kv_root))
             .map(|h| *h)
             .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
     }
@@ -386,7 +384,7 @@ impl Drop for DbInner {
 impl api::Db for Db {
     type Historical = DbRev<SharedStore>;
 
-    type Proposal = Proposal;
+    type Proposal = proposal::Proposal;
 
     async fn revision(&self, root_hash: HashKey) -> Result<Arc<Self::Historical>, api::Error> {
         let rev = block_in_place(|| self.get_revision(&TrieHash(root_hash)));
@@ -400,7 +398,9 @@ impl api::Db for Db {
     }
 
     async fn root_hash(&self) -> Result<HashKey, api::Error> {
-        self.kv_root_hash().map(|hash| hash.0).map_err(Into::into)
+        block_in_place(|| self.kv_root_hash())
+            .map(|hash| hash.0)
+            .map_err(Into::into)
     }
 
     async fn propose<K: KeyType, V: ValueType>(
@@ -434,13 +434,17 @@ pub struct Db {
 impl Db {
     const PARAM_SIZE: u64 = size_of::<DbParams>() as u64;
 
-    /// Open a database.
-    pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DbConfig) -> Result<Self, DbError> {
-        // TODO: make sure all fds are released at the end
+    pub async fn new<P: AsRef<Path>>(db_path: P, cfg: &DbConfig) -> Result<Self, api::Error> {
         if cfg.truncate {
-            let _ = std::fs::remove_dir_all(db_path.as_ref());
+            let _ = tokio::fs::remove_dir_all(db_path.as_ref()).await;
         }
 
+        block_in_place(|| Db::new_internal(db_path, cfg.clone()))
+            .map_err(|e| api::Error::InternalError(e.into()))
+    }
+
+    /// Open a database.
+    fn new_internal<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, DbError> {
         let open_options = if cfg.truncate {
             file::Options::Truncate
         } else {
@@ -465,7 +469,7 @@ impl Db {
             {
                 return Err(DbError::InvalidParams);
             }
-            Self::initialize_header_on_disk(cfg, fd0)?;
+            Self::initialize_header_on_disk(&cfg, fd0)?;
         }
 
         // read DbParams
@@ -482,10 +486,12 @@ impl Db {
         let (sender, inbound) = tokio::sync::mpsc::unbounded_channel();
         let disk_requester = DiskBufferRequester::new(sender);
         let buffer = cfg.buffer.clone();
-        let disk_thread = Some(std::thread::spawn(move || {
-            let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
-            disk_buffer.run()
-        }));
+        let disk_thread = block_in_place(|| {
+            Some(std::thread::spawn(move || {
+                let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
+                disk_buffer.run()
+            }))
+        });
 
         let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
             &StoreConfig::builder()
@@ -753,10 +759,10 @@ impl Db {
     }
 
     /// Create a proposal.
-    pub fn new_proposal<K: KeyType, V: ValueType>(
+    pub(crate) fn new_proposal<K: KeyType, V: ValueType>(
         &self,
         data: Batch<K, V>,
-    ) -> Result<Proposal, DbError> {
+    ) -> Result<proposal::Proposal, DbError> {
         let mut inner = self.inner.write();
         let reset_store_headers = inner.reset_store_headers;
         let (store, mut rev) = Db::new_store(
@@ -792,7 +798,7 @@ impl Db {
         rev.flush_dirty().unwrap();
 
         let parent = ProposalBase::View(Arc::clone(&self.revisions.lock().base_revision));
-        Ok(Proposal {
+        Ok(proposal::Proposal {
             m: Arc::clone(&self.inner),
             r: Arc::clone(&self.revisions),
             cfg: self.cfg.clone(),
@@ -904,18 +910,8 @@ impl Db {
         self.revisions.lock().base_revision.kv_dump(w)
     }
     /// Get root hash of the latest generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
+    pub(crate) fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.revisions.lock().base_revision.kv_root_hash()
-    }
-
-    /// Get a value in the kv store associated with a particular key.
-    #[measure(HitCount)]
-    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
-        self.revisions
-            .lock()
-            .base_revision
-            .kv_get(key)
-            .ok_or(DbError::KeyNotFound)
     }
 
     pub fn metrics(&self) -> Arc<DbMetrics> {

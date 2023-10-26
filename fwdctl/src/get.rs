@@ -1,9 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, bail, Error, Result};
 use clap::Args;
-use firewood::db::{Db, DbConfig, DbError, WalConfig};
+use firewood::{
+    db::{Db, DbConfig, WalConfig},
+    v2::api::{self, Db as _, DbView},
+};
 use log;
 use std::str;
 
@@ -24,27 +26,26 @@ pub struct Options {
     pub db: String,
 }
 
-pub fn run(opts: &Options) -> Result<()> {
+pub async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("get key value pair {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
         .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = Db::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
+    let db = Db::new(opts.db.clone(), &cfg.build()).await?;
 
-    match db.kv_get(opts.key.as_bytes()) {
-        Ok(val) => {
-            let s = match str::from_utf8(&val) {
-                Ok(v) => v,
-                Err(e) => return Err(anyhow!("Invalid UTF-8 sequence: {}", e)),
-            };
+    let rev = db.revision(db.root_hash().await?).await?;
+
+    match rev.val(opts.key.as_bytes()).await {
+        Ok(Some(val)) => {
+            let s = String::from_utf8_lossy(val.as_ref());
             println!("{:?}", s);
-            if val.is_empty() {
-                bail!("no value found for key");
-            }
             Ok(())
         }
-        Err(DbError::KeyNotFound) => bail!("key not found"),
-        Err(e) => bail!(e),
+        Ok(None) => {
+            eprintln!("Key '{}' not found", opts.key);
+            Ok(())
+        }
+        Err(e) => Err(e),
     }
 }

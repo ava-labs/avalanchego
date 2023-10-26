@@ -1,9 +1,13 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Error, Result};
+use std::sync::Arc;
+
 use clap::Args;
-use firewood::db::{BatchOp, Db, DbConfig, WalConfig};
+use firewood::{
+    db::{BatchOp, Db, DbConfig, WalConfig},
+    v2::api::{self, Db as _, Proposal},
+};
 use log;
 
 #[derive(Debug, Args)]
@@ -27,23 +31,20 @@ pub struct Options {
     pub db: String,
 }
 
-pub fn run(opts: &Options) -> Result<()> {
+pub async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("inserting key value pair {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
         .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = match Db::new(opts.db.as_str(), &cfg.build()) {
-        Ok(db) => db,
-        Err(_) => return Err(anyhow!("error opening database")),
-    };
+    let db = Db::new(opts.db.clone(), &cfg.build()).await?;
 
     let batch: Vec<BatchOp<Vec<u8>, Vec<u8>>> = vec![BatchOp::Put {
         key: opts.key.clone().into(),
         value: opts.value.bytes().collect(),
     }];
-    let proposal = db.new_proposal(batch).map_err(Error::msg)?;
-    proposal.commit_sync().map_err(Error::msg)?;
+    let proposal = Arc::new(db.propose(batch).await?);
+    proposal.commit().await?;
 
     println!("{}", opts.key);
     Ok(())

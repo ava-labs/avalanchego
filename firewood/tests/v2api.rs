@@ -1,15 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::{error::Error, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use firewood::{
-    db::{BatchOp, Db as PersistedDb, DbConfig, DbError},
+    db::{BatchOp, Db as PersistedDb, DbConfig},
     v2::api::{Db, DbView, Proposal},
 };
 
 #[tokio::test(flavor = "multi_thread")]
-async fn smoke() -> Result<(), Box<dyn Error>> {
+async fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = DbConfig::builder().truncate(true).build();
     let db = Arc::new(testdb(cfg).await?);
     let empty_hash = db.root_hash().await?;
@@ -18,7 +18,7 @@ async fn smoke() -> Result<(), Box<dyn Error>> {
     // insert a single key/value
     let (key, value) = (b"smoke", b"test");
     let batch_put = BatchOp::Put { key, value };
-    let proposal: Arc<firewood::db::Proposal> = db.propose(vec![batch_put]).await?.into();
+    let proposal = Arc::new(db.propose(vec![batch_put]).await?);
     proposal.commit().await?;
 
     // ensure the latest hash is different
@@ -41,11 +41,9 @@ async fn smoke() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn testdb(cfg: DbConfig) -> Result<PersistedDb, DbError> {
+async fn testdb(cfg: DbConfig) -> Result<impl firewood::v2::api::Db, firewood::v2::api::Error> {
     let tmpdbpath = tmp_dir().join("testdb");
-    tokio::task::spawn_blocking(move || PersistedDb::new(tmpdbpath, &cfg))
-        .await
-        .unwrap()
+    PersistedDb::new(tmpdbpath, &cfg).await
 }
 
 fn tmp_dir() -> PathBuf {

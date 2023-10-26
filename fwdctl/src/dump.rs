@@ -1,10 +1,13 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{Error, Result};
 use clap::Args;
-use firewood::db::{Db, DbConfig, WalConfig};
+use firewood::{
+    db::{Db, DbConfig, WalConfig},
+    v2::api::{self},
+};
 use log;
+use tokio::task::block_in_place;
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -18,13 +21,14 @@ pub struct Options {
     pub db: String,
 }
 
-pub fn run(opts: &Options) -> Result<()> {
+pub async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("dump database {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
         .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = Db::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
-    db.kv_dump(&mut std::io::stdout().lock())
-        .map_err(Error::msg)
+    let db = Db::new(opts.db.clone(), &cfg.build()).await?;
+    Ok(block_in_place(|| {
+        db.kv_dump(&mut std::io::stdout().lock())
+    })?)
 }
