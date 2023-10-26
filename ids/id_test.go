@@ -149,7 +149,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 
 func TestIDHex(t *testing.T) {
 	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
-	expected := "617661206c616273000000000000000000000000000000000000000000000000" //nolint:gosec
+	expected := "617661206c616273000000000000000000000000000000000000000000000000"
 	require.Equal(t, expected, id.Hex())
 }
 
