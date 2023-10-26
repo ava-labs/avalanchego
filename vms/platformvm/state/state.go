@@ -1322,7 +1322,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			continue
 		}
 
-		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
+		vdr.PublicKey = bls.DeserializePublicKey(pkBytes)
 	}
 
 	// Note: this does not fallback to the linkeddb index because the linkeddb
@@ -2060,7 +2060,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						staker.PublicKey.Serialize(),
+						bls.SerializePublicKey(staker.PublicKey),
 					)
 					if err != nil {
 						return err
