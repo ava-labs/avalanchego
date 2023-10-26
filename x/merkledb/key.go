@@ -50,7 +50,10 @@ type Token struct {
 }
 
 func (t TokenConfiguration) ToToken(val byte) Token {
-	return Token{value: val, length: t.bitsPerToken}
+	return Token{
+		value:  val,
+		length: t.bitsPerToken,
+	}
 }
 
 func (t TokenConfiguration) Valid() error {
