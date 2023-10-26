@@ -633,3 +633,41 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlerStartError(t *testing.T) {
+	require := require.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	require.NoError(err)
+
+	handler, err := New(
+		ctx,
+		validators.NewManager(),
+		nil,
+		time.Second,
+		testThreadPoolSize,
+		resourceTracker,
+		nil,
+		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
+	)
+	require.NoError(err)
+
+	// Starting a handler with an unprovided engine should immediately cause the
+	// handler to shutdown.
+	handler.SetEngineManager(&EngineManager{})
+	ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Initializing,
+	})
+	handler.Start(context.Background(), false)
+
+	_, err = handler.AwaitStopped(context.Background())
+	require.NoError(err)
+}
