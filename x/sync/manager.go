@@ -490,7 +490,7 @@ func (m *Manager) findNextKey(
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
 		if deepestNode.Key.Length() < proofKeyPath.Length() {
-			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.tokenConfig.BitsPerToken())) + 1
+			startingChildToken = int(m.tokenConfig.Token(proofKeyPath, deepestNode.Key.Length())) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
