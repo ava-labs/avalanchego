@@ -45,6 +45,10 @@ type StateSyncableVM interface {
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error)
 
+	// BackfillBlocksEnabled checks if VM wants to download all blocks from state summary one
+	// down to genesis.
+	//
+	// Returns ids.EmptyID if block backfilling is not enabled.
 	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
 
 	BackfillBlocks(ctx context.Context, blocks [][]byte) error

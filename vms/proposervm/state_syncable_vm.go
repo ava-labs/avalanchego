@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -162,12 +161,27 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 	}, nil
 }
 
-var errNotYetImplemented = errors.New("backfilling not yet implemented")
+func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+	if vm.ssVM == nil {
+		return ids.Empty, nil
+	}
 
-func (*VM) BackfillBlocksEnabled(context.Context) (ids.ID, error) {
-	return ids.Empty, errNotYetImplemented
+	return vm.ssVM.BackfillBlocksEnabled(ctx)
 }
 
-func (*VM) BackfillBlocks(context.Context, [][]byte) error {
-	return errNotYetImplemented
+func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) error {
+	innerBlksBytes := make([][]byte, 0, len(blksBytes))
+	for i, blkBytes := range blksBytes {
+		blk, err := vm.parseProposerBlock(ctx, blkBytes)
+		if err != nil {
+			return fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
+		}
+		// TODO: consider validating that block is at least below last accepted block
+		// or that block has not been stored yet
+		if err := blk.acceptOuterBlk(); err != nil {
+			return err
+		}
+		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
+	}
+	return vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
 }
