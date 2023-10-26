@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -245,7 +246,7 @@ func (n *Node) initNetworking() error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
@@ -679,7 +680,7 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
