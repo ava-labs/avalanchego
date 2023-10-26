@@ -336,7 +336,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// Extend the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))

@@ -44,13 +44,8 @@ type TokenConfiguration struct {
 	bitsPerToken int
 }
 
-type Token struct {
-	length int
-	value  byte
-}
-
-func (t TokenConfiguration) ToToken(val byte) Token {
-	return Token{value: val, length: t.bitsPerToken}
+func (t TokenConfiguration) ToKey(val byte) Key {
+	return Key{value: string([]byte{val << dualBitIndex(t.bitsPerToken)}), length: t.bitsPerToken}
 }
 
 func (t TokenConfiguration) Valid() error {
@@ -60,6 +55,38 @@ func (t TokenConfiguration) Valid() error {
 		}
 	}
 	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
+}
+
+// Token returns the token at the specified index,
+func (t TokenConfiguration) Token(k Key, bitIndex int) byte {
+	storageByte := k.value[bitIndex/8]
+	// Shift the byte right to get the token to the rightmost position.
+	storageByte >>= dualBitIndex((bitIndex + t.bitsPerToken) % 8)
+	// Apply a mask to remove any other tokens in the byte.
+	return storageByte & (0xFF >> dualBitIndex(t.bitsPerToken))
+}
+
+func (t TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
+	commonIndex := 0
+	for first.length > commonIndex && second.length > commonIndex+secondOffset &&
+		t.Token(first, commonIndex) == t.Token(second, commonIndex+secondOffset) {
+		commonIndex += t.bitsPerToken
+	}
+	return commonIndex
+}
+
+// iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
+// this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
+func (t TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
+	if k.length-bitsToSkip < prefix.length {
+		return false
+	}
+	for i := 0; i < prefix.length; i += t.bitsPerToken {
+		if t.Token(k, bitsToSkip+i) != t.Token(prefix, i) {
+			return false
+		}
+	}
+	return true
 }
 
 func (t TokenConfiguration) BranchFactor() int {
@@ -140,23 +167,15 @@ func (k Key) Length() int {
 	return k.length
 }
 
-// Token returns the token at the specified index,
-func (k Key) Token(bitIndex int, tokenBitSize int) byte {
-	storageByte := k.value[bitIndex/8]
-	// Shift the byte right to get the token to the rightmost position.
-	storageByte >>= dualBitIndex((bitIndex + tokenBitSize) % 8)
-	// Apply a mask to remove any other tokens in the byte.
-	return storageByte & (0xFF >> dualBitIndex(tokenBitSize))
-}
-
-// Append returns a new Path that equals the current
+// Extend returns a new Path that equals the current
 // Path with [token] appended to the end.
-func (k Key) Append(token Token) Key {
-	buffer := make([]byte, bytesNeeded(k.length+token.length))
-	k.appendIntoBuffer(buffer, token)
+func (k Key) Extend(extensionKey Key) Key {
+	buffer := make([]byte, bytesNeeded(k.length+extensionKey.length))
+	copy(buffer, k.value)
+	extendIntoBuffer(buffer, extensionKey, k.length)
 	return Key{
 		value:  byteSliceToString(buffer),
-		length: k.length + token.length,
+		length: k.length + extensionKey.length,
 	}
 }
 
@@ -170,45 +189,37 @@ func (k Key) Less(other Key) bool {
 	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }
 
-func (k Key) AppendExtend(token Token, extensionKey Key) Key {
-	appendBytes := bytesNeeded(k.length + token.length)
-	totalBitLength := k.length + token.length + extensionKey.length
+func (k Key) DoubleExtend(firstKey Key, secondKey Key) Key {
+	totalBitLength := k.length + firstKey.length + secondKey.length
 	buffer := make([]byte, bytesNeeded(totalBitLength))
-	k.appendIntoBuffer(buffer[:appendBytes], token)
+	copy(buffer, k.value)
 
-	result := Key{
+	extendIntoBuffer(buffer, firstKey, k.length)
+	extendIntoBuffer(buffer, secondKey, k.length+firstKey.length)
+
+	return Key{
 		value:  byteSliceToString(buffer),
 		length: totalBitLength,
 	}
+}
 
-	// the extension path will be shifted based on the number of tokens in the partial byte
-	bitsRemainder := (k.length + token.length) % 8
-
-	extensionBuffer := buffer[appendBytes-1:]
-	if extensionKey.length == 0 {
-		return result
+func extendIntoBuffer(buffer []byte, val Key, bitsOffset int) {
+	if val.length == 0 {
+		return
 	}
-
-	// If the existing value fits into a whole number of bytes,
-	// the extension path can be copied directly into the buffer.
+	bytesOffset := bytesNeeded(bitsOffset)
+	bitsRemainder := bitsOffset % 8
 	if bitsRemainder == 0 {
-		copy(extensionBuffer[1:], extensionKey.value)
-		return result
+		copy(buffer[bytesOffset:], val.value)
+		return
 	}
 
 	// Fill the partial byte with the first [shift] bits of the extension path
-	extensionBuffer[0] |= extensionKey.value[0] >> bitsRemainder
+	buffer[bytesOffset-1] |= val.value[0] >> bitsRemainder
 
 	// copy the rest of the extension path bytes into the buffer,
 	// shifted byte shift bits
-	shiftCopy(extensionBuffer[1:], extensionKey.value, dualBitIndex(bitsRemainder))
-
-	return result
-}
-
-func (k Key) appendIntoBuffer(buffer []byte, token Token) {
-	copy(buffer, k.value)
-	buffer[len(buffer)-1] |= token.value << dualBitIndex((k.length+token.length)%8)
+	shiftCopy(buffer[bytesOffset:], val.value, dualBitIndex(bitsRemainder))
 }
 
 // dualBitIndex gets the dual of the bit index
@@ -298,20 +309,6 @@ func (k Key) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
 	return stringToByteSlice(k.value)
-}
-
-// iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
-// this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
-func (k Key) iteratedHasPrefix(prefix Key, bitsToSkip int, tokenBitSize int) bool {
-	if k.length-bitsToSkip < prefix.length {
-		return false
-	}
-	for i := 0; i < prefix.length; i += tokenBitSize {
-		if k.Token(bitsToSkip+i, tokenBitSize) != prefix.Token(i, tokenBitSize) {
-			return false
-		}
-	}
-	return true
 }
 
 // byteSliceToString converts the []byte to a string

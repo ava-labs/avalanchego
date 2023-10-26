@@ -852,7 +852,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
-			childPath := key.AppendExtend(t.tokenConfig.ToToken(index), compressedPath)
+			childPath := key.DoubleExtend(t.tokenConfig.ToKey(index), compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.

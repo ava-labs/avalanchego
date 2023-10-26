@@ -678,7 +678,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.Key.Append(config.TokenConfig.ToToken(childIdx)),
+					key: node.Key.Extend(config.TokenConfig.ToKey(childIdx)),
 					id:  childID,
 				})
 			}
@@ -689,7 +689,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.Key.Append(config.TokenConfig.ToToken(childIdx)),
+					key: node.Key.Extend(config.TokenConfig.ToKey(childIdx)),
 					id:  childID,
 				})
 			}

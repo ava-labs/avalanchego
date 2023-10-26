@@ -495,7 +495,7 @@ func (m *Manager) findNextKey(
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.tokenConfig.BranchFactor()); hasDifference {
-			nextKey = maybe.Some(deepestNode.Key.Append(m.tokenConfig.ToToken(childIndex)).Bytes())
+			nextKey = maybe.Some(deepestNode.Key.Extend(m.tokenConfig.ToKey(childIndex)).Bytes())
 			break
 		}
 	}

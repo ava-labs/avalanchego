@@ -552,7 +552,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// Extend the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	b.Ctx.Log.Debug("starting bootstrapping",

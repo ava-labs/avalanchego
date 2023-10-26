@@ -1215,7 +1215,7 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 // Assumes this node has exactly one child.
 func getSingleChildKey(tc TokenConfiguration, n *node) Key {
 	for index, entry := range n.children {
-		return n.key.AppendExtend(tc.ToToken(index), entry.compressedKey)
+		return n.key.DoubleExtend(tc.ToKey(index), entry.compressedKey)
 	}
 	return Key{}
 }
