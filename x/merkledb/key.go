@@ -145,7 +145,7 @@ func (k Key) Token(bitIndex int, tokenBitSize int) byte {
 	// Shift the byte right to get the token to the rightmost position.
 	storageByte >>= dualBitIndex((bitIndex + tokenBitSize) % 8)
 	// Apply a mask to remove any other tokens in the byte.
-	return storageByte & (0xFF >> (8 - tokenBitSize))
+	return storageByte & (0xFF >> dualBitIndex(tokenBitSize))
 }
 
 // Append returns a new Path that equals the current
