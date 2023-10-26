@@ -70,3 +70,11 @@ func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
 func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
 	return sig.Verify(false, pk, false, msg, ciphersuiteProofOfPossession)
 }
+
+func DeserializePublicKey(pkBytes []byte) *PublicKey {
+	return new(PublicKey).Deserialize(pkBytes)
+}
+
+func SerializePublicKey(key *PublicKey) []byte {
+	return key.Serialize()
+}

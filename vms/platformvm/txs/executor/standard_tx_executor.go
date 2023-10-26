@@ -155,7 +155,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		for index, input := range tx.Ins {
 			utxo, err := e.State.GetUTXO(input.InputID())
 			if err != nil {
-				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err) //nolint:gosec
+				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
 			}
 			utxos[index] = utxo
 		}

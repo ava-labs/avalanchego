@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
@@ -71,7 +72,7 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 		if vdr.PublicKey != nil {
 			// This is a performance optimization to avoid the cost of compression
 			// from PublicKeyToBytes.
-			vdrPB.PublicKey = vdr.PublicKey.Serialize()
+			vdrPB.PublicKey = bls.SerializePublicKey(vdr.PublicKey)
 		}
 		resp.Validators[i] = vdrPB
 		i++
