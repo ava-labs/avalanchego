@@ -31,7 +31,7 @@ type intermediateNodeDB struct {
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
-	tc                TokenConfiguration
+	tc                *TokenConfiguration
 }
 
 func newIntermediateNodeDB(
@@ -40,7 +40,7 @@ func newIntermediateNodeDB(
 	metrics merkleMetrics,
 	size int,
 	evictionBatchSize int,
-	tc TokenConfiguration,
+	tc *TokenConfiguration,
 ) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,

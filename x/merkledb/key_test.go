@@ -10,6 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestTokenConfigValid(t *testing.T) {
+	require := require.New(t)
+	for _, tc := range validTokenConfigurations {
+		require.NoError(tc.Valid())
+	}
+	require.Error((&TokenConfiguration{}).Valid())
+
+	var nilTC *TokenConfiguration
+	require.Error(nilTC.Valid())
+}
+
 func TestHasPartialByte(t *testing.T) {
 	for _, branchFactor := range validTokenConfigurations {
 		t.Run(fmt.Sprint(branchFactor), func(t *testing.T) {
@@ -48,8 +59,8 @@ func TestHasPartialByte(t *testing.T) {
 func Test_Key_Has_Prefix(t *testing.T) {
 	type test struct {
 		name           string
-		keyA           func(bf TokenConfiguration) Key
-		keyB           func(bf TokenConfiguration) Key
+		keyA           func(bf *TokenConfiguration) Key
+		keyB           func(bf *TokenConfiguration) Key
 		isStrictPrefix bool
 		isPrefix       bool
 	}
@@ -59,15 +70,15 @@ func Test_Key_Has_Prefix(t *testing.T) {
 	tests := []test{
 		{
 			name:           "equal keys",
-			keyA:           func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
-			keyB:           func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyA:           func(bf *TokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyB:           func(bf *TokenConfiguration) Key { return ToKey([]byte(key)) },
 			isPrefix:       true,
 			isStrictPrefix: false,
 		},
 		{
 			name: "one key has one fewer token",
-			keyA: func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
-			keyB: func(bf TokenConfiguration) Key {
+			keyA: func(bf *TokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyB: func(bf *TokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
 			isPrefix:       true,
@@ -75,10 +86,10 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		},
 		{
 			name: "equal keys, both have one fewer token",
-			keyA: func(bf TokenConfiguration) Key {
+			keyA: func(bf *TokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
-			keyB: func(bf TokenConfiguration) Key {
+			keyB: func(bf *TokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
 			isPrefix:       true,
@@ -86,17 +97,17 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		},
 		{
 			name:           "different keys",
-			keyA:           func(bf TokenConfiguration) Key { return ToKey([]byte{0xF7}) },
-			keyB:           func(bf TokenConfiguration) Key { return ToKey([]byte{0xF0}) },
+			keyA:           func(bf *TokenConfiguration) Key { return ToKey([]byte{0xF7}) },
+			keyB:           func(bf *TokenConfiguration) Key { return ToKey([]byte{0xF0}) },
 			isPrefix:       false,
 			isStrictPrefix: false,
 		},
 		{
 			name: "same bytes, different lengths",
-			keyA: func(bf TokenConfiguration) Key {
+			keyA: func(bf *TokenConfiguration) Key {
 				return ToKey([]byte{0x10, 0x00}).Take(bf.bitsPerToken)
 			},
-			keyB: func(bf TokenConfiguration) Key {
+			keyB: func(bf *TokenConfiguration) Key {
 				return ToKey([]byte{0x10, 0x00}).Take(bf.bitsPerToken * 2)
 			},
 			isPrefix:       false,
@@ -177,7 +188,7 @@ func Test_Key_Token(t *testing.T) {
 	type test struct {
 		name         string
 		inputBytes   []byte
-		branchFactor TokenConfiguration
+		branchFactor *TokenConfiguration
 		assertTokens func(*require.Assertions, Key)
 	}
 

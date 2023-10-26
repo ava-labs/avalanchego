@@ -99,7 +99,7 @@ type trieView struct {
 	// The root of the trie represented by this view.
 	root *node
 
-	tokenConfig TokenConfiguration
+	tokenConfig *TokenConfiguration
 }
 
 // NewView returns a new view on top of this Trie where the passed changes

@@ -25,7 +25,7 @@ func getBasicDB() (*merkleDB, error) {
 	)
 }
 
-func getBasicDBWithBranchFactor(bf TokenConfiguration) (*merkleDB, error) {
+func getBasicDBWithBranchFactor(bf *TokenConfiguration) (*merkleDB, error) {
 	config := newDefaultConfig()
 	config.TokenConfig = bf
 	return newDatabase(

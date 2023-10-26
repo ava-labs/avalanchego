@@ -1213,7 +1213,7 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 
 // Returns the path of the only child of this node.
 // Assumes this node has exactly one child.
-func getSingleChildKey(tc TokenConfiguration, n *node) Key {
+func getSingleChildKey(tc *TokenConfiguration, n *node) Key {
 	for index, entry := range n.children {
 		return n.key.DoubleExtend(tc.ToKey(index), entry.compressedKey)
 	}

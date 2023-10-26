@@ -139,7 +139,7 @@ type MerkleDB interface {
 
 type Config struct {
 	// TokenConfig determines the branching factor and other aspects of the tokens that make up a key
-	TokenConfig TokenConfiguration
+	TokenConfig *TokenConfiguration
 
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
@@ -204,7 +204,7 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	tokenConfig TokenConfiguration
+	tokenConfig *TokenConfiguration
 }
 
 // New returns a new merkle database.

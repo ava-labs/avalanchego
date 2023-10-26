@@ -851,7 +851,7 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc TokenConfiguration) {
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc *TokenConfiguration) {
 	db, err := getBasicDBWithBranchFactor(tc)
 	require.NoError(err)
 

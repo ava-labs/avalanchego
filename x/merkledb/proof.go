@@ -138,7 +138,7 @@ type Proof struct {
 // Returns nil if the trie given in [proof] has root [expectedRootID].
 // That is, this is a valid proof that [proof.Key] exists/doesn't exist
 // in the trie with root [expectedRootID].
-func (proof *Proof) Verify(ctx context.Context, tc TokenConfiguration, expectedRootID ids.ID) error {
+func (proof *Proof) Verify(ctx context.Context, tc *TokenConfiguration, expectedRootID ids.ID) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
 		return ErrNoProof
@@ -282,7 +282,7 @@ type RangeProof struct {
 //	If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	tc TokenConfiguration,
+	tc *TokenConfiguration,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
@@ -734,7 +734,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [Key], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(tc TokenConfiguration, proof []ProofNode, key maybe.Maybe[Key]) error {
+func verifyProofPath(tc *TokenConfiguration, proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
 	}
@@ -871,7 +871,7 @@ func addPathInfo(
 }
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc TokenConfiguration) (*trieView, error) {
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc *TokenConfiguration) (*trieView, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),

@@ -15,23 +15,23 @@ import (
 var (
 	ErrInvalidTokenConfig = errors.New("token configuration must match one of the predefined configurations ")
 
-	BranchFactor2TokenConfig = TokenConfiguration{
+	BranchFactor2TokenConfig = &TokenConfiguration{
 		branchFactor: 2,
 		bitsPerToken: 1,
 	}
-	BranchFactor4TokenConfig = TokenConfiguration{
+	BranchFactor4TokenConfig = &TokenConfiguration{
 		branchFactor: 4,
 		bitsPerToken: 2,
 	}
-	BranchFactor16TokenConfig = TokenConfiguration{
+	BranchFactor16TokenConfig = &TokenConfiguration{
 		branchFactor: 16,
 		bitsPerToken: 4,
 	}
-	BranchFactor256TokenConfig = TokenConfiguration{
+	BranchFactor256TokenConfig = &TokenConfiguration{
 		branchFactor: 256,
 		bitsPerToken: 8,
 	}
-	validTokenConfigurations = []TokenConfiguration{
+	validTokenConfigurations = []*TokenConfiguration{
 		BranchFactor2TokenConfig,
 		BranchFactor4TokenConfig,
 		BranchFactor16TokenConfig,
@@ -44,11 +44,11 @@ type TokenConfiguration struct {
 	bitsPerToken int
 }
 
-func (t TokenConfiguration) ToKey(val byte) Key {
+func (t *TokenConfiguration) ToKey(val byte) Key {
 	return Key{value: string([]byte{val << dualBitIndex(t.bitsPerToken)}), length: t.bitsPerToken}
 }
 
-func (t TokenConfiguration) Valid() error {
+func (t *TokenConfiguration) Valid() error {
 	for _, validConfig := range validTokenConfigurations {
 		if validConfig == t {
 			return nil
@@ -58,7 +58,7 @@ func (t TokenConfiguration) Valid() error {
 }
 
 // Token returns the token at the specified index,
-func (t TokenConfiguration) Token(k Key, bitIndex int) byte {
+func (t *TokenConfiguration) Token(k Key, bitIndex int) byte {
 	storageByte := k.value[bitIndex/8]
 	// Shift the byte right to get the token to the rightmost position.
 	storageByte >>= dualBitIndex((bitIndex + t.bitsPerToken) % 8)
@@ -66,7 +66,7 @@ func (t TokenConfiguration) Token(k Key, bitIndex int) byte {
 	return storageByte & (0xFF >> dualBitIndex(t.bitsPerToken))
 }
 
-func (t TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
+func (t *TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
 	commonIndex := 0
 	for first.length > commonIndex && second.length > commonIndex+secondOffset &&
 		t.Token(first, commonIndex) == t.Token(second, commonIndex+secondOffset) {
@@ -77,7 +77,7 @@ func (t TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOff
 
 // iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
 // this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
-func (t TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
+func (t *TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
 	if k.length-bitsToSkip < prefix.length {
 		return false
 	}
@@ -89,11 +89,11 @@ func (t TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
 	return true
 }
 
-func (t TokenConfiguration) BranchFactor() int {
+func (t *TokenConfiguration) BranchFactor() int {
 	return t.branchFactor
 }
 
-func (t TokenConfiguration) BitsPerToken() int {
+func (t *TokenConfiguration) BitsPerToken() int {
 	return t.bitsPerToken
 }
 

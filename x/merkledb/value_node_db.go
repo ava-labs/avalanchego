@@ -28,7 +28,7 @@ type valueNodeDB struct {
 	metrics   merkleMetrics
 
 	closed      utils.Atomic[bool]
-	tokenConfig TokenConfiguration
+	tokenConfig *TokenConfiguration
 }
 
 func newValueNodeDB(
@@ -36,7 +36,7 @@ func newValueNodeDB(
 	bufferPool *sync.Pool,
 	metrics merkleMetrics,
 	cacheSize int,
-	tokenConfig TokenConfiguration,
+	tokenConfig *TokenConfiguration,
 ) *valueNodeDB {
 	return &valueNodeDB{
 		metrics:     metrics,

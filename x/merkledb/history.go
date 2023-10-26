@@ -33,7 +33,7 @@ type trieHistory struct {
 	// Each change is tagged with this monotonic increasing number.
 	nextInsertNumber uint64
 
-	tc TokenConfiguration
+	tc *TokenConfiguration
 }
 
 // Tracks the beginning and ending state of a value.
@@ -65,7 +65,7 @@ func newChangeSummary(estimatedSize int) *changeSummary {
 	}
 }
 
-func newTrieHistory(maxHistoryLookback int, tc TokenConfiguration) *trieHistory {
+func newTrieHistory(maxHistoryLookback int, tc *TokenConfiguration) *trieHistory {
 	return &trieHistory{
 		maxHistoryLen: maxHistoryLookback,
 		history:       buffer.NewUnboundedDeque[*changeSummaryAndInsertNumber](maxHistoryLookback),
