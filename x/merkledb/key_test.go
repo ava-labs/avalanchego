@@ -4,10 +4,15 @@
 package merkledb
 
 import (
+	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
 func TestHasPartialByte(t *testing.T) {
@@ -556,4 +561,39 @@ func TestShiftCopy(t *testing.T) {
 			require.Equal(t, tt.expected, tt.dst)
 		})
 	}
+}
+
+func initiateValues(batch []database.BatchOp, seed int64) []database.BatchOp {
+	r := rand.New(rand.NewSource(seed))
+	maxKeyLen := 25
+	maxValLen := 32
+	for i := 0; i < len(batch); i++ {
+		keyLen := r.Intn(maxKeyLen)
+		key := make([]byte, keyLen+7)
+		_, _ = r.Read(key)
+
+		valueLen := r.Intn(maxValLen)
+		value := make([]byte, valueLen)
+		_, _ = r.Read(value)
+		batch[i] = database.BatchOp{Key: key, Value: value}
+	}
+	return batch
+}
+
+func Test_Insert(t *testing.T) {
+	valueToInsert := initiateValues(make([]database.BatchOp, 150000), 0)
+	require := require.New(t)
+	db, err := newDatabase(
+		context.Background(),
+		memdb.New(),
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+	for i := 0; i < 10; i++ {
+		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: valueToInsert, ConsumeBytes: true})
+		require.NoError(err)
+		view.GetMerkleRoot(context.Background())
+	}
+	require.NoError(db.Close())
 }
