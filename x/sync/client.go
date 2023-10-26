@@ -124,7 +124,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
 			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(c.tokenConfig, changeProofResp.ChangeProof); err != nil {
+			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
 				return nil, err
 			}
 
@@ -158,7 +158,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_RangeProof:
 
 			var rangeProof merkledb.RangeProof
-			if err := rangeProof.UnmarshalProto(c.tokenConfig, changeProofResp.RangeProof); err != nil {
+			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
 				return nil, err
 			}
 
@@ -260,7 +260,7 @@ func (c *client) GetRangeProof(
 		endKey := maybeBytesToMaybe(req.EndKey)
 
 		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(c.tokenConfig, &rangeProofProto); err != nil {
+		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
 		}
 

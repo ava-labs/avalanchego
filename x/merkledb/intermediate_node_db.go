@@ -119,7 +119,7 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 	}
 	db.bufferPool.Put(dbKey)
 
-	return parseNode(db.tc, key, nodeBytes)
+	return parseNode(key, nodeBytes)
 }
 
 // constructDBKey returns a key that can be used in [db.baseDB].

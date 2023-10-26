@@ -44,13 +44,12 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errTooManyChildren    = errors.New("length of children list is larger than branching factor")
-	errChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
-	errLeadingZeroes      = errors.New("varint has leading zeroes")
-	errInvalidBool        = errors.New("decoded bool is neither true nor false")
-	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
-	errExtraSpace         = errors.New("trailing buffer space")
-	errIntOverflow        = errors.New("value overflows int")
+	ErrChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
+	ErrLeadingZeroes      = errors.New("varint has leading zeroes")
+	ErrInvalidBool        = errors.New("decoded bool is neither true nor false")
+	ErrNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
+	ErrExtraSpace         = errors.New("trailing buffer space")
+	ErrIntOverflow        = errors.New("value overflows int")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -71,7 +70,7 @@ type encoder interface {
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeDBNode(tc TokenConfiguration, bytes []byte, n *dbNode) error
+	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
 func newCodec() encoderDecoder {
@@ -140,7 +139,7 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNode(tc TokenConfiguration, b []byte, n *dbNode) error {
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -157,21 +156,19 @@ func (c *codecImpl) decodeDBNode(tc TokenConfiguration, b []byte, n *dbNode) err
 	switch {
 	case err != nil:
 		return err
-	case numChildren > uint64(tc.BranchFactor()):
-		return errTooManyChildren
 	case numChildren > uint64(src.Len()/minChildLen):
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, tc.BranchFactor())
+	n.children = make(map[byte]child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
-		if index >= uint64(tc.BranchFactor()) || (i != 0 && index <= previousChild) {
-			return errChildIndexTooLarge
+		if i != 0 && index <= previousChild {
+			return ErrChildIndexTooLarge
 		}
 		previousChild = index
 
@@ -194,7 +191,7 @@ func (c *codecImpl) decodeDBNode(tc TokenConfiguration, b []byte, n *dbNode) err
 		}
 	}
 	if src.Len() != 0 {
-		return errExtraSpace
+		return ErrExtraSpace
 	}
 	return nil
 }
@@ -219,7 +216,7 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	case boolByte == falseByte:
 		return false, nil
 	default:
-		return false, errInvalidBool
+		return false, ErrInvalidBool
 	}
 }
 
@@ -249,7 +246,7 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 			return 0, err
 		}
 		if lastByte == 0x00 {
-			return 0, errLeadingZeroes
+			return 0, ErrLeadingZeroes
 		}
 	}
 
@@ -348,7 +345,7 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 		return Key{}, err
 	}
 	if length > math.MaxInt {
-		return Key{}, errIntOverflow
+		return Key{}, ErrIntOverflow
 	}
 	result := Key{
 		length: int(length),
@@ -370,7 +367,7 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 		// Generate a mask with (8-remainderBitCount) 0s followed by remainderBitCount 1s.
 		paddingMask := byte(0xFF >> result.remainderBitCount())
 		if buffer[keyBytesLen-1]&paddingMask != 0 {
-			return Key{}, errNonZeroKeyPadding
+			return Key{}, ErrNonZeroKeyPadding
 		}
 	}
 	result.value = string(buffer)

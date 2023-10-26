@@ -138,7 +138,7 @@ func sendRangeProofRequest(
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 			var response merkledb.RangeProof
-			require.NoError(response.UnmarshalProto(merkledb.BranchFactor16TokenConfig, &responseProto))
+			require.NoError(response.UnmarshalProto(&responseProto))
 
 			// modify if needed
 			if modifyResponse != nil {
@@ -456,7 +456,7 @@ func sendChangeProofRequest(
 			if responseProto.GetChangeProof() != nil {
 				// Server responded with a change proof
 				var changeProof merkledb.ChangeProof
-				require.NoError(changeProof.UnmarshalProto(merkledb.BranchFactor16TokenConfig, responseProto.GetChangeProof()))
+				require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
 
 				// modify if needed
 				if modifyChangeProof != nil {
@@ -478,7 +478,7 @@ func sendChangeProofRequest(
 
 			// Server responded with a range proof
 			var rangeProof merkledb.RangeProof
-			require.NoError(rangeProof.UnmarshalProto(merkledb.BranchFactor16TokenConfig, responseProto.GetRangeProof()))
+			require.NoError(rangeProof.UnmarshalProto(responseProto.GetRangeProof()))
 
 			// modify if needed
 			if modifyRangeProof != nil {

@@ -26,7 +26,7 @@ func Test_Node_Marshal(t *testing.T) {
 	root.addChild(BranchFactor16TokenConfig, childNode)
 
 	data := root.bytes()
-	rootParsed, err := parseNode(BranchFactor16TokenConfig, ToKey([]byte("")), data)
+	rootParsed, err := parseNode(ToKey([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
@@ -63,7 +63,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err := parseNode(BranchFactor16TokenConfig, ToKey([]byte("")), broken)
+		_, err := parseNode(ToKey([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

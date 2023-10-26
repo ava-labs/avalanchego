@@ -1247,7 +1247,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(BranchFactor16TokenConfig, protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
@@ -1264,7 +1264,7 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(BranchFactor16TokenConfig, protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode)
 	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
 }
 
@@ -1277,11 +1277,11 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	protoNode := node.ToProto()
 
 	childID := ids.GenerateTestID()
-	protoNode.Children[uint32(BranchFactor16TokenConfig.BranchFactor())] = childID[:]
+	protoNode.Children[256] = childID[:]
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(BranchFactor16TokenConfig, protoNode)
-	require.ErrorIs(t, err, ErrInvalidChildIndex)
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, ErrChildIndexTooLarge)
 }
 
 func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
@@ -1328,7 +1328,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var node ProofNode
-			err := node.UnmarshalProto(BranchFactor16TokenConfig, tt.nodeFunc())
+			err := node.UnmarshalProto(tt.nodeFunc())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1347,7 +1347,7 @@ func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
 		// Assert the unmarshaled one is the same as the original.
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
-		require.NoError(unmarshaledNode.UnmarshalProto(BranchFactor16TokenConfig, protoNode))
+		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
@@ -1404,7 +1404,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(BranchFactor16TokenConfig, protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1466,7 +1466,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(BranchFactor16TokenConfig, protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1477,7 +1477,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
 	var proof ChangeProof
-	err := proof.UnmarshalProto(BranchFactor16TokenConfig, nil)
+	err := proof.UnmarshalProto(nil)
 	require.ErrorIs(t, err, ErrNilChangeProof)
 }
 
@@ -1531,7 +1531,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(BranchFactor16TokenConfig, protoProof)
+	err := unmarshaledProof.UnmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrNilMaybeBytes)
 }
 
@@ -1549,7 +1549,7 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var proof ChangeProof
-	err := proof.UnmarshalProto(BranchFactor16TokenConfig, protoProof)
+	err := proof.UnmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
@@ -1591,7 +1591,7 @@ func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof Proof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(BranchFactor16TokenConfig, protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1633,7 +1633,7 @@ func TestProofProtoUnmarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var proof Proof
-			err := proof.UnmarshalProto(BranchFactor16TokenConfig, tt.proof)
+			err := proof.UnmarshalProto(tt.proof)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

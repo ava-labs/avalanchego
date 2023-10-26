@@ -31,8 +31,6 @@ var (
 	ErrNonIncreasingValues         = errors.New("keys sent are not in increasing order")
 	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
-	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
-	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
 	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
 	ErrNoStartProof                = errors.New("no start proof")
@@ -87,7 +85,7 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 	return pbNode
 }
 
-func (node *ProofNode) UnmarshalProto(tc TokenConfiguration, pbNode *pb.ProofNode) error {
+func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 	switch {
 	case pbNode == nil:
 		return ErrNilProofNode
@@ -106,8 +104,8 @@ func (node *ProofNode) UnmarshalProto(tc TokenConfiguration, pbNode *pb.ProofNod
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
-		if childIndex >= uint32(tc.branchFactor) {
-			return ErrInvalidChildIndex
+		if childIndex > 255 {
+			return ErrChildIndexTooLarge
 		}
 		childID, err := ids.ToID(childIDBytes)
 		if err != nil {
@@ -215,7 +213,7 @@ func (proof *Proof) ToProto() *pb.Proof {
 	return pbProof
 }
 
-func (proof *Proof) UnmarshalProto(tc TokenConfiguration, pbProof *pb.Proof) error {
+func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
 	switch {
 	case pbProof == nil:
 		return ErrNilProof
@@ -233,7 +231,7 @@ func (proof *Proof) UnmarshalProto(tc TokenConfiguration, pbProof *pb.Proof) err
 
 	proof.Path = make([]ProofNode, len(pbProof.Proof))
 	for i, pbNode := range pbProof.Proof {
-		if err := proof.Path[i].UnmarshalProto(tc, pbNode); err != nil {
+		if err := proof.Path[i].UnmarshalProto(pbNode); err != nil {
 			return err
 		}
 	}
@@ -433,21 +431,21 @@ func (proof *RangeProof) ToProto() *pb.RangeProof {
 	}
 }
 
-func (proof *RangeProof) UnmarshalProto(tc TokenConfiguration, pbProof *pb.RangeProof) error {
+func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 	if pbProof == nil {
 		return ErrNilRangeProof
 	}
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := proof.StartProof[i].UnmarshalProto(tc, protoNode); err != nil {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
 	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := proof.EndProof[i].UnmarshalProto(tc, protoNode); err != nil {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
@@ -585,21 +583,21 @@ func (proof *ChangeProof) ToProto() *pb.ChangeProof {
 	}
 }
 
-func (proof *ChangeProof) UnmarshalProto(tc TokenConfiguration, pbProof *pb.ChangeProof) error {
+func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
 		return ErrNilChangeProof
 	}
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := proof.StartProof[i].UnmarshalProto(tc, protoNode); err != nil {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
 	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := proof.EndProof[i].UnmarshalProto(tc, protoNode); err != nil {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
@@ -743,7 +741,13 @@ func verifyProofPath(tc TokenConfiguration, proof []ProofNode, key maybe.Maybe[K
 
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
-		nodeKey := proof[i].Key
+		currentProofNode := proof[i]
+		for index := range currentProofNode.Children {
+			if int(index) >= tc.branchFactor {
+				return ErrInvalidChildIndex
+			}
+		}
+		nodeKey := currentProofNode.Key
 		if key.HasValue() && nodeKey.length%tc.BitsPerToken() != 0 {
 			return ErrInconsistentBranchFactor
 		}

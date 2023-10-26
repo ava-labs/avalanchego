@@ -89,7 +89,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 
-	return parseNode(db.tokenConfig, key, nodeBytes)
+	return parseNode(key, nodeBytes)
 }
 
 // Batch of database operations
@@ -170,7 +170,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(i.db.tokenConfig, ToKey(key), i.nodeIter.Value())
+	n, err := parseNode(ToKey(key), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

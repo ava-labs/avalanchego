@@ -176,7 +176,7 @@ func newTrieView(
 				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-		if err := newView.recordValueChange(ToKey(key), newVal); err != nil {
+		if err := newView.recordValueChange(toKey(key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -184,7 +184,7 @@ func newTrieView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(ToKey(stringToByteSlice(key)), val); err != nil {
+		if err := newView.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
 			return nil, err
 		}
 	}

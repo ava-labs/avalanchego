@@ -47,9 +47,9 @@ func newNode(key Key) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(tokenConfig TokenConfiguration, key Key, nodeBytes []byte) (*node, error) {
+func parseNode(key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := codec.decodeDBNode(tokenConfig, nodeBytes, &n); err != nil {
+	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{

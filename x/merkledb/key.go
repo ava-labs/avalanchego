@@ -6,6 +6,7 @@ package merkledb
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"strings"
 	"unsafe"
 )
@@ -47,6 +48,10 @@ type Token struct {
 	value  byte
 }
 
+func (t TokenConfiguration) ToToken(val byte) Token {
+	return Token{value: val, length: t.bitsPerToken}
+}
+
 func (t TokenConfiguration) Valid() error {
 	for _, validConfig := range validTokenConfigurations {
 		if validConfig == t {
@@ -54,10 +59,6 @@ func (t TokenConfiguration) Valid() error {
 		}
 	}
 	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
-}
-
-func (t TokenConfiguration) ToToken(val byte) Token {
-	return Token{value: val, length: t.bitsPerToken}
 }
 
 func (t TokenConfiguration) BranchFactor() int {
@@ -74,10 +75,14 @@ type Key struct {
 	value  string
 }
 
-// ToKey returns [keyBytes] as a new key with the given [branchFactor].
-// Assumes [branchFactor] is valid.
-// Caller must not modify [keyBytes] after this call.
+// ToKey returns [keyBytes] as a new key
 func ToKey(keyBytes []byte) Key {
+	return toKey(slices.Clone(keyBytes))
+}
+
+// toKey returns [keyBytes] as a new key
+// Caller must not modify [keyBytes] after this call.
+func toKey(keyBytes []byte) Key {
 	return Key{
 		value:  byteSliceToString(keyBytes),
 		length: len(keyBytes) * 8,
