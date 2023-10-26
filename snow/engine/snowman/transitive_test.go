@@ -32,14 +32,14 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(commonCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -86,7 +86,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	return vdr, vals, sender, vm, te, gBlk
 }
 
-func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	commonCfg := common.DefaultConfigTest()
 	engCfg := DefaultConfigs()
 	return setup(t, commonCfg, engCfg)
@@ -231,8 +231,7 @@ func TestEngineQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blockID)
 		require.Equal(uint64(1), requestedHeight)
@@ -282,8 +281,7 @@ func TestEngineQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blockID)
 		require.Equal(uint64(1), requestedHeight)
@@ -333,16 +331,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -393,8 +391,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk0.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -467,8 +464,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*secondQueryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -637,8 +633,7 @@ func TestEnginePushQuery(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID, requestedHeight uint64) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.True(inVdrs.Equals(vdrSet))
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -684,8 +679,7 @@ func TestEngineBuildBlock(t *testing.T) {
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ []byte, _ uint64) {
 		require.False(*pushSent)
 		*pushSent = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -707,8 +701,7 @@ func TestEngineRepoll(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
 		require.False(*queried)
 		*queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -733,16 +726,16 @@ func TestVoteCanceling(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -792,8 +785,7 @@ func TestVoteCanceling(t *testing.T) {
 		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1, vdr2)
+		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.Bytes(), blkBytes)
 		require.Equal(uint64(1), requestedHeight)
@@ -1170,8 +1162,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(issuedBlk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -1322,7 +1313,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(secondVdr, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(te.Ctx.SubnetID, secondVdr, nil, ids.Empty, 1))
 
 	sender.Default(true)
 
@@ -1508,11 +1499,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params.ConcurrentRepolls = 2
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1606,14 +1597,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1664,8 +1655,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		require.False((*queried))
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr0, vdr1)
+		vdrSet := set.Of(vdr0, vdr1)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -1704,11 +1694,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Params.AlphaConfidence = 1
 	engCfg.Params.OptimalProcessing = 1
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1771,8 +1761,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		reqID = rID
 		require.False(queried)
 		queried = true
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 	}
 
@@ -2272,8 +2261,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.NodeID]{}
-	expectedVdrSet.Add(vdr)
+	expectedVdrSet := set.Of(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
@@ -2347,8 +2335,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		*queried = true
 
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
+		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
@@ -2446,8 +2433,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require := require.New(t)
 
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
-	expectedVdrSet := set.Set[ids.NodeID]{}
-	expectedVdrSet.Add(vdr)
+	expectedVdrSet := set.Of(vdr)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
@@ -2737,11 +2723,11 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender

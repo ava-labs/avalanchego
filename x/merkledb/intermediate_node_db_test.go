@@ -23,7 +23,7 @@ import (
 func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
-	n := newNode(nil, NewPath([]byte{0x00}, BranchFactor16))
+	n := newNode(nil, ToKey([]byte{0x00}, BranchFactor16))
 	n.setValue(maybe.Some([]byte{byte(0x02)}))
 	nodeSize := cacheEntrySize(n.key, n)
 
@@ -42,7 +42,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	)
 
 	// Put a key-node pair
-	node1Key := NewPath([]byte{0x01}, BranchFactor16)
+	node1Key := ToKey([]byte{0x01}, BranchFactor16)
 	node1 := newNode(nil, node1Key)
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
@@ -73,8 +73,8 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	expectedSize := 0
 	added := 0
 	for {
-		key := NewPath([]byte{byte(added)}, BranchFactor16)
-		node := newNode(nil, emptyPath(BranchFactor16))
+		key := ToKey([]byte{byte(added)}, BranchFactor16)
+		node := newNode(nil, emptyKey(BranchFactor16))
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -93,8 +93,8 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key := NewPath([]byte{byte(added)}, BranchFactor16)
-	node := newNode(nil, emptyPath(BranchFactor16))
+	key := ToKey([]byte{byte(added)}, BranchFactor16)
+	node := newNode(nil, emptyKey(BranchFactor16))
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
@@ -102,7 +102,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.Equal(1, db.nodeCache.fifo.Len())
 	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(NewPath([]byte{byte(added)}, BranchFactor16), gotKey)
+	require.Equal(ToKey([]byte{byte(added)}, BranchFactor16), gotKey)
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache
@@ -150,8 +150,8 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	) {
 		require := require.New(t)
 		for _, branchFactor := range branchFactors {
-			p := NewPath(key, branchFactor)
-			if p.tokensLength <= int(tokenLength) {
+			p := ToKey(key, branchFactor)
+			if p.tokenLength <= int(tokenLength) {
 				t.SkipNow()
 			}
 			p = p.Take(int(tokenLength))
@@ -190,7 +190,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	)
 
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	constructedKey := db.constructDBKey(NewPath([]byte{}, BranchFactor16))
+	constructedKey := db.constructDBKey(ToKey([]byte{}, BranchFactor16))
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 	require.Equal(byte(16), constructedKey[len(constructedKey)-1])
@@ -201,7 +201,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 	}
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	p := NewPath([]byte{0xF0}, BranchFactor16).Take(1)
+	p := ToKey([]byte{0xF0}, BranchFactor16).Take(1)
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])

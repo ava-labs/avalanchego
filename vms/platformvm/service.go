@@ -7,11 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
 	stdjson "encoding/json"
-	stdmath "math"
 
 	"go.uber.org/zap"
 
@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -45,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -106,6 +106,9 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 		zap.String("method", "getHeight"),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	ctx := r.Context()
 	height, err := s.vm.GetCurrentHeight(ctx)
 	response.Height = json.Uint64(height)
@@ -136,6 +139,9 @@ func (s *Service) ExportKey(_ *http.Request, args *ExportKeyArgs, reply *ExportK
 	if err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -175,6 +181,9 @@ func (s *Service) ImportKey(_ *http.Request, args *ImportKeyArgs, reply *api.JSO
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -221,11 +230,13 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response 
 		logging.UserStrings("addresses", args.Addresses),
 	)
 
-	// Parse to address
 	addrs, err := avax.ParseServiceAddresses(s.addrManager, args.Addresses)
 	if err != nil {
 		return err
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	utxos, err := avax.GetAllUTXOs(s.vm.state, addrs)
 	if err != nil {
@@ -244,16 +255,16 @@ utxoFor:
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
 			if out.Locktime <= currentTime {
-				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					unlockeds[assetID] = stdmath.MaxUint64
+					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			} else {
-				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedNotStakeables[assetID] = stdmath.MaxUint64
+					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
@@ -267,23 +278,23 @@ utxoFor:
 				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
-				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedNotStakeables[assetID] = stdmath.MaxUint64
+					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
 			case out.Locktime <= currentTime:
-				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					unlockeds[assetID] = stdmath.MaxUint64
+					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			default:
-				newBalance, err := math.Add64(lockedStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add64(lockedStakeables[assetID], out.Amount())
 				if err != nil {
-					lockedStakeables[assetID] = stdmath.MaxUint64
+					lockedStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedStakeables[assetID] = newBalance
 				}
@@ -297,17 +308,17 @@ utxoFor:
 
 	balances := maps.Clone(lockedStakeables)
 	for assetID, amount := range lockedNotStakeables {
-		newBalance, err := math.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add64(balances[assetID], amount)
 		if err != nil {
-			balances[assetID] = stdmath.MaxUint64
+			balances[assetID] = math.MaxUint64
 		} else {
 			balances[assetID] = newBalance
 		}
 	}
 	for assetID, amount := range unlockeds {
-		newBalance, err := math.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add64(balances[assetID], amount)
 		if err != nil {
-			balances[assetID] = stdmath.MaxUint64
+			balances[assetID] = math.MaxUint64
 		} else {
 			balances[assetID] = newBalance
 		}
@@ -341,6 +352,9 @@ func (s *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *a
 		logging.UserString("username", args.Username),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
 		return err
@@ -366,6 +380,9 @@ func (s *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *a
 		zap.String("method", "listAddresses"),
 		logging.UserString("username", args.Username),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -446,6 +463,10 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 	if limit <= 0 || builder.MaxPageSize < limit {
 		limit = builder.MaxPageSize
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	if sourceChain == s.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
 			s.vm.state,
@@ -530,6 +551,9 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 		zap.String("service", "platform"),
 		zap.String("method", "getSubnets"),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	getAll := len(args.IDs) == 0
 	if getAll {
@@ -656,6 +680,9 @@ func (s *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs
 		return nil
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	transformSubnetIntf, err := s.vm.state.GetSubnetTransformation(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf(
@@ -757,8 +784,10 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Of(args.NodeIDs...)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -972,8 +1001,10 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := set.Set[ids.NodeID]{}
-	nodeIDs.Add(args.NodeIDs...)
+	nodeIDs := set.Of(args.NodeIDs...)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	numNodeIDs := nodeIDs.Len()
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -1081,6 +1112,9 @@ func (s *Service) GetCurrentSupply(r *http.Request, args *GetCurrentSupplyArgs, 
 		zap.String("method", "getCurrentSupply"),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	supply, err := s.vm.state.GetCurrentSupply(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("fetching current supply failed: %w", err)
@@ -1120,17 +1154,9 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		zap.Uint16("size", uint16(args.Size)),
 	)
 
-	validators, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return fmt.Errorf(
-			"couldn't get validators of subnet %q. Is it being validated?",
-			args.SubnetID,
-		)
-	}
-
-	sample, err := validators.Sample(int(args.Size))
+	sample, err := s.vm.Validators.Sample(args.SubnetID, int(args.Size))
 	if err != nil {
-		return fmt.Errorf("sampling errored with %w", err)
+		return fmt.Errorf("sampling %s errored with %w", args.SubnetID, err)
 	}
 
 	if sample == nil {
@@ -1206,6 +1232,9 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem while parsing reward address: %w", err)
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -1317,6 +1346,9 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		return err
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
 		return err
@@ -1423,6 +1455,9 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 		return err
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
 		return err
@@ -1504,6 +1539,9 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	if err != nil {
 		return err
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -1599,6 +1637,9 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 		return err
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
 		return err
@@ -1684,6 +1725,9 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	if err != nil {
 		return err
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -1789,8 +1833,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	}
 	// If creating AVM instance, use secp256k1fx
 	// TODO: Document FXs and have user specify them in API call
-	fxIDsSet := set.Set[ids.ID]{}
-	fxIDsSet.Add(fxIDs...)
+	fxIDsSet := set.Of(fxIDs...)
 	if vmID == constants.AVMID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
@@ -1804,6 +1847,9 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	if err != nil {
 		return err
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -1878,6 +1924,9 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 		return errMissingBlockchainID
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	// if its aliased then vm created this chain.
 	if aliasedID, err := s.vm.Chains.Lookup(args.BlockchainID); err == nil {
 		if s.nodeValidates(aliasedID) {
@@ -1936,12 +1985,8 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	validators, ok := s.vm.Validators.Get(chain.SubnetID)
-	if !ok {
-		return false
-	}
-
-	return validators.Contains(s.vm.ctx.NodeID)
+	_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
+	return isValidator
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {
@@ -1987,6 +2032,9 @@ func (s *Service) ValidatedBy(r *http.Request, args *ValidatedByArgs, response *
 		zap.String("method", "validatedBy"),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	var err error
 	ctx := r.Context()
 	response.SubnetID, err = s.vm.GetSubnetID(ctx, args.BlockchainID)
@@ -2009,6 +2057,9 @@ func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *Vali
 		zap.String("service", "platform"),
 		zap.String("method", "validates"),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	if args.SubnetID != constants.PrimaryNetworkID {
 		subnetTx, _, err := s.vm.state.GetTx(args.SubnetID)
@@ -2066,6 +2117,9 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 		zap.String("method", "getBlockchains"),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	subnets, err := s.vm.state.GetSubnets()
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
@@ -2119,7 +2173,6 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	return nil
 }
 
-// IssueTx issues a tx
 func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -2134,6 +2187,10 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.
 	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	if err := s.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
@@ -2147,6 +2204,9 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetT
 		zap.String("service", "platform"),
 		zap.String("method", "getTx"),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	tx, _, err := s.vm.state.GetTx(args.TxID)
 	if err != nil {
@@ -2186,6 +2246,9 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 		zap.String("service", "platform"),
 		zap.String("method", "getTxStatus"),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	_, txStatus, err := s.vm.state.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
@@ -2280,6 +2343,9 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 		return err
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	currentStakerIterator, err := s.vm.state.GetCurrentStakerIterator()
 	if err != nil {
 		return err
@@ -2370,6 +2436,9 @@ func (s *Service) GetMinStake(_ *http.Request, args *GetMinStakeArgs, reply *Get
 		return nil
 	}
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	transformSubnetIntf, err := s.vm.state.GetSubnetTransformation(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf(
@@ -2414,11 +2483,11 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 		zap.String("method", "getTotalStake"),
 	)
 
-	vdrs, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return errMissingValidatorSet
+	totalWeight, err := s.vm.Validators.TotalWeight(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("couldn't get total weight: %w", err)
 	}
-	weight := json.Uint64(vdrs.Weight())
+	weight := json.Uint64(totalWeight)
 	reply.Weight = weight
 	reply.Stake = weight
 	return nil
@@ -2451,6 +2520,10 @@ func (s *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs
 	if startTime.After(endTime) {
 		return errStartAfterEndTime
 	}
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	now := s.vm.state.GetTimestamp()
 	if startTime.Before(now) {
 		return errStartTimeInThePast
@@ -2494,6 +2567,9 @@ func (s *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *Ge
 		zap.String("method", "getRewardUTXOs"),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	utxos, err := s.vm.state.GetRewardUTXOs(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
@@ -2529,6 +2605,9 @@ func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestamp
 		zap.String("service", "platform"),
 		zap.String("method", "getTimestamp"),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	reply.Timestamp = s.vm.state.GetTimestamp()
 	return nil
@@ -2615,6 +2694,9 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 		zap.Stringer("subnetID", args.SubnetID),
 	)
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	ctx := r.Context()
 	var err error
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
@@ -2631,6 +2713,9 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 		zap.Stringer("blkID", args.BlockID),
 		zap.Stringer("encoding", args.Encoding),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	block, err := s.vm.manager.GetStatelessBlock(args.BlockID)
 	if err != nil {
@@ -2661,6 +2746,9 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 		zap.Uint64("height", uint64(args.Height)),
 		zap.Stringer("encoding", args.Encoding),
 	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	blockID, err := s.vm.state.GetBlockIDAtHeight(uint64(args.Height))
 	if err != nil {
@@ -2762,9 +2850,9 @@ func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked ma
 		}
 
 		assetID := output.AssetID()
-		newAmount, err := math.Add64(totalAmountStaked[assetID], secpOut.Amt)
+		newAmount, err := safemath.Add64(totalAmountStaked[assetID], secpOut.Amt)
 		if err != nil {
-			newAmount = stdmath.MaxUint64
+			newAmount = math.MaxUint64
 		}
 		totalAmountStaked[assetID] = newAmount
 

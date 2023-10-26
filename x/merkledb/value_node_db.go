@@ -24,7 +24,7 @@ type valueNodeDB struct {
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
-	nodeCache cache.Cacher[Path, *node]
+	nodeCache cache.Cacher[Key, *node]
 	metrics   merkleMetrics
 
 	closed       utils.Atomic[bool]
@@ -66,11 +66,11 @@ func (db *valueNodeDB) Close() {
 func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	return &valueNodeBatch{
 		db:  db,
-		ops: make(map[Path]*node, defaultBufferLength),
+		ops: make(map[Key]*node, defaultBufferLength),
 	}
 }
 
-func (db *valueNodeDB) Get(key Path) (*node, error) {
+func (db *valueNodeDB) Get(key Key) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.ValueNodeCacheHit()
 		if cachedValue == nil {
@@ -95,14 +95,14 @@ func (db *valueNodeDB) Get(key Path) (*node, error) {
 // Batch of database operations
 type valueNodeBatch struct {
 	db  *valueNodeDB
-	ops map[Path]*node
+	ops map[Key]*node
 }
 
-func (b *valueNodeBatch) Put(key Path, value *node) {
+func (b *valueNodeBatch) Put(key Key, value *node) {
 	b.ops[key] = value
 }
 
-func (b *valueNodeBatch) Delete(key Path) {
+func (b *valueNodeBatch) Delete(key Key) {
 	b.ops[key] = nil
 }
 
@@ -170,7 +170,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(NewPath(key, i.db.branchFactor), i.nodeIter.Value())
+	n, err := parseNode(ToKey(key, i.db.branchFactor), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

@@ -38,6 +38,9 @@ func (e *tracedBootstrapableEngine) ForceAccepted(ctx context.Context, acceptedC
 	return e.bootstrapableEngine.ForceAccepted(ctx, acceptedContainerIDs)
 }
 
-func (e *tracedBootstrapableEngine) Clear() error {
-	return e.bootstrapableEngine.Clear()
+func (e *tracedBootstrapableEngine) Clear(ctx context.Context) error {
+	ctx, span := e.tracer.Start(ctx, "tracedBootstrapableEngine.Clear")
+	defer span.End()
+
+	return e.bootstrapableEngine.Clear(ctx)
 }
