@@ -965,9 +965,12 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 // addUnverifiedBlockToConsensus returns whether the block was added and an
 // error if one occurred while adding it to consensus.
 func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snowman.Block) (bool, error) {
+	blkID := blk.ID()
+
 	// make sure this block is valid
 	if err := blk.Verify(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
+			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
 
@@ -976,7 +979,6 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 		return false, nil
 	}
 
-	blkID := blk.ID()
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
