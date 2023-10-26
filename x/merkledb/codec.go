@@ -167,7 +167,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
-		if i != 0 && index <= previousChild {
+		if i != 0 && index <= previousChild || index > math.MaxUint8 {
 			return ErrChildIndexTooLarge
 		}
 		previousChild = index
