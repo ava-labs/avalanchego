@@ -6,9 +6,10 @@ package merkledb
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"strings"
 	"unsafe"
+
+	"golang.org/x/exp/slices"
 )
 
 var (
