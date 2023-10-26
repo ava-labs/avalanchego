@@ -51,9 +51,7 @@ type Builder interface {
 		options ...common.Option,
 	) (map[ids.ID]uint64, error)
 
-	// NewBaseTx creates a new simple value transfer. Because the P-chain
-	// doesn't intend for balance transfers to occur, this method is expensive
-	// and abuses the creation of subnets.
+	// NewBaseTx creates a new simple value transfer.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
