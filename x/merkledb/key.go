@@ -75,8 +75,8 @@ func (t *TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOf
 	return commonIndex
 }
 
-// iteratedHasPrefix checks if the provided prefix path is a prefix of the current path after having skipped [skipTokens] tokens first
-// this has better performance than constructing the actual path via Skip() then calling HasPrefix because it avoids the []byte allocation
+// hasPrefix checks if the provided prefix key is a prefix of the current key after having skipped [bitsToSkip] bits first
+// this has better performance than constructing the actual key via Skip() then calling HasPrefix because it avoids the []byte allocation
 func (t *TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
 	if k.length-bitsToSkip < prefix.length {
 		return false
