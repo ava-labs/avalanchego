@@ -103,5 +103,11 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 }
 
 func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
-	return targetCodec.RegisterType(&TransferSubnetOwnershipTx{})
+	errs := wrappers.Errs{}
+
+	errs.Add(
+		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
+		targetCodec.RegisterType(&BaseTx{}),
+	)
+	return errs.Err
 }
