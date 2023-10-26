@@ -47,7 +47,7 @@ func newDefaultConfig() Config {
 		IntermediateNodeCacheSize: units.MiB,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
-		TokenConfig:               BranchFactor16TokenConfig,
+		BranchFactor:              BranchFactor16,
 	}
 }
 
@@ -851,7 +851,7 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc TokenConfiguration) {
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc tokenConfiguration) {
 	db, err := getBasicDBWithBranchFactor(tc)
 	require.NoError(err)
 
@@ -907,7 +907,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tc To
 
 			require.NoError(rangeProof.Verify(
 				context.Background(),
-				db.tokenConfig,
+				db.branchFactor,
 				start,
 				end,
 				root,

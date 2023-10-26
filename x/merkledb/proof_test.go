@@ -23,7 +23,7 @@ import (
 
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
-	err := proof.Verify(context.Background(), BranchFactor16TokenConfig, ids.Empty)
+	err := proof.Verify(context.Background(), BranchFactor16, ids.Empty)
 	require.ErrorIs(t, err, ErrNoProof)
 }
 
@@ -43,7 +43,7 @@ func Test_Proof_Simple(t *testing.T) {
 	proof, err := db.GetProof(ctx, []byte{})
 	require.NoError(err)
 
-	require.NoError(proof.Verify(ctx, db.tokenConfig, expectedRoot))
+	require.NoError(proof.Verify(ctx, db.branchFactor, expectedRoot))
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
@@ -112,7 +112,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), BranchFactor16TokenConfig, db.getMerkleRoot())
+			err = proof.Verify(context.Background(), BranchFactor16, db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -148,7 +148,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.root.id,
@@ -158,7 +158,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 
 	err = proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.root.id,
@@ -223,7 +223,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), db.tokenConfig, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = proof.Verify(context.Background(), db.branchFactor, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -281,11 +281,11 @@ func Test_Proof(t *testing.T) {
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NoError(proof.Verify(context.Background(), dbTrie.tokenConfig, expectedRootID))
+	require.NoError(proof.Verify(context.Background(), dbTrie.branchFactor, expectedRootID))
 
 	proof.Path[0].ValueOrHash = maybe.Some([]byte("value2"))
 
-	err = proof.Verify(context.Background(), dbTrie.tokenConfig, expectedRootID)
+	err = proof.Verify(context.Background(), dbTrie.branchFactor, expectedRootID)
 	require.ErrorIs(err, ErrInvalidProof)
 }
 
@@ -499,7 +499,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), BranchFactor16TokenConfig, tt.start, tt.end, ids.Empty)
+			err := tt.proof.Verify(context.Background(), BranchFactor16, tt.start, tt.end, ids.Empty)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -534,7 +534,7 @@ func Test_RangeProof(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{3, 5}),
 		db.root.id,
@@ -587,7 +587,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Nothing[[]byte](),
 		maybe.Some([]byte("key35")),
 		db.root.id,
@@ -622,7 +622,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Some([]byte{1}),
 		maybe.Nothing[[]byte](),
 		db.root.id,
@@ -665,7 +665,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		db.tokenConfig,
+		db.branchFactor,
 		maybe.Some([]byte("key1")),
 		maybe.Some([]byte("key2")),
 		db.root.id,
@@ -1225,7 +1225,7 @@ func TestVerifyProofPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, tc := range validTokenConfigurations {
-				err := verifyProofPath(tc, tt.path, tt.proofKey)
+				err := verifyProofPath(BranchFactor(tc.branchFactor), tt.path, tt.proofKey)
 				require.ErrorIs(t, err, tt.expectedErr)
 			}
 		})
@@ -1698,7 +1698,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		require.NoError(rangeProof.Verify(
 			context.Background(),
-			db.tokenConfig,
+			db.branchFactor,
 			start,
 			end,
 			rootID,
@@ -1747,7 +1747,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			rootID, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
-			require.NoError(proof.Verify(context.Background(), db.tokenConfig, rootID))
+			require.NoError(proof.Verify(context.Background(), db.branchFactor, rootID))
 		default:
 			require.NotEmpty(rangeProof.EndProof)
 
@@ -1762,7 +1762,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			rootID, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
-			require.NoError(proof.Verify(context.Background(), db.tokenConfig, rootID))
+			require.NoError(proof.Verify(context.Background(), db.branchFactor, rootID))
 		}
 	})
 }
@@ -1798,7 +1798,7 @@ func FuzzProofVerification(f *testing.F) {
 		rootID, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		require.NoError(proof.Verify(context.Background(), db.tokenConfig, rootID))
+		require.NoError(proof.Verify(context.Background(), db.branchFactor, rootID))
 
 		// Insert a new key-value pair
 		newKey := make([]byte, 32)

@@ -25,9 +25,10 @@ func getBasicDB() (*merkleDB, error) {
 	)
 }
 
-func getBasicDBWithBranchFactor(bf TokenConfiguration) (*merkleDB, error) {
+// TODO replace param
+func getBasicDBWithBranchFactor(tc tokenConfiguration) (*merkleDB, error) {
 	config := newDefaultConfig()
-	config.TokenConfig = bf
+	config.BranchFactor = BranchFactor(tc.branchFactor)
 	return newDatabase(
 		context.Background(),
 		memdb.New(),

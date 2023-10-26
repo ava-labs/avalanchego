@@ -102,9 +102,9 @@ type Manager struct {
 	cancelCtx context.CancelFunc
 
 	// Set to true when StartSyncing is called.
-	syncing     bool
-	closeOnce   sync.Once
-	tokenConfig merkledb.TokenConfiguration
+	syncing      bool
+	closeOnce    sync.Once
+	branchFactor merkledb.BranchFactor
 }
 
 type ManagerConfig struct {
@@ -113,7 +113,7 @@ type ManagerConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	TokenConfig           merkledb.TokenConfiguration
+	BranchFactor          merkledb.BranchFactor
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
@@ -127,7 +127,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-	if err := config.TokenConfig.Valid(); err != nil {
+	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +136,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
-		tokenConfig:     config.TokenConfig,
+		branchFactor:    config.BranchFactor,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -490,12 +490,12 @@ func (m *Manager) findNextKey(
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
 		if deepestNode.Key.Length() < proofKeyPath.Length() {
-			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.tokenConfig.BitsPerToken())) + 1
+			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.branchFactor.BitsPerToken())) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.tokenConfig.BranchFactor()); hasDifference {
-			nextKey = maybe.Some(deepestNode.Key.Append(m.tokenConfig.ToToken(childIndex)).Bytes())
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, int(m.branchFactor) /*TODO change param type?*/); hasDifference {
+			nextKey = maybe.Some(deepestNode.Key.Append(merkledb.NewToken(childIndex, m.branchFactor)).Bytes())
 			break
 		}
 	}

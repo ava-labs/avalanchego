@@ -848,7 +848,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err := trie.getEditableNode(getSingleChildKey(dbTrie.tokenConfig, root), true)
+	firstNode, err := trie.getEditableNode(getSingleChildKey(dbTrie.branchFactor, root), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -870,7 +870,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err = trie.getEditableNode(getSingleChildKey(dbTrie.tokenConfig, root), true)
+	firstNode, err = trie.getEditableNode(getSingleChildKey(dbTrie.branchFactor, root), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 2)
 }
@@ -1213,9 +1213,9 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 
 // Returns the path of the only child of this node.
 // Assumes this node has exactly one child.
-func getSingleChildKey(tc TokenConfiguration, n *node) Key {
+func getSingleChildKey(bf BranchFactor, n *node) Key {
 	for index, entry := range n.children {
-		return n.key.AppendExtend(tc.ToToken(index), entry.compressedKey)
+		return n.key.AppendExtend(NewToken(index, bf), entry.compressedKey)
 	}
 	return Key{}
 }

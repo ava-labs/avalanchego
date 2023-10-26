@@ -48,8 +48,8 @@ func TestHasPartialByte(t *testing.T) {
 func Test_Key_Has_Prefix(t *testing.T) {
 	type test struct {
 		name           string
-		keyA           func(bf TokenConfiguration) Key
-		keyB           func(bf TokenConfiguration) Key
+		keyA           func(tokenConfiguration) Key
+		keyB           func(tokenConfiguration) Key
 		isStrictPrefix bool
 		isPrefix       bool
 	}
@@ -59,15 +59,15 @@ func Test_Key_Has_Prefix(t *testing.T) {
 	tests := []test{
 		{
 			name:           "equal keys",
-			keyA:           func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
-			keyB:           func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyA:           func(tokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyB:           func(tokenConfiguration) Key { return ToKey([]byte(key)) },
 			isPrefix:       true,
 			isStrictPrefix: false,
 		},
 		{
 			name: "one key has one fewer token",
-			keyA: func(bf TokenConfiguration) Key { return ToKey([]byte(key)) },
-			keyB: func(bf TokenConfiguration) Key {
+			keyA: func(tokenConfiguration) Key { return ToKey([]byte(key)) },
+			keyB: func(bf tokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
 			isPrefix:       true,
@@ -75,10 +75,10 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		},
 		{
 			name: "equal keys, both have one fewer token",
-			keyA: func(bf TokenConfiguration) Key {
+			keyA: func(bf tokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
-			keyB: func(bf TokenConfiguration) Key {
+			keyB: func(bf tokenConfiguration) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - bf.bitsPerToken)
 			},
 			isPrefix:       true,
@@ -86,18 +86,18 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		},
 		{
 			name:           "different keys",
-			keyA:           func(bf TokenConfiguration) Key { return ToKey([]byte{0xF7}) },
-			keyB:           func(bf TokenConfiguration) Key { return ToKey([]byte{0xF0}) },
+			keyA:           func(tokenConfiguration) Key { return ToKey([]byte{0xF7}) },
+			keyB:           func(tokenConfiguration) Key { return ToKey([]byte{0xF0}) },
 			isPrefix:       false,
 			isStrictPrefix: false,
 		},
 		{
 			name: "same bytes, different lengths",
-			keyA: func(bf TokenConfiguration) Key {
-				return ToKey([]byte{0x10, 0x00}).Take(bf.bitsPerToken)
+			keyA: func(tc tokenConfiguration) Key {
+				return ToKey([]byte{0x10, 0x00}).Take(tc.bitsPerToken)
 			},
-			keyB: func(bf TokenConfiguration) Key {
-				return ToKey([]byte{0x10, 0x00}).Take(bf.bitsPerToken * 2)
+			keyB: func(tc tokenConfiguration) Key {
+				return ToKey([]byte{0x10, 0x00}).Take(tc.bitsPerToken * 2)
 			},
 			isPrefix:       false,
 			isStrictPrefix: false,
@@ -105,14 +105,14 @@ func Test_Key_Has_Prefix(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, bf := range validTokenConfigurations {
-			t.Run(tt.name+" bf "+fmt.Sprint(bf), func(t *testing.T) {
+		for _, tc := range validTokenConfigurations {
+			t.Run(tt.name+" tc "+fmt.Sprint(tc), func(t *testing.T) {
 				require := require.New(t)
-				keyA := tt.keyA(bf)
-				keyB := tt.keyB(bf)
+				keyA := tt.keyA(tc)
+				keyB := tt.keyB(tc)
 
 				require.Equal(tt.isPrefix, keyA.HasPrefix(keyB))
-				require.Equal(tt.isPrefix, keyA.iteratedHasPrefix(keyB, 0, bf.bitsPerToken))
+				require.Equal(tt.isPrefix, keyA.iteratedHasPrefix(keyB, 0, tc.bitsPerToken))
 				require.Equal(tt.isStrictPrefix, keyA.HasStrictPrefix(keyB))
 			})
 		}
@@ -177,15 +177,15 @@ func Test_Key_Token(t *testing.T) {
 	type test struct {
 		name         string
 		inputBytes   []byte
-		branchFactor TokenConfiguration
+		tokenConfig  tokenConfiguration
 		assertTokens func(*require.Assertions, Key)
 	}
 
 	tests := []test{
 		{
-			name:         "branch factor 2",
-			inputBytes:   []byte{0b0_1_0_1_0_1_0_1, 0b1_0_1_0_1_0_1_0},
-			branchFactor: BranchFactor2TokenConfig,
+			name:        "branch factor 2",
+			inputBytes:  []byte{0b0_1_0_1_0_1_0_1, 0b1_0_1_0_1_0_1_0},
+			tokenConfig: BranchFactor2TokenConfig,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(0), key.Token(0, BranchFactor2TokenConfig.bitsPerToken))
 				require.Equal(byte(1), key.Token(1, BranchFactor2TokenConfig.bitsPerToken))
@@ -206,9 +206,9 @@ func Test_Key_Token(t *testing.T) {
 			},
 		},
 		{
-			name:         "branch factor 4",
-			inputBytes:   []byte{0b00_01_10_11, 0b11_10_01_00},
-			branchFactor: BranchFactor4TokenConfig,
+			name:        "branch factor 4",
+			inputBytes:  []byte{0b00_01_10_11, 0b11_10_01_00},
+			tokenConfig: BranchFactor4TokenConfig,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(0), key.Token(0, BranchFactor4TokenConfig.bitsPerToken))  // 00
 				require.Equal(byte(1), key.Token(2, BranchFactor4TokenConfig.bitsPerToken))  // 01
@@ -232,7 +232,7 @@ func Test_Key_Token(t *testing.T) {
 				0b1100_1101,
 				0b1110_1111,
 			},
-			branchFactor: BranchFactor16TokenConfig,
+			tokenConfig: BranchFactor16TokenConfig,
 			assertTokens: func(require *require.Assertions, key Key) {
 				for i := 0; i < 16; i++ {
 					require.Equal(byte(i), key.Token(i*BranchFactor16TokenConfig.bitsPerToken, BranchFactor16TokenConfig.bitsPerToken))
@@ -244,9 +244,9 @@ func Test_Key_Token(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		i := i
 		tests = append(tests, test{
-			name:         fmt.Sprintf("branch factor 256, byte %d", i),
-			inputBytes:   []byte{byte(i)},
-			branchFactor: BranchFactor256TokenConfig,
+			name:        fmt.Sprintf("branch factor 256, byte %d", i),
+			inputBytes:  []byte{byte(i)},
+			tokenConfig: BranchFactor256TokenConfig,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(i), key.Token(0, BranchFactor256TokenConfig.bitsPerToken))
 			},
@@ -349,7 +349,7 @@ func Test_Key_AppendExtend(t *testing.T) {
 
 func TestKeyBytesNeeded(t *testing.T) {
 	type test struct {
-		TokenConfiguration
+		tokenConfiguration
 		bitLength   int
 		bytesNeeded int
 	}
@@ -374,7 +374,7 @@ func TestKeyBytesNeeded(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("branch factor %d, tokens length %d", tt.TokenConfiguration, tt.bitLength), func(t *testing.T) {
+		t.Run(fmt.Sprintf("branch factor %d, tokens length %d", tt.tokenConfiguration, tt.bitLength), func(t *testing.T) {
 			require := require.New(t)
 			require.Equal(tt.bytesNeeded, bytesNeeded(tt.bitLength))
 		})

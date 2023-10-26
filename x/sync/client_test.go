@@ -38,7 +38,7 @@ func newDefaultDBConfig() merkledb.Config {
 		IntermediateNodeCacheSize: defaultRequestKeyLimit,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
-		TokenConfig:               merkledb.BranchFactor16TokenConfig,
+		BranchFactor:              merkledb.BranchFactor16,
 	}
 }
 
@@ -94,7 +94,7 @@ func sendRangeProofRequest(
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
-		TokenConfig:   merkledb.BranchFactor16TokenConfig,
+		BranchFactor:  merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 
@@ -411,7 +411,7 @@ func sendChangeProofRequest(
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
-		TokenConfig:   merkledb.BranchFactor16TokenConfig,
+		BranchFactor:  merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 
@@ -802,7 +802,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 			NetworkClient: networkClient,
 			Log:           logging.NoLog{},
 			Metrics:       &mockMetrics{},
-			TokenConfig:   merkledb.BranchFactor16TokenConfig,
+			BranchFactor:  merkledb.BranchFactor16,
 		},
 	)
 	require.NoError(err)

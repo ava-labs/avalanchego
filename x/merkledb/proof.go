@@ -138,12 +138,12 @@ type Proof struct {
 // Returns nil if the trie given in [proof] has root [expectedRootID].
 // That is, this is a valid proof that [proof.Key] exists/doesn't exist
 // in the trie with root [expectedRootID].
-func (proof *Proof) Verify(ctx context.Context, tc TokenConfiguration, expectedRootID ids.ID) error {
+func (proof *Proof) Verify(ctx context.Context, bf BranchFactor, expectedRootID ids.ID) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(tc, proof.Path, maybe.Some(proof.Key)); err != nil {
+	if err := verifyProofPath(bf, proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func (proof *Proof) Verify(ctx context.Context, tc TokenConfiguration, expectedR
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil, tc)
+	view, err := getStandaloneTrieView(ctx, nil, bf)
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ type RangeProof struct {
 //	If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	tc TokenConfiguration,
+	bf BranchFactor,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
@@ -331,7 +331,7 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(tc, proof.StartProof, smallestProvenPath); err != nil {
+	if err := verifyProofPath(bf, proof.StartProof, smallestProvenPath); err != nil {
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
@@ -345,7 +345,7 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(tc, proof.EndProof, largestProvenPath); err != nil {
+	if err := verifyProofPath(bf, proof.EndProof, largestProvenPath); err != nil {
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
@@ -367,7 +367,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, ops, tc)
+	view, err := getStandaloneTrieView(ctx, ops, bf)
 	if err != nil {
 		return err
 	}
@@ -734,7 +734,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [Key], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(tc TokenConfiguration, proof []ProofNode, key maybe.Maybe[Key]) error {
+func verifyProofPath(bf BranchFactor, proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
 	}
@@ -743,12 +743,12 @@ func verifyProofPath(tc TokenConfiguration, proof []ProofNode, key maybe.Maybe[K
 	for i := 0; i < len(proof)-1; i++ {
 		currentProofNode := proof[i]
 		for index := range currentProofNode.Children {
-			if int(index) >= tc.branchFactor {
+			if int(index) >= int(bf) {
 				return ErrInvalidChildIndex
 			}
 		}
 		nodeKey := currentProofNode.Key
-		if key.HasValue() && nodeKey.length%tc.BitsPerToken() != 0 {
+		if key.HasValue() && nodeKey.length%bf.BitsPerToken() != 0 {
 			return ErrInconsistentBranchFactor
 		}
 
@@ -852,7 +852,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
-			childPath := key.AppendExtend(t.tokenConfig.ToToken(index), compressedPath)
+			childPath := key.AppendExtend(NewToken(index, t.branchFactor), compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
@@ -871,7 +871,7 @@ func addPathInfo(
 }
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc TokenConfiguration) (*trieView, error) {
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, bf BranchFactor) (*trieView, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
@@ -880,7 +880,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc Token
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,
-			TokenConfig:               tc,
+			BranchFactor:              bf,
 		},
 		&mockMetrics{},
 	)

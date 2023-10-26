@@ -39,7 +39,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
-		BranchFactor16TokenConfig,
+		BranchFactor16,
 	)
 
 	// Put a key-node pair
@@ -151,7 +151,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				&mockMetrics{},
 				cacheSize,
 				evictionBatchSize,
-				branchFactor,
+				BranchFactor(branchFactor.branchFactor), // TODO fix
 			)
 
 			p := ToKey(key)
@@ -192,7 +192,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
-		BranchFactor16TokenConfig,
+		BranchFactor16,
 	)
 
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})

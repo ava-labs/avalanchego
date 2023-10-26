@@ -15,23 +15,23 @@ import (
 var (
 	ErrInvalidTokenConfig = errors.New("token configuration must match one of the predefined configurations ")
 
-	BranchFactor2TokenConfig = TokenConfiguration{
+	BranchFactor2TokenConfig = tokenConfiguration{
 		branchFactor: 2,
 		bitsPerToken: 1,
 	}
-	BranchFactor4TokenConfig = TokenConfiguration{
+	BranchFactor4TokenConfig = tokenConfiguration{
 		branchFactor: 4,
 		bitsPerToken: 2,
 	}
-	BranchFactor16TokenConfig = TokenConfiguration{
+	BranchFactor16TokenConfig = tokenConfiguration{
 		branchFactor: 16,
 		bitsPerToken: 4,
 	}
-	BranchFactor256TokenConfig = TokenConfiguration{
+	BranchFactor256TokenConfig = tokenConfiguration{
 		branchFactor: 256,
 		bitsPerToken: 8,
 	}
-	validTokenConfigurations = []TokenConfiguration{
+	validTokenConfigurations = []tokenConfiguration{
 		BranchFactor2TokenConfig,
 		BranchFactor4TokenConfig,
 		BranchFactor16TokenConfig,
@@ -39,9 +39,50 @@ var (
 	}
 )
 
-type TokenConfiguration struct {
+type BranchFactor int
+
+const (
+	BranchFactor2   BranchFactor = 2
+	BranchFactor4   BranchFactor = 4
+	BranchFactor16  BranchFactor = 16
+	BranchFactor256 BranchFactor = 256
+)
+
+func (bf BranchFactor) Valid() error {
+	switch bf {
+	case BranchFactor2, BranchFactor4, BranchFactor16, BranchFactor256:
+		return nil
+	default:
+		return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, bf) // TODO fix error
+	}
+}
+
+func (bf BranchFactor) BitsPerToken() int {
+	switch bf {
+	case BranchFactor2:
+		return 1
+	case BranchFactor4:
+		return 2
+	case BranchFactor16:
+		return 4
+	case BranchFactor256:
+		return 8
+	default:
+		// This should never happen
+		return -1
+	}
+}
+
+type tokenConfiguration struct {
 	branchFactor int
 	bitsPerToken int
+}
+
+func NewToken(val byte, branchFactor BranchFactor) Token {
+	return Token{
+		value:  val,
+		length: branchFactor.BitsPerToken(),
+	}
 }
 
 type Token struct {
@@ -49,14 +90,14 @@ type Token struct {
 	value  byte
 }
 
-func (t TokenConfiguration) ToToken(val byte) Token {
+func (t tokenConfiguration) ToToken(val byte) Token {
 	return Token{
 		value:  val,
 		length: t.bitsPerToken,
 	}
 }
 
-func (t TokenConfiguration) Valid() error {
+func (t tokenConfiguration) Valid() error {
 	for _, validConfig := range validTokenConfigurations {
 		if validConfig == t {
 			return nil
@@ -65,11 +106,11 @@ func (t TokenConfiguration) Valid() error {
 	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
 }
 
-func (t TokenConfiguration) BranchFactor() int {
+func (t tokenConfiguration) BranchFactor() int {
 	return t.branchFactor
 }
 
-func (t TokenConfiguration) BitsPerToken() int {
+func (t tokenConfiguration) BitsPerToken() int {
 	return t.bitsPerToken
 }
 

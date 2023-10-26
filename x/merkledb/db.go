@@ -139,7 +139,7 @@ type MerkleDB interface {
 
 type Config struct {
 	// TokenConfig determines the branching factor and other aspects of the tokens that make up a key
-	TokenConfig TokenConfiguration
+	BranchFactor BranchFactor // TODO replace with branch factor
 
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
@@ -204,7 +204,7 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	tokenConfig TokenConfiguration
+	branchFactor BranchFactor
 }
 
 // New returns a new merkle database.
@@ -222,7 +222,7 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	if err := config.TokenConfig.Valid(); err != nil {
+	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 
@@ -241,14 +241,14 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.TokenConfig),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), config.TokenConfig),
-		history:              newTrieHistory(int(config.HistoryLength), config.TokenConfig),
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.BranchFactor),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), config.BranchFactor),
+		history:              newTrieHistory(int(config.HistoryLength), config.BranchFactor),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenConfig:          config.TokenConfig,
+		branchFactor:         config.BranchFactor,
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -1017,7 +1017,7 @@ func (db *merkleDB) VerifyChangeProof(
 	smallestKey := maybe.Bind(start, ToKey)
 
 	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(db.tokenConfig, proof.StartProof, smallestKey); err != nil {
+	if err := verifyProofPath(db.branchFactor, proof.StartProof, smallestKey); err != nil {
 		return err
 	}
 
@@ -1033,7 +1033,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(db.tokenConfig, proof.EndProof, largestKey); err != nil {
+	if err := verifyProofPath(db.branchFactor, proof.EndProof, largestKey); err != nil {
 		return err
 	}
 

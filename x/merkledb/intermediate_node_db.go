@@ -31,7 +31,7 @@ type intermediateNodeDB struct {
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
-	tc                TokenConfiguration
+	branchFactor      BranchFactor
 }
 
 func newIntermediateNodeDB(
@@ -40,14 +40,14 @@ func newIntermediateNodeDB(
 	metrics merkleMetrics,
 	size int,
 	evictionBatchSize int,
-	tc TokenConfiguration,
+	bf BranchFactor,
 ) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
-		tc:                tc,
+		branchFactor:      bf,
 	}
 	result.nodeCache = newOnEvictCache(
 		size,
@@ -127,12 +127,12 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 // byte length but different token length, so we add padding to differentiate.
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
-	if db.tc == BranchFactor256TokenConfig {
+	if db.branchFactor == BranchFactor256 {
 		// For BranchFactor256TokenConfig, no padding is needed since byte length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(db.tc.ToToken(1)).Bytes())
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(NewToken(1, db.branchFactor)).Bytes())
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {

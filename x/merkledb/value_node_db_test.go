@@ -28,7 +28,7 @@ func TestValueNodeDB(t *testing.T) {
 		},
 		&mockMetrics{},
 		size,
-		BranchFactor16TokenConfig,
+		BranchFactor16,
 	)
 
 	// Getting a key that doesn't exist should return an error.
@@ -124,7 +124,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
-		BranchFactor16TokenConfig,
+		BranchFactor16,
 	)
 
 	// Put key-node pairs.
