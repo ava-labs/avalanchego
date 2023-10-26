@@ -206,11 +206,16 @@ impl<'a, T: Send + Sync> ObjRef<'a, T> {
 
         Ok(())
     }
+
+    pub fn into_ptr(self) -> DiskAddress {
+        self.deref().as_ptr()
+    }
 }
 
 impl<'a, T: Send + Sync> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
+        // TODO: Something is seriously wrong here but I'm not quite sure about the best approach for the fix
         self.inner.as_ref().unwrap()
     }
 }

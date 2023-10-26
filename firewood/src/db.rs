@@ -32,6 +32,7 @@ use std::{
     io::{Cursor, ErrorKind, Write},
     mem::size_of,
     num::NonZeroUsize,
+    ops::Deref,
     os::fd::{AsFd, BorrowedFd},
     path::Path,
     sync::Arc,
@@ -287,10 +288,7 @@ impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
         let obj_ref = self.merkle.get(key, self.header.kv_root);
         match obj_ref {
             Err(e) => Err(api::Error::IO(std::io::Error::new(ErrorKind::Other, e))),
-            Ok(obj) => match obj {
-                None => Ok(None),
-                Some(inner) => Ok(Some(inner.as_ref().to_owned())),
-            },
+            Ok(obj) => Ok(obj.map(|inner| inner.deref().to_owned())),
         }
     }
 
