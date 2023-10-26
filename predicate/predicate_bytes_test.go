@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,4 +48,19 @@ func TestUnpackInvalidPredicate(t *testing.T) {
 			require.Error(err, "Predicate length %d, Padding length %d (0x%x)", len(validPredicate), len(padding), invalidPredicate)
 		}
 	}
+}
+
+func TestPredicateResultsBytes(t *testing.T) {
+	require := require.New(t)
+	dataTooShort := utils.RandomBytes(params.DynamicFeeExtraDataSize - 1)
+	_, ok := GetPredicateResultBytes(dataTooShort)
+	require.False(ok)
+
+	preDUPgradeData := utils.RandomBytes(params.DynamicFeeExtraDataSize)
+	_, ok = GetPredicateResultBytes(preDUPgradeData)
+	require.False(ok)
+	postDUpgradeData := utils.RandomBytes(params.DynamicFeeExtraDataSize + 2)
+	resultBytes, ok := GetPredicateResultBytes(postDUpgradeData)
+	require.True(ok)
+	require.Equal(resultBytes, postDUpgradeData[params.DynamicFeeExtraDataSize:])
 }

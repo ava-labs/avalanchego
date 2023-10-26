@@ -51,14 +51,14 @@ func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 	return trimmedPredicateBytes[:len(trimmedPredicateBytes)-1], nil
 }
 
-// GetPredicateResultBytes returns the predicate result bytes from the extra data.
-// If the extra data does not contain predicate result bytes, an error is returned.
-func GetPredicateResultBytes(extraData []byte) ([]byte, error) {
+// GetPredicateResultBytes returns the predicate result bytes from the extra data and
+// true iff the predicate results bytes have non-zero length.
+func GetPredicateResultBytes(extraData []byte) ([]byte, bool) {
 	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or equal to this size.
 	// After the DUpgrade, the VM pre-verifies the extra data past the dynamic fee rollup window is
 	// valid.
-	if len(extraData) < params.DynamicFeeExtraDataSize {
-		return nil, fmt.Errorf("%w: got: %d, required: %d", ErrorInvalidExtraData, len(extraData), params.DynamicFeeExtraDataSize)
+	if len(extraData) <= params.DynamicFeeExtraDataSize {
+		return nil, false
 	}
-	return extraData[params.DynamicFeeExtraDataSize:], nil
+	return extraData[params.DynamicFeeExtraDataSize:], true
 }

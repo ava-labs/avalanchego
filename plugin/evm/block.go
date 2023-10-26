@@ -271,9 +271,9 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
-	headerPredicateResultsBytes, err := predicate.GetPredicateResultBytes(extraData)
-	if err != nil {
-		return err
+	headerPredicateResultsBytes, ok := predicate.GetPredicateResultBytes(extraData)
+	if !ok {
+		return fmt.Errorf("failed to find predicate results in extra data: %x", extraData)
 	}
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
