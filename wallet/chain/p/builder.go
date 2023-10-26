@@ -60,7 +60,7 @@ type Builder interface {
 	NewBaseTx(
 		outputs []*avax.TransferableOutput,
 		options ...common.Option,
-	) (*txs.CreateSubnetTx, error)
+	) (*txs.BaseTx, error)
 
 	// NewAddValidatorTx creates a new validator of the primary network.
 	//
@@ -289,9 +289,9 @@ func (b *builder) GetImportableBalance(
 func (b *builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*txs.CreateSubnetTx, error) {
+) (*txs.BaseTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
@@ -311,15 +311,14 @@ func (b *builder) NewBaseTx(
 	outputs = append(outputs, changeOutputs...)
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
 
-	return &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	return &txs.BaseTx{
+		BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
-		}},
-		Owner: &secp256k1fx.OutputOwners{},
+		},
 	}, nil
 }
 
