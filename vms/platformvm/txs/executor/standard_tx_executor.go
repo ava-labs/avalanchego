@@ -533,7 +533,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.CreateBlockchainTxFee, // TODO: Fix
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
 		},
 	); err != nil {
 		return err
