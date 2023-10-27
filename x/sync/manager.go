@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"sync"
+
+	"golang.org/x/exp/maps"
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
@@ -803,14 +804,14 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte
 
 	keysUnion := map[byte]struct{}{}
 	if node1 != nil {
-		for key, _ := range node1.Children {
+		for key := range node1.Children {
 			if int(key) >= startIndex {
 				keysUnion[key] = struct{}{}
 			}
 		}
 	}
 	if node2 != nil {
-		for key, _ := range node2.Children {
+		for key := range node2.Children {
 			if int(key) >= startIndex {
 				keysUnion[key] = struct{}{}
 			}

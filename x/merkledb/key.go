@@ -38,13 +38,15 @@ var (
 		BranchFactor2:   1,
 		BranchFactor4:   2,
 		BranchFactor16:  4,
-		BranchFactor256: 8}
+		BranchFactor256: 8,
+	}
 
 	sizeToBf = map[int]BranchFactor{
 		1: BranchFactor2,
 		2: BranchFactor4,
 		4: BranchFactor16,
-		8: BranchFactor256}
+		8: BranchFactor256,
+	}
 )
 
 type BranchFactor int
