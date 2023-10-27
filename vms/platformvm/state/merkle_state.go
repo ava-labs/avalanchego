@@ -681,7 +681,7 @@ func (ms *merkleState) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	}
 
 	subnetIDKey := merkleSubnetOwnersKey(subnetID)
-	ownerBytes, err := ms.merkleDB.Get(subnetIDKey[:])
+	ownerBytes, err := ms.merkleDB.Get(subnetIDKey)
 	if err == nil {
 		var owner fx.Owner
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
