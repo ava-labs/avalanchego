@@ -38,7 +38,6 @@ func TestRecover(t *testing.T) {
 func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
-	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
@@ -46,6 +45,7 @@ func TestCachedRecover(t *testing.T) {
 	sig, err := key.Sign(msg)
 	require.NoError(err)
 
+	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
 	pub1, err := r.RecoverPublicKeyFromBytes(msg, sig)
 	require.NoError(err)
 	pub2, err := r.RecoverPublicKeyFromBytes(msg, sig)
