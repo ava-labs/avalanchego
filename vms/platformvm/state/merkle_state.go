@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -53,15 +54,16 @@ const (
 var (
 	_ State = (*merkleState)(nil)
 
-	merkleStatePrefix      = []byte{0x00}
-	merkleSingletonPrefix  = []byte{0x01}
-	merkleBlockPrefix      = []byte{0x02}
-	merkleBlockIDsPrefix   = []byte{0x03}
-	merkleTxPrefix         = []byte{0x04}
-	merkleIndexUTXOsPrefix = []byte{0x05} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix = []byte{0x08}
+	merkleStatePrefix       = []byte{0x00}
+	merkleSingletonPrefix   = []byte{0x01}
+	merkleBlockPrefix       = []byte{0x02}
+	merkleBlockIDsPrefix    = []byte{0x03}
+	merkleTxPrefix          = []byte{0x04}
+	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix  = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix  = []byte{0x08}
+	merkleRewardUtxosPrefix = []byte{0x09}
 
 	// merkle db sections
 	metadataSectionPrefix      = byte(0x00)
@@ -73,11 +75,10 @@ var (
 	elasticSubnetSectionPrefix      = []byte{0x02}
 	chainsSectionPrefix             = []byte{0x03}
 	utxosSectionPrefix              = []byte{0x04}
-	rewardUtxosSectionPrefix        = []byte{0x05}
-	currentStakersSectionPrefix     = []byte{0x06}
-	pendingStakersSectionPrefix     = []byte{0x07}
-	delegateeRewardsPrefix          = []byte{0x08}
-	subnetOwnersPrefix              = []byte{0x09}
+	currentStakersSectionPrefix     = []byte{0x05}
+	pendingStakersSectionPrefix     = []byte{0x06}
+	delegateeRewardsPrefix          = []byte{0x07}
+	subnetOwnersPrefix              = []byte{0x08}
 )
 
 func NewMerkleState(
@@ -135,6 +136,7 @@ func newMerkleState(
 		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
+		rewardUTXOsDB                 = prefixdb.New(merkleRewardUtxosPrefix, baseDB)
 	)
 
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
@@ -245,10 +247,8 @@ func newMerkleState(
 		delegateeRewardCache:    make(map[ids.NodeID]map[ids.ID]uint64),
 		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
 
-		modifiedUTXOs:    make(map[ids.ID]*avax.UTXO),
-		utxoCache:        &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
-		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
-		rewardUTXOsCache: rewardUTXOsCache,
+		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
+		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
 
 		modifiedSupplies: make(map[ids.ID]uint64),
 		suppliesCache:    suppliesCache,
@@ -284,6 +284,10 @@ func newMerkleState(
 
 		flatValidatorWeightDiffsDB:    flatValidatorWeightDiffsDB,
 		flatValidatorPublicKeyDiffsDB: flatValidatorPublicKeyDiffsDB,
+
+		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
+		rewardUTXOsCache: rewardUTXOsCache,
+		rewardUTXOsDB:    rewardUTXOsDB,
 	}, nil
 }
 
@@ -310,9 +314,6 @@ type merkleState struct {
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
 	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
-
-	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
 
 	// Metadata section
 	chainTime, latestComittedChainTime                  time.Time
@@ -360,6 +361,11 @@ type merkleState struct {
 
 	flatValidatorWeightDiffsDB    database.Database
 	flatValidatorPublicKeyDiffsDB database.Database
+
+	// Reward UTXOs section
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
+	rewardUTXOsDB    database.Database
 }
 
 // STAKERS section
@@ -542,40 +548,6 @@ func (ms *merkleState) AddUTXO(utxo *avax.UTXO) {
 
 func (ms *merkleState) DeleteUTXO(utxoID ids.ID) {
 	ms.modifiedUTXOs[utxoID] = nil
-}
-
-func (ms *merkleState) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := ms.addedRewardUTXOs[txID]; exists {
-		return utxos, nil
-	}
-	if utxos, exists := ms.rewardUTXOsCache.Get(txID); exists {
-		return utxos, nil
-	}
-
-	utxos := make([]*avax.UTXO, 0)
-
-	prefix := merkleRewardUtxosIDPrefix(txID)
-
-	it := ms.merkleDB.NewIteratorWithPrefix(prefix)
-	defer it.Release()
-
-	for it.Next() {
-		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
-			return nil, err
-		}
-		utxos = append(utxos, utxo)
-	}
-	if err := it.Error(); err != nil {
-		return nil, err
-	}
-
-	ms.rewardUTXOsCache.Put(txID, utxos)
-	return utxos, nil
-}
-
-func (ms *merkleState) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
-	ms.addedRewardUTXOs[txID] = append(ms.addedRewardUTXOs[txID], utxo)
 }
 
 // METADATA Section
@@ -975,6 +947,40 @@ func (ms *merkleState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Ti
 	return staker.StartTime, nil
 }
 
+// REWARD UTXOs SECTION
+func (ms *merkleState) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := ms.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	if utxos, exists := ms.rewardUTXOsCache.Get(txID); exists {
+		return utxos, nil
+	}
+
+	rawTxDB := prefixdb.New(txID[:], ms.rewardUTXOsDB)
+	txDB := linkeddb.NewDefault(rawTxDB)
+	it := txDB.NewIterator()
+	defer it.Release()
+
+	utxos := []*avax.UTXO(nil)
+	for it.Next() {
+		utxo := &avax.UTXO{}
+		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	ms.rewardUTXOsCache.Put(txID, utxos)
+	return utxos, nil
+}
+
+func (ms *merkleState) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	ms.addedRewardUTXOs[txID] = append(ms.addedRewardUTXOs[txID], utxo)
+}
+
 // VALIDATORS Section
 func (ms *merkleState) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
 	for nodeID, validator := range ms.currentStakers.validators[subnetID] {
@@ -1144,6 +1150,7 @@ func (ms *merkleState) write(updateValidators bool, height uint64) error {
 		ms.writeLocalUptimes(),
 		ms.writeWeightDiffs(height, weightDiffs),
 		ms.writeBlsKeyDiffs(height, blsKeyDiffs),
+		ms.writeRewardUTXOs(),
 		ms.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
 	)
 	return errs.Err
@@ -1323,7 +1330,6 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writePendingStakers(&batchOps, pendingData),
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
-		ms.writeRewardUTXOs(&batchOps),
 	)
 	if errs.Err != nil {
 		return errs.Err
@@ -1544,26 +1550,6 @@ func (ms *merkleState) writeUTXOs(batchOps *[]database.BatchOp) error {
 	return nil
 }
 
-func (ms *merkleState) writeRewardUTXOs(batchOps *[]database.BatchOp) error {
-	for txID, utxos := range ms.addedRewardUTXOs {
-		delete(ms.addedRewardUTXOs, txID)
-		ms.rewardUTXOsCache.Put(txID, utxos)
-		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
-			if err != nil {
-				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
-			}
-
-			key := merkleRewardUtxoIDKey(txID, utxo.InputID())
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:   key,
-				Value: utxoBytes,
-			})
-		}
-	}
-	return nil
-}
-
 func (ms *merkleState) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for nodeID, nodeDelegateeRewards := range ms.modifiedDelegateeReward {
 		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
@@ -1706,6 +1692,27 @@ func (ms *merkleState) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeI
 		}
 		if err := ms.flatValidatorPublicKeyDiffsDB.Put(key, blsKeyBytes); err != nil {
 			return fmt.Errorf("failed to add bls key diffs: %w", err)
+		}
+	}
+	return nil
+}
+
+func (ms *merkleState) writeRewardUTXOs() error {
+	for txID, utxos := range ms.addedRewardUTXOs {
+		delete(ms.addedRewardUTXOs, txID)
+		ms.rewardUTXOsCache.Put(txID, utxos)
+		rawTxDB := prefixdb.New(txID[:], ms.rewardUTXOsDB)
+		txDB := linkeddb.NewDefault(rawTxDB)
+
+		for _, utxo := range utxos {
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			if err != nil {
+				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
+			}
+			utxoID := utxo.InputID()
+			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+				return fmt.Errorf("failed to add reward UTXO: %w", err)
+			}
 		}
 	}
 	return nil

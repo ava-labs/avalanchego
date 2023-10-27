@@ -76,23 +76,6 @@ func TestUtxoIDKey(t *testing.T) {
 	require.Equal(utxoID[:], key[len(prefix):])
 }
 
-func TestRewardUtxoKey(t *testing.T) {
-	require := require.New(t)
-	txID := ids.GenerateTestID()
-	utxoID := ids.GenerateTestID()
-	prefix := rewardUtxosSectionPrefix
-
-	keyPrefix := merkleRewardUtxosIDPrefix(txID)
-	key := merkleRewardUtxoIDKey(txID, utxoID)
-
-	require.Len(keyPrefix, len(prefix)+len(txID[:]))
-	require.Equal(prefix, key[0:len(prefix)])
-	require.Equal(txID[:], keyPrefix[len(prefix):])
-
-	require.Len(key, len(keyPrefix)+len(utxoID[:]))
-	require.Equal(utxoID[:], key[len(keyPrefix):])
-}
-
 func TestUtxosIndexKey(t *testing.T) {
 	require := require.New(t)
 	utxoID := ids.GenerateTestID()

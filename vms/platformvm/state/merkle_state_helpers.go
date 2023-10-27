@@ -77,19 +77,6 @@ func merkleUtxoIDKey(utxoID ids.ID) []byte {
 	return key
 }
 
-func merkleRewardUtxosIDPrefix(txID ids.ID) []byte {
-	prefix := make([]byte, len(rewardUtxosSectionPrefix)+len(txID))
-	copy(prefix, rewardUtxosSectionPrefix)
-	copy(prefix[len(rewardUtxosSectionPrefix):], txID[:])
-	return prefix
-}
-
-func merkleRewardUtxoIDKey(txID, utxoID ids.ID) []byte {
-	key := merkleRewardUtxosIDPrefix(txID)
-	key = append(key, utxoID[:]...)
-	return key
-}
-
 func merkleUtxoIndexKey(address []byte, utxoID ids.ID) []byte {
 	key := make([]byte, len(address)+ids.IDLen)
 	copy(key, address)
