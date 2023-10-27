@@ -39,7 +39,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
-		BranchFactor16TokenConfig,
+		4,
 	)
 
 	// Put a key-node pair
@@ -142,7 +142,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		tokenLength uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range validTokenConfigurations {
+		for _, tokenSize := range validTokenSizes {
 			db := newIntermediateNodeDB(
 				baseDB,
 				&sync.Pool{
@@ -151,11 +151,11 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				&mockMetrics{},
 				cacheSize,
 				evictionBatchSize,
-				branchFactor,
+				tokenSize,
 			)
 
 			p := ToKey(key)
-			uBitLength := tokenLength * uint(branchFactor.bitsPerToken)
+			uBitLength := tokenLength * uint(tokenSize)
 			if uBitLength >= uint(p.length) {
 				t.SkipNow()
 			}
@@ -164,16 +164,16 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			baseLength := len(p.value) + len(intermediateNodePrefix)
 			require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 			switch {
-			case branchFactor == BranchFactor256TokenConfig:
+			case tokenSize == 8:
 				// for keys with tokens of size byte, no padding is added
 				require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
 				require.Len(constructedKey, baseLength)
-				require.Equal(p.Extend(branchFactor.ToKey(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
 				require.Len(constructedKey, baseLength+1)
-				require.Equal(p.Extend(branchFactor.ToKey(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			}
 		}
 	})
@@ -192,7 +192,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
-		BranchFactor16TokenConfig,
+		4,
 	)
 
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
@@ -207,9 +207,9 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 	}
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	p := ToKey([]byte{0xF0}).Take(BranchFactor16TokenConfig.bitsPerToken)
+	p := ToKey([]byte{0xF0}).Take(4)
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(p.Extend(BranchFactor16TokenConfig.ToKey(1)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+	require.Equal(p.Extend(ToToken(1, 4)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 }

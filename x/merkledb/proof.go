@@ -40,7 +40,6 @@ var (
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrInvalidChildIndex           = errors.New("child index must be less than branch factor")
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilKey                      = errors.New("key is nil")
@@ -121,7 +120,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 	return nil
 }
 
-// An inclusion/exclustion proof of a key.
+// Proof represents an inclusion/exclusion proof of a key.
 type Proof struct {
 	// Nodes in the proof path from root --> target key
 	// (or node that would be where key is if it doesn't exist).
@@ -138,12 +137,12 @@ type Proof struct {
 // Returns nil if the trie given in [proof] has root [expectedRootID].
 // That is, this is a valid proof that [proof.Key] exists/doesn't exist
 // in the trie with root [expectedRootID].
-func (proof *Proof) Verify(ctx context.Context, tc *TokenConfiguration, expectedRootID ids.ID) error {
+func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize int) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(tc, proof.Path, maybe.Some(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
 
@@ -170,7 +169,7 @@ func (proof *Proof) Verify(ctx context.Context, tc *TokenConfiguration, expected
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil, tc)
+	view, err := getStandaloneTrieView(ctx, nil, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -282,10 +281,10 @@ type RangeProof struct {
 //	If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	tc *TokenConfiguration,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
+	tokenSize int,
 ) error {
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
@@ -331,7 +330,7 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(tc, proof.StartProof, smallestProvenPath); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestProvenPath); err != nil {
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
@@ -345,7 +344,7 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(tc, proof.EndProof, largestProvenPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestProvenPath); err != nil {
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
@@ -367,7 +366,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, ops, tc)
+	view, err := getStandaloneTrieView(ctx, ops, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -734,7 +733,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [Key], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(tc *TokenConfiguration, proof []ProofNode, key maybe.Maybe[Key]) error {
+func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
 	}
@@ -742,20 +741,7 @@ func verifyProofPath(tc *TokenConfiguration, proof []ProofNode, key maybe.Maybe[
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		currentProofNode := proof[i]
-		for index := range currentProofNode.Children {
-			if int(index) >= tc.branchFactor {
-				return ErrInvalidChildIndex
-			}
-		}
 		nodeKey := currentProofNode.Key
-		if key.HasValue() && nodeKey.length%tc.bitsPerToken != 0 {
-			return ErrInconsistentBranchFactor
-		}
-		for index := range currentProofNode.Children {
-			if int(index) > tc.branchFactor {
-				return ErrInconsistentBranchFactor
-			}
-		}
 
 		// Because the interface only support []byte keys,
 		// a key with a partial byte should store a value
@@ -857,7 +843,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
-			childPath := key.DoubleExtend(t.tokenConfig.ToKey(index), compressedPath)
+			childPath := key.Extend(ToToken(index, t.tokenSize), compressedPath)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
@@ -876,7 +862,7 @@ func addPathInfo(
 }
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc *TokenConfiguration) (*trieView, error) {
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int) (*trieView, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
@@ -885,7 +871,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, tc *Toke
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,
-			TokenConfig:               tc,
+			BranchFactor:              sizeToBf[size],
 		},
 		&mockMetrics{},
 	)

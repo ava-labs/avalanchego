@@ -13,81 +13,78 @@ import (
 )
 
 var (
-	ErrInvalidTokenConfig = errors.New("token configuration must match one of the predefined configurations ")
+	ErrInvalidBranchFactor = errors.New("branch factor must match one of the predefined branch factors")
 
-	BranchFactor2TokenConfig = &TokenConfiguration{
-		branchFactor: 2,
-		bitsPerToken: 1,
+	validTokenSizes = []int{
+		1,
+		2,
+		4,
+		8,
 	}
-	BranchFactor4TokenConfig = &TokenConfiguration{
-		branchFactor: 4,
-		bitsPerToken: 2,
+
+	validBranchFactors = []BranchFactor{
+		BranchFactor2,
+		BranchFactor4,
+		BranchFactor16,
+		BranchFactor256,
 	}
-	BranchFactor16TokenConfig = &TokenConfiguration{
-		branchFactor: 16,
-		bitsPerToken: 4,
-	}
-	BranchFactor256TokenConfig = &TokenConfiguration{
-		branchFactor: 256,
-		bitsPerToken: 8,
-	}
-	validTokenConfigurations = []*TokenConfiguration{
-		BranchFactor2TokenConfig,
-		BranchFactor4TokenConfig,
-		BranchFactor16TokenConfig,
-		BranchFactor256TokenConfig,
-	}
+
+	BranchFactor2   = BranchFactor(2)
+	BranchFactor4   = BranchFactor(4)
+	BranchFactor16  = BranchFactor(16)
+	BranchFactor256 = BranchFactor(256)
+
+	bfToSize = map[BranchFactor]int{
+		BranchFactor2:   1,
+		BranchFactor4:   2,
+		BranchFactor16:  4,
+		BranchFactor256: 8}
+
+	sizeToBf = map[int]BranchFactor{
+		1: BranchFactor2,
+		2: BranchFactor4,
+		4: BranchFactor16,
+		8: BranchFactor256}
 )
 
-type TokenConfiguration struct {
-	branchFactor int
-	bitsPerToken int
-}
+type BranchFactor int
 
-// ToKey creates a key version of the passed byte with length equal to bitsPerToken
-func (t *TokenConfiguration) ToKey(val byte) Key {
-	return Key{value: string([]byte{val << dualBitIndex(t.bitsPerToken)}), length: t.bitsPerToken}
-}
-
-func (t *TokenConfiguration) Valid() error {
-	for _, validConfig := range validTokenConfigurations {
-		if validConfig == t {
+func (b BranchFactor) Valid() error {
+	for _, validBF := range validBranchFactors {
+		if validBF == b {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: %d", ErrInvalidTokenConfig, t)
+	return fmt.Errorf("%w: %d", ErrInvalidBranchFactor, b)
+}
+
+// ToToken creates a key version of the passed byte with length equal to bitsPerToken
+func ToToken(val byte, tokenSize int) Key {
+	return Key{value: string([]byte{val << dualBitIndex(tokenSize)}), length: tokenSize}
 }
 
 // Token returns the token at the specified index,
 // Assumes that bitindex + bitsPerToken doesn't cross a byte boundary
-func (t *TokenConfiguration) Token(k Key, bitIndex int) byte {
+func (k Key) Token(bitIndex int, tokenSize int) byte {
 	storageByte := k.value[bitIndex/8]
 	// Shift the byte right to get the token to the rightmost position.
-	storageByte >>= dualBitIndex((bitIndex + t.bitsPerToken) % 8)
+	storageByte >>= dualBitIndex((bitIndex + tokenSize) % 8)
 	// Apply a mask to remove any other tokens in the byte.
-	return storageByte & (0xFF >> dualBitIndex(t.bitsPerToken))
+	return storageByte & (0xFF >> dualBitIndex(tokenSize))
 }
 
-// hasPrefix checks if the provided prefix key is a prefix of the current key after having skipped [bitsToSkip] bits first
+// iteratedHasPrefix checks if the provided prefix key is a prefix of the current key after having skipped [bitsToSkip] bits first
 // this has better performance than constructing the actual key via Skip() then calling HasPrefix because it avoids the []byte allocation
-func (t *TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {
+func (k Key) iteratedHasPrefix(prefix Key, bitsToSkip int, tokenSize int) bool {
 	if k.length-bitsToSkip < prefix.length {
 		return false
 	}
-	for i := 0; i < prefix.length; i += t.bitsPerToken {
-		if t.Token(k, bitsToSkip+i) != t.Token(prefix, i) {
+	for i := 0; i < prefix.length; i += tokenSize {
+		if k.Token(bitsToSkip+i, tokenSize) != prefix.Token(i, tokenSize) {
 			return false
 		}
 	}
 	return true
-}
-
-func (t *TokenConfiguration) BranchFactor() int {
-	return t.branchFactor
-}
-
-func (t *TokenConfiguration) BitsPerToken() int {
-	return t.bitsPerToken
 }
 
 type Key struct {
@@ -160,18 +157,6 @@ func (k Key) Length() int {
 	return k.length
 }
 
-// Extend returns a new Path that equals the current
-// Path with [token] appended to the end.
-func (k Key) Extend(extensionKey Key) Key {
-	buffer := make([]byte, bytesNeeded(k.length+extensionKey.length))
-	copy(buffer, k.value)
-	extendIntoBuffer(buffer, extensionKey, k.length)
-	return Key{
-		value:  byteSliceToString(buffer),
-		length: k.length + extensionKey.length,
-	}
-}
-
 // Greater returns true if current Key is greater than other Key
 func (k Key) Greater(other Key) bool {
 	return k.value > other.value || (k.value == other.value && k.length > other.length)
@@ -182,13 +167,18 @@ func (k Key) Less(other Key) bool {
 	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }
 
-func (k Key) DoubleExtend(firstKey Key, secondKey Key) Key {
-	totalBitLength := k.length + firstKey.length + secondKey.length
+func (k Key) Extend(keys ...Key) Key {
+	totalBitLength := k.length
+	for _, key := range keys {
+		totalBitLength += key.length
+	}
 	buffer := make([]byte, bytesNeeded(totalBitLength))
 	copy(buffer, k.value)
-
-	extendIntoBuffer(buffer, firstKey, k.length)
-	extendIntoBuffer(buffer, secondKey, k.length+firstKey.length)
+	currentTotal := k.length
+	for _, key := range keys {
+		extendIntoBuffer(buffer, key, currentTotal)
+		currentTotal += key.length
+	}
 
 	return Key{
 		value:  byteSliceToString(buffer),

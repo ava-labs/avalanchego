@@ -18,20 +18,20 @@ func Test_Node_Marshal(t *testing.T) {
 
 	fullKey := ToKey([]byte("key"))
 	childNode := newNode(fullKey)
-	root.addChild(BranchFactor16TokenConfig, childNode)
+	root.addChild(childNode, 4)
 	childNode.setValue(maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
 	childNode.calculateID(&mockMetrics{})
-	root.addChild(BranchFactor16TokenConfig, childNode)
+	root.addChild(childNode, 4)
 
 	data := root.bytes()
 	rootParsed, err := parseNode(ToKey([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
-	rootIndex := BranchFactor16TokenConfig.Token(getSingleChildKey(BranchFactor16TokenConfig, root), 0)
-	parsedIndex := BranchFactor16TokenConfig.Token(getSingleChildKey(BranchFactor16TokenConfig, rootParsed), 0)
+	rootIndex := getSingleChildKey(root, 4).Token(0, 4)
+	parsedIndex := getSingleChildKey(rootParsed, 4).Token(0, 4)
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
 	require.Equal(t, rootChildEntry.id, parseChildEntry.id)
@@ -43,21 +43,21 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	fullKey := ToKey([]byte{255})
 	childNode1 := newNode(fullKey)
-	root.addChild(BranchFactor16TokenConfig, childNode1)
+	root.addChild(childNode1, 4)
 	childNode1.setValue(maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
 
 	childNode1.calculateID(&mockMetrics{})
-	root.addChild(BranchFactor16TokenConfig, childNode1)
+	root.addChild(childNode1, 4)
 
 	fullKey = ToKey([]byte{237})
 	childNode2 := newNode(fullKey)
-	root.addChild(BranchFactor16TokenConfig, childNode2)
+	root.addChild(childNode2, 4)
 	childNode2.setValue(maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
 
 	childNode2.calculateID(&mockMetrics{})
-	root.addChild(BranchFactor16TokenConfig, childNode2)
+	root.addChild(childNode2, 4)
 
 	data := root.bytes()
 
