@@ -2,12 +2,15 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::{
-    db::{Db, DbConfig, WalConfig},
+    db::{DbConfig, WalConfig},
     v2::api::{self, BatchOp, Db as _, DbView, Proposal},
 };
 use tokio::task::block_in_place;
 
 use std::{collections::VecDeque, env::temp_dir, path::PathBuf, sync::Arc};
+
+mod common;
+use common::TestDbCreator;
 
 // TODO: use a trait
 macro_rules! kv_dump {
@@ -35,14 +38,13 @@ async fn test_basic_metrics() {
                 .build(),
         );
 
-    let mut tmpdir: PathBuf = std::env::var_os("CARGO_TARGET_DIR")
-        .unwrap_or(temp_dir().into())
-        .into();
-    tmpdir.push("/tmp/test_basic_metrics");
+    let db = TestDbCreator::builder()
+        .cfg(cfg.build())
+        .test_name("test_basic_metrics")
+        .build()
+        .create()
+        .await;
 
-    let db = firewood::db::Db::new(tmpdir, &cfg.truncate(true).build())
-        .await
-        .unwrap();
     // let metrics = db.metrics();
     // TODO: kv_get is no longer a valid metric, and DbRev has no access to Db.metrics (yet)
     //assert_eq!(metrics.kv_get.hit_count.get(), 0);
@@ -82,7 +84,8 @@ async fn test_revisions() {
                 .block_nbit(8)
                 .max_revisions(10)
                 .build(),
-        );
+        )
+        .build();
 
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
     let max_len0 = 8;
@@ -102,15 +105,13 @@ async fn test_revisions() {
         key
     };
 
-    let mut tmpdir: PathBuf = std::env::var_os("CARGO_TARGET_DIR")
-        .unwrap_or(temp_dir().into())
-        .into();
-    tmpdir.push("/tmp/test_revisions");
-
     for i in 0..10 {
-        let db = Db::new(&tmpdir, &cfg.clone().truncate(true).build())
-            .await
-            .unwrap();
+        let db = TestDbCreator::builder()
+            .cfg(cfg.clone())
+            .test_name("test_revisions")
+            .build()
+            .create()
+            .await;
         let mut dumped = VecDeque::new();
         let mut hashes: VecDeque<api::HashKey> = VecDeque::new();
         for _ in 0..10 {
@@ -142,10 +143,8 @@ async fn test_revisions() {
                 assert_eq!(kv_dump!(rev), *dump, "not the same: Pass {i}");
             }
         }
-        drop(db);
-        let db = Db::new(tmpdir.clone(), &cfg.clone().truncate(false).build())
-            .await
-            .unwrap();
+
+        let db = db.reopen().await;
         for (dump, hash) in dumped.iter().zip(hashes.iter().cloned()) {
             let rev = db.revision(hash).await.unwrap();
             rev.root_hash().await.unwrap();
@@ -247,16 +246,16 @@ macro_rules! assert_val {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn db_proposal() -> Result<(), api::Error> {
-    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+    let cfg = DbConfig::builder()
+        .wal(WalConfig::builder().max_revisions(10).build())
+        .build();
 
-    let mut tmpdir: PathBuf = std::env::var_os("CARGO_TARGET_DIR")
-        .unwrap_or(temp_dir().into())
-        .into();
-    tmpdir.push("/tmp/test_db_proposal");
-
-    let db = firewood::db::Db::new(tmpdir, &cfg.clone().truncate(true).build())
-        .await
-        .expect("db initiation should succeed");
+    let db = TestDbCreator::builder()
+        .cfg(cfg)
+        .test_name("db_proposal")
+        .build()
+        .create()
+        .await;
 
     let batch = vec![
         BatchOp::Put {

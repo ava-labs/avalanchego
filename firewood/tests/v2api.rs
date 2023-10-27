@@ -1,17 +1,26 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use firewood::{
-    db::{BatchOp, Db as PersistedDb, DbConfig},
+    db::{BatchOp, DbConfig},
     v2::api::{Db, DbView, Proposal},
 };
+
+pub mod common;
+use common::TestDbCreator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = DbConfig::builder().truncate(true).build();
-    let db = Arc::new(testdb(cfg).await?);
+    let db = TestDbCreator::builder()
+        .cfg(cfg)
+        .test_name("smoke")
+        .build()
+        .create()
+        .await;
+
     let empty_hash = db.root_hash().await?;
     assert_ne!(empty_hash, [0; 32]);
 
@@ -39,15 +48,4 @@ async fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     // assert_eq!(value, None);
 
     Ok(())
-}
-
-async fn testdb(cfg: DbConfig) -> Result<impl firewood::v2::api::Db, firewood::v2::api::Error> {
-    let tmpdbpath = tmp_dir().join("testdb");
-    PersistedDb::new(tmpdbpath, &cfg).await
-}
-
-fn tmp_dir() -> PathBuf {
-    option_env!("CARGO_TARGET_TMPDIR")
-        .map(PathBuf::from)
-        .unwrap_or(std::env::temp_dir())
 }
