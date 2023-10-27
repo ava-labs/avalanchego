@@ -748,7 +748,7 @@ func verifyProofPath(tc *TokenConfiguration, proof []ProofNode, key maybe.Maybe[
 			}
 		}
 		nodeKey := currentProofNode.Key
-		if key.HasValue() && nodeKey.length%tc.BitsPerToken() != 0 {
+		if key.HasValue() && nodeKey.length%tc.bitsPerToken != 0 {
 			return ErrInconsistentBranchFactor
 		}
 

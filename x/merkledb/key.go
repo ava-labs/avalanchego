@@ -66,15 +66,6 @@ func (t *TokenConfiguration) Token(k Key, bitIndex int) byte {
 	return storageByte & (0xFF >> dualBitIndex(t.bitsPerToken))
 }
 
-func (t *TokenConfiguration) getLengthOfCommonPrefix(first, second Key, secondOffset int) int {
-	commonIndex := 0
-	for first.length > commonIndex && second.length > commonIndex+secondOffset &&
-		t.Token(first, commonIndex) == t.Token(second, commonIndex+secondOffset) {
-		commonIndex += t.bitsPerToken
-	}
-	return commonIndex
-}
-
 // hasPrefix checks if the provided prefix key is a prefix of the current key after having skipped [bitsToSkip] bits first
 // this has better performance than constructing the actual key via Skip() then calling HasPrefix because it avoids the []byte allocation
 func (t *TokenConfiguration) hasPrefix(k Key, prefix Key, bitsToSkip int) bool {

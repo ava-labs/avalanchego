@@ -785,7 +785,7 @@ func (t *trieView) insert(
 		return nil, err
 	}
 
-	// a node with that exact path already exists so update its value
+	// a node with that exact key already exists so update its value
 	if closestNode.key == key {
 		closestNode.setValue(value)
 		// closestNode was already marked as changed in the ancestry loop above
@@ -794,18 +794,18 @@ func (t *trieView) insert(
 
 	// A node with the exact key doesn't exist so determine the portion of the
 	// key that hasn't been matched yet
-	// Note that [key] has prefix [closestNodeFullPath] but exactMatch was false,
-	// so [key] must be longer than [closestNodeFullPath] and the following index and slice won't OOB.
+	// Note that [key] has prefix [closestNodeKey] but exactMatch was false,
+	// so [key] must be longer than [key] and the following index and slice won't OOB.
 	existingChildEntry, hasChild := closestNode.children[t.tokenConfig.Token(key, closestNode.key.length)]
 	if !hasChild {
-		// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
+		// there are no existing nodes along the key [key], so create a new node to insert [value]
 		newNode := newNode(key)
 		newNode.setValue(value)
 		closestNode.addChild(t.tokenConfig, newNode)
 		return newNode, t.recordNewNode(newNode)
 	}
 
-	// if we have reached this point, then the [fullpath] we are trying to insert and
+	// if we have reached this point, then the [key] we are trying to insert and
 	// the existing path node have some common prefix.
 	// a new branching node will be created that will represent this common prefix and
 	// have the existing path node and the value being inserted as children.
@@ -814,7 +814,7 @@ func (t *trieView) insert(
 	// find how many tokens are common between the existing child's compressed path and
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
-	commonPrefixLength := t.tokenConfig.getLengthOfCommonPrefix(existingChildEntry.compressedKey, key, closestNode.key.length+t.tokenConfig.bitsPerToken)
+	commonPrefixLength := getLengthOfCommonPrefix(t.tokenConfig, existingChildEntry.compressedKey, key, closestNode.key.length+t.tokenConfig.bitsPerToken)
 
 	// If the length of the existing child's compressed path is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
 	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
@@ -851,6 +851,15 @@ func (t *trieView) insert(
 		})
 
 	return nodeWithValue, t.recordNewNode(branchNode)
+}
+
+func getLengthOfCommonPrefix(t *TokenConfiguration, first, second Key, secondOffset int) int {
+	commonIndex := 0
+	for first.length > commonIndex && second.length > commonIndex+secondOffset &&
+		t.Token(first, commonIndex) == t.Token(second, commonIndex+secondOffset) {
+		commonIndex += t.bitsPerToken
+	}
+	return commonIndex
 }
 
 // Records that a node has been created.
