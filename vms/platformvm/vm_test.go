@@ -2193,3 +2193,52 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	}
 	require.Equal(expectedOwner, subnetOwner)
 }
+
+func TestBaseTx(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	spendAmt := uint64(100000)
+
+	baseTx, err := vm.txBuilder.NewBaseTx(
+		spendAmt,
+		[]*secp256k1.PrivateKey{keys[0]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+
+	inputAmt := uint64(0)
+	for inputID := range baseTx.Unsigned.InputIDs() {
+		utxo, err := vm.state.GetUTXO(inputID)
+		require.NoError(err)
+		require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+		castOut := utxo.Out.(*secp256k1fx.TransferOutput)
+		inputAmt += castOut.Amt
+	}
+
+	outputAmt := uint64(0)
+	for _, output := range baseTx.Unsigned.Outputs() {
+		require.IsType(&secp256k1fx.TransferOutput{}, output.Out)
+		castOut := output.Out.(*secp256k1fx.TransferOutput)
+		outputAmt += castOut.Amt
+	}
+
+	require.Equal(spendAmt+vm.TxFee, inputAmt-outputAmt)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(baseTx))
+	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	baseTxRawBlock := baseTxBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, baseTxRawBlock)
+	require.Contains(baseTxRawBlock.Txs(), baseTx)
+
+	require.NoError(baseTxBlock.Verify(context.Background()))
+	require.NoError(baseTxBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+}
