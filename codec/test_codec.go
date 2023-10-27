@@ -65,7 +65,7 @@ type Foo interface {
 
 type MyInnerStruct struct {
 	Str               string `serialize:"true"`
-	NumberNotProvided *int32 `serialize:"true,omitempty"`
+	NumberNotProvided *int32 `serialize:"true,nullable"`
 }
 
 func (*MyInnerStruct) Foo() int {
@@ -89,9 +89,9 @@ type MyInnerStruct3 struct {
 }
 
 type MyStructWithPtr struct {
-	N1 *int32   `serialize:"true,omitempty"`
-	N2 *int64   `serialize:"true,omitempty"`
-	N3 []*int32 `serialize:"true,omitempty"`
+	N1 *int32   `serialize:"true,nullable"`
+	N2 *int64   `serialize:"true,nullable"`
+	N3 []*int32 `serialize:"true,nullable"`
 }
 
 type myStruct struct {
