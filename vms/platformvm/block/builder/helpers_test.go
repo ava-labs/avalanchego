@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -419,10 +418,8 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-	return errs.Err
 }

@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -71,7 +72,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -245,7 +245,7 @@ func (n *Node) initNetworking() error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
@@ -679,7 +679,7 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
@@ -894,8 +894,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// Register the VMs that Avalanche supports
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
@@ -940,8 +939,8 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
-	if errs.Errored() {
-		return errs.Err
+	if err != nil {
+		return err
 	}
 
 	// initialize vm runtime manager
