@@ -751,6 +751,11 @@ func verifyProofPath(tc *TokenConfiguration, proof []ProofNode, key maybe.Maybe[
 		if key.HasValue() && nodeKey.length%tc.bitsPerToken != 0 {
 			return ErrInconsistentBranchFactor
 		}
+		for index := range currentProofNode.Children {
+			if int(index) > tc.branchFactor {
+				return ErrInconsistentBranchFactor
+			}
+		}
 
 		// Because the interface only support []byte keys,
 		// a key with a partial byte should store a value
