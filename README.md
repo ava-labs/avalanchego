@@ -131,7 +131,12 @@ To connect to the Fuji Testnet, run:
 
 ### Creating a Local Testnet
 
-See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a-local-test-network/)
+The [avalanche-cli](https://github.com/ava-labs/avalanche-cli) is the easiest way to start a local network.
+
+```sh
+avalanche network start
+avalanche network status
+```
 
 ## Bootstrapping
 
