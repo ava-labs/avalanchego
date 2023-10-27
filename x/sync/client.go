@@ -73,7 +73,7 @@ type client struct {
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
 	metrics             SyncMetrics
-	tokenConfig         *merkledb.TokenConfiguration
+	tokenSize           int
 }
 
 type ClientConfig struct {
@@ -82,11 +82,11 @@ type ClientConfig struct {
 	StateSyncMinVersion *version.Application
 	Log                 logging.Logger
 	Metrics             SyncMetrics
-	TokenConfig         *merkledb.TokenConfiguration
+	BranchFactor        merkledb.BranchFactor
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
-	if err := config.TokenConfig.Valid(); err != nil {
+	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 	return &client{
@@ -95,7 +95,7 @@ func NewClient(config *ClientConfig) (Client, error) {
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-		tokenConfig:         config.TokenConfig,
+		tokenSize:           merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}, nil
 }
 
@@ -166,12 +166,12 @@ func (c *client) GetChangeProof(
 			// so they sent a range proof instead.
 			err := verifyRangeProof(
 				ctx,
-				c.tokenConfig,
 				&rangeProof,
 				int(req.KeyLimit),
 				startKey,
 				endKey,
 				req.EndRootHash,
+				c.tokenSize,
 			)
 			if err != nil {
 				return nil, err
@@ -204,12 +204,12 @@ func (c *client) GetChangeProof(
 // than [keyLimit] keys.
 func verifyRangeProof(
 	ctx context.Context,
-	tokenConfig *merkledb.TokenConfiguration,
 	rangeProof *merkledb.RangeProof,
 	keyLimit int,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
+	tokenSize int,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -226,10 +226,10 @@ func verifyRangeProof(
 
 	if err := rangeProof.Verify(
 		ctx,
-		tokenConfig,
 		start,
 		end,
 		root,
+		tokenSize,
 	); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
@@ -266,12 +266,12 @@ func (c *client) GetRangeProof(
 
 		if err := verifyRangeProof(
 			ctx,
-			c.tokenConfig,
 			&rangeProof,
 			int(req.KeyLimit),
 			startKey,
 			endKey,
 			req.RootHash,
+			c.tokenSize,
 		); err != nil {
 			return nil, err
 		}

@@ -242,13 +242,13 @@ func newDatabase(
 		metrics:              metrics,
 		baseDB:               db,
 		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), bfToSize[config.BranchFactor]),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenSize:            bfToSize[config.BranchFactor],
+		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()

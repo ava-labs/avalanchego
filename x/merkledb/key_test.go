@@ -276,7 +276,7 @@ func Test_Key_Append(t *testing.T) {
 
 	key := ToKey([]byte{})
 	for _, bf := range validBranchFactors {
-		size := bfToSize[bf]
+		size := BranchFactorToTokenSize[bf]
 		for i := 0; i < int(bf); i++ {
 			appendedKey := key.Extend(ToToken(byte(i), size), ToToken(byte(i/2), size))
 			require.Equal(byte(i), appendedKey.Token(0, size))

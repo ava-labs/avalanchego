@@ -34,7 +34,7 @@ var (
 	BranchFactor16  = BranchFactor(16)
 	BranchFactor256 = BranchFactor(256)
 
-	bfToSize = map[BranchFactor]int{
+	BranchFactorToTokenSize = map[BranchFactor]int{
 		BranchFactor2:   1,
 		BranchFactor4:   2,
 		BranchFactor16:  4,

@@ -141,7 +141,7 @@ func Test_History_Large(t *testing.T) {
 			require.NoError(err)
 			require.NotNil(proof)
 
-			require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[i], bfToSize[config.BranchFactor]))
+			require.NoError(proof.Verify(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), roots[i], BranchFactorToTokenSize[config.BranchFactor]))
 		}
 	}
 }

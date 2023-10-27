@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"sync"
 
 	"go.uber.org/zap"
@@ -102,9 +103,9 @@ type Manager struct {
 	cancelCtx context.CancelFunc
 
 	// Set to true when StartSyncing is called.
-	syncing     bool
-	closeOnce   sync.Once
-	tokenConfig *merkledb.TokenConfiguration
+	syncing   bool
+	closeOnce sync.Once
+	tokenSize int
 }
 
 type ManagerConfig struct {
@@ -113,7 +114,7 @@ type ManagerConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	TokenConfig           *merkledb.TokenConfiguration
+	BranchFactor          merkledb.BranchFactor
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
@@ -127,7 +128,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
-	if err := config.TokenConfig.Valid(); err != nil {
+	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +137,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
-		tokenConfig:     config.TokenConfig,
+		tokenSize:       merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -490,12 +491,12 @@ func (m *Manager) findNextKey(
 		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
 		if deepestNode.Key.Length() < proofKeyPath.Length() {
-			startingChildToken = int(m.tokenConfig.Token(proofKeyPath, deepestNode.Key.Length())) + 1
+			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.tokenSize)) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken, m.tokenConfig.BranchFactor()); hasDifference {
-			nextKey = maybe.Some(deepestNode.Key.Extend(m.tokenConfig.ToKey(childIndex)).Bytes())
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
+			nextKey = maybe.Some(deepestNode.Key.Extend(merkledb.ToToken(childIndex, m.tokenSize)).Bytes())
 			break
 		}
 	}
@@ -794,22 +795,40 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int, branchFactor int) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < branchFactor; childIndex++ {
+
+	keysUnion := map[byte]struct{}{}
+	if node1 != nil {
+		for key, _ := range node1.Children {
+			if int(key) >= startIndex {
+				keysUnion[key] = struct{}{}
+			}
+		}
+	}
+	if node2 != nil {
+		for key, _ := range node2.Children {
+			if int(key) >= startIndex {
+				keysUnion[key] = struct{}{}
+			}
+		}
+	}
+	keys := maps.Keys(keysUnion)
+	slices.Sort(keys)
+	for _, childIndex := range keys {
 		if node1 != nil {
-			child1, ok1 = node1.Children[byte(childIndex)]
+			child1, ok1 = node1.Children[childIndex]
 		}
 		if node2 != nil {
-			child2, ok2 = node2.Children[byte(childIndex)]
+			child2, ok2 = node2.Children[childIndex]
 		}
 		// if one node has a child and the other doesn't or the children ids don't match,
 		// return the current child index as the first difference
 		if (ok1 || ok2) && child1 != child2 {
-			return byte(childIndex), true
+			return childIndex, true
 		}
 	}
 	// there were no differences found

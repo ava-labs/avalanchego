@@ -85,7 +85,7 @@ func Test_Creation(t *testing.T) {
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -116,7 +116,7 @@ func Test_Completion(t *testing.T) {
 		TargetRoot:            emptyRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -219,7 +219,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -295,7 +295,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 
@@ -343,7 +343,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x12}, []byte{4}))
@@ -378,7 +378,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NoError(db.Delete([]byte{0x12}))
@@ -413,7 +413,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -475,7 +475,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -543,7 +543,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -678,7 +678,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.Key.Extend(config.TokenConfig.ToKey(childIdx)),
+					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}
@@ -689,7 +689,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.Key.Extend(config.TokenConfig.ToKey(childIdx)),
+					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}
@@ -765,7 +765,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			TargetRoot:            ids.GenerateTestID(),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			TokenConfig:           merkledb.BranchFactor16TokenConfig,
+			BranchFactor:          merkledb.BranchFactor16,
 		})
 		require.NoError(err)
 
@@ -812,7 +812,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -871,7 +871,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -897,7 +897,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(newSyncer)
@@ -962,7 +962,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -1060,7 +1060,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		TargetRoot:            firstSyncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -1100,7 +1100,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		TokenConfig:           merkledb.BranchFactor16TokenConfig,
+		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
 
