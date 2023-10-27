@@ -1397,9 +1397,7 @@ func (ms *merkleState) writePermissionedSubnets(batchOps *[]database.BatchOp) er
 
 func (ms *merkleState) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 	for subnetID, owner := range ms.subnetOwners {
-		subnetID := subnetID
 		owner := owner
-		delete(ms.subnetOwners, subnetID)
 
 		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
