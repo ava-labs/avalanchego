@@ -73,7 +73,7 @@ type client struct {
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
 	metrics             SyncMetrics
-	tokenConfig         merkledb.TokenConfiguration
+	tokenConfig         *merkledb.TokenConfiguration
 }
 
 type ClientConfig struct {
@@ -82,7 +82,7 @@ type ClientConfig struct {
 	StateSyncMinVersion *version.Application
 	Log                 logging.Logger
 	Metrics             SyncMetrics
-	TokenConfig         merkledb.TokenConfiguration
+	TokenConfig         *merkledb.TokenConfiguration
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
@@ -204,7 +204,7 @@ func (c *client) GetChangeProof(
 // than [keyLimit] keys.
 func verifyRangeProof(
 	ctx context.Context,
-	tokenConfig merkledb.TokenConfiguration,
+	tokenConfig *merkledb.TokenConfiguration,
 	rangeProof *merkledb.RangeProof,
 	keyLimit int,
 	start maybe.Maybe[[]byte],

@@ -104,7 +104,7 @@ type Manager struct {
 	// Set to true when StartSyncing is called.
 	syncing     bool
 	closeOnce   sync.Once
-	tokenConfig merkledb.TokenConfiguration
+	tokenConfig *merkledb.TokenConfiguration
 }
 
 type ManagerConfig struct {
@@ -113,7 +113,7 @@ type ManagerConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	TokenConfig           merkledb.TokenConfiguration
+	TokenConfig           *merkledb.TokenConfiguration
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
