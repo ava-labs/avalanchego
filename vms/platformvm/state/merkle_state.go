@@ -1396,7 +1396,7 @@ func (ms *merkleState) writePermissionedSubnets(batchOps *[]database.BatchOp) er
 	return nil
 }
 
-func (ms *merkleState) writeSubnetOwners(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+func (ms *merkleState) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 	for subnetID, owner := range ms.subnetOwners {
 		subnetID := subnetID
 		owner := owner
