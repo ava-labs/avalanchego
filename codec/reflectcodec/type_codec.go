@@ -89,11 +89,14 @@ func (c *genericCodec) Size(value interface{}) (int, error) {
 	return size, err
 }
 
+// size returns the size of the value along with whether the value is constant sized.
 func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 	return c.sizeWithOmitEmpty(value, false)
 }
 
-// size returns the size of the value along with whether the value is constant sized.
+// size returns the size of the value along with whether the value is constant
+// sized. This function takes into account a `nullable` property which allows
+// pointers and interfaces serialize nil values using an extra byte
 func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (int, bool, error) {
 	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
@@ -309,13 +312,16 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen)
 }
 
+// marshal writes the byte representation of [value] to [p]
+// [value]'s underlying value must not be a nil pointer or interface
+// c.lock should be held for the duration of this function
 func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32) error {
 	return c.marshalWithOmitEmpty(value, p, maxSliceLen, false)
 }
 
-// marshal writes the byte representation of [value] to [p]
-// [value]'s underlying value must not be a nil pointer or interface
-// c.lock should be held for the duration of this function
+// Similar to marshal() but it takes `nullable` from the callee. Nullable is
+// used right now for pointers and interfaces and it uses an extra byte to
+// serialize nil values.
 func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32, nullable bool) error {
 	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
@@ -390,7 +396,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 		}
 		if nullable {
 			p.PackBool(value.IsNil())
-			if value.IsNil() {
+			if value.IsNil() || p.Err != nil {
 				return p.Err
 			}
 		}
@@ -544,12 +550,15 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	return nil
 }
 
+// Unmarshal from p.Bytes into [value]. [value] must be addressable.
+// c.lock should be held for the duration of this function
 func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSliceLen uint32) error {
 	return c.unmarshalWithOmitEmpty(p, value, maxSliceLen, false)
 }
 
-// Unmarshal from p.Bytes into [value]. [value] must be addressable.
-// c.lock should be held for the duration of this function
+// Extends unmarshal to receive the `nullable` property which if set true
+// affects how pointers and interfaces are unmarshalled, as an extra byte would
+// be used to unmarshal nil values for pointers and interaces
 func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.Value, maxSliceLen uint32, nullable bool) error {
 	switch value.Kind() {
 	case reflect.Uint8:
@@ -608,7 +617,8 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		return nil
 	case reflect.Slice:
 		if nullable {
-			if p.UnpackBool() {
+			isNil := p.UnpackBool()
+			if isNil || p.Err != nil {
 				return p.Err
 			}
 		}
@@ -673,7 +683,9 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		return nil
 	case reflect.Interface:
 		if nullable {
-			if p.UnpackBool() {
+			isNil := p.UnpackBool()
+			if p.Err != nil || isNil {
+				// Value is actually nil or there was an error
 				return p.Err
 			}
 		}
@@ -702,16 +714,18 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		}
 		return nil
 	case reflect.Ptr:
+		if nullable {
+			isNil := p.UnpackBool()
+			if p.Err != nil || isNil {
+				// Value is actually nil or there was an error
+				return p.Err
+			}
+		}
 		// Get the type this pointer points to
 		t := value.Type().Elem()
 		// Create a new pointer to a new value of the underlying type
 		v := reflect.New(t)
 		// Fill the value
-		if nullable {
-			if p.UnpackBool() {
-				return p.Err
-			}
-		}
 		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
