@@ -135,7 +135,11 @@ func (p *postForkCommonComponents) Verify(
 			return err
 		}
 		if childPChainHeight > currentPChainHeight {
-			return errPChainHeightNotReached
+			return fmt.Errorf("%w: %d > %d",
+				errPChainHeightNotReached,
+				childPChainHeight,
+				currentPChainHeight,
+			)
 		}
 
 		childHeight := child.Height()

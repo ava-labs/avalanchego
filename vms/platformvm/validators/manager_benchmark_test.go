@@ -102,7 +102,6 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
-	vdrs.Add(constants.PrimaryNetworkID, validators.NewSet())
 
 	execConfig, err := config.GetExecutionConfig(nil)
 	require.NoError(err)

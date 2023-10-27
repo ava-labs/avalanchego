@@ -16,7 +16,7 @@ func DefaultConfigs() Config {
 	return Config{
 		Ctx:        commonCfg.Ctx,
 		Sender:     commonCfg.Sender,
-		Validators: validators.NewSet(),
+		Validators: validators.NewManager(),
 		VM:         &block.TestVM{},
 		Params: snowball.Parameters{
 			K:                     1,

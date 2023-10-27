@@ -159,6 +159,19 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
+	// Creates a transaction that transfers ownership of [subnetID]
+	// threshold: [threshold] of [ownerAddrs] needed to manage this subnet
+	// ownerAddrs: control addresses for the new subnet
+	// keys: keys to use for modifying the subnet
+	// changeAddr: address to send change to, if there is any
+	NewTransferSubnetOwnershipTx(
+		subnetID ids.ID,
+		threshold uint32,
+		ownerAddrs []ids.ShortID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	// newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 	// Commit block, will set the chain's timestamp to [timestamp].
 	NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error)
@@ -607,5 +620,44 @@ func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 		return nil, err
 	}
 
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	threshold uint32,
+	ownerAddrs []ids.ShortID,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
+	}
+	signers = append(signers, subnetSigners)
+
+	utx := &txs.TransferSubnetOwnershipTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		Subnet:     subnetID,
+		SubnetAuth: subnetAuth,
+		Owner: &secp256k1fx.OutputOwners{
+			Threshold: threshold,
+			Addrs:     ownerAddrs,
+		},
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
 	return tx, tx.SyntacticVerify(b.ctx)
 }

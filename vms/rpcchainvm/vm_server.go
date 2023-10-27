@@ -338,24 +338,21 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 		return nil, err
 	}
 	resp := &vmpb.CreateHandlersResponse{}
-	for prefix, h := range handlers {
-		handler := h
-
+	for prefix, handler := range handlers {
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {
 			return nil, err
 		}
 		server := grpcutils.NewServer()
 		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
 
 		// Start HTTP service
 		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:      prefix,
-			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverListener.Addr().String(),
+			Prefix:     prefix,
+			ServerAddr: serverListener.Addr().String(),
 		})
 	}
 	return resp, nil
@@ -367,24 +364,21 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 		return nil, err
 	}
 	resp := &vmpb.CreateStaticHandlersResponse{}
-	for prefix, h := range handlers {
-		handler := h
-
+	for prefix, handler := range handlers {
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {
 			return nil, err
 		}
 		server := grpcutils.NewServer()
 		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
 
 		// Start HTTP service
 		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:      prefix,
-			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverListener.Addr().String(),
+			Prefix:     prefix,
+			ServerAddr: serverListener.Addr().String(),
 		})
 	}
 	return resp, nil

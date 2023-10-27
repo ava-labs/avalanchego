@@ -110,7 +110,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	}
 
 	acceptedFrontiers := tracker.NewAccepted()
-	config.Validators.RegisterCallbackListener(acceptedFrontiers)
+	config.Validators.RegisterCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
@@ -367,6 +367,10 @@ func (*Transitive) Halt(context.Context) {}
 
 func (t *Transitive) Shutdown(ctx context.Context) error {
 	t.Ctx.Log.Info("shutting down consensus engine")
+
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	return t.VM.Shutdown(ctx)
 }
 
@@ -453,6 +457,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
@@ -784,7 +791,7 @@ func (t *Transitive) sendQuery(
 		zap.Stringer("validators", t.Validators),
 	)
 
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
@@ -958,9 +965,12 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 // addUnverifiedBlockToConsensus returns whether the block was added and an
 // error if one occurred while adding it to consensus.
 func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snowman.Block) (bool, error) {
+	blkID := blk.ID()
+
 	// make sure this block is valid
 	if err := blk.Verify(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
+			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
 
@@ -969,7 +979,6 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 		return false, nil
 	}
 
-	blkID := blk.ID()
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))

@@ -189,3 +189,18 @@ func (mr *MockBuilderMockRecorder) NewRewardValidatorTx(arg0 interface{}) *gomoc
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRewardValidatorTx", reflect.TypeOf((*MockBuilder)(nil).NewRewardValidatorTx), arg0)
 }
+
+// NewTransferSubnetOwnershipTx mocks base method.
+func (m *MockBuilder) NewTransferSubnetOwnershipTx(arg0 ids.ID, arg1 uint32, arg2 []ids.ShortID, arg3 []*secp256k1.PrivateKey, arg4 ids.ShortID) (*txs.Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewTransferSubnetOwnershipTx", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(*txs.Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewTransferSubnetOwnershipTx indicates an expected call of NewTransferSubnetOwnershipTx.
+func (mr *MockBuilderMockRecorder) NewTransferSubnetOwnershipTx(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewTransferSubnetOwnershipTx", reflect.TypeOf((*MockBuilder)(nil).NewTransferSubnetOwnershipTx), arg0, arg1, arg2, arg3, arg4)
+}

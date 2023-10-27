@@ -6,16 +6,16 @@ package executor
 import (
 	"errors"
 	"fmt"
-
-	stdmath "math"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -37,6 +37,7 @@ var (
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
+	ErrDUpgradeNotActive               = errors.New("attempting to use a D-upgrade feature prior to activation")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -272,7 +273,7 @@ func verifyAddSubnetValidatorTx(
 // * [sTx]'s creds authorize it to spend the stated inputs.
 // * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
 // * The flow checker passes.
-func removeSubnetValidatorValidation(
+func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *txs.Tx,
@@ -392,13 +393,13 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
+	maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
 	if err != nil {
 		return nil, ErrStakeOverflow
 	}
 
 	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
-		maximumWeight = math.Min(maximumWeight, backend.Config.MaxValidatorStake)
+		maximumWeight = safemath.Min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
 	txID := sTx.ID()
@@ -639,14 +640,14 @@ func verifyAddPermissionlessDelegatorTx(
 		)
 	}
 
-	maximumWeight, err := math.Mul64(
+	maximumWeight, err := safemath.Mul64(
 		uint64(delegatorRules.maxValidatorWeightFactor),
 		validator.Weight,
 	)
 	if err != nil {
-		maximumWeight = stdmath.MaxUint64
+		maximumWeight = math.MaxUint64
 	}
-	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
+	maximumWeight = safemath.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	txID := sTx.ID()
 	newStaker, err := state.NewPendingStaker(txID, tx)
@@ -710,6 +711,53 @@ func verifyAddPermissionlessDelegatorTx(
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return ErrFutureStakeTime
+	}
+
+	return nil
+}
+
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * [sTx]'s creds authorize it to spend the stated inputs.
+// * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
+// * The flow checker passes.
+func verifyTransferSubnetOwnershipTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.TransferSubnetOwnershipTx,
+) error {
+	if !backend.Config.IsDActivated(chainState.GetTimestamp()) {
+		return ErrDUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
+	}
+
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return nil
