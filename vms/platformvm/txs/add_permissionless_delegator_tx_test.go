@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 	"testing"
@@ -601,6 +602,145 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 	unsignedComplexAddPrimaryTxBytes, err := Codec.Marshal(Version, &unsignedComplexAddPrimaryTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexAddPrimaryTxBytes, unsignedComplexAddPrimaryTxBytes)
+
+	aliaser := ids.NewAliaser()
+	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
+
+	unsignedComplexAddPrimaryTx.InitCtx(&snow.Context{
+		NetworkID:   1,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: avaxAssetID,
+		BCLookup:    aliaser,
+	})
+
+	unsignedComplexAddPrimaryTxJSONBytes, err := json.MarshalIndent(unsignedComplexAddPrimaryTx, "", "\t")
+	require.NoError(err)
+	require.Equal(`{
+	"networkID": 1,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"addresses": [
+					"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+				],
+				"amount": 1,
+				"locktime": 0,
+				"threshold": 1
+			}
+		},
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+					],
+					"amount": 18446744073709551615,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"validator": {
+		"nodeID": "NodeID-2ZbTY9GatRTrfinAoYiYLcf6CvrPAUYgo",
+		"start": 12345,
+		"end": 17292345,
+		"weight": 5000000000000
+	},
+	"subnetID": "11111111111111111111111111111111LpoYY",
+	"stake": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"addresses": [
+					"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+				],
+				"amount": 2000000000000,
+				"locktime": 0,
+				"threshold": 1
+			}
+		},
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 987654321,
+				"output": {
+					"addresses": [],
+					"amount": 3000000000000,
+					"locktime": 87654321,
+					"threshold": 0
+				}
+			}
+		}
+	],
+	"rewardsOwner": {
+		"addresses": [],
+		"locktime": 0,
+		"threshold": 0
+	}
+}`, string(unsignedComplexAddPrimaryTxJSONBytes))
 }
 
 func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
@@ -1218,6 +1358,145 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 	unsignedComplexAddSubnetTxBytes, err := Codec.Marshal(Version, &unsignedComplexAddSubnetTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexAddSubnetTxBytes, unsignedComplexAddSubnetTxBytes)
+
+	aliaser := ids.NewAliaser()
+	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
+
+	unsignedComplexAddSubnetTx.InitCtx(&snow.Context{
+		NetworkID:   1,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: avaxAssetID,
+		BCLookup:    aliaser,
+	})
+
+	unsignedComplexAddSubnetTxJSONBytes, err := json.MarshalIndent(unsignedComplexAddSubnetTx, "", "\t")
+	require.NoError(err)
+	require.Equal(`{
+	"networkID": 1,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"addresses": [
+					"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+				],
+				"amount": 1,
+				"locktime": 0,
+				"threshold": 1
+			}
+		},
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+					],
+					"amount": 18446744073709551600,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"validator": {
+		"nodeID": "NodeID-2ZbTY9GatRTrfinAoYiYLcf6CvrPAUYgo",
+		"start": 12345,
+		"end": 12346,
+		"weight": 9
+	},
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"stake": [
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"addresses": [
+					"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+				],
+				"amount": 2,
+				"locktime": 0,
+				"threshold": 1
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 987654321,
+				"output": {
+					"addresses": [],
+					"amount": 7,
+					"locktime": 87654321,
+					"threshold": 0
+				}
+			}
+		}
+	],
+	"rewardsOwner": {
+		"addresses": [],
+		"locktime": 0,
+		"threshold": 0
+	}
+}`, string(unsignedComplexAddSubnetTxJSONBytes))
 }
 
 func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {

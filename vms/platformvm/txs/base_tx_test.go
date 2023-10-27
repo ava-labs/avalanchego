@@ -41,13 +41,34 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		Memo: []byte{1, 2, 3},
 	}}
 
-	txBytes, err := json.Marshal(tx)
+	txJSONBytes, err := json.MarshalIndent(tx, "", "\t")
 	require.NoError(err)
 
-	asString := string(txBytes)
-
-	require.Contains(asString, `"networkID":4`)
-	require.Contains(asString, `"blockchainID":"SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg"`)
-	require.Contains(asString, `"inputs":[{"txID":"t64jLxDRmxo8y48WjbRALPAZuSDZ6qPVaaeDzxHA4oSojhLt","outputIndex":5,"assetID":"2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU","fxID":"2mB8TguRrYvbGw7G2UBqKfmL8osS7CfmzAAHSzuZK8bwpRKdY","input":{"Err":null,"Val":100}}]`)
-	require.Contains(asString, `"outputs":[{"assetID":"2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU","fxID":"2mB8TguRrYvbGw7G2UBqKfmL8osS7CfmzAAHSzuZK8bwpRKdY","output":{"Err":null,"Val":100}}]`)
+	require.Equal(`{
+	"networkID": 4,
+	"blockchainID": "SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg",
+	"outputs": [
+		{
+			"assetID": "2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU",
+			"fxID": "2mB8TguRrYvbGw7G2UBqKfmL8osS7CfmzAAHSzuZK8bwpRKdY",
+			"output": {
+				"Err": null,
+				"Val": 100
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "t64jLxDRmxo8y48WjbRALPAZuSDZ6qPVaaeDzxHA4oSojhLt",
+			"outputIndex": 5,
+			"assetID": "2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU",
+			"fxID": "2mB8TguRrYvbGw7G2UBqKfmL8osS7CfmzAAHSzuZK8bwpRKdY",
+			"input": {
+				"Err": null,
+				"Val": 100
+			}
+		}
+	],
+	"memo": "0x010203"
+}`, string(txJSONBytes))
 }
