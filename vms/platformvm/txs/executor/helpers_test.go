@@ -74,9 +74,6 @@ var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
-	// Used to create and use keys.
-	testKeyfactory secp256k1.Factory
-
 	errMissing = errors.New("missing")
 )
 
