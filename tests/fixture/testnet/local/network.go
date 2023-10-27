@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -65,7 +66,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 			continue
 		}
 
-		dirPath = filepath.Join(rootDir, fmt.Sprint(networkID))
+		dirPath = filepath.Join(rootDir, strconv.FormatUint(uint64(networkID), 10))
 		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
 		if err == nil {
 			return networkID, dirPath, nil
@@ -304,7 +305,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 	})
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[config.NetworkNameKey] = fmt.Sprintf("%d", ln.Genesis.NetworkID)
+	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(ln.Genesis.NetworkID), 10)
 
 	// Ensure keys are added if necessary
 	if err := node.EnsureKeys(); err != nil {

@@ -4,7 +4,7 @@
 package keystore
 
 import (
-	"fmt"
+	"encoding/hex"
 	"math/rand"
 	"testing"
 
@@ -58,7 +58,7 @@ func TestServiceCreateUser(t *testing.T) {
 func genStr(n int) string {
 	b := make([]byte, n)
 	rand.Read(b) // #nosec G404
-	return fmt.Sprintf("%x", b)[:n]
+	return hex.EncodeToString(b)[:n]
 }
 
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
