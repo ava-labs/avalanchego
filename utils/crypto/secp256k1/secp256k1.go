@@ -139,8 +139,8 @@ type PublicKey struct {
 	bytes []byte
 }
 
-func (k *PublicKey) Verify(bytes, sig []byte) bool {
-	return k.VerifyHash(hashing.ComputeHash256(bytes), sig)
+func (k *PublicKey) Verify(msg, sig []byte) bool {
+	return k.VerifyHash(hashing.ComputeHash256(msg), sig)
 }
 
 func (k *PublicKey) VerifyHash(hash, sig []byte) bool {
@@ -191,8 +191,8 @@ func (k *PrivateKey) Address() ids.ShortID {
 	return k.PublicKey().Address()
 }
 
-func (k *PrivateKey) Sign(bytes []byte) ([]byte, error) {
-	return k.SignHash(hashing.ComputeHash256(bytes))
+func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {
+	return k.SignHash(hashing.ComputeHash256(msg))
 }
 
 func (k *PrivateKey) SignHash(hash []byte) ([]byte, error) {

@@ -177,8 +177,8 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 
 func TestSigning(t *testing.T) {
 	tests := []struct {
-		bytes []byte
-		sig   []byte
+		msg []byte
+		sig []byte
 	}{
 		{
 			[]byte("hello world"),
@@ -227,10 +227,10 @@ func TestSigning(t *testing.T) {
 	key := TestKeys()[0]
 
 	for _, tt := range tests {
-		t.Run(string(tt.bytes), func(t *testing.T) {
+		t.Run(string(tt.msg), func(t *testing.T) {
 			require := require.New(t)
 
-			bytes, err := key.Sign(tt.bytes)
+			bytes, err := key.Sign(tt.msg)
 			require.NoError(err)
 			require.Equal(tt.sig, bytes)
 		})
