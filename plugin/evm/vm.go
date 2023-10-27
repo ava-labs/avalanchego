@@ -542,7 +542,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	// TODO: read size from settings
-	vm.mempool, err = NewMempool(chainCtx.AVAXAssetID, defaultMempoolSize, vm.verifyTxAtTip)
+	vm.mempool, err = NewMempool(chainCtx, defaultMempoolSize, vm.verifyTxAtTip)
 	if err != nil {
 		return fmt.Errorf("failed to initialize mempool: %w", err)
 	}
@@ -1481,6 +1481,8 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 		}
 	}
 
+	// We don’t need to revert the state here in case verifyTx errors, because
+	// [preferredState] is thrown away either way.
 	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, rules)
 }
 

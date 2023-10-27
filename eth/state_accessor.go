@@ -68,6 +68,7 @@ var noopReleaser = tracers.StateReleaseFunc(func() {})
 //     provided, it would be preferable to start from a fresh state, if we have it
 //     on disk.
 func (eth *Ethereum) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
+	reexec = 0 // Do not support re-executing historical blocks to grab state
 	var (
 		current  *types.Block
 		database state.Database

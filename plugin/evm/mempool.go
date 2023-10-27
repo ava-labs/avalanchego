@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/log"
@@ -50,8 +51,7 @@ func newMempoolMetrics() *mempoolMetrics {
 type Mempool struct {
 	lock sync.RWMutex
 
-	// AVAXAssetID is the fee paying currency of any atomic transaction
-	AVAXAssetID ids.ID
+	ctx *snow.Context
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
 	// currentTxs is the set of transactions about to be added to a block.
@@ -80,14 +80,14 @@ type Mempool struct {
 }
 
 // NewMempool returns a Mempool with [maxSize]
-func NewMempool(AVAXAssetID ids.ID, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
+func NewMempool(ctx *snow.Context, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
 	bloom, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}
 
 	return &Mempool{
-		AVAXAssetID:  AVAXAssetID,
+		ctx:          ctx,
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU[ids.ID, *Tx]{Size: discardedTxsCacheSize},
 		currentTxs:   make(map[ids.ID]*Tx),
@@ -131,7 +131,7 @@ func (m *Mempool) atomicTxGasPrice(tx *Tx) (uint64, error) {
 	if gasUsed == 0 {
 		return 0, errNoGasUsed
 	}
-	burned, err := tx.Burned(m.AVAXAssetID)
+	burned, err := tx.Burned(m.ctx.AVAXAssetID)
 	if err != nil {
 		return 0, err
 	}
@@ -139,6 +139,9 @@ func (m *Mempool) atomicTxGasPrice(tx *Tx) (uint64, error) {
 }
 
 func (m *Mempool) Add(tx *GossipAtomicTx) error {
+	m.ctx.Lock.RLock()
+	defer m.ctx.Lock.RUnlock()
+
 	return m.AddTx(tx.Tx)
 }
 

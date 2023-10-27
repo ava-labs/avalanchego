@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMempoolAddTx(t *testing.T) {
 	require := require.New(t)
-	m, err := NewMempool(ids.Empty, 5_000, nil)
+	m, err := NewMempool(&snow.Context{}, 5_000, nil)
 	require.NoError(err)
 
 	txs := make([]*GossipAtomicTx, 0)
