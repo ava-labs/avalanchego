@@ -103,7 +103,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 	expectedUnsignedSimpleTransferSubnetOwnershipTxBytes := []byte{
 		// Codec version
 		0x00, 0x00,
-		// RemoveSubnetValidatorTx Type ID
+		// TransferSubnetOwnershipTx Type ID
 		0x00, 0x00, 0x00, 0x21,
 		// Mainnet network ID
 		0x00, 0x00, 0x00, 0x01,
@@ -276,7 +276,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 	}
 	avax.SortTransferableOutputs(complexTransferSubnetOwnershipTx.Outs, Codec)
 	utils.Sort(complexTransferSubnetOwnershipTx.Ins)
-	require.NoError(simpleTransferSubnetOwnershipTx.SyntacticVerify(&snow.Context{
+	require.NoError(complexTransferSubnetOwnershipTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
