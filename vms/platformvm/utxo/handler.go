@@ -443,7 +443,7 @@ func (h *handler) VerifySpend(
 		if err != nil {
 			return fmt.Errorf(
 				"failed to read consumed UTXO %s due to: %w",
-				&input.UTXOID, //nolint:gosec
+				&input.UTXOID,
 				err,
 			)
 		}

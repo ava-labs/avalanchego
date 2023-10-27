@@ -655,7 +655,7 @@ func (b *builder) mintFTs(
 		// add the operation to the array
 		operations = append(operations, &txs.Operation{
 			Asset:   utxo.Asset,
-			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID}, //nolint:gosec
+			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
 			Op: &secp256k1fx.MintOperation{
 				MintInput: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
@@ -717,7 +717,7 @@ func (b *builder) mintNFTs(
 		operations = append(operations, &txs.Operation{
 			Asset: avax.Asset{ID: assetID},
 			UTXOIDs: []*avax.UTXOID{
-				&utxo.UTXOID, //nolint:gosec
+				&utxo.UTXOID,
 			},
 			Op: &nftfx.MintOperation{
 				MintInput: secp256k1fx.Input{
@@ -773,7 +773,7 @@ func (b *builder) mintProperty(
 		operations = append(operations, &txs.Operation{
 			Asset: avax.Asset{ID: assetID},
 			UTXOIDs: []*avax.UTXOID{
-				&utxo.UTXOID, //nolint:gosec
+				&utxo.UTXOID,
 			},
 			Op: &propertyfx.MintOperation{
 				MintInput: secp256k1fx.Input{
@@ -829,7 +829,7 @@ func (b *builder) burnProperty(
 		operations = append(operations, &txs.Operation{
 			Asset: avax.Asset{ID: assetID},
 			UTXOIDs: []*avax.UTXOID{
-				&utxo.UTXOID, //nolint:gosec
+				&utxo.UTXOID,
 			},
 			Op: &propertyfx.BurnOperation{
 				Input: secp256k1fx.Input{
