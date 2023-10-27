@@ -5,7 +5,6 @@ package txs
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,14 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-var errInvalidSubnetAuth = errors.New("invalid subnet auth")
-
-func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
+func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 	require := require.New(t)
 
 	addr := ids.ShortID{
@@ -51,11 +49,6 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
-	nodeID := ids.NodeID{
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44,
-	}
 	subnetID := ids.ID{
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
@@ -63,7 +56,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
 	}
 
-	simpleRemoveValidatorTx := &RemoveSubnetValidatorTx{
+	simpleTransferSubnetOwnershipTx := &TransferSubnetOwnershipTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
@@ -89,23 +82,29 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 				Memo: types.JSONByteSlice{},
 			},
 		},
-		NodeID: nodeID,
 		Subnet: subnetID,
 		SubnetAuth: &secp256k1fx.Input{
 			SigIndices: []uint32{3},
 		},
+		Owner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
 	}
-	require.NoError(simpleRemoveValidatorTx.SyntacticVerify(&snow.Context{
+	require.NoError(simpleTransferSubnetOwnershipTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
-	expectedUnsignedSimpleRemoveValidatorTxBytes := []byte{
+	expectedUnsignedSimpleTransferSubnetOwnershipTxBytes := []byte{
 		// Codec version
 		0x00, 0x00,
 		// RemoveSubnetValidatorTx Type ID
-		0x00, 0x00, 0x00, 0x17,
+		0x00, 0x00, 0x00, 0x21,
 		// Mainnet network ID
 		0x00, 0x00, 0x00, 0x01,
 		// P-chain blockchain ID
@@ -138,13 +137,9 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// index of signer
 		0x00, 0x00, 0x00, 0x05,
-		// length of memo field
+		// length of memo
 		0x00, 0x00, 0x00, 0x00,
-		// nodeID to remove
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44,
-		// subnetID to remove from
+		// subnetID to modify
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
@@ -155,13 +150,25 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// index of signer
 		0x00, 0x00, 0x00, 0x03,
+		// secp256k1fx output owners type ID
+		0x00, 0x00, 0x00, 0x0b,
+		// locktime
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// threshold
+		0x00, 0x00, 0x00, 0x01,
+		// number of addrs
+		0x00, 0x00, 0x00, 0x01,
+		// Addrs[0]
+		0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+		0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+		0x44, 0x55, 0x66, 0x77,
 	}
-	var unsignedSimpleRemoveValidatorTx UnsignedTx = simpleRemoveValidatorTx
-	unsignedSimpleRemoveValidatorTxBytes, err := Codec.Marshal(Version, &unsignedSimpleRemoveValidatorTx)
+	var unsignedSimpleTransferSubnetOwnershipTx UnsignedTx = simpleTransferSubnetOwnershipTx
+	unsignedSimpleTransferSubnetOwnershipTxBytes, err := Codec.Marshal(Version, &unsignedSimpleTransferSubnetOwnershipTx)
 	require.NoError(err)
-	require.Equal(expectedUnsignedSimpleRemoveValidatorTxBytes, unsignedSimpleRemoveValidatorTxBytes)
+	require.Equal(expectedUnsignedSimpleTransferSubnetOwnershipTxBytes, unsignedSimpleTransferSubnetOwnershipTxBytes)
 
-	complexRemoveValidatorTx := &RemoveSubnetValidatorTx{
+	complexTransferSubnetOwnershipTx := &TransferSubnetOwnershipTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
@@ -255,25 +262,31 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 				Memo: types.JSONByteSlice("😅\nwell that's\x01\x23\x45!"),
 			},
 		},
-		NodeID: nodeID,
 		Subnet: subnetID,
 		SubnetAuth: &secp256k1fx.Input{
 			SigIndices: []uint32{},
 		},
+		Owner: &secp256k1fx.OutputOwners{
+			Locktime:  876543210,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
 	}
-	avax.SortTransferableOutputs(complexRemoveValidatorTx.Outs, Codec)
-	utils.Sort(complexRemoveValidatorTx.Ins)
-	require.NoError(simpleRemoveValidatorTx.SyntacticVerify(&snow.Context{
+	avax.SortTransferableOutputs(complexTransferSubnetOwnershipTx.Outs, Codec)
+	utils.Sort(complexTransferSubnetOwnershipTx.Ins)
+	require.NoError(simpleTransferSubnetOwnershipTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
-	expectedUnsignedComplexRemoveValidatorTxBytes := []byte{
+	expectedUnsignedComplexTransferSubnetOwnershipTxBytes := []byte{
 		// Codec version
 		0x00, 0x00,
-		// RemoveSubnetValidatorTx Type ID
-		0x00, 0x00, 0x00, 0x17,
+		// TransferSubnetOwnershipTx Type ID
+		0x00, 0x00, 0x00, 0x21,
 		// Mainnet network ID
 		0x00, 0x00, 0x00, 0x01,
 		// P-chain blockchain ID
@@ -402,11 +415,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0xf0, 0x9f, 0x98, 0x85, 0x0a, 0x77, 0x65, 0x6c,
 		0x6c, 0x20, 0x74, 0x68, 0x61, 0x74, 0x27, 0x73,
 		0x01, 0x23, 0x45, 0x21,
-		// nodeID to remove
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-		0x11, 0x22, 0x33, 0x44,
-		// subnetID to remove from
+		// subnetID to modify
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
@@ -415,23 +424,35 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x0a,
 		// number of signatures needed in authorization
 		0x00, 0x00, 0x00, 0x00,
+		// secp256k1fx output owners type ID
+		0x00, 0x00, 0x00, 0x0b,
+		// locktime
+		0x00, 0x00, 0x00, 0x00, 0x34, 0x3e, 0xfc, 0xea,
+		// threshold
+		0x00, 0x00, 0x00, 0x01,
+		// number of addrs
+		0x00, 0x00, 0x00, 0x01,
+		// Addrs[0]
+		0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+		0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+		0x44, 0x55, 0x66, 0x77,
 	}
-	var unsignedComplexRemoveValidatorTx UnsignedTx = complexRemoveValidatorTx
-	unsignedComplexRemoveValidatorTxBytes, err := Codec.Marshal(Version, &unsignedComplexRemoveValidatorTx)
+	var unsignedComplexTransferSubnetOwnershipTx UnsignedTx = complexTransferSubnetOwnershipTx
+	unsignedComplexTransferSubnetOwnershipTxBytes, err := Codec.Marshal(Version, &unsignedComplexTransferSubnetOwnershipTx)
 	require.NoError(err)
-	require.Equal(expectedUnsignedComplexRemoveValidatorTxBytes, unsignedComplexRemoveValidatorTxBytes)
+	require.Equal(expectedUnsignedComplexTransferSubnetOwnershipTxBytes, unsignedComplexTransferSubnetOwnershipTxBytes)
 
 	aliaser := ids.NewAliaser()
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
 
-	unsignedComplexRemoveValidatorTx.InitCtx(&snow.Context{
+	unsignedComplexTransferSubnetOwnershipTx.InitCtx(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 		BCLookup:    aliaser,
 	})
 
-	unsignedComplexRemoveValidatorTxJSONBytes, err := json.MarshalIndent(unsignedComplexRemoveValidatorTx, "", "\t")
+	unsignedComplexTransferSubnetOwnershipTxJSONBytes, err := json.MarshalIndent(unsignedComplexTransferSubnetOwnershipTx, "", "\t")
 	require.NoError(err)
 	require.Equal(`{
 	"networkID": 1,
@@ -507,18 +528,24 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		}
 	],
 	"memo": "0xf09f98850a77656c6c2074686174277301234521",
-	"nodeID": "NodeID-2ZbTY9GatRTrfinAoYiYLcf6CvrPAUYgo",
 	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
 	"subnetAuthorization": {
 		"signatureIndices": []
+	},
+	"newOwner": {
+		"addresses": [
+			"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+		],
+		"locktime": 876543210,
+		"threshold": 1
 	}
-}`, string(unsignedComplexRemoveValidatorTxJSONBytes))
+}`, string(unsignedComplexTransferSubnetOwnershipTxJSONBytes))
 }
 
-func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
+func TestTransferSubnetOwnershipTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name        string
-		txFunc      func(*gomock.Controller) *RemoveSubnetValidatorTx
+		txFunc      func(*gomock.Controller) *TransferSubnetOwnershipTx
 		expectedErr error
 	}
 
@@ -557,26 +584,24 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tests := []test{
 		{
 			name: "nil tx",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
+			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
 				return nil
 			},
 			expectedErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
-				return &RemoveSubnetValidatorTx{BaseTx: verifiedBaseTx}
+			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
+				return &TransferSubnetOwnershipTx{BaseTx: verifiedBaseTx}
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "invalid BaseTx",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
-				return &RemoveSubnetValidatorTx{
+			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
+				return &TransferSubnetOwnershipTx{
 					// Set subnetID so we don't error on that check.
 					Subnet: ids.GenerateTestID(),
-					// Set NodeID so we don't error on that check.
-					NodeID: ids.GenerateTestNodeID(),
 					BaseTx: invalidBaseTx,
 				}
 			},
@@ -584,27 +609,23 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "invalid subnetID",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
-				return &RemoveSubnetValidatorTx{
+			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
+				return &TransferSubnetOwnershipTx{
 					BaseTx: validBaseTx,
-					// Set NodeID so we don't error on that check.
-					NodeID: ids.GenerateTestNodeID(),
 					Subnet: constants.PrimaryNetworkID,
 				}
 			},
-			expectedErr: ErrRemovePrimaryNetworkValidator,
+			expectedErr: ErrTransferPermissionlessSubnet,
 		},
 		{
 			name: "invalid subnetAuth",
-			txFunc: func(ctrl *gomock.Controller) *RemoveSubnetValidatorTx {
+			txFunc: func(ctrl *gomock.Controller) *TransferSubnetOwnershipTx {
 				// This SubnetAuth fails verification.
 				invalidSubnetAuth := verify.NewMockVerifiable(ctrl)
 				invalidSubnetAuth.EXPECT().Verify().Return(errInvalidSubnetAuth)
-				return &RemoveSubnetValidatorTx{
+				return &TransferSubnetOwnershipTx{
 					// Set subnetID so we don't error on that check.
-					Subnet: ids.GenerateTestID(),
-					// Set NodeID so we don't error on that check.
-					NodeID:     ids.GenerateTestNodeID(),
+					Subnet:     ids.GenerateTestID(),
 					BaseTx:     validBaseTx,
 					SubnetAuth: invalidSubnetAuth,
 				}
@@ -613,17 +634,18 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "passes verification",
-			txFunc: func(ctrl *gomock.Controller) *RemoveSubnetValidatorTx {
+			txFunc: func(ctrl *gomock.Controller) *TransferSubnetOwnershipTx {
 				// This SubnetAuth passes verification.
 				validSubnetAuth := verify.NewMockVerifiable(ctrl)
 				validSubnetAuth.EXPECT().Verify().Return(nil)
-				return &RemoveSubnetValidatorTx{
+				mockOwner := fx.NewMockOwner(ctrl)
+				mockOwner.EXPECT().Verify().Return(nil)
+				return &TransferSubnetOwnershipTx{
 					// Set subnetID so we don't error on that check.
-					Subnet: ids.GenerateTestID(),
-					// Set NodeID so we don't error on that check.
-					NodeID:     ids.GenerateTestNodeID(),
+					Subnet:     ids.GenerateTestID(),
 					BaseTx:     validBaseTx,
 					SubnetAuth: validSubnetAuth,
+					Owner:      mockOwner,
 				}
 			},
 			expectedErr: nil,
