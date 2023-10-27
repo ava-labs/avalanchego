@@ -44,6 +44,7 @@ type TokenConfiguration struct {
 	bitsPerToken int
 }
 
+// ToKey creates a key version of the passed byte with length equal to bitsPerToken
 func (t *TokenConfiguration) ToKey(val byte) Key {
 	return Key{value: string([]byte{val << dualBitIndex(t.bitsPerToken)}), length: t.bitsPerToken}
 }
@@ -58,6 +59,7 @@ func (t *TokenConfiguration) Valid() error {
 }
 
 // Token returns the token at the specified index,
+// Assumes that bitindex + bitsPerToken doesn't cross a byte boundary
 func (t *TokenConfiguration) Token(k Key, bitIndex int) byte {
 	storageByte := k.value[bitIndex/8]
 	// Shift the byte right to get the token to the rightmost position.
