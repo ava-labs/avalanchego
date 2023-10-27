@@ -100,6 +100,21 @@ func (mr *MockBuilderMockRecorder) NewAdvanceTimeTx(arg0 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAdvanceTimeTx", reflect.TypeOf((*MockBuilder)(nil).NewAdvanceTimeTx), arg0)
 }
 
+// NewBaseTx mocks base method.
+func (m *MockBuilder) NewBaseTx(arg0 uint64, arg1 []*secp256k1.PrivateKey, arg2 ids.ShortID) (*txs.Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewBaseTx", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*txs.Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewBaseTx indicates an expected call of NewBaseTx.
+func (mr *MockBuilderMockRecorder) NewBaseTx(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBaseTx", reflect.TypeOf((*MockBuilder)(nil).NewBaseTx), arg0, arg1, arg2)
+}
+
 // NewCreateChainTx mocks base method.
 func (m *MockBuilder) NewCreateChainTx(arg0 ids.ID, arg1 []byte, arg2 ids.ID, arg3 []ids.ID, arg4 string, arg5 []*secp256k1.PrivateKey, arg6 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
