@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -52,16 +53,15 @@ const (
 var (
 	_ State = (*merkleState)(nil)
 
-	merkleStatePrefix       = []byte{0x00}
-	merkleSingletonPrefix   = []byte{0x01}
-	merkleBlockPrefix       = []byte{0x02}
-	merkleBlockIDsPrefix    = []byte{0x03}
-	merkleTxPrefix          = []byte{0x04}
-	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix  = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix  = []byte{0x08}
-	merkleSubnetOwnerPrefix = []byte{0x09}
+	merkleStatePrefix      = []byte{0x00}
+	merkleSingletonPrefix  = []byte{0x01}
+	merkleBlockPrefix      = []byte{0x02}
+	merkleBlockIDsPrefix   = []byte{0x03}
+	merkleTxPrefix         = []byte{0x04}
+	merkleIndexUTXOsPrefix = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix    = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix = []byte{0x08}
 
 	// merkle db sections
 	metadataSectionPrefix      = byte(0x00)
@@ -77,6 +77,7 @@ var (
 	currentStakersSectionPrefix     = []byte{0x06}
 	pendingStakersSectionPrefix     = []byte{0x07}
 	delegateeRewardsPrefix          = []byte{0x08}
+	subnetOwnersPrefix              = []byte{0x09}
 )
 
 func NewMerkleState(
@@ -134,7 +135,6 @@ func newMerkleState(
 		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
-		subnetOwnerDB                 = prefixdb.New(merkleSubnetOwnerPrefix, baseDB)
 	)
 
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
@@ -254,7 +254,6 @@ func newMerkleState(
 		suppliesCache:    suppliesCache,
 
 		subnetOwners:     make(map[ids.ID]fx.Owner),
-		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
 
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
@@ -326,7 +325,6 @@ type merkleState struct {
 	// Subnet ID --> Owner of the subnet
 	subnetOwners     map[ids.ID]fx.Owner
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
-	subnetOwnerDB    database.Database
 
 	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
 	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
@@ -682,7 +680,8 @@ func (ms *merkleState) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return ownerAndSize.owner, nil
 	}
 
-	ownerBytes, err := ms.subnetOwnerDB.Get(subnetID[:])
+	subnetIDKey := merkleSubnetOwnersKey(subnetID)
+	ownerBytes, err := ms.merkleDB.Get(subnetIDKey[:])
 	if err == nil {
 		var owner fx.Owner
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
@@ -1412,13 +1411,13 @@ func (ms *merkleState) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 			size:  len(ownerBytes),
 		})
 
-		key := merklePermissionedSubnetKey(subnetID)
+		key := merkleSubnetOwnersKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
 			Key:   key,
 			Value: ownerBytes,
 		})
 	}
-	ms.addedPermissionedSubnets = make([]*txs.Tx, 0)
+	maps.Clear(ms.subnetOwners)
 	return nil
 }
 
