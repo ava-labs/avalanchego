@@ -81,7 +81,7 @@ func ToPrivateKey(b []byte) (*PrivateKey, error) {
 	}, nil
 }
 
-func RecoverPublicKeyFromBytes(bytes, sig []byte) (*PublicKey, error) {
+func RecoverPublicKey(bytes, sig []byte) (*PublicKey, error) {
 	return RecoverPublicKeyFromHash(hashing.ComputeHash256(bytes), sig)
 }
 
@@ -111,7 +111,7 @@ type RecoverCache struct {
 	cache.LRU[ids.ID, *PublicKey]
 }
 
-func (r *RecoverCache) RecoverPublicKeyFromBytes(bytes, sig []byte) (*PublicKey, error) {
+func (r *RecoverCache) RecoverPublicKey(bytes, sig []byte) (*PublicKey, error) {
 	return r.RecoverPublicKeyFromHash(hashing.ComputeHash256(bytes), sig)
 }
 

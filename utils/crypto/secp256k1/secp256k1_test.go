@@ -22,17 +22,17 @@ func TestRecover(t *testing.T) {
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
-	bytes := []byte{1, 2, 3}
-	sig, err := key.Sign(bytes)
+	msg := []byte{1, 2, 3}
+	sig, err := key.Sign(msg)
 	require.NoError(err)
 
 	pub := key.PublicKey()
-	pubRec, err := RecoverPublicKeyFromBytes(bytes, sig)
+	pubRec, err := RecoverPublicKey(msg, sig)
 	require.NoError(err)
 
 	require.Equal(pub, pubRec)
 
-	require.True(pub.Verify(bytes, sig))
+	require.True(pub.Verify(msg, sig))
 }
 
 func TestCachedRecover(t *testing.T) {
@@ -41,14 +41,14 @@ func TestCachedRecover(t *testing.T) {
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
-	bytes := []byte{1, 2, 3}
-	sig, err := key.Sign(bytes)
+	msg := []byte{1, 2, 3}
+	sig, err := key.Sign(msg)
 	require.NoError(err)
 
 	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
-	pub1, err := r.RecoverPublicKeyFromBytes(bytes, sig)
+	pub1, err := r.RecoverPublicKey(msg, sig)
 	require.NoError(err)
-	pub2, err := r.RecoverPublicKeyFromBytes(bytes, sig)
+	pub2, err := r.RecoverPublicKey(msg, sig)
 	require.NoError(err)
 
 	require.Equal(key.PublicKey(), pub1)
@@ -89,8 +89,8 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	sk, err := NewPrivateKey()
 	require.NoError(err)
 
-	bytes := []byte{'h', 'e', 'l', 'l', 'o'}
-	sig, err := sk.Sign(bytes)
+	msg := []byte{'h', 'e', 'l', 'l', 'o'}
+	sig, err := sk.Sign(msg)
 	require.NoError(err)
 
 	var s secp256k1.ModNScalar
@@ -99,7 +99,7 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	newSBytes := s.Bytes()
 	copy(sig[32:], newSBytes[:])
 
-	_, err = RecoverPublicKeyFromBytes(bytes, sig)
+	_, err = RecoverPublicKey(msg, sig)
 	require.ErrorIs(err, errMutatedSig)
 }
 
@@ -298,7 +298,7 @@ func FuzzVerifySignature(f *testing.F) {
 		sig, err := privateKey.Sign(data)
 		require.NoError(err)
 
-		recoveredPublicKey, err := RecoverPublicKeyFromBytes(data, sig)
+		recoveredPublicKey, err := RecoverPublicKey(data, sig)
 		require.NoError(err)
 
 		require.Equal(publicKey, recoveredPublicKey)

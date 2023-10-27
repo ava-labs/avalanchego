@@ -56,7 +56,7 @@ func (tx *Tx) SenderID() (ids.ShortID, error) {
 		return ids.ShortEmpty, err
 	}
 
-	pk, err := secpCache.RecoverPublicKeyFromBytes(unsignedBytes, tx.Signature[:])
+	pk, err := secpCache.RecoverPublicKey(unsignedBytes, tx.Signature[:])
 	if err != nil {
 		return ids.ShortEmpty, err
 	}
