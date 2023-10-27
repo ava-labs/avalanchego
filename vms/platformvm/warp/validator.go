@@ -72,7 +72,7 @@ func GetCanonicalValidatorSet(
 			continue
 		}
 
-		pkBytes := vdr.PublicKey.Serialize()
+		pkBytes := bls.SerializePublicKey(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Validator{

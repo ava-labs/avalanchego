@@ -69,8 +69,8 @@ linters:
     - revive
     - staticcheck
     - stylecheck
-    - typecheck
     - tagalign
+    - typecheck
     - unconvert
     - unparam
     - unused

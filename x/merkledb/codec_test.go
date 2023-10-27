@@ -186,6 +186,22 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 	)
 	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
+
+	proof := dbNode{
+		value:    maybe.Some([]byte{1}),
+		children: map[byte]child{},
+	}
+
+	nodeBytes := codec.encodeDBNode(&proof)
+	// Remove num children (0) from end
+	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
+	proofBytesBuf := bytes.NewBuffer(nodeBytes)
+
+	// Put num children > branch factor
+	codec.(*codecImpl).encodeUint(proofBytesBuf, uint64(BranchFactor16+1))
+
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode, BranchFactor16)
+	require.ErrorIs(err, errTooManyChildren)
 }
 
 // Ensure that encodeHashValues is deterministic
