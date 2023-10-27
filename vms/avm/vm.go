@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	stdjson "encoding/json"
@@ -34,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/network"
@@ -47,8 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/blocks/builder"
-	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
+	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
@@ -84,7 +85,7 @@ type VM struct {
 
 	registerer prometheus.Registerer
 
-	parser blocks.Parser
+	parser block.Parser
 
 	pubsub *pubsub.Server
 
@@ -207,7 +208,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.parser, err = blocks.NewCustomParser(
+	vm.parser, err = block.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
@@ -319,7 +320,7 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	codec := json.NewCodec()
 
 	rpcServer := rpc.NewServer()
@@ -340,24 +341,22 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
-	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
-		"/wallet": {Handler: walletServer},
-		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
+	return map[string]http.Handler{
+		"":        rpcServer,
+		"/wallet": walletServer,
+		"/events": vm.pubsub,
 	}, err
 }
 
-func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-
-	// name this service "avm"
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	staticService := CreateStaticService()
-	return map[string]*common.HTTPHandler{
-		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}, newServer.RegisterService(staticService, "avm")
+	return map[string]http.Handler{
+		"": server,
+	}, server.RegisterService(staticService, "avm")
 }
 
 /*
@@ -445,10 +444,12 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
 		if err != nil {
-			vm.ctx.Log.Error("state pruning failed",
+			vm.ctx.Log.Warn("state pruning failed",
 				zap.Error(err),
 			)
+			return
 		}
+		vm.ctx.Log.Info("state pruning finished")
 	}()
 
 	return nil

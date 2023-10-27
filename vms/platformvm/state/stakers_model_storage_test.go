@@ -901,12 +901,8 @@ func checkValidatorSetContent(res commands.Result) bool {
 	sysIt.Release()
 
 	for subnetID, nodes := range valContent {
-		vals, found := valSet.Get(subnetID)
-		if !found {
-			return false
-		}
 		for nodeID, weight := range nodes {
-			valWeight := vals.GetWeight(nodeID)
+			valWeight := valSet.GetWeight(subnetID, nodeID)
 			if weight != valWeight {
 				return false
 			}

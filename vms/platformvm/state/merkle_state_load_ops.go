@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -61,12 +61,12 @@ func (ms *merkleState) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
 
-	genesisState, err := genesis.ParseState(genesisBytes)
+	genesisState, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (ms *merkleState) init(genesisBytes []byte) error {
 	return ms.Commit()
 }
 
-func (ms *merkleState) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {
+func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	ms.SetLastAccepted(genesisBlkID)
 	ms.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -90,7 +90,8 @@ func (ms *merkleState) syncGenesis(genesisBlk blocks.Block, genesis *genesis.Sta
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
-		ms.AddUTXO(utxo)
+		avaxUTXO := utxo.UTXO
+		ms.AddUTXO(&avaxUTXO)
 	}
 
 	// Persist primary network validator set at genesis
@@ -284,38 +285,37 @@ func (ms *merkleState) loadPendingStakers() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (ms *merkleState) initValidatorSets() error {
-	primaryValidators, ok := ms.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return errMissingValidatorSet
-	}
-	if primaryValidators.Len() != 0 {
+	if ms.cfg.Validators.Count(constants.PrimaryNetworkID) != 0 {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := ms.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
+	err := ms.ApplyCurrentValidators(constants.PrimaryNetworkID, ms.cfg.Validators)
 	if err != nil {
 		return err
 	}
 
 	vl := validators.NewLogger(ms.ctx.Log, ms.bootstrapped, constants.PrimaryNetworkID, ms.ctx.NodeID)
-	primaryValidators.RegisterCallbackListener(vl)
+	ms.cfg.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
 
-	ms.metrics.SetLocalStake(primaryValidators.GetWeight(ms.ctx.NodeID))
-	ms.metrics.SetTotalStake(primaryValidators.Weight())
+	ms.metrics.SetLocalStake(ms.cfg.Validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
+	totalWeight, err := ms.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
+	}
+	ms.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range ms.cfg.TrackedSubnets {
-		subnetValidators := validators.NewSet()
-		err := ms.ValidatorSet(subnetID, subnetValidators)
+		if ms.cfg.Validators.Count(subnetID) != 0 {
+			// Enforce the invariant that the validator set is empty here.
+			return errValidatorSetAlreadyPopulated
+		}
+		err := ms.ApplyCurrentValidators(subnetID, ms.cfg.Validators)
 		if err != nil {
 			return err
 		}
 
-		if !ms.cfg.Validators.Add(subnetID, subnetValidators) {
-			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
-		}
-
 		vl := validators.NewLogger(ms.ctx.Log, ms.bootstrapped, subnetID, ms.ctx.NodeID)
-		subnetValidators.RegisterCallbackListener(vl)
+		ms.cfg.Validators.RegisterCallbackListener(subnetID, vl)
 	}
 	return nil
 }

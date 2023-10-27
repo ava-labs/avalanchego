@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -58,12 +59,20 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 	ipResolutionTimeout  = 30 * time.Second
+
+	ipcDeprecationMsg      = "IPC API is deprecated"
+	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		IpcAPIEnabledKey:      ipcDeprecationMsg,
+		IpcsChainIDsKey:       ipcDeprecationMsg,
+		IpcsPathKey:           ipcDeprecationMsg,
+		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+	}
 
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
@@ -88,9 +97,10 @@ var (
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
-	return snowball.Parameters{
-		K:     v.GetInt(SnowSampleSizeKey),
-		Alpha: v.GetInt(SnowQuorumSizeKey),
+	p := snowball.Parameters{
+		K:               v.GetInt(SnowSampleSizeKey),
+		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
 		// During the X-chain linearization we require BetaVirtuous and
 		// BetaRogue to be equal. Therefore we use the more conservative
 		// BetaRogue value for both BetaVirtuous and BetaRogue.
@@ -104,6 +114,11 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
 		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
+	if v.IsSet(SnowQuorumSizeKey) {
+		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
+		p.AlphaConfidence = p.AlphaPreference
+	}
+	return p
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -446,7 +461,10 @@ func getNetworkConfig(
 }
 
 func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
-	alpha := consensusParameters.Alpha
+	// AlphaConfidence is used here to ensure that benching can't cause a
+	// liveness failure. If AlphaPreference were used, the benchlist may grow to
+	// a point that committing would be extremely unlikely to happen.
+	alpha := consensusParameters.AlphaConfidence
 	k := consensusParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
@@ -950,7 +968,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 	aliasMap := make(map[ids.ID][]string)
 	if err := json.Unmarshal(fileBytes, &aliasMap); err != nil {
-		return nil, fmt.Errorf("%w on %s: %s", errUnmarshalling, name, err)
+		return nil, fmt.Errorf("%w on %s: %w", errUnmarshalling, name, err)
 	}
 	return aliasMap, nil
 }
@@ -1101,6 +1119,11 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
+			if config.ConsensusParameters.Alpha != nil {
+				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+			}
+
 			if err := config.Valid(); err != nil {
 				return nil, err
 			}
@@ -1146,7 +1169,12 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, fmt.Errorf("%w: %s", errUnmarshalling, err)
+			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
+		}
+
+		if config.ConsensusParameters.Alpha != nil {
+			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
+			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
 		}
 
 		if err := config.Valid(); err != nil {
@@ -1248,6 +1276,8 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 		},
 		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
+		AppName:         constants.AppName,
+		Version:         version.Current.String(),
 	}, nil
 }
 

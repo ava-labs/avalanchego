@@ -73,6 +73,7 @@ type client struct {
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
 	metrics             SyncMetrics
+	branchFactor        merkledb.BranchFactor
 }
 
 type ClientConfig struct {
@@ -81,16 +82,21 @@ type ClientConfig struct {
 	StateSyncMinVersion *version.Application
 	Log                 logging.Logger
 	Metrics             SyncMetrics
+	BranchFactor        merkledb.BranchFactor
 }
 
-func NewClient(config *ClientConfig) Client {
+func NewClient(config *ClientConfig) (Client, error) {
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
+	}
 	return &client{
 		networkClient:       config.NetworkClient,
 		stateSyncNodes:      config.StateSyncNodeIDs,
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-	}
+		branchFactor:        config.BranchFactor,
+	}, nil
 }
 
 // GetChangeProof synchronously retrieves the change proof given by [req].
@@ -118,7 +124,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
 			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
+			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof, c.branchFactor); err != nil {
 				return nil, err
 			}
 
@@ -143,18 +149,24 @@ func (c *client) GetChangeProof(
 				endKey,
 				endRoot,
 			); err != nil {
-				return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+				return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 			}
 
 			return &merkledb.ChangeOrRangeProof{
 				ChangeProof: &changeProof,
 			}, nil
 		case *pb.SyncGetChangeProofResponse_RangeProof:
+
+			var rangeProof merkledb.RangeProof
+			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof, c.branchFactor); err != nil {
+				return nil, err
+			}
+
 			// The server did not have enough history to send us a change proof
 			// so they sent a range proof instead.
-			rangeProof, err := parseAndVerifyRangeProof(
+			err := verifyRangeProof(
 				ctx,
-				changeProofResp.RangeProof,
+				&rangeProof,
 				int(req.KeyLimit),
 				startKey,
 				endKey,
@@ -165,7 +177,7 @@ func (c *client) GetChangeProof(
 			}
 
 			return &merkledb.ChangeOrRangeProof{
-				RangeProof: rangeProof,
+				RangeProof: &rangeProof,
 			}, nil
 		default:
 			return nil, fmt.Errorf(
@@ -186,30 +198,25 @@ func (c *client) GetChangeProof(
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 
-// Parse [rangeProofProto] to a merkledb.RangeProof and verify it's
-// a valid range proof for keys in [start, end] for root [rootBytes].
-// Returns [errTooManyKeys] if the response contains more than [keyLimit] keys.
-func parseAndVerifyRangeProof(
+// Verify [rangeProof] is a valid range proof for keys in [start, end] for
+// root [rootBytes]. Returns [errTooManyKeys] if the response contains more
+// than [keyLimit] keys.
+func verifyRangeProof(
 	ctx context.Context,
-	rangeProofProto *pb.RangeProof,
+	rangeProof *merkledb.RangeProof,
 	keyLimit int,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
-) (*merkledb.RangeProof, error) {
+) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	var rangeProof merkledb.RangeProof
-	if err := rangeProof.UnmarshalProto(rangeProofProto); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Ensure the response does not contain more than the maximum requested number of leaves.
 	if len(rangeProof.KeyValues) > keyLimit {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: (%d) > %d)",
 			errTooManyKeys, len(rangeProof.KeyValues), keyLimit,
 		)
@@ -221,9 +228,9 @@ func parseAndVerifyRangeProof(
 		end,
 		root,
 	); err != nil {
-		return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
-	return &rangeProof, nil
+	return nil
 }
 
 // GetRangeProof synchronously retrieves the range proof given by [req].
@@ -249,14 +256,22 @@ func (c *client) GetRangeProof(
 		startKey := maybeBytesToMaybe(req.StartKey)
 		endKey := maybeBytesToMaybe(req.EndKey)
 
-		return parseAndVerifyRangeProof(
+		var rangeProof merkledb.RangeProof
+		if err := rangeProof.UnmarshalProto(&rangeProofProto, c.branchFactor); err != nil {
+			return nil, err
+		}
+
+		if err := verifyRangeProof(
 			ctx,
-			&rangeProofProto,
+			&rangeProof,
 			int(req.KeyLimit),
 			startKey,
 			endKey,
 			req.RootHash,
-		)
+		); err != nil {
+			return nil, err
+		}
+		return &rangeProof, nil
 	}
 
 	reqBytes, err := proto.Marshal(&pb.Request{
@@ -322,7 +337,7 @@ func getAndParse[T any](
 			if lastErr != nil {
 				// prefer reporting [lastErr] if it's not nil.
 				return nil, fmt.Errorf(
-					"request failed after %d attempts with last error %w and ctx error %s",
+					"request failed after %d attempts with last error %w and ctx error %w",
 					attempt, lastErr, ctx.Err(),
 				)
 			}

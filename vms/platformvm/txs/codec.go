@@ -41,6 +41,10 @@ func init() {
 		c.SkipRegistrations(5)
 
 		errs.Add(RegisterUnsignedTxsTypes(c))
+
+		c.SkipRegistrations(4)
+
+		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
 	errs.Add(
 		Codec.RegisterCodec(Version, c),
@@ -96,4 +100,8 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
 	return errs.Err
+}
+
+func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+	return targetCodec.RegisterType(&TransferSubnetOwnershipTx{})
 }

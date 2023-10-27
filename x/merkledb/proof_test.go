@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -21,67 +20,6 @@ import (
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
-
-func getBasicDB() (*merkleDB, error) {
-	return newDatabase(
-		context.Background(),
-		memdb.New(),
-		newDefaultConfig(),
-		&mockMetrics{},
-	)
-}
-
-func writeBasicBatch(t *testing.T, db *merkleDB) {
-	require := require.New(t)
-
-	batch := db.NewBatch()
-	require.NoError(batch.Put([]byte{0}, []byte{0}))
-	require.NoError(batch.Put([]byte{1}, []byte{1}))
-	require.NoError(batch.Put([]byte{2}, []byte{2}))
-	require.NoError(batch.Put([]byte{3}, []byte{3}))
-	require.NoError(batch.Put([]byte{4}, []byte{4}))
-	require.NoError(batch.Write())
-}
-
-func newRandomProofNode(r *rand.Rand) ProofNode {
-	key := make([]byte, r.Intn(32)) // #nosec G404
-	_, _ = r.Read(key)              // #nosec G404
-	serializedKey := newPath(key).Serialize()
-
-	val := make([]byte, r.Intn(64)) // #nosec G404
-	_, _ = r.Read(val)              // #nosec G404
-
-	children := map[byte]ids.ID{}
-	for j := 0; j < NodeBranchFactor; j++ {
-		if r.Float64() < 0.5 {
-			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
-			children[byte(j)] = childID
-		}
-	}
-
-	hasValue := rand.Intn(2) == 1 // #nosec G404
-	var valueOrHash maybe.Maybe[[]byte]
-	if hasValue {
-		// use the hash instead when length is greater than the hash length
-		if len(val) >= HashLength {
-			val = hashing.ComputeHash256(val)
-		} else if len(val) == 0 {
-			// We do this because when we encode a value of []byte{} we will later
-			// decode it as nil.
-			// Doing this prevents inconsistency when comparing the encoded and
-			// decoded values.
-			val = nil
-		}
-		valueOrHash = maybe.Some(val)
-	}
-
-	return ProofNode{
-		KeyPath:     serializedKey,
-		ValueOrHash: valueOrHash,
-		Children:    children,
-	}
-}
 
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
@@ -122,11 +60,11 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "odd length key path with value",
+			name: "odd length key with value",
 			malform: func(proof *Proof) {
 				proof.Path[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "last proof node has missing value",
@@ -247,11 +185,11 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: ErrProofValueDoesntMatch,
 		},
 		{
-			name: "EndProof: odd length key path with value",
+			name: "EndProof: odd length key with value",
 			malform: func(proof *RangeProof) {
 				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "EndProof: last proof node has missing value",
@@ -333,10 +271,10 @@ func Test_Proof(t *testing.T) {
 
 	require.Len(proof.Path, 3)
 
-	require.Equal(newPath([]byte("key1")).Serialize(), proof.Path[2].KeyPath)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16), proof.Path[2].Key)
 	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
 
-	require.Equal(newPath([]byte{}).Serialize(), proof.Path[0].KeyPath)
+	require.Equal(ToKey([]byte{}, BranchFactor16), proof.Path[0].Key)
 	require.True(proof.Path[0].ValueOrHash.IsNothing())
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
@@ -419,7 +357,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -431,7 +369,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -443,7 +381,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{2}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -457,13 +395,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{2}).Serialize(),
+						Key: ToKey([]byte{2}, BranchFactor16),
 					},
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 				},
-				EndProof: []ProofNode{{}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -477,16 +415,16 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
+						Key: ToKey([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
+						Key: ToKey([]byte{1, 2, 3, 4}, BranchFactor16),
 					},
 				},
-				EndProof: []ProofNode{{}},
+				EndProof: []ProofNode{{Key: emptyKey(BranchFactor16)}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -500,14 +438,38 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{2}).Serialize(),
+						Key: ToKey([]byte{2}, BranchFactor16),
 					},
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 				},
 			},
 			expectedErr: ErrProofNodeNotForKey,
+		},
+		{
+			name:  "inconsistent branching factor",
+			start: maybe.Some([]byte{1, 2}),
+			end:   maybe.Some([]byte{1, 2}),
+			proof: &RangeProof{
+				StartProof: []ProofNode{
+					{
+						Key: ToKey([]byte{1}, BranchFactor16),
+					},
+					{
+						Key: ToKey([]byte{1, 2}, BranchFactor16),
+					},
+				},
+				EndProof: []ProofNode{
+					{
+						Key: ToKey([]byte{1}, BranchFactor4),
+					},
+					{
+						Key: ToKey([]byte{1, 2}, BranchFactor4),
+					},
+				},
+			},
+			expectedErr: ErrInconsistentBranchFactor,
 		},
 		{
 			name:  "end proof has node for wrong key",
@@ -519,13 +481,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						Key: ToKey([]byte{1}, BranchFactor16),
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
+						Key: ToKey([]byte{1, 2, 3}, BranchFactor16), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
+						Key: ToKey([]byte{1, 2, 3, 4}, BranchFactor16),
 					},
 				},
 			},
@@ -561,12 +523,12 @@ func Test_RangeProof(t *testing.T) {
 	require.Equal([]byte{2}, proof.KeyValues[1].Value)
 	require.Equal([]byte{3}, proof.KeyValues[2].Value)
 
-	require.Equal([]byte{}, proof.EndProof[0].KeyPath.Value)
-	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Value)
-	require.Equal([]byte{3}, proof.EndProof[2].KeyPath.Value)
+	require.Nil(proof.EndProof[0].Key.Bytes())
+	require.Equal([]byte{0}, proof.EndProof[1].Key.Bytes())
+	require.Equal([]byte{3}, proof.EndProof[2].Key.Bytes())
 
 	// only a single node here since others are duplicates in endproof
-	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Value)
+	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -616,9 +578,9 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value1"), proof.KeyValues[0].Value)
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
-	require.Equal(newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
-	require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
-	require.Equal(newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16), proof.EndProof[2].Key, BranchFactor16)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16).Take(7), proof.EndProof[1].Key)
+	require.Equal(ToKey([]byte(""), BranchFactor16), proof.EndProof[0].Key, BranchFactor16)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -648,11 +610,11 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.Equal([]byte{1}, proof.KeyValues[0].Value)
 	require.Equal([]byte{2}, proof.KeyValues[1].Value)
 
-	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Value)
+	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
-	require.Equal([]byte{}, proof.EndProof[0].KeyPath.Value)
-	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Value)
-	require.Equal([]byte{2}, proof.EndProof[2].KeyPath.Value)
+	require.Nil(proof.EndProof[0].Key.Bytes())
+	require.Equal([]byte{0}, proof.EndProof[1].Key.Bytes())
+	require.Equal([]byte{2}, proof.EndProof[2].Key.Bytes())
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -690,11 +652,11 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Empty(proof.KeyValues[2].Value)
 
 	require.Len(proof.StartProof, 1)
-	require.Equal(newPath([]byte("key1")).Serialize(), proof.StartProof[0].KeyPath)
+	require.Equal(ToKey([]byte("key1"), BranchFactor16), proof.StartProof[0].Key, BranchFactor16)
 
 	require.Len(proof.EndProof, 3)
-	require.Equal(newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
-	require.Equal(newPath([]byte{}).Serialize(), proof.EndProof[0].KeyPath)
+	require.Equal(ToKey([]byte("key2"), BranchFactor16), proof.EndProof[2].Key, BranchFactor16)
+	require.Equal(ToKey([]byte{}, BranchFactor16), proof.EndProof[0].Key, BranchFactor16)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -837,7 +799,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			malform: func(proof *ChangeProof) {
 				proof.EndProof[1].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
-			expectedErr: ErrOddLengthWithValue,
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
 			name: "last proof node has missing value",
@@ -980,8 +942,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "start proof node has wrong prefix",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{
-					{KeyPath: newPath([]byte{2}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{Key: ToKey([]byte{2}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Some([]byte{1, 2, 3}),
@@ -992,8 +954,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "start proof non-increasing",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{
-					{KeyPath: newPath([]byte{1}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{Key: ToKey([]byte{1}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Some([]byte{1, 2, 3}),
@@ -1007,8 +969,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2}, Value: maybe.Some([]byte{0})},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: newPath([]byte{2}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{Key: ToKey([]byte{2}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1022,8 +984,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2, 3}},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: newPath([]byte{1}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{Key: ToKey([]byte{1}, BranchFactor16)},
+					{Key: ToKey([]byte{2, 3}, BranchFactor16)},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1125,7 +1087,7 @@ func TestVerifyProofPath(t *testing.T) {
 	type test struct {
 		name        string
 		path        []ProofNode
-		proofKey    []byte
+		proofKey    maybe.Maybe[Key]
 		expectedErr error
 	}
 
@@ -1133,124 +1095,131 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name:        "empty",
 			path:        nil,
-			proofKey:    nil,
+			proofKey:    maybe.Nothing[Key](),
 			expectedErr: nil,
 		},
 		{
 			name:        "1 element",
-			path:        []ProofNode{{}},
-			proofKey:    nil,
+			path:        []ProofNode{{Key: ToKey([]byte{1}, BranchFactor16)}},
+			proofKey:    maybe.Nothing[Key](),
 			expectedErr: nil,
 		},
 		{
 			name: "non-increasing keys",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "invalid key",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 4}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 4}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "extra node inclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "extra node exclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3, 4}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 3, 4}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "happy path exclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 4}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 4}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
 			name: "happy path inclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: nil,
 		},
 		{
 			name: "repeat nodes",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "repeat nodes 2",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
 			name: "repeat nodes 3",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2, 3}, BranchFactor16)},
 			},
-			proofKey:    []byte{1, 2, 3},
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
 			name: "oddLength key with value",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: SerializedPath{Value: []byte{1, 2, 240}, NibbleLength: 5}, ValueOrHash: maybe.Some([]byte{1})},
+				{Key: ToKey([]byte{1}, BranchFactor16)},
+				{Key: ToKey([]byte{1, 2}, BranchFactor16)},
+				{
+					Key: Key{
+						value:       string([]byte{1, 2, 240}),
+						tokenLength: 5,
+						tokenConfig: branchFactorToTokenConfig[BranchFactor16],
+					},
+					ValueOrHash: maybe.Some([]byte{1}),
+				},
 			},
-			proofKey:    []byte{1, 2, 3},
-			expectedErr: ErrOddLengthWithValue,
+			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3}, BranchFactor16)),
+			expectedErr: ErrPartialByteLengthWithValue,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, newPath(tt.proofKey))
+			err := verifyProofPath(tt.path, tt.proofKey)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1271,7 +1240,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
@@ -1288,7 +1257,7 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
 }
 
@@ -1301,10 +1270,10 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	protoNode := node.ToProto()
 
 	childID := ids.GenerateTestID()
-	protoNode.Children[NodeBranchFactor] = childID[:]
+	protoNode.Children[uint32(BranchFactor16)] = childID[:]
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidChildIndex)
 }
 
@@ -1345,48 +1314,49 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 				protoNode.Key = nil
 				return protoNode
 			},
-			expectedErr: ErrNilSerializedPath,
+			expectedErr: ErrNilKey,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var node ProofNode
-			err := node.UnmarshalProto(tt.nodeFunc())
+			err := node.UnmarshalProto(tt.nodeFunc(), BranchFactor16)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
 
-func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	for i := 0; i < 1_000; i++ {
+func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		node := newRandomProofNode(rand)
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
-		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
+		require.NoError(unmarshaledNode.UnmarshalProto(protoNode, BranchFactor16))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
-	}
+	})
 }
 
-func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random range proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1427,22 +1397,23 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
-func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random change proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
@@ -1488,18 +1459,18 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
 	var proof ChangeProof
-	err := proof.UnmarshalProto(nil)
+	err := proof.UnmarshalProto(nil, BranchFactor16)
 	require.ErrorIs(t, err, ErrNilChangeProof)
 }
 
@@ -1553,7 +1524,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(protoProof)
+	err := unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16)
 	require.ErrorIs(t, err, ErrNilMaybeBytes)
 }
 
@@ -1571,17 +1542,18 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var proof ChangeProof
-	err := proof.UnmarshalProto(protoProof)
+	err := proof.UnmarshalProto(protoProof, BranchFactor16)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
-func TestProofProtoMarshalUnmarshal(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+	) {
+		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-	for i := 0; i < 500; i++ {
 		// Make a random proof.
 		proofLen := rand.Intn(32)
 		proofPath := make([]ProofNode, proofLen)
@@ -1603,7 +1575,7 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		}
 
 		proof := Proof{
-			Key:   key,
+			Key:   ToKey(key, BranchFactor16),
 			Value: value,
 			Path:  proofPath,
 		}
@@ -1612,13 +1584,13 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof Proof
 		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof, BranchFactor16))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
-	}
+	})
 }
 
 func TestProofProtoUnmarshal(t *testing.T) {
@@ -1654,50 +1626,47 @@ func TestProofProtoUnmarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var proof Proof
-			err := proof.UnmarshalProto(tt.proof)
+			err := proof.UnmarshalProto(tt.proof, BranchFactor16)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	var (
-		numKeyValues  = 2048
-		deletePortion = 0.25
-	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
+		randSeed int64,
 		startBytes []byte,
 		endBytes []byte,
 		maxProofLen uint,
+		numKeyValues uint,
 	) {
 		require := require.New(t)
 
-		// Make sure proof bounds are valid
-		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
-			return
-		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
-			return
+			t.SkipNow()
 		}
+
+		// Make sure proof bounds are valid
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
+			t.SkipNow()
+		}
+
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
 
 		start := maybe.Nothing[[]byte]()
 		if len(startBytes) != 0 {
@@ -1729,15 +1698,13 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		// Make sure the start proof doesn't contain any nodes
 		// that are in the end proof.
-		endProofKeys := set.Set[path]{}
+		endProofKeys := set.Set[Key]{}
 		for _, node := range rangeProof.EndProof {
-			path := node.KeyPath.deserialize()
-			endProofKeys.Add(path)
+			endProofKeys.Add(node.Key)
 		}
 
 		for _, node := range rangeProof.StartProof {
-			path := node.KeyPath.deserialize()
-			require.NotContains(endProofKeys, path)
+			require.NotContains(endProofKeys, node.Key)
 		}
 
 		// Make sure the EndProof invariant is maintained
@@ -1746,7 +1713,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
-					require.Empty(rangeProof.EndProof[0].KeyPath)
+					require.Empty(rangeProof.EndProof[0].Key.Bytes())
 				} else {
 					require.Empty(rangeProof.EndProof)
 				}
@@ -1765,7 +1732,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   endBytes,
+				Key:   ToKey(endBytes, BranchFactor16),
 				Value: value,
 			}
 
@@ -1780,7 +1747,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			// EndProof should be a proof for largest key-value.
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   greatestKV.Key,
+				Key:   ToKey(greatestKV.Key, BranchFactor16),
 				Value: maybe.Some(greatestKV.Value),
 			}
 
@@ -1792,33 +1759,27 @@ func FuzzRangeProofInvariants(f *testing.F) {
 	})
 }
 
-func FuzzProof(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	var (
-		numKeyValues  = 2048
-		deletePortion = 0.25
-	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
+func FuzzProofVerification(f *testing.F) {
+	deletePortion := 0.25
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
+		randSeed int64,
+		numKeyValues uint,
 	) {
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 		require := require.New(t)
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
 
 		proof, err := db.GetProof(
 			context.Background(),
@@ -1848,42 +1809,40 @@ func FuzzProof(f *testing.F) {
 }
 
 // Generate change proofs and verify that they are valid.
-func FuzzChangeProof(f *testing.F) {
-	now := time.Now().UnixNano()
-	f.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
+func FuzzChangeProofVerification(f *testing.F) {
 	const (
 		numKeyValues  = defaultHistoryLength / 2
 		deletePortion = 0.25
 	)
-
-	db, err := getBasicDB()
-	require.NoError(f, err)
-
-	startRootID, err := db.GetMerkleRoot(context.Background())
-	require.NoError(f, err)
-
-	// Insert a bunch of random key values.
-	// Don't insert so many that we have insufficient history.
-	insertRandomKeyValues(
-		require.New(f),
-		rand,
-		[]database.Database{db},
-		numKeyValues,
-		deletePortion,
-	)
-
-	endRootID, err := db.GetMerkleRoot(context.Background())
-	require.NoError(f, err)
 
 	f.Fuzz(func(
 		t *testing.T,
 		startBytes []byte,
 		endBytes []byte,
 		maxProofLen uint,
+		randSeed int64,
 	) {
 		require := require.New(t)
+		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		db, err := getBasicDB()
+		require.NoError(err)
+
+		startRootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		// Insert a bunch of random key values.
+		// Don't insert so many that we have insufficient history.
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			numKeyValues,
+			deletePortion,
+		)
+
+		endRootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
 
 		// Make sure proof bounds are valid
 		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
@@ -1921,27 +1880,5 @@ func FuzzChangeProof(f *testing.F) {
 			end,
 			endRootID,
 		))
-
-		// Insert another key-value pair
-		newKey := make([]byte, 32)
-		_, _ = rand.Read(newKey) // #nosec G404
-		newValue := make([]byte, 32)
-		_, _ = rand.Read(newValue) // #nosec G404
-		require.NoError(db.Put(newKey, newValue))
-
-		// Delete a key-value pair so database doesn't grow too large
-		iter := db.NewIterator()
-		require.NoError(db.Delete(iter.Key()))
-		iter.Release()
-
-		oldEndRootID := endRootID
-		endRootID, err = db.GetMerkleRoot(context.Background())
-		require.NoError(err)
-		if oldEndRootID != endRootID {
-			// Need this check because if we insert and then immediately
-			// delete a key-value pair, the root ID won't change and we'll
-			// error because start root ID == end root ID.
-			startRootID = oldEndRootID
-		}
 	})
 }

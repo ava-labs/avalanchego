@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -71,6 +72,8 @@ type VMServer struct {
 	// If nil, the underlying VM doesn't implement the interface.
 	ssVM block.StateSyncableVM
 
+	allowShutdown *utils.Atomic[bool]
+
 	processMetrics prometheus.Gatherer
 	dbManager      manager.Manager
 	log            logging.Logger
@@ -83,13 +86,14 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm block.ChainVM) *VMServer {
+func NewServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool]) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
-		vm:   vm,
-		bVM:  bVM,
-		ssVM: ssVM,
+		vm:            vm,
+		bVM:           bVM,
+		ssVM:          ssVM,
+		allowShutdown: allowShutdown,
 	}
 }
 
@@ -316,6 +320,7 @@ func (vm *VMServer) SetState(ctx context.Context, stateReq *vmpb.SetStateRequest
 }
 
 func (vm *VMServer) Shutdown(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	vm.allowShutdown.Set(true)
 	if vm.closed == nil {
 		return &emptypb.Empty{}, nil
 	}
@@ -333,24 +338,21 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 		return nil, err
 	}
 	resp := &vmpb.CreateHandlersResponse{}
-	for prefix, h := range handlers {
-		handler := h
-
+	for prefix, handler := range handlers {
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {
 			return nil, err
 		}
 		server := grpcutils.NewServer()
 		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
 
 		// Start HTTP service
 		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:      prefix,
-			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverListener.Addr().String(),
+			Prefix:     prefix,
+			ServerAddr: serverListener.Addr().String(),
 		})
 	}
 	return resp, nil
@@ -362,24 +364,21 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 		return nil, err
 	}
 	resp := &vmpb.CreateStaticHandlersResponse{}
-	for prefix, h := range handlers {
-		handler := h
-
+	for prefix, handler := range handlers {
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {
 			return nil, err
 		}
 		server := grpcutils.NewServer()
 		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
 
 		// Start HTTP service
 		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:      prefix,
-			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverListener.Addr().String(),
+			Prefix:     prefix,
+			ServerAddr: serverListener.Addr().String(),
 		})
 	}
 	return resp, nil

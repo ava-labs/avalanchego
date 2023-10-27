@@ -107,7 +107,7 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey)
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)
@@ -136,7 +136,7 @@ func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*secp256k1.PrivateKey) 
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)
@@ -165,7 +165,7 @@ func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)

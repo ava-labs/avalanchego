@@ -31,8 +31,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -41,7 +42,7 @@ import (
 )
 
 const (
-	HistoryLength = int(256)
+	HistoryLength = uint(256)
 
 	valueNodeCacheSize        = 512 * units.MiB
 	intermediateNodeCacheSize = 512 * units.MiB
@@ -51,15 +52,16 @@ const (
 var (
 	_ State = (*merkleState)(nil)
 
-	merkleStatePrefix      = []byte{0x00}
-	merkleSingletonPrefix  = []byte{0x01}
-	merkleBlockPrefix      = []byte{0x02}
-	merkleBlockIDsPrefix   = []byte{0x03}
-	merkleTxPrefix         = []byte{0x04}
-	merkleIndexUTXOsPrefix = []byte{0x05} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix = []byte{0x08}
+	merkleStatePrefix       = []byte{0x00}
+	merkleSingletonPrefix   = []byte{0x01}
+	merkleBlockPrefix       = []byte{0x02}
+	merkleBlockIDsPrefix    = []byte{0x03}
+	merkleTxPrefix          = []byte{0x04}
+	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix  = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix  = []byte{0x08}
+	merkleSubnetOwnerPrefix = []byte{0x09}
 
 	// merkle db sections
 	metadataSectionPrefix      = byte(0x00)
@@ -132,6 +134,7 @@ func newMerkleState(
 		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
+		subnetOwnerDB                 = prefixdb.New(merkleSubnetOwnerPrefix, baseDB)
 	)
 
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
@@ -140,6 +143,7 @@ func newMerkleState(
 	}
 
 	merkleDB, err := merkledb.New(context.TODO(), baseMerkleDB, merkledb.Config{
+		BranchFactor:              merkledb.BranchFactor16,
 		HistoryLength:             HistoryLength,
 		ValueNodeCacheSize:        valueNodeCacheSize,
 		IntermediateNodeCacheSize: intermediateNodeCacheSize,
@@ -168,6 +172,17 @@ func newMerkleState(
 		return nil, err
 	}
 
+	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
+		"subnet_owner_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+			return ids.IDLen + f.size
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -186,10 +201,10 @@ func newMerkleState(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, blocks.Block](
+	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, blocks.Block](execCfg.BlockCacheSize, blockSize),
+		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -238,6 +253,10 @@ func newMerkleState(
 		modifiedSupplies: make(map[ids.ID]uint64),
 		suppliesCache:    suppliesCache,
 
+		subnetOwners:     make(map[ids.ID]fx.Owner),
+		subnetOwnerDB:    subnetOwnerDB,
+		subnetOwnerCache: subnetOwnerCache,
+
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
 		permissionedSubnetCache:  nil, // created first time GetSubnets is called
 		addedElasticSubnets:      make(map[ids.ID]*txs.Tx),
@@ -250,7 +269,7 @@ func newMerkleState(
 		txCache:  txCache,
 		txDB:     txDB,
 
-		addedBlocks: make(map[ids.ID]blocks.Block),
+		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
 		blockDB:     blockDB,
 
@@ -304,6 +323,11 @@ type merkleState struct {
 	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
 
 	// Subnets section
+	// Subnet ID --> Owner of the subnet
+	subnetOwners     map[ids.ID]fx.Owner
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwnerDB    database.Database
+
 	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
 	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
 	addedElasticSubnets      map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -315,8 +339,8 @@ type merkleState struct {
 
 	// Blocks section
 	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
-	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block.
-	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block.
+	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
@@ -646,6 +670,55 @@ func (ms *merkleState) AddSubnet(createSubnetTx *txs.Tx) {
 	ms.addedPermissionedSubnets = append(ms.addedPermissionedSubnets, createSubnetTx)
 }
 
+func (ms *merkleState) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	if owner, exists := ms.subnetOwners[subnetID]; exists {
+		return owner, nil
+	}
+
+	if ownerAndSize, cached := ms.subnetOwnerCache.Get(subnetID); cached {
+		if ownerAndSize.owner == nil {
+			return nil, database.ErrNotFound
+		}
+		return ownerAndSize.owner, nil
+	}
+
+	ownerBytes, err := ms.subnetOwnerDB.Get(subnetID[:])
+	if err == nil {
+		var owner fx.Owner
+		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+			return nil, err
+		}
+		ms.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+		return owner, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
+	subnetIntf, _, err := ms.GetTx(subnetID)
+	if err != nil {
+		if err == database.ErrNotFound {
+			ms.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
+		}
+		return nil, err
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+	}
+
+	ms.SetSubnetOwner(subnetID, subnet.Owner)
+	return subnet.Owner, nil
+}
+
+func (ms *merkleState) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	ms.subnetOwners[subnetID] = owner
+}
+
 func (ms *merkleState) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	if tx, exists := ms.addedElasticSubnets[subnetID]; exists {
 		return tx, nil
@@ -767,7 +840,7 @@ func (ms *merkleState) AddTx(tx *txs.Tx, status status.Status) {
 }
 
 // BLOCKs Section
-func (ms *merkleState) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+func (ms *merkleState) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := ms.addedBlocks[blockID]; exists {
 		return blk, nil
 	}
@@ -784,7 +857,7 @@ func (ms *merkleState) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 	switch err {
 	case nil:
 		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-		blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+		blk, err := block.Parse(block.GenesisCodec, blkBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -801,7 +874,7 @@ func (ms *merkleState) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 	}
 }
 
-func (ms *merkleState) AddStatelessBlock(block blocks.Block) {
+func (ms *merkleState) AddStatelessBlock(block block.Block) {
 	ms.addedBlocks[block.ID()] = block
 }
 
@@ -904,17 +977,17 @@ func (ms *merkleState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Ti
 }
 
 // VALIDATORS Section
-func (ms *merkleState) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+func (ms *merkleState) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
 	for nodeID, validator := range ms.currentStakers.validators[subnetID] {
 		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+		if err := vdrs.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
 			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+			if err := vdrs.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
 				return err
 			}
@@ -1244,6 +1317,7 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 	errs.Add(
 		ms.writeMetadata(&batchOps),
 		ms.writePermissionedSubnets(&batchOps),
+		ms.writeSubnetOwners(&batchOps),
 		ms.writeElasticSubnets(&batchOps),
 		ms.writeChains(&batchOps),
 		ms.writeCurrentStakers(&batchOps, currentData),
@@ -1316,6 +1390,32 @@ func (ms *merkleState) writePermissionedSubnets(batchOps *[]database.BatchOp) er
 		*batchOps = append(*batchOps, database.BatchOp{
 			Key:   key,
 			Value: subnetTx.Bytes(),
+		})
+	}
+	ms.addedPermissionedSubnets = make([]*txs.Tx, 0)
+	return nil
+}
+
+func (ms *merkleState) writeSubnetOwners(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+	for subnetID, owner := range ms.subnetOwners {
+		subnetID := subnetID
+		owner := owner
+		delete(ms.subnetOwners, subnetID)
+
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+
+		ms.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+
+		key := merklePermissionedSubnetKey(subnetID)
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: ownerBytes,
 		})
 	}
 	ms.addedPermissionedSubnets = make([]*txs.Tx, 0)
@@ -1641,12 +1741,11 @@ func (ms *merkleState) updateValidatorSet(
 		}
 
 		if weightDiff.Decrease {
-			err = validators.RemoveWeight(ms.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+			err = ms.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 		} else {
 			if validatorDiff.validatorStatus == added {
 				staker := validatorDiff.validator
-				err = validators.Add(
-					ms.cfg.Validators,
+				err = ms.cfg.Validators.AddStaker(
 					subnetID,
 					nodeID,
 					staker.PublicKey,
@@ -1654,7 +1753,7 @@ func (ms *merkleState) updateValidatorSet(
 					weightDiff.Amount,
 				)
 			} else {
-				err = validators.AddWeight(ms.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+				err = ms.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 			}
 		}
 		if err != nil {
@@ -1662,12 +1761,12 @@ func (ms *merkleState) updateValidatorSet(
 		}
 	}
 
-	primaryValidators, ok := ms.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return nil
+	ms.metrics.SetLocalStake(ms.cfg.Validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
+	totalWeight, err := ms.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight: %w", err)
 	}
-	ms.metrics.SetLocalStake(primaryValidators.GetWeight(ms.ctx.NodeID))
-	ms.metrics.SetTotalStake(primaryValidators.Weight())
+	ms.metrics.SetTotalStake(totalWeight)
 	return nil
 }
 

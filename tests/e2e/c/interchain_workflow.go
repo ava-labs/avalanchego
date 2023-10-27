@@ -26,12 +26,16 @@ import (
 var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
-	const (
-		txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
-		gasLimit = uint64(21000)   // Standard gas limit
-	)
+	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
 
 	ginkgo.It("should ensure that funds can be transferred from the C-Chain to the X-Chain and the P-Chain", func() {
+		ginkgo.By("initializing a new eth client")
+		// Select a random node URI to use for both the eth client and
+		// the wallet to avoid having to verify that all nodes are at
+		// the same height before initializing the wallet.
+		nodeURI := e2e.Env.GetRandomNodeURI()
+		ethClient := e2e.Env.NewEthClient(nodeURI)
+
 		ginkgo.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		senderKey := e2e.Env.AllocateFundedKey()
 		senderEthAddress := evm.GetEthAddress(senderKey)
@@ -40,23 +44,16 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		require.NoError(err)
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
 
-		// Select a random node URI to use for both the eth client and
-		// the wallet to avoid having to verify that all nodes are at
-		// the same height before initializing the wallet.
-		nodeURI := e2e.Env.GetRandomNodeURI()
-		ethClient := e2e.Env.NewEthClientForURI(nodeURI)
-
 		ginkgo.By("sending funds from one address to another on the C-Chain", func() {
 			// Create transaction
 			acceptedNonce, err := ethClient.AcceptedNonceAt(e2e.DefaultContext(), senderEthAddress)
 			require.NoError(err)
-			gasPrice, err := ethClient.SuggestGasPrice(e2e.DefaultContext())
-			require.NoError(err)
+			gasPrice := e2e.SuggestGasPrice(ethClient)
 			tx := types.NewTransaction(
 				acceptedNonce,
 				recipientEthAddress,
 				big.NewInt(int64(txAmount)),
-				gasLimit,
+				e2e.DefaultGasLimit,
 				gasPrice,
 				nil,
 			)
@@ -68,7 +65,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 			require.NoError(err)
 
-			require.NoError(ethClient.SendTransaction(e2e.DefaultContext(), signedTx))
+			_ = e2e.SendEthTransaction(ethClient, signedTx)
 
 			ginkgo.By("waiting for the C-Chain recipient address to have received the sent funds")
 			e2e.Eventually(func() bool {
@@ -83,7 +80,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		// matches on-chain state.
 		ginkgo.By("initializing a keychain and associated wallet")
 		keychain := secp256k1fx.NewKeychain(senderKey, recipientKey)
-		baseWallet := e2e.Env.NewWalletForURI(keychain, nodeURI)
+		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -115,6 +112,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				xWallet.BlockchainID(),
 				exportOutputs,
 				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
 			require.NoError(err)
 		})
@@ -141,6 +139,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				constants.PlatformChainID,
 				exportOutputs,
 				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
 			require.NoError(err)
 		})
@@ -159,7 +158,9 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				recipientKey.Address(),
 			)))
 			require.NoError(err)
-			require.Greater(balances[avaxAssetID], uint64(0))
+			require.Positive(balances[avaxAssetID])
 		})
+
+		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })

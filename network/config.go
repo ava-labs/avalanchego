@@ -26,7 +26,7 @@ type HealthConfig struct {
 	Enabled bool `json:"-"`
 
 	// MinConnectedPeers is the minimum number of peers that the network should
-	// be connected to to be considered healthy.
+	// be connected to be considered healthy.
 	MinConnectedPeers uint `json:"minConnectedPeers"`
 
 	// MaxTimeSinceMsgReceived is the maximum amount of time since the network
@@ -134,8 +134,8 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// TrackedSubnets of the node.
-	TrackedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons        validators.Set  `json:"-"`
+	TrackedSubnets set.Set[ids.ID]    `json:"-"`
+	Beacons        validators.Manager `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`

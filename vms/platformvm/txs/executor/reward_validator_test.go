@@ -287,10 +287,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-
-	stake := vdrSet.GetWeight(vdrNodeID)
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -310,10 +307,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	expectedReward := uint64(1000000)
 
@@ -344,7 +339,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
-	require.Equal(env.config.MinValidatorStake, vdrSet.GetWeight(vdrNodeID))
+	stake = env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
+	require.Equal(env.config.MinValidatorStake, stake)
 }
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
@@ -412,10 +408,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
@@ -423,10 +417,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// test validator stake
-	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-
-	stake := vdrSet.GetWeight(vdrNodeID)
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -632,10 +623,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
@@ -809,10 +798,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	vdrDestSet := set.Set[ids.ShortID]{}
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.Set[ids.ShortID]{}
-	delDestSet.Add(delRewardAddress)
+	vdrDestSet := set.Of(vdrRewardAddress)
+	delDestSet := set.Of(delRewardAddress)
 
 	expectedReward := uint64(1000000)
 

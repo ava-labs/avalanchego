@@ -69,17 +69,17 @@ func (mr *MockMerkleDBMockRecorder) CommitChangeProof(arg0, arg1 interface{}) *g
 }
 
 // CommitRangeProof mocks base method.
-func (m *MockMerkleDB) CommitRangeProof(arg0 context.Context, arg1 maybe.Maybe[[]uint8], arg2 *RangeProof) error {
+func (m *MockMerkleDB) CommitRangeProof(arg0 context.Context, arg1, arg2 maybe.Maybe[[]uint8], arg3 *RangeProof) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CommitRangeProof", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CommitRangeProof", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CommitRangeProof indicates an expected call of CommitRangeProof.
-func (mr *MockMerkleDBMockRecorder) CommitRangeProof(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockMerkleDBMockRecorder) CommitRangeProof(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitRangeProof", reflect.TypeOf((*MockMerkleDB)(nil).CommitRangeProof), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitRangeProof", reflect.TypeOf((*MockMerkleDB)(nil).CommitRangeProof), arg0, arg1, arg2, arg3)
 }
 
 // Compact mocks base method.
@@ -345,6 +345,34 @@ func (mr *MockMerkleDBMockRecorder) NewView(arg0, arg1 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0, arg1)
 }
 
+// PrefetchPath mocks base method.
+func (m *MockMerkleDB) PrefetchPath(arg0 []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrefetchPath", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrefetchPath indicates an expected call of PrefetchPath.
+func (mr *MockMerkleDBMockRecorder) PrefetchPath(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrefetchPath", reflect.TypeOf((*MockMerkleDB)(nil).PrefetchPath), arg0)
+}
+
+// PrefetchPaths mocks base method.
+func (m *MockMerkleDB) PrefetchPaths(arg0 [][]byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrefetchPaths", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrefetchPaths indicates an expected call of PrefetchPaths.
+func (mr *MockMerkleDBMockRecorder) PrefetchPaths(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrefetchPaths", reflect.TypeOf((*MockMerkleDB)(nil).PrefetchPaths), arg0)
+}
+
 // Put mocks base method.
 func (m *MockMerkleDB) Put(arg0, arg1 []byte) error {
 	m.ctrl.T.Helper()
@@ -374,7 +402,7 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 }
 
 // getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 path, arg1 bool) (*node, error) {
+func (m *MockMerkleDB) getEditableNode(arg0 Key, arg1 bool) (*node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
 	ret0, _ := ret[0].(*node)
@@ -389,7 +417,7 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 }
 
 // getValue mocks base method.
-func (m *MockMerkleDB) getValue(arg0 path) ([]byte, error) {
+func (m *MockMerkleDB) getValue(arg0 Key) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getValue", arg0)
 	ret0, _ := ret[0].([]byte)

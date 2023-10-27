@@ -719,9 +719,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 }
 
-// SendAncestors sends an Ancestors message to the consensus engine running on
-// the specified chain on the specified node.
-// The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
@@ -755,10 +752,6 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 }
 
-// SendGet sends a Get message to the consensus engine running on the specified
-// chain to the specified node. The Get message signifies that this
-// consensus engine would like the recipient to send this consensus engine the
-// specified container.
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
@@ -843,10 +836,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 }
 
-// SendPut sends a Put message to the consensus engine running on the specified
-// chain on the specified node.
-// The Put message signifies that this consensus engine is giving to the
-// recipient the contents of the specified container.
 func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container, s.engineType)
@@ -889,12 +878,13 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 }
 
-// SendPushQuery sends a PushQuery message to the consensus engines running on
-// the specified chains on the specified nodes.
-// The PushQuery message signifies that this consensus engine would like each
-// node to send their preferred frontier given the existence of the specified
-// container.
-func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+func (s *sender) SendPushQuery(
+	ctx context.Context,
+	nodeIDs set.Set[ids.NodeID],
+	requestID uint32,
+	container []byte,
+	requestedHeight uint64,
+) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -934,6 +924,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			deadline,
 			container,
+			requestedHeight,
 			s.ctx.NodeID,
 			s.engineType,
 		)
@@ -967,6 +958,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		requestID,
 		deadline,
 		container,
+		requestedHeight,
 		s.engineType,
 	)
 
@@ -986,6 +978,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Binary("container", container),
+			zap.Uint64("requestedHeight", requestedHeight),
 			zap.Error(err),
 		)
 	}
@@ -999,6 +992,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 					zap.Stringer("chainID", s.ctx.ChainID),
 					zap.Uint32("requestID", requestID),
 					zap.Binary("container", container),
+					zap.Uint64("requestedHeight", requestedHeight),
 				)
 			} else {
 				s.ctx.Log.Debug("failed to send message",
@@ -1006,6 +1000,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("chainID", s.ctx.ChainID),
 					zap.Uint32("requestID", requestID),
+					zap.Uint64("requestedHeight", requestedHeight),
 				)
 			}
 
@@ -1022,11 +1017,13 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	}
 }
 
-// SendPullQuery sends a PullQuery message to the consensus engines running on
-// the specified chains on the specified nodes.
-// The PullQuery message signifies that this consensus engine would like each
-// node to send their preferred frontier.
-func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(
+	ctx context.Context,
+	nodeIDs set.Set[ids.NodeID],
+	requestID uint32,
+	containerID ids.ID,
+	requestedHeight uint64,
+) {
 	ctx = utils.Detach(ctx)
 
 	// Tell the router to expect a response message or a message notifying
@@ -1066,6 +1063,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			deadline,
 			containerID,
+			requestedHeight,
 			s.ctx.NodeID,
 			s.engineType,
 		)
@@ -1098,6 +1096,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 		requestID,
 		deadline,
 		containerID,
+		requestedHeight,
 		s.engineType,
 	)
 
@@ -1117,6 +1116,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			zap.Uint32("requestID", requestID),
 			zap.Duration("deadline", deadline),
 			zap.Stringer("containerID", containerID),
+			zap.Uint64("requestedHeight", requestedHeight),
 			zap.Error(err),
 		)
 	}
@@ -1129,6 +1129,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
 				zap.Stringer("containerID", containerID),
+				zap.Uint64("requestedHeight", requestedHeight),
 			)
 
 			// Register failures for nodes we didn't send a request to.
@@ -1144,8 +1145,14 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	}
 }
 
-// SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) {
+func (s *sender) SendChits(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	preferredID ids.ID,
+	preferredIDAtHeight ids.ID,
+	acceptedID ids.ID,
+) {
 	ctx = utils.Detach(ctx)
 
 	// If [nodeID] is myself, send this message directly
@@ -1155,6 +1162,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			s.ctx.ChainID,
 			requestID,
 			preferredID,
+			preferredIDAtHeight,
 			acceptedID,
 			nodeID,
 		)
@@ -1163,13 +1171,14 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, acceptedID)
+	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, preferredIDAtHeight, acceptedID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.ChitsOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 			zap.Stringer("acceptedID", acceptedID),
 			zap.Error(err),
 		)
@@ -1191,6 +1200,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 			zap.Stringer("acceptedID", acceptedID),
 		)
 	}
@@ -1243,9 +1253,6 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return nil
 }
 
-// SendAppRequest sends an application-level request to the given nodes.
-// The meaning of this request, and how it should be handled, is defined by the
-// VM.
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
@@ -1370,8 +1377,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	return nil
 }
 
-// SendAppResponse sends a response to an application-level request from the
-// given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx = utils.Detach(ctx)
 
@@ -1475,7 +1480,6 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 	return nil
 }
 
-// SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1519,7 +1523,6 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	return nil
 }
 
-// SendGossip gossips the provided container
 func (s *sender) SendGossip(_ context.Context, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(

@@ -32,6 +32,8 @@ type trieHistory struct {
 
 	// Each change is tagged with this monotonic increasing number.
 	nextInsertNumber uint64
+
+	toKey func([]byte) Key
 }
 
 // Tracks the beginning and ending state of a value.
@@ -52,22 +54,23 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	rootID ids.ID
-	nodes  map[path]*change[*node]
-	values map[path]*change[maybe.Maybe[[]byte]]
+	nodes  map[Key]*change[*node]
+	values map[Key]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[path]*change[*node], estimatedSize),
-		values: make(map[path]*change[maybe.Maybe[[]byte]], estimatedSize),
+		nodes:  make(map[Key]*change[*node], estimatedSize),
+		values: make(map[Key]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 
-func newTrieHistory(maxHistoryLookback int) *trieHistory {
+func newTrieHistory(maxHistoryLookback int, toKey func([]byte) Key) *trieHistory {
 	return &trieHistory{
 		maxHistoryLen: maxHistoryLookback,
 		history:       buffer.NewUnboundedDeque[*changeSummaryAndInsertNumber](maxHistoryLookback),
 		lastChanges:   make(map[ids.ID]*changeSummaryAndInsertNumber),
+		toKey:         toKey,
 	}
 }
 
@@ -153,10 +156,10 @@ func (th *trieHistory) getValueChanges(
 	var (
 		// Keep track of changed keys so the largest can be removed
 		// in order to stay within the [maxLength] limit if necessary.
-		changedKeys = set.Set[path]{}
+		changedKeys = set.Set[Key]{}
 
-		startPath = maybe.Bind(start, newPath)
-		endPath   = maybe.Bind(end, newPath)
+		startKey = maybe.Bind(start, th.toKey)
+		endKey   = maybe.Bind(end, th.toKey)
 
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -180,8 +183,8 @@ func (th *trieHistory) getValueChanges(
 		// Add the changes from this commit to [combinedChanges].
 		for key, valueChange := range changes.values {
 			// The key is outside the range [start, end].
-			if (startPath.HasValue() && key.Compare(startPath.Value()) < 0) ||
-				(end.HasValue() && key.Compare(endPath.Value()) > 0) {
+			if (startKey.HasValue() && key.Less(startKey.Value())) ||
+				(end.HasValue() && key.Greater(endKey.Value())) {
 				continue
 			}
 
@@ -234,8 +237,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	}
 
 	var (
-		startPath                    = maybe.Bind(start, newPath)
-		endPath                      = maybe.Bind(end, newPath)
+		startKey                     = maybe.Bind(start, th.toKey)
+		endKey                       = maybe.Bind(end, th.toKey)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
@@ -256,8 +259,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		}
 
 		for key, valueChange := range changes.values {
-			if (startPath.IsNothing() || key.Compare(startPath.Value()) >= 0) &&
-				(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
+			if (startKey.IsNothing() || !key.Less(startKey.Value())) &&
+				(endKey.IsNothing() || !key.Greater(endKey.Value())) {
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.before
 				} else {

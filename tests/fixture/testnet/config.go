@@ -40,6 +40,9 @@ const (
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
 	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
+
+	// A short min stake duration enables testing of staking logic.
+	DefaultMinStakeDuration = time.Second
 )
 
 var (
@@ -157,6 +160,12 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 	return nil
 }
 
+// NodeURI associates a node ID with its API URI.
+type NodeURI struct {
+	NodeID ids.NodeID
+	URI    string
+}
+
 // NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
 	NodeID ids.NodeID
@@ -214,7 +223,7 @@ func (nc *NodeConfig) EnsureBLSSigningKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	nc.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.Serialize())
+	nc.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SerializeSecretKey(newKey))
 	return nil
 }
 
