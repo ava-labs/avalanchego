@@ -16,7 +16,8 @@ func TestBranchFactor_Valid(t *testing.T) {
 		require.NoError(bf.Valid())
 	}
 	var empty BranchFactor
-	require.ErrorIs(empty.Valid(), ErrInvalidBranchFactor)
+	err := empty.Valid()
+	require.ErrorIs(err, ErrInvalidBranchFactor)
 }
 
 func TestHasPartialByte(t *testing.T) {
