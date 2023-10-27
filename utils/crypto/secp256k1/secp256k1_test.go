@@ -19,25 +19,26 @@ import (
 func TestRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
-	msg := []byte{1, 2, 3}
-	sig, err := key.Sign(msg)
+	bytes := []byte{1, 2, 3}
+	sig, err := key.Sign(bytes)
 	require.NoError(err)
 
 	pub := key.PublicKey()
-	pubRec, err := f.RecoverPublicKey(msg, sig)
+	pubRec, err := RecoverPublicKeyFromBytes(bytes, sig)
 	require.NoError(err)
 
 	require.Equal(pub, pubRec)
+
+	require.True(pub.Verify(bytes, sig))
 }
 
 func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{Cache: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
+	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
@@ -45,12 +46,13 @@ func TestCachedRecover(t *testing.T) {
 	sig, err := key.Sign(msg)
 	require.NoError(err)
 
-	pub1, err := f.RecoverPublicKey(msg, sig)
+	pub1, err := r.RecoverPublicKeyFromBytes(msg, sig)
 	require.NoError(err)
-	pub2, err := f.RecoverPublicKey(msg, sig)
+	pub2, err := r.RecoverPublicKeyFromBytes(msg, sig)
 	require.NoError(err)
 
-	require.Equal(pub1, pub2)
+	require.Equal(key.PublicKey(), pub1)
+	require.Equal(key.PublicKey(), pub2)
 }
 
 func TestExtensive(t *testing.T) {
@@ -84,12 +86,11 @@ func TestGenRecreate(t *testing.T) {
 func TestVerifyMutatedSignature(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	sk, err := NewPrivateKey()
 	require.NoError(err)
 
-	msg := []byte{'h', 'e', 'l', 'l', 'o'}
-	sig, err := sk.Sign(msg)
+	bytes := []byte{'h', 'e', 'l', 'l', 'o'}
+	sig, err := sk.Sign(bytes)
 	require.NoError(err)
 
 	var s secp256k1.ModNScalar
@@ -98,7 +99,7 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	newSBytes := s.Bytes()
 	copy(sig[32:], newSBytes[:])
 
-	_, err = f.RecoverPublicKey(msg, sig)
+	_, err = RecoverPublicKeyFromBytes(bytes, sig)
 	require.ErrorIs(err, errMutatedSig)
 }
 
@@ -176,8 +177,8 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 
 func TestSigning(t *testing.T) {
 	tests := []struct {
-		msg []byte
-		sig []byte
+		bytes []byte
+		sig   []byte
 	}{
 		{
 			[]byte("hello world"),
@@ -226,19 +227,66 @@ func TestSigning(t *testing.T) {
 	key := TestKeys()[0]
 
 	for _, tt := range tests {
-		t.Run(string(tt.msg), func(t *testing.T) {
+		t.Run(string(tt.bytes), func(t *testing.T) {
 			require := require.New(t)
 
-			bytes, err := key.Sign(tt.msg)
+			bytes, err := key.Sign(tt.bytes)
 			require.NoError(err)
 			require.Equal(tt.sig, bytes)
 		})
 	}
 }
 
-func FuzzVerifySignature(f *testing.F) {
-	factory := Factory{}
+func TestExportedMethods(t *testing.T) {
+	require := require.New(t)
 
+	key := TestKeys()[0]
+
+	pubKey := key.PublicKey()
+	require.Equal("111111111111111111116DBWJs", pubKey.addr.String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.Address().String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.addr.String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", key.Address().String())
+
+	expectedPubKeyBytes := []byte{
+		0x03, 0x73, 0x93, 0x53, 0x47, 0x88, 0x44, 0x78,
+		0xe4, 0x94, 0x5c, 0xd0, 0xfd, 0x94, 0x8e, 0xcf,
+		0x08, 0x8b, 0x94, 0xdf, 0xc9, 0x20, 0x74, 0xf0,
+		0xfb, 0x03, 0xda, 0x6f, 0x4d, 0xbc, 0x94, 0x35,
+		0x7d,
+	}
+	require.Equal(expectedPubKeyBytes, pubKey.bytes)
+
+	expectedPubKey, err := ToPublicKey(expectedPubKeyBytes)
+	require.NoError(err)
+	require.Equal(expectedPubKey.Address(), pubKey.Address())
+	require.Equal(expectedPubKeyBytes, expectedPubKey.Bytes())
+
+	expectedECDSAParams := struct {
+		X []byte
+		Y []byte
+	}{
+		[]byte{
+			0x73, 0x93, 0x53, 0x47, 0x88, 0x44, 0x78, 0xe4,
+			0x94, 0x5c, 0xd0, 0xfd, 0x94, 0x8e, 0xcf, 0x08,
+			0x8b, 0x94, 0xdf, 0xc9, 0x20, 0x74, 0xf0, 0xfb,
+			0x03, 0xda, 0x6f, 0x4d, 0xbc, 0x94, 0x35, 0x7d,
+		},
+		[]byte{
+			0x78, 0xe7, 0x39, 0x45, 0x6c, 0x3b, 0xdb, 0x9e,
+			0xe9, 0xb2, 0xa9, 0xf2, 0x84, 0xfa, 0x64, 0x32,
+			0xd8, 0x4e, 0xf0, 0xfa, 0x3f, 0x82, 0xf5, 0x56,
+			0x10, 0x40, 0x71, 0x7f, 0x1f, 0x5e, 0x8e, 0x27,
+		},
+	}
+	require.Equal(expectedECDSAParams.X, pubKey.ToECDSA().X.Bytes())
+	require.Equal(expectedECDSAParams.Y, pubKey.ToECDSA().Y.Bytes())
+
+	require.Equal(expectedECDSAParams.X, key.ToECDSA().X.Bytes())
+	require.Equal(expectedECDSAParams.Y, key.ToECDSA().Y.Bytes())
+}
+
+func FuzzVerifySignature(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
@@ -250,9 +298,9 @@ func FuzzVerifySignature(f *testing.F) {
 		sig, err := privateKey.Sign(data)
 		require.NoError(err)
 
-		recoveredPublicKey, err := factory.RecoverPublicKey(data, sig)
+		recoveredPublicKey, err := RecoverPublicKeyFromBytes(data, sig)
 		require.NoError(err)
 
-		require.Equal(publicKey.Bytes(), recoveredPublicKey.Bytes())
+		require.Equal(publicKey, recoveredPublicKey)
 	})
 }
