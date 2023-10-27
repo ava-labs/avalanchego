@@ -15,10 +15,10 @@ func TestTokenConfigValid(t *testing.T) {
 	for _, tc := range validTokenConfigurations {
 		require.NoError(tc.Valid())
 	}
-	require.Error((&TokenConfiguration{}).Valid())
+	require.ErrorIs((&TokenConfiguration{}).Valid(), ErrInvalidTokenConfig)
 
 	var nilTC *TokenConfiguration
-	require.Error(nilTC.Valid())
+	require.ErrorIs(nilTC.Valid(), ErrInvalidTokenConfig)
 }
 
 func TestHasPartialByte(t *testing.T) {
