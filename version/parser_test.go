@@ -87,6 +87,10 @@ func TestParseApplication(t *testing.T) {
 			expectedErr: errMissingApplicationPrefix,
 		},
 		{
+			version:     "avalanchego/v1.2.3",
+			expectedErr: errMissingApplicationPrefix,
+		},
+		{
 			version:     "avalanche/",
 			expectedErr: errMissingVersions,
 		},
