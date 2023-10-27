@@ -134,22 +134,22 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, omitEmpty bool) (i
 		return prefixSize + size, false, nil
 
 	case reflect.Interface:
-		if value.IsNil() {
-			if omitEmpty {
+		prefixSize := 0
+		if omitEmpty {
+			if value.IsNil() {
 				return wrappers.BoolLen, false, nil
 			}
+			prefixSize += wrappers.BoolLen
+		} else if value.IsNil() {
 			// Can't marshal nil interfaces (but nil slices are fine)
 			return 0, false, errMarshalNil
 		}
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
-		prefixSize := c.typer.PrefixSize(underlyingType)
+		prefixSize += c.typer.PrefixSize(underlyingType)
 		valueSize, _, err := c.size(value.Elem())
 		if err != nil {
 			return 0, false, err
-		}
-		if omitEmpty {
-			prefixSize += wrappers.BoolLen
 		}
 		return prefixSize + valueSize, false, nil
 
