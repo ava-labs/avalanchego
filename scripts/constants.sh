@@ -7,14 +7,13 @@ GOPATH="$(go env GOPATH)"
 DOCKERHUB_REPO="avaplatform/avalanchego"
 
 # if this isn't a git repository (say building from a release), don't set our git constants.
-if [ ! -d .git ]
-then
+if [ ! -d .git ]; then
     CURRENT_BRANCH=""
     SUBNET_EVM_COMMIT=""
     SUBNET_EVM_COMMIT_ID=""
 else
     # Current branch
-    CURRENT_BRANCH=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2> /dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD || :)}
+    CURRENT_BRANCH=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2>/dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD || :)}
 
     # Image build id
     #
@@ -26,14 +25,11 @@ fi
 
 echo "Using branch: ${CURRENT_BRANCH}"
 
-BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${AVALANCHEGO_VERSION}-Subnet-EVM-${CURRENT_BRANCH}"}
-
 # Static compilation
 STATIC_LD_FLAGS=''
-if [ "${STATIC_COMPILATION:-}" = 1 ]
-then
+if [ "${STATIC_COMPILATION:-}" = 1 ]; then
     export CC=musl-gcc
-    command -v $CC || ( echo $CC must be available for static compilation && exit 1 )
+    command -v $CC || (echo $CC must be available for static compilation && exit 1)
     STATIC_LD_FLAGS=' -extldflags "-static" -linkmode external '
 fi
 
@@ -41,4 +37,4 @@ fi
 #
 # We use "export" here instead of just setting a bash variable because we need
 # to pass this flag to all child processes spawned by the shell.
-export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
