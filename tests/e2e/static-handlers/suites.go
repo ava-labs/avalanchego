@@ -115,7 +115,6 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 
 	ginkgo.It("can make calls to platformvm static api", func() {
 		keys := []*secp256k1.PrivateKey{}
-		factory := secp256k1.Factory{}
 		for _, key := range []string{
 			"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
 			"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
@@ -125,7 +124,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		} {
 			privKeyBytes, err := cb58.Decode(key)
 			require.NoError(err)
-			pk, err := factory.ToPrivateKey(privKeyBytes)
+			pk, err := secp256k1.ToPrivateKey(privKeyBytes)
 			require.NoError(err)
 			keys = append(keys, pk)
 		}

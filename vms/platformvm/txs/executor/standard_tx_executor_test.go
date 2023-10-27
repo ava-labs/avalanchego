@@ -439,7 +439,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
