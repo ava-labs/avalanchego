@@ -14,6 +14,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	secp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	secp256k1fx "github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -101,18 +102,18 @@ func (mr *MockBuilderMockRecorder) NewAdvanceTimeTx(arg0 interface{}) *gomock.Ca
 }
 
 // NewBaseTx mocks base method.
-func (m *MockBuilder) NewBaseTx(arg0 uint64, arg1 []*secp256k1.PrivateKey, arg2 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewBaseTx(arg0 uint64, arg1 secp256k1fx.OutputOwners, arg2 []*secp256k1.PrivateKey, arg3 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBaseTx", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "NewBaseTx", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*txs.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewBaseTx indicates an expected call of NewBaseTx.
-func (mr *MockBuilderMockRecorder) NewBaseTx(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockBuilderMockRecorder) NewBaseTx(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBaseTx", reflect.TypeOf((*MockBuilder)(nil).NewBaseTx), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBaseTx", reflect.TypeOf((*MockBuilder)(nil).NewBaseTx), arg0, arg1, arg2, arg3)
 }
 
 // NewCreateChainTx mocks base method.
