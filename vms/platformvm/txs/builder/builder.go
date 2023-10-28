@@ -94,10 +94,12 @@ type DecisionTxBuilder interface {
 	) (*txs.Tx, error)
 
 	// amount: amount the sender is sending
+	// owner: recipient of the funds
 	// keys: keys to sign the tx and pay the amount
 	// changeAddr: address to send change to, if there is any
 	NewBaseTx(
 		amount uint64,
+		owner secp256k1fx.OutputOwners,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
@@ -673,6 +675,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 
 func (b *builder) NewBaseTx(
 	amount uint64,
+	owner secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
@@ -680,6 +683,16 @@ func (b *builder) NewBaseTx(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
+
+	outs = append(outs, &avax.TransferableOutput{
+		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:          amount,
+			OutputOwners: owner,
+		},
+	})
+
+	avax.SortTransferableOutputs(outs, txs.Codec)
 
 	utx := &txs.BaseTx{
 		BaseTx: avax.BaseTx{
