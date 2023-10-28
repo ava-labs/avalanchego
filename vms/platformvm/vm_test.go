@@ -2204,6 +2204,7 @@ func TestBaseTx(t *testing.T) {
 	}()
 
 	sendAmt := uint64(100000)
+	changeAddr := ids.ShortEmpty
 
 	baseTx, err := vm.txBuilder.NewBaseTx(
 		sendAmt,
@@ -2214,7 +2215,7 @@ func TestBaseTx(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty,
+		changeAddr,
 	)
 	require.NoError(err)
 
@@ -2244,7 +2245,7 @@ func TestBaseTx(t *testing.T) {
 		if castOut.AddressesSet().Equals(set.Of(keys[1].Address())) {
 			key1OutputAmt += castOut.Amt
 		}
-		if castOut.AddressesSet().Equals(set.Of(ids.ShortEmpty)) {
+		if castOut.AddressesSet().Equals(set.Of(changeAddr)) {
 			changeAddrOutputAmt += castOut.Amt
 		}
 		totalOutputAmt += castOut.Amt
