@@ -254,10 +254,9 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 
 	if keyCount > 0 {
 		// Ensure there are keys for genesis generation to fund
-		factory := secp256k1.Factory{}
 		keys := make([]*secp256k1.PrivateKey, 0, keyCount)
 		for i := 0; i < keyCount; i++ {
-			key, err := factory.NewPrivateKey()
+			key, err := secp256k1.NewPrivateKey()
 			if err != nil {
 				return fmt.Errorf("failed to generate private key: %w", err)
 			}

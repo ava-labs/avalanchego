@@ -32,8 +32,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		nodeURI := e2e.Env.GetRandomNodeURI()
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		factory := secp256k1.Factory{}
-		recipientKey, err := factory.NewPrivateKey()
+		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)

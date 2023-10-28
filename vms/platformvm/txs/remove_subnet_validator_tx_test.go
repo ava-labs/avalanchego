@@ -263,7 +263,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	}
 	avax.SortTransferableOutputs(complexRemoveValidatorTx.Outs, Codec)
 	utils.Sort(complexRemoveValidatorTx.Ins)
-	require.NoError(simpleRemoveValidatorTx.SyntacticVerify(&snow.Context{
+	require.NoError(complexRemoveValidatorTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,

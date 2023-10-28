@@ -116,9 +116,6 @@ var (
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
 
-	// Used to create and use keys.
-	testKeyFactory secp256k1.Factory
-
 	errMissing = errors.New("missing")
 )
 
@@ -492,7 +489,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := testKeyFactory.NewPrivateKey()
+	key, _ := secp256k1.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -2035,7 +2032,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
