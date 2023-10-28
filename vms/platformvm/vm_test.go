@@ -2228,6 +2228,7 @@ func TestBaseTx(t *testing.T) {
 		}
 		totalInputAmt += castOut.Amt
 	}
+	require.Equal(totalInputAmt, key0InputAmt)
 
 	totalOutputAmt := uint64(0)
 	key0OutputAmt := uint64(0)
@@ -2247,10 +2248,9 @@ func TestBaseTx(t *testing.T) {
 		}
 		totalOutputAmt += castOut.Amt
 	}
+	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
 	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
-	require.Equal(totalInputAmt, key0InputAmt)
-	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	require.NoError(vm.Builder.AddUnverifiedTx(baseTx))
