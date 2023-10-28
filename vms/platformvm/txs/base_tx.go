@@ -16,6 +16,8 @@ import (
 )
 
 var (
+	_ UnsignedTx = (*BaseTx)(nil)
+
 	ErrNilTx = errors.New("tx is nil")
 
 	errOutputsNotSorted      = errors.New("outputs not sorted")
