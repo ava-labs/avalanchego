@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -55,9 +54,6 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = ts.Keys[0:3]
-
-	// Used to create and use keys.
-	testKeyfactory secp256k1.Factory
 
 	errMissing = errors.New("missing")
 )
@@ -365,10 +361,8 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-	return errs.Err
 }

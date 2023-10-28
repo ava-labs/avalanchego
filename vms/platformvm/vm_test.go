@@ -89,8 +89,6 @@ var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = ts.Keys[0:3]
 
-	testKeyFactory secp256k1.Factory
-
 	errMissing = errors.New("missing")
 )
 
@@ -464,7 +462,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := ts.GenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(ts.MinStakingDuration)
-	key, _ := testKeyFactory.NewPrivateKey()
+	key, _ := secp256k1.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -2008,7 +2006,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
