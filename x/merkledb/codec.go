@@ -11,6 +11,9 @@ import (
 	"math"
 	"sync"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -59,7 +62,7 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeDBNode(n *dbNode, factor BranchFactor) []byte
+	encodeDBNode(n *dbNode) []byte
 	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
 }
@@ -87,7 +90,7 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
+func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size of [n] to prevent memory allocations
@@ -99,13 +102,14 @@ func (c *codecImpl) encodeDBNode(n *dbNode, branchFactor BranchFactor) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := 0; BranchFactor(index) < branchFactor; index++ {
-		if entry, ok := n.children[byte(index)]; ok {
-			c.encodeUint(buf, uint64(index))
-			c.encodeKey(buf, entry.compressedKey)
-			_, _ = buf.Write(entry.id[:])
-			c.encodeBool(buf, entry.hasValue)
-		}
+	keys := maps.Keys(n.children)
+	slices.Sort(keys)
+	for _, index := range keys {
+		entry := n.children[index]
+		c.encodeUint(buf, uint64(index))
+		c.encodeKey(buf, entry.compressedKey)
+		_, _ = buf.Write(entry.id[:])
+		c.encodeBool(buf, entry.hasValue)
 	}
 	return buf.Bytes()
 }
