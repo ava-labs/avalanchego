@@ -53,6 +53,11 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	// TODO: Correctly track subnet owners in [getSubnetSigners]
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 	err := b.b.removeUTXOs(
 		b.ctx,

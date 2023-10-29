@@ -100,7 +100,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
 	require.NoError(err)
 
-	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
+	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
 	require.NoError(user.PutKeys(pk, ts.Keys[0]))
@@ -177,8 +177,7 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := secp256k1.Factory{}
-	recipientKey, err := factory.NewPrivateKey()
+	recipientKey, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))

@@ -77,15 +77,13 @@ var (
 )
 
 func init() {
-	factory := secp256k1.Factory{}
-
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
 		keyBytes, _ := cb58.Decode(key)
-		pk, _ := factory.ToPrivateKey(keyBytes)
+		pk, _ := secp256k1.ToPrivateKey(keyBytes)
 		keys = append(keys, pk)
 		addrs = append(addrs, pk.PublicKey().Address())
 	}

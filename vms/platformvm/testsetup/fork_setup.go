@@ -11,5 +11,5 @@ const (
 	BanffFork         ActiveFork = 2
 	CortinaFork       ActiveFork = 3
 	DFork             ActiveFork = 4
-	LatestFork        ActiveFork = CortinaFork // DFork not activated yet!
+	LatestFork        ActiveFork = DFork
 )

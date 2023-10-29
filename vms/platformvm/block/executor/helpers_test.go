@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -329,12 +328,14 @@ func shutdownEnvironment(t *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
+	var err error
 	if t.state != nil {
-		errs.Add(t.state.Close())
+		err = t.state.Close()
 	}
-	errs.Add(t.baseDB.Close())
-	return errs.Err
+	return utils.Err(
+		err,
+		t.baseDB.Close(),
+	)
 }
 
 func addPendingValidator(
