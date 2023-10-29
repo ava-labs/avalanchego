@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -522,6 +523,111 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 	unsignedComplexTransformTxBytes, err := Codec.Marshal(Version, &unsignedComplexTransformTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexTransformTxBytes, unsignedComplexTransformTxBytes)
+
+	aliaser := ids.NewAliaser()
+	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
+
+	unsignedComplexTransformTx.InitCtx(&snow.Context{
+		NetworkID:   1,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: avaxAssetID,
+		BCLookup:    aliaser,
+	})
+
+	unsignedComplexTransformTxJSONBytes, err := json.MarshalIndent(unsignedComplexTransformTx, "", "\t")
+	require.NoError(err)
+	require.Equal(`{
+	"networkID": 1,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-avax1g32kvaugnx4tk3z4vemc3xd2hdz92enh972wxr"
+					],
+					"amount": 18446744073709551615,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+	"initialSupply": 1152921504606846976,
+	"maximumSupply": 1152921504606846976,
+	"minConsumptionRate": 0,
+	"maxConsumptionRate": 0,
+	"minValidatorStake": 1,
+	"maxValidatorStake": 1152921504606846976,
+	"minStakeDuration": 1,
+	"maxStakeDuration": 1,
+	"minDelegationFee": 0,
+	"minDelegatorStake": 18446744073709551615,
+	"maxValidatorWeightFactor": 255,
+	"uptimeRequirement": 0,
+	"subnetAuthorization": {
+		"signatureIndices": []
+	}
+}`, string(unsignedComplexTransformTxJSONBytes))
 }
 
 func TestTransformSubnetTxSyntacticVerify(t *testing.T) {

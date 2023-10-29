@@ -1143,8 +1143,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
-	factory := secp256k1.Factory{}
-	nodeIDKey, _ := factory.NewPrivateKey()
+	nodeIDKey, _ := secp256k1.NewPrivateKey()
 	rewardAddress := nodeIDKey.PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
