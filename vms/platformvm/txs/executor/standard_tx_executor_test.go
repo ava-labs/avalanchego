@@ -69,9 +69,9 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 			expectedError: errEmptyNodeID,
 		},
 	}
-	for _, tst := range tests {
+	for _, test := range tests {
 		// Case: Empty validator node ID after banff
-		env.config.BanffTime = tst.banffTime
+		env.config.BanffTime = test.banffTime
 
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			env.config.MinValidatorStake,
@@ -94,7 +94,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, tst.expectedError)
+		require.ErrorIs(err, test.expectedError)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	dummyH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
-	type tst struct {
+	type test struct {
 		description          string
 		stakeAmount          uint64
 		startTime            uint64
@@ -180,7 +180,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		expectedMempoolErr   error
 	}
 
-	tests := []tst{
+	tests := []test{
 		{
 			description:          "validator stops validating earlier than delegator",
 			stakeAmount:          dummyH.config.MinDelegatorStake,
@@ -441,7 +441,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())

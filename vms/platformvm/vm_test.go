@@ -73,8 +73,6 @@ var (
 	// Its threshold is 2
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = ts.Keys[0:3]
-
-	testKeyFactory secp256k1.Factory
 )
 
 // Returns:
@@ -217,6 +215,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	vm := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
+	vm.DTime = vm.CortinaTime // activate DFork as well
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
@@ -385,7 +384,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := ts.GenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(ts.MinStakingDuration)
-	key, _ := testKeyFactory.NewPrivateKey()
+	key, _ := secp256k1.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -1879,7 +1878,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1961,4 +1960,79 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeID(id))
 	require.ErrorIs(err, database.ErrNotFound)
+}
+
+func TestTransferSubnetOwnershipTx(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// Create a subnet
+	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].Address(),
+	)
+	require.NoError(err)
+	subnetID := createSubnetTx.ID()
+
+	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
+	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	createSubnetRawBlock := createSubnetBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, createSubnetRawBlock)
+	require.Contains(createSubnetRawBlock.Txs(), createSubnetTx)
+
+	require.NoError(createSubnetBlock.Verify(context.Background()))
+	require.NoError(createSubnetBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	subnetOwner, err := vm.state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	expectedOwner := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			ts.Keys[0].PublicKey().Address(),
+		},
+	}
+	require.Equal(expectedOwner, subnetOwner)
+
+	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
+		subnetID,
+		1,
+		[]ids.ShortID{ts.Keys[1].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(transferSubnetOwnershipTx))
+	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	transferSubnetOwnershipRawBlock := transferSubnetOwnershipBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, transferSubnetOwnershipRawBlock)
+	require.Contains(transferSubnetOwnershipRawBlock.Txs(), transferSubnetOwnershipTx)
+
+	require.NoError(transferSubnetOwnershipBlock.Verify(context.Background()))
+	require.NoError(transferSubnetOwnershipBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	subnetOwner, err = vm.state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	expectedOwner = &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			ts.Keys[1].PublicKey().Address(),
+		},
+	}
+	require.Equal(expectedOwner, subnetOwner)
 }

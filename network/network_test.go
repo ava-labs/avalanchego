@@ -683,3 +683,88 @@ func TestDialContext(t *testing.T) {
 	network.StartClose()
 	wg.Wait()
 }
+
+func TestAllowConnectionAsAValidator(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+
+	networks := make([]Network, len(configs))
+	for i, config := range configs {
+		msgCreator := newMessageCreator(t)
+		registry := prometheus.NewRegistry()
+
+		g, err := peer.NewGossipTracker(registry, "foobar")
+		require.NoError(err)
+
+		log := logging.NoLog{}
+		gossipTrackerCallback := peer.GossipTrackerCallback{
+			Log:           log,
+			GossipTracker: g,
+		}
+
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		vdrs := validators.NewManager()
+		vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
+		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		config := config
+
+		config.GossipTracker = g
+		config.Beacons = beacons
+		config.Validators = vdrs
+		config.RequireValidatorToConnect = true
+
+		net, err := NewNetwork(
+			config,
+			msgCreator,
+			registry,
+			log,
+			listeners[i],
+			dialer,
+			&testHandler{
+				InboundHandler: nil,
+				ConnectedF:     nil,
+				DisconnectedF:  nil,
+			},
+		)
+		require.NoError(err)
+		networks[i] = net
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(networks))
+	for i, net := range networks {
+		if i != 0 {
+			config := configs[0]
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+		}
+
+		go func(net Network) {
+			defer wg.Done()
+
+			require.NoError(net.Dispatch())
+		}(net)
+	}
+
+	network := networks[1].(*network)
+	require.Eventually(
+		func() bool {
+			network.peersLock.RLock()
+			defer network.peersLock.RUnlock()
+
+			nodeID := nodeIDs[0]
+			_, contains := network.connectedPeers.GetByID(nodeID)
+			return contains
+		},
+		10*time.Second,
+		50*time.Millisecond,
+	)
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
