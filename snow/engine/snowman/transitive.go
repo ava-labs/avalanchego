@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/event"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -56,9 +55,7 @@ type Transitive struct {
 	common.AcceptedStateSummaryHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
-	common.AncestorsHandler
 	common.AppHandler
-	validators.Connector
 
 	RequestID uint32
 
@@ -96,9 +93,9 @@ type Transitive struct {
 	errs wrappers.Errs
 
 	// START OF BLOCK BACKFILLING STUFF
-	fetchFrom set.Set[ids.NodeID] // picked from bootstrapper
-	peers     tracker.Peers
-
+	fetchFrom           set.Set[ids.NodeID] // picked from bootstrapper
+	peers               tracker.Peers
+	backfillingRequests common.Requests // tracks which validators were asked for which containers in which requests
 	// END OF BLOCK BACKFILLING STUFF
 }
 
@@ -130,9 +127,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
-		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
@@ -1015,24 +1010,113 @@ func (t *Transitive) startBlockBackfilling(ctx context.Context) error {
 		return nil // nothing to do
 	}
 
-	switch blkID, err := ssVM.BackfillBlocksEnabled(ctx); {
+	switch wantedBlk, err := ssVM.BackfillBlocksEnabled(ctx); {
 	case err != nil:
 		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
-	case blkID == ids.Empty:
+	case wantedBlk == ids.Empty:
 		t.Ctx.Log.Info("block backfilling not enabled")
 		return nil
 	default:
-		validatorID, ok := t.fetchFrom.Peek()
-		if !ok {
-			return fmt.Errorf("dropping request for %s as there are no nodes to request blkID from", blkID)
-		}
+		return t.fetch(ctx, wantedBlk)
+	}
+}
 
-		// We only allow one outbound request at a time from a node
-		t.markUnavailable(validatorID)
-		t.RequestID++
-		t.Sender.SendGetAncestors(ctx, validatorID, t.RequestID, blkID)
+// Ancestors handles the receipt of multiple containers. Should be received in
+// response to a GetAncestors message to [nodeID] with request ID [requestID]
+func (t *Transitive) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+	// Make sure this is in response to a request we made
+	wantedBlkID, ok := t.backfillingRequests.Remove(nodeID, requestID)
+	if !ok { // this message isn't in response to a request we made
+		t.Ctx.Log.Debug("received unexpected Ancestors",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
+
+	lenBlks := len(blks)
+	if lenBlks == 0 {
+		t.Ctx.Log.Debug("received Ancestors with no block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
+
+		t.markUnavailable(nodeID)
+
+		// Send another request for this
+		return t.fetch(ctx, wantedBlkID)
+	}
+
+	// This node has responded - so add it back into the set
+	t.fetchFrom.Add(nodeID)
+
+	if lenBlks > t.Config.AncestorsMaxContainersReceived {
+		blks = blks[:t.Config.AncestorsMaxContainersReceived]
+		t.Ctx.Log.Debug("ignoring containers in Ancestors",
+			zap.Int("numContainers", lenBlks-t.Config.AncestorsMaxContainersReceived),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
+	}
+
+	ssVM, ok := t.VM.(block.StateSyncableVM)
+	if !ok {
+		return nil // nothing to do
+	}
+
+	nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks)
+	if err != nil { // the provided blocks couldn't be parsed
+		t.Ctx.Log.Debug("failed to parse blocks in Ancestors",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
+		return t.fetch(ctx, wantedBlkID)
+	}
+
+	return t.fetch(ctx, nextWantedBlkID)
+}
+
+func (t *Transitive) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	blkID, ok := t.backfillingRequests.Remove(nodeID, requestID)
+	if !ok {
+		t.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	// This node timed out their request, so we can add them back to [fetchFrom]
+	t.fetchFrom.Add(nodeID)
+
+	// Send another request for this
+	return t.fetch(ctx, blkID)
+}
+
+// Get block [blkID] and its ancestors from a peer
+func (t *Transitive) fetch(ctx context.Context, blkID ids.ID) error {
+	// Make sure we haven't already requested this block
+	if t.backfillingRequests.Contains(blkID) {
+		return nil
+	}
+
+	if _, err := t.VM.GetBlock(ctx, blkID); err == nil {
+		// Requesting known block is the stopping condition for block backfilling
+		return nil
+	}
+
+	validatorID, ok := t.fetchFrom.Peek()
+	if !ok {
+		return fmt.Errorf("dropping request for %s as there are no peers", blkID)
+	}
+
+	// We only allow one outbound request at a time from a node
+	t.markUnavailable(validatorID)
+	t.RequestID++
+	t.backfillingRequests.Add(validatorID, t.RequestID, blkID)
+	t.Sender.SendGetAncestors(ctx, validatorID, t.RequestID, blkID)
+	return nil
 }
 
 func (t *Transitive) markUnavailable(nodeID ids.NodeID) {
@@ -1050,10 +1134,10 @@ func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersi
 	if _, ok := t.Validators.GetValidator(t.Ctx.SubnetID, nodeID); ok {
 		t.fetchFrom.Add(nodeID)
 	}
-	return t.Connector.Connected(ctx, nodeID, nodeVersion)
+	return t.VM.Connected(ctx, nodeID, nodeVersion)
 }
 
 func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	t.markUnavailable(nodeID)
-	return t.Connector.Disconnected(ctx, nodeID)
+	return t.VM.Disconnected(ctx, nodeID)
 }

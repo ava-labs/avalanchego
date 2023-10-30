@@ -26,5 +26,7 @@ type Config struct {
 	PartialSync bool
 
 	// used for block-backfilling
-	Peers tracker.Peers
+	Peers                          tracker.Peers
+	AncestorsMaxContainersSent     int
+	AncestorsMaxContainersReceived int
 }

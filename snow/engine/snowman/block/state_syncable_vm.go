@@ -52,5 +52,12 @@ type StateSyncableVM interface {
 	// TODO ABENEGIA: Use error instead of the EmptyID
 	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
 
+	// BackfillBlocks pass blocks bytes retrieved via GetAncestors calls to the VM
+	// It's left to the VM the duty to parse and validate the blocks.
+	// BackfillBlocks returns the next block ID to be requested and an error
+	// Upon error, engine will issue a GetAncestor call to a different peer
+	// with the previously requested block ID
+	// If BackfillBlocks returns a block known to the VM, the engine will
+	// stop asking for blocks ancestors. (TODO: consider using a boolean or an empty blockID)
 	BackfillBlocks(ctx context.Context, blocks [][]byte) error
 }
