@@ -13,8 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -173,30 +171,19 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	innerBlk, err := vm.ChainVM.GetBlock(ctx, innerBlkID)
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	vm.latestBlockBackfillingHeight = innerBlk.Height()
+	// vvv This is wrong vvv It returns innerVM BlockID, instead of proposerVM blockID
 	return innerBlkID, nil
 }
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, error) {
-	var (
-		innerBlksBytes  = make([][]byte, 0, len(blksBytes))
-		minBlocksHeight = vm.latestBlockBackfillingHeight
-	)
-
+	innerBlksBytes := make([][]byte, 0, len(blksBytes))
 	for i, blkBytes := range blksBytes {
 		blk, err := vm.parseProposerBlock(ctx, blkBytes)
 		if err != nil {
 			return ids.Empty, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
-		if blk.Height() > vm.latestBlockBackfillingHeight {
-			return ids.Empty, fmt.Errorf("")
-		}
-		minBlocksHeight = safemath.Min(minBlocksHeight, blk.Height())
+
+		// TODO: introduce validation
 
 		if err := blk.acceptOuterBlk(); err != nil {
 			return ids.Empty, fmt.Errorf("failed indexing backfilled block, index %d, %w", i, err)
@@ -204,6 +191,6 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, e
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 
-	vm.lastAcceptedHeight = minBlocksHeight
+	// vvv This is wrong vvv It returns innerVM BlockID, instead of proposerVM blockID
 	return vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
 }
