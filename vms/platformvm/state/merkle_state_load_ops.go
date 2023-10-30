@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -152,8 +152,7 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (ms *merkleState) load(hasSynced bool) error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		ms.loadMerkleMetadata(),
 		ms.loadCurrentStakers(),
 		ms.loadPendingStakers(),
@@ -161,7 +160,6 @@ func (ms *merkleState) load(hasSynced bool) error {
 
 		ms.logMerkleRoot(!hasSynced), // we already logged if sync has happened
 	)
-	return errs.Err
 }
 
 func (ms *merkleState) loadMerkleMetadata() error {

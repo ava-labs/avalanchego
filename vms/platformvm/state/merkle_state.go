@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1117,8 +1116,7 @@ func (*merkleState) Checksum() ids.ID {
 }
 
 func (ms *merkleState) Close() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		ms.flatValidatorWeightDiffsDB.Close(),
 		ms.flatValidatorPublicKeyDiffsDB.Close(),
 		ms.localUptimesDB.Close(),
@@ -1129,7 +1127,6 @@ func (ms *merkleState) Close() error {
 		ms.merkleDB.Close(),
 		ms.baseMerkleDB.Close(),
 	)
-	return errs.Err
 }
 
 func (ms *merkleState) write(updateValidators bool, height uint64) error {
@@ -1142,8 +1139,7 @@ func (ms *merkleState) write(updateValidators bool, height uint64) error {
 		return err
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		ms.writeMerkleState(currentData, pendingData),
 		ms.writeBlocks(),
 		ms.writeTxs(),
@@ -1153,7 +1149,6 @@ func (ms *merkleState) write(updateValidators bool, height uint64) error {
 		ms.writeRewardUTXOs(),
 		ms.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
 	)
-	return errs.Err
 }
 
 func (ms *merkleState) processCurrentStakers() (
@@ -1315,12 +1310,8 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 }
 
 func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
-	var (
-		errs     = wrappers.Errs{}
-		batchOps = make([]database.BatchOp, 0)
-	)
-
-	errs.Add(
+	batchOps := make([]database.BatchOp, 0)
+	err := utils.Err(
 		ms.writeMetadata(&batchOps),
 		ms.writePermissionedSubnets(&batchOps),
 		ms.writeSubnetOwners(&batchOps),
@@ -1331,8 +1322,8 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
 	)
-	if errs.Err != nil {
-		return errs.Err
+	if err != nil {
+		return err
 	}
 
 	if len(batchOps) == 0 {
