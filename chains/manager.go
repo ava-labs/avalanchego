@@ -878,6 +878,8 @@ func (m *manager) createAvalancheChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
+
+		Peers: connectedBeacons,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
@@ -1231,6 +1233,7 @@ func (m *manager) createSnowmanChain(
 		Params:        consensusParams,
 		Consensus:     consensus,
 		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
+		Peers:         connectedBeacons,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {

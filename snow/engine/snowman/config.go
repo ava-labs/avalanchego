@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -23,4 +24,7 @@ type Config struct {
 	Params      snowball.Parameters
 	Consensus   snowman.Consensus
 	PartialSync bool
+
+	// used for block-backfilling
+	Peers tracker.Peers
 }

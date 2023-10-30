@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/event"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const nonVerifiedCacheSize = 64 * units.MiB
@@ -92,6 +94,12 @@ type Transitive struct {
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
+
+	// START OF BLOCK BACKFILLING STUFF
+	fetchFrom set.Set[ids.NodeID] // picked from bootstrapper
+	peers     tracker.Peers
+
+	// END OF BLOCK BACKFILLING STUFF
 }
 
 func newTransitive(config Config) (*Transitive, error) {
@@ -135,6 +143,10 @@ func newTransitive(config Config) (*Transitive, error) {
 			"",
 			config.Ctx.Registerer,
 		),
+
+		// block-backfilling stuff
+		fetchFrom: set.Of[ids.NodeID](config.Validators.GetValidatorIDs(config.Ctx.SubnetID)...),
+		peers:     config.Peers,
 	}
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
@@ -454,7 +466,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 			err)
 	}
 
-	return nil
+	// Start Block backfilling if needed
+	// TODO: for now we extend transitive engine with backfilling features
+	// Later on we'll repackage them into a separate struct to be moved in syncer package.
+	return t.startBlockBackfilling(ctx)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -991,4 +1006,54 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 		metrics: &t.metrics,
 		tree:    t.nonVerifieds,
 	})
+}
+
+// BLOCK BACKFILLING STUFF
+func (t *Transitive) startBlockBackfilling(ctx context.Context) error {
+	ssVM, ok := t.VM.(block.StateSyncableVM)
+	if !ok {
+		return nil // nothing to do
+	}
+
+	switch blkID, err := ssVM.BackfillBlocksEnabled(ctx); {
+	case err != nil:
+		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
+	case blkID == ids.Empty:
+		t.Ctx.Log.Info("block backfilling not enabled")
+		return nil
+	default:
+		validatorID, ok := t.fetchFrom.Peek()
+		if !ok {
+			return fmt.Errorf("dropping request for %s as there are no nodes to request blkID from", blkID)
+		}
+
+		// We only allow one outbound request at a time from a node
+		t.markUnavailable(validatorID)
+		t.RequestID++
+		t.Sender.SendGetAncestors(ctx, validatorID, t.RequestID, blkID)
+		return nil
+	}
+}
+
+func (t *Transitive) markUnavailable(nodeID ids.NodeID) {
+	t.fetchFrom.Remove(nodeID)
+
+	// if [fetchFrom] has become empty, reset it to the currently preferred
+	// peers
+	if t.fetchFrom.Len() == 0 {
+		t.fetchFrom = t.peers.PreferredPeers()
+	}
+}
+
+func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	// Ensure fetchFrom reflects proper validator list
+	if _, ok := t.Validators.GetValidator(t.Ctx.SubnetID, nodeID); ok {
+		t.fetchFrom.Add(nodeID)
+	}
+	return t.Connector.Connected(ctx, nodeID, nodeVersion)
+}
+
+func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	t.markUnavailable(nodeID)
+	return t.Connector.Disconnected(ctx, nodeID)
 }

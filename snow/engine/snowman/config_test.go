@@ -30,5 +30,7 @@ func DefaultConfigs() Config {
 			MaxItemProcessingTime: 1,
 		},
 		Consensus: &snowman.Topological{},
+
+		Peers: commonCfg.StartupTracker,
 	}
 }

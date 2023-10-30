@@ -49,6 +49,7 @@ type StateSyncableVM interface {
 	// down to genesis.
 	//
 	// Returns ids.EmptyID if block backfilling is not enabled.
+	// TODO ABENEGIA: Use error instead of the EmptyID
 	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
 
 	BackfillBlocks(ctx context.Context, blocks [][]byte) error
