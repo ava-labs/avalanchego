@@ -213,47 +213,6 @@ impl Storable for CompactSpaceHeader {
     }
 }
 
-struct ObjPtrField(DiskAddress);
-
-impl ObjPtrField {
-    const MSIZE: u64 = 8;
-}
-
-impl Storable for ObjPtrField {
-    fn hydrate<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
-        let raw = mem
-            .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::InvalidCacheView {
-                offset: addr,
-                size: Self::MSIZE,
-            })?;
-        let obj_ptr = raw.as_deref()[0..8].into();
-        Ok(Self(obj_ptr))
-    }
-
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
-        Cursor::new(to).write_all(&self.to_le_bytes())?;
-        Ok(())
-    }
-
-    fn dehydrated_len(&self) -> u64 {
-        Self::MSIZE
-    }
-}
-
-impl std::ops::Deref for ObjPtrField {
-    type Target = DiskAddress;
-    fn deref(&self) -> &DiskAddress {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for ObjPtrField {
-    fn deref_mut(&mut self) -> &mut DiskAddress {
-        &mut self.0
-    }
-}
-
 #[derive(Debug)]
 struct U64Field(u64);
 
