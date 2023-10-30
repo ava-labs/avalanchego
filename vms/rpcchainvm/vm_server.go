@@ -499,7 +499,7 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-	dbHealth, err := vm.dbHealthChecks(ctx)
+	dbHealth, err := vm.db.HealthCheck(ctx)
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
@@ -512,19 +512,6 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	return &vmpb.HealthResponse{
 		Details: details,
 	}, err
-}
-
-func (vm *VMServer) dbHealthChecks(ctx context.Context) (interface{}, error) {
-	// Check Database health
-	// Shared gRPC client don't close
-	health, err := vm.db.HealthCheck(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check db health: %w", err)
-	}
-
-	details := make(map[string]interface{}, 1)
-	details["db"] = health // TODO what should go here?
-	return details, nil
 }
 
 func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.VersionResponse, error) {
