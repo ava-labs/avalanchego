@@ -147,6 +147,10 @@ func TestAncestorsProcessing(t *testing.T) {
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
 
+	// for current test we need a single validator. Disconnect the other
+	dummyCtx := context.Background()
+	require.NoError(te.Disconnected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]))
+
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
 	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
@@ -158,7 +162,6 @@ func TestAncestorsProcessing(t *testing.T) {
 	}
 
 	// issue blocks request
-	dummyCtx := context.Background()
 	startReqNum := uint32(0)
 	require.NoError(te.Start(dummyCtx, startReqNum))
 
@@ -191,6 +194,10 @@ func TestAncestorsProcessing(t *testing.T) {
 	}
 	{
 		// handle empty Ancestor response
+
+		// Connect second validator, to allow requesting it the block following faulty response from first validator
+		require.NoError(te.Connected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1], version.CurrentApp))
+
 		emptyBlkBytes := [][]byte{}
 		require.NoError(te.Ancestors(dummyCtx, nodeID, responseReqID, emptyBlkBytes))
 		require.Nil(pushedBlks)               // blocks from wrong NodeID are not pushed to VM
@@ -275,6 +282,10 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
 
+	// for current test we need a single validator. Disconnect the other
+	dummyCtx := context.Background()
+	require.NoError(te.Disconnected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]))
+
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
 	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
@@ -282,7 +293,6 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 	}
 
 	// start the engine
-	dummyCtx := context.Background()
 	startReqNum := uint32(0)
 	require.NoError(te.Start(dummyCtx, startReqNum))
 
@@ -417,8 +427,8 @@ func setupBlockBackfillingTests(t *testing.T) (Config, *fullVM, *common.SenderTe
 	// add at least a peer to be reached out for blocks
 	vals := validators.NewManager()
 	engCfg.Validators = vals
-	vdr1 := ids.GenerateTestNodeID()
-	vdr2 := ids.GenerateTestNodeID()
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
 	errs := wrappers.Errs{}
 	errs.Add(
 		vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1),
