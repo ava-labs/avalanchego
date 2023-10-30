@@ -192,8 +192,7 @@ func (vm *VM) Initialize(
 	chainCtx.Metrics = optionalGatherer
 
 	vm.ctx = chainCtx
-	prefixDB := prefixdb.New(dbPrefix, db)
-	vm.db = versiondb.New(prefixDB)
+	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", registerer)
 	if err != nil {
 		return err
