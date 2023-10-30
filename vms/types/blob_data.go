@@ -19,3 +19,18 @@ func (b JSONByteSlice) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(hexData)
 }
+
+func (b *JSONByteSlice) UnmarshalJSON(data []byte) error {
+	var hexData string
+
+	if err := json.Unmarshal(data, &hexData); err != nil {
+		return err
+	}
+	decoded, err := formatting.Decode(formatting.HexNC, hexData)
+	if err != nil {
+		return err
+	}
+
+	*b = decoded
+	return nil
+}
