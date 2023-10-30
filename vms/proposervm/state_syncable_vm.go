@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -166,22 +168,42 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, nil
 	}
 
-	return vm.ssVM.BackfillBlocksEnabled(ctx)
+	innerBlkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	innerBlk, err := vm.ChainVM.GetBlock(ctx, innerBlkID)
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	vm.latestBlockBackfillingHeight = innerBlk.Height()
+	return innerBlkID, nil
 }
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, error) {
-	innerBlksBytes := make([][]byte, 0, len(blksBytes))
+	var (
+		innerBlksBytes  = make([][]byte, 0, len(blksBytes))
+		minBlocksHeight = vm.latestBlockBackfillingHeight
+	)
+
 	for i, blkBytes := range blksBytes {
 		blk, err := vm.parseProposerBlock(ctx, blkBytes)
 		if err != nil {
 			return ids.Empty, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
-		// TODO: consider validating that block is at least below last accepted block
-		// or that block has not been stored yet
+		if blk.Height() > vm.latestBlockBackfillingHeight {
+			return ids.Empty, fmt.Errorf("")
+		}
+		minBlocksHeight = safemath.Min(minBlocksHeight, blk.Height())
+
 		if err := blk.acceptOuterBlk(); err != nil {
 			return ids.Empty, fmt.Errorf("failed indexing backfilled block, index %d, %w", i, err)
 		}
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
+
+	vm.lastAcceptedHeight = minBlocksHeight
 	return vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
 }

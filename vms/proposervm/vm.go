@@ -133,6 +133,9 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
+
+	// blockBackfilling attributes
+	latestBlockBackfillingHeight uint64
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
