@@ -31,6 +31,8 @@ func DefaultConfigs() Config {
 		},
 		Consensus: &snowman.Topological{},
 
-		Peers: commonCfg.StartupTracker,
+		Peers:                          commonCfg.StartupTracker,
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
 	}
 }

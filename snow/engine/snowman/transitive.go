@@ -1074,7 +1074,7 @@ func (t *Transitive) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID
 		t.Ctx.Log.Info("block backfilling done")
 		return nil
 	case err != nil:
-		t.Ctx.Log.Debug("failed to parse blocks in Ancestors",
+		t.Ctx.Log.Debug("failed to backfill blocks in Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
@@ -1104,11 +1104,6 @@ func (t *Transitive) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, 
 
 // Get block [blkID] and its ancestors from a peer
 func (t *Transitive) fetch(ctx context.Context, blkID ids.ID) error {
-	// Make sure we haven't already requested this block
-	if t.backfillingRequests.Contains(blkID) {
-		return nil
-	}
-
 	validatorID, ok := t.fetchFrom.Peek()
 	if !ok {
 		return fmt.Errorf("dropping request for %s: %w", blkID, errNoPeersToDownloadBlocksFrom)
