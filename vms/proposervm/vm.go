@@ -330,6 +330,10 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+	return parseProposerBlock(ctx, b)
+}
+
+func (vm *VM) parseProposerBlock(ctx context.Context, b []byte) (Block, error) {
 	if blk, err := vm.parsePostForkBlock(ctx, b); err == nil {
 		return blk, nil
 	}
