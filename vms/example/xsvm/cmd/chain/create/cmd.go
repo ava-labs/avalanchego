@@ -42,9 +42,9 @@ func createFunc(c *cobra.Command, args []string) error {
 	// that [uri] is hosting.
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:              config.URI,
-		AVAXKeychain:     kc,
-		EthKeychain:      kc,
+		URI:          config.URI,
+		AVAXKeychain: kc,
+		// EthKeychain:      kc,
 		PChainTxsToFetch: set.Of(config.SubnetID),
 	})
 	if err != nil {
