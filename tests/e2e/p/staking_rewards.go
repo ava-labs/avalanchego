@@ -59,22 +59,21 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(betaNode)
 
 		ginkgo.By("generating reward keys")
-		factory := secp256k1.Factory{}
 
-		alphaValidationRewardKey, err := factory.NewPrivateKey()
+		alphaValidationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
-		alphaDelegationRewardKey, err := factory.NewPrivateKey()
-		require.NoError(err)
-
-		betaValidationRewardKey, err := factory.NewPrivateKey()
-		require.NoError(err)
-		betaDelegationRewardKey, err := factory.NewPrivateKey()
+		alphaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		gammaDelegationRewardKey, err := factory.NewPrivateKey()
+		betaValidationRewardKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+		betaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		deltaDelegationRewardKey, err := factory.NewPrivateKey()
+		gammaDelegationRewardKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+
+		deltaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
 		rewardKeys := []*secp256k1.PrivateKey{

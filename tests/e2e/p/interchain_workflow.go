@@ -48,8 +48,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		factory := secp256k1.Factory{}
-		recipientKey, err := factory.NewPrivateKey()
+		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
@@ -105,7 +104,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(30 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			const (
@@ -146,7 +145,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(15 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
