@@ -108,8 +108,8 @@ enum Error {
   ERROR_UNSPECIFIED = 0;
   ERROR_CLOSED = 1;
   ERROR_NOT_FOUND = 2;
-  ERROR_HEIGHT_INDEX_INCOMPLETE = 4;
-  ERROR_STATE_SYNC_NOT_IMPLEMENTED = 5;
+  ERROR_HEIGHT_INDEX_INCOMPLETE = 3;
+  ERROR_STATE_SYNC_NOT_IMPLEMENTED = 4;
 }
 
 message InitializeRequest {
@@ -173,7 +173,7 @@ message Handler {
   string prefix = 1;
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
-  string server_addr = 3;
+  string server_addr = 2;
 }
 
 message BuildBlockRequest {
