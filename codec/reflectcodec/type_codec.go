@@ -85,19 +85,14 @@ func (c *genericCodec) Size(value interface{}) (int, error) {
 		return 0, errMarshalNil // can't marshal nil
 	}
 
-	size, _, err := c.size(reflect.ValueOf(value))
+	size, _, err := c.size(reflect.ValueOf(value), false)
 	return size, err
-}
-
-// size returns the size of the value along with whether the value is constant sized.
-func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
-	return c.sizeWithOmitEmpty(value, false)
 }
 
 // size returns the size of the value along with whether the value is constant
 // sized. This function takes into account a `nullable` property which allows
-// pointers and interfaces serialize nil values using an extra byte
-func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (int, bool, error) {
+// pointers and interfaces to serialize nil values
+func (c *genericCodec) size(value reflect.Value, nullable bool) (int, bool, error) {
 	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
 		return wrappers.ByteLen, true, nil
@@ -120,56 +115,43 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 	case reflect.String:
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
-		prefixSize := 0
-		if nullable {
-			if value.IsNil() {
-				return wrappers.BoolLen, false, nil
+		if value.IsNil() {
+			if !nullable {
+				return 0, false, errMarshalNil
 			}
-			prefixSize += wrappers.BoolLen
-		} else if value.IsNil() {
-			return 0, false, errMarshalNil
+			return wrappers.BoolLen, false, nil
 		}
 
-		size, _, err := c.size(value.Elem())
-		if err != nil {
-			return 0, false, err
+		size, constSize, err := c.size(value.Elem(), false)
+		if nullable {
+			return wrappers.BoolLen + size, false, err
 		}
-		return prefixSize + size, false, nil
+		return size, constSize, err
 
 	case reflect.Interface:
-		prefixSize := 0
-		if nullable {
-			if value.IsNil() {
-				return wrappers.BoolLen, false, nil
+		if value.IsNil() {
+			if !nullable {
+				return 0, false, errMarshalNil
 			}
-			prefixSize += wrappers.BoolLen
-		} else if value.IsNil() {
-			// Can't marshal nil interfaces (but nil slices are fine)
-			return 0, false, errMarshalNil
+			return wrappers.BoolLen, false, nil
 		}
+
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
-		prefixSize += c.typer.PrefixSize(underlyingType)
-		valueSize, _, err := c.size(value.Elem())
-		if err != nil {
-			return 0, false, err
+		prefixSize := c.typer.PrefixSize(underlyingType)
+		valueSize, _, err := c.size(value.Elem(), false)
+		if nullable {
+			return wrappers.BoolLen + prefixSize + valueSize, false, err
 		}
-		return prefixSize + valueSize, false, nil
+		return prefixSize + valueSize, false, err
 
 	case reflect.Slice:
-		prefixSize := 0
-		if nullable {
-			prefixSize += wrappers.BoolLen
-			if value.IsNil() {
-				return prefixSize, false, nil
-			}
-		}
 		numElts := value.Len()
 		if numElts == 0 {
-			return wrappers.IntLen + prefixSize, false, nil
+			return wrappers.IntLen, false, nil
 		}
 
-		size, constSize, err := c.sizeWithOmitEmpty(value.Index(0), nullable)
+		size, constSize, err := c.size(value.Index(0), nullable)
 		if err != nil {
 			return 0, false, err
 		}
@@ -177,17 +159,17 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 		// For fixed-size types we manually calculate lengths rather than
 		// processing each element separately to improve performance.
 		if constSize {
-			return wrappers.IntLen + prefixSize + numElts*size, false, nil
+			return wrappers.IntLen + numElts*size, false, nil
 		}
 
 		for i := 1; i < numElts; i++ {
-			innerSize, _, err := c.sizeWithOmitEmpty(value.Index(i), nullable)
+			innerSize, _, err := c.size(value.Index(i), nullable)
 			if err != nil {
 				return 0, false, err
 			}
 			size += innerSize
 		}
-		return wrappers.IntLen + size + prefixSize, false, nil
+		return wrappers.IntLen + size, false, nil
 
 	case reflect.Array:
 		numElts := value.Len()
@@ -195,7 +177,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 			return 0, true, nil
 		}
 
-		size, constSize, err := c.sizeWithOmitEmpty(value.Index(0), nullable)
+		size, constSize, err := c.size(value.Index(0), nullable)
 		if err != nil {
 			return 0, false, err
 		}
@@ -207,7 +189,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 		}
 
 		for i := 1; i < numElts; i++ {
-			innerSize, _, err := c.sizeWithOmitEmpty(value.Index(i), nullable)
+			innerSize, _, err := c.size(value.Index(i), nullable)
 			if err != nil {
 				return 0, false, err
 			}
@@ -226,7 +208,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 			constSize = true
 		)
 		for _, fieldDesc := range serializedFields {
-			innerSize, innerConstSize, err := c.sizeWithOmitEmpty(value.Field(fieldDesc.Index), fieldDesc.Nullable)
+			innerSize, innerConstSize, err := c.size(value.Field(fieldDesc.Index), fieldDesc.Nullable)
 			if err != nil {
 				return 0, false, err
 			}
@@ -241,11 +223,11 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 			return wrappers.IntLen, false, nil
 		}
 
-		keySize, keyConstSize, err := c.size(iter.Key())
+		keySize, keyConstSize, err := c.size(iter.Key(), false)
 		if err != nil {
 			return 0, false, err
 		}
-		valueSize, valueConstSize, err := c.size(iter.Value())
+		valueSize, valueConstSize, err := c.size(iter.Value(), nullable)
 		if err != nil {
 			return 0, false, err
 		}
@@ -260,7 +242,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 				totalValueSize = valueSize
 			)
 			for iter.Next() {
-				valueSize, _, err := c.size(iter.Value())
+				valueSize, _, err := c.size(iter.Value(), nullable)
 				if err != nil {
 					return 0, false, err
 				}
@@ -274,7 +256,7 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 				totalKeySize = keySize
 			)
 			for iter.Next() {
-				keySize, _, err := c.size(iter.Key())
+				keySize, _, err := c.size(iter.Key(), false)
 				if err != nil {
 					return 0, false, err
 				}
@@ -285,11 +267,11 @@ func (c *genericCodec) sizeWithOmitEmpty(value reflect.Value, nullable bool) (in
 		default:
 			totalSize := wrappers.IntLen + keySize + valueSize
 			for iter.Next() {
-				keySize, _, err := c.size(iter.Key())
+				keySize, _, err := c.size(iter.Key(), false)
 				if err != nil {
 					return 0, false, err
 				}
-				valueSize, _, err := c.size(iter.Value())
+				valueSize, _, err := c.size(iter.Value(), nullable)
 				if err != nil {
 					return 0, false, err
 				}
@@ -309,20 +291,13 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 		return errMarshalNil // can't marshal nil
 	}
 
-	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen)
+	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen, false)
 }
 
 // marshal writes the byte representation of [value] to [p]
-// [value]'s underlying value must not be a nil pointer or interface
+//
 // c.lock should be held for the duration of this function
-func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32) error {
-	return c.marshalWithOmitEmpty(value, p, maxSliceLen, false)
-}
-
-// Similar to marshal() but it takes `nullable` from the callee. Nullable is
-// used right now for pointers and interfaces and it uses an extra byte to
-// serialize nil values.
-func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32, nullable bool) error {
+func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32, nullable bool) error {
 	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
 		p.PackByte(uint8(value.Uint()))
@@ -358,30 +333,31 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 		isNil := value.IsNil()
 		if nullable {
 			p.PackBool(isNil)
-			if isNil {
+			if isNil || p.Err != nil {
 				return p.Err
 			}
 		} else if isNil {
 			return errMarshalNil
 		}
 
-		return c.marshal(value.Elem(), p, c.maxSliceLen)
+		return c.marshal(value.Elem(), p, c.maxSliceLen, false)
 	case reflect.Interface:
 		isNil := value.IsNil()
 		if nullable {
 			p.PackBool(isNil)
-			if isNil {
+			if isNil || p.Err != nil {
 				return p.Err
 			}
 		} else if isNil {
 			return errMarshalNil
 		}
+
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
 		if err := c.typer.PackPrefix(p, underlyingType); err != nil {
 			return err
 		}
-		if err := c.marshal(value.Elem(), p, c.maxSliceLen); err != nil {
+		if err := c.marshal(value.Elem(), p, c.maxSliceLen, false); err != nil {
 			return err
 		}
 		return p.Err
@@ -393,12 +369,6 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 				numElts,
 				maxSliceLen,
 			)
-		}
-		if nullable {
-			p.PackBool(value.IsNil())
-			if value.IsNil() || p.Err != nil {
-				return p.Err
-			}
 		}
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
@@ -417,7 +387,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
-			if err := c.marshalWithOmitEmpty(value.Index(i), p, c.maxSliceLen, nullable); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen, nullable); err != nil {
 				return err
 			}
 		}
@@ -437,7 +407,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			)
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the array
-			if err := c.marshalWithOmitEmpty(value.Index(i), p, c.maxSliceLen, nullable); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen, nullable); err != nil {
 				return err
 			}
 		}
@@ -448,7 +418,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			return err
 		}
 		for _, fieldDesc := range serializedFields { // Go through all fields of this struct that are serialized
-			if err := c.marshalWithOmitEmpty(value.Field(fieldDesc.Index), p, fieldDesc.MaxSliceLen, fieldDesc.Nullable); err != nil { // Serialize the field and write to byte array
+			if err := c.marshal(value.Field(fieldDesc.Index), p, fieldDesc.MaxSliceLen, fieldDesc.Nullable); err != nil { // Serialize the field and write to byte array
 				return err
 			}
 		}
@@ -479,7 +449,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 		startOffset := p.Offset
 		endOffset := p.Offset
 		for i, key := range keys {
-			if err := c.marshal(key, p, c.maxSliceLen); err != nil {
+			if err := c.marshal(key, p, c.maxSliceLen, false); err != nil {
 				return err
 			}
 			if p.Err != nil {
@@ -512,7 +482,7 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 			}
 
 			// serialize and pack value
-			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen); err != nil {
+			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen, nullable); err != nil {
 				return err
 			}
 		}
@@ -523,8 +493,8 @@ func (c *genericCodec) marshalWithOmitEmpty(value reflect.Value, p *wrappers.Pac
 	}
 }
 
-// Unmarshal unmarshals [bytes] into [dest], where
-// [dest] must be a pointer or interface
+// Unmarshal unmarshals [bytes] into [dest], where [dest] must be a pointer or
+// interface
 func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if dest == nil {
 		return errUnmarshalNil
@@ -537,7 +507,7 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if destPtr.Kind() != reflect.Ptr {
 		return errNeedPointer
 	}
-	if err := c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen); err != nil {
+	if err := c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen, false); err != nil {
 		return err
 	}
 	if p.Offset != len(bytes) {
@@ -551,15 +521,13 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
+//
+// The `nullable` property affects how pointers and interfaces are unmarshalled,
+// as an extra byte would be used to unmarshal nil values for pointers and
+// interaces
+//
 // c.lock should be held for the duration of this function
-func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSliceLen uint32) error {
-	return c.unmarshalWithOmitEmpty(p, value, maxSliceLen, false)
-}
-
-// Extends unmarshal to receive the `nullable` property which if set true
-// affects how pointers and interfaces are unmarshalled, as an extra byte would
-// be used to unmarshal nil values for pointers and interaces
-func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.Value, maxSliceLen uint32, nullable bool) error {
+func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSliceLen uint32, nullable bool) error {
 	switch value.Kind() {
 	case reflect.Uint8:
 		value.SetUint(uint64(p.UnpackByte()))
@@ -616,12 +584,6 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		}
 		return nil
 	case reflect.Slice:
-		if nullable {
-			isNil := p.UnpackBool()
-			if isNil || p.Err != nil {
-				return p.Err
-			}
-		}
 		numElts32 := p.UnpackInt()
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
@@ -652,7 +614,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshalWithOmitEmpty(p, value.Index(i), c.maxSliceLen, nullable); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen, nullable); err != nil {
 				return fmt.Errorf("couldn't unmarshal slice element: %w", err)
 			}
 		}
@@ -670,7 +632,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 			return nil
 		}
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshalWithOmitEmpty(p, value.Index(i), c.maxSliceLen, nullable); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen, nullable); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %w", err)
 			}
 		}
@@ -684,17 +646,17 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 	case reflect.Interface:
 		if nullable {
 			isNil := p.UnpackBool()
-			if p.Err != nil || isNil {
-				// Value is actually nil or there was an error
+			if isNil || p.Err != nil {
 				return p.Err
 			}
 		}
+
 		intfImplementor, err := c.typer.UnpackPrefix(p, value.Type())
 		if err != nil {
 			return err
 		}
 		// Unmarshal into the struct
-		if err := c.unmarshal(p, intfImplementor, c.maxSliceLen); err != nil {
+		if err := c.unmarshal(p, intfImplementor, c.maxSliceLen, false); err != nil {
 			return fmt.Errorf("couldn't unmarshal interface: %w", err)
 		}
 		// And assign the filled struct to the value
@@ -708,7 +670,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 		}
 		// Go through the fields and umarshal into them
 		for _, fieldDesc := range serializedFieldIndices {
-			if err := c.unmarshalWithOmitEmpty(p, value.Field(fieldDesc.Index), fieldDesc.MaxSliceLen, fieldDesc.Nullable); err != nil {
+			if err := c.unmarshal(p, value.Field(fieldDesc.Index), fieldDesc.MaxSliceLen, fieldDesc.Nullable); err != nil {
 				return fmt.Errorf("couldn't unmarshal struct: %w", err)
 			}
 		}
@@ -716,17 +678,17 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 	case reflect.Ptr:
 		if nullable {
 			isNil := p.UnpackBool()
-			if p.Err != nil || isNil {
-				// Value is actually nil or there was an error
+			if isNil || p.Err != nil {
 				return p.Err
 			}
 		}
+
 		// Get the type this pointer points to
 		t := value.Type().Elem()
 		// Create a new pointer to a new value of the underlying type
 		v := reflect.New(t)
 		// Fill the value
-		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen); err != nil {
+		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen, false); err != nil {
 			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
 		// Assign to the top-level struct's member
@@ -761,7 +723,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 
 			keyStartOffset := p.Offset
 
-			if err := c.unmarshal(p, mapKey, c.maxSliceLen); err != nil {
+			if err := c.unmarshal(p, mapKey, c.maxSliceLen, false); err != nil {
 				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
 			}
 
@@ -779,7 +741,7 @@ func (c *genericCodec) unmarshalWithOmitEmpty(p *wrappers.Packer, value reflect.
 
 			// Get the value
 			mapValue := reflect.New(mapValueType).Elem()
-			if err := c.unmarshal(p, mapValue, c.maxSliceLen); err != nil {
+			if err := c.unmarshal(p, mapValue, c.maxSliceLen, nullable); err != nil {
 				return fmt.Errorf("couldn't unmarshal map value for key %s: %w", mapKey, err)
 			}
 

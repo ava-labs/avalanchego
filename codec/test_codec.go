@@ -455,7 +455,9 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 	require.Zero(version)
 	require.Equal(struct1, struct1Unmarshaled)
 
-	struct1 = MyStructWithPtr{}
+	struct1 = MyStructWithPtr{
+		N3: []*int32{},
+	}
 	bytes, err = manager.Marshal(0, struct1)
 	require.NoError(err)
 
