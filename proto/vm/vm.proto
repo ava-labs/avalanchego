@@ -268,10 +268,6 @@ message AppRequestFailedMsg {
   bytes node_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
-  // VM defined error code
-  uint32 error_code = 3;
-  // VM defined error message
-  string error_message = 4;
 }
 
 message AppResponseMsg {
