@@ -474,19 +474,14 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	pathToKey, err := view.getPathTo(db.toKey(keyBytes))
-	if err != nil {
-		return err
-	}
-	for _, n := range pathToKey {
-		if n.hasValue() {
-			db.valueNodeDB.nodeCache.Put(n.key, n)
-		} else if err := db.intermediateNodeDB.nodeCache.Put(n.key, n); err != nil {
-			return err
+	return view.visitPathToKey(db.toKey(keyBytes), func(n *node) error {
+		if !n.hasValue() {
+			return db.intermediateNodeDB.nodeCache.Put(n.key, n)
 		}
-	}
 
-	return nil
+		db.valueNodeDB.nodeCache.Put(n.key, n)
+		return nil
+	})
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
