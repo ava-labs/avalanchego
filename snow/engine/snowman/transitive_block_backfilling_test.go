@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -125,7 +126,7 @@ func TestEngineErrsIfThereAreNoPeersToDownloadBlocksFrom(t *testing.T) {
 
 	reqNum := uint32(0)
 	err = te.Start(dummyCtx, reqNum)
-	require.ErrorIs(err, errNoPeersToDownloadBlocksFrom)
+	require.ErrorIs(err, syncer.ErrNoPeersToDownloadBlocksFrom)
 
 	// riconnect at least a validator and show that GetAncestors requests are issued
 	for _, valID := range engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID) {

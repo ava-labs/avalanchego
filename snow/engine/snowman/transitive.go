@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -21,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/event"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -35,11 +34,7 @@ import (
 
 const nonVerifiedCacheSize = 64 * units.MiB
 
-var (
-	_ Engine = (*Transitive)(nil)
-
-	errNoPeersToDownloadBlocksFrom = errors.New("no connected peers to download blocks from")
-)
+var _ Engine = (*Transitive)(nil)
 
 func New(config Config) (Engine, error) {
 	return newTransitive(config)
@@ -61,6 +56,8 @@ type Transitive struct {
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AppHandler
+
+	*syncer.BlockBackfiller
 
 	RequestID uint32
 
@@ -96,13 +93,6 @@ type Transitive struct {
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
-
-	// START OF BLOCK BACKFILLING STUFF
-	fetchFrom                 set.Set[ids.NodeID] // picked from bootstrapper
-	peers                     tracker.Peers
-	backfillingRequests       common.Requests // tracks which validators were asked for which block in which requests
-	blkBackfillingInterrupted bool            // flag to allow backfilling restart after recovering from validators disconnections
-	// END OF BLOCK BACKFILLING STUFF
 }
 
 func newTransitive(config Config) (*Transitive, error) {
@@ -144,12 +134,19 @@ func newTransitive(config Config) (*Transitive, error) {
 			"",
 			config.Ctx.Registerer,
 		),
-
-		// block-backfilling stuff
-		fetchFrom:                 set.Of[ids.NodeID](config.Validators.GetValidatorIDs(config.Ctx.SubnetID)...),
-		peers:                     config.Peers,
-		blkBackfillingInterrupted: len(config.Peers.PreferredPeers()) > 0,
 	}
+	t.BlockBackfiller = syncer.NewBlockBackfiller(
+		syncer.BlockBackfillerConfig{
+			Ctx:                            config.Ctx,
+			VM:                             config.VM,
+			Sender:                         config.Sender,
+			Validators:                     config.Validators,
+			Peers:                          config.Peers,
+			AncestorsMaxContainersSent:     config.AncestorsMaxContainersSent,
+			AncestorsMaxContainersReceived: config.AncestorsMaxContainersReceived,
+			SharedRequestID:                &t.RequestID,
+		},
+	)
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
@@ -469,9 +466,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	// Start Block backfilling if needed
-	// TODO: for now we extend transitive engine with backfilling features
-	// Later on we'll repackage them into a separate struct to be moved in syncer package.
-	return t.startBlockBackfilling(ctx)
+	return t.BlockBackfiller.Start(ctx)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -1010,147 +1005,16 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 	})
 }
 
-// BLOCK BACKFILLING STUFF
-func (t *Transitive) startBlockBackfilling(ctx context.Context) error {
-	ssVM, ok := t.VM.(block.StateSyncableVM)
-	if !ok {
-		return nil // nothing to do
-	}
-
-	switch wantedBlk, err := ssVM.BackfillBlocksEnabled(ctx); {
-	case err == block.ErrBlockBackfillingNotEnabled:
-		t.Ctx.Log.Info("block backfilling not enabled")
-		return nil
-	case err != nil:
-		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
-	default:
-		return t.fetch(ctx, wantedBlk)
-	}
-}
-
-// Ancestors handles the receipt of multiple containers. Should be received in
-// response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (t *Transitive) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	// Make sure this is in response to a request we made
-	wantedBlkID, ok := t.backfillingRequests.Remove(nodeID, requestID)
-	if !ok { // this message isn't in response to a request we made
-		t.Ctx.Log.Debug("received unexpected Ancestors",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-		)
-		return nil
-	}
-
-	lenBlks := len(blks)
-	if lenBlks == 0 {
-		t.Ctx.Log.Debug("received Ancestors with no block",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-		)
-
-		t.markUnavailable(nodeID)
-
-		// Send another request for this
-		return t.fetch(ctx, wantedBlkID)
-	}
-
-	// This node has responded - so add it back into the set
-	t.fetchFrom.Add(nodeID)
-
-	if lenBlks > t.Config.AncestorsMaxContainersReceived {
-		blks = blks[:t.Config.AncestorsMaxContainersReceived]
-		t.Ctx.Log.Debug("ignoring containers in Ancestors",
-			zap.Int("numContainers", lenBlks-t.Config.AncestorsMaxContainersReceived),
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-		)
-	}
-
-	ssVM, ok := t.VM.(block.StateSyncableVM)
-	if !ok {
-		return nil // nothing to do
-	}
-
-	switch nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks); {
-	case err == block.ErrStopBlockBackfilling:
-		t.Ctx.Log.Info("block backfilling done")
-		return nil
-	case err != nil:
-		t.Ctx.Log.Debug("failed to backfill blocks in Ancestors",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Error(err),
-		)
-		return t.fetch(ctx, wantedBlkID)
-	default:
-		return t.fetch(ctx, nextWantedBlkID)
-	}
-}
-
-func (t *Transitive) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := t.backfillingRequests.Remove(nodeID, requestID)
-	if !ok {
-		t.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-		)
-		return nil
-	}
-
-	// This node timed out their request, so we can add them back to [fetchFrom]
-	t.fetchFrom.Add(nodeID)
-
-	// Send another request for this
-	return t.fetch(ctx, blkID)
-}
-
-// Get block [blkID] and its ancestors from a peer
-func (t *Transitive) fetch(ctx context.Context, blkID ids.ID) error {
-	validatorID, ok := t.fetchFrom.Peek()
-	if !ok {
-		return fmt.Errorf("dropping request for %s: %w", blkID, errNoPeersToDownloadBlocksFrom)
-	}
-
-	// We only allow one outbound request at a time from a node
-	t.markUnavailable(validatorID)
-	t.RequestID++
-	t.backfillingRequests.Add(validatorID, t.RequestID, blkID)
-	t.Sender.SendGetAncestors(ctx, validatorID, t.RequestID, blkID)
-	return nil
-}
-
-func (t *Transitive) markUnavailable(nodeID ids.NodeID) {
-	t.fetchFrom.Remove(nodeID)
-
-	// if [fetchFrom] has become empty, reset it to the currently preferred
-	// peers
-	if t.fetchFrom.Len() == 0 {
-		t.fetchFrom = t.peers.PreferredPeers()
-	}
-}
-
 func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := t.Validators.GetValidator(t.Ctx.SubnetID, nodeID); ok {
-		t.fetchFrom.Add(nodeID)
-	}
 	if err := t.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
-
-	if !t.blkBackfillingInterrupted {
-		return nil
-	}
-
-	// first validator reconnected. Resume blocks backfilling if needed
-	t.blkBackfillingInterrupted = false
-	return t.startBlockBackfilling(ctx)
+	return t.BlockBackfiller.Connected(ctx, nodeID)
 }
 
 func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	t.markUnavailable(nodeID)
-
-	// if there is no validator left, flag that blocks backfilling is interrupted.
-	t.blkBackfillingInterrupted = len(t.fetchFrom) == 0
-	return t.VM.Disconnected(ctx, nodeID)
+	if err := t.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+	return t.BlockBackfiller.Disconnected(nodeID)
 }
