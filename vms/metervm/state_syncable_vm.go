@@ -97,19 +97,19 @@ func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
 	if vm.ssVM == nil {
-		return block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	err := vm.ssVM.BackfillBlocks(ctx, blocks)
+	nextWantedBlkID, err := vm.ssVM.BackfillBlocks(ctx, blocks)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.backfillBlocks.Observe(duration)
-		return err
+		return nextWantedBlkID, err
 	}
 	vm.blockMetrics.backfillBlocks.Observe(duration)
-	return nil
+	return nextWantedBlkID, nil
 }

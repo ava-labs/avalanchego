@@ -837,12 +837,16 @@ func (vm *VMServer) BackfillBlocksEnabled(ctx context.Context, _ *emptypb.Empty)
 }
 
 func (vm *VMServer) BackfillBlocks(ctx context.Context, req *vmpb.BackfillBlocksRequest) (*vmpb.BackfillBlocksResponse, error) {
-	var err error
+	var (
+		nextWantedBlkID ids.ID
+		err             error
+	)
 	if vm.ssVM != nil {
-		err = vm.ssVM.BackfillBlocks(ctx, req.BlksBytes)
+		nextWantedBlkID, err = vm.ssVM.BackfillBlocks(ctx, req.BlksBytes)
 	}
 
 	return &vmpb.BackfillBlocksResponse{
+		Id:  nextWantedBlkID[:],
 		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }

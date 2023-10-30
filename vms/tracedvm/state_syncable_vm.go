@@ -84,9 +84,9 @@ func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	return vm.ssVM.BackfillBlocksEnabled(ctx)
 }
 
-func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
 	if vm.ssVM == nil {
-		return block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, block.ErrStateSyncableVMNotImplemented
 	}
 
 	ctx, span := vm.tracer.Start(ctx, vm.backfillBlocksTag, oteltrace.WithAttributes(

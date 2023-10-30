@@ -827,7 +827,7 @@ func (vm *VMClient) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	return ids.ID(resp.Id), err
 }
 
-func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
+func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
 	resp, err := vm.client.BackfillBlocks(
 		ctx,
 		&vmpb.BackfillBlocksRequest{
@@ -835,12 +835,12 @@ func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) error {
 		},
 	)
 	if err != nil {
-		return err
+		return ids.Empty, err
 	}
 	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
-		return errEnumToError[errEnum]
+		return ids.ID(resp.Id), errEnumToError[errEnum]
 	}
-	return nil
+	return ids.ID(resp.Id), nil
 }
 
 func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*blockClient, error) {

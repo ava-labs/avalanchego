@@ -169,17 +169,17 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	return vm.ssVM.BackfillBlocksEnabled(ctx)
 }
 
-func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) error {
+func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, error) {
 	innerBlksBytes := make([][]byte, 0, len(blksBytes))
 	for i, blkBytes := range blksBytes {
 		blk, err := vm.parseProposerBlock(ctx, blkBytes)
 		if err != nil {
-			return fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
+			return ids.Empty, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
 		// TODO: consider validating that block is at least below last accepted block
 		// or that block has not been stored yet
 		if err := blk.acceptOuterBlk(); err != nil {
-			return err
+			return ids.Empty, fmt.Errorf("failed indexing backfilled block, index %d, %w", i, err)
 		}
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}

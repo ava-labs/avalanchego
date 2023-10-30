@@ -410,7 +410,8 @@ message BackfillBlocksRequest {
 }
 
 message BackfillBlocksResponse {
-  Error err = 1;
+  bytes id = 1;
+  Error err = 2;
 }
 
 message StateSummaryAcceptRequest {

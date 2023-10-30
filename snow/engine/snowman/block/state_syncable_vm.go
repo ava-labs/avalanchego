@@ -10,7 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+var (
+	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+	ErrBlockBackfillingNotEnabled    = errors.New("vm does not require block backfilling")
+	ErrStopBlockBackfilling          = errors.New("vm required stopping block backfilling")
+)
 
 // StateSyncableVM contains the functionality to allow VMs to sync to a given
 // state, rather then boostrapping from genesis.
@@ -48,16 +52,15 @@ type StateSyncableVM interface {
 	// BackfillBlocksEnabled checks if VM wants to download all blocks from state summary one
 	// down to genesis.
 	//
-	// Returns ids.EmptyID if block backfilling is not enabled.
-	// TODO ABENEGIA: Use error instead of the EmptyID
+	// Returns ErrBlockBackfillingNotEnabled if block backfilling is not enabled.
 	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
 
-	// BackfillBlocks pass blocks bytes retrieved via GetAncestors calls to the VM
-	// It's left to the VM the duty to parse and validate the blocks.
+	// BackfillBlocks passes blocks bytes retrieved via GetAncestors calls to the VM
+	// It's left to the VM the to parse, validate and index the blocks.
 	// BackfillBlocks returns the next block ID to be requested and an error
-	// Upon error, engine will issue a GetAncestor call to a different peer
+	// If BackfillBlocks returns no error, engine will request the blockID returned by the VM
+	// If BackfillBlocks returns ErrStopBlockBackfilling, engine will stop requesting block ancestors
+	// If BackfillBlocks returns any other error, engine will issue a GetAncestor call to a different peer
 	// with the previously requested block ID
-	// If BackfillBlocks returns a block known to the VM, the engine will
-	// stop asking for blocks ancestors. (TODO: consider using a boolean or an empty blockID)
-	BackfillBlocks(ctx context.Context, blocks [][]byte) error
+	BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error)
 }
