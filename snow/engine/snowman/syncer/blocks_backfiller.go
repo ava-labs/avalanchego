@@ -34,6 +34,9 @@ type BlockBackfillerConfig struct {
 	AncestorsMaxContainersSent     int
 	AncestorsMaxContainersReceived int
 
+	// BlockBackfiller is supposed to be embedded into the engine.
+	// So requestID is shared among BlockBackfiller and the engine to
+	// avoid duplications.
 	SharedRequestID *uint32
 }
 
@@ -57,12 +60,14 @@ func NewBlockBackfiller(cfg BlockBackfillerConfig) *BlockBackfiller {
 func (bb *BlockBackfiller) Start(ctx context.Context) error {
 	ssVM, ok := bb.VM.(block.StateSyncableVM)
 	if !ok {
+		bb.Ctx.StateSyncing.Set(false)
 		return nil // nothing to do
 	}
 
 	switch wantedBlk, err := ssVM.BackfillBlocksEnabled(ctx); {
 	case err == block.ErrBlockBackfillingNotEnabled:
 		bb.Ctx.Log.Info("block backfilling not enabled")
+		bb.Ctx.StateSyncing.Set(false)
 		return nil
 	case err != nil:
 		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
@@ -117,6 +122,7 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 	switch nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks); {
 	case err == block.ErrStopBlockBackfilling:
 		bb.Ctx.Log.Info("block backfilling done")
+		bb.Ctx.StateSyncing.Set(false)
 		return nil
 	case err != nil:
 		bb.Ctx.Log.Debug("failed to backfill blocks in Ancestors",

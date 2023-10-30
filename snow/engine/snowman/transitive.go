@@ -392,8 +392,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.StateSyncing.Set(false)
-		return nil
+		return t.BlockBackfiller.Start(ctx)
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),

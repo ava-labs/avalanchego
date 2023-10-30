@@ -1519,6 +1519,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	peers = tracker.NewPeers()
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1528,7 +1529,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		cpuTracker,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
-		tracker.NewPeers(),
+		peers,
 	)
 	require.NoError(err)
 
@@ -1550,6 +1551,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxItemProcessingTime: 1,
 		},
 		Consensus: consensus,
+
+		Peers:                          peers,
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)
