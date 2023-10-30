@@ -15,18 +15,16 @@ func TestSizeWithNil(t *testing.T) {
 	var x *int32
 	y := int32(1)
 	c := genericCodec{}
-	_, _, err := c.size(reflect.ValueOf(x))
+	_, _, err := c.size(reflect.ValueOf(x), false)
 	require.ErrorIs(err, errMarshalNil)
-	_, _, err = c.sizeWithOmitEmpty(reflect.ValueOf(x), false)
-	require.ErrorIs(err, errMarshalNil)
-	len, _, err := c.sizeWithOmitEmpty(reflect.ValueOf(x), true)
+	len, _, err := c.size(reflect.ValueOf(x), true)
 	require.Empty(err)
 	require.Equal(1, len)
 	x = &y
-	len, _, err = c.sizeWithOmitEmpty(reflect.ValueOf(y), true)
+	len, _, err = c.size(reflect.ValueOf(y), true)
 	require.Empty(err)
 	require.Equal(4, len)
-	len, _, err = c.sizeWithOmitEmpty(reflect.ValueOf(x), true)
+	len, _, err = c.size(reflect.ValueOf(x), true)
 	require.Empty(err)
 	require.Equal(5, len)
 }
