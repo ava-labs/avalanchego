@@ -37,6 +37,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -496,41 +499,36 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	// TODO fix this
-	// start the db manager
-	// var (
-	// 	dbManager manager.Manager
-	// 	err       error
-	// )
-	// switch n.Config.DatabaseConfig.Name {
-	// case leveldb.Name:
-	// 	//dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
-	// case memdb.Name:
-	// 	dbManager = manager.NewMemDB(version.CurrentDatabase)
-	// default:
-	// 	err = fmt.Errorf(
-	// 		"db-type was %q but should have been one of {%s, %s}",
-	// 		n.Config.DatabaseConfig.Name,
-	// 		leveldb.Name,
-	// 		memdb.Name,
-	// 	)
-	// }
-	// if err != nil {
-	// 	return err
-	// }
+	// start the db
+	switch n.Config.DatabaseConfig.Name {
+	case leveldb.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
+		var err error
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
+		}
+		return nil
+	case memdb.Name:
+		n.DB = memdb.New()
+	default:
+		return fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s}",
+			n.Config.DatabaseConfig.Name,
+			leveldb.Name,
+			memdb.Name,
+		)
+	}
 
-	// meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	// if err != nil {
-	// 	return err
-	// }
+	var err error
+	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
+	if err != nil {
+		return err
+	}
 
-	// n.DBManager = meterDBManager
-
-	// currentDB := dbManager.Current()
-	// n.Log.Info("initializing database",
-	// 	zap.Stringer("dbVersion", currentDB.Version),
-	// )
-	// n.DB = currentDB.Database
+	n.Log.Info("initializing database",
+		zap.Stringer("dbVersion", version.CurrentDatabase),
+	)
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
