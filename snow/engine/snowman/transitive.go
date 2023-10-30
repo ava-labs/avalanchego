@@ -1011,11 +1011,11 @@ func (t *Transitive) startBlockBackfilling(ctx context.Context) error {
 	}
 
 	switch wantedBlk, err := ssVM.BackfillBlocksEnabled(ctx); {
-	case err != nil:
-		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
-	case wantedBlk == ids.Empty:
+	case err == block.ErrBlockBackfillingNotEnabled:
 		t.Ctx.Log.Info("block backfilling not enabled")
 		return nil
+	case err != nil:
+		return fmt.Errorf("failed checking if state sync block backfilling is enabled: %w", err)
 	default:
 		return t.fetch(ctx, wantedBlk)
 	}
@@ -1064,17 +1064,20 @@ func (t *Transitive) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil // nothing to do
 	}
 
-	nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks)
-	if err != nil { // the provided blocks couldn't be parsed
+	switch nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks); {
+	case err == block.ErrStopBlockBackfilling:
+		t.Ctx.Log.Info("block backfilling done")
+		return nil
+	case err != nil:
 		t.Ctx.Log.Debug("failed to parse blocks in Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
 		)
 		return t.fetch(ctx, wantedBlkID)
+	default:
+		return t.fetch(ctx, nextWantedBlkID)
 	}
-
-	return t.fetch(ctx, nextWantedBlkID)
 }
 
 func (t *Transitive) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
