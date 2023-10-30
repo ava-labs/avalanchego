@@ -267,7 +267,7 @@ message AppRequestFailedMsg {
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
   // VM defined error code
-  string error_code = 3;
+  uint32 error_code = 3;
   // VM defined error message
   string error_message = 4;
 }
