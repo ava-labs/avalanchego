@@ -152,7 +152,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 	// Dial the database
 	dbclientConn, err := grpcutils.Dial(
-		req.DbServer.ServerAddr,
+		req.DbServerAddr,
 		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
 		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
 	)

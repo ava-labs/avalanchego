@@ -198,10 +198,8 @@ func (vm *VMClient) Initialize(
 		GenesisBytes: genesisBytes,
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
-		DbServer: &vmpb.DBServer{
-			ServerAddr: dbServerAddr,
-		},
-		ServerAddr: serverAddr,
+		DbServerAddr: dbServerAddr,
+		ServerAddr:   serverAddr,
 	})
 	if err != nil {
 		return err
