@@ -679,7 +679,11 @@ func (b *builder) NewBaseTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Spend(b.state, keys, amount, b.cfg.TxFee, changeAddr)
+	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	if err != nil {
+		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+	}
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
