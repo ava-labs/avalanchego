@@ -46,9 +46,9 @@ func main() {
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:              uri,
-		AVAXKeychain:     kc,
-		EthKeychain:      kc,
+		URI:          uri,
+		AVAXKeychain: kc,
+		// EthKeychain:      kc,
 		PChainTxsToFetch: set.Of(subnetID),
 	})
 	if err != nil {
