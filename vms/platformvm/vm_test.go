@@ -1174,7 +1174,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
-	firstDB := prefixdb.New([]byte{0}, db)
+	firstDB := prefixdb.New([]byte{}, db)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
