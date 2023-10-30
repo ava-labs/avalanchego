@@ -62,7 +62,7 @@ func (ipPort IPPort) Equal(other IPPort) bool {
 }
 
 func (ipPort IPPort) String() string {
-	return net.JoinHostPort(ipPort.IP.String(), fmt.Sprintf("%d", ipPort.Port))
+	return net.JoinHostPort(ipPort.IP.String(), strconv.FormatUint(uint64(ipPort.Port), 10))
 }
 
 // IsZero returns if the IP or port is zeroed out

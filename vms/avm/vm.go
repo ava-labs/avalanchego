@@ -29,11 +29,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -308,12 +308,10 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		vm.state.Close(),
 		vm.baseDB.Close(),
 	)
-	return errs.Err
 }
 
 func (*VM) Version(context.Context) (string, error) {
