@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -34,7 +35,11 @@ import (
 
 const nonVerifiedCacheSize = 64 * units.MiB
 
-var _ Engine = (*Transitive)(nil)
+var (
+	_ Engine = (*Transitive)(nil)
+
+	errNoPeersToDownloadBlocksFrom = errors.New("no connected peers to download blocks from")
+)
 
 func New(config Config) (Engine, error) {
 	return newTransitive(config)
@@ -1104,14 +1109,9 @@ func (t *Transitive) fetch(ctx context.Context, blkID ids.ID) error {
 		return nil
 	}
 
-	if _, err := t.VM.GetBlock(ctx, blkID); err == nil {
-		// Requesting known block is the stopping condition for block backfilling
-		return nil
-	}
-
 	validatorID, ok := t.fetchFrom.Peek()
 	if !ok {
-		return fmt.Errorf("dropping request for %s as there are no peers", blkID)
+		return fmt.Errorf("dropping request for %s: %w", blkID, errNoPeersToDownloadBlocksFrom)
 	}
 
 	// We only allow one outbound request at a time from a node
