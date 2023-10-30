@@ -64,6 +64,10 @@ func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	return ErrWrongTxType
+}
+
 func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }

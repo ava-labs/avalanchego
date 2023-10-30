@@ -1322,7 +1322,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			continue
 		}
 
-		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
+		vdr.PublicKey = bls.DeserializePublicKey(pkBytes)
 	}
 
 	// Note: this does not fallback to the linkeddb index because the linkeddb
@@ -1404,14 +1404,12 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		s.loadMetadata(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
 	)
-	return errs.Err
 }
 
 func (s *state) loadMetadata() error {
@@ -1568,8 +1566,10 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			potentialRewardBytes := delegatorIt.Value()
-			potentialReward, err := database.ParseUInt64(potentialRewardBytes)
+			metadata := &delegatorMetadata{
+				txID: txID,
+			}
+			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
 			}
@@ -1579,7 +1579,7 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, potentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}
@@ -1594,14 +1594,12 @@ func (s *state) loadCurrentValidators() error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
 		subnetDelegatorIt.Error(),
 	)
-	return errs.Err
 }
 
 func (s *state) loadPendingValidators() error {
@@ -1680,14 +1678,12 @@ func (s *state) loadPendingValidators() error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
 		subnetDelegatorIt.Error(),
 	)
-	return errs.Err
 }
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
@@ -1729,8 +1725,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1745,12 +1740,10 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeChains(),
 		s.writeMetadata(),
 	)
-	return errs.Err
 }
 
 func (s *state) Close() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -1773,7 +1766,6 @@ func (s *state) Close() error {
 		s.blockDB.Close(),
 		s.blockIDDB.Close(),
 	)
-	return errs.Err
 }
 
 func (s *state) sync(genesis []byte) error {
@@ -2032,7 +2024,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := block.GenesisCodec.Marshal(block.Version, metadata)
+				metadataBytes, err := metadataCodec.Marshal(v0, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -2058,7 +2050,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						staker.PublicKey.Serialize(),
+						bls.SerializePublicKey(staker.PublicKey),
 					)
 					if err != nil {
 						return err
@@ -2175,7 +2167,11 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to increase node weight diff: %w", err)
 		}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
+		metadata := &delegatorMetadata{
+			txID:            staker.TxID,
+			PotentialReward: staker.PotentialReward,
+		}
+		if err := writeDelegatorMetadata(currentDelegatorList, metadata); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
@@ -2531,14 +2527,13 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			errs := wrappers.Errs{}
-			errs.Add(
+			err := utils.Err(
 				s.Commit(),
 				blockIterator.Error(),
 			)
 			lock.Unlock()
-			if errs.Errored() {
-				return errs.Err
+			if err != nil {
+				return err
 			}
 
 			// We release the iterator here to allow the underlying database to

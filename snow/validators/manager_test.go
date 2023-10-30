@@ -204,22 +204,10 @@ func TestGet(t *testing.T) {
 	require.Equal(nodeID, vdr1.NodeID)
 	require.Equal(pk, vdr1.PublicKey)
 	require.Equal(uint64(2), vdr1.Weight)
-}
 
-func TestContains(t *testing.T) {
-	require := require.New(t)
-
-	m := NewManager()
-	subnetID := ids.GenerateTestID()
-
-	nodeID := ids.GenerateTestNodeID()
-	require.False(m.Contains(subnetID, nodeID))
-
-	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
-
-	require.True(m.Contains(subnetID, nodeID))
-	require.NoError(m.RemoveWeight(subnetID, nodeID, 1))
-	require.False(m.Contains(subnetID, nodeID))
+	require.NoError(m.RemoveWeight(subnetID, nodeID, 2))
+	_, ok = m.GetValidator(subnetID, nodeID)
+	require.False(ok)
 }
 
 func TestLen(t *testing.T) {

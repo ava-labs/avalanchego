@@ -9,7 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -46,13 +46,12 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 		),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(m.numProcessing),
 		registerer.Register(m.numCalls),
 		registerer.Register(m.totalDuration),
 	)
-	return m, errs.Err
+	return m, err
 }
 
 func (m *metrics) wrapHandler(chainName string, handler http.Handler) http.Handler {

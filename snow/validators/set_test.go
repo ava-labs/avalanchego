@@ -155,21 +155,10 @@ func TestSetGet(t *testing.T) {
 	require.Equal(nodeID, vdr1.NodeID)
 	require.Equal(pk, vdr1.PublicKey)
 	require.Equal(uint64(2), vdr1.Weight)
-}
 
-func TestSetContains(t *testing.T) {
-	require := require.New(t)
-
-	s := newSet()
-
-	nodeID := ids.GenerateTestNodeID()
-	require.False(s.Contains(nodeID))
-
-	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
-
-	require.True(s.Contains(nodeID))
-	require.NoError(s.RemoveWeight(nodeID, 1))
-	require.False(s.Contains(nodeID))
+	require.NoError(s.RemoveWeight(nodeID, 2))
+	_, ok = s.Get(nodeID)
+	require.False(ok)
 }
 
 func TestSetLen(t *testing.T) {
