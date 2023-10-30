@@ -508,7 +508,6 @@ func (n *Node) initDatabase() error {
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
 		}
-		return nil
 	case memdb.Name:
 		n.DB = memdb.New()
 	default:
