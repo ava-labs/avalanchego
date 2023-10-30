@@ -24,9 +24,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// pebbleByteOverHead is the number of bytes of constant overhead that
-// should be added to a batch size per operation.
-const pebbleByteOverHead = 8
+const (
+	Name = "pebble"
+
+	// pebbleByteOverHead is the number of bytes of constant overhead that
+	// should be added to a batch size per operation.
+	pebbleByteOverHead = 8
+)
 
 var (
 	_ database.Database = (*Database)(nil)
