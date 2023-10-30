@@ -37,9 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -109,8 +106,7 @@ type Node struct {
 	ID ids.NodeID
 
 	// Storage for this node
-	DBManager manager.Manager
-	DB        database.Database
+	DB database.Database
 
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
@@ -500,40 +496,41 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
+	// TODO fix this
 	// start the db manager
-	var (
-		dbManager manager.Manager
-		err       error
-	)
-	switch n.Config.DatabaseConfig.Name {
-	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
-	case memdb.Name:
-		dbManager = manager.NewMemDB(version.CurrentDatabase)
-	default:
-		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
-			n.Config.DatabaseConfig.Name,
-			leveldb.Name,
-			memdb.Name,
-		)
-	}
-	if err != nil {
-		return err
-	}
+	// var (
+	// 	dbManager manager.Manager
+	// 	err       error
+	// )
+	// switch n.Config.DatabaseConfig.Name {
+	// case leveldb.Name:
+	// 	//dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+	// case memdb.Name:
+	// 	dbManager = manager.NewMemDB(version.CurrentDatabase)
+	// default:
+	// 	err = fmt.Errorf(
+	// 		"db-type was %q but should have been one of {%s, %s}",
+	// 		n.Config.DatabaseConfig.Name,
+	// 		leveldb.Name,
+	// 		memdb.Name,
+	// 	)
+	// }
+	// if err != nil {
+	// 	return err
+	// }
 
-	meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	if err != nil {
-		return err
-	}
+	// meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
+	// if err != nil {
+	// 	return err
+	// }
 
-	n.DBManager = meterDBManager
+	// n.DBManager = meterDBManager
 
-	currentDB := dbManager.Current()
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", currentDB.Version),
-	)
-	n.DB = currentDB.Database
+	// currentDB := dbManager.Current()
+	// n.Log.Info("initializing database",
+	// 	zap.Stringer("dbVersion", currentDB.Version),
+	// )
+	// n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -830,7 +827,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
 		TxAcceptorGroup:                         n.TxAcceptorGroup,
 		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DBManager:                               n.DBManager,
+		DB:                                      n.DB,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
@@ -980,8 +977,7 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	n.keystore = keystore.New(n.Log, keystoreDB)
+	n.keystore = keystore.New(n.Log, prefixdb.New([]byte("keystore"), n.DB))
 	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
@@ -1547,7 +1543,7 @@ func (n *Node) shutdown() {
 	n.Log.Info("cleaning up plugin runtimes")
 	n.runtimeManager.Stop(context.TODO())
 
-	if n.DBManager != nil {
+	if n.DB != nil {
 		if err := n.DB.Delete(ungracefulShutdown); err != nil {
 			n.Log.Error(
 				"failed to delete ungraceful shutdown key",
@@ -1555,7 +1551,7 @@ func (n *Node) shutdown() {
 			)
 		}
 
-		if err := n.DBManager.Close(); err != nil {
+		if err := n.DB.Close(); err != nil {
 			n.Log.Warn("error during DB shutdown",
 				zap.Error(err),
 			)
