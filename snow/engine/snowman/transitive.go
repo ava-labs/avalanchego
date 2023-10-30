@@ -98,9 +98,10 @@ type Transitive struct {
 	errs wrappers.Errs
 
 	// START OF BLOCK BACKFILLING STUFF
-	fetchFrom           set.Set[ids.NodeID] // picked from bootstrapper
-	peers               tracker.Peers
-	backfillingRequests common.Requests // tracks which validators were asked for which containers in which requests
+	fetchFrom                 set.Set[ids.NodeID] // picked from bootstrapper
+	peers                     tracker.Peers
+	backfillingRequests       common.Requests // tracks which validators were asked for which block in which requests
+	blkBackfillingInterrupted bool            // flag to allow backfilling restart after recovering from validators disconnections
 	// END OF BLOCK BACKFILLING STUFF
 }
 
@@ -145,8 +146,9 @@ func newTransitive(config Config) (*Transitive, error) {
 		),
 
 		// block-backfilling stuff
-		fetchFrom: set.Of[ids.NodeID](config.Validators.GetValidatorIDs(config.Ctx.SubnetID)...),
-		peers:     config.Peers,
+		fetchFrom:                 set.Of[ids.NodeID](config.Validators.GetValidatorIDs(config.Ctx.SubnetID)...),
+		peers:                     config.Peers,
+		blkBackfillingInterrupted: len(config.Peers.PreferredPeers()) > 0,
 	}
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
@@ -1132,10 +1134,23 @@ func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersi
 	if _, ok := t.Validators.GetValidator(t.Ctx.SubnetID, nodeID); ok {
 		t.fetchFrom.Add(nodeID)
 	}
-	return t.VM.Connected(ctx, nodeID, nodeVersion)
+	if err := t.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if !t.blkBackfillingInterrupted {
+		return nil
+	}
+
+	// first validator reconnected. Resume blocks backfilling if needed
+	t.blkBackfillingInterrupted = false
+	return t.startBlockBackfilling(ctx)
 }
 
 func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	t.markUnavailable(nodeID)
+
+	// if there is no validator left, flag that blocks backfilling is interrupted.
+	t.blkBackfillingInterrupted = len(t.fetchFrom) == 0
 	return t.VM.Disconnected(ctx, nodeID)
 }

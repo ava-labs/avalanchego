@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func TestGetAncestorsRequestIssuedIfBlockBackfillingIsEnabled(t *testing.T) {
@@ -94,12 +95,8 @@ func TestEngineErrsIfBlockBackfillingIsEnabledCheckErrs(t *testing.T) {
 func TestEngineErrsIfThereAreNoPeersToDownloadBlocksFrom(t *testing.T) {
 	require := require.New(t)
 
-	engCfg, vm, _, err := setupBlockBackfillingTests(t)
+	engCfg, vm, sender, err := setupBlockBackfillingTests(t)
 	require.NoError(err)
-
-	// drop validators, so that there are no peers connected to request blocks from
-	vals := validators.NewManager()
-	engCfg.Validators = vals
 
 	// create the engine
 	te, err := newTransitive(engCfg)
@@ -111,10 +108,33 @@ func TestEngineErrsIfThereAreNoPeersToDownloadBlocksFrom(t *testing.T) {
 		return reqBlk, nil
 	}
 
+	var (
+		issuedBlkRequest = false
+		issuedBlkID      ids.ID
+	)
+	sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
+		issuedBlkRequest = true
+		issuedBlkID = blkID
+	}
+
+	// disconnect all validators, so that there are no peers to download blocks from
 	dummyCtx := context.Background()
+	for _, valID := range engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID) {
+		require.NoError(te.Disconnected(dummyCtx, valID))
+	}
+
 	reqNum := uint32(0)
 	err = te.Start(dummyCtx, reqNum)
 	require.ErrorIs(err, errNoPeersToDownloadBlocksFrom)
+
+	// riconnect at least a validator and show that GetAncestors requests are issued
+	for _, valID := range engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID) {
+		require.NoError(te.Connected(dummyCtx, valID, version.CurrentApp))
+	}
+
+	// check that GetAncestors request is issued once a validator has reconnected
+	require.True(issuedBlkRequest)
+	require.Equal(reqBlk, issuedBlkID)
 }
 
 func TestAncestorsProcessing(t *testing.T) {
@@ -263,21 +283,22 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 
 	// start the engine
 	dummyCtx := context.Background()
-	responseReqID := uint32(0)
-	require.NoError(te.Start(dummyCtx, responseReqID))
+	startReqNum := uint32(0)
+	require.NoError(te.Start(dummyCtx, startReqNum))
+
+	var (
+		nodeID        = engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[0]
+		responseReqID = startReqNum
+		blkBytes      = [][]byte{{1}} // content does not matter here. We just need it non-empty
+
+		pushedBlks       = false
+		nextRequestedBlk = ids.GenerateTestID()
+		issuedBlk        = ids.Empty
+	)
 
 	// 1. Successfully request and download some blocks
 	{
-		var (
-			nodeID        = engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[0]
-			responseReqID = responseReqID + 1
-			blkBytes      = [][]byte{{1}} // content does not matter here. We just need it non-empty
-
-			pushedBlks       = false
-			nextRequestedBlk = ids.GenerateTestID()
-			issuedBlk        = ids.Empty
-		)
-
+		responseReqID++
 		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
 			pushedBlks = true
 			return nextRequestedBlk, nil // requestedBlkID does not really matter here
@@ -292,15 +313,10 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 
 	// 2. Successfully request and download some more blocks
 	{
-		var (
-			nodeID        = engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[0]
-			responseReqID = responseReqID + 2
-			blkBytes      = [][]byte{{1}} // content does not matter here. We just need it non-empty
-
-			pushedBlks       = false
-			nextRequestedBlk = ids.GenerateTestID()
-			issuedBlk        = ids.Empty
-		)
+		pushedBlks = false
+		nextRequestedBlk = ids.GenerateTestID()
+		issuedBlk = ids.Empty
+		responseReqID++
 
 		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
 			pushedBlks = true
@@ -315,16 +331,30 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 		require.Equal(nextRequestedBlk, issuedBlk)
 	}
 
-	// 3. Let the VM stop block downloading (block backfilling complete)
+	// 3. If block backfilling fails in VM, the same blocks are requested to a different VM
 	{
-		var (
-			nodeID        = engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[0]
-			responseReqID = responseReqID + 3
-			blkBytes      = [][]byte{{1}} // content does not matter here. We just need it non-empty
+		pushedBlks = false
+		issuedBlk = ids.Empty
+		responseReqID++
 
-			pushedBlks       = false
-			issuedBlkRequest = false
-		)
+		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+			pushedBlks = true
+			return ids.Empty, errors.New("custom error upon backfilling")
+		}
+		sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
+			issuedBlk = blkID
+		}
+
+		require.NoError(te.Ancestors(dummyCtx, nodeID, responseReqID, blkBytes))
+		require.True(pushedBlks)
+		require.Equal(nextRequestedBlk, issuedBlk) // we expect to ask again block requested at step 2
+	}
+
+	// 4. Let the VM stop block downloading (block backfilling complete)
+	{
+		issuedBlkRequest := false
+		pushedBlks = false
+		responseReqID++
 
 		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
 			pushedBlks = true
@@ -336,7 +366,7 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 
 		require.NoError(te.Ancestors(dummyCtx, nodeID, responseReqID, blkBytes))
 		require.True(pushedBlks)
-		require.False(issuedBlkRequest)
+		require.False(issuedBlkRequest) // no more requests, block backfilling done
 	}
 }
 
