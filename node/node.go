@@ -525,10 +525,6 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", version.CurrentDatabase),
-	)
-
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
@@ -552,6 +548,10 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	n.Log.Info("initializing database",
+		zap.Stringer("genesisHash", genesisHash),
+	)
 
 	ok, err := n.DB.Has(ungracefulShutdown)
 	if err != nil {

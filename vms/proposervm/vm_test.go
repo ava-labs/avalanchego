@@ -2041,7 +2041,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		memdb.New(), // make sure that DBs are compressed correctly
+		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
 		nil,
 		nil,
