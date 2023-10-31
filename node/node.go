@@ -93,7 +93,8 @@ var (
 	genesisHashKey     = []byte("genesisID")
 	ungracefulShutdown = []byte("ungracefulShutdown")
 
-	indexerDBPrefix = []byte{0x00}
+	indexerDBPrefix  = []byte{0x00}
+	keystoreDBPrefix = []byte("keystore")
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -546,10 +547,6 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", version.CurrentDatabase),
-	)
-
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
@@ -573,6 +570,10 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	n.Log.Info("initializing database",
+		zap.Stringer("genesisHash", genesisHash),
+	)
 
 	ok, err := n.DB.Has(ungracefulShutdown)
 	if err != nil {
@@ -995,7 +996,7 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	n.keystore = keystore.New(n.Log, prefixdb.New([]byte("keystore"), n.DB))
+	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
 	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
