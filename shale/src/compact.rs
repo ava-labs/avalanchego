@@ -214,47 +214,6 @@ impl Storable for CompactSpaceHeader {
 }
 
 #[derive(Debug)]
-struct U64Field(u64);
-
-impl U64Field {
-    const MSIZE: u64 = 8;
-}
-
-impl Storable for U64Field {
-    fn hydrate<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
-        let raw = mem
-            .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::InvalidCacheView {
-                offset: addr,
-                size: Self::MSIZE,
-            })?;
-        Ok(Self(u64::from_le_bytes(raw.as_deref().try_into().unwrap())))
-    }
-
-    fn dehydrated_len(&self) -> u64 {
-        Self::MSIZE
-    }
-
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
-        Cursor::new(to).write_all(&self.0.to_le_bytes())?;
-        Ok(())
-    }
-}
-
-impl std::ops::Deref for U64Field {
-    type Target = u64;
-    fn deref(&self) -> &u64 {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for U64Field {
-    fn deref_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-}
-
-#[derive(Debug)]
 struct CompactSpaceInner<M> {
     meta_space: Arc<M>,
     compact_space: Arc<M>,
