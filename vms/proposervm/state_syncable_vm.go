@@ -163,13 +163,7 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 
 func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	if vm.ssVM == nil || !vm.stateSyncDone.Get() {
-		return ids.Empty, nil
-	}
-
-	// if vm implements Snowman++, a block height index must be available
-	// to support state sync
-	if err := vm.VerifyHeightIndex(ctx); err != nil {
-		return ids.Empty, fmt.Errorf("could not verify height index: %w", err)
+		return ids.Empty, block.ErrBlockBackfillingNotEnabled
 	}
 
 	innerBlkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
