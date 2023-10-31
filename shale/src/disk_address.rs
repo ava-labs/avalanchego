@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use std::hash::Hash;
+use std::mem::size_of;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 
@@ -160,7 +161,7 @@ impl std::ops::BitAnd<usize> for DiskAddress {
 }
 
 impl DiskAddress {
-    const MSIZE: u64 = 8;
+    const MSIZE: u64 = size_of::<Self>() as u64;
 }
 
 impl Storable for DiskAddress {
