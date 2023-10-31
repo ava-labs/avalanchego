@@ -504,6 +504,8 @@ func (n *Node) initDatabase() error {
 	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
+		// Prior to v1.10.15, the only on-disk database was leveldb, and its
+		// files went to [dbPath]/[networkID]/v1.4.5.
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
 		var err error
 		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
