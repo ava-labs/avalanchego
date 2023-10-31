@@ -613,7 +613,7 @@ func (c *genericCodec) unmarshal(
 			return p.Err
 		}
 		// Unmarshal each element and append it into the slice.
-		value.Set(reflect.MakeSlice(value.Type(), 0, initialSliceLen))
+		value.Set(reflect.MakeSlice(sliceType, 0, initialSliceLen))
 		zeroValue := reflect.Zero(innerType)
 		for i := 0; i < numElts; i++ {
 			value.Set(reflect.Append(value, zeroValue))
