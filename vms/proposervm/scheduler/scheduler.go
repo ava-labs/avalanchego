@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -37,15 +38,18 @@ type scheduler struct {
 	// from telling the engine to call its VM's BuildBlock method until the
 	// given time
 	newBuildBlockTime chan time.Time
+
+	stateSyncDone *utils.Atomic[bool]
 }
 
-func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
+func New(log logging.Logger, toEngine chan<- common.Message, stateSyncDone *utils.Atomic[bool]) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, cap(toEngine))
 	return &scheduler{
 		log:               log,
 		fromVM:            vmToEngine,
 		toEngine:          toEngine,
 		newBuildBlockTime: make(chan time.Time),
+		stateSyncDone:     stateSyncDone,
 	}, vmToEngine
 }
 
@@ -74,9 +78,10 @@ waitloop:
 
 		for {
 			select {
-			case msg := <-s.fromVM:
-				// Give the engine the message from the VM asking the engine to
-				// build a block
+			case msg := <-s.fromVM: // Pass the message up to the engine
+				if msg == common.StateSyncDone {
+					s.stateSyncDone.Set(true)
+				}
 				select {
 				case s.toEngine <- msg:
 				default:

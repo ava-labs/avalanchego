@@ -133,6 +133,8 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
+
+	stateSyncDone utils.Atomic[bool]
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -220,7 +222,7 @@ func (vm *VM) Initialize(
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine, &vm.stateSyncDone)
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
 
@@ -327,10 +329,10 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
-	return vm.parseProposerBlock(ctx, b)
+	return vm.parseBlock(ctx, b)
 }
 
-func (vm *VM) parseProposerBlock(ctx context.Context, b []byte) (Block, error) {
+func (vm *VM) parseBlock(ctx context.Context, b []byte) (Block, error) {
 	if blk, err := vm.parsePostForkBlock(ctx, b); err == nil {
 		return blk, nil
 	}

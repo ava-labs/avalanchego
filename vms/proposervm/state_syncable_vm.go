@@ -162,35 +162,80 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 }
 
 func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
-	if vm.ssVM == nil {
+	if vm.ssVM == nil || !vm.stateSyncDone.Get() {
 		return ids.Empty, nil
+	}
+
+	// if vm implements Snowman++, a block height index must be available
+	// to support state sync
+	if err := vm.VerifyHeightIndex(ctx); err != nil {
+		return ids.Empty, fmt.Errorf("could not verify height index: %w", err)
 	}
 
 	innerBlkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
 	if err != nil {
-		return ids.Empty, err
+		return ids.Empty, fmt.Errorf("failed checking that block backfilling is enabled in innerVM: %w", err)
 	}
 
-	// vvv This is wrong vvv It returns innerVM BlockID, instead of proposerVM blockID
-	return innerBlkID, nil
+	innerBlk, err := vm.ChainVM.GetBlock(ctx, innerBlkID)
+	if err != nil {
+		return ids.Empty, fmt.Errorf("failed retrieving block ID %s from innerVM: %w", innerBlkID, err)
+	}
+
+	return vm.GetBlockIDAtHeight(ctx, innerBlk.Height())
 }
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, error) {
-	innerBlksBytes := make([][]byte, 0, len(blksBytes))
+	// if vm implements Snowman++, a block height index must be available
+	// to support state sync
+	if err := vm.VerifyHeightIndex(ctx); err != nil {
+		return ids.Empty, fmt.Errorf("could not verify height index: %w", err)
+	}
+
+	var (
+		blks           = make([]Block, 0, len(blksBytes))
+		innerBlksBytes = make([][]byte, 0, len(blksBytes))
+	)
+
 	for i, blkBytes := range blksBytes {
-		blk, err := vm.parseProposerBlock(ctx, blkBytes)
+		blk, err := vm.parseBlock(ctx, blkBytes)
 		if err != nil {
 			return ids.Empty, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
 
 		// TODO: introduce validation
 
-		if err := blk.acceptOuterBlk(); err != nil {
-			return ids.Empty, fmt.Errorf("failed indexing backfilled block, index %d, %w", i, err)
-		}
+		blks = append(blks, blk)
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 
-	// vvv This is wrong vvv It returns innerVM BlockID, instead of proposerVM blockID
-	return vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
+	nextInnerBlkID, err := vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
+	if err == nil {
+		// no error signals at least a single block has been accepted by the innerVM. (not necessarily all of them)
+		// Find out which blocks have been accepted and store them.
+		// Should the process err while looping there will be innerVM blocks not indexed by proposerVM. Repair will be
+		// carried out upon restart.
+		for _, blk := range blks {
+			_, err := vm.ChainVM.GetBlock(ctx, blk.getInnerBlk().ID())
+			if err != nil {
+				continue
+			}
+			if err := blk.acceptOuterBlk(); err != nil {
+				return ids.Empty, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
+			}
+		}
+	}
+
+	// Finally map innerVM next block ID to proposerVM one
+	innerBlk, err := vm.ChainVM.GetBlock(ctx, nextInnerBlkID)
+	if err != nil {
+		return ids.Empty, fmt.Errorf("failed retrieving inner vm next block: %w", err)
+	}
+
+	// vvv is this correct? When have I height indexed this block??? vvv If it errs it may be one of the blocks in the list
+	nextBlkID, err := vm.GetBlockIDAtHeight(ctx, innerBlk.Height())
+	if err != nil {
+		return ids.Empty, fmt.Errorf("failed mapping innerVM next block ID to proposerVM one: %w", err)
+	}
+	return nextBlkID, err
 }
