@@ -92,7 +92,8 @@ var (
 	genesisHashKey     = []byte("genesisID")
 	ungracefulShutdown = []byte("ungracefulShutdown")
 
-	indexerDBPrefix = []byte{0x00}
+	indexerDBPrefix  = []byte{0x00}
+	keystoreDBPrefix = []byte("keystore")
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -974,7 +975,7 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	n.keystore = keystore.New(n.Log, prefixdb.New([]byte("keystore"), n.DB))
+	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
 	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
