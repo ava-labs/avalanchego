@@ -501,20 +501,32 @@ func (n *Node) Dispatch() error {
 
 func (n *Node) initDatabase() error {
 	// start the db
-	switch n.Config.DatabaseConfig.Name {
-	case leveldb.Name:
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		var err error
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
-		}
+	switch dbName := n.Config.DatabaseConfig.Name; dbName {
 	case memdb.Name:
 		n.DB = memdb.New()
-	case pebble.Name:
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		var err error
-		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+	case leveldb.Name, pebble.Name:
+		var (
+			finalPathElem = pebble.Name
+			newDBFunc     = pebble.New
+		)
+		if dbName == leveldb.Name {
+			// Prior to v1.10.15, the only on-disk database was leveldb,
+			// and its files went to [dbPath]/[networkID]/v1.4.5.
+			finalPathElem = version.CurrentDatabase.String()
+			newDBFunc = leveldb.New
+		}
+
+		var (
+			dbPath = filepath.Join(n.Config.DatabaseConfig.Path, finalPathElem)
+			err    error
+		)
+		n.DB, err = newDBFunc(
+			dbPath,
+			n.Config.DatabaseConfig.Config,
+			n.Log,
+			"db_internal",
+			n.MetricsRegisterer,
+		)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
 		}
