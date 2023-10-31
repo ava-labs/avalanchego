@@ -157,8 +157,6 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
 	)
 	if err != nil {
-		// Ignore closing errors to return the original error
-		_ = vm.connCloser.Close()
 		return nil, err
 	}
 	vm.connCloser.Add(dbclientConn)
