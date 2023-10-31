@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -315,9 +315,9 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 		BanffTime:              banffForkTime,
 	}}
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	db := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, db)
+	atomicDB := prefixdb.New([]byte{1}, db)
 
 	vm.clock.Set(banffForkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
@@ -341,7 +341,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		chainDBManager,
+		chainDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -371,7 +371,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	return vm, baseDBManager.Current().Database, msm
+	return vm, db, msm
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
@@ -1172,9 +1172,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
-	firstDB := db.NewPrefixDBManager([]byte{})
+	firstDB := prefixdb.New([]byte{}, db)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
@@ -1187,8 +1187,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstCtx := defaultContext(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(firstCtx.ChainID),
@@ -1279,7 +1279,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := prefixdb.New([]byte{}, db)
 	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
@@ -1304,10 +1304,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	_, genesisBytes := defaultGenesis(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
-
+	baseDB := memdb.New()
+	vmDB := prefixdb.New([]byte("vm"), baseDB)
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
@@ -1325,7 +1324,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext(t)
 
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),
@@ -1340,7 +1339,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		vmDBManager,
+		vmDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -1630,7 +1629,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1655,7 +1653,7 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		memdb.New(),
 		genesisBytes,
 		nil,
 		nil,
@@ -1787,9 +1785,9 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
-	firstDB := db.NewPrefixDBManager([]byte{})
+	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1833,7 +1831,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	// Restart the VM with a larger uptime requirement
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := prefixdb.New([]byte{}, db)
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1925,7 +1923,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
