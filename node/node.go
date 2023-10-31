@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -503,20 +504,30 @@ func (n *Node) initDatabase() error {
 	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
+		// Prior to v1.10.15, the only on-disk database was leveldb, and its
+		// files went to [dbPath]/[networkID]/v1.4.5.
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
 		var err error
 		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
 		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
+			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
 		}
 	case memdb.Name:
 		n.DB = memdb.New()
+	case pebble.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
+		var err error
+		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
+		}
 	default:
 		return fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
+			"db-type was %q but should have been one of {%s, %s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
+			pebble.Name,
 		)
 	}
 
