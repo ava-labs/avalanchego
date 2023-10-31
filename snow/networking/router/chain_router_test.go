@@ -451,12 +451,12 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed = true
 		return nil
 	}
-	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32) error {
+	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32, *common.AppError) error {
 		defer wg.Done()
 		calledAppRequestFailed = true
 		return nil
 	}
-	bootstrapper.CrossChainAppRequestFailedF = func(context.Context, ids.ID, uint32) error {
+	bootstrapper.CrossChainAppRequestFailedF = func(context.Context, ids.ID, uint32, *common.AppError) error {
 		defer wg.Done()
 		calledCrossChainAppRequestFailed = true
 		return nil
@@ -634,10 +634,12 @@ func TestRouterTimeout(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InternalAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -658,6 +660,8 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -1055,10 +1059,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InternalAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			),
 			engineType,
 		)
@@ -1085,6 +1091,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 				ctx.ChainID,
 				ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			),
 			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
@@ -1411,6 +1419,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 			responder.ChainID,
 			requester.ChainID,
 			uint32(1),
+			common.ErrTimeout.Code,
+			common.ErrTimeout.Message,
 		),
 		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	)
