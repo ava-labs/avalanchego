@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -12,6 +13,22 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
+)
+
+var (
+	// ErrUnexpected is a default error used to signal unexpected behavior
+	ErrUnexpected = &AppError{
+		Code:    0,
+		Message: "unexpected error",
+	}
+
+	// ErrTimeout is used to signal a response timeout
+	ErrTimeout = &AppError{
+		Code:    1,
+		Message: "timed out",
+	}
+
+	_ error = (*AppError)(nil)
 )
 
 // Engine describes the standard interface of a consensus engine.
@@ -390,15 +407,13 @@ type AppResponseHandler interface {
 		response []byte,
 	) error
 
-	// Notify this engine that an AppRequest it issued has failed.
-	//
-	// This function will be called if an AppRequest message with nodeID and
-	// requestID was previously sent by this engine and will not receive a
-	// response.
+	// AppRequestFailed is called when a pending AppRequest failed due to either
+	// a timeout or an application-defined reason.
 	AppRequestFailed(
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
+		err error,
 	) error
 }
 
@@ -459,15 +474,13 @@ type CrossChainAppResponseHandler interface {
 		response []byte,
 	) error
 
-	// Notify this engine that a CrossChainAppRequest it issued has failed.
-	//
-	// This function will be called if a CrossChainAppRequest message with
-	// nodeID and requestID was previously sent by this engine and will not
-	// receive a response.
+	// CrossChainAppRequestFailed is called when a pending CrossChainAppRequest
+	// failed due to either a timeout or an application-defined reason.
 	CrossChainAppRequestFailed(
 		ctx context.Context,
 		chainID ids.ID,
 		requestID uint32,
+		err error,
 	) error
 }
 
@@ -501,4 +514,25 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
+}
+
+// AppError is an application-defined error
+type AppError struct {
+	// Code is application-defined and should be used for error matching
+	Code uint32
+	// Message is a human-readable error message
+	Message string
+}
+
+func (a *AppError) Error() string {
+	return fmt.Sprintf("%d: %s", a.Code, a.Message)
+}
+
+func (a *AppError) Is(target error) bool {
+	appErr, ok := target.(*AppError)
+	if !ok {
+		return false
+	}
+
+	return a.Code == appErr.Code
 }

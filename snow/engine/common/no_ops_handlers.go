@@ -288,12 +288,13 @@ func (nop *noOpAppHandler) CrossChainAppRequest(_ context.Context, chainID ids.I
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
+func (nop *noOpAppHandler) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32, err error) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.CrossChainAppRequestFailedOp),
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
+		zap.Error(err),
 	)
 	return nil
 }
@@ -318,12 +319,13 @@ func (nop *noOpAppHandler) AppRequest(_ context.Context, nodeID ids.NodeID, requ
 	return nil
 }
 
-func (nop *noOpAppHandler) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (nop *noOpAppHandler) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.AppRequestFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
+		zap.Error(err),
 	)
 	return nil
 }

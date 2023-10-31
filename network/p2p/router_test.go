@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -33,6 +34,8 @@ func TestAppRequestResponse(t *testing.T) {
 	ctxVal := new(string)
 	*ctxKey = "foo"
 	*ctxVal = "bar"
+
+	errFoo := errors.New("foo")
 
 	tests := []struct {
 		name        string
@@ -81,7 +84,7 @@ func TestAppRequestResponse(t *testing.T) {
 					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 						for range nodeIDs {
 							go func() {
-								require.NoError(t, router.AppRequestFailed(ctx, nodeID, requestID))
+								require.NoError(t, router.AppRequestFailed(ctx, nodeID, requestID, errFoo))
 							}()
 						}
 					})
@@ -89,7 +92,7 @@ func TestAppRequestResponse(t *testing.T) {
 				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.ErrorIs(t, err, ErrAppRequestFailed)
+					require.ErrorIs(t, err, errFoo)
 					require.Equal(t, nodeID, actualNodeID)
 					require.Nil(t, actualResponse)
 				}
@@ -137,14 +140,15 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendCrossChainAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, request []byte) {
 						go func() {
-							require.NoError(t, router.CrossChainAppRequestFailed(ctx, chainID, requestID))
+							require.NoError(t,
+								router.CrossChainAppRequestFailed(ctx, chainID, requestID, errFoo))
 						}()
 					})
 
 				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.ErrorIs(t, err, ErrAppRequestFailed)
+					require.ErrorIs(t, err, errFoo)
 					require.Equal(t, chainID, actualChainID)
 					require.Nil(t, actualResponse)
 				}
@@ -269,7 +273,7 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested app request failed",
 			requestFunc: func(router *Router) error {
-				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
+				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -283,7 +287,7 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested cross-chain request failed",
 			requestFunc: func(router *Router) error {
-				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
+				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},

@@ -37,9 +37,9 @@ func (m *MockNetworkClient) EXPECT() *MockNetworkClientMockRecorder {
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
+func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }

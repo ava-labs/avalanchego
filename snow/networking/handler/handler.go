@@ -842,8 +842,18 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	case *p2p.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-	case *message.AppRequestFailed:
-		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
+	case *p2p.AppRequestFailed:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
+		return engine.AppRequestFailed(
+			ctx,
+			nodeID,
+			m.RequestId,
+			err,
+		)
 
 	case *p2p.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
@@ -866,10 +876,16 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 
 	case *message.CrossChainAppRequestFailed:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
 		return engine.CrossChainAppRequestFailed(
 			ctx,
 			m.SourceChainID,
 			m.RequestID,
+			err,
 		)
 
 	default:

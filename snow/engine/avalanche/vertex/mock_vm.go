@@ -75,7 +75,7 @@ func (mr *MockLinearizableVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32) error {
+func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -83,9 +83,9 @@ func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.Nod
 }
 
 // AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *MockLinearizableVMMockRecorder) AppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockLinearizableVMMockRecorder) AppRequestFailed(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockLinearizableVM)(nil).AppRequestFailed), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockLinearizableVM)(nil).AppRequestFailed), arg0, arg1, arg2, arg3)
 }
 
 // AppResponse mocks base method.
@@ -176,9 +176,9 @@ func (mr *MockLinearizableVMMockRecorder) CrossChainAppRequest(arg0, arg1, arg2,
 }
 
 // CrossChainAppRequestFailed mocks base method.
-func (m *MockLinearizableVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32) error {
+func (m *MockLinearizableVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 error) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }

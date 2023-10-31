@@ -284,6 +284,26 @@ func InboundAppRequest(
 	}
 }
 
+func InboundAppRequestFailed(
+	nodeID ids.NodeID,
+	chainID ids.ID,
+	requestID uint32,
+	errorCode uint32,
+	errorMessage string,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     AppRequestFailedOp,
+		message: &p2p.AppRequestFailed{
+			ChainId:      chainID[:],
+			RequestId:    requestID,
+			ErrorCode:    errorCode,
+			ErrorMessage: errorMessage,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 func InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
