@@ -151,7 +151,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	vm.processMetrics = registerer
 
 	// Dial the database
-	dbclientConn, err := grpcutils.Dial(
+	dbClientConn, err := grpcutils.Dial(
 		req.DbServerAddr,
 		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
 		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
@@ -159,9 +159,9 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
-	vm.connCloser.Add(dbclientConn)
+	vm.connCloser.Add(dbClientConn)
 	vm.db = corruptabledb.New(
-		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbclientConn)),
+		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
 	)
 
 	// TODO: Allow the logger to be configured by the client
