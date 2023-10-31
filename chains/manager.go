@@ -602,11 +602,11 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	db := prefixdb.New(vmDBPrefix, prefixDB)
-	vertexDB := prefixdb.New(vertexDBPrefix, db)
-	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, db)
-	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, db)
-	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, db)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	vertexDB := prefixdb.New(vertexDBPrefix, prefixDB)
+	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, prefixDB)
+	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -729,7 +729,7 @@ func (m *manager) createAvalancheChain(
 	err = dagVM.Initialize(
 		context.TODO(),
 		ctx.Context,
-		db,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
@@ -795,7 +795,7 @@ func (m *manager) createAvalancheChain(
 
 		registerer:   snowmanRegisterer,
 		ctx:          ctx.Context,
-		db:           db,
+		db:           vmDB,
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
@@ -1008,8 +1008,8 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	db := prefixdb.New(vmDBPrefix, prefixDB)
-	bootstrappingDB := prefixdb.New(bootstrappingDB, db)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(bootstrappingDB, prefixDB)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
@@ -1142,7 +1142,7 @@ func (m *manager) createSnowmanChain(
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
-		db,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
