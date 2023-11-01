@@ -161,29 +161,24 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 	}, nil
 }
 
-func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
 	if vm.ssVM == nil || !vm.stateSyncDone.Get() {
-		return ids.Empty, block.ErrBlockBackfillingNotEnabled
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
 
-	innerBlkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
+	_, innerBlkHeight, err := vm.ssVM.BackfillBlocksEnabled(ctx)
 	if err != nil {
-		return ids.Empty, fmt.Errorf("failed checking that block backfilling is enabled in innerVM: %w", err)
+		return ids.Empty, 0, fmt.Errorf("failed checking that block backfilling is enabled in innerVM: %w", err)
 	}
 
-	innerBlk, err := vm.ChainVM.GetBlock(ctx, innerBlkID)
-	if err != nil {
-		return ids.Empty, fmt.Errorf("failed retrieving block ID %s from innerVM: %w", innerBlkID, err)
-	}
-
-	return vm.GetBlockIDAtHeight(ctx, innerBlk.Height())
+	return vm.nextBlockBackfillData(ctx, innerBlkHeight)
 }
 
-func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, error) {
+func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, uint64, error) {
 	// if vm implements Snowman++, a block height index must be available
 	// to support state sync
 	if err := vm.VerifyHeightIndex(ctx); err != nil {
-		return ids.Empty, fmt.Errorf("could not verify height index: %w", err)
+		return ids.Empty, 0, fmt.Errorf("could not verify height index: %w", err)
 	}
 
 	var (
@@ -194,7 +189,7 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, e
 	for i, blkBytes := range blksBytes {
 		blk, err := vm.parseBlock(ctx, blkBytes)
 		if err != nil {
-			return ids.Empty, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
+			return ids.Empty, 0, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
 
 		// TODO: introduce validation
@@ -203,7 +198,7 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, e
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 
-	nextInnerBlkID, err := vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
+	_, nextInnerBlkHeight, err := vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
 	if err == nil {
 		// no error signals at least a single block has been accepted by the innerVM. (not necessarily all of them)
 		// Find out which blocks have been accepted and store them.
@@ -215,21 +210,25 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, e
 				continue
 			}
 			if err := blk.acceptOuterBlk(); err != nil {
-				return ids.Empty, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
+				return ids.Empty, 0, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
 			}
 		}
 	}
 
-	// Finally map innerVM next block ID to proposerVM one
-	innerBlk, err := vm.ChainVM.GetBlock(ctx, nextInnerBlkID)
+	return vm.nextBlockBackfillData(ctx, nextInnerBlkHeight)
+}
+
+func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) (ids.ID, uint64, error) {
+	childBlkHeight := innerBlkHeight + 1
+	childBlkID, err := vm.GetBlockIDAtHeight(ctx, childBlkHeight)
 	if err != nil {
-		return ids.Empty, fmt.Errorf("failed retrieving inner vm next block: %w", err)
+		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block ID at height %d: %w", childBlkHeight, err)
 	}
 
-	// vvv is this correct? When have I height indexed this block??? vvv If it errs it may be one of the blocks in the list
-	nextBlkID, err := vm.GetBlockIDAtHeight(ctx, innerBlk.Height())
+	childBlk, err := vm.getBlock(ctx, childBlkID)
 	if err != nil {
-		return ids.Empty, fmt.Errorf("failed mapping innerVM next block ID to proposerVM one: %w", err)
+		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block %s: %w", childBlkID, err)
 	}
-	return nextBlkID, err
+
+	return childBlk.Parent(), innerBlkHeight, nil
 }

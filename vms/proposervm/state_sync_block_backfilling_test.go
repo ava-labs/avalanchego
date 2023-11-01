@@ -46,11 +46,11 @@ func TestBlockBackfillEnabled(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary, stateSummaryBlkID := createTestStateSummary(t, innerVM, vm, innerSummary, innerStateSyncedBlk)
+	stateSummary, stateSummaryParentBlkID := createTestStateSummary(t, innerVM, vm, innerSummary, innerStateSyncedBlk)
 
 	// Block backfilling not enabled before state sync is accepted
 	ctx := context.Background()
-	_, err := vm.BackfillBlocksEnabled(ctx)
+	_, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
@@ -73,26 +73,26 @@ func TestBlockBackfillEnabled(t *testing.T) {
 	}
 
 	// Block backfilling not enabled before innerVM declares state sync done
-	_, err = vm.BackfillBlocksEnabled(ctx)
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
 	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
 
 	fromInnerVMCh <- common.StateSyncDone
 	<-toEngineCh
 
 	// Block backfilling not enabled until innerVM says so
-	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return ids.Empty, block.ErrBlockBackfillingNotEnabled
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
-	_, err = vm.BackfillBlocksEnabled(ctx)
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
 	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
 
 	// 3. Finally check that block backfilling is done
-	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-	blkID, err := vm.BackfillBlocksEnabled(ctx)
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
-	require.Equal(stateSummaryBlkID, blkID)
+	require.Equal(stateSummaryParentBlkID, blkID)
 }
 
 func createTestStateSummary(
@@ -128,7 +128,7 @@ func createTestStateSummary(
 
 	summary, err := vm.ParseStateSummary(context.Background(), statelessSummary.Bytes())
 	require.NoError(err)
-	return summary, slb.ID()
+	return summary, slb.ParentID()
 }
 
 func setupBlockBackfillingVM(t *testing.T, toEngineCh chan<- common.Message) (*fullVM, *VM, chan<- common.Message) {

@@ -52,15 +52,17 @@ type StateSyncableVM interface {
 	// BackfillBlocksEnabled checks if VM wants to download all blocks from state summary one
 	// down to genesis.
 	//
+	// Returns the ID and height of the block it wants to start backfilling from.
 	// Returns ErrBlockBackfillingNotEnabled if block backfilling is not enabled.
-	BackfillBlocksEnabled(ctx context.Context) (ids.ID, error)
+	// BackfillBlocksEnabled can be called multiple times by the engine
+	BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error)
 
 	// BackfillBlocks passes blocks bytes retrieved via GetAncestors calls to the VM
 	// It's left to the VM the to parse, validate and index the blocks.
 	// BackfillBlocks returns the next block ID to be requested and an error
-	// If BackfillBlocks returns no error, engine will request the blockID returned by the VM
-	// If BackfillBlocks returns ErrStopBlockBackfilling, engine will stop requesting block ancestors
+	// Returns the ID and height of the block it wants to start backfilling from.
+	// Returns [ErrStopBlockBackfilling] if VM has done backfilling; engine will stop requesting blocks.
 	// If BackfillBlocks returns any other error, engine will issue a GetAncestor call to a different peer
 	// with the previously requested block ID
-	BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error)
+	BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error)
 }

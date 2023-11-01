@@ -73,9 +73,9 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 	return vm.ssVM.GetStateSummary(ctx, height)
 }
 
-func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
 	}
 
 	ctx, span := vm.tracer.Start(ctx, vm.backfillBlocksEnabledTag)
@@ -84,9 +84,9 @@ func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
 	return vm.ssVM.BackfillBlocksEnabled(ctx)
 }
 
-func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
 	}
 
 	ctx, span := vm.tracer.Start(ctx, vm.backfillBlocksTag, oteltrace.WithAttributes(

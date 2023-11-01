@@ -80,36 +80,36 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 	return summary, nil
 }
 
-func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (vm *blockVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blkID, err := vm.ssVM.BackfillBlocksEnabled(ctx)
+	blkID, blkHeight, err := vm.ssVM.BackfillBlocksEnabled(ctx)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.backfillBlocksEnabled.Observe(duration)
-		return ids.Empty, err
+		return ids.Empty, blkHeight, err
 	}
 	vm.blockMetrics.backfillBlocksEnabled.Observe(duration)
-	return blkID, nil
+	return blkID, blkHeight, nil
 }
 
-func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
+func (vm *blockVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, block.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	nextWantedBlkID, err := vm.ssVM.BackfillBlocks(ctx, blocks)
+	nextWantedBlkID, nextWantedBlkHeight, err := vm.ssVM.BackfillBlocks(ctx, blocks)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.backfillBlocks.Observe(duration)
-		return nextWantedBlkID, err
+		return nextWantedBlkID, nextWantedBlkHeight, err
 	}
 	vm.blockMetrics.backfillBlocks.Observe(duration)
-	return nextWantedBlkID, nil
+	return nextWantedBlkID, nextWantedBlkHeight, nil
 }

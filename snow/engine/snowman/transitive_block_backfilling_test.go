@@ -33,8 +33,9 @@ func TestGetAncestorsRequestIssuedIfBlockBackfillingIsEnabled(t *testing.T) {
 
 	// enable block backfilling and check blocks request starts with block provided by VM
 	reqBlk := ids.GenerateTestID()
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return reqBlk, nil
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return reqBlk, dummyHeight, nil
 	}
 
 	var issuedBlkID ids.ID
@@ -59,8 +60,9 @@ func TestGetAncestorsRequestNotIssuedIfBlockBackfillingIsNotEnabled(t *testing.T
 	require.NoError(err)
 
 	// disable block backfilling
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return ids.Empty, block.ErrBlockBackfillingNotEnabled
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, dummyHeight, block.ErrBlockBackfillingNotEnabled
 	}
 
 	// this will make engine Start fail if SendGetAncestor is attempted
@@ -83,8 +85,9 @@ func TestEngineErrsIfBlockBackfillingIsEnabledCheckErrs(t *testing.T) {
 
 	// let BackfillBlocksEnabled err with non-flag error
 	customErr := errors.New("a custom error")
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return ids.Empty, customErr
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, dummyHeight, customErr
 	}
 
 	dummyCtx := context.Background()
@@ -105,8 +108,9 @@ func TestEngineErrsIfThereAreNoPeersToDownloadBlocksFrom(t *testing.T) {
 
 	// enable block backfilling
 	reqBlk := ids.GenerateTestID()
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return reqBlk, nil
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return reqBlk, dummyHeight, nil
 	}
 
 	var (
@@ -154,8 +158,9 @@ func TestAncestorsProcessing(t *testing.T) {
 
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return reqBlkFirst, nil
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return reqBlkFirst, dummyHeight, nil
 	}
 	issuedBlk := ids.Empty
 	sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
@@ -174,9 +179,10 @@ func TestAncestorsProcessing(t *testing.T) {
 		pushedBlks    [][]byte
 		reqBlkSecond  = ids.GenerateTestID()
 	)
-	vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+
+	vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 		pushedBlks = b
-		return reqBlkSecond, nil
+		return reqBlkSecond, dummyHeight, nil
 	}
 
 	{
@@ -227,8 +233,9 @@ func TestGetAncestorsFailedProcessing(t *testing.T) {
 
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return reqBlkFirst, nil
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return reqBlkFirst, dummyHeight, nil
 	}
 	issuedBlk := ids.Empty
 	sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
@@ -247,9 +254,9 @@ func TestGetAncestorsFailedProcessing(t *testing.T) {
 		pushedBlks    [][]byte
 		reqBlkSecond  = ids.GenerateTestID()
 	)
-	vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+	vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 		pushedBlks = b
-		return reqBlkSecond, nil
+		return reqBlkSecond, dummyHeight, nil
 	}
 	{
 		// handle Ancestor response from unexpected nodeID
@@ -289,8 +296,9 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
-	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, error) {
-		return reqBlkFirst, nil
+	dummyHeight := uint64(1492)
+	vm.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return reqBlkFirst, dummyHeight, nil
 	}
 
 	// start the engine
@@ -310,9 +318,9 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 	// 1. Successfully request and download some blocks
 	{
 		responseReqID++
-		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 			pushedBlks = true
-			return nextRequestedBlk, nil // requestedBlkID does not really matter here
+			return nextRequestedBlk, dummyHeight, nil // requestedBlkID does not really matter here
 		}
 		sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
 			issuedBlk = blkID
@@ -329,9 +337,9 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 		issuedBlk = ids.Empty
 		responseReqID++
 
-		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 			pushedBlks = true
-			return nextRequestedBlk, nil // requestedBlkID does not really matter here
+			return nextRequestedBlk, dummyHeight, nil // requestedBlkID does not really matter here
 		}
 		sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
 			issuedBlk = blkID
@@ -348,9 +356,9 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 		issuedBlk = ids.Empty
 		responseReqID++
 
-		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 			pushedBlks = true
-			return ids.Empty, errors.New("custom error upon backfilling")
+			return ids.Empty, dummyHeight, errors.New("custom error upon backfilling")
 		}
 		sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
 			issuedBlk = blkID
@@ -367,9 +375,9 @@ func TestBackfillingTerminatedByVM(t *testing.T) {
 		pushedBlks = false
 		responseReqID++
 
-		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, error) {
+		vm.BackfillBlocksF = func(ctx context.Context, b [][]byte) (ids.ID, uint64, error) {
 			pushedBlks = true
-			return ids.Empty, block.ErrStopBlockBackfilling
+			return ids.Empty, dummyHeight, block.ErrStopBlockBackfilling
 		}
 		sender.SendGetAncestorsF = func(ctx context.Context, ni ids.NodeID, u uint32, blkID ids.ID) {
 			issuedBlkRequest = true
