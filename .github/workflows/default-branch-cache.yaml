@@ -2,6 +2,7 @@
 name: default-branch-cache
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
