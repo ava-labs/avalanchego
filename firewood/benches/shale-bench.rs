@@ -4,14 +4,14 @@
 use criterion::{
     black_box, criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion,
 };
-use pprof::ProfilerGuard;
-use rand::Rng;
-use shale::{
+use firewood::shale::{
     cached::{DynamicMem, PlainMem},
     compact::{CompactHeader, CompactSpaceHeader},
     disk_address::DiskAddress,
     CachedStore, Obj, StoredView,
 };
+use pprof::ProfilerGuard;
+use rand::Rng;
 use std::{fs::File, os::raw::c_int, path::Path};
 
 const BENCH_MEM_SIZE: usize = 2_000_000;

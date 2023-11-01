@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::ObjCache;
+use crate::shale::ObjCache;
 
 use super::disk_address::DiskAddress;
 use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
@@ -589,7 +589,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
 mod tests {
     use sha3::Digest;
 
-    use crate::{cached::DynamicMem, ObjCache};
+    use crate::shale::{self, cached::DynamicMem, ObjCache};
 
     use super::*;
 
@@ -648,7 +648,7 @@ mod tests {
         let compact_header = DiskAddress::from(0x1);
         dm.write(
             compact_header.unwrap().get(),
-            &crate::to_dehydrated(&CompactSpaceHeader::new(
+            &shale::to_dehydrated(&CompactSpaceHeader::new(
                 reserved.0.unwrap(),
                 reserved.0.unwrap(),
             ))

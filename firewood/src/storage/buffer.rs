@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
 
 use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
+use crate::shale::SpaceId;
 use crate::storage::DeltaPage;
 use aiofut::{AioBuilder, AioError, AioManager};
 use futures::future::join_all;
@@ -19,7 +20,6 @@ use growthring::{
     walerror::WalError,
     WalFileImpl, WalStoreImpl,
 };
-use shale::SpaceId;
 use tokio::{
     sync::{
         mpsc,
@@ -621,6 +621,7 @@ mod tests {
     use tokio::task::block_in_place;
 
     use super::*;
+    use crate::shale::CachedStore;
     use crate::{
         file,
         storage::{
@@ -628,7 +629,6 @@ mod tests {
             StoreRevShared, ZeroStore,
         },
     };
-    use shale::CachedStore;
 
     const STATE_SPACE: SpaceId = 0x0;
     const HASH_SIZE: usize = 32;

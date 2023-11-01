@@ -1,6 +1,12 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::shale::{
+    self,
+    compact::{CompactSpace, CompactSpaceHeader},
+    disk_address::DiskAddress,
+    CachedStore, Obj, ShaleError, ShaleStore, SpaceId, Storable, StoredView,
+};
 pub use crate::{
     config::{DbConfig, DbRevConfig},
     storage::{buffer::DiskBufferConfig, WalConfig},
@@ -21,11 +27,6 @@ use async_trait::async_trait;
 use bytemuck::{cast_slice, AnyBitPattern};
 use metered::metered;
 use parking_lot::{Mutex, RwLock};
-use shale::{
-    compact::{CompactSpace, CompactSpaceHeader},
-    disk_address::DiskAddress,
-    CachedStore, Obj, ShaleError, ShaleStore, SpaceId, Storable, StoredView,
-};
 use std::{
     collections::VecDeque,
     error::Error,

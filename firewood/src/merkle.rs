@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::shale::{self, disk_address::DiskAddress, ObjWriteError, ShaleError, ShaleStore};
 use crate::{nibbles::Nibbles, v2::api::Proof};
 use sha3::Digest;
-use shale::{self, disk_address::DiskAddress, ObjWriteError, ShaleError, ShaleStore};
 use std::{
     cmp::Ordering,
     collections::HashMap,

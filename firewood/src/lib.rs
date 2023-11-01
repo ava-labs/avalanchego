@@ -193,5 +193,7 @@ pub mod storage;
 
 pub mod config;
 pub mod nibbles;
+// TODO: shale should not be pub, but there are integration test dependencies :(
+pub mod shale;
 
 pub mod v2;

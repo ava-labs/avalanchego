@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 
 use bytemuck::NoUninit;
 
-use crate::{CachedStore, ShaleError, Storable};
+use crate::shale::{CachedStore, ShaleError, Storable};
 
 /// The virtual disk address of an object
 #[repr(C)]

@@ -6,6 +6,7 @@ use super::{
     DbHeader, DbInner, DbRev, DbRevInner, SharedStore, Store, Universe, MERKLE_META_SPACE,
     MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
 };
+use crate::shale::CachedStore;
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
     storage::{buffer::BufferWrite, AshRecord, StoreRevMut},
@@ -13,7 +14,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use parking_lot::{Mutex, RwLock};
-use shale::CachedStore;
 use std::{io::ErrorKind, sync::Arc};
 use tokio::task::block_in_place;
 

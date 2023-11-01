@@ -22,7 +22,6 @@ bytemuck = { version = "1.13.1", features = ["derive"] }
 enum-as-inner = "0.6.0"
 growth-ring = { version = "0.0.4", path = "../growth-ring" }
 libaio = {version = "0.0.4", path = "../libaio" }
-shale = { version = "0.0.4", path = "../shale" }
 futures = "0.3.24"
 hex = "0.4.3"
 lru = "0.12.0"

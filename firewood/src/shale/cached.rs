@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
+use crate::shale::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
 use std::{
     borrow::BorrowMut,
     fmt::Debug,
@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Purely volatile, vector-based implementation for [CachedStore]. This is good for testing or trying
-/// out stuff (persistent data structures) built on [ShaleStore](crate::ShaleStore) in memory, without having to write
+/// out stuff (persistent data structures) built on [ShaleStore](super::ShaleStore) in memory, without having to write
 /// your own [CachedStore] implementation.
 #[derive(Debug)]
 pub struct PlainMem {

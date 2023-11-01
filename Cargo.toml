@@ -5,7 +5,6 @@ members = [
   "growth-ring",
   "libaio",
   "rpc",
-  "shale",
 ]
 resolver = "2"
 

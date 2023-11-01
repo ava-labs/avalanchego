@@ -5,10 +5,11 @@ use firewood::{
     merkle::Node,
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
     proof::ProofError,
+    // TODO: we should not be using shale from an integration test
+    shale::{cached::DynamicMem, compact::CompactSpace},
     v2::api::Proof,
 };
 use rand::Rng;
-use shale::{cached::DynamicMem, compact::CompactSpace};
 use std::collections::HashMap;
 
 type Store = CompactSpace<Node, DynamicMem>;

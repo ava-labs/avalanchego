@@ -7,17 +7,17 @@ use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, 
 use firewood::{
     db::{BatchOp, DbConfig},
     merkle::{Merkle, TrieHash, TRIE_HASH_LEN},
+    shale::{
+        cached::PlainMem,
+        compact::{CompactHeader, CompactSpace},
+        disk_address::DiskAddress,
+        CachedStore, ObjCache, Storable, StoredView,
+    },
     storage::WalConfig,
     v2::api::{Db, Proposal},
 };
 use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
-use shale::{
-    cached::PlainMem,
-    compact::{CompactHeader, CompactSpace},
-    disk_address::DiskAddress,
-    CachedStore, ObjCache, Storable, StoredView,
-};
 use std::{fs::File, iter::repeat_with, ops::Deref, os::raw::c_int, path::Path, sync::Arc};
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
