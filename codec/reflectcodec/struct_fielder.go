@@ -87,8 +87,10 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 		// Multiple tags per fields can be specified.
 		// Serialize/Deserialize field if it has
 		// any tag with the right value
-		captureField := false
-		nullable := false
+		var (
+			captureField bool
+			nullable     bool
+		)
 		for _, tag := range s.tags {
 			switch tagValue := field.Tag.Get(tag); tagValue {
 			case TagValue:
