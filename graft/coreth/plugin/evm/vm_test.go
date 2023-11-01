@@ -36,7 +36,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -50,7 +51,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -109,7 +109,6 @@ var (
 
 func init() {
 	var b []byte
-	factory := secp256k1.Factory{}
 
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
@@ -117,7 +116,7 @@ func init() {
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
 		b, _ = cb58.Decode(key)
-		pk, _ := factory.ToPrivateKey(b)
+		pk, _ := secp256k1.ToPrivateKey(b)
 		testKeys = append(testKeys, pk)
 		testEthAddrs = append(testEthAddrs, GetEthAddress(pk))
 		testShortIDAddrs = append(testShortIDAddrs, pk.PublicKey().Address())
@@ -177,7 +176,7 @@ func NewContext() *snow.Context {
 func setupGenesis(t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
-	manager.Manager,
+	database.Database,
 	[]byte,
 	chan engCommon.Message,
 	*atomic.Memory) {
@@ -187,13 +186,9 @@ func setupGenesis(t *testing.T,
 	genesisBytes := BuildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
-	baseDBManager := manager.NewMemDB(&version.Semantic{
-		Major: 1,
-		Minor: 4,
-		Patch: 5,
-	})
+	baseDB := memdb.New()
 
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
@@ -202,11 +197,7 @@ func setupGenesis(t *testing.T,
 
 	userKeystore := keystore.New(
 		logging.NoLog{},
-		manager.NewMemDB(&version.Semantic{
-			Major: 1,
-			Minor: 4,
-			Patch: 5,
-		}),
+		memdb.New(),
 	)
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
@@ -214,8 +205,8 @@ func setupGenesis(t *testing.T,
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan engCommon.Message, 1)
-	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
-	return ctx, prefixedDBManager, genesisBytes, issuer, m
+	prefixedDB := prefixdb.New([]byte{1}, baseDB)
+	return ctx, prefixedDB, genesisBytes, issuer, m
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
@@ -227,18 +218,18 @@ func GenesisVM(t *testing.T,
 	configJSON string,
 	upgradeJSON string,
 ) (chan engCommon.Message,
-	*VM, manager.Manager,
+	*VM, database.Database,
 	*atomic.Memory,
 	*engCommon.SenderTest) {
 	vm := &VM{}
-	ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
+	ctx, db, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &engCommon.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 	if err := vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		db,
 		genesisBytes,
 		[]byte(upgradeJSON),
 		[]byte(configJSON),
@@ -254,7 +245,7 @@ func GenesisVM(t *testing.T,
 		assert.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
 	}
 
-	return issuer, vm, dbManager, m, appSender
+	return issuer, vm, db, m, appSender
 }
 
 func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, index uint32, assetID ids.ID, amount uint64, addr ids.ShortID) (*avax.UTXO, error) {
@@ -295,8 +286,8 @@ func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, index 
 // GenesisVMWithUTXOs creates a GenesisVM and generates UTXOs in the X-Chain Shared Memory containing AVAX based on the [utxos] map
 // Generates UTXOIDs by using a hash of the address in the [utxos] map such that the UTXOs will be generated deterministically.
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory, *engCommon.SenderTest) {
-	issuer, vm, dbManager, sharedMemory, sender := GenesisVM(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON)
+func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, database.Database, *atomic.Memory, *engCommon.SenderTest) {
+	issuer, vm, db, sharedMemory, sender := GenesisVM(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON)
 	for addr, avaxAmount := range utxos {
 		txID, err := ids.ToID(hashing.ComputeHash256(addr.Bytes()))
 		if err != nil {
@@ -307,7 +298,7 @@ func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON stri
 		}
 	}
 
-	return issuer, vm, dbManager, sharedMemory, sender
+	return issuer, vm, db, sharedMemory, sender
 }
 
 func TestVMConfig(t *testing.T) {

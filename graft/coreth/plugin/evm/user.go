@@ -22,7 +22,6 @@ var (
 )
 
 type user struct {
-	secpFactory *secp256k1.Factory
 	// This user's database, acquired from the keystore
 	db *encdb.Database
 }
@@ -116,7 +115,7 @@ func (u *user) getKey(address common.Address) (*secp256k1.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return u.secpFactory.ToPrivateKey(bytes)
+	return secp256k1.ToPrivateKey(bytes)
 }
 
 // Return all private keys controlled by this user
