@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -38,7 +39,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 	}
 	trieAccountLeaves := 0
 
-	trie.AssertTrieConsistency(t, root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
+	syncutils.AssertTrieConsistency(t, root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
 		trieAccountLeaves++
 		accHash := common.BytesToHash(key)
 		var acc types.StateAccount
@@ -73,7 +74,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		storageTrieLeavesCount := 0
 
 		// check storage trie and storage snapshot consistency
-		trie.AssertTrieConsistency(t, acc.Root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
+		syncutils.AssertTrieConsistency(t, acc.Root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB, accHash, common.BytesToHash(key))
 			assert.Equal(t, val, snapshotVal)
@@ -89,7 +90,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 }
 
 func fillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB *trie.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := trie.FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	newRoot, _ := syncutils.FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := rand.Read(codeBytes)
 		if err != nil {
@@ -102,7 +103,7 @@ func fillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB
 
 		// now create state trie
 		numKeys := 16
-		account.Root, _, _ = trie.GenerateTrie(t, serverTrieDB, numKeys, common.HashLength)
+		account.Root, _, _ = syncutils.GenerateTrie(t, serverTrieDB, numKeys, common.HashLength)
 		return account
 	})
 	return newRoot
@@ -119,18 +120,18 @@ func FillAccountsWithOverlappingStorage(
 ) (common.Hash, map[*keystore.Key]*types.StateAccount) {
 	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
 	for i := 0; i < numOverlappingStorageRoots; i++ {
-		storageRoot, _, _ := trie.GenerateTrie(t, trieDB, 16, common.HashLength)
+		storageRoot, _, _ := syncutils.GenerateTrie(t, trieDB, 16, common.HashLength)
 		storageRoots = append(storageRoots, storageRoot)
 	}
 	storageRootIndex := 0
-	return trie.FillAccounts(t, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
+	return syncutils.FillAccounts(t, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 		switch i % 3 {
 		case 0: // unmodified account
 		case 1: // account with overlapping storage root
 			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
 			storageRootIndex++
 		case 2: // account with unique storage root
-			account.Root, _, _ = trie.GenerateTrie(t, trieDB, 16, common.HashLength)
+			account.Root, _, _ = syncutils.GenerateTrie(t, trieDB, 16, common.HashLength)
 		}
 
 		return account
