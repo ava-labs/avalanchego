@@ -54,13 +54,13 @@ type fullVM struct {
 	*block.TestStateSyncableVM
 }
 
-func buildTestPeers(t *testing.T) validators.Set {
+func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
 	// we consider more than common.MaxOutstandingBroadcastRequests peers
 	// so to test the effect of cap on number of requests sent out
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
+		require.NoError(t, vdrs.AddStaker(subnetID, beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
 }

@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -303,7 +302,7 @@ utxoFor:
 			continue utxoFor
 		}
 
-		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID) //nolint:gosec
+		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
 
 	balances := maps.Clone(lockedStakeables)
@@ -1154,17 +1153,9 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		zap.Uint16("size", uint16(args.Size)),
 	)
 
-	validators, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return fmt.Errorf(
-			"couldn't get validators of subnet %q. Is it being validated?",
-			args.SubnetID,
-		)
-	}
-
-	sample, err := validators.Sample(int(args.Size))
+	sample, err := s.vm.Validators.Sample(args.SubnetID, int(args.Size))
 	if err != nil {
-		return fmt.Errorf("sampling errored with %w", err)
+		return fmt.Errorf("sampling %s errored with %w", args.SubnetID, err)
 	}
 
 	if sample == nil {
@@ -1291,13 +1282,11 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // AddDelegatorArgs are the arguments to AddDelegator
@@ -1403,13 +1392,11 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
@@ -1511,13 +1498,11 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -1589,13 +1574,11 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // ExportAVAXArgs are the arguments to ExportAVAX
@@ -1687,13 +1670,11 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // ImportAVAXArgs are the arguments to ImportAVAX
@@ -1774,13 +1755,11 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 /*
@@ -1900,13 +1879,11 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
@@ -1993,12 +1970,8 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	validators, ok := s.vm.Validators.Get(chain.SubnetID)
-	if !ok {
-		return false
-	}
-
-	return validators.Contains(s.vm.ctx.NodeID)
+	_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
+	return isValidator
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {
@@ -2495,11 +2468,11 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 		zap.String("method", "getTotalStake"),
 	)
 
-	vdrs, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return errMissingValidatorSet
+	totalWeight, err := s.vm.Validators.TotalWeight(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("couldn't get total weight: %w", err)
 	}
-	weight := json.Uint64(vdrs.Weight())
+	weight := json.Uint64(totalWeight)
 	reply.Weight = weight
 	reply.Stake = weight
 	return nil

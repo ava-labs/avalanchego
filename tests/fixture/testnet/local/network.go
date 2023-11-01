@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -65,7 +66,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 			continue
 		}
 
-		dirPath = filepath.Join(rootDir, fmt.Sprint(networkID))
+		dirPath = filepath.Join(rootDir, strconv.FormatUint(uint64(networkID), 10))
 		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
 		if err == nil {
 			return networkID, dirPath, nil
@@ -253,10 +254,9 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 
 	if keyCount > 0 {
 		// Ensure there are keys for genesis generation to fund
-		factory := secp256k1.Factory{}
 		keys := make([]*secp256k1.PrivateKey, 0, keyCount)
 		for i := 0; i < keyCount; i++ {
-			key, err := factory.NewPrivateKey()
+			key, err := secp256k1.NewPrivateKey()
 			if err != nil {
 				return fmt.Errorf("failed to generate private key: %w", err)
 			}
@@ -304,7 +304,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 	})
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[config.NetworkNameKey] = fmt.Sprintf("%d", ln.Genesis.NetworkID)
+	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(ln.Genesis.NetworkID), 10)
 
 	// Ensure keys are added if necessary
 	if err := node.EnsureKeys(); err != nil {

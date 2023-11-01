@@ -668,7 +668,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		type keyAndID struct {
-			key merkledb.Path
+			key merkledb.Key
 			id  ids.ID
 		}
 
@@ -677,7 +677,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.KeyPath.Append(childIdx),
+					key: node.Key.Append(childIdx),
 					id:  childID,
 				})
 			}
@@ -688,7 +688,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.KeyPath.Append(childIdx),
+					key: node.Key.Append(childIdx),
 					id:  childID,
 				})
 			}
@@ -731,7 +731,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// Find smallest difference between the set of key/ID pairs proven by
 		// the remote/local proofs for key/ID pairs after the last received key.
 		var (
-			smallestDiffKey merkledb.Path
+			smallestDiffKey merkledb.Key
 			foundDiff       bool
 		)
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {

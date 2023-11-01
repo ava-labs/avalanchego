@@ -58,7 +58,6 @@ type test struct {
 }
 
 func TestRFC6979Compliance(t *testing.T) {
-	f := Factory{}
 	for i, tt := range rfc6979Tests {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
 			require := require.New(t)
@@ -66,7 +65,7 @@ func TestRFC6979Compliance(t *testing.T) {
 			skBytes, err := hex.DecodeString(tt.skHex)
 			require.NoError(err)
 
-			sk, err := f.ToPrivateKey(skBytes)
+			sk, err := ToPrivateKey(skBytes)
 			require.NoError(err)
 
 			msgBytes := []byte(tt.msg)
