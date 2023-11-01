@@ -93,43 +93,17 @@ pub trait CachedStore: Debug + Send + Sync {
     fn id(&self) -> SpaceId;
 }
 
-/// A addressed, typed, and read-writable handle for the stored item in [ShaleStore]. The object
-/// represents the decoded/mapped data. The implementation of [ShaleStore] could use [ObjCache] to
-/// turn a `TypedView` into an [ObjRef].
-pub trait TypedView<T: ?Sized + Send + Sync>:
-    std::fmt::Debug + Deref<Target = T> + Send + Sync
-{
-    /// Get the offset of the initial byte in the linear space.
-    fn get_offset(&self) -> usize;
-    /// Access it as a [CachedStore] object.
-    fn get_mem_store(&self) -> &dyn CachedStore;
-    /// Access it as a mutable CachedStore object
-    fn get_mut_mem_store(&mut self) -> &mut dyn CachedStore;
-    /// Estimate the serialized length of the current type content. It should not be smaller than
-    /// the actually length.
-    fn estimate_mem_image(&self) -> Option<u64>;
-    /// Serialize the type content to the memory image. It defines how the current in-memory object
-    /// of `T` should be represented in the linear storage space.
-    fn write_mem_image(&self, mem_image: &mut [u8]) -> Result<(), ShaleError>;
-    /// Gain mutable access to the typed content. By changing it, its serialized bytes (and length)
-    /// could change.
-    fn write(&mut self) -> &mut T;
-    /// Returns if the typed content is memory-mapped (i.e., all changes through `write` are auto
-    /// reflected in the underlying [CachedStore]).
-    fn is_mem_mapped(&self) -> bool;
-}
-
 /// A wrapper of `TypedView` to enable writes. The direct construction (by [Obj::from_typed_view]
 /// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
 /// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [DiskAddress]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 #[derive(Debug)]
-pub struct Obj<T: ?Sized + Send + Sync> {
-    value: Box<dyn TypedView<T>>,
+pub struct Obj<T: Storable> {
+    value: Box<StoredView<T>>,
     dirty: Option<u64>,
 }
 
-impl<T: ?Sized + Send + Sync> Obj<T> {
+impl<T: Storable> Obj<T> {
     #[inline(always)]
     pub fn as_ptr(&self) -> DiskAddress {
         DiskAddress(NonZeroUsize::new(self.value.get_offset()))
@@ -155,7 +129,7 @@ impl<T: ?Sized + Send + Sync> Obj<T> {
     }
 
     #[inline(always)]
-    pub fn from_typed_view(value: Box<dyn TypedView<T>>) -> Self {
+    pub fn from_typed_view(value: Box<StoredView<T>>) -> Self {
         Obj { value, dirty: None }
     }
 
@@ -173,13 +147,13 @@ impl<T: ?Sized + Send + Sync> Obj<T> {
     }
 }
 
-impl<T: ?Sized + Send + Sync> Drop for Obj<T> {
+impl<T: Storable> Drop for Obj<T> {
     fn drop(&mut self) {
         self.flush_dirty()
     }
 }
 
-impl<T: ?Sized + Send + Sync> Deref for Obj<T> {
+impl<T: Storable> Deref for Obj<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.value
@@ -187,12 +161,12 @@ impl<T: ?Sized + Send + Sync> Deref for Obj<T> {
 }
 
 /// User handle that offers read & write access to the stored [ShaleStore] item.
-pub struct ObjRef<'a, T: Send + Sync> {
+pub struct ObjRef<'a, T: Storable> {
     inner: Option<Obj<T>>,
     cache: &'a ObjCache<T>,
 }
 
-impl<'a, T: Send + Sync> ObjRef<'a, T> {
+impl<'a, T: Storable> ObjRef<'a, T> {
     fn new(inner: Option<Obj<T>>, cache: &'a ObjCache<T>) -> Self {
         Self { inner, cache }
     }
@@ -212,7 +186,7 @@ impl<'a, T: Send + Sync> ObjRef<'a, T> {
     }
 }
 
-impl<'a, T: Send + Sync> Deref for ObjRef<'a, T> {
+impl<'a, T: Storable> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
         // TODO: Something is seriously wrong here but I'm not quite sure about the best approach for the fix
@@ -220,7 +194,7 @@ impl<'a, T: Send + Sync> Deref for ObjRef<'a, T> {
     }
 }
 
-impl<'a, T: Send + Sync> Drop for ObjRef<'a, T> {
+impl<'a, T: Storable> Drop for ObjRef<'a, T> {
     fn drop(&mut self) {
         let mut inner = self.inner.take().unwrap();
         let ptr = inner.as_ptr();
@@ -238,7 +212,7 @@ impl<'a, T: Send + Sync> Drop for ObjRef<'a, T> {
 
 /// A persistent item storage backed by linear logical space. New items can be created and old
 /// items could be retrieved or dropped.
-pub trait ShaleStore<T: Send + Sync> {
+pub trait ShaleStore<T: Storable> {
     /// Dereference [DiskAddress] to a unique handle that allows direct access to the item in memory.
     fn get_item(&'_ self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
@@ -269,7 +243,7 @@ pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
     Ok(buff)
 }
 
-/// Reference implementation of [TypedView]. It takes any type that implements [Storable]
+/// A stored view of any [Storable]
 pub struct StoredView<T> {
     decoded: T,
     mem: Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>,
@@ -277,7 +251,7 @@ pub struct StoredView<T> {
     len_limit: u64,
 }
 
-impl<T: Storable + Debug> Debug for StoredView<T> {
+impl<T: Debug> Debug for StoredView<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let StoredView {
             decoded,
@@ -300,7 +274,7 @@ impl<T: Storable> Deref for StoredView<T> {
     }
 }
 
-impl<T: Storable + Debug + Send + Sync> TypedView<T> for StoredView<T> {
+impl<T: Storable> StoredView<T> {
     fn get_offset(&self) -> usize {
         self.offset
     }
@@ -334,7 +308,7 @@ impl<T: Storable + Debug + Send + Sync> TypedView<T> for StoredView<T> {
     }
 }
 
-impl<T: Storable + Debug + Send + Sync + 'static> StoredView<T> {
+impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::hydrate(offset, space)?;
@@ -387,7 +361,7 @@ impl<T: Storable + Debug + Send + Sync + 'static> StoredView<T> {
     }
 }
 
-impl<T: Storable + Send + Sync> StoredView<T> {
+impl<T: Storable> StoredView<T> {
     fn new_from_slice(
         offset: usize,
         len_limit: u64,
@@ -402,7 +376,7 @@ impl<T: Storable + Send + Sync> StoredView<T> {
         })
     }
 
-    pub fn slice<U: Storable + Debug + Send + Sync + 'static>(
+    pub fn slice<U: Storable + 'static>(
         s: &Obj<T>,
         offset: usize,
         length: u64,
@@ -430,7 +404,7 @@ impl<T: Storable + Send + Sync> StoredView<T> {
 }
 
 #[derive(Debug)]
-pub struct ObjCacheInner<T: Send + Sync> {
+pub struct ObjCacheInner<T: Storable> {
     cached: lru::LruCache<DiskAddress, Obj<T>>,
     pinned: HashMap<DiskAddress, bool>,
     dirty: HashSet<DiskAddress>,
@@ -438,9 +412,9 @@ pub struct ObjCacheInner<T: Send + Sync> {
 
 /// [ObjRef] pool that is used by [ShaleStore] implementation to construct [ObjRef]s.
 #[derive(Debug)]
-pub struct ObjCache<T: Send + Sync>(Arc<RwLock<ObjCacheInner<T>>>);
+pub struct ObjCache<T: Storable>(Arc<RwLock<ObjCacheInner<T>>>);
 
-impl<T: Send + Sync> ObjCache<T> {
+impl<T: Storable> ObjCache<T> {
     pub fn new(capacity: usize) -> Self {
         Self(Arc::new(RwLock::new(ObjCacheInner {
             cached: lru::LruCache::new(NonZeroUsize::new(capacity).expect("non-zero cache size")),

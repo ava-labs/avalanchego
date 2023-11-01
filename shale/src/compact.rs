@@ -227,7 +227,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
     }
 
-    fn get_data_ref<U: Storable + Debug + Send + Sync + 'static>(
+    fn get_data_ref<U: Storable + 'static>(
         &self,
         ptr: DiskAddress,
         len_limit: u64,
@@ -493,12 +493,12 @@ impl<M: CachedStore> CompactSpaceInner<M> {
 }
 
 #[derive(Debug)]
-pub struct CompactSpace<T: Send + Sync, M> {
+pub struct CompactSpace<T: Storable, M> {
     inner: RwLock<CompactSpaceInner<M>>,
     obj_cache: ObjCache<T>,
 }
 
-impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
+impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     pub fn new(
         meta_space: Arc<M>,
         compact_space: Arc<M>,
@@ -521,9 +521,7 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
-impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> ShaleStore<T>
-    for CompactSpace<T, M>
-{
+impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for CompactSpace<T, M> {
     fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
         let addr = self.inner.write().unwrap().alloc(size)?;
