@@ -23,7 +23,7 @@ var (
 		TestBigArray,
 		TestPointerToStruct,
 		TestSliceOfStruct,
-		TestStructWithPtr,
+		TestStructWithNullablePtr,
 		TestInterface,
 		TestSliceOfInterface,
 		TestArrayOfInterface,
@@ -88,7 +88,7 @@ type MyInnerStruct3 struct {
 	F   Foo           `serialize:"true"`
 }
 
-type MyStructWithPtr struct {
+type MyStructWithNullablePtr struct {
 	N1 *int32   `serialize:"true,nullable"`
 	N2 *int64   `serialize:"true,nullable"`
 	N3 []*int32 `serialize:"true,nullable"`
@@ -424,11 +424,11 @@ func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
 	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
-func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
+func TestStructWithNullablePtr(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 	n1 := int32(5)
 	n2 := int64(10)
-	struct1 := MyStructWithPtr{
+	struct1 := MyStructWithNullablePtr{
 		N1: &n1,
 		N2: &n2,
 		N3: []*int32{
@@ -438,7 +438,7 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 		},
 	}
 
-	require.NoError(codec.RegisterType(&MyStructWithPtr{}))
+	require.NoError(codec.RegisterType(&MyStructWithNullablePtr{}))
 	manager := NewDefaultManager()
 	require.NoError(manager.RegisterCodec(0, codec))
 
@@ -449,13 +449,13 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 	require.Len(bytes, bytesLen)
 
-	var struct1Unmarshaled MyStructWithPtr
+	var struct1Unmarshaled MyStructWithNullablePtr
 	version, err := manager.Unmarshal(bytes, &struct1Unmarshaled)
 	require.NoError(err)
 	require.Zero(version)
 	require.Equal(struct1, struct1Unmarshaled)
 
-	struct1 = MyStructWithPtr{
+	struct1 = MyStructWithNullablePtr{
 		N3: []*int32{},
 	}
 	bytes, err = manager.Marshal(0, struct1)
@@ -465,7 +465,7 @@ func TestStructWithPtr(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 	require.Len(bytes, bytesLen)
 
-	var struct1Unmarshaled2 MyStructWithPtr
+	var struct1Unmarshaled2 MyStructWithNullablePtr
 	version, err = manager.Unmarshal(bytes, &struct1Unmarshaled2)
 	require.NoError(err)
 	require.Zero(version)
