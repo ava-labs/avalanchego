@@ -175,12 +175,6 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error)
 }
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, uint64, error) {
-	// if vm implements Snowman++, a block height index must be available
-	// to support state sync
-	if err := vm.VerifyHeightIndex(ctx); err != nil {
-		return ids.Empty, 0, fmt.Errorf("could not verify height index: %w", err)
-	}
-
 	var (
 		blks           = make([]Block, 0, len(blksBytes))
 		innerBlksBytes = make([][]byte, 0, len(blksBytes))
