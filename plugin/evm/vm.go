@@ -897,10 +897,6 @@ func newHandler(name string, service interface{}) (http.Handler, error) {
 	server := avalancheRPC.NewServer()
 	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json")
 	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(service, name); err != nil {
-		return nil, err
-	}
-
 	return server, server.RegisterService(service, name)
 }
 
