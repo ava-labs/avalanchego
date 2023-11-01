@@ -161,10 +161,10 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 	}, nil
 }
 
-func (*VM) BackfillBlocksEnabled(context.Context) (ids.ID, error) {
-	return ids.Empty, block.ErrBlockBackfillingNotEnabled
+func (*VM) BackfillBlocksEnabled(context.Context) (ids.ID, uint64, error) {
+	return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 }
 
-func (*VM) BackfillBlocks(context.Context, [][]byte) (ids.ID, error) {
-	return ids.Empty, block.ErrStopBlockBackfilling
+func (*VM) BackfillBlocks(context.Context, [][]byte) (ids.ID, uint64, error) {
+	return ids.Empty, 0, block.ErrStopBlockBackfilling
 }

@@ -40,12 +40,13 @@ func (m *MockStateSyncableVM) EXPECT() *MockStateSyncableVMMockRecorder {
 }
 
 // BackfillBlocks mocks base method.
-func (m *MockStateSyncableVM) BackfillBlocks(arg0 context.Context, arg1 [][]byte) (ids.ID, error) {
+func (m *MockStateSyncableVM) BackfillBlocks(arg0 context.Context, arg1 [][]byte) (ids.ID, uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BackfillBlocks", arg0, arg1)
 	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // BackfillBlocks indicates an expected call of BackfillBlocks.
@@ -55,12 +56,13 @@ func (mr *MockStateSyncableVMMockRecorder) BackfillBlocks(arg0, arg1 interface{}
 }
 
 // BackfillBlocksEnabled mocks base method.
-func (m *MockStateSyncableVM) BackfillBlocksEnabled(arg0 context.Context) (ids.ID, error) {
+func (m *MockStateSyncableVM) BackfillBlocksEnabled(arg0 context.Context) (ids.ID, uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BackfillBlocksEnabled", arg0)
 	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // BackfillBlocksEnabled indicates an expected call of BackfillBlocksEnabled.

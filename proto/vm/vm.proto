@@ -402,7 +402,8 @@ message GetStateSummaryResponse {
 
 message BackfillBlocksEnabledResponse {
   bytes id = 1;
-  Error err = 2;
+  uint64 height = 2;
+  Error err = 3;
 }
 
 message BackfillBlocksRequest {
@@ -411,7 +412,8 @@ message BackfillBlocksRequest {
 
 message BackfillBlocksResponse {
   bytes id = 1;
-  Error err = 2;
+  uint64 height = 2;
+  Error err = 3;
 }
 
 message StateSummaryAcceptRequest {

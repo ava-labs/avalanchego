@@ -823,31 +823,35 @@ func (vm *VMServer) GetStateSummary(
 
 func (vm *VMServer) BackfillBlocksEnabled(ctx context.Context, _ *emptypb.Empty) (*vmpb.BackfillBlocksEnabledResponse, error) {
 	var (
-		blkID = ids.Empty
-		err   error
+		blkID  = ids.Empty
+		height uint64
+		err    error
 	)
 	if vm.ssVM != nil {
-		blkID, err = vm.ssVM.BackfillBlocksEnabled(ctx)
+		blkID, height, err = vm.ssVM.BackfillBlocksEnabled(ctx)
 	}
 
 	return &vmpb.BackfillBlocksEnabledResponse{
-		Id:  blkID[:],
-		Err: errorToErrEnum[err],
+		Id:     blkID[:],
+		Height: height,
+		Err:    errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) BackfillBlocks(ctx context.Context, req *vmpb.BackfillBlocksRequest) (*vmpb.BackfillBlocksResponse, error) {
 	var (
-		nextWantedBlkID ids.ID
-		err             error
+		nextWantedBlkID     ids.ID
+		nextWantedBlkHeight uint64
+		err                 error
 	)
 	if vm.ssVM != nil {
-		nextWantedBlkID, err = vm.ssVM.BackfillBlocks(ctx, req.BlksBytes)
+		nextWantedBlkID, nextWantedBlkHeight, err = vm.ssVM.BackfillBlocks(ctx, req.BlksBytes)
 	}
 
 	return &vmpb.BackfillBlocksResponse{
-		Id:  nextWantedBlkID[:],
-		Err: errorToErrEnum[err],
+		Id:     nextWantedBlkID[:],
+		Height: nextWantedBlkHeight,
+		Err:    errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 

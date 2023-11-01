@@ -64,7 +64,7 @@ func (bb *BlockBackfiller) Start(ctx context.Context) error {
 		return nil // nothing to do
 	}
 
-	switch wantedBlk, err := ssVM.BackfillBlocksEnabled(ctx); {
+	switch wantedBlk, _, err := ssVM.BackfillBlocksEnabled(ctx); {
 	case err == block.ErrBlockBackfillingNotEnabled:
 		bb.Ctx.Log.Info("block backfilling not enabled")
 		bb.Ctx.StateSyncing.Set(false)
@@ -119,7 +119,7 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 		return nil // nothing to do
 	}
 
-	switch nextWantedBlkID, err := ssVM.BackfillBlocks(ctx, blks); {
+	switch nextWantedBlkID, _, err := ssVM.BackfillBlocks(ctx, blks); {
 	case err == block.ErrStopBlockBackfilling:
 		bb.Ctx.Log.Info("block backfilling done")
 		bb.Ctx.StateSyncing.Set(false)

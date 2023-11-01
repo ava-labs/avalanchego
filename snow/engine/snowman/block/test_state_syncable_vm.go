@@ -40,8 +40,8 @@ type TestStateSyncableVM struct {
 	ParseStateSummaryF          func(ctx context.Context, summaryBytes []byte) (StateSummary, error)
 	GetStateSummaryF            func(ctx context.Context, summaryHeight uint64) (StateSummary, error)
 
-	BackfillBlocksEnabledF func(context.Context) (ids.ID, error)
-	BackfillBlocksF        func(context.Context, [][]byte) (ids.ID, error)
+	BackfillBlocksEnabledF func(context.Context) (ids.ID, uint64, error)
+	BackfillBlocksF        func(context.Context, [][]byte) (ids.ID, uint64, error)
 }
 
 func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -94,22 +94,22 @@ func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeigh
 	return nil, errGetStateSummary
 }
 
-func (vm *TestStateSyncableVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (vm *TestStateSyncableVM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
 	if vm.BackfillBlocksEnabledF != nil {
 		return vm.BackfillBlocksEnabledF(ctx)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
 		require.FailNow(vm.T, errGetStateSummary.Error())
 	}
-	return ids.Empty, errBackfillBlocksEnabled
+	return ids.Empty, 0, errBackfillBlocksEnabled
 }
 
-func (vm *TestStateSyncableVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
+func (vm *TestStateSyncableVM) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error) {
 	if vm.BackfillBlocksF != nil {
 		return vm.BackfillBlocksF(ctx, blocks)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
 		require.FailNow(vm.T, errGetStateSummary.Error())
 	}
-	return ids.Empty, errBackfillBlock
+	return ids.Empty, 0, errBackfillBlock
 }

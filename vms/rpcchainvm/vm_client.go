@@ -815,19 +815,19 @@ func (vm *VMClient) GetStateSummary(ctx context.Context, summaryHeight uint64) (
 	}, err
 }
 
-func (vm *VMClient) BackfillBlocksEnabled(ctx context.Context) (ids.ID, error) {
+func (vm *VMClient) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
 	resp, err := vm.client.BackfillBlocksEnabled(ctx, &emptypb.Empty{})
 	if err != nil {
-		return ids.Empty, err
+		return ids.Empty, 0, err
 	}
 	err = errEnumToError[resp.Err]
 	if err == block.ErrStateSyncableVMNotImplemented {
-		return ids.Empty, nil
+		return ids.Empty, 0, nil
 	}
-	return ids.ID(resp.Id), err
+	return ids.ID(resp.Id), resp.Height, err
 }
 
-func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, error) {
+func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error) {
 	resp, err := vm.client.BackfillBlocks(
 		ctx,
 		&vmpb.BackfillBlocksRequest{
@@ -835,12 +835,12 @@ func (vm *VMClient) BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID
 		},
 	)
 	if err != nil {
-		return ids.Empty, err
+		return ids.Empty, 0, err
 	}
 	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
-		return ids.ID(resp.Id), errEnumToError[errEnum]
+		return ids.ID(resp.Id), resp.Height, errEnumToError[errEnum]
 	}
-	return ids.ID(resp.Id), nil
+	return ids.ID(resp.Id), resp.Height, nil
 }
 
 func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*blockClient, error) {
