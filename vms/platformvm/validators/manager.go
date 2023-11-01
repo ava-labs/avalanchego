@@ -197,13 +197,6 @@ func (m *manager) GetValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache := m.getValidatorSetCache(subnetID)
-
-	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
-		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
-	}
-
 	// get the start time to track metrics
 	startTime := m.clk.Time()
 
@@ -221,32 +214,11 @@ func (m *manager) GetValidatorSet(
 		return nil, err
 	}
 
-	// cache the validator set
-	validatorSetsCache.Put(targetHeight, validatorSet)
-
 	duration := m.clk.Time().Sub(startTime)
 	m.metrics.IncValidatorSetsCreated()
 	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
 	return validatorSet, nil
-}
-
-func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
-	// Only cache tracked subnets
-	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
-		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
-	}
-
-	validatorSetsCache, exists := m.caches[subnetID]
-	if exists {
-		return validatorSetsCache
-	}
-
-	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
-		Size: validatorSetsCacheSize,
-	}
-	m.caches[subnetID] = validatorSetsCache
-	return validatorSetsCache
 }
 
 func (m *manager) makePrimaryNetworkValidatorSet(
