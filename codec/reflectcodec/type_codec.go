@@ -85,7 +85,7 @@ func (c *genericCodec) Size(value interface{}) (int, error) {
 		return 0, errMarshalNil // can't marshal nil
 	}
 
-	size, _, err := c.size(reflect.ValueOf(value), false)
+	size, _, err := c.size(reflect.ValueOf(value), false /*nullable*/)
 	return size, err
 }
 
