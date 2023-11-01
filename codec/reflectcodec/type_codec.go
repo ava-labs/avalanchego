@@ -522,7 +522,7 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
 //
-// The `nullable` property affects how pointers and interfaces are unmarshalled,
+// The [nullable] property affects how pointers and interfaces are unmarshalled,
 // as an extra byte would be used to unmarshal nil values for pointers and
 // interaces
 //
