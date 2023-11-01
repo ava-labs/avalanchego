@@ -92,7 +92,7 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 			nullable     bool
 		)
 		for _, tag := range s.tags {
-			switch tagValue := field.Tag.Get(tag); tagValue {
+			switch field.Tag.Get(tag) {
 			case TagValue:
 				captureField = true
 			case TagWithNullableValue:
