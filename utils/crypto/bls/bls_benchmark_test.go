@@ -4,7 +4,7 @@
 package bls
 
 import (
-	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,7 @@ func BenchmarkSign(b *testing.B) {
 	privateKey, err := NewSecretKey()
 	require.NoError(b, err)
 	for _, messageSize := range sizes {
-		b.Run(fmt.Sprintf("%d", messageSize), func(b *testing.B) {
+		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
 
 			b.ResetTimer()
@@ -49,7 +49,7 @@ func BenchmarkVerify(b *testing.B) {
 	publicKey := PublicFromSecretKey(privateKey)
 
 	for _, messageSize := range sizes {
-		b.Run(fmt.Sprintf("%d", messageSize), func(b *testing.B) {
+		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
 			signature := Sign(privateKey, message)
 
@@ -72,7 +72,7 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 	}
 
 	for _, size := range sizes {
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				_, err := AggregatePublicKeys(keys[:size])
 				require.NoError(b, err)

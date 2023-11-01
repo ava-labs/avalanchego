@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var _ Manager = (*manager)(nil)
@@ -42,7 +41,6 @@ type Manager interface {
 type Config struct {
 	Benchable              Benchable          `json:"-"`
 	Validators             validators.Manager `json:"-"`
-	SybilProtectionEnabled bool               `json:"-"`
 	Threshold              int                `json:"threshold"`
 	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
 	Duration               time.Duration      `json:"duration"`
@@ -110,16 +108,10 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
-	vdrs := m.config.Validators
-	if !m.config.SybilProtectionEnabled {
-		// If sybil protection is disabled, everyone validates every chain
-		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
-	}
-
 	benchlist, err := NewBenchlist(
 		ctx,
 		m.config.Benchable,
-		vdrs,
+		m.config.Validators,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
 		m.config.Duration,

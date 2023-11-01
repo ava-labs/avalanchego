@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -128,7 +129,11 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
-		return errPChainHeightNotReached
+		return fmt.Errorf("%w: %d > %d",
+			errPChainHeightNotReached,
+			childPChainHeight,
+			currentPChainHeight,
+		)
 	}
 	if childPChainHeight < b.vm.minimumPChainHeight {
 		return errPChainHeightTooLow
