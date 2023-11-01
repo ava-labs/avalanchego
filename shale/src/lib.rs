@@ -99,7 +99,7 @@ pub trait CachedStore: Debug + Send + Sync {
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 #[derive(Debug)]
 pub struct Obj<T: Storable> {
-    value: Box<StoredView<T>>,
+    value: StoredView<T>,
     dirty: Option<u64>,
 }
 
@@ -109,7 +109,7 @@ impl<T: Storable> Obj<T> {
         DiskAddress(NonZeroUsize::new(self.value.get_offset()))
     }
 
-    /// Write to the underlying object. Returns `Some(())` on success.
+    /// Write to the underlying object. Returns `Ok(())` on success.
     #[inline]
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
         modify(self.value.write());
@@ -129,7 +129,7 @@ impl<T: Storable> Obj<T> {
     }
 
     #[inline(always)]
-    pub fn from_typed_view(value: Box<StoredView<T>>) -> Self {
+    pub fn from_typed_view(value: StoredView<T>) -> Self {
         Obj { value, dirty: None }
     }
 
@@ -341,11 +341,11 @@ impl<T: Storable + 'static> StoredView<T> {
         ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<T>, ShaleError> {
-        Ok(Obj::from_typed_view(Box::new(Self::new(
+        Ok(Obj::from_typed_view(Self::new(
             ptr.get(),
             len_limit,
             store,
-        )?)))
+        )?))
     }
 
     #[inline(always)]
@@ -355,9 +355,9 @@ impl<T: Storable + 'static> StoredView<T> {
         len_limit: u64,
         decoded: T,
     ) -> Result<Obj<T>, ShaleError> {
-        Ok(Obj::from_typed_view(Box::new(Self::from_hydrated(
+        Ok(Obj::from_typed_view(Self::from_hydrated(
             addr, len_limit, decoded, store,
-        )?)))
+        )?))
     }
 }
 
@@ -390,12 +390,7 @@ impl<T: Storable> StoredView<T> {
                 error: "dirty write",
             });
         }
-        let r = Box::new(StoredView::new_from_slice(
-            addr_,
-            length,
-            decoded,
-            s.value.get_mem_store(),
-        )?);
+        let r = StoredView::new_from_slice(addr_, length, decoded, s.value.get_mem_store())?;
         Ok(Obj {
             value: r,
             dirty: None,

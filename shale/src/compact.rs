@@ -253,7 +253,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
             .unwrap();
 
         if desc_addr != DiskAddress(**self.header.meta_space_tail) {
-            let desc_last = self.get_descriptor(**self.header.meta_space_tail.value)?;
+            let desc_last = self.get_descriptor(*self.header.meta_space_tail.value)?;
             let mut desc = self.get_descriptor(desc_addr)?;
             desc.write(|r| *r = *desc_last).unwrap();
             let mut header = self.get_header(desc.haddr.into())?;
