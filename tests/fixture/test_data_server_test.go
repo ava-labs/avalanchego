@@ -17,10 +17,9 @@ import (
 func TestAllocateFundedKeys(t *testing.T) {
 	require := require.New(t)
 
-	factory := secp256k1.Factory{}
 	keys := make([]*secp256k1.PrivateKey, 5)
 	for i := range keys {
-		key, err := factory.NewPrivateKey()
+		key, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keys[i] = key
 	}

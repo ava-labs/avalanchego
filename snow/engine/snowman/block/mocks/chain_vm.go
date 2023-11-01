@@ -13,7 +13,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	manager "github.com/ava-labs/avalanchego/database/manager"
+	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -262,7 +262,7 @@ func (mr *MockChainVMMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 manager.Manager, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
+func (m *MockChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)

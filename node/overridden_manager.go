@@ -1,21 +1,22 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validators
+package node
 
 import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Manager = (*overriddenManager)(nil)
+var _ validators.Manager = (*overriddenManager)(nil)
 
-// NewOverriddenManager returns a Manager that overrides of all calls to the
+// newOverriddenManager returns a Manager that overrides of all calls to the
 // underlying Manager to only operate on the validators in [subnetID].
-func NewOverriddenManager(subnetID ids.ID, manager Manager) Manager {
+func newOverriddenManager(subnetID ids.ID, manager validators.Manager) *overriddenManager {
 	return &overriddenManager{
 		subnetID: subnetID,
 		manager:  manager,
@@ -27,7 +28,7 @@ func NewOverriddenManager(subnetID ids.ID, manager Manager) Manager {
 // subnetID here is typically the primary network ID, as it has the superset of
 // all subnet validators.
 type overriddenManager struct {
-	manager  Manager
+	manager  validators.Manager
 	subnetID ids.ID
 }
 
@@ -43,7 +44,7 @@ func (o *overriddenManager) GetWeight(_ ids.ID, nodeID ids.NodeID) uint64 {
 	return o.manager.GetWeight(o.subnetID, nodeID)
 }
 
-func (o *overriddenManager) GetValidator(_ ids.ID, nodeID ids.NodeID) (*Validator, bool) {
+func (o *overriddenManager) GetValidator(_ ids.ID, nodeID ids.NodeID) (*validators.Validator, bool) {
 	return o.manager.GetValidator(o.subnetID, nodeID)
 }
 
@@ -67,11 +68,11 @@ func (o *overriddenManager) Sample(_ ids.ID, size int) ([]ids.NodeID, error) {
 	return o.manager.Sample(o.subnetID, size)
 }
 
-func (o *overriddenManager) GetMap(ids.ID) map[ids.NodeID]*GetValidatorOutput {
+func (o *overriddenManager) GetMap(ids.ID) map[ids.NodeID]*validators.GetValidatorOutput {
 	return o.manager.GetMap(o.subnetID)
 }
 
-func (o *overriddenManager) RegisterCallbackListener(_ ids.ID, listener SetCallbackListener) {
+func (o *overriddenManager) RegisterCallbackListener(_ ids.ID, listener validators.SetCallbackListener) {
 	o.manager.RegisterCallbackListener(o.subnetID, listener)
 }
 
