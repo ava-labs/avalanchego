@@ -89,9 +89,10 @@ type MyInnerStruct3 struct {
 }
 
 type MyStructWithNullablePtr struct {
-	N1 *int32   `serialize:"true,nullable"`
-	N2 *int64   `serialize:"true,nullable"`
-	N3 []*int32 `serialize:"true,nullable"`
+	N1 *int32             `serialize:"true,nullable"`
+	N2 *int64             `serialize:"true,nullable"`
+	N3 []*int32           `serialize:"true,nullable"`
+	N4 map[int32][]*int32 `serialize:"true,nullable"`
 }
 
 type myStruct struct {
@@ -428,6 +429,10 @@ func TestStructWithNullablePtr(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 	n1 := int32(5)
 	n2 := int64(10)
+	n4 := make(map[int32][]*int32, 0)
+	n4[0] = []*int32{&n1}
+	n4[5] = []*int32{nil}
+
 	struct1 := MyStructWithNullablePtr{
 		N1: &n1,
 		N2: &n2,
@@ -436,6 +441,7 @@ func TestStructWithNullablePtr(codec GeneralCodec, t testing.TB) {
 			nil,
 			&n1,
 		},
+		N4: n4,
 	}
 
 	require.NoError(codec.RegisterType(&MyStructWithNullablePtr{}))
@@ -457,6 +463,7 @@ func TestStructWithNullablePtr(codec GeneralCodec, t testing.TB) {
 
 	struct1 = MyStructWithNullablePtr{
 		N3: []*int32{},
+		N4: make(map[int32][]*int32, 0),
 	}
 	bytes, err = manager.Marshal(0, struct1)
 	require.NoError(err)
