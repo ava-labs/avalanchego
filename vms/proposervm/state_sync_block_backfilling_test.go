@@ -35,6 +35,7 @@ func TestBlockBackfillEnabled(t *testing.T) {
 
 	// 1. Accept a State summary
 	var (
+		forkHeight                 = uint64(100)
 		stateSummaryHeight         = uint64(2023)
 		proVMParentStateSummaryBlk = ids.GenerateTestID()
 	)
@@ -51,7 +52,7 @@ func TestBlockBackfillEnabled(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createTestStateSummary(t, vm, proVMParentStateSummaryBlk, forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
 
 	// Block backfilling not enabled before state sync is accepted
 	ctx := context.Background()
@@ -115,7 +116,8 @@ func TestBlockBackfill(t *testing.T) {
 	}()
 
 	var (
-		blkCount           = 1
+		forkHeight         = uint64(100)
+		blkCount           = 10
 		startBlkHeight     = uint64(1492)
 		proBlks, innerBlks = createTestBlocks(t, vm, blkCount, startBlkHeight)
 
@@ -137,7 +139,7 @@ func TestBlockBackfill(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
@@ -275,6 +277,7 @@ func createTestStateSummary(
 	t *testing.T,
 	vm *VM,
 	proVMParentStateSummaryBlk ids.ID,
+	forkHeight uint64,
 	innerVM *fullVM,
 	innerSummary *block.TestStateSummary,
 	innerBlk *snowman.TestBlock,
@@ -291,7 +294,7 @@ func createTestStateSummary(
 	)
 	require.NoError(err)
 
-	statelessSummary, err := summary.Build(innerSummary.Height()-1, slb.Bytes(), innerSummary.Bytes())
+	statelessSummary, err := summary.Build(forkHeight, slb.Bytes(), innerSummary.Bytes())
 	require.NoError(err)
 
 	innerVM.ParseStateSummaryF = func(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {

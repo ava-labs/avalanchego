@@ -6,8 +6,10 @@ package proposervm
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -176,7 +178,7 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error)
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, uint64, error) {
 	var (
-		blks           = make([]Block, 0, len(blksBytes))
+		blks           = make(map[uint64]Block)
 		innerBlksBytes = make([][]byte, 0, len(blksBytes))
 	)
 
@@ -188,7 +190,7 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 
 		// TODO: introduce validation
 
-		blks = append(blks, blk)
+		blks[blk.Height()] = blk
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 
@@ -198,7 +200,15 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 		// Find out which blocks have been accepted and store them.
 		// Should the process err while looping there will be innerVM blocks not indexed by proposerVM. Repair will be
 		// carried out upon restart.
-		for _, blk := range blks {
+
+		// Make sure to sort blocks by height to accept them in the right order
+		blkHeights := maps.Keys(blks)
+		sort.Slice(blkHeights, func(i, j int) bool {
+			return blkHeights[i] < blkHeights[j] // sort in ascending order
+		})
+
+		for _, h := range blkHeights {
+			blk := blks[h]
 			_, err := vm.ChainVM.GetBlock(ctx, blk.getInnerBlk().ID())
 			if err != nil {
 				continue
