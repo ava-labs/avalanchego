@@ -191,32 +191,16 @@ func newTrieView(
 	return newView, nil
 }
 
-// Creates a view of the db at a historical root using the provided changes
 func newHistoricalTrieView(
 	db *merkleDB,
 	changes *changeSummary,
 ) (*trieView, error) {
-	if changes == nil {
-		return nil, ErrNoValidRoot
-	}
 
-	passedRootChange, ok := changes.nodes[Key{}]
-	if !ok {
-		return nil, ErrNoValidRoot
+	changeOps := make([]database.BatchOp, 0, len(changes.values))
+	for key, valueChange := range changes.values {
+		changeOps = append(changeOps, database.BatchOp{Key: key.Bytes(), Value: valueChange.after.Value(), Delete: valueChange.after.IsNothing()})
 	}
-
-	newView := &trieView{
-		root:       passedRootChange.after,
-		db:         db,
-		parentTrie: db,
-		changes:    changes,
-		tokenSize:  db.tokenSize,
-	}
-	// since this is a set of historical changes, all nodes have already been calculated
-	// since no new changes have occurred, no new calculations need to be done
-	newView.calculateNodesOnce.Do(func() {})
-	newView.nodesAlreadyCalculated.Set(true)
-	return newView, nil
+	return newTrieView(db, db, ViewChanges{BatchOps: changeOps})
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.

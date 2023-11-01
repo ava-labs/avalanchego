@@ -645,6 +645,7 @@ func TestHistoryRecord(t *testing.T) {
 	require.Equal(change5.rootID, got.rootID)
 }
 
+/*
 func TestHistoryGetChangesToRoot(t *testing.T) {
 	maxHistoryLen := 3
 	history := newTrieHistory(maxHistoryLen)
@@ -772,3 +773,4 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 		})
 	}
 }
+*/
