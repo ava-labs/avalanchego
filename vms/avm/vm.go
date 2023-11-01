@@ -20,7 +20,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/pubsub"
@@ -144,7 +143,7 @@ type Config struct {
 func (vm *VM) Initialize(
 	_ context.Context,
 	ctx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
@@ -181,7 +180,6 @@ func (vm *VM) Initialize(
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.Aliaser = ids.NewAliaser()
 
-	db := dbManager.Current().Database
 	vm.ctx = ctx
 	vm.appSender = appSender
 	vm.baseDB = db
