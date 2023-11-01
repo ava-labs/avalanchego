@@ -1,5 +1,19 @@
 # Release Notes
 
+## [v1.10.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.15)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is updated to `30` all plugins must update to be compatible.
+
+### Configs
+
+- Added `pebble` as an allowed option to `--db-type`
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.14...v1.10.15
+
 ## [v1.10.14](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.14)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
