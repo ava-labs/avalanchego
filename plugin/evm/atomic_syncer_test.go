@@ -19,6 +19,7 @@ import (
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/handlers"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
+	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -110,7 +111,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	// we re-initialise trie DB for asserting the trie to make sure any issues with unflushed writes
 	// are caught here as this will only pass if all trie nodes have been written to the underlying DB
 	clientTrieDB := atomicTrie.TrieDB()
-	trie.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
+	syncutils.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
 	// check all commit heights are created
 	for height := uint64(commitInterval); height <= targetHeight; height += commitInterval {
@@ -124,7 +125,7 @@ func TestAtomicSyncer(t *testing.T) {
 	rand.Seed(1)
 	targetHeight := 10 * uint64(commitInterval)
 	serverTrieDB := trie.NewDatabase(memorydb.New())
-	root, _, _ := trie.GenerateTrie(t, serverTrieDB, int(targetHeight), atomicKeyLength)
+	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, int(targetHeight), atomicKeyLength)
 
 	testAtomicSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight))
 }
@@ -134,7 +135,7 @@ func TestAtomicSyncerResume(t *testing.T) {
 	targetHeight := 10 * uint64(commitInterval)
 	serverTrieDB := trie.NewDatabase(memorydb.New())
 	numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
-	root, _, _ := trie.GenerateTrie(t, serverTrieDB, numTrieKeys, atomicKeyLength)
+	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys, atomicKeyLength)
 
 	testAtomicSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 		{
@@ -151,12 +152,12 @@ func TestAtomicSyncerResumeNewRootCheckpoint(t *testing.T) {
 	targetHeight1 := 10 * uint64(commitInterval)
 	serverTrieDB := trie.NewDatabase(memorydb.New())
 	numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
-	root1, _, _ := trie.GenerateTrie(t, serverTrieDB, numTrieKeys1, atomicKeyLength)
+	root1, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys1, atomicKeyLength)
 
 	rand.Seed(1) // seed rand again to get the same leafs in GenerateTrie
 	targetHeight2 := 20 * uint64(commitInterval)
 	numTrieKeys2 := int(targetHeight2) - 1 // no atomic ops for genesis
-	root2, _, _ := trie.GenerateTrie(t, serverTrieDB, numTrieKeys2, atomicKeyLength)
+	root2, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys2, atomicKeyLength)
 
 	testAtomicSyncer(t, serverTrieDB, targetHeight1, root1, []atomicSyncTestCheckpoint{
 		{

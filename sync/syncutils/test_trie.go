@@ -1,7 +1,7 @@
 // (c) 2021-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package trie
+package syncutils
 
 import (
 	cryptoRand "crypto/rand"
@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/trie/trienode"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,11 +26,11 @@ import (
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
 // GenerateTrie reads from [rand] and the caller should call rand.Seed(n) for deterministic results
-func GenerateTrie(t *testing.T, trieDB *Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
+func GenerateTrie(t *testing.T, trieDB *trie.Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
 	if keySize < wrappers.LongLen+1 {
 		t.Fatal("key size must be at least 9 bytes (8 bytes for uint64 and 1 random byte)")
 	}
-	testTrie := NewEmpty(trieDB)
+	testTrie := trie.NewEmpty(trieDB)
 
 	keys, values := FillTrie(t, numKeys, keySize, testTrie)
 
@@ -45,7 +47,7 @@ func GenerateTrie(t *testing.T, trieDB *Database, numKeys int, keySize int) (com
 // FillTrie fills a given trie with [numKeys] number of keys, each of size [keySize]
 // returns inserted keys and values
 // FillTrie reads from [rand] and the caller should call rand.Seed(n) for deterministic results
-func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *Trie) ([][]byte, [][]byte) {
+func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *trie.Trie) ([][]byte, [][]byte) {
 	keys := make([][]byte, 0, numKeys)
 	values := make([][]byte, 0, numKeys)
 
@@ -70,18 +72,18 @@ func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *Trie) ([][]byte,
 
 // AssertTrieConsistency ensures given trieDB [a] and [b] both have the same
 // non-empty trie at [root]. (all key/value pairs must be equal)
-func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *Database, onLeaf func(key, val []byte) error) {
-	trieA, err := New(TrieID(root), a)
+func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *trie.Database, onLeaf func(key, val []byte) error) {
+	trieA, err := trie.New(trie.TrieID(root), a)
 	if err != nil {
 		t.Fatalf("error creating trieA, root=%s, err=%v", root, err)
 	}
-	trieB, err := New(TrieID(root), b)
+	trieB, err := trie.New(trie.TrieID(root), b)
 	if err != nil {
 		t.Fatalf("error creating trieB, root=%s, err=%v", root, err)
 	}
 
-	itA := NewIterator(trieA.NodeIterator(nil))
-	itB := NewIterator(trieB.NodeIterator(nil))
+	itA := trie.NewIterator(trieA.NodeIterator(nil))
+	itB := trie.NewIterator(trieB.NodeIterator(nil))
 	count := 0
 	for itA.Next() && itB.Next() {
 		count++
@@ -100,16 +102,11 @@ func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *Database, onLea
 	assert.Greater(t, count, 0)
 }
 
-// CorruptTrie deletes every [n]th trie node from the trie given by [root] from the trieDB.
-// Assumes that the trie given by root can be iterated without issue.
-func CorruptTrie(t *testing.T, trieDB *Database, root common.Hash, n int) {
-	batch := trieDB.diskdb.NewBatch()
-	// next delete some trie nodes
-	tr, err := New(TrieID(root), trieDB)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+// CorruptTrie deletes every [n]th trie node from the trie given by [tr] from the underlying [db].
+// Assumes [tr] can be iterated without issue.
+func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
+	// Delete some trie nodes
+	batch := diskdb.NewBatch()
 	nodeIt := tr.NodeIterator(nil)
 	count := 0
 	for nodeIt.Next(true) {
@@ -133,7 +130,7 @@ func CorruptTrie(t *testing.T, trieDB *Database, root common.Hash, n int) {
 // [onAccount] is called if non-nil (so the caller can modify the account before it is stored in the secure trie).
 // returns the new trie root and a map of funded keys to StateAccount structs.
 func FillAccounts(
-	t *testing.T, trieDB *Database, root common.Hash, numAccounts int,
+	t *testing.T, trieDB *trie.Database, root common.Hash, numAccounts int,
 	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
 ) (common.Hash, map[*keystore.Key]*types.StateAccount) {
 	var (
@@ -143,7 +140,7 @@ func FillAccounts(
 		accounts    = make(map[*keystore.Key]*types.StateAccount, numAccounts)
 	)
 
-	tr, err := NewStateTrie(TrieID(root), trieDB)
+	tr, err := trie.NewStateTrie(trie.TrieID(root), trieDB)
 	if err != nil {
 		t.Fatalf("error opening trie: %v", err)
 	}
