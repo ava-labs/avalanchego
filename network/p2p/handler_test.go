@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -61,6 +62,7 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 					},
 				},
 				ValidatorSet: tt.validatorSet,
+				Log:          logging.NoLog{},
 			}
 
 			handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
@@ -101,6 +103,7 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 			handler := ValidatorHandler{
 				Handler:      NoOpHandler{},
 				ValidatorSet: tt.validatorSet,
+				Log:          logging.NoLog{},
 			}
 
 			_, err := handler.AppRequest(context.Background(), tt.nodeID, time.Time{}, []byte("foobar"))

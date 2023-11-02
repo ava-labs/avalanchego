@@ -66,10 +66,12 @@ func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []by
 type ValidatorHandler struct {
 	Handler
 	ValidatorSet ValidatorSet
+	Log          logging.Logger
 }
 
 func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	if !v.ValidatorSet.Has(ctx, nodeID) {
+		v.Log.Debug("dropping message", zap.Stringer("nodeID", nodeID))
 		return
 	}
 
