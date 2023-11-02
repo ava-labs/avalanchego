@@ -35,7 +35,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
-	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Clear(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
@@ -61,7 +61,7 @@ func (c *dBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
-func (c *dBClient) Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dBClient) Clear(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, DB_Clear_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -129,7 +129,7 @@ func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofReq
 // for forward compatibility
 type DBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
-	Clear(context.Context, *ClearRequest) (*emptypb.Empty, error)
+	Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
@@ -146,7 +146,7 @@ type UnimplementedDBServer struct {
 func (UnimplementedDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMerkleRoot not implemented")
 }
-func (UnimplementedDBServer) Clear(context.Context, *ClearRequest) (*emptypb.Empty, error) {
+func (UnimplementedDBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Clear not implemented")
 }
 func (UnimplementedDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
@@ -199,7 +199,7 @@ func _DB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _DB_Clear_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClearRequest)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func _DB_Clear_Handler(srv interface{}, ctx context.Context, dec func(interface{
 		FullMethod: DB_Clear_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBServer).Clear(ctx, req.(*ClearRequest))
+		return srv.(DBServer).Clear(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

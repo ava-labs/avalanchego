@@ -21,7 +21,7 @@ message Request {
 service DB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
-  rpc Clear(ClearRequest) returns (google.protobuf.Empty);
+  rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
@@ -36,8 +36,6 @@ service DB {
 message GetMerkleRootResponse {
   bytes root_hash = 1;
 }
-
-message ClearRequest {}
 
 message GetProofRequest {
   bytes key = 1;

@@ -221,7 +221,7 @@ func (s *DBServer) CommitRangeProof(
 
 func (s *DBServer) Clear(
 	_ context.Context,
-	req *pb.ClearRequest,
+	req *emptypb.Empty,
 ) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, s.db.Clear()
 }
