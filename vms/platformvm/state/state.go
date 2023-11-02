@@ -140,10 +140,6 @@ type State interface {
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
-	// ApplyCurrentValidators adds all the current validators and delegators of
-	// [subnetID] into [vdrs].
-	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
-
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
 	// [endHeight]. Applying the diffs modifies [validators].
@@ -1139,26 +1135,6 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
-	for nodeID, validator := range s.currentStakers.validators[subnetID] {
-		staker := validator.validator
-		if err := vdrs.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
-			return err
-		}
-
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
-				return err
-			}
-		}
-		delegatorIterator.Release()
-	}
-	return nil
-}
-
 func (s *state) ApplyValidatorWeightDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1689,13 +1665,28 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
-	if s.cfg.Validators.Count(constants.PrimaryNetworkID) != 0 {
-		// Enforce the invariant that the validator set is empty here.
-		return errValidatorSetAlreadyPopulated
-	}
-	err := s.ApplyCurrentValidators(constants.PrimaryNetworkID, s.cfg.Validators)
-	if err != nil {
-		return err
+	for subnetID, validators := range s.currentStakers.validators {
+		if s.cfg.Validators.Count(subnetID) != 0 {
+			// Enforce the invariant that the validator set is empty here.
+			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
+		}
+
+		for nodeID, validator := range validators {
+			staker := validator.validator
+			if err := s.cfg.Validators.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+				return err
+			}
+
+			delegatorIterator := NewTreeIterator(validator.delegators)
+			for delegatorIterator.Next() {
+				staker := delegatorIterator.Value()
+				if err := s.cfg.Validators.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
+					delegatorIterator.Release()
+					return err
+				}
+			}
+			delegatorIterator.Release()
+		}
 	}
 
 	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
@@ -1709,15 +1700,6 @@ func (s *state) initValidatorSets() error {
 	s.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range s.cfg.TrackedSubnets {
-		if s.cfg.Validators.Count(subnetID) != 0 {
-			// Enforce the invariant that the validator set is empty here.
-			return errValidatorSetAlreadyPopulated
-		}
-		err := s.ApplyCurrentValidators(subnetID, s.cfg.Validators)
-		if err != nil {
-			return err
-		}
-
 		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
 		s.cfg.Validators.RegisterCallbackListener(subnetID, vl)
 	}
@@ -2106,11 +2088,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 			// TODO: Move the validator set management out of the state package
 			if !updateValidators {
-				continue
-			}
-
-			// We only track the current validator set of tracked subnets.
-			if subnetID != constants.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
 				continue
 			}
 
