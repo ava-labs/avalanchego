@@ -29,7 +29,6 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
-	id          ids.ID
 	key         Key
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
@@ -79,19 +78,13 @@ func (n *node) bytes() []byte {
 // clear the cached values that will need to be recalculated whenever the node changes
 // for example, node ID and byte representation
 func (n *node) onNodeChanged() {
-	n.id = ids.Empty
 	n.nodeBytes = nil
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) {
-	if n.id != ids.Empty {
-		return
-	}
-
+func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
-	bytes := codec.encodeHashValues(n)
-	n.id = hashing.ComputeHash256Array(bytes)
+	return hashing.ComputeHash256Array(codec.encodeHashValues(n))
 }
 
 // Set [n]'s value to [val].
@@ -117,7 +110,6 @@ func (n *node) addChild(childNode *node, tokenSize int) {
 		childNode.key.Token(n.key.length, tokenSize),
 		child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
-			id:            childNode.id,
 			hasValue:      childNode.hasValue(),
 		},
 	)
@@ -141,7 +133,6 @@ func (n *node) removeChild(child *node, tokenSize int) {
 // it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
-		id:  n.id,
 		key: n.key,
 		dbNode: dbNode{
 			value:    n.value,

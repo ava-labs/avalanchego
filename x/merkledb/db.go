@@ -195,7 +195,8 @@ type merkleDB struct {
 	infoTracer  trace.Tracer
 
 	// The root of this trie.
-	root *node
+	root   *node
+	rootID ids.ID
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -569,7 +570,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return db.root.id
+	return db.rootID
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -960,6 +961,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
 	db.root = rootChange.after
+	db.rootID = changes.rootID
 	db.history.record(changes)
 	return nil
 }
@@ -1144,29 +1146,26 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// check under both prefixes
 	var err error
 	db.root, err = db.intermediateNodeDB.Get(Key{})
-	if err == database.ErrNotFound {
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			return ids.Empty, err
+		}
 		db.root, err = db.valueNodeDB.Get(Key{})
-	}
-	if err == nil {
-		// Root already exists, so calculate its id
-		db.root.calculateID(db.metrics)
-		return db.root.id, nil
-	}
-	if err != database.ErrNotFound {
-		return ids.Empty, err
-	}
+		if err != nil {
+			if !errors.Is(err, database.ErrNotFound) {
+				return ids.Empty, err
+			}
+		}
 
-	// Root doesn't exist; make a new one.
-	db.root = newNode(Key{})
-
-	// update its ID
-	db.root.calculateID(db.metrics)
-
-	if err := db.intermediateNodeDB.Put(Key{}, db.root); err != nil {
-		return ids.Empty, err
+		// Root doesn't exist; make a new one.
+		db.root = newNode(Key{})
+		if err := db.intermediateNodeDB.Put(Key{}, db.root); err != nil {
+			return ids.Empty, err
+		}
 	}
 
-	return db.root.id, nil
+	db.rootID = db.root.calculateID(db.metrics)
+	return db.rootID, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].

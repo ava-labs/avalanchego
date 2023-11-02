@@ -234,9 +234,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.root)
+		t.changes.rootID = t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.root.id
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -247,13 +246,18 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	return err
 }
 
+type idAndNode struct {
+	id ids.ID
+	n  *node
+}
+
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(n *node) {
+func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
 		wg              sync.WaitGroup
-		updatedChildren = make(chan *node, len(n.children))
+		updatedChildren = make(chan idAndNode, len(n.children))
 	)
 
 	for childIndex, child := range n.children {
@@ -268,10 +272,8 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 		calculateChildID := func() {
 			defer wg.Done()
 
-			t.calculateNodeIDsHelper(childNodeChange.after)
-
 			// Note that this will never block
-			updatedChildren <- childNodeChange.after
+			updatedChildren <- idAndNode{id: t.calculateNodeIDsHelper(childNodeChange.after), n: childNodeChange.after}
 		}
 
 		// Try updating the child and its descendants in a goroutine.
@@ -291,16 +293,16 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	close(updatedChildren)
 
 	for updatedChild := range updatedChildren {
-		index := updatedChild.key.Token(n.key.length, t.tokenSize)
+		index := updatedChild.n.key.Token(n.key.length, t.tokenSize)
 		n.setChildEntry(index, child{
 			compressedKey: n.children[index].compressedKey,
 			id:            updatedChild.id,
-			hasValue:      updatedChild.hasValue(),
+			hasValue:      updatedChild.n.hasValue(),
 		})
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	n.calculateID(t.db.metrics)
+	return n.calculateID(t.db.metrics)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
@@ -348,8 +350,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return proof, nil
 	}
 
-	childNode, err := t.getNodeWithID(
-		child.id,
+	childNode, err := t.getNode(
 		closestNode.key.Extend(ToToken(nextIndex, t.tokenSize), child.compressedKey),
 		child.hasValue,
 	)
@@ -531,7 +532,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.root.id, nil
+	return t.changes.rootID, nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -603,7 +604,7 @@ func (t *trieView) remove(key Key) error {
 	}
 
 	// confirm a node exists with a value
-	keyNode, err := t.getNodeWithID(ids.Empty, key, true)
+	keyNode, err := t.getNode(key, true)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			// key didn't exist
@@ -718,7 +719,7 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 			return nil
 		}
 		// grab the next node along the path
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key.Take(currentNode.key.length+t.tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
+		currentNode, err = t.getNode(key.Take(currentNode.key.length+t.tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -737,7 +738,7 @@ func (t *trieView) getEditableNode(key Key, hadValue bool) (*node, error) {
 	}
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ids.Empty, key, hadValue)
+	n, err := t.getNode(key, hadValue)
 	if err != nil {
 		return nil, err
 	}
@@ -938,7 +939,7 @@ func (t *trieView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 // sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key Key, hasValue bool) (*node, error) {
+func (t *trieView) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -954,11 +955,6 @@ func (t *trieView) getNodeWithID(id ids.ID, key Key, hasValue bool) (*node, erro
 		return nil, err
 	}
 
-	// only need to initialize the id if it's from the parent trie.
-	// nodes in the current view change list have already been initialized.
-	if id != ids.Empty {
-		parentTrieNode.id = id
-	}
 	return parentTrieNode, nil
 }
 
