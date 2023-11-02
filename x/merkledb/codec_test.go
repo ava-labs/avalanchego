@@ -199,7 +199,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			randSeed int,
 		) {
 			require := require.New(t)
-			for _, bf := range validBranchFactors { // Create a random *hashValues
+			for _, bf := range validBranchFactors { // Create a random node
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 				children := map[byte]child{}
@@ -235,7 +235,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 					},
 				}
 
-				// Serialize the *hashValues with both codecs
+				// Serialize hv with both codecs
 				hvBytes1 := codec1.encodeHashValues(hv)
 				hvBytes2 := codec2.encodeHashValues(hv)
 
