@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	ledger "github.com/ava-labs/ledger-avalanche/go"
+	bip32 "github.com/tyler-smith/go-bip32"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
-	bip32 "github.com/tyler-smith/go-bip32"
 )
 
 const (
