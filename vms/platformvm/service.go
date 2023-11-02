@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -1283,13 +1282,11 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // AddDelegatorArgs are the arguments to AddDelegator
@@ -1395,13 +1392,11 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
@@ -1503,13 +1498,11 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -1581,13 +1574,11 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // ExportAVAXArgs are the arguments to ExportAVAX
@@ -1679,13 +1670,11 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // ImportAVAXArgs are the arguments to ImportAVAX
@@ -1766,13 +1755,11 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 /*
@@ -1892,13 +1879,11 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
-	return errs.Err
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus

@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,8 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -74,9 +72,6 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
-
-	// Used to create and use keys.
-	testKeyfactory secp256k1.Factory
 
 	errMissing = errors.New("missing")
 )
@@ -121,8 +116,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	config := defaultConfig(postBanff, postCortina)
 	clk := defaultClock(postBanff || postCortina)
 
-	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
+	baseDB := versiondb.New(memdb.New())
 	ctx, msm := defaultCtx(baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
@@ -444,10 +438,8 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-	return errs.Err
 }

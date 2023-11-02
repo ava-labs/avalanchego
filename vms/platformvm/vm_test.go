@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -115,9 +115,6 @@ var (
 
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
-
-	// Used to create and use keys.
-	testKeyFactory secp256k1.Factory
 
 	errMissing = errors.New("missing")
 )
@@ -318,9 +315,9 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 		BanffTime:              banffForkTime,
 	}}
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	db := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, db)
+	atomicDB := prefixdb.New([]byte{1}, db)
 
 	vm.clock.Set(banffForkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
@@ -344,7 +341,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		chainDBManager,
+		chainDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -374,7 +371,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	return vm, baseDBManager.Current().Database, msm
+	return vm, db, msm
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
@@ -492,7 +489,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := testKeyFactory.NewPrivateKey()
+	key, _ := secp256k1.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -1175,9 +1172,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
-	firstDB := db.NewPrefixDBManager([]byte{})
+	firstDB := prefixdb.New([]byte{}, db)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
@@ -1190,8 +1187,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstCtx := defaultContext(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(firstCtx.ChainID),
@@ -1282,7 +1279,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := prefixdb.New([]byte{}, db)
 	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
@@ -1307,10 +1304,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	_, genesisBytes := defaultGenesis(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
-
+	baseDB := memdb.New()
+	vmDB := prefixdb.New([]byte("vm"), baseDB)
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
@@ -1328,7 +1324,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext(t)
 
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),
@@ -1343,7 +1339,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		vmDBManager,
+		vmDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -1633,7 +1629,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1658,7 +1653,7 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		memdb.New(),
 		genesisBytes,
 		nil,
 		nil,
@@ -1790,9 +1785,9 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
-	firstDB := db.NewPrefixDBManager([]byte{})
+	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1836,7 +1831,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	// Restart the VM with a larger uptime requirement
-	secondDB := db.NewPrefixDBManager([]byte{})
+	secondDB := prefixdb.New([]byte{}, db)
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1928,7 +1923,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
-	db := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -2035,7 +2030,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -2192,4 +2187,79 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		},
 	}
 	require.Equal(expectedOwner, subnetOwner)
+}
+
+func TestBaseTx(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	sendAmt := uint64(100000)
+	changeAddr := ids.ShortEmpty
+
+	baseTx, err := vm.txBuilder.NewBaseTx(
+		sendAmt,
+		secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				keys[1].Address(),
+			},
+		},
+		[]*secp256k1.PrivateKey{keys[0]},
+		changeAddr,
+	)
+	require.NoError(err)
+
+	totalInputAmt := uint64(0)
+	key0InputAmt := uint64(0)
+	for inputID := range baseTx.Unsigned.InputIDs() {
+		utxo, err := vm.state.GetUTXO(inputID)
+		require.NoError(err)
+		require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+		castOut := utxo.Out.(*secp256k1fx.TransferOutput)
+		if castOut.AddressesSet().Equals(set.Of(keys[0].Address())) {
+			key0InputAmt += castOut.Amt
+		}
+		totalInputAmt += castOut.Amt
+	}
+	require.Equal(totalInputAmt, key0InputAmt)
+
+	totalOutputAmt := uint64(0)
+	key0OutputAmt := uint64(0)
+	key1OutputAmt := uint64(0)
+	changeAddrOutputAmt := uint64(0)
+	for _, output := range baseTx.Unsigned.Outputs() {
+		require.IsType(&secp256k1fx.TransferOutput{}, output.Out)
+		castOut := output.Out.(*secp256k1fx.TransferOutput)
+		if castOut.AddressesSet().Equals(set.Of(keys[0].Address())) {
+			key0OutputAmt += castOut.Amt
+		}
+		if castOut.AddressesSet().Equals(set.Of(keys[1].Address())) {
+			key1OutputAmt += castOut.Amt
+		}
+		if castOut.AddressesSet().Equals(set.Of(changeAddr)) {
+			changeAddrOutputAmt += castOut.Amt
+		}
+		totalOutputAmt += castOut.Amt
+	}
+	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
+
+	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	require.Equal(sendAmt, key1OutputAmt)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(baseTx))
+	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	baseTxRawBlock := baseTxBlock.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffStandardBlock{}, baseTxRawBlock)
+	require.Contains(baseTxRawBlock.Txs(), baseTx)
+
+	require.NoError(baseTxBlock.Verify(context.Background()))
+	require.NoError(baseTxBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 }
