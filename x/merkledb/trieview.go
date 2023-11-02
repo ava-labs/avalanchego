@@ -275,6 +275,13 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 			// This child wasn't changed.
 			continue
 		}
+		if !ok {
+			children, err := t.getChildren(childKey)
+			if err != nil {
+				return ids.Empty, err
+			}
+			childrenChange = children
+		}
 
 		var childValue maybe.Maybe[[]byte]
 		if valueChanged {
