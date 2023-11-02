@@ -114,7 +114,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeNode(node)
+			buf := codec.encodeNode(node, maybe.Nothing[[]byte]())
 			require.Equal(b, buf)
 		},
 	)
@@ -164,13 +164,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					children: children,
 				}
 
-				nodeBytes := codec.encodeNode(&n)
+				nodeBytes := codec.encodeNode(&n, value)
 
 				var gotNode node
 				require.NoError(codec.decodeNode(nodeBytes, &gotNode))
 				require.Equal(n, gotNode)
 
-				nodeBytes2 := codec.encodeNode(&gotNode)
+				nodeBytes2 := codec.encodeNode(&gotNode, gotNode.value)
 				require.Equal(nodeBytes, nodeBytes2)
 			}
 		},
@@ -233,8 +233,8 @@ func FuzzEncodeHashValues(f *testing.F) {
 				}
 
 				// Serialize the *hashValues with both codecs
-				hvBytes1 := codec1.encodeHashValues(ToKey(key), hv)
-				hvBytes2 := codec2.encodeHashValues(ToKey(key), hv)
+				hvBytes1 := codec1.encodeHashValues(ToKey(key), hv, hv.value)
+				hvBytes2 := codec2.encodeHashValues(ToKey(key), hv, hv.value)
 
 				// Make sure they're the same
 				require.Equal(hvBytes1, hvBytes2)

@@ -61,11 +61,11 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeNode(n *node) []byte
+	encodeNode(n *node, value maybe.Maybe[[]byte]) []byte
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
-	encodeHashValues(key Key, n *node) []byte
+	encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]) []byte
 }
 
 type decoder interface {
@@ -91,7 +91,7 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeNode(n *node) []byte {
+func (c *codecImpl) encodeNode(n *node, value maybe.Maybe[[]byte]) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size of [n] to prevent memory allocations
@@ -99,7 +99,7 @@ func (c *codecImpl) encodeNode(n *node) []byte {
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
 	)
 
-	c.encodeMaybeByteSlice(buf, n.value)
+	c.encodeMaybeByteSlice(buf, value)
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
@@ -115,7 +115,7 @@ func (c *codecImpl) encodeNode(n *node) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(key Key, n *node) []byte {
+func (c *codecImpl) encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size [hv] to prevent memory allocations
@@ -133,7 +133,7 @@ func (c *codecImpl) encodeHashValues(key Key, n *node) []byte {
 		c.encodeUint(buf, uint64(index))
 		_, _ = buf.Write(entry.id[:])
 	}
-	c.encodeMaybeByteSlice(buf, n.getValueDigest())
+	c.encodeMaybeByteSlice(buf, getValueDigest(value))
 	c.encodeKey(buf, key)
 
 	return buf.Bytes()

@@ -331,6 +331,12 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		Key: ToKey(key),
 	}
 
+	value, err := t.getValue(proof.Key)
+	if err != nil {
+		return nil, err
+	}
+	proof.Value = value
+
 	var (
 		closestKey  Key
 		closestNode *node
@@ -338,15 +344,18 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	if err := t.visitPathToKey(proof.Key, func(key Key, n *node) error {
 		closestKey = key
 		closestNode = n
-		proof.Path = append(proof.Path, n.asProofNode(key))
+
+		value, err := t.getValue(key)
+		if err != nil {
+			return err
+		}
+		proof.Path = append(proof.Path, n.asProofNode(key, value))
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
 	if closestKey == proof.Key {
-		// There is a node with the given [key].
-		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
 		return proof, nil
 	}
 
@@ -367,7 +376,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
-	proof.Path = append(proof.Path, childNode.asProofNode(childKey))
+	value, err = t.getValue(childKey)
+	if err != nil {
+		return nil, err
+	}
+	proof.Path = append(proof.Path, childNode.asProofNode(childKey, value))
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -555,7 +568,15 @@ func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []er
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValueCopy(ToKey(key))
+		val, err := t.getValueCopy(ToKey(key))
+		switch {
+		case err != nil:
+			valueErrors[i] = err
+		case val.IsNothing():
+			valueErrors[i] = database.ErrNotFound
+		default:
+			results[i] = val.Value()
+		}
 	}
 	return results, valueErrors
 }
@@ -566,42 +587,46 @@ func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
 	defer span.End()
 
-	return t.getValueCopy(ToKey(key))
+	val, err := t.getValueCopy(ToKey(key))
+	if err != nil {
+		return nil, err
+	}
+	if val.IsNothing() {
+		return nil, database.ErrNotFound
+	}
+	return val.Value(), nil
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *trieView) getValueCopy(key Key) ([]byte, error) {
+func (t *trieView) getValueCopy(key Key) (maybe.Maybe[[]byte], error) {
 	val, err := t.getValue(key)
 	if err != nil {
-		return nil, err
+		return maybe.Nothing[[]byte](), err
 	}
-	return slices.Clone(val), nil
+	return maybe.Bind(val, slices.Clone[[]byte]), nil
 }
 
-func (t *trieView) getValue(key Key) ([]byte, error) {
+func (t *trieView) getValue(key Key) (maybe.Maybe[[]byte], error) {
 	if t.isInvalid() {
-		return nil, ErrInvalid
+		return maybe.Nothing[[]byte](), ErrInvalid
 	}
 
 	if change, ok := t.changes.values[key]; ok {
 		t.db.metrics.ViewValueCacheHit()
-		if change.after.IsNothing() {
-			return nil, database.ErrNotFound
-		}
-		return change.after.Value(), nil
+		return change.after, nil
 	}
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
 	value, err := t.getParentTrie().getValue(key)
 	if err != nil {
-		return nil, err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	// ensure no ancestor changes occurred during execution
 	if t.isInvalid() {
-		return nil, ErrInvalid
+		return maybe.Nothing[[]byte](), ErrInvalid
 	}
 
 	return value, nil
@@ -896,7 +921,7 @@ func (t *trieView) recordNodeDeleted(key Key, after *node) error {
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
+func (t *trieView) recordKeyChange(key Key, after *node, _ bool, newNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
@@ -913,7 +938,12 @@ func (t *trieView) recordKeyChange(key Key, after *node, hadValue bool, newNode 
 		return nil
 	}
 
-	before, err := t.getParentTrie().getEditableNode(key, hadValue)
+	val, err := t.getParentTrie().getValue(key)
+	if err != nil {
+		return err
+	}
+
+	before, err := t.getParentTrie().getEditableNode(key, val.HasValue())
 	if err != nil && err != database.ErrNotFound {
 		return err
 	}
@@ -940,19 +970,12 @@ func (t *trieView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 	}
 
 	// grab the before value
-	var beforeMaybe maybe.Maybe[[]byte]
 	before, err := t.getParentTrie().getValue(key)
-	switch err {
-	case nil:
-		beforeMaybe = maybe.Some(before)
-	case database.ErrNotFound:
-		beforeMaybe = maybe.Nothing[[]byte]()
-	default:
+	if err != nil {
 		return err
 	}
-
 	t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
-		before: beforeMaybe,
+		before: before,
 		after:  value,
 	}
 	return nil

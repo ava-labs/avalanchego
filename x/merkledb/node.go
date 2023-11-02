@@ -48,13 +48,13 @@ func (n *node) hasValue() bool {
 
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
-	return codec.encodeNode(n)
+	return codec.encodeNode(n, n.value)
 }
 
 // Returns and caches the ID of this node.
 func (n *node) calculateID(key Key, metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
-	return hashing.ComputeHash256Array(codec.encodeHashValues(key, n))
+	return hashing.ComputeHash256Array(codec.encodeHashValues(key, n, n.value))
 }
 
 // Set [n]'s value to [val].
@@ -63,10 +63,14 @@ func (n *node) setValue(val maybe.Maybe[[]byte]) {
 }
 
 func (n *node) getValueDigest() maybe.Maybe[[]byte] {
-	if n.value.IsNothing() || len(n.value.Value()) <= HashLength {
-		return n.value
+	return getValueDigest(n.value)
+}
+
+func getValueDigest(val maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+	if val.IsNothing() || len(val.Value()) < HashLength {
+		return val
 	}
-	return maybe.Some(hashing.ComputeHash256(n.value.Value()))
+	return maybe.Some(hashing.ComputeHash256(val.Value()))
 }
 
 // Adds a child to [n] without a reference to the child node.
@@ -86,11 +90,11 @@ func (n *node) clone() *node {
 }
 
 // Returns the ProofNode representation of this node.
-func (n *node) asProofNode(key Key) ProofNode {
+func (n *node) asProofNode(key Key, value maybe.Maybe[[]byte]) ProofNode {
 	pn := ProofNode{
 		Key:         key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: n.getValueDigest(),
+		ValueOrHash: getValueDigest(value),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

@@ -18,42 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
-	var view *trieView
-	if asTrieView, ok := t.(*trieView); ok {
-		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
-			return nil, err
-		}
-		view = asTrieView
-	}
-	if asDatabases, ok := t.(*merkleDB); ok {
-		dbView, err := asDatabases.NewView(context.Background(), ViewChanges{})
-		if err != nil {
-			return nil, err
-		}
-		view = dbView.(*trieView)
-	}
-
-	path := ToKey([]byte(key))
-	var (
-		resultKey Key
-		result    *node
-	)
-	err := view.visitPathToKey(path, func(key Key, n *node) error {
-		result = n
-		resultKey = key
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resultKey != path || result == nil {
-		return nil, database.ErrNotFound
-	}
-
-	return result.value.Value(), nil
-}
-
 func Test_GetValue_Safety(t *testing.T) {
 	require := require.New(t)
 
@@ -308,7 +272,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(err)
 	trie2 := trieIntf2.(*trieView)
 
-	value, err = getNodeValue(trie2, "key")
+	value, err = trie2.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
 
@@ -341,7 +305,7 @@ func Test_Trie_InsertAndRetrieve(t *testing.T) {
 
 	require.NoError(dbTrie.Put([]byte("key"), []byte("value")))
 
-	value, err = getNodeValue(dbTrie, "key")
+	value, err = dbTrie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
 }
@@ -362,7 +326,7 @@ func Test_Trie_Overwrite(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	value, err := getNodeValue(trie, "key")
+	value, err := trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
@@ -375,7 +339,7 @@ func Test_Trie_Overwrite(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	value, err = getNodeValue(trie, "key")
+	value, err = trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value2"), value)
 }
@@ -397,7 +361,7 @@ func Test_Trie_Delete(t *testing.T) {
 	)
 	require.NoError(err)
 
-	value, err := getNodeValue(trie, "key")
+	value, err := trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
@@ -411,7 +375,7 @@ func Test_Trie_Delete(t *testing.T) {
 	)
 	require.NoError(err)
 
-	value, err = getNodeValue(trie, "key")
+	value, err = trie.GetValue(context.Background(), []byte("key"))
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 }
@@ -443,7 +407,7 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
 
-	value, err := getNodeValue(trie, "key")
+	value, err := trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
@@ -458,11 +422,11 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	trie = trieIntf.(*trieView)
 
-	value, err = getNodeValue(trie, "key")
+	value, err = trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	value, err = getNodeValue(trie, "key1")
+	value, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
@@ -477,15 +441,15 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	trie = trieIntf.(*trieView)
 
-	value, err = getNodeValue(trie, "key")
+	value, err = trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	value, err = getNodeValue(trie, "key1")
+	value, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	value, err = getNodeValue(trie, "key12")
+	value, err = trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 }
@@ -507,7 +471,7 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
 
-	value, err := getNodeValue(trie, "key12")
+	value, err := trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
@@ -522,11 +486,11 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	trie = trieIntf.(*trieView)
 
-	value, err = getNodeValue(trie, "key12")
+	value, err = trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	value, err = getNodeValue(trie, "key1")
+	value, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
@@ -541,15 +505,15 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	trie = trieIntf.(*trieView)
 
-	value, err = getNodeValue(trie, "key12")
+	value, err = trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	value, err = getNodeValue(trie, "key1")
+	value, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	value, err = getNodeValue(trie, "key")
+	value, err = trie.GetValue(context.Background(), []byte("key"))
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
 }
@@ -573,11 +537,11 @@ func Test_Trie_SplitBranch(t *testing.T) {
 	)
 	require.NoError(err)
 
-	value, err := getNodeValue(trie, "key12")
+	value, err := trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	value, err = getNodeValue(trie, "key134")
+	value, err = trie.GetValue(context.Background(), []byte("key134"))
 	require.NoError(err)
 	require.Equal([]byte("value134"), value)
 }
@@ -692,19 +656,19 @@ func Test_Trie_NoExistingResidual(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
-	value, err := getNodeValue(trie, "k")
+	value, err := trie.GetValue(context.Background(), []byte("k"))
 	require.NoError(err)
 	require.Equal([]byte("1"), value)
 
-	value, err = getNodeValue(trie, "ke")
+	value, err = trie.GetValue(context.Background(), []byte("ke"))
 	require.NoError(err)
 	require.Equal([]byte("2"), value)
 
-	value, err = getNodeValue(trie, "key1")
+	value, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.NoError(err)
 	require.Equal([]byte("3"), value)
 
-	value, err = getNodeValue(trie, "key123")
+	value, err = trie.GetValue(context.Background(), []byte("key123"))
 	require.NoError(err)
 	require.Equal([]byte("4"), value)
 }
@@ -730,15 +694,15 @@ func Test_Trie_BatchApply(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
-	value, err := getNodeValue(trie, "key12")
+	value, err := trie.GetValue(context.Background(), []byte("key12"))
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	value, err = getNodeValue(trie, "key134")
+	value, err = trie.GetValue(context.Background(), []byte("key134"))
 	require.NoError(err)
 	require.Equal([]byte("value134"), value)
 
-	_, err = getNodeValue(trie, "key1")
+	_, err = trie.GetValue(context.Background(), []byte("key1"))
 	require.ErrorIs(err, database.ErrNotFound)
 }
 

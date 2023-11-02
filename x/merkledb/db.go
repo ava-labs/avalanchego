@@ -49,6 +49,7 @@ var (
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}
 	intermediateNodePrefix = []byte{2}
+	valuePrefix            = []byte{3}
 
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
@@ -179,6 +180,7 @@ type merkleDB struct {
 	// including metadata, intermediate nodes and value nodes.
 	baseDB database.Database
 
+	valueDB            *valueDB
 	valueNodeDB        *valueNodeDB
 	intermediateNodeDB *intermediateNodeDB
 
@@ -250,6 +252,7 @@ func newDatabase(
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
+		valueDB:              newValueDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -498,7 +501,15 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(ToKey(key))
+		val, err := db.getValueCopy(ToKey(key))
+		switch {
+		case err != nil:
+			errors[i] = err
+		case val.IsNothing():
+			errors[i] = database.ErrNotFound
+		default:
+			values[i] = val.Value()
+		}
 	}
 	return values, errors
 }
@@ -512,24 +523,31 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(ToKey(key))
+	val, err := db.getValueCopy(ToKey(key))
+	switch {
+	case err != nil:
+		return nil, err
+	case val.IsNothing():
+		return nil, database.ErrNotFound
+	}
+	return val.Value(), nil
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueCopy(key Key) ([]byte, error) {
+func (db *merkleDB) getValueCopy(key Key) (maybe.Maybe[[]byte], error) {
 	val, err := db.getValueWithoutLock(key)
 	if err != nil {
-		return nil, err
+		return maybe.Nothing[[]byte](), err
 	}
-	return slices.Clone(val), nil
+	return maybe.Bind(val, slices.Clone[[]byte]), nil
 }
 
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getValue(key Key) ([]byte, error) {
+func (db *merkleDB) getValue(key Key) (maybe.Maybe[[]byte], error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -539,19 +557,12 @@ func (db *merkleDB) getValue(key Key) ([]byte, error) {
 // getValueWithoutLock returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueWithoutLock(key Key) ([]byte, error) {
+func (db *merkleDB) getValueWithoutLock(key Key) (maybe.Maybe[[]byte], error) {
 	if db.closed {
-		return nil, database.ErrClosed
+		return maybe.Nothing[[]byte](), database.ErrClosed
 	}
 
-	n, err := db.getNode(key, true /* hasValue */)
-	if err != nil {
-		return nil, err
-	}
-	if n.value.IsNothing() {
-		return nil, database.ErrNotFound
-	}
-	return n.value.Value(), nil
+	return db.valueDB.Get(key)
 }
 
 func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -778,11 +789,11 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(ToKey(k))
-	if err == database.ErrNotFound {
+	val, err := db.getValueWithoutLock(ToKey(k))
+	if err != nil {
 		return false, nil
 	}
-	return err == nil, err
+	return val.HasValue(), nil
 }
 
 func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -950,6 +961,18 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		}
 	}
 	nodesSpan.End()
+
+	currentValueBatch := db.valueDB.NewBatch()
+	for key, valueChange := range changes.values {
+		if valueChange.after.IsNothing() {
+			currentValueBatch.Delete(key)
+		} else {
+			currentValueBatch.Put(key, valueChange.after.Value())
+		}
+	}
+	if err := currentValueBatch.Write(); err != nil {
+		return err
+	}
 
 	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
 	err := currentValueNodeBatch.Write()

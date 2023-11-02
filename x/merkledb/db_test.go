@@ -63,13 +63,52 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(ToKey(keyBytes), true)
-	require.NoError(err)
-
 	// node's value shouldn't be affected by the edit
 	originalVal := slices.Clone(val)
 	val[0]++
-	require.Equal(originalVal, n.value.Value())
+
+	val, err = db.Get(keyBytes)
+	require.NoError(err)
+
+	require.Equal(originalVal, val)
+}
+
+func initiateValues(batch []database.BatchOp, seed int64) []database.BatchOp {
+	r := rand.New(rand.NewSource(seed))
+	maxKeyLen := 25
+	maxValLen := 32
+	for i := 0; i < len(batch); i++ {
+		keyLen := r.Intn(maxKeyLen)
+		key := make([]byte, keyLen+7)
+		_, _ = r.Read(key)
+
+		valueLen := r.Intn(maxValLen)
+		value := make([]byte, valueLen)
+		_, _ = r.Read(value)
+		batch[i] = database.BatchOp{Key: key, Value: value}
+	}
+	return batch
+}
+
+var valueToInsert = initiateValues(make([]database.BatchOp, 150000), 0)
+
+func Test_Insert(t *testing.T) {
+	require := require.New(t)
+
+	for i := 0; i < 10; i++ {
+		db, err := newDatabase(
+			context.Background(),
+			memdb.New(),
+			newDefaultConfig(),
+			&mockMetrics{},
+		)
+		require.NoError(err)
+		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: valueToInsert, ConsumeBytes: true})
+		require.NoError(err)
+		_, err = view.GetMerkleRoot(context.Background())
+		require.NoError(err)
+		require.NoError(db.Close())
+	}
 }
 
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
@@ -476,7 +515,7 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 	require.NoError(err)
 	require.Empty(value)
 
-	value, err = getNodeValue(db, string(key))
+	value, err = db.GetValue(context.Background(), []byte(string(key)))
 	require.NoError(err)
 	require.Empty(value)
 }
@@ -988,7 +1027,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			want := values[ToKey(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 
-			trieValue, err := getNodeValue(db, string(step.key))
+			trieValue, err := db.GetValue(context.Background(), []byte(string(step.key)))
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
