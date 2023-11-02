@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
+
 	"golang.org/x/term"
 
 	"github.com/ava-labs/avalanchego/app"
@@ -44,7 +45,7 @@ func main() {
 		fmt.Println(app.Header)
 	}
 
-	nodeApp, err := app.New(nodeConfig) // Create node wrapper
+	nodeApp, err := app.New(nodeConfig)
 	if err != nil {
 		fmt.Printf("couldn't start node: %s\n", err)
 		os.Exit(1)

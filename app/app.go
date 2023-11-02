@@ -59,14 +59,14 @@ func New(config node.Config) (App, error) {
 	log, err := logFactory.Make("main")
 	if err != nil {
 		logFactory.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize log: %w", err)
 	}
 
 	n, err := node.New(&config, logFactory, log)
 	if err != nil {
 		log.Stop()
 		logFactory.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize node: %w", err)
 	}
 
 	return &app{
