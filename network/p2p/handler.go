@@ -111,9 +111,8 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
-func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
-	err := r.handler.AppGossip(ctx, nodeID, msg)
-	if err != nil {
+func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) {
+	if err := r.handler.AppGossip(ctx, nodeID, msg); err != nil {
 		r.log.Debug("failed to handle message",
 			zap.Stringer("messageOp", message.AppGossipOp),
 			zap.Stringer("nodeID", nodeID),
@@ -121,7 +120,6 @@ func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 			zap.Binary("message", msg),
 		)
 	}
-	return nil
 }
 
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {

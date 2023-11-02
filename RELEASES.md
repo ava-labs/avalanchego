@@ -1,5 +1,41 @@
 # Release Notes
 
+## [v1.10.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.15)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is updated to `30` all plugins must update to be compatible.
+
+### Configs
+
+- Added `pebble` as an allowed option to `--db-type`
+
+### Fixes
+
+- Fixed C-chain tracer API panic
+
+### What's Changed
+
+- Reduce allocations on insert and remove by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2201
+- `merkledb` -- shift nit by @danlaine in https://github.com/ava-labs/avalanchego/pull/2218
+- Update `golangci-lint` to `v1.55.1` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2228
+- Add json marshal tests to existing serialization tests in `platformvm/txs` pkg by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2227
+- Move all blst function usage to `bls` pkg by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2222
+- `merkledb` -- don't pass `BranchFactor` to `encodeDBNode` by @danlaine in https://github.com/ava-labs/avalanchego/pull/2217
+- Add `utils.Err` helper by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2212
+- Enable `perfsprint` linter by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2229
+- Trim down size of secp256k1 `Factory` struct by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2223
+- Fix test typos by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2233
+- P2P AppRequestFailed protobuf definition by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2111
+- Remove error from Router AppGossip by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2238
+- Document host and port behavior in help text by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2236
+- Remove `database.Manager` by @danlaine in https://github.com/ava-labs/avalanchego/pull/2239
+- Add `BaseTx` support to platformvm by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2232
+- Add `pebble` as valid value for `--db-type`. by @danlaine in https://github.com/ava-labs/avalanchego/pull/2244
+- Add nullable option to codec by @nytzuga in https://github.com/ava-labs/avalanchego/pull/2171
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.14...v1.10.15
+
 ## [v1.10.14](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.14)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
