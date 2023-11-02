@@ -81,7 +81,7 @@ func (n *node) hasValue() bool {
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
 	if n.nodeBytes == nil {
-		n.nodeBytes = codec.encodeDBNode(&n.dbNode, n.key.branchFactor)
+		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
 
 	return n.nodeBytes
