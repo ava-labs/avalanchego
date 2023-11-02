@@ -265,9 +265,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.latestBackfilledBlock, err = vm.State.GetLastBackfilledBlkID()
-	if err != nil && err != database.ErrNotFound {
-		return fmt.Errorf("failed loading last backfilled block, %w", err)
+	if err := vm.repairBlockBackfilling(ctx); err != nil {
+		return err
 	}
 
 	forkHeight, err := vm.getForkHeight()
@@ -286,6 +285,52 @@ func (vm *VM) Initialize(
 		return err
 	}
 	return nil
+}
+
+func (vm *VM) repairBlockBackfilling(ctx context.Context) error {
+	bottomBlkID, err := vm.State.GetLastBackfilledBlkID()
+	switch {
+	case errors.Is(err, database.ErrNotFound):
+		// vm never backfilled blocks.
+		return nil
+	case err != nil:
+		return fmt.Errorf("failed loading last backfilled block ID %s, %w", bottomBlkID, err)
+	default:
+		// check alignment
+	}
+
+	for {
+		blk, err := vm.getBlock(ctx, bottomBlkID)
+		if err != nil {
+			return fmt.Errorf("failed retrieving latest backfilled block, %s: %w", bottomBlkID, err)
+		}
+
+		var (
+			innerBlkID     = blk.getInnerBlk().ID()
+			childBlkHeight = blk.Height() + 1
+		)
+
+		_, err = vm.ChainVM.GetBlock(ctx, innerBlkID)
+		switch err {
+		case nil:
+			if err := vm.db.Commit(); err != nil {
+				return fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
+			}
+			return nil // proposerVM and innerVM aligned
+		case database.ErrNotFound:
+			if err := vm.revertBackfilledBlock(blk); err != nil {
+				return err
+			}
+			childBlkID, err := vm.GetBlockIDAtHeight(ctx, childBlkHeight)
+			if err != nil {
+				return fmt.Errorf("failed retrieving blkID at height %d, while repairing backfilled blocks: %w", childBlkHeight, err)
+			}
+			bottomBlkID = childBlkID
+		default:
+			return fmt.Errorf("failed retrieving inner vm blk id %s, while repairing backfilled blocks: %w", innerBlkID, err)
+		}
+		vm.latestBackfilledBlock = bottomBlkID
+	}
 }
 
 // shutdown ops then propagate shutdown to innerVM

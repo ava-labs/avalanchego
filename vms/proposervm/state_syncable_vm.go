@@ -225,29 +225,17 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 	}
 
 	// 4. Check alignment
-	blkReversalHappened := false
 	for _, blk := range blks {
 		innerBlkID := blk.getInnerBlk().ID()
 		switch _, err := vm.ChainVM.GetBlock(ctx, innerBlkID); err {
 		case nil:
 			continue
 		case database.ErrNotFound:
-			// revert block acceptance since innerVM block has not been accepted
-			if err := vm.State.DeleteBlock(blk.ID()); err != nil {
-				return ids.Empty, 0, fmt.Errorf("failed reverting backfilled VM block %s, %w", blk.ID(), err)
-			}
-			if err := vm.State.DeleteBlockIDAtHeight(blk.Height()); err != nil {
+			if err := vm.revertBackfilledBlock(blk); err != nil {
 				return ids.Empty, 0, fmt.Errorf("failed reverting backfilled VM block from height index %s, %w", blk.ID(), err)
 			}
-			blkReversalHappened = true
 		default:
 			return ids.Empty, 0, fmt.Errorf("failed checking innerVM block %s, %w", innerBlkID, err)
-		}
-	}
-
-	if blkReversalHappened {
-		if err := vm.db.Commit(); err != nil {
-			return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
 		}
 	}
 
@@ -275,4 +263,14 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 	}
 
 	return childBlk.Parent(), innerBlkHeight, nil
+}
+
+func (vm *VM) revertBackfilledBlock(blk Block) error {
+	if err := vm.State.DeleteBlock(blk.ID()); err != nil {
+		return fmt.Errorf("failed reverting backfilled VM block %s, %w", blk.ID(), err)
+	}
+	if err := vm.State.DeleteBlockIDAtHeight(blk.Height()); err != nil {
+		return fmt.Errorf("failed reverting backfilled VM block from height index %s, %w", blk.ID(), err)
+	}
+	return nil
 }
