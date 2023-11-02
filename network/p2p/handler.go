@@ -30,7 +30,7 @@ type Handler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		gossipBytes []byte,
-	) error
+	)
 	// AppRequest is called when handling an AppRequest message.
 	// Returns the bytes for the response corresponding to [requestBytes]
 	AppRequest(
@@ -52,9 +52,7 @@ type Handler interface {
 
 type NoOpHandler struct{}
 
-func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) error {
-	return nil
-}
+func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
@@ -70,12 +68,12 @@ type ValidatorHandler struct {
 	ValidatorSet ValidatorSet
 }
 
-func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	if !v.ValidatorSet.Has(ctx, nodeID) {
-		return ErrNotValidator
+		return
 	}
 
-	return v.Handler.AppGossip(ctx, nodeID, gossipBytes)
+	v.Handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
 func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
@@ -112,14 +110,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) {
-	if err := r.handler.AppGossip(ctx, nodeID, msg); err != nil {
-		r.log.Debug("failed to handle message",
-			zap.Stringer("messageOp", message.AppGossipOp),
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint64("handlerID", r.handlerID),
-			zap.Binary("message", msg),
-		)
-	}
+	r.handler.AppGossip(ctx, nodeID, msg)
 }
 
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
