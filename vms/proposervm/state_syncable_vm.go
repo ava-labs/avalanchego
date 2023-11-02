@@ -177,45 +177,77 @@ func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error)
 }
 
 func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, uint64, error) {
-	var (
-		blks           = make(map[uint64]Block)
-		innerBlksBytes = make([][]byte, 0, len(blksBytes))
-	)
+	blks := make(map[uint64]Block)
 
+	// 1. Parse
 	for i, blkBytes := range blksBytes {
 		blk, err := vm.parseBlock(ctx, blkBytes)
 		if err != nil {
 			return ids.Empty, 0, fmt.Errorf("failed parsing backfilled block, index %d, %w", i, err)
 		}
-
-		// TODO: introduce validation
-
 		blks[blk.Height()] = blk
-		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 
+	// 2. Validate outer blocks
+	blkHeights := maps.Keys(blks)
+	sort.Slice(blkHeights, func(i, j int) bool {
+		return blkHeights[i] < blkHeights[j] // sort in ascending order by heights
+	})
+
+	topBlk, err := vm.getBlock(ctx, vm.latestBackfilledBlock)
+	if err != nil {
+		return ids.Empty, 0, fmt.Errorf("failed retrieving latest backfilled block, %s, %w", vm.latestBackfilledBlock, err)
+	}
+	for i := len(blkHeights) - 1; i >= 0; i-- {
+		blk := blks[blkHeights[i]]
+		if topBlk.Parent() != blk.ID() {
+			return ids.Empty, 0, fmt.Errorf("unexpected backfilled block %s, expected child' parent is %s", blk.ID(), topBlk.Parent())
+		}
+		if err := blk.acceptOuterBlk(); err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
+		}
+		topBlk = blk
+	}
+
+	// 3. Backfill inner blocks to innerVM
+	innerBlksBytes := make([][]byte, 0, len(blksBytes))
+	for _, blk := range blks {
+		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
+	}
 	_, nextInnerBlkHeight, err := vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
-	if err == nil {
-		// no error signals at least a single block has been accepted by the innerVM. (not necessarily all of them)
-		// Find out which blocks have been accepted and store them.
-		// Should the process err while looping there will be innerVM blocks not indexed by proposerVM. Repair will be
-		// carried out upon restart.
+	switch err {
+	case block.ErrStopBlockBackfilling:
+		return ids.Empty, 0, err // done backfilling
+	case nil:
+		// check alignment
+	default:
+		return ids.Empty, 0, fmt.Errorf("failed inner VM block backfilling, %w", err)
+	}
 
-		// Make sure to sort blocks by height to accept them in the right order
-		blkHeights := maps.Keys(blks)
-		sort.Slice(blkHeights, func(i, j int) bool {
-			return blkHeights[i] < blkHeights[j] // sort in ascending order
-		})
+	// 4. Check alignment
+	blkReversalHappened := false
+	for _, blk := range blks {
+		innerBlkID := blk.getInnerBlk().ID()
+		switch _, err := vm.ChainVM.GetBlock(ctx, innerBlkID); err {
+		case nil:
+			continue
+		case database.ErrNotFound:
+			// revert block acceptance since innerVM block has not been accepted
+			if err := vm.State.DeleteBlock(blk.ID()); err != nil {
+				return ids.Empty, 0, fmt.Errorf("failed reverting backfilled VM block %s, %w", blk.ID(), err)
+			}
+			if err := vm.State.DeleteBlockIDAtHeight(blk.Height()); err != nil {
+				return ids.Empty, 0, fmt.Errorf("failed reverting backfilled VM block from height index %s, %w", blk.ID(), err)
+			}
+			blkReversalHappened = true
+		default:
+			return ids.Empty, 0, fmt.Errorf("failed checking innerVM block %s, %w", innerBlkID, err)
+		}
+	}
 
-		for _, h := range blkHeights {
-			blk := blks[h]
-			_, err := vm.ChainVM.GetBlock(ctx, blk.getInnerBlk().ID())
-			if err != nil {
-				continue
-			}
-			if err := blk.acceptOuterBlk(); err != nil {
-				return ids.Empty, 0, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
-			}
+	if blkReversalHappened {
+		if err := vm.db.Commit(); err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
 		}
 	}
 
@@ -234,5 +266,6 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block %s: %w", childBlkID, err)
 	}
 
+	vm.latestBackfilledBlock = childBlkID
 	return childBlk.Parent(), innerBlkHeight, nil
 }

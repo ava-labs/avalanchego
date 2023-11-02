@@ -135,6 +135,8 @@ type VM struct {
 	lastAcceptedHeight uint64
 
 	stateSyncDone utils.Atomic[bool]
+
+	latestBackfilledBlock ids.ID
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
