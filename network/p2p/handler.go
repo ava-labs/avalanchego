@@ -110,8 +110,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	appResponse, err := r.Handler.CrossChainAppRequest(ctx, chainID, deadline,
-		request)
+	appResponse, err := r.Handler.CrossChainAppRequest(ctx, chainID, deadline, request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),

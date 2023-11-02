@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -20,10 +23,12 @@ var (
 type ThrottlerHandler struct {
 	Handler
 	Throttler Throttler
+	Log       logging.Logger
 }
 
 func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	if !t.Throttler.Handle(nodeID) {
+		t.Log.Debug("dropping message", zap.Stringer("nodeID", nodeID))
 		return
 	}
 

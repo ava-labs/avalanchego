@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ Handler = (*testHandler)(nil)
@@ -43,6 +44,7 @@ func TestThrottlerHandlerAppGossip(t *testing.T) {
 					},
 				},
 				Throttler: tt.Throttler,
+				Log:       logging.NoLog{},
 			}
 
 			handler.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte("foobar"))
@@ -74,6 +76,7 @@ func TestThrottlerHandlerAppRequest(t *testing.T) {
 			handler := ThrottlerHandler{
 				Handler:   NoOpHandler{},
 				Throttler: tt.Throttler,
+				Log:       logging.NoLog{},
 			}
 			_, err := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expectedErr)
