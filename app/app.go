@@ -54,11 +54,25 @@ type App interface {
 	ExitCode() (int, error)
 }
 
-func New(config node.Config) App {
+func New(config node.Config) (App, error) {
+	logFactory := logging.NewFactory(config.LoggingConfig)
+	log, err := logFactory.Make("main")
+	if err != nil {
+		logFactory.Close()
+		return nil, err
+	}
+
+	n, err := node.New(&config, logFactory, log)
+	if err != nil {
+		log.Stop()
+		logFactory.Close()
+		return nil, err
+	}
+
 	return &app{
 		config: config,
-		node:   &node.Node{},
-	}
+		node:   n,
+	}, nil
 }
 
 func Run(app App) int {
@@ -214,17 +228,6 @@ func (a *app) Start() error {
 	// Note that if the node config said to not dynamically resolve and
 	// update our public IP, [p.config.IPUdater] is a no-op implementation.
 	go a.config.IPUpdater.Dispatch(log)
-
-	if err := a.node.Initialize(&a.config, log, logFactory); err != nil {
-		log.Fatal("error initializing node",
-			zap.Error(err),
-		)
-		mapper.UnmapAllPorts()
-		a.config.IPUpdater.Stop()
-		log.Stop()
-		logFactory.Close()
-		return err
-	}
 
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
