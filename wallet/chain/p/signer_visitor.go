@@ -51,6 +51,14 @@ func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return errUnsupportedTxType
 }
 
+func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
 func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
@@ -123,6 +131,19 @@ func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *signerVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

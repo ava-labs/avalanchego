@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -28,8 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -77,15 +77,13 @@ var (
 )
 
 func init() {
-	factory := secp256k1.Factory{}
-
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
 		keyBytes, _ := cb58.Decode(key)
-		pk, _ := factory.ToPrivateKey(keyBytes)
+		pk, _ := secp256k1.ToPrivateKey(keyBytes)
 		keys = append(keys, pk)
 		addrs = append(addrs, pk.PublicKey().Address())
 	}
@@ -135,17 +133,15 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
 	ctx := newContext(tb)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	baseDB := memdb.New()
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
-	require.NoError(err)
+	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	for _, user := range c.keystoreUsers {
@@ -183,7 +179,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		nil,
 		configBytes,

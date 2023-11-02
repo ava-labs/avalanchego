@@ -43,8 +43,7 @@ type User interface {
 }
 
 type user struct {
-	factory secp256k1.Factory
-	db      *encdb.Database
+	db *encdb.Database
 }
 
 // NewUserFromKeystore tracks a keystore user from the provided keystore
@@ -125,7 +124,7 @@ func (u *user) GetKey(address ids.ShortID) (*secp256k1.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return u.factory.ToPrivateKey(bytes)
+	return secp256k1.ToPrivateKey(bytes)
 }
 
 func (u *user) Close() error {
@@ -143,11 +142,9 @@ func NewKey(u User) (*secp256k1.PrivateKey, error) {
 
 // Create and store [numKeys] new keys that will be controlled by this user.
 func NewKeys(u User, numKeys int) ([]*secp256k1.PrivateKey, error) {
-	factory := secp256k1.Factory{}
-
 	keys := make([]*secp256k1.PrivateKey, numKeys)
 	for i := range keys {
-		sk, err := factory.NewPrivateKey()
+		sk, err := secp256k1.NewPrivateKey()
 		if err != nil {
 			return nil, err
 		}

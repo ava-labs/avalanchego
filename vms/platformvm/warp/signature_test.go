@@ -56,7 +56,7 @@ func newTestValidator() *testValidator {
 		sk:     sk,
 		vdr: &Validator{
 			PublicKey:      pk,
-			PublicKeyBytes: pk.Serialize(),
+			PublicKeyBytes: bls.SerializePublicKey(pk),
 			Weight:         3,
 			NodeIDs:        []ids.NodeID{nodeID},
 		},
