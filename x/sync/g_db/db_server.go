@@ -219,9 +219,6 @@ func (s *DBServer) CommitRangeProof(
 	return &emptypb.Empty{}, err
 }
 
-func (s *DBServer) Clear(
-	_ context.Context,
-	req *emptypb.Empty,
-) (*emptypb.Empty, error) {
+func (s *DBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, s.db.Clear()
 }
