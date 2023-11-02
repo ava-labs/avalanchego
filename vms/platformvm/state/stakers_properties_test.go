@@ -15,11 +15,10 @@ import (
 	"github.com/leanovate/gopter/prop"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -35,8 +34,7 @@ const (
 func TestGeneralStakerContainersProperties(t *testing.T) {
 	storeCreators := map[string]func() (Stakers, error){
 		"base state": func() (Stakers, error) {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			return buildChainState(baseDB, nil)
 		},
 		"diff": func() (Stakers, error) {
@@ -497,8 +495,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 }
 
 func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
+	baseDB := versiondb.New(memdb.New())
 	baseState, err := buildChainState(baseDB, trackedSubnets)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %w", err)
