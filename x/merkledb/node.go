@@ -30,7 +30,6 @@ type child struct {
 type node struct {
 	dbNode
 	key         Key
-	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
 }
 
@@ -52,9 +51,8 @@ func parseNode(key Key, nodeBytes []byte) (*node, error) {
 		return nil, err
 	}
 	result := &node{
-		dbNode:    n,
-		key:       key,
-		nodeBytes: nodeBytes,
+		dbNode: n,
+		key:    key,
 	}
 
 	result.setValueDigest()
@@ -68,17 +66,7 @@ func (n *node) hasValue() bool {
 
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
-	if n.nodeBytes == nil {
-		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
-	}
-
-	return n.nodeBytes
-}
-
-// clear the cached values that will need to be recalculated whenever the node changes
-// for example, node ID and byte representation
-func (n *node) onNodeChanged() {
-	n.nodeBytes = nil
+	return codec.encodeDBNode(&n.dbNode)
 }
 
 // Returns and caches the ID of this node.
@@ -89,7 +77,6 @@ func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 
 // Set [n]'s value to [val].
 func (n *node) setValue(val maybe.Maybe[[]byte]) {
-	n.onNodeChanged()
 	n.value = val
 	n.setValueDigest()
 }
@@ -117,13 +104,11 @@ func (n *node) addChild(childNode *node, tokenSize int) {
 
 // Adds a child to [n] without a reference to the child node.
 func (n *node) setChildEntry(index byte, childEntry child) {
-	n.onNodeChanged()
 	n.children[index] = childEntry
 }
 
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node, tokenSize int) {
-	n.onNodeChanged()
 	delete(n.children, child.key.Token(n.key.length, tokenSize))
 }
 
@@ -139,7 +124,6 @@ func (n *node) clone() *node {
 			children: maps.Clone(n.children),
 		},
 		valueDigest: n.valueDigest,
-		nodeBytes:   n.nodeBytes,
 	}
 }
 
