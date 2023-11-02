@@ -234,7 +234,7 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 		for idx, id := range benchedIDs {
 			alias, err := i.chainManager.PrimaryAlias(id)
 			if err != nil {
-				return fmt.Errorf("failed to get primary alias for chain ID %s: %v", id, err)
+				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
 			}
 			benchedAliases[idx] = alias
 		}
