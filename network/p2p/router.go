@@ -173,8 +173,8 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 	r.handlers[handlerID] = &meteredHandler{
 		responder: &responder{
+			Handler:   handler,
 			handlerID: handlerID,
-			handler:   handler,
 			log:       r.log,
 			sender:    r.sender,
 		},

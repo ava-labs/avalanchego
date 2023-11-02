@@ -86,14 +86,14 @@ func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, dea
 
 // responder automatically sends the response for a given request
 type responder struct {
+	Handler
 	handlerID uint64
-	handler   Handler
 	log       logging.Logger
 	sender    common.AppSender
 }
 
 func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	appResponse, err := r.handler.AppRequest(ctx, nodeID, deadline, request)
+	appResponse, err := r.Handler.AppRequest(ctx, nodeID, deadline, request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
 			zap.Stringer("messageOp", message.AppRequestOp),
@@ -109,12 +109,9 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
-func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) {
-	r.handler.AppGossip(ctx, nodeID, msg)
-}
-
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	appResponse, err := r.handler.CrossChainAppRequest(ctx, chainID, deadline, request)
+	appResponse, err := r.Handler.CrossChainAppRequest(ctx, chainID, deadline,
+		request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
