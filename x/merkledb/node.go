@@ -4,12 +4,10 @@
 package merkledb
 
 import (
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"golang.org/x/exp/maps"
 )
 
 const HashLength = 32
@@ -29,8 +27,7 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
-	key         Key
-	valueDigest maybe.Maybe[[]byte]
+	key Key
 }
 
 // Returns a new node with the given [key] and no value.
@@ -54,8 +51,6 @@ func parseNode(key Key, nodeBytes []byte) (*node, error) {
 		dbNode: n,
 		key:    key,
 	}
-
-	result.setValueDigest()
 	return result, nil
 }
 
@@ -78,15 +73,13 @@ func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 // Set [n]'s value to [val].
 func (n *node) setValue(val maybe.Maybe[[]byte]) {
 	n.value = val
-	n.setValueDigest()
 }
 
-func (n *node) setValueDigest() {
-	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
-		n.valueDigest = n.value
-	} else {
-		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
+func (n *node) getValueDigest() maybe.Maybe[[]byte] {
+	if n.value.IsNothing() || len(n.value.Value()) <= HashLength {
+		return n.value
 	}
+	return maybe.Some(hashing.ComputeHash256(n.value.Value()))
 }
 
 // Adds [child] as a child of [n].
@@ -123,7 +116,6 @@ func (n *node) clone() *node {
 			value:    n.value,
 			children: maps.Clone(n.children),
 		},
-		valueDigest: n.valueDigest,
 	}
 }
 
@@ -132,7 +124,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		Key:         n.key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
+		ValueOrHash: n.getValueDigest(),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

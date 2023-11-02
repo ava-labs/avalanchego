@@ -822,13 +822,10 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insert(key, maybe.Nothing[[]byte]())
+		n, err := t.insert(key, proofNode.ValueOrHash)
 		if err != nil {
 			return err
 		}
-		// We overwrite the valueDigest to be the hash provided in the proof
-		// node because we may not know the pre-image of the valueDigest.
-		n.valueDigest = proofNode.ValueOrHash
 
 		if !shouldInsertLeftChildren && !shouldInsertRightChildren {
 			// No children of proof nodes are outside the range.

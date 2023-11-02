@@ -133,7 +133,7 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 		c.encodeUint(buf, uint64(index))
 		_, _ = buf.Write(entry.id[:])
 	}
-	c.encodeMaybeByteSlice(buf, n.valueDigest)
+	c.encodeMaybeByteSlice(buf, n.getValueDigest())
 	c.encodeKey(buf, n.key)
 
 	return buf.Bytes()
