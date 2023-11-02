@@ -64,7 +64,7 @@ type TestVM struct {
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, err error) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -239,7 +239,7 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 
 func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
 	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID)
+		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, err)
 	}
 	if !vm.CantCrossChainAppRequestFailed {
 		return nil
