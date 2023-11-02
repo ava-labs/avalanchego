@@ -49,6 +49,7 @@ type pendingCrossChainAppRequest struct {
 	CrossChainAppResponseCallback
 }
 
+// meteredHandler emits metrics for a Handler
 type meteredHandler struct {
 	*responder
 	*metrics
@@ -198,6 +199,9 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 	}, nil
 }
 
+// AppRequest routes an AppRequest to a Handler based on the handler prefix.
+//
+// The message is dropped if no matching handler can be found.
 func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(request)
@@ -220,6 +224,10 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	return nil
 }
 
+// AppRequestFailed routes an AppRequestFailed message to the callback
+// corresponding to requestID.
+//
+// A fatal error has occurred if no corresponding requestID can be found.
 func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
@@ -232,6 +240,10 @@ func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 	return nil
 }
 
+// AppResponse routes an AppResponse message to the callback corresponding to
+// requestID.
+//
+// A fatal error has occurred if no corresponding requestID can be found.
 func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
@@ -244,6 +256,10 @@ func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 	return nil
 }
 
+// AppGossip routes an AppGossip message to a Handler based on the handler
+// prefix.
+//
+// The message is dropped if no matching handler can be found.
 func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(gossip)
@@ -262,6 +278,10 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 	return nil
 }
 
+// CrossChainAppRequest routes a CrossChainAppRequest message to a Handler
+// based on the handler prefix.
+//
+// The message is dropped if no matching handler can be found.
 func (r *Router) CrossChainAppRequest(
 	ctx context.Context,
 	chainID ids.ID,
@@ -290,6 +310,10 @@ func (r *Router) CrossChainAppRequest(
 	return nil
 }
 
+// CrossChainAppRequestFailed routes a CrossChainAppRequestFailed message to
+// the callback corresponding to requestID.
+//
+// A fatal error has occurred if no corresponding requestID can be found.
 func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
@@ -302,6 +326,10 @@ func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 	return nil
 }
 
+// CrossChainAppResponse routes a CrossChainAppResponse message to the callback
+// corresponding to requestID.
+//
+// A fatal error has occurred if no corresponding requestID can be found.
 func (r *Router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
