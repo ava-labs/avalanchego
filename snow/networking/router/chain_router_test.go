@@ -43,11 +43,6 @@ const (
 	testThreadPoolSize = 2
 )
 
-var (
-	_ timeout.Manager = (*timeoutDisabled)(nil)
-	_ handler.Handler = (*testHandler)(nil)
-)
-
 func TestShutdown(t *testing.T) {
 	require := require.New(t)
 
