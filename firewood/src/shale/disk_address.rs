@@ -165,17 +165,17 @@ impl DiskAddress {
 }
 
 impl Storable for DiskAddress {
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         use std::io::{Cursor, Write};
         Cursor::new(to).write_all(&self.0.unwrap().get().to_le_bytes())?;
         Ok(())
     }
 
-    fn hydrate<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
+    fn deserialize<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {

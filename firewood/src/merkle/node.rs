@@ -454,7 +454,7 @@ impl Node {
                 }),
                 lazy_dirty: AtomicBool::new(false),
             }
-            .dehydrated_len()
+            .serialized_len()
         })
     }
 
@@ -525,7 +525,7 @@ impl Node {
 }
 
 impl Storable for Node {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         const META_SIZE: usize = 32 + 1 + 1;
         let meta_raw =
             mem.get_view(addr, META_SIZE as u64)
@@ -738,7 +738,7 @@ impl Storable for Node {
         }
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         32 + 1
             + 1
             + match &self.inner {
@@ -770,7 +770,7 @@ impl Storable for Node {
             }
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
 
         let mut attrs = 0;
@@ -907,14 +907,14 @@ pub(super) mod tests {
     #[test_case(branch(0x0a, b"hello world".to_vec().into(), None); "branch with data")]
     #[test_case(branch(0x0a, None, vec![0x01, 0x02, 0x03].into()); "branch without data")]
     fn test_encoding(node: Node) {
-        let mut bytes = vec![0; node.dehydrated_len() as usize];
+        let mut bytes = vec![0; node.serialized_len() as usize];
 
-        node.dehydrate(&mut bytes).unwrap();
+        node.serialize(&mut bytes).unwrap();
 
-        let mut mem = PlainMem::new(node.dehydrated_len(), 0x00);
+        let mut mem = PlainMem::new(node.serialized_len(), 0x00);
         mem.write(0, &bytes);
 
-        let hydrated_node = Node::hydrate(0, &mem).unwrap();
+        let hydrated_node = Node::deserialize(0, &mem).unwrap();
 
         assert_eq!(node, hydrated_node);
     }

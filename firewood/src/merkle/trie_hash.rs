@@ -21,7 +21,7 @@ impl std::ops::Deref for TrieHash {
 }
 
 impl Storable for TrieHash {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, U64_TRIE_HASH_LEN)
             .ok_or(ShaleError::InvalidCacheView {
@@ -32,11 +32,11 @@ impl Storable for TrieHash {
         Ok(Self(raw.as_deref()[..TRIE_HASH_LEN].try_into().unwrap()))
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         U64_TRIE_HASH_LEN
     }
 
-    fn dehydrate(&self, mut to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, mut to: &mut [u8]) -> Result<(), ShaleError> {
         to.write_all(&self.0).map_err(ShaleError::Io)
     }
 }
@@ -56,7 +56,7 @@ mod tests {
         let zero_hash = TrieHash([0u8; TRIE_HASH_LEN]);
 
         let mut to = [1u8; TRIE_HASH_LEN];
-        zero_hash.dehydrate(&mut to).unwrap();
+        zero_hash.serialize(&mut to).unwrap();
 
         assert_eq!(&to, &zero_hash.0);
     }

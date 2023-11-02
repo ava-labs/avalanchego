@@ -227,9 +227,9 @@ pub trait ShaleStore<T: Storable> {
 /// implementation could be directly transmuting to/from a POD struct. But sometimes necessary
 /// compression/decompression is needed to reduce disk I/O and facilitate faster in-memory access.
 pub trait Storable {
-    fn dehydrated_len(&self) -> u64;
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError>;
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError>
+    fn serialized_len(&self) -> u64;
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError>;
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
     fn is_mem_mapped(&self) -> bool {
@@ -238,8 +238,8 @@ pub trait Storable {
 }
 
 pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
-    let mut buff = vec![0; item.dehydrated_len() as usize];
-    item.dehydrate(&mut buff)?;
+    let mut buff = vec![0; item.serialized_len() as usize];
+    item.serialize(&mut buff)?;
     Ok(buff)
 }
 
@@ -288,7 +288,7 @@ impl<T: Storable> StoredView<T> {
     }
 
     fn estimate_mem_image(&self) -> Option<u64> {
-        let len = self.decoded.dehydrated_len();
+        let len = self.decoded.serialized_len();
         if len > self.len_limit {
             None
         } else {
@@ -297,7 +297,7 @@ impl<T: Storable> StoredView<T> {
     }
 
     fn write_mem_image(&self, mem_image: &mut [u8]) -> Result<(), ShaleError> {
-        self.decoded.dehydrate(mem_image)
+        self.decoded.serialize(mem_image)
     }
 
     fn write(&mut self) -> &mut T {
@@ -311,7 +311,7 @@ impl<T: Storable> StoredView<T> {
 impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
-        let decoded = T::hydrate(offset, space)?;
+        let decoded = T::deserialize(offset, space)?;
         Ok(Self {
             offset,
             decoded,

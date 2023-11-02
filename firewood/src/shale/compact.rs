@@ -29,7 +29,7 @@ impl CompactHeader {
 }
 
 impl Storable for CompactHeader {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -48,11 +48,11 @@ impl Storable for CompactHeader {
         })
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.payload_size.to_le_bytes())?;
         cur.write_all(&[if self.is_freed { 1 } else { 0 }])?;
@@ -71,7 +71,7 @@ impl CompactFooter {
 }
 
 impl Storable for CompactFooter {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -82,11 +82,11 @@ impl Storable for CompactFooter {
         Ok(Self { payload_size })
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         Cursor::new(to).write_all(&self.payload_size.to_le_bytes())?;
         Ok(())
     }
@@ -103,7 +103,7 @@ impl CompactDescriptor {
 }
 
 impl Storable for CompactDescriptor {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -119,11 +119,11 @@ impl Storable for CompactDescriptor {
         })
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.payload_size.to_le_bytes())?;
         cur.write_all(&self.haddr.to_le_bytes())?;
@@ -180,7 +180,7 @@ impl CompactSpaceHeader {
 }
 
 impl Storable for CompactSpaceHeader {
-    fn hydrate<T: CachedStore + Debug>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore + Debug>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -199,11 +199,11 @@ impl Storable for CompactSpaceHeader {
         })
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.meta_space_tail.to_le_bytes())?;
         cur.write_all(&self.compact_space_tail.to_le_bytes())?;
@@ -523,7 +523,7 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
 
 impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for CompactSpace<T, M> {
     fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
-        let size = item.dehydrated_len() + extra;
+        let size = item.serialized_len() + extra;
         let addr = self.inner.write().unwrap().alloc(size)?;
 
         let obj = {
@@ -611,7 +611,7 @@ mod tests {
     }
 
     impl Storable for Hash {
-        fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+        fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
             let raw = mem
                 .get_view(addr, Self::MSIZE)
                 .ok_or(ShaleError::InvalidCacheView {
@@ -625,11 +625,11 @@ mod tests {
             ))
         }
 
-        fn dehydrated_len(&self) -> u64 {
+        fn serialized_len(&self) -> u64 {
             Self::MSIZE
         }
 
-        fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+        fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
             let mut cur = to;
             cur.write_all(&self.0)?;
             Ok(())

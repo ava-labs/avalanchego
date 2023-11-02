@@ -201,7 +201,7 @@ impl DbHeader {
 }
 
 impl Storable for DbHeader {
-    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
+    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -213,11 +213,11 @@ impl Storable for DbHeader {
         })
     }
 
-    fn dehydrated_len(&self) -> u64 {
+    fn serialized_len(&self) -> u64 {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+    fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.kv_root.to_le_bytes())?;
         Ok(())
