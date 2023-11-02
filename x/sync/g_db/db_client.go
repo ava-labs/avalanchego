@@ -186,19 +186,7 @@ func (c *DBClient) CommitRangeProof(
 	return err
 }
 
-func (c *DBClient) ClearRange(
-	start maybe.Maybe[[]byte],
-	end maybe.Maybe[[]byte],
-) error {
-	_, err := c.client.ClearRange(context.Background(), &pb.ClearRangeRequest{
-		StartKey: &pb.MaybeBytes{
-			Value:     start.Value(),
-			IsNothing: start.IsNothing(),
-		},
-		EndKey: &pb.MaybeBytes{
-			Value:     end.Value(),
-			IsNothing: end.IsNothing(),
-		},
-	})
+func (c *DBClient) Clear() error {
+	_, err := c.client.Clear(context.Background(), &pb.ClearRequest{})
 	return err
 }

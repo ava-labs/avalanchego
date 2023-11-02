@@ -119,11 +119,9 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
-type ClearRanger interface {
-	// Deletes all key-value pairs with keys in the range [start, end].
-	// If [start] is Nothing, there's no lower bound on the range.
-	// If [end] is Nothing, there's no upper bound on the range.
-	ClearRange(start, end maybe.Maybe[[]byte]) error
+type Clearer interface {
+	// Deletes all key/value pairs from the database.
+	Clear() error
 }
 
 type Prefetcher interface {
@@ -141,7 +139,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
-	ClearRanger
+	Clearer
 	Trie
 	MerkleRootGetter
 	ProofGetter
@@ -1287,11 +1285,12 @@ func (db *merkleDB) getRoot() maybe.Maybe[*node] {
 	return db.root
 }
 
-func (db *merkleDB) ClearRange(start, end maybe.Maybe[[]byte]) error {
+func (db *merkleDB) Clear() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	keysToDelete, err := db.getKeysNotInSet(start, end, set.Set[string]{})
+	// TODO is it faster to clear another way?
+	keysToDelete, err := db.getKeysNotInSet(maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), set.Set[string]{})
 	if err != nil {
 		return err
 	}

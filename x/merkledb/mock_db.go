@@ -5,12 +5,12 @@
 package merkledb
 
 import (
-        maybe "github.com/ava-labs/avalanchego/utils/maybe"
-        gomock "go.uber.org/mock/gomock"
         reflect "reflect"
         context "context"
         database "github.com/ava-labs/avalanchego/database"
         ids "github.com/ava-labs/avalanchego/ids"
+        maybe "github.com/ava-labs/avalanchego/utils/maybe"
+        gomock "go.uber.org/mock/gomock"
 )
 
 // MockMerkleDB is a mock of MerkleDB interface.
@@ -36,18 +36,18 @@ func (m *MockMerkleDB) EXPECT() *MockMerkleDBMockRecorder {
         return m.recorder
 }
 
-// ClearRange mocks base method.
-func (m *MockMerkleDB) ClearRange(arg0, arg1 maybe.Maybe[[]uint8]) error {
+// Clear mocks base method.
+func (m *MockMerkleDB) Clear() error {
         m.ctrl.T.Helper()
-        ret := m.ctrl.Call(m, "ClearRange", arg0, arg1)
+        ret := m.ctrl.Call(m, "Clear")
         ret0, _ := ret[0].(error)
         return ret0
 }
 
-// ClearRange indicates an expected call of ClearRange.
-func (mr *MockMerkleDBMockRecorder) ClearRange(arg0, arg1 interface{}) *gomock.Call {
+// Clear indicates an expected call of Clear.
+func (mr *MockMerkleDBMockRecorder) Clear() *gomock.Call {
         mr.mock.ctrl.T.Helper()
-        return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearRange", reflect.TypeOf((*MockMerkleDB)(nil).ClearRange), arg0, arg1)
+        return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockMerkleDB)(nil).Clear))
 }
 
 // Close mocks base method.
@@ -413,11 +413,11 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 
 // getEditableNode mocks base method.
 func (m *MockMerkleDB) getEditableNode(arg0 Key, arg1 bool) (*node, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
-	ret0, _ := ret[0].(*node)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+        m.ctrl.T.Helper()
+        ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
+        ret0, _ := ret[0].(*node)
+        ret1, _ := ret[1].(error)
+        return ret0, ret1
 }
 
 // getEditableNode indicates an expected call of getEditableNode.
@@ -442,11 +442,11 @@ func (mr *MockMerkleDBMockRecorder) getRoot() *gomock.Call {
 
 // getValue mocks base method.
 func (m *MockMerkleDB) getValue(arg0 Key) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getValue", arg0)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+        m.ctrl.T.Helper()
+        ret := m.ctrl.Call(m, "getValue", arg0)
+        ret0, _ := ret[0].([]byte)
+        ret1, _ := ret[1].(error)
+        return ret0, ret1
 }
 
 // getValue indicates an expected call of getValue.

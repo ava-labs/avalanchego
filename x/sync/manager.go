@@ -266,11 +266,12 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	if targetRootID == ids.Empty {
 		// The trie is empty after this change.
 		// Delete all the key-value pairs in the range.
-		if err := m.config.DB.ClearRange(work.start, work.end); err != nil {
+		if err := m.config.DB.Clear(); err != nil {
 			m.setError(err)
 			return
 		}
-		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		work.start = maybe.Nothing[[]byte]()
+		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
 		return
 	}
 
@@ -342,11 +343,12 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if targetRootID == ids.Empty {
-		if err := m.config.DB.ClearRange(work.start, work.end); err != nil {
+		if err := m.config.DB.Clear(); err != nil {
 			m.setError(err)
 			return
 		}
-		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		work.start = maybe.Nothing[[]byte]()
+		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
 		return
 	}
 
