@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	emptyKey               = Key{}
 	ErrInvalidBranchFactor = errors.New("branch factor must match one of the predefined branch factors")
 
 	validTokenSizes = []int{
