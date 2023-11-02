@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -50,7 +50,7 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 func (vm *blockVM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	db manager.Manager,
+	db database.Database,
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,

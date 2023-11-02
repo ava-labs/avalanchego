@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/api/health"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -47,7 +47,7 @@ type VM interface {
 	Initialize(
 		ctx context.Context,
 		chainCtx *snow.Context,
-		dbManager manager.Manager,
+		db database.Database,
 		genesisBytes []byte,
 		upgradeBytes []byte,
 		configBytes []byte,

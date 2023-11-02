@@ -19,7 +19,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -33,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -733,11 +733,11 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	}
 	vm.clock.Set(forkTime)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
-	ctx, _ := ts.Context(require, baseDBManager.Current().Database)
+	ctx, _ := ts.Context(require, baseDB)
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -755,7 +755,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	err = vm.Initialize(
 		context.Background(),
 		ctx,
-		chainDBManager,
+		chainDB,
 		genesisBytes,
 		nil,
 		nil,
