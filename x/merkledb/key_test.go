@@ -511,7 +511,7 @@ func FuzzKeyTake(f *testing.F) {
 			key2 := key1.Take(bitsToTake)
 			require.Equal(bitsToTake, key2.length)
 			if key2.hasPartialByte() {
-				paddingMask := byte(0xFF >> key2.remainderBitCount())
+				paddingMask := byte(0xFF >> (key2.length % 8))
 				require.Zero(key2.value[len(key2.value)-1] & paddingMask)
 			}
 			for i := 0; i < bitsToTake; i += ts {

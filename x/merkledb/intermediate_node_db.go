@@ -124,7 +124,7 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 
 // constructDBKey returns a key that can be used in [db.baseDB].
 // We need to be able to differentiate between two keys of equal
-// byte length but different token length, so we add padding to differentiate.
+// byte length but different bit length, so we add padding to differentiate.
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 	if db.tokenSize == 8 {

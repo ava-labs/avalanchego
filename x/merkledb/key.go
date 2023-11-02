@@ -51,6 +51,7 @@ var (
 
 type BranchFactor int
 
+// Valid checks if BranchFactor [b] is one of the predefined valid options for BranchFactor
 func (b BranchFactor) Valid() error {
 	for _, validBF := range validBranchFactors {
 		if validBF == b {
@@ -60,29 +61,29 @@ func (b BranchFactor) Valid() error {
 	return fmt.Errorf("%w: %d", ErrInvalidBranchFactor, b)
 }
 
-// ToToken creates a key version of the passed byte with length equal to bitsPerToken
+// ToToken creates a key version of the passed byte with bit length equal to tokenSize
 func ToToken(val byte, tokenSize int) Key {
 	return Key{value: string([]byte{val << dualBitIndex(tokenSize)}), length: tokenSize}
 }
 
 // Token returns the token at the specified index,
-// Assumes that bitindex + bitsPerToken doesn't cross a byte boundary
+// Assumes that bitindex + tokenSize doesn't cross a byte boundary
 func (k Key) Token(bitIndex int, tokenSize int) byte {
 	storageByte := k.value[bitIndex/8]
-	// Shift the byte right to get the token to the rightmost position.
+	// Shift the byte right to get the last bit to the rightmost position.
 	storageByte >>= dualBitIndex((bitIndex + tokenSize) % 8)
-	// Apply a mask to remove any other tokens in the byte.
+	// Apply a mask to remove any other bits in the byte.
 	return storageByte & (0xFF >> dualBitIndex(tokenSize))
 }
 
-// iteratedHasPrefix checks if the provided prefix key is a prefix of the current key after having skipped [bitsToSkip] bits first
-// this has better performance than constructing the actual key via Skip() then calling HasPrefix because it avoids the []byte allocation
-func (k Key) iteratedHasPrefix(prefix Key, bitsToSkip int, tokenSize int) bool {
-	if k.length-bitsToSkip < prefix.length {
+// iteratedHasPrefix checks if the provided prefix key is a prefix of the current key starting after the [bitsOffset]th bit
+// this has better performance than constructing the actual key via Skip() then calling HasPrefix because it avoids an allocation
+func (k Key) iteratedHasPrefix(prefix Key, bitsOffset int, tokenSize int) bool {
+	if k.length-bitsOffset < prefix.length {
 		return false
 	}
 	for i := 0; i < prefix.length; i += tokenSize {
-		if k.Token(bitsToSkip+i, tokenSize) != prefix.Token(i, tokenSize) {
+		if k.Token(bitsOffset+i, tokenSize) != prefix.Token(i, tokenSize) {
 			return false
 		}
 	}
@@ -92,15 +93,19 @@ func (k Key) iteratedHasPrefix(prefix Key, bitsToSkip int, tokenSize int) bool {
 type Key struct {
 	// The number of bits in the key.
 	length int
-	value  string
+	// The string representation of the key
+	value string
 }
 
 // ToKey returns [keyBytes] as a new key
+// Assumes all bits of the keyBytes are part of the Key, call Key.Take if that is not the case
+// Creates a copy of [keyBytes], so keyBytes are safe to edit after the call
 func ToKey(keyBytes []byte) Key {
 	return toKey(slices.Clone(keyBytes))
 }
 
 // toKey returns [keyBytes] as a new key
+// Assumes all bits of the keyBytes are part of the Key, call Key.Take if that is not the case
 // Caller must not modify [keyBytes] after this call.
 func toKey(keyBytes []byte) Key {
 	return Key{
@@ -123,7 +128,7 @@ func (k Key) HasPrefix(prefix Key) bool {
 
 	// The number of tokens in the last byte of [prefix], or zero
 	// if [prefix] fits into a whole number of bytes.
-	remainderBitCount := prefix.remainderBitCount()
+	remainderBitCount := prefix.length % 8
 	if remainderBitCount == 0 {
 		return strings.HasPrefix(k.value, prefix.value)
 	}
@@ -151,10 +156,7 @@ func (k Key) HasStrictPrefix(prefix Key) bool {
 	return k != prefix && k.HasPrefix(prefix)
 }
 
-func (k Key) remainderBitCount() int {
-	return k.length % 8
-}
-
+// Length returns the number of bits in the Key
 func (k Key) Length() int {
 	return k.length
 }
@@ -169,6 +171,7 @@ func (k Key) Less(other Key) bool {
 	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }
 
+// Extend returns a new Key that is the in-order aggregation of Key [k] with [keys]
 func (k Key) Extend(keys ...Key) Key {
 	totalBitLength := k.length
 	for _, key := range keys {
@@ -233,7 +236,7 @@ func shiftCopy(dst []byte, src string, shift int) {
 }
 
 // Skip returns a new Key that contains the last
-// k.length-tokensToSkip tokens of [k].
+// k.length-bitsToSkip bits of [k].
 func (k Key) Skip(bitsToSkip int) Key {
 	if k.length <= bitsToSkip {
 		return Key{}
@@ -249,7 +252,7 @@ func (k Key) Skip(bitsToSkip int) Key {
 		return result
 	}
 
-	// tokensToSkip does not remove a whole number of bytes.
+	// bitsToSkip does not remove a whole number of bytes.
 	// copy the remaining shifted bytes into a new buffer.
 	buffer := make([]byte, bytesNeeded(result.length))
 	bitsRemovedFromFirstRemainingByte := bitsToSkip % 8
@@ -259,7 +262,7 @@ func (k Key) Skip(bitsToSkip int) Key {
 	return result
 }
 
-// Take returns a new Key that contains the first tokensToTake tokens of the current Key
+// Take returns a new Key that contains the first bitsToTake bits of the current Key
 func (k Key) Take(bitsToTake int) Key {
 	if k.length <= bitsToTake {
 		return k
@@ -269,7 +272,7 @@ func (k Key) Take(bitsToTake int) Key {
 		length: bitsToTake,
 	}
 
-	remainderBits := result.remainderBitCount()
+	remainderBits := result.length % 8
 	if remainderBits == 0 {
 		result.value = k.value[:bitsToTake/8]
 		return result
@@ -280,7 +283,7 @@ func (k Key) Take(bitsToTake int) Key {
 	buffer := make([]byte, bytesNeeded(bitsToTake))
 	copy(buffer, k.value)
 
-	// We want to zero out everything to the right of the last token, which is at index [tokensToTake] - 1
+	// We want to zero out everything to the right of the last token, which is at index bitsToTake-1
 	// Mask will be (8-remainderBits) number of 1's followed by (remainderBits) number of 0's
 	buffer[len(buffer)-1] &= byte(0xFF << dualBitIndex(remainderBits))
 
