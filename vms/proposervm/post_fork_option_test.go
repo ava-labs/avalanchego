@@ -576,6 +576,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 				},
 				BytesV:     []byte{2},
 				ParentV:    coreOracleBlkID,
+				HeightV:    coreGenBlk.Height() + 2,
 				TimestampV: coreGenBlk.Timestamp().Add(time.Second),
 			},
 			&snowman.TestBlock{
@@ -585,6 +586,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 				},
 				BytesV:     []byte{3},
 				ParentV:    coreOracleBlkID,
+				HeightV:    coreGenBlk.Height() + 2,
 				TimestampV: coreGenBlk.Timestamp().Add(time.Second),
 			},
 		},

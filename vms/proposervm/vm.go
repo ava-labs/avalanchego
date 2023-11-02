@@ -805,13 +805,17 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	height := blk.Height()
 	blkID := blk.ID()
 
-	vm.lastAcceptedHeight = height
-	delete(vm.verifiedBlocks, blkID)
+	// following backfill introduction we may store past
+	// blocks, hence safeguard last accepted block data
+	if height >= vm.lastAcceptedHeight {
+		vm.lastAcceptedHeight = height
+		delete(vm.verifiedBlocks, blkID)
 
-	// Persist this block, its height index, and its status
-	if err := vm.State.SetLastAccepted(blkID); err != nil {
-		return err
+		if err := vm.State.SetLastAccepted(blkID); err != nil {
+			return err
+		}
 	}
+
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
 		return err
 	}
