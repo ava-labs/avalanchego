@@ -108,12 +108,13 @@ func New(config *Config, logFactory logging.Factory, logger logging.Logger) (*No
 		return nil, fmt.Errorf("invalid staking certificate: %w", err)
 	}
 
-	n := &Node{}
+	n := &Node{
+		Log:        logger,
+		LogFactory: logFactory,
+		ID:         ids.NodeIDFromCert(stakingCert),
+		Config:     config,
+	}
 
-	n.Log = logger
-	n.Config = config
-	n.ID = ids.NodeIDFromCert(stakingCert)
-	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
 	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
