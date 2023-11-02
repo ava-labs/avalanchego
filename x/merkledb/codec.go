@@ -26,13 +26,13 @@ const (
 	minMaybeByteSliceLen = boolLen
 	minKeyLen            = minVarIntLen
 	minByteSliceLen      = minVarIntLen
-	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
+	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen
 
 	estimatedKeyLen           = 64
 	estimatedValueLen         = 64
 	estimatedCompressedKeyLen = 8
 	// Child index, child compressed key, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -108,7 +108,6 @@ func (c *codecImpl) encodeChildren(n nodeChildren) []byte {
 		c.encodeUint(buf, uint64(index))
 		c.encodeKey(buf, entry.compressedKey)
 		_, _ = buf.Write(entry.id[:])
-		c.encodeBool(buf, entry.hasValue)
 	}
 	return buf.Bytes()
 }
@@ -167,14 +166,9 @@ func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 		if err != nil {
 			return nil, err
 		}
-		hasValue, err := c.decodeBool(src)
-		if err != nil {
-			return nil, err
-		}
 		n[byte(index)] = child{
 			compressedKey: compressedKey,
 			id:            childID,
-			hasValue:      hasValue,
 		}
 	}
 	if src.Len() != 0 {

@@ -124,7 +124,6 @@ func FuzzEncodeHashValues(f *testing.F) {
 					children[byte(i)] = child{
 						compressedKey: ToKey(compressedKeyBytes),
 						id:            ids.GenerateTestID(),
-						hasValue:      r.Intn(2) == 1, // #nosec G404
 					}
 				}
 

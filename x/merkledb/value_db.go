@@ -87,14 +87,19 @@ func (db *valueDB) Get(key Key) (maybe.Maybe[[]byte], error) {
 	defer db.bufferPool.Put(prefixedKey)
 
 	db.metrics.DatabaseNodeRead()
+	result := maybe.Nothing[[]byte]()
 	val, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return maybe.Nothing[[]byte](), nil
 		}
-		return maybe.Nothing[[]byte](), err
+		return maybe.Nothing[[]byte](), nil
+	} else {
+		result = maybe.Some(val)
 	}
-	return maybe.Some(val), nil
+
+	db.nodeCache.Put(key, result)
+	return result, nil
 }
 
 // Batch of database operations

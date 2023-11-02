@@ -335,7 +335,6 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 		n[index] = child{
 			compressedKey: n[index].compressedKey,
 			id:            updatedChild.id,
-			hasValue:      updatedChild.hasValue,
 		}
 	}
 
@@ -751,7 +750,6 @@ func (t *trieView) compressNodePath(parent nodeChildren, parentKey Key, node nod
 		child{
 			compressedKey: childKey.Skip(parentKey.length + t.tokenSize),
 			id:            childEntry.id,
-			hasValue:      childEntry.hasValue,
 		}
 	t.recordNodeChange(parentKey, parent)
 	return nil
@@ -891,7 +889,6 @@ func (t *trieView) insert(
 		child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
-			hasValue:      existingChildEntry.hasValue,
 		}
 
 	return nodeWithValue, nil

@@ -16,7 +16,6 @@ type nodeChildren map[byte]child
 type child struct {
 	compressedKey Key
 	id            ids.ID
-	hasValue      bool
 }
 
 // Returns and caches the ID of this node.
