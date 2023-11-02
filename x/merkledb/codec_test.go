@@ -290,7 +290,6 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 					key = key.Skip(1)
 				}
 
-				hasValue := rand.Intn(2) == 1 // #nosec G404
 				b := codec.encodeKeyAndHasValue(key, hasValue)
 				var (
 					gotKey      Key
