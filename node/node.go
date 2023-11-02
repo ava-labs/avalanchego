@@ -100,6 +100,7 @@ var (
 	errShuttingDown  = errors.New("server shutting down")
 )
 
+// New returns an instance of Node
 func New(config *Config, logFactory logging.Factory, logger logging.Logger) (*Node, error) {
 	tlsCert := config.StakingTLSCert.Leaf
 	stakingCert := staking.CertificateFromX509(tlsCert)
