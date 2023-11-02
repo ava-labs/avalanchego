@@ -821,12 +821,10 @@ func addPathInfo(
 		}
 
 		// load the node associated with the key or create a new one
-		// pass nothing because we are going to overwrite the value digest below
 		n, err := t.insert(key, proofNode.ValueOrHash)
 		if err != nil {
 			return err
 		}
-
 		if !shouldInsertLeftChildren && !shouldInsertRightChildren {
 			// No children of proof nodes are outside the range.
 			// No need to add any children to [n].

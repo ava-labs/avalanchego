@@ -52,9 +52,9 @@ func (n *node) bytes() []byte {
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(key Key, metrics merkleMetrics) ids.ID {
+func (n *node) calculateID(key Key, metrics merkleMetrics, value maybe.Maybe[[]byte]) ids.ID {
 	metrics.HashCalculated()
-	return hashing.ComputeHash256Array(codec.encodeHashValues(key, n, n.value))
+	return hashing.ComputeHash256Array(codec.encodeHashValues(key, n, value))
 }
 
 // Set [n]'s value to [val].

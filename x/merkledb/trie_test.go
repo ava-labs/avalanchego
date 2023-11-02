@@ -1234,8 +1234,11 @@ func TestTrieCommitToDB(t *testing.T) {
 				view, err := db.NewView(context.Background(), ViewChanges{})
 				r.NoError(err)
 
+				altView, err := db.NewView(context.Background(), ViewChanges{})
+				r.NoError(err)
+
 				// Change the parent
-				view.(*trieView).parentTrie = &trieView{}
+				view.(*trieView).parentTrie = altView
 
 				return view
 			},

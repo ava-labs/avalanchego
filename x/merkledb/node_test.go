@@ -24,7 +24,7 @@ func Test_Node_Marshal(t *testing.T) {
 
 	root.setChildEntry(fullKey.Token(0, 4), child{
 		compressedKey: fullKey.Skip(4),
-		id:            childNode.calculateID(fullKey, &mockMetrics{})},
+		id:            childNode.calculateID(fullKey, &mockMetrics{}, maybe.Some([]byte("value")))},
 	)
 
 	data := root.bytes()
@@ -45,22 +45,20 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	fullKey := ToKey([]byte{255})
 	childNode1 := newNode()
-	childNode1.setValue(maybe.Some([]byte("value1")))
 
 	root.setChildEntry(fullKey.Token(0, 4), child{
 		compressedKey: fullKey.Skip(4),
-		id:            childNode1.calculateID(fullKey, &mockMetrics{}),
+		id:            childNode1.calculateID(fullKey, &mockMetrics{}, maybe.Nothing[[]byte]()),
 		hasValue:      true,
 	},
 	)
 
 	fullKey = ToKey([]byte{237})
 	childNode2 := newNode()
-	childNode2.setValue(maybe.Some([]byte("value2")))
 
 	root.setChildEntry(fullKey.Token(0, 4), child{
 		compressedKey: fullKey.Skip(4),
-		id:            childNode2.calculateID(fullKey, &mockMetrics{}),
+		id:            childNode2.calculateID(fullKey, &mockMetrics{}, maybe.Some([]byte("value2"))),
 		hasValue:      true,
 	},
 	)

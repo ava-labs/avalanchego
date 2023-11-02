@@ -1168,18 +1168,20 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(Key{})
+
+	val, err := db.valueDB.Get(Key{})
+	if err != nil {
+		return ids.Empty, nil
+	}
+	if val.IsNothing() {
+		db.root, err = db.intermediateNodeDB.Get(Key{})
+	} else {
+		db.root, err = db.valueNodeDB.Get(Key{})
+	}
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return ids.Empty, err
 		}
-		db.root, err = db.valueNodeDB.Get(Key{})
-		if err != nil {
-			if !errors.Is(err, database.ErrNotFound) {
-				return ids.Empty, err
-			}
-		}
-
 		// Root doesn't exist; make a new one.
 		db.root = newNode()
 		if err := db.intermediateNodeDB.Put(Key{}, db.root); err != nil {
@@ -1187,7 +1189,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		}
 	}
 
-	db.rootID = db.root.calculateID(Key{}, db.metrics)
+	db.rootID = db.root.calculateID(Key{}, db.metrics, db.root.value)
 	return db.rootID, nil
 }
 
