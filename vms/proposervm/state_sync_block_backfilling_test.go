@@ -12,14 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -477,7 +476,7 @@ func setupBlockBackfillingVM(
 	}
 
 	toProVMChannel := make(chan<- common.Message)
-	innerVM.InitializeF = func(_ context.Context, _ *snow.Context, _ manager.Manager,
+	innerVM.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database,
 		_ []byte, _ []byte, _ []byte, ch chan<- common.Message,
 		_ []*common.Fx, _ common.AppSender,
 	) error {
@@ -495,9 +494,6 @@ func setupBlockBackfillingVM(
 	}
 
 	// createVM
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-
 	vm := New(
 		innerVM,
 		time.Time{},
@@ -514,7 +510,7 @@ func setupBlockBackfillingVM(
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		memdb.New(),
 		innerGenesisBlk.Bytes(),
 		nil,
 		nil,

@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
@@ -129,7 +128,7 @@ func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker 
 func (vm *VMClient) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
@@ -155,33 +154,21 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	// Initialize and serve each database and construct the db manager
-	// initialize request parameters
-	versionedDBs := dbManager.GetDatabases()
-	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
-	for i, semDB := range versionedDBs {
-		dbVersion := semDB.Version.String()
-		serverListener, err := grpcutils.NewListener()
-		if err != nil {
-			return err
-		}
-		serverAddr := serverListener.Addr().String()
-
-		go grpcutils.Serve(serverListener, vm.newDBServer(semDB.Database))
-		chainCtx.Log.Info("grpc: serving database",
-			zap.String("version", dbVersion),
-			zap.String("address", serverAddr),
-		)
-
-		versionedDBServers[i] = &vmpb.VersionedDBServer{
-			ServerAddr: serverAddr,
-			Version:    dbVersion,
-		}
+	// Initialize the database
+	dbServerListener, err := grpcutils.NewListener()
+	if err != nil {
+		return err
 	}
+	dbServerAddr := dbServerListener.Addr().String()
+
+	go grpcutils.Serve(dbServerListener, vm.newDBServer(db))
+	chainCtx.Log.Info("grpc: serving database",
+		zap.String("address", dbServerAddr),
+	)
 
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(chainCtx.Keystore)
-	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, dbManager.Current().Database)
+	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, db)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
 	vm.appSender = appsender.NewServer(appSender)
 	vm.validatorStateServer = gvalidators.NewServer(chainCtx.ValidatorState)
@@ -211,7 +198,7 @@ func (vm *VMClient) Initialize(
 		GenesisBytes: genesisBytes,
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
-		DbServers:    versionedDBServers,
+		DbServerAddr: dbServerAddr,
 		ServerAddr:   serverAddr,
 	})
 	if err != nil {
