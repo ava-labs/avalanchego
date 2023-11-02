@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestBranchFactor_Valid(t *testing.T) {
 
 func TestHasPartialByte(t *testing.T) {
 	for _, ts := range validTokenSizes {
-		t.Run(fmt.Sprint(ts), func(t *testing.T) {
+		t.Run(strconv.Itoa(ts), func(t *testing.T) {
 			require := require.New(t)
 
 			key := Key{}
@@ -116,7 +117,7 @@ func Test_Key_Has_Prefix(t *testing.T) {
 
 	for _, tt := range tests {
 		for _, ts := range validTokenSizes {
-			t.Run(tt.name+" ts "+fmt.Sprint(ts), func(t *testing.T) {
+			t.Run(tt.name+" ts "+strconv.Itoa(ts), func(t *testing.T) {
 				require := require.New(t)
 				keyA := tt.keyA(ts)
 				keyB := tt.keyB(ts)
