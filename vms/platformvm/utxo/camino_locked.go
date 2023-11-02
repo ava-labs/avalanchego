@@ -274,7 +274,7 @@ func (h *handler) Lock(
 	insAmounts := make(map[ids.ID]OwnerAmounts)
 
 	var toOwnerID *ids.ID
-	if to != nil && appliedLockState == locked.StateUnlocked {
+	if to != nil && (appliedLockState == locked.StateUnlocked || appliedLockState == locked.StateDeposited) {
 		id, err := txs.GetOwnerID(to)
 		if err != nil {
 			return nil, nil, nil, nil, err
