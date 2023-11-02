@@ -101,7 +101,11 @@ var (
 )
 
 // New returns an instance of Node
-func New(config *Config, logFactory logging.Factory, logger logging.Logger) (*Node, error) {
+func New(
+	config *Config,
+	logFactory logging.Factory,
+	logger logging.Logger,
+) (*Node, error) {
 	tlsCert := config.StakingTLSCert.Leaf
 	stakingCert := staking.CertificateFromX509(tlsCert)
 	if err := staking.ValidateCertificate(stakingCert); err != nil {
