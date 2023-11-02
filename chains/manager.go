@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -57,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -180,7 +181,7 @@ type ManagerConfig struct {
 	BlockAcceptorGroup          snow.AcceptorGroup
 	TxAcceptorGroup             snow.AcceptorGroup
 	VertexAcceptorGroup         snow.AcceptorGroup
-	DBManager                   dbManager.Manager
+	DB                          database.Database
 	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
@@ -596,18 +597,16 @@ func (m *manager) createAvalancheChain(
 		State: snow.Initializing,
 	})
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
+	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
-
-	db := prefixDBManager.Current()
-	vertexDB := prefixdb.New(vertexDBPrefix, db.Database)
-	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, db.Database)
-	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, db.Database)
-	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, db.Database)
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	vertexDB := prefixdb.New(vertexDBPrefix, prefixDB)
+	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, prefixDB)
+	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -730,7 +729,7 @@ func (m *manager) createAvalancheChain(
 	err = dagVM.Initialize(
 		context.TODO(),
 		ctx.Context,
-		vmDBManager,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
@@ -796,7 +795,7 @@ func (m *manager) createAvalancheChain(
 
 		registerer:   snowmanRegisterer,
 		ctx:          ctx.Context,
-		dbManager:    vmDBManager,
+		db:           vmDB,
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
@@ -1004,15 +1003,13 @@ func (m *manager) createSnowmanChain(
 		State: snow.Initializing,
 	})
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
+	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
-
-	db := prefixDBManager.Current()
-	bootstrappingDB := prefixdb.New(bootstrappingDB, db.Database)
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(bootstrappingDB, prefixDB)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
@@ -1145,7 +1142,7 @@ func (m *manager) createSnowmanChain(
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
-		vmDBManager,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -86,8 +85,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	config := ts.Config(postBanff, postCortina)
 	clk := defaultClock(postBanff || postCortina)
 
-	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
+	baseDB := versiondb.New(memdb.New())
 	ctx, msm := ts.Context(r, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
