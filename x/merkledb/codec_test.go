@@ -108,13 +108,13 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 		) {
 			require := require.New(t)
 			codec := codec.(*codecImpl)
-			node := &dbNode{}
-			if err := codec.decodeDBNode(b, node); err != nil {
+			node := &node{}
+			if err := codec.decodeNode(b, node); err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeDBNode(node)
+			buf := codec.encodeNode(node)
 			require.Equal(b, buf)
 		},
 	)
@@ -159,18 +159,18 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 						id:            childID,
 					}
 				}
-				node := dbNode{
+				n := node{
 					value:    value,
 					children: children,
 				}
 
-				nodeBytes := codec.encodeDBNode(&node)
+				nodeBytes := codec.encodeNode(&n)
 
-				var gotNode dbNode
-				require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
-				require.Equal(node, gotNode)
+				var gotNode node
+				require.NoError(codec.decodeNode(nodeBytes, &gotNode))
+				require.Equal(n, gotNode)
 
-				nodeBytes2 := codec.encodeDBNode(&gotNode)
+				nodeBytes2 := codec.encodeNode(&gotNode)
 				require.Equal(nodeBytes, nodeBytes2)
 			}
 		},
@@ -181,10 +181,10 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		parsedDBNode  dbNode
+		parsedDBNode  node
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	err := codec.decodeNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 }
 
@@ -228,10 +228,8 @@ func FuzzEncodeHashValues(f *testing.F) {
 				_, _ = r.Read(key)              // #nosec G404
 
 				hv := &node{
-					dbNode: dbNode{
-						children: children,
-						value:    value,
-					},
+					children: children,
+					value:    value,
 				}
 
 				// Serialize the *hashValues with both codecs

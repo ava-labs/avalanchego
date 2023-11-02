@@ -61,7 +61,7 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeDBNode(n *dbNode) []byte
+	encodeNode(n *node) []byte
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
@@ -70,7 +70,7 @@ type encoder interface {
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeDBNode(bytes []byte, n *dbNode) error
+	decodeNode(bytes []byte, n *node) error
 }
 
 func newCodec() encoderDecoder {
@@ -91,7 +91,7 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
+func (c *codecImpl) encodeNode(n *node) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size of [n] to prevent memory allocations
@@ -139,7 +139,7 @@ func (c *codecImpl) encodeHashValues(key Key, n *node) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
+func (c *codecImpl) decodeNode(b []byte, n *node) error {
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}

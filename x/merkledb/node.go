@@ -13,7 +13,7 @@ import (
 const HashLength = 32
 
 // Representation of a node stored in the database.
-type dbNode struct {
+type node struct {
 	value    maybe.Maybe[[]byte]
 	children map[byte]child
 }
@@ -24,31 +24,21 @@ type child struct {
 	hasValue      bool
 }
 
-// node holds additional information on top of the dbNode that makes calculations easier to do
-type node struct {
-	dbNode
-}
-
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
 func newNode() *node {
 	return &node{
-		dbNode: dbNode{
-			children: make(map[byte]child, 2),
-		},
+		children: make(map[byte]child, 2),
 	}
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(nodeBytes []byte) (*node, error) {
-	n := dbNode{}
-	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
+	n := &node{}
+	if err := codec.decodeNode(nodeBytes, n); err != nil {
 		return nil, err
 	}
-	result := &node{
-		dbNode: n,
-	}
-	return result, nil
+	return n, nil
 }
 
 // Returns true iff this node has a value.
@@ -58,7 +48,7 @@ func (n *node) hasValue() bool {
 
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
-	return codec.encodeDBNode(&n.dbNode)
+	return codec.encodeNode(n)
 }
 
 // Returns and caches the ID of this node.
@@ -90,10 +80,8 @@ func (n *node) setChildEntry(index byte, childEntry child) {
 // it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
-		dbNode: dbNode{
-			value:    n.value,
-			children: maps.Clone(n.children),
-		},
+		value:    n.value,
+		children: maps.Clone(n.children),
 	}
 }
 
