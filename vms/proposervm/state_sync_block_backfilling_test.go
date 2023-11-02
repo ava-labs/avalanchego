@@ -161,13 +161,13 @@ func TestBlockBackfillSuccess(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
 
 	fromInnerVMCh <- common.StateSyncDone
 	<-toEngineCh
 
-	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
-		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
-	}
 	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
 	require.Equal(proTopBlk.ID(), blkID)
@@ -275,13 +275,13 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
 
 	fromInnerVMCh <- common.StateSyncDone
 	<-toEngineCh
 
-	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
-		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
-	}
 	blkID, height, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
 	require.Equal(proTopBlk.ID(), blkID)
