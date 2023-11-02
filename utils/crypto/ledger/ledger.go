@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
+	bip32 "github.com/tyler-smith/go-bip32"
 )
 
 const (
@@ -26,6 +27,7 @@ var _ keychain.Ledger = (*Ledger)(nil)
 // provides Avalanche-specific access.
 type Ledger struct {
 	device *ledger.LedgerAvalanche
+	epk    *bip32.Key
 }
 
 func New() (keychain.Ledger, error) {
@@ -40,21 +42,40 @@ func addressPath(index uint32) string {
 }
 
 func (l *Ledger) Address(hrp string, addressIndex uint32) (ids.ShortID, error) {
-	_, hash, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
+	resp, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
 	if err != nil {
 		return ids.ShortEmpty, err
 	}
-	return ids.ToShortID(hash)
+	return ids.ToShortID(resp.Hash)
 }
 
 func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
-	addresses := make([]ids.ShortID, len(addressIndices))
-	for i, v := range addressIndices {
-		_, hash, err := l.device.GetPubKey(addressPath(v), false, "", "")
+	if l.epk == nil {
+		pk, chainCode, err := l.device.GetExtPubKey(rootPath, false, "", "")
 		if err != nil {
 			return nil, err
 		}
-		copy(addresses[i][:], hash)
+		l.epk = &bip32.Key{
+			Key:       pk,
+			ChainCode: chainCode,
+		}
+	}
+	// get first derivation of 0/v path
+	child0, err := l.epk.NewChildKey(0)
+	if err != nil {
+		return nil, err
+	}
+	addresses := make([]ids.ShortID, len(addressIndices))
+	for i, child1Index := range addressIndices {
+		child1, err := child0.NewChildKey(child1Index)
+		if err != nil {
+			return nil, err
+		}
+		shortAddr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(child1.Key))
+		if err != nil {
+			return nil, err
+		}
+		copy(addresses[i][:], shortAddr[:])
 	}
 	return addresses, nil
 }
