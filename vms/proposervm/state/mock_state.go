@@ -185,6 +185,21 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
 }
 
+// GetLastBackfilledBlkID mocks base method.
+func (m *MockState) GetLastBackfilledBlkID() (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastBackfilledBlkID")
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastBackfilledBlkID indicates an expected call of GetLastBackfilledBlkID.
+func (mr *MockStateMockRecorder) GetLastBackfilledBlkID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBackfilledBlkID", reflect.TypeOf((*MockState)(nil).GetLastBackfilledBlkID))
+}
+
 // GetMinimumHeight mocks base method.
 func (m *MockState) GetMinimumHeight() (uint64, error) {
 	m.ctrl.T.Helper()
@@ -268,4 +283,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) error {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetLastBackfilledBlkID mocks base method.
+func (m *MockState) SetLastBackfilledBlkID(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetLastBackfilledBlkID", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetLastBackfilledBlkID indicates an expected call of SetLastBackfilledBlkID.
+func (mr *MockStateMockRecorder) SetLastBackfilledBlkID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBackfilledBlkID", reflect.TypeOf((*MockState)(nil).SetLastBackfilledBlkID), arg0)
 }

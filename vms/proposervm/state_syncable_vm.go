@@ -267,5 +267,12 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 	}
 
 	vm.latestBackfilledBlock = childBlkID
+	if err := vm.State.SetLastBackfilledBlkID(childBlkID); err != nil {
+		return ids.Empty, 0, fmt.Errorf("failed storing last backfilled block ID, %w", err)
+	}
+	if err := vm.db.Commit(); err != nil {
+		return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
+	}
+
 	return childBlk.Parent(), innerBlkHeight, nil
 }

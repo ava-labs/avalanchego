@@ -265,6 +265,11 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	vm.latestBackfilledBlock, err = vm.State.GetLastBackfilledBlkID()
+	if err != nil && err != database.ErrNotFound {
+		return fmt.Errorf("failed loading last backfilled block, %w", err)
+	}
+
 	forkHeight, err := vm.getForkHeight()
 	switch err {
 	case nil:
