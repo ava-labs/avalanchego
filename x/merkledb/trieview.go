@@ -258,20 +258,13 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	return err
 }
 
-type nodeInfo struct {
-	key      Key
-	id       ids.ID
-	hasValue bool
-}
-
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.Maybe[[]byte]) (ids.ID, error) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg              sync.WaitGroup
-		eg              errgroup.Group
-		updatedChildren = make(chan nodeInfo, len(n))
+		wg sync.WaitGroup
+		eg errgroup.Group
 	)
 
 	for childIndex, child := range n {
@@ -293,6 +286,8 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 			}
 			childValue = val
 		}
+
+		childIndex := childIndex
 		wg.Add(1)
 		calculateChildID := func() error {
 			defer wg.Done()
@@ -300,12 +295,7 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 			if err != nil {
 				return err
 			}
-			// Note that this will never block
-			updatedChildren <- nodeInfo{
-				key:      childKey,
-				id:       id,
-				hasValue: childValue.HasValue(),
-			}
+			n[childIndex].id = id
 			return nil
 		}
 
@@ -327,15 +317,6 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 	wg.Wait()
 	if err := eg.Wait(); err != nil {
 		return ids.Empty, err
-	}
-	close(updatedChildren)
-
-	for updatedChild := range updatedChildren {
-		index := updatedChild.key.Token(key.length, t.tokenSize)
-		n[index] = child{
-			compressedKey: n[index].compressedKey,
-			id:            updatedChild.id,
-		}
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
@@ -733,7 +714,7 @@ func (t *trieView) compressNodePath(parent nodeChildren, parentKey Key, node nod
 	t.recordNodeDeleted(nodeKey, node)
 
 	var (
-		childEntry child
+		childEntry *child
 		childKey   Key
 	)
 	// There is only one child, but we don't know the index.
@@ -747,7 +728,7 @@ func (t *trieView) compressNodePath(parent nodeChildren, parentKey Key, node nod
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	parent[childKey.Token(parentKey.length, t.tokenSize)] =
-		child{
+		&child{
 			compressedKey: childKey.Skip(parentKey.length + t.tokenSize),
 			id:            childEntry.id,
 		}
@@ -850,7 +831,7 @@ func (t *trieView) insert(
 	existingChildEntry, hasChild := closestNode[key.Token(closestKey.length, t.tokenSize)]
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
-		closestNode[key.Token(closestKey.length, t.tokenSize)] = child{compressedKey: key.Skip(closestKey.length + t.tokenSize)}
+		closestNode[key.Token(closestKey.length, t.tokenSize)] = &child{compressedKey: key.Skip(closestKey.length + t.tokenSize)}
 		return t.recordNewNode(key), nil
 	}
 
@@ -874,19 +855,19 @@ func (t *trieView) insert(
 	branchKey := key.Take(closestKey.length + t.tokenSize + commonPrefixLength)
 	branchNode := t.recordNewNode(branchKey)
 
-	closestNode[branchKey.Token(closestKey.length, t.tokenSize)] = child{compressedKey: branchKey.Skip(closestKey.length + t.tokenSize)}
+	closestNode[branchKey.Token(closestKey.length, t.tokenSize)] = &child{compressedKey: branchKey.Skip(closestKey.length + t.tokenSize)}
 	nodeWithValue := branchNode
 
 	if key.length != branchKey.length {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
 		nodeWithValue = t.recordNewNode(key)
-		branchNode[key.Token(branchKey.length, t.tokenSize)] = child{compressedKey: key.Skip(branchKey.length + t.tokenSize)}
+		branchNode[key.Token(branchKey.length, t.tokenSize)] = &child{compressedKey: key.Skip(branchKey.length + t.tokenSize)}
 	}
 
 	// add the existing child onto the branch node
 	branchNode[existingChildEntry.compressedKey.Token(commonPrefixLength, t.tokenSize)] =
-		child{
+		&child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
 		}

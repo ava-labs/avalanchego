@@ -146,7 +146,7 @@ func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 	case numChildren > uint64(src.Len()/minChildLen):
 		return nil, io.ErrUnexpectedEOF
 	}
-	n := make(map[byte]child, numChildren)
+	n := make(nodeChildren, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
@@ -166,7 +166,7 @@ func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 		if err != nil {
 			return nil, err
 		}
-		n[byte(index)] = child{
+		n[byte(index)] = &child{
 			compressedKey: compressedKey,
 			id:            childID,
 		}

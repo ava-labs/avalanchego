@@ -11,7 +11,7 @@ import (
 
 const HashLength = 32
 
-type nodeChildren map[byte]child
+type nodeChildren map[byte]*child
 
 type child struct {
 	compressedKey Key

@@ -846,7 +846,7 @@ func addPathInfo(
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
 				// We only need the IDs to be correct so that the calculated hash is correct.
-				n[index] = child{
+				n[index] = &child{
 					id:            childID,
 					compressedKey: compressedPath,
 				}
