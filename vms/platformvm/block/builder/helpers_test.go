@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -96,8 +95,7 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.baseDB = versiondb.New(memdb.New())
 	res.ctx, res.msm = defaultCtx(res.baseDB)
 
 	res.ctx.Lock.Lock()

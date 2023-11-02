@@ -51,6 +51,14 @@ func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return errUnsupportedTxType
 }
 
+func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
 func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

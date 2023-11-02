@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -46,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -117,8 +116,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.baseDB = versiondb.New(memdb.New())
 	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
