@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -57,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -180,7 +181,7 @@ type ManagerConfig struct {
 	BlockAcceptorGroup          snow.AcceptorGroup
 	TxAcceptorGroup             snow.AcceptorGroup
 	VertexAcceptorGroup         snow.AcceptorGroup
-	DBManager                   dbManager.Manager
+	DB                          database.Database
 	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
@@ -531,19 +532,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	}
 
-	vdrs := m.Validators
-	if !m.SybilProtectionEnabled {
-		// If sybil protection is disabled, everyone validates every chain
-		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
-	}
-
 	var chain *chain
 	switch vm := vm.(type) {
 	case vertex.LinearizableVMWithEngine:
 		chain, err = m.createAvalancheChain(
 			ctx,
 			chainParams.GenesisData,
-			vdrs,
+			m.Validators,
 			vm,
 			fxs,
 			sb,
@@ -552,7 +547,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
-		beacons := vdrs
+		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
 		}
@@ -560,7 +555,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
-			vdrs,
+			m.Validators,
 			beacons,
 			vm,
 			fxs,
@@ -602,18 +597,16 @@ func (m *manager) createAvalancheChain(
 		State: snow.Initializing,
 	})
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
+	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
-
-	db := prefixDBManager.Current()
-	vertexDB := prefixdb.New(vertexDBPrefix, db.Database)
-	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, db.Database)
-	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, db.Database)
-	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, db.Database)
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	vertexDB := prefixdb.New(vertexDBPrefix, prefixDB)
+	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, prefixDB)
+	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -736,7 +729,7 @@ func (m *manager) createAvalancheChain(
 	err = dagVM.Initialize(
 		context.TODO(),
 		ctx.Context,
-		vmDBManager,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
@@ -802,7 +795,7 @@ func (m *manager) createAvalancheChain(
 
 		registerer:   snowmanRegisterer,
 		ctx:          ctx.Context,
-		dbManager:    vmDBManager,
+		db:           vmDB,
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
@@ -1010,15 +1003,13 @@ func (m *manager) createSnowmanChain(
 		State: snow.Initializing,
 	})
 
-	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
+	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
 	if err != nil {
 		return nil, err
 	}
-	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
-
-	db := prefixDBManager.Current()
-	bootstrappingDB := prefixdb.New(bootstrappingDB, db.Database)
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(bootstrappingDB, prefixDB)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
@@ -1151,7 +1142,7 @@ func (m *manager) createSnowmanChain(
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
-		vmDBManager,
+		vmDB,
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
@@ -1359,7 +1350,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		if !m.IsBootstrapped(constants.PlatformChainID) {
 			return "node is currently bootstrapping", nil
 		}
-		if !m.Validators.Contains(constants.PrimaryNetworkID, m.NodeID) {
+		if _, ok := m.Validators.GetValidator(constants.PrimaryNetworkID, m.NodeID); !ok {
 			return "node is not a primary network validator", nil
 		}
 

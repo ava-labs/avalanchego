@@ -180,7 +180,8 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnet.IsAllowed(nodeID, h.validators.Contains(h.ctx.SubnetID, nodeID))
+	_, ok := h.validators.GetValidator(h.ctx.SubnetID, nodeID)
+	return h.subnet.IsAllowed(nodeID, ok)
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
@@ -221,8 +222,6 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
-		h.ctx.Lock.Unlock()
-
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
 		)
