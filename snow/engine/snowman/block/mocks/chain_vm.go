@@ -82,9 +82,9 @@ func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, ar
 }
 
 // AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *MockChainVMMockRecorder) AppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) AppRequestFailed(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).AppRequestFailed), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).AppRequestFailed), arg0, arg1, arg2, arg3)
 }
 
 // AppResponse mocks base method.
@@ -183,9 +183,9 @@ func (m *MockChainVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.
 }
 
 // CrossChainAppRequestFailed indicates an expected call of CrossChainAppRequestFailed.
-func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequestFailed), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequestFailed), arg0, arg1, arg2, arg3)
 }
 
 // CrossChainAppResponse mocks base method.
