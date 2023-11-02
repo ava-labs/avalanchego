@@ -23,9 +23,9 @@ import (
 func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
-	n := newNode(ToKey([]byte{0x00}))
+	n := newNode()
 	n.setValue(maybe.Some([]byte{byte(0x02)}))
-	nodeSize := cacheEntrySize(n.key, n)
+	nodeSize := cacheEntrySize(ToKey([]byte{0x00}), n)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
 	cacheSize := nodeSize * 20
@@ -44,7 +44,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 
 	// Put a key-node pair
 	node1Key := ToKey([]byte{0x01})
-	node1 := newNode(node1Key)
+	node1 := newNode()
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
 
@@ -54,7 +54,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.Equal(node1, node1Read)
 
 	// Overwrite the key-node pair
-	node1Updated := newNode(node1Key)
+	node1Updated := newNode()
 	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
 	require.NoError(db.Put(node1Key, node1Updated))
 
@@ -75,7 +75,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	added := 0
 	for {
 		key := ToKey([]byte{byte(added)})
-		node := newNode(Key{})
+		node := newNode()
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -95,7 +95,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
 	key := ToKey([]byte{byte(added)})
-	node := newNode(Key{})
+	node := newNode()
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 

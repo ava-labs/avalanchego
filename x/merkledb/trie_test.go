@@ -35,15 +35,19 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	}
 
 	path := ToKey([]byte(key))
-	var result *node
-	err := view.visitPathToKey(path, func(n *node) error {
+	var (
+		resultKey Key
+		result    *node
+	)
+	err := view.visitPathToKey(path, func(key Key, n *node) error {
 		result = n
+		resultKey = key
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	if result.key != path || result == nil {
+	if resultKey != path || result == nil {
 		return nil, database.ErrNotFound
 	}
 
@@ -118,15 +122,15 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.IsType(&trieView{}, trieIntf)
 	trie := trieIntf.(*trieView)
 
-	var nodePath []*node
-	require.NoError(trie.visitPathToKey(ToKey(nil), func(n *node) error {
-		nodePath = append(nodePath, n)
+	var keys []Key
+	require.NoError(trie.visitPathToKey(ToKey(nil), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
 
 	// Just the root
-	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Len(keys, 1)
+	require.Equal(Key{}, keys[0])
 
 	// Insert a key
 	key1 := []byte{0}
@@ -143,16 +147,16 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
-	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key1), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key1), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
 
 	// Root and 1 value
-	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1), nodePath[1].key)
+	require.Len(keys, 2)
+	require.Equal(Key{}, keys[0])
+	require.Equal(ToKey(key1), keys[1])
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
@@ -169,15 +173,15 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
-	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
-	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1), nodePath[1].key)
-	require.Equal(ToKey(key2), nodePath[2].key)
+	require.Len(keys, 3)
+	require.Equal(Key{}, keys[0])
+	require.Equal(ToKey(key1), keys[1])
+	require.Equal(ToKey(key2), keys[2])
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
@@ -194,49 +198,49 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
-	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key3), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key3), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
 
-	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key3), nodePath[1].key)
+	require.Len(keys, 2)
+	require.Equal(Key{}, keys[0])
+	require.Equal(ToKey(key3), keys[1])
 
 	// Other key path not affected
-	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
-	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1), nodePath[1].key)
-	require.Equal(ToKey(key2), nodePath[2].key)
+	require.Len(keys, 3)
+	require.Equal(Key{}, keys[0])
+	require.Equal(ToKey(key1), keys[1])
+	require.Equal(ToKey(key2), keys[2])
 
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
-	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key4), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key4), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
 
-	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1), nodePath[1].key)
-	require.Equal(ToKey(key2), nodePath[2].key)
+	require.Len(keys, 3)
+	require.Equal(Key{}, keys[0])
+	require.Equal(ToKey(key1), keys[1])
+	require.Equal(ToKey(key2), keys[2])
 
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
-	nodePath = make([]*node, 0, 1)
-	require.NoError(trie.visitPathToKey(ToKey(key5), func(n *node) error {
-		nodePath = append(nodePath, n)
+	keys = []Key{}
+	require.NoError(trie.visitPathToKey(ToKey(key5), func(key Key, n *node) error {
+		keys = append(keys, key)
 		return nil
 	}))
-	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Len(keys, 1)
+	require.Equal(Key{}, keys[0])
 }
 
 func Test_Trie_ViewOnCommitedView(t *testing.T) {
@@ -318,7 +322,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	rawBytes, err := dbTrie.baseDB.Get(prefixedKey)
 	require.NoError(err)
 
-	node, err := parseNode(ToKey(key), rawBytes)
+	node, err := parseNode(rawBytes)
 	require.NoError(err)
 	require.Equal([]byte("value"), node.value.Value())
 }
@@ -848,7 +852,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err := trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
+	firstNode, err := trie.getEditableNode(getSingleChildKey(Key{}, root, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -870,7 +874,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err = trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
+	firstNode, err = trie.getEditableNode(getSingleChildKey(Key{}, root, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 2)
 }
@@ -1213,9 +1217,9 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 
 // Returns the path of the only child of this node.
 // Assumes this node has exactly one child.
-func getSingleChildKey(n *node, tokenSize int) Key {
+func getSingleChildKey(key Key, n *node, tokenSize int) Key {
 	for index, entry := range n.children {
-		return n.key.Extend(ToToken(index, tokenSize), entry.compressedKey)
+		return key.Extend(ToToken(index, tokenSize), entry.compressedKey)
 	}
 	return Key{}
 }

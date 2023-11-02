@@ -86,7 +86,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 
-	return parseNode(key, nodeBytes)
+	return parseNode(nodeBytes)
 }
 
 // Batch of database operations
@@ -125,10 +125,11 @@ func (b *valueNodeBatch) Write() error {
 }
 
 type iterator struct {
-	db       *valueNodeDB
-	nodeIter database.Iterator
-	current  *node
-	err      error
+	db         *valueNodeDB
+	nodeIter   database.Iterator
+	current    *node
+	currentKey Key
+	err        error
 }
 
 func (i *iterator) Error() error {
@@ -145,7 +146,7 @@ func (i *iterator) Key() []byte {
 	if i.current == nil {
 		return nil
 	}
-	return i.current.key.Bytes()
+	return i.currentKey.Bytes()
 }
 
 func (i *iterator) Value() []byte {
@@ -167,12 +168,12 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(ToKey(key), i.nodeIter.Value())
+	n, err := parseNode(i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false
 	}
-
+	i.currentKey = ToKey(key)
 	i.current = n
 	return true
 }

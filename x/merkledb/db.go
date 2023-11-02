@@ -287,7 +287,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(Key{})
+	db.root = newNode()
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -469,12 +469,12 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	return view.visitPathToKey(ToKey(keyBytes), func(n *node) error {
+	return view.visitPathToKey(ToKey(keyBytes), func(key Key, n *node) error {
 		if !n.hasValue() {
-			return db.intermediateNodeDB.nodeCache.Put(n.key, n)
+			return db.intermediateNodeDB.nodeCache.Put(key, n)
 		}
 
-		db.valueNodeDB.nodeCache.Put(n.key, n)
+		db.valueNodeDB.nodeCache.Put(key, n)
 		return nil
 	})
 }
@@ -1158,13 +1158,13 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		}
 
 		// Root doesn't exist; make a new one.
-		db.root = newNode(Key{})
+		db.root = newNode()
 		if err := db.intermediateNodeDB.Put(Key{}, db.root); err != nil {
 			return ids.Empty, err
 		}
 	}
 
-	db.rootID = db.root.calculateID(db.metrics)
+	db.rootID = db.root.calculateID(Key{}, db.metrics)
 	return db.rootID, nil
 }
 

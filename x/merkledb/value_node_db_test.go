@@ -40,7 +40,6 @@ func TestValueNodeDB(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0x01}),
 		},
-		key: key,
 	}
 	batch := db.NewBatch()
 	batch.Put(key, node1)
@@ -75,7 +74,6 @@ func TestValueNodeDB(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0x02}),
 		},
-		key: key,
 	}
 	batch = db.NewBatch()
 	batch.Put(key, node1)
@@ -132,7 +130,6 @@ func TestValueNodeDBIterator(t *testing.T) {
 			dbNode: dbNode{
 				value: maybe.Some([]byte{byte(i)}),
 			},
-			key: key,
 		}
 		batch := db.NewBatch()
 		batch.Put(key, node)
@@ -170,7 +167,6 @@ func TestValueNodeDBIterator(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x00}),
 		},
-		key: key,
 	}
 	batch := db.NewBatch()
 	batch.Put(key, n)
@@ -181,7 +177,6 @@ func TestValueNodeDBIterator(t *testing.T) {
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x01}),
 		},
-		key: key,
 	}
 	batch = db.NewBatch()
 	batch.Put(key, n)

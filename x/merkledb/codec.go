@@ -65,7 +65,7 @@ type encoder interface {
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
-	encodeHashValues(n *node) []byte
+	encodeHashValues(key Key, n *node) []byte
 }
 
 type decoder interface {
@@ -115,7 +115,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(n *node) []byte {
+func (c *codecImpl) encodeHashValues(key Key, n *node) []byte {
 	var (
 		numChildren = len(n.children)
 		// Estimate size [hv] to prevent memory allocations
@@ -134,7 +134,7 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 		_, _ = buf.Write(entry.id[:])
 	}
 	c.encodeMaybeByteSlice(buf, n.getValueDigest())
-	c.encodeKey(buf, n.key)
+	c.encodeKey(buf, key)
 
 	return buf.Bytes()
 }

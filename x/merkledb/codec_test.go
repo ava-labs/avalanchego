@@ -228,7 +228,6 @@ func FuzzEncodeHashValues(f *testing.F) {
 				_, _ = r.Read(key)              // #nosec G404
 
 				hv := &node{
-					key: ToKey(key),
 					dbNode: dbNode{
 						children: children,
 						value:    value,
@@ -236,8 +235,8 @@ func FuzzEncodeHashValues(f *testing.F) {
 				}
 
 				// Serialize the *hashValues with both codecs
-				hvBytes1 := codec1.encodeHashValues(hv)
-				hvBytes2 := codec2.encodeHashValues(hv)
+				hvBytes1 := codec1.encodeHashValues(ToKey(key), hv)
+				hvBytes2 := codec2.encodeHashValues(ToKey(key), hv)
 
 				// Make sure they're the same
 				require.Equal(hvBytes1, hvBytes2)

@@ -13,57 +13,63 @@ import (
 )
 
 func Test_Node_Marshal(t *testing.T) {
-	root := newNode(Key{})
+	root := newNode()
 	require.NotNil(t, root)
 
 	fullKey := ToKey([]byte("key"))
-	childNode := newNode(fullKey)
-	root.addChild(childNode, 4)
+	childNode := newNode()
+	root.setChildEntry(fullKey.Token(0, 4), child{compressedKey: fullKey.Skip(4)})
 	childNode.setValue(maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
-	childNode.calculateID(&mockMetrics{})
-	root.addChild(childNode, 4)
+	root.setChildEntry(fullKey.Token(0, 4), child{
+		compressedKey: fullKey.Skip(4),
+		id:            childNode.calculateID(fullKey, &mockMetrics{})},
+	)
 
 	data := root.bytes()
-	rootParsed, err := parseNode(ToKey([]byte("")), data)
+	rootParsed, err := parseNode(data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
-	rootIndex := getSingleChildKey(root, 4).Token(0, 4)
-	parsedIndex := getSingleChildKey(rootParsed, 4).Token(0, 4)
+	rootIndex := getSingleChildKey(Key{}, root, 4).Token(0, 4)
+	parsedIndex := getSingleChildKey(Key{}, rootParsed, 4).Token(0, 4)
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
 	require.Equal(t, rootChildEntry.id, parseChildEntry.id)
 }
 
 func Test_Node_Marshal_Errors(t *testing.T) {
-	root := newNode(Key{})
+	root := newNode()
 	require.NotNil(t, root)
 
 	fullKey := ToKey([]byte{255})
-	childNode1 := newNode(fullKey)
-	root.addChild(childNode1, 4)
+	childNode1 := newNode()
 	childNode1.setValue(maybe.Some([]byte("value1")))
-	require.NotNil(t, childNode1)
 
-	childNode1.calculateID(&mockMetrics{})
-	root.addChild(childNode1, 4)
+	root.setChildEntry(fullKey.Token(0, 4), child{
+		compressedKey: fullKey.Skip(4),
+		id:            childNode1.calculateID(fullKey, &mockMetrics{}),
+		hasValue:      true,
+	},
+	)
 
 	fullKey = ToKey([]byte{237})
-	childNode2 := newNode(fullKey)
-	root.addChild(childNode2, 4)
+	childNode2 := newNode()
 	childNode2.setValue(maybe.Some([]byte("value2")))
-	require.NotNil(t, childNode2)
 
-	childNode2.calculateID(&mockMetrics{})
-	root.addChild(childNode2, 4)
+	root.setChildEntry(fullKey.Token(0, 4), child{
+		compressedKey: fullKey.Skip(4),
+		id:            childNode2.calculateID(fullKey, &mockMetrics{}),
+		hasValue:      true,
+	},
+	)
 
 	data := root.bytes()
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err := parseNode(ToKey([]byte("")), broken)
+		_, err := parseNode(broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

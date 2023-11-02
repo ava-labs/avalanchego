@@ -27,29 +27,26 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
-	key Key
 }
 
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(key Key) *node {
+func newNode() *node {
 	return &node{
 		dbNode: dbNode{
 			children: make(map[byte]child, 2),
 		},
-		key: key,
 	}
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key Key, nodeBytes []byte) (*node, error) {
+func parseNode(nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
 		dbNode: n,
-		key:    key,
 	}
 	return result, nil
 }
@@ -65,9 +62,9 @@ func (n *node) bytes() []byte {
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) ids.ID {
+func (n *node) calculateID(key Key, metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
-	return hashing.ComputeHash256Array(codec.encodeHashValues(n))
+	return hashing.ComputeHash256Array(codec.encodeHashValues(key, n))
 }
 
 // Set [n]'s value to [val].
@@ -82,27 +79,9 @@ func (n *node) getValueDigest() maybe.Maybe[[]byte] {
 	return maybe.Some(hashing.ComputeHash256(n.value.Value()))
 }
 
-// Adds [child] as a child of [n].
-// Assumes [child]'s key is valid as a child of [n].
-// That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(childNode *node, tokenSize int) {
-	n.setChildEntry(
-		childNode.key.Token(n.key.length, tokenSize),
-		child{
-			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
-			hasValue:      childNode.hasValue(),
-		},
-	)
-}
-
 // Adds a child to [n] without a reference to the child node.
 func (n *node) setChildEntry(index byte, childEntry child) {
 	n.children[index] = childEntry
-}
-
-// Removes [child] from [n]'s children.
-func (n *node) removeChild(child *node, tokenSize int) {
-	delete(n.children, child.key.Token(n.key.length, tokenSize))
 }
 
 // clone Returns a copy of [n].
@@ -111,7 +90,6 @@ func (n *node) removeChild(child *node, tokenSize int) {
 // it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
-		key: n.key,
 		dbNode: dbNode{
 			value:    n.value,
 			children: maps.Clone(n.children),
@@ -120,9 +98,9 @@ func (n *node) clone() *node {
 }
 
 // Returns the ProofNode representation of this node.
-func (n *node) asProofNode() ProofNode {
+func (n *node) asProofNode(key Key) ProofNode {
 	pn := ProofNode{
-		Key:         n.key,
+		Key:         key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
 		ValueOrHash: n.getValueDigest(),
 	}
