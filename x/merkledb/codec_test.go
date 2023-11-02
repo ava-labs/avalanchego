@@ -279,9 +279,7 @@ func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
 			t *testing.T,
 			keyBytes []byte,
 			hasValue bool,
-			value []byte,
 			removeToken bool,
-			numChildren int,
 		) {
 			require := require.New(t)
 
