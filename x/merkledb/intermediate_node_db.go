@@ -27,7 +27,7 @@ type intermediateNodeDB struct {
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
-	nodeCache onEvictCache[Key, *node]
+	nodeCache onEvictCache[Key, nodeChildren]
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
@@ -51,17 +51,19 @@ func newIntermediateNodeDB(
 	}
 	result.nodeCache = newOnEvictCache(
 		size,
-		cacheEntrySize,
+		func(k Key, n nodeChildren) int {
+			return len(k.value) + codec.childrenSize(n)
+		},
 		result.onEviction,
 	)
 	return result
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
-func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
+func (db *intermediateNodeDB) onEviction(key Key, n nodeChildren) error {
 	writeBatch := db.baseDB.NewBatch()
 
-	totalSize := cacheEntrySize(key, n)
+	totalSize := db.nodeCache.size(key, n)
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
 		_ = db.baseDB.Close()
 		return err
@@ -78,7 +80,7 @@ func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 			// The cache is empty.
 			break
 		}
-		totalSize += cacheEntrySize(key, n)
+		totalSize += db.nodeCache.size(key, n)
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
 			_ = db.baseDB.Close()
 			return err
@@ -91,17 +93,17 @@ func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 	return nil
 }
 
-func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) error {
+func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n nodeChildren) error {
 	dbKey := db.constructDBKey(key)
 	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
 	if n == nil {
 		return b.Delete(dbKey)
 	}
-	return b.Put(dbKey, n.bytes())
+	return b.Put(dbKey, codec.encodeChildren(n))
 }
 
-func (db *intermediateNodeDB) Get(key Key) (*node, error) {
+func (db *intermediateNodeDB) Get(key Key) (nodeChildren, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
@@ -118,8 +120,11 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 	db.bufferPool.Put(dbKey)
-
-	return parseNode(nodeBytes)
+	children, err := codec.decodeChildren(nodeBytes)
+	if err != nil {
+		return nil, err
+	}
+	return children, nil
 }
 
 // constructDBKey returns a key that can be used in [db.baseDB].
@@ -135,7 +140,7 @@ func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
 }
 
-func (db *intermediateNodeDB) Put(key Key, n *node) error {
+func (db *intermediateNodeDB) Put(key Key, n nodeChildren) error {
 	return db.nodeCache.Put(key, n)
 }
 

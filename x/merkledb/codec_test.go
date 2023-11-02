@@ -100,94 +100,6 @@ func FuzzCodecKey(f *testing.F) {
 	)
 }
 
-func FuzzCodecDBNodeCanonical(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-			codec := codec.(*codecImpl)
-			node := &node{}
-			if err := codec.decodeNode(b, node); err != nil {
-				t.SkipNow()
-			}
-
-			// Encoding [node] should be the same as [b].
-			buf := codec.encodeNode(node, maybe.Nothing[[]byte]())
-			require.Equal(b, buf)
-		},
-	)
-}
-
-func FuzzCodecDBNodeDeterministic(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-			hasValue bool,
-			valueBytes []byte,
-		) {
-			require := require.New(t)
-			for _, bf := range validBranchFactors {
-				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-				value := maybe.Nothing[[]byte]()
-				if hasValue {
-					if len(valueBytes) == 0 {
-						// We do this because when we encode a value of []byte{}
-						// we will later decode it as nil.
-						// Doing this prevents inconsistency when comparing the
-						// encoded and decoded values below.
-						valueBytes = nil
-					}
-					value = maybe.Some(valueBytes)
-				}
-
-				numChildren := r.Intn(int(bf)) // #nosec G404
-
-				children := map[byte]child{}
-				for i := 0; i < numChildren; i++ {
-					var childID ids.ID
-					_, _ = r.Read(childID[:]) // #nosec G404
-
-					childKeyBytes := make([]byte, r.Intn(32)) // #nosec G404
-					_, _ = r.Read(childKeyBytes)              // #nosec G404
-
-					children[byte(i)] = child{
-						compressedKey: ToKey(childKeyBytes),
-						id:            childID,
-					}
-				}
-				n := node{
-					value:    value,
-					children: children,
-				}
-
-				nodeBytes := codec.encodeNode(&n, value)
-
-				var gotNode node
-				require.NoError(codec.decodeNode(nodeBytes, &gotNode))
-				require.Equal(n, gotNode)
-
-				nodeBytes2 := codec.encodeNode(&gotNode, gotNode.value)
-				require.Equal(nodeBytes, nodeBytes2)
-			}
-		},
-	)
-}
-
-func TestCodecDecodeDBNode_TooShort(t *testing.T) {
-	require := require.New(t)
-
-	var (
-		parsedDBNode  node
-		tooShortBytes = make([]byte, minDBNodeLen-1)
-	)
-	err := codec.decodeNode(tooShortBytes, &parsedDBNode)
-	require.ErrorIs(err, io.ErrUnexpectedEOF)
-}
-
 // Ensure that encodeHashValues is deterministic
 func FuzzEncodeHashValues(f *testing.F) {
 	codec1 := newCodec()
@@ -227,14 +139,9 @@ func FuzzEncodeHashValues(f *testing.F) {
 				key := make([]byte, r.Intn(32)) // #nosec G404
 				_, _ = r.Read(key)              // #nosec G404
 
-				hv := &node{
-					children: children,
-					value:    value,
-				}
-
 				// Serialize the *hashValues with both codecs
-				hvBytes1 := codec1.encodeHashValues(ToKey(key), hv, hv.value)
-				hvBytes2 := codec2.encodeHashValues(ToKey(key), hv, hv.value)
+				hvBytes1 := codec1.encodeHashValues(ToKey(key), children, value)
+				hvBytes2 := codec2.encodeHashValues(ToKey(key), children, value)
 
 				// Make sure they're the same
 				require.Equal(hvBytes1, hvBytes2)

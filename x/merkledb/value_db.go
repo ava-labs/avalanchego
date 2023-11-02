@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ database.Iterator = (*iterator)(nil)
+var _ database.Iterator = (*valueIterator)(nil)
 
 type valueDB struct {
 	// Holds unused []byte
@@ -170,7 +170,7 @@ func (i *valueIterator) Next() bool {
 
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
-	key = key[valueNodePrefixLen:]
+	key = key[valuePrefixLen:]
 	i.currentKey = ToKey(key)
 	i.currentValue = i.nodeIter.Value()
 	return true

@@ -26,7 +26,6 @@ const (
 	minMaybeByteSliceLen = boolLen
 	minKeyLen            = minVarIntLen
 	minByteSliceLen      = minVarIntLen
-	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
 	estimatedKeyLen           = 64
@@ -61,16 +60,17 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeNode(n *node, value maybe.Maybe[[]byte]) []byte
+	encodeChildren(n nodeChildren) []byte
+	childrenSize(n nodeChildren) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
-	encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]) []byte
+	encodeHashValues(key Key, n nodeChildren, value maybe.Maybe[[]byte]) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeNode(bytes []byte, n *node) error
+	decodeChildren(bytes []byte) (nodeChildren, error)
 }
 
 func newCodec() encoderDecoder {
@@ -91,22 +91,20 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeNode(n *node, value maybe.Maybe[[]byte]) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
+func (c *codecImpl) childrenSize(n nodeChildren) int {
+	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n)
+}
 
-	c.encodeMaybeByteSlice(buf, value)
-	c.encodeUint(buf, uint64(numChildren))
+func (c *codecImpl) encodeChildren(n nodeChildren) []byte {
+	buf := bytes.NewBuffer(make([]byte, 0, c.childrenSize(n)))
+
+	c.encodeUint(buf, uint64(len(n)))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	keys := maps.Keys(n.children)
+	keys := maps.Keys(n)
 	slices.Sort(keys)
 	for _, index := range keys {
-		entry := n.children[index]
+		entry := n[index]
 		c.encodeUint(buf, uint64(index))
 		c.encodeKey(buf, entry.compressedKey)
 		_, _ = buf.Write(entry.id[:])
@@ -115,9 +113,9 @@ func (c *codecImpl) encodeNode(n *node, value maybe.Maybe[[]byte]) []byte {
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]) []byte {
+func (c *codecImpl) encodeHashValues(key Key, n nodeChildren, value maybe.Maybe[[]byte]) []byte {
 	var (
-		numChildren = len(n.children)
+		numChildren = len(n)
 		// Estimate size [hv] to prevent memory allocations
 		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
@@ -126,10 +124,10 @@ func (c *codecImpl) encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]
 	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
-	keys := maps.Keys(n.children)
+	keys := maps.Keys(n)
 	slices.Sort(keys)
 	for _, index := range keys {
-		entry := n.children[index]
+		entry := n[index]
 		c.encodeUint(buf, uint64(index))
 		_, _ = buf.Write(entry.id[:])
 	}
@@ -139,61 +137,50 @@ func (c *codecImpl) encodeHashValues(key Key, n *node, value maybe.Maybe[[]byte]
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeNode(b []byte, n *node) error {
-	if minDBNodeLen > len(b) {
-		return io.ErrUnexpectedEOF
-	}
-
+func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 	src := bytes.NewReader(b)
-
-	value, err := c.decodeMaybeByteSlice(src)
-	if err != nil {
-		return err
-	}
-	n.value = value
 
 	numChildren, err := c.decodeUint(src)
 	switch {
 	case err != nil:
-		return err
+		return nil, err
 	case numChildren > uint64(src.Len()/minChildLen):
-		return io.ErrUnexpectedEOF
+		return nil, io.ErrUnexpectedEOF
 	}
-
-	n.children = make(map[byte]child, numChildren)
+	n := make(map[byte]child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if i != 0 && index <= previousChild || index > math.MaxUint8 {
-			return ErrChildIndexTooLarge
+			return nil, ErrChildIndexTooLarge
 		}
 		previousChild = index
 
 		compressedKey, err := c.decodeKey(src)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		childID, err := c.decodeID(src)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		hasValue, err := c.decodeBool(src)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		n.children[byte(index)] = child{
+		n[byte(index)] = child{
 			compressedKey: compressedKey,
 			id:            childID,
 			hasValue:      hasValue,
 		}
 	}
 	if src.Len() != 0 {
-		return ErrExtraSpace
+		return nil, ErrExtraSpace
 	}
-	return nil
+	return n, nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {

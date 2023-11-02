@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 	"sync"
 
@@ -93,12 +94,13 @@ type trieView struct {
 	// Changes made to this view.
 	// May include nodes that haven't been updated
 	// but will when their ID is recalculated.
-	changes *changeSummary
+	changes  *changeSummary
+	children map[Key]nodeChildren
 
 	db *merkleDB
 
 	// The root of the trie represented by this view.
-	root *node
+	root nodeChildren
 
 	tokenSize int
 }
@@ -148,7 +150,7 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
+	root, err := parentTrie.getChildren(Key{})
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, ErrNoValidRoot
@@ -162,6 +164,7 @@ func newTrieView(
 		parentTrie: parentTrie,
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 		tokenSize:  db.tokenSize,
+		children:   make(map[Key]nodeChildren, len(changes.BatchOps)+len(changes.MapOps)),
 	}
 
 	for _, op := range changes.BatchOps {
@@ -235,12 +238,12 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		var _ maybe.Maybe[[]byte]
-		_, err = t.getValue(emptyKey)
+		var rootVal maybe.Maybe[[]byte]
+		rootVal, err = t.getValue(emptyKey)
 		if err != nil {
 			return
 		}
-		t.changes.rootID, err = t.calculateNodeIDsHelper(Key{}, t.root, t.root.value)
+		t.changes.rootID, err = t.calculateNodeIDsHelper(Key{}, t.root, rootVal)
 		if err != nil {
 			return
 		}
@@ -263,30 +266,37 @@ type nodeInfo struct {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(key Key, n *node, val maybe.Maybe[[]byte]) (ids.ID, error) {
+func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.Maybe[[]byte]) (ids.ID, error) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
 		wg              sync.WaitGroup
 		eg              errgroup.Group
-		updatedChildren = make(chan nodeInfo, len(n.children))
+		updatedChildren = make(chan nodeInfo, len(n))
 	)
 
-	for childIndex, child := range n.children {
+	for childIndex, child := range n {
 		childKey := key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
-		childNodeChange, ok := t.changes.nodes[childKey]
-		if !ok {
+		changedValue, valueChanged := t.changes.values[childKey]
+		childrenChange, ok := t.children[childKey]
+		if !valueChanged && !ok {
 			// This child wasn't changed.
 			continue
 		}
 
+		var childValue maybe.Maybe[[]byte]
+		if valueChanged {
+			childValue = changedValue.after
+		} else {
+			val, err := t.getValue(childKey)
+			if err != nil {
+				return ids.Empty, err
+			}
+			childValue = val
+		}
 		wg.Add(1)
 		calculateChildID := func() error {
 			defer wg.Done()
-			_, err := t.getValue(childKey)
-			if err != nil {
-				return err
-			}
-			id, err := t.calculateNodeIDsHelper(childKey, childNodeChange.after, childNodeChange.after.value)
+			id, err := t.calculateNodeIDsHelper(childKey, childrenChange, childValue)
 			if err != nil {
 				return err
 			}
@@ -294,7 +304,7 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n *node, val maybe.Maybe[[]by
 			updatedChildren <- nodeInfo{
 				key:      childKey,
 				id:       id,
-				hasValue: childNodeChange.after.value.HasValue(),
+				hasValue: childValue.HasValue(),
 			}
 			return nil
 		}
@@ -322,15 +332,15 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n *node, val maybe.Maybe[[]by
 
 	for updatedChild := range updatedChildren {
 		index := updatedChild.key.Token(key.length, t.tokenSize)
-		n.setChildEntry(index, child{
-			compressedKey: n.children[index].compressedKey,
+		n[index] = child{
+			compressedKey: n[index].compressedKey,
 			id:            updatedChild.id,
 			hasValue:      updatedChild.hasValue,
-		})
+		}
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(key, t.db.metrics, n.value), nil
+	return calculateID(key, t.db.metrics, n, val), nil
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
@@ -362,16 +372,16 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	var (
 		closestKey  Key
-		closestNode *node
+		closestNode nodeChildren
 	)
-	if err := t.visitPathToKey(proof.Key, func(key Key, n *node) error {
+	if err := t.visitPathToKey(proof.Key, func(key Key, n nodeChildren) error {
 		closestKey = key
 		closestNode = n
-		_, err := t.getValue(key)
+		value, err := t.getValue(key)
 		if err != nil {
 			return err
 		}
-		proof.Path = append(proof.Path, n.asProofNode(key, closestNode.value))
+		proof.Path = append(proof.Path, asProofNode(key, n, value))
 		return nil
 	}); err != nil {
 		return nil, err
@@ -385,24 +395,21 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// If there is a child at the index where the node would be
 	// if it existed, include that child in the proof.
 	nextIndex := proof.Key.Token(closestKey.length, t.tokenSize)
-	child, ok := closestNode.children[nextIndex]
+	child, ok := closestNode[nextIndex]
 	if !ok {
 		return proof, nil
 	}
 
 	childKey := closestKey.Extend(ToToken(nextIndex, t.tokenSize), child.compressedKey)
-	childNode, err := t.getNode(
-		childKey,
-		child.hasValue,
-	)
+	childNode, err := t.getChildrenInternal(childKey)
 	if err != nil {
 		return nil, err
 	}
-	_, err = t.getValue(childKey)
+	value, err = t.getValue(childKey)
 	if err != nil {
 		return nil, err
 	}
-	proof.Path = append(proof.Path, childNode.asProofNode(childKey, childNode.value))
+	proof.Path = append(proof.Path, asProofNode(childKey, childNode, value))
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -660,10 +667,6 @@ func (t *trieView) remove(key Key) error {
 		return ErrNodesAlreadyCalculated
 	}
 
-	if err := t.recordValueChange(key, maybe.Nothing[[]byte]()); err != nil {
-		return err
-	}
-
 	val, valChanged := t.changes.values[key]
 	if !valChanged || val.before.IsNothing() || val.after.HasValue() {
 		return nil
@@ -674,9 +677,9 @@ func (t *trieView) remove(key Key) error {
 	// grab parent and grandparent nodes for path compression
 	var (
 		grandParentKey, parentKey, nodeToDeleteKey Key
-		grandParent, parent, nodeToDelete          *node
+		grandParent, parent, nodeToDelete          nodeChildren
 	)
-	if err := t.visitPathToKey(key, func(key Key, n *node) error {
+	if err := t.visitPathToKey(key, func(key Key, n nodeChildren) error {
 		grandParentKey = parentKey
 		parentKey = nodeToDeleteKey
 		nodeToDeleteKey = key
@@ -684,23 +687,21 @@ func (t *trieView) remove(key Key) error {
 		grandParent = parent
 		parent = nodeToDelete
 		nodeToDelete = n
-		return t.recordNodeChange(key, n)
+		t.recordNodeChange(key, n)
+		return nil
 	}); err != nil {
 		return err
 	}
 
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if len(nodeToDelete.children) != 0 {
+	if len(nodeToDelete) != 0 {
 		// merge this node and its child into a single node if possible
 		return t.compressNodePath(parent, parentKey, nodeToDelete, nodeToDeleteKey)
 	}
 
 	// if the removed node has no children, the node can be removed from the trie
-	if err := t.recordNodeDeleted(nodeToDeleteKey, nodeToDelete); err != nil {
-		return err
-	}
+	t.recordNodeDeleted(nodeToDeleteKey, nodeToDelete)
 	if parent != nil {
-		delete(parent.children, nodeToDeleteKey.Token(parentKey.length, t.tokenSize))
+		delete(parent, nodeToDeleteKey.Token(parentKey.length, t.tokenSize))
 
 		// merge the parent node and its child into a single node if possible
 		return t.compressNodePath(grandParent, grandParentKey, parent, parentKey)
@@ -716,7 +717,7 @@ func (t *trieView) remove(key Key) error {
 // * [node] has a value.
 // * [node] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent *node, parentKey Key, node *node, nodeKey Key) error {
+func (t *trieView) compressNodePath(parent nodeChildren, parentKey Key, node nodeChildren, nodeKey Key) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
@@ -726,13 +727,11 @@ func (t *trieView) compressNodePath(parent *node, parentKey Key, node *node, nod
 		return err
 	}
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
-	if parent == nil || len(node.children) != 1 || val.HasValue() {
+	if parent == nil || len(node) != 1 || val.HasValue() {
 		return nil
 	}
 
-	if err := t.recordNodeDeleted(nodeKey, node); err != nil {
-		return err
-	}
+	t.recordNodeDeleted(nodeKey, node)
 
 	var (
 		childEntry child
@@ -741,20 +740,21 @@ func (t *trieView) compressNodePath(parent *node, parentKey Key, node *node, nod
 	// There is only one child, but we don't know the index.
 	// "Cycle" over the key/values to find the only child.
 	// Note this iteration once because len(node.children) == 1.
-	for index, entry := range node.children {
+	for index, entry := range node {
 		childKey = nodeKey.Extend(ToToken(index, t.tokenSize), entry.compressedKey)
 		childEntry = entry
 	}
 
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
-	parent.setChildEntry(childKey.Token(parentKey.length, t.tokenSize),
+	parent[childKey.Token(parentKey.length, t.tokenSize)] =
 		child{
 			compressedKey: childKey.Skip(parentKey.length + t.tokenSize),
 			id:            childEntry.id,
 			hasValue:      childEntry.hasValue,
-		})
-	return t.recordNodeChange(parentKey, parent)
+		}
+	t.recordNodeChange(parentKey, parent)
+	return nil
 }
 
 // Returns the nodes along the path to [key].
@@ -762,7 +762,7 @@ func (t *trieView) compressNodePath(parent *node, parentKey Key, node *node, nod
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) error {
+func (t *trieView) visitPathToKey(key Key, visitNode func(Key, nodeChildren) error) error {
 	var (
 		// all node paths start at the root
 		currentNode = t.root
@@ -775,7 +775,7 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) err
 	// while the entire path hasn't been matched
 	for currentKey.length < key.length {
 		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentKey.length, t.tokenSize)]
+		nextChildEntry, hasChild := currentNode[key.Token(currentKey.length, t.tokenSize)]
 
 		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentKey.length+t.tokenSize, t.tokenSize) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
@@ -783,7 +783,7 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) err
 		}
 		// grab the next node along the path
 		currentKey = key.Take(currentKey.length + t.tokenSize + nextChildEntry.compressedKey.length)
-		currentNode, err = t.getNode(currentKey, nextChildEntry.hasValue)
+		currentNode, err = t.getChildrenInternal(currentKey)
 		if err != nil {
 			return err
 		}
@@ -796,13 +796,13 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) err
 
 // Get a copy of the node matching the passed key from the trie.
 // Used by views to get nodes from their ancestors.
-func (t *trieView) getEditableNode(key Key, hadValue bool) (*node, error) {
+func (t *trieView) getChildren(key Key) (nodeChildren, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
 
 	// grab the node in question
-	n, err := t.getNode(key, hadValue)
+	n, err := t.getChildrenInternal(key)
 	if err != nil {
 		return nil, err
 	}
@@ -813,7 +813,7 @@ func (t *trieView) getEditableNode(key Key, hadValue bool) (*node, error) {
 	}
 
 	// return a clone of the node, so it can be edited without affecting this trie
-	return n.clone(), nil
+	return maps.Clone(n), nil
 }
 
 // insert a key/value pair into the correct node of the trie.
@@ -821,30 +821,26 @@ func (t *trieView) getEditableNode(key Key, hadValue bool) (*node, error) {
 func (t *trieView) insert(
 	key Key,
 	value maybe.Maybe[[]byte],
-) (*node, error) {
+) (nodeChildren, error) {
 	if t.nodesAlreadyCalculated.Get() {
 		return nil, ErrNodesAlreadyCalculated
 	}
 
-	if err := t.recordValueChange(key, value); err != nil {
-		return nil, err
-	}
-
 	var (
 		closestKey  Key
-		closestNode *node
+		closestNode nodeChildren
 	)
-	if err := t.visitPathToKey(key, func(key Key, n *node) error {
+	if err := t.visitPathToKey(key, func(key Key, n nodeChildren) error {
 		closestKey = key
 		closestNode = n
-		return t.recordNodeChange(key, n)
+		t.recordNodeChange(key, n)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
 
 	// a node with that exact key already exists so update its value
 	if closestKey == key {
-		closestNode.setValue(value)
 		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
@@ -853,13 +849,11 @@ func (t *trieView) insert(
 	// key that hasn't been matched yet
 	// Note that [key] has prefix [closestNodeKey] but exactMatch was false,
 	// so [key] must be longer than [key] and the following index and slice won't OOB.
-	existingChildEntry, hasChild := closestNode.children[key.Token(closestKey.length, t.tokenSize)]
+	existingChildEntry, hasChild := closestNode[key.Token(closestKey.length, t.tokenSize)]
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
-		newNode := newNode()
-		newNode.setValue(value)
-		closestNode.setChildEntry(key.Token(closestKey.length, t.tokenSize), child{compressedKey: key.Skip(closestKey.length + t.tokenSize)})
-		return newNode, t.recordNewNode(key, newNode)
+		closestNode[key.Token(closestKey.length, t.tokenSize)] = child{compressedKey: key.Skip(closestKey.length + t.tokenSize)}
+		return t.recordNewNode(key), nil
 	}
 
 	// if we have reached this point, then the [key] we are trying to insert and
@@ -879,36 +873,28 @@ func (t *trieView) insert(
 		return nil, ErrGetPathToFailure
 	}
 
-	branchNode := newNode()
 	branchKey := key.Take(closestKey.length + t.tokenSize + commonPrefixLength)
-	closestNode.setChildEntry(branchKey.Token(closestKey.length, t.tokenSize), child{compressedKey: branchKey.Skip(closestKey.length + t.tokenSize)})
+	branchNode := t.recordNewNode(branchKey)
+
+	closestNode[branchKey.Token(closestKey.length, t.tokenSize)] = child{compressedKey: branchKey.Skip(closestKey.length + t.tokenSize)}
 	nodeWithValue := branchNode
 
-	if key.length == branchKey.length {
-		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
-		branchNode.setValue(value)
-	} else {
+	if key.length != branchKey.length {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
-		newNode := newNode()
-		newNode.setValue(value)
-		branchNode.setChildEntry(key.Token(branchKey.length, t.tokenSize), child{compressedKey: key.Skip(branchKey.length + t.tokenSize)})
-		if err := t.recordNewNode(key, newNode); err != nil {
-			return nil, err
-		}
-		nodeWithValue = newNode
+		nodeWithValue = t.recordNewNode(key)
+		branchNode[key.Token(branchKey.length, t.tokenSize)] = child{compressedKey: key.Skip(branchKey.length + t.tokenSize)}
 	}
 
 	// add the existing child onto the branch node
-	branchNode.setChildEntry(
-		existingChildEntry.compressedKey.Token(commonPrefixLength, t.tokenSize),
+	branchNode[existingChildEntry.compressedKey.Token(commonPrefixLength, t.tokenSize)] =
 		child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
 			hasValue:      existingChildEntry.hasValue,
-		})
+		}
 
-	return nodeWithValue, t.recordNewNode(branchKey, branchNode)
+	return nodeWithValue, nil
 }
 
 func getLengthOfCommonPrefix(first, second Key, secondOffset int, tokenSize int) int {
@@ -922,60 +908,27 @@ func getLengthOfCommonPrefix(first, second Key, secondOffset int, tokenSize int)
 
 // Records that a node has been created.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNewNode(key Key, after *node) error {
-	return t.recordKeyChange(key, after, true /* newNode */)
+func (t *trieView) recordNewNode(key Key) nodeChildren {
+	result := make(nodeChildren, 2)
+	t.recordKeyChange(key, result)
+	return result
 }
 
-// Records that an existing node has been changed.
-// Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeChange(key Key, after *node) error {
-	return t.recordKeyChange(key, after, false /* newNode */)
+func (t *trieView) recordNodeChange(key Key, after nodeChildren) {
+	t.recordKeyChange(key, after)
 }
 
-// Records that the node associated with the given key has been deleted.
-// Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordNodeDeleted(key Key, after *node) error {
+func (t *trieView) recordNodeDeleted(key Key, after nodeChildren) {
 	// don't delete the root.
 	if key.length == 0 {
-		return t.recordKeyChange(key, after, false /* newNode */)
+		t.recordKeyChange(key, after)
+		return
 	}
-	return t.recordKeyChange(key, nil, false /* newNode */)
+	t.recordKeyChange(key, nil)
 }
 
-// Records that the node associated with the given key has been changed.
-// If it is an existing node, record what its value was before it was changed.
-// Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) recordKeyChange(key Key, after *node, newNode bool) error {
-	if t.nodesAlreadyCalculated.Get() {
-		return ErrNodesAlreadyCalculated
-	}
-
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
-		return nil
-	}
-
-	if newNode {
-		t.changes.nodes[key] = &change[*node]{
-			after: after,
-		}
-		return nil
-	}
-
-	val, err := t.getParentTrie().getValue(key)
-	if err != nil {
-		return err
-	}
-
-	before, err := t.getParentTrie().getEditableNode(key, val.HasValue())
-	if err != nil && err != database.ErrNotFound {
-		return err
-	}
-	t.changes.nodes[key] = &change[*node]{
-		before: before,
-		after:  after,
-	}
-	return nil
+func (t *trieView) recordKeyChange(key Key, n nodeChildren) {
+	t.children[key] = n
 }
 
 // Records that a key's value has been added or updated.
@@ -1010,23 +963,18 @@ func (t *trieView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 // sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNode(key Key, hasValue bool) (*node, error) {
+func (t *trieView) getChildrenInternal(key Key) (nodeChildren, error) {
 	// check for the key within the changed nodes
-	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
+	if c, isChanged := t.children[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
-		if nodeChange.after == nil {
+		if c == nil {
 			return nil, database.ErrNotFound
 		}
-		return nodeChange.after, nil
+		return c, nil
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hasValue)
-	if err != nil {
-		return nil, err
-	}
-
-	return parentTrieNode, nil
+	return t.getParentTrie().getChildren(key)
 }
 
 // Get the parent trie of the view

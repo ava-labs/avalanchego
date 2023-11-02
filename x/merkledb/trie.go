@@ -38,9 +38,7 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Key) (maybe.Maybe[[]byte], error)
 
-	// get an editable copy of the node with the given key path
-	// hasValue indicates which db to look in (value or intermediate)
-	getEditableNode(key Key, hasValue bool) (*node, error)
+	getChildren(key Key) (nodeChildren, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].

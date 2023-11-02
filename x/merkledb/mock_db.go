@@ -401,21 +401,6 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyChangeProof", reflect.TypeOf((*MockMerkleDB)(nil).VerifyChangeProof), arg0, arg1, arg2, arg3, arg4)
 }
 
-// getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 Key, arg1 bool) (*node, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
-	ret0, _ := ret[0].(*node)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getEditableNode indicates an expected call of getEditableNode.
-func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getEditableNode", reflect.TypeOf((*MockMerkleDB)(nil).getEditableNode), arg0, arg1)
-}
-
 // getValue mocks base method.
 func (m *MockMerkleDB) getValue(arg0 Key) ([]byte, error) {
 	m.ctrl.T.Helper()
