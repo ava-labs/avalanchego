@@ -350,12 +350,12 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	// The sentinel node is always the first node in the path.
 	// If the sentinel node is not the root, remove it from the proofPath.
-	if proofPath[0] != root {
-		proofPath = proofPath[1:]
+	if root != t.sentinelNode {
+		proof.Path = proof.Path[1:]
 	}
 
 	// if there are no nodes in the proof path, add the root to serve as an exclusion proof
-	if len(proofPath) == 0 {
+	if len(proof.Path) == 0 {
 		proof.Path = []ProofNode{root.asProofNode()}
 		return proof, nil
 	}
@@ -734,6 +734,7 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 	var (
 		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
 		currentNode = t.sentinelNode
+		err         error
 	)
 	if err := visitNode(currentNode); err != nil {
 		return err
