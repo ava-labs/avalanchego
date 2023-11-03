@@ -439,7 +439,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
@@ -1222,7 +1222,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, state.ErrCantFindSubnet)
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1239,7 +1239,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			expectedErr: state.ErrCantFindSubnet,
+			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "no permission to remove validator",

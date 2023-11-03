@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -672,7 +671,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	coreVM.InitializeF = func(
 		context.Context,
 		*snow.Context,
-		manager.Manager,
+		database.Database,
 		[]byte,
 		[]byte,
 		[]byte,

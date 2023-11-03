@@ -15,7 +15,8 @@ import (
 
 var validParameters = snowball.Parameters{
 	K:                     1,
-	Alpha:                 1,
+	AlphaPreference:       1,
+	AlphaConfidence:       1,
 	BetaVirtuous:          1,
 	BetaRogue:             1,
 	ConcurrentRepolls:     1,
@@ -34,8 +35,8 @@ func TestValid(t *testing.T) {
 			name: "invalid consensus parameters",
 			s: Config{
 				ConsensusParameters: snowball.Parameters{
-					K:     2,
-					Alpha: 1,
+					K:               2,
+					AlphaPreference: 1,
 				},
 			},
 			expectedErr: snowball.ErrParametersInvalid,

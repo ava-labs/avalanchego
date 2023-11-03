@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
+var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	const transferAmount = 10 * units.Avax
@@ -32,8 +32,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		nodeURI := e2e.Env.GetRandomNodeURI()
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		factory := secp256k1.Factory{}
-		recipientKey, err := factory.NewPrivateKey()
+		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
@@ -91,7 +90,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 				recipientKey.Address(),
 			)))
 			require.NoError(err)
-			require.Greater(balances[avaxAssetID], uint64(0))
+			require.Positive(balances[avaxAssetID])
 		})
 
 		ginkgo.By("exporting AVAX from the X-Chain to the C-Chain", func() {
@@ -146,7 +145,9 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 				recipientKey.Address(),
 			)))
 			require.NoError(err)
-			require.Greater(balances[avaxAssetID], uint64(0))
+			require.Positive(balances[avaxAssetID])
 		})
+
+		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })

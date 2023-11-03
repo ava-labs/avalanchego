@@ -1,0 +1,44 @@
+name: Unit Tests
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit_tests:
+    name: unit_tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.10'
+          check-latest: true
+      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
+        shell: bash
+        if: matrix.os == 'windows-2022'
+        run: echo "TIMEOUT=240s" >> $GITHUB_ENV
+      - name: build_test
+        shell: bash
+        run: ./scripts/build_test.sh
+        env:
+          TIMEOUT: ${{ env.TIMEOUT }}
+      - name: fuzz_test
+        shell: bash
+        if: matrix.os == 'ubuntu-22.04' # Only run on Ubuntu 22.04
+        run: ./scripts/build_fuzz.sh 15 # Run each fuzz test 15 seconds

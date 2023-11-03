@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -29,9 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -42,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -217,7 +216,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			key, err := testKeyFactory.NewPrivateKey()
+			key, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			id := key.PublicKey().Address()
@@ -343,15 +342,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -370,7 +366,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		baseDBManager,
+		baseDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -422,7 +418,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := blocks.NewBanffStandardBlock(
+	statelessStandardBlk, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -431,7 +427,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
+	statelessStandardBlk, err = block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -440,7 +436,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
+	statelessStandardBlk, err = block.NewBanffStandardBlock(
 		preferredChainTime,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
@@ -479,7 +475,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -505,7 +501,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewBanffStandardBlock(
+	statelessBlk, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -567,7 +563,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorStandardBlk.ID()
 	preferredHeight = addValidatorStandardBlk.Height()
 
-	statelessImportBlk, err := blocks.NewBanffStandardBlock(
+	statelessImportBlk, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -627,7 +623,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeStandardBlk, err := blocks.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk, err := block.NewBanffStandardBlock(
 		newValidatorStartTime,
 		preferredID,
 		preferredHeight+1,
@@ -653,10 +649,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -720,7 +715,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorStandardBlk0, err := blocks.NewBanffStandardBlock(
+	statelessAddValidatorStandardBlk0, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -749,7 +744,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorStandardBlk0.ID()
 	preferredHeight = addValidatorStandardBlk0.Height()
 
-	statelessAdvanceTimeStandardBlk0, err := blocks.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk0, err := block.NewBanffStandardBlock(
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,
@@ -817,7 +812,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeStandardBlk0.ID()
 	preferredHeight = advanceTimeStandardBlk0.Height()
 
-	statelessImportBlk, err := blocks.NewBanffStandardBlock(
+	statelessImportBlk, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -890,7 +885,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorStandardBlk1, err := blocks.NewBanffStandardBlock(
+	statelessAddValidatorStandardBlk1, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -920,7 +915,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorStandardBlk1.ID()
 	preferredHeight = addValidatorStandardBlk1.Height()
 
-	statelessAdvanceTimeStandardBlk1, err := blocks.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk1, err := block.NewBanffStandardBlock(
 		newValidatorStartTime1,
 		preferredID,
 		preferredHeight+1,
@@ -963,10 +958,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -1060,7 +1054,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := blocks.NewBanffStandardBlock(
+	statelessStandardBlk, err := block.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -1095,7 +1089,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
+	statelessStandardBlk, err = block.NewBanffStandardBlock(
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,
@@ -1158,7 +1152,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1242,7 +1236,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1359,7 +1353,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1404,10 +1398,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.TrackedSubnets.Add(createSubnetTx.ID())
-	subnetValidators := validators.NewSet()
-	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
-
-	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
+	require.NoError(vm.state.ApplyCurrentValidators(createSubnetTx.ID(), vm.Validators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
@@ -1603,7 +1594,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -1803,7 +1794,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2005,7 +1996,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2208,7 +2199,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2263,7 +2254,7 @@ func checkValidatorBlsKeyIsSet(
 		return errors.New("unexpected BLS key")
 	case expectedBlsKey != nil && val.PublicKey == nil:
 		return errors.New("missing BLS key")
-	case !bytes.Equal(expectedBlsKey.Serialize(), val.PublicKey.Serialize()):
+	case !bytes.Equal(bls.SerializePublicKey(expectedBlsKey), bls.SerializePublicKey(val.PublicKey)):
 		return errors.New("incorrect BLS key")
 	default:
 		return nil

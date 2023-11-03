@@ -121,6 +121,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	avax.Produce(e.State, txID, tx.Outs)
 	// Add the new subnet to the database
 	e.State.AddSubnet(e.Tx)
+	e.State.SetSubnetOwner(txID, tx.Owner)
 	return nil
 }
 
@@ -357,12 +358,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 }
 
 // Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
-// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
-// This transaction will result in [tx.NodeID] being removed as a validator of
+// [e.State]. For verification rules, see [verifyRemoveSubnetValidatorTx]. This
+// transaction will result in [tx.NodeID] being removed as a validator of
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -487,5 +488,60 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
+	return nil
+}
+
+// Verifies a [*txs.TransferSubnetOwnershipTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [verifyTransferSubnetOwnershipTx].
+// This transaction will result in the ownership of [tx.Subnet] being transferred
+// to [tx.Owner].
+func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	err := verifyTransferSubnetOwnershipTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
+	if !e.Backend.Config.IsDActivated(e.State.GetTimestamp()) {
+		return ErrDUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	if err := e.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
+		},
+	); err != nil {
+		return err
+	}
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }

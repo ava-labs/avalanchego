@@ -648,7 +648,7 @@ func TestIterator(t *testing.T, db Database) {
 	require.NoError(iterator.Error())
 }
 
-// TestIteratorStart tests to make sure the the iterator can be configured to
+// TestIteratorStart tests to make sure the iterator can be configured to
 // start mid way through the database.
 func TestIteratorStart(t *testing.T, db Database) {
 	require := require.New(t)
@@ -933,7 +933,15 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
+	// Test compacting with nil bounds
 	require.NoError(db.Compact(nil, nil))
+
+	// Test compacting when start > end
+	require.NoError(db.Compact([]byte{2}, []byte{1}))
+
+	// Test compacting when start > largest key
+	require.NoError(db.Compact([]byte{255}, nil))
+
 	require.NoError(db.Close())
 	err := db.Compact(nil, nil)
 	require.ErrorIs(err, ErrClosed)

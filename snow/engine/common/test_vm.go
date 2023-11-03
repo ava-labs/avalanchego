@@ -6,12 +6,13 @@ package common
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/version"
@@ -48,11 +49,11 @@ type TestVM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
-	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
-	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
+	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
+	CreateStaticHandlersF       func(context.Context) (map[string]http.Handler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
@@ -88,7 +89,7 @@ func (vm *TestVM) Default(cant bool) {
 func (vm *TestVM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	db manager.Manager,
+	db database.Database,
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
@@ -141,7 +142,7 @@ func (vm *TestVM) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlersF(ctx)
 	}
@@ -151,7 +152,7 @@ func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, 
 	return nil, nil
 }
 
-func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	if vm.CreateStaticHandlersF != nil {
 		return vm.CreateStaticHandlersF(ctx)
 	}

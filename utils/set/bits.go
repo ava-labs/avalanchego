@@ -4,7 +4,7 @@
 package set
 
 import (
-	"fmt"
+	"encoding/hex"
 	"math/big"
 	"math/bits"
 )
@@ -98,5 +98,5 @@ func BitsFromBytes(bytes []byte) Bits {
 
 // String returns the hex representation of this bitset
 func (b Bits) String() string {
-	return fmt.Sprintf("%x", b.bits.Bytes())
+	return hex.EncodeToString(b.bits.Bytes())
 }

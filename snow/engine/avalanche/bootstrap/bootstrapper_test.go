@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -53,7 +54,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 
 	ctx := snow.DefaultConsensusContextTest()
 
-	peers := validators.NewSet()
+	vdrs := validators.NewManager()
 	db := memdb.New()
 	sender := &common.SenderTest{T: t}
 	manager := vertex.NewTestManager(t)
@@ -78,7 +79,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
 	require.NoError(err)
@@ -87,14 +88,16 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	require.NoError(err)
 
 	peerTracker := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
-	peers.RegisterCallbackListener(startupTracker)
+	totalWeight, err := vdrs.TotalWeight(constants.PrimaryNetworkID)
+	require.NoError(err)
+	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
+	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, startupTracker)
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
+		Beacons:                        vdrs,
+		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
+		Alpha:                          totalWeight/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -77,8 +78,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	// Generate new, random key to sign tx with
-	factory := secp256k1.Factory{}
-	key, err := factory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	// Replace a valid signature with one from another key
@@ -130,7 +130,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, state.ErrCantFindSubnet)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // Ensure valid tx passes semanticVerify

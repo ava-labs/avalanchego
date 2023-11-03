@@ -9,10 +9,11 @@ package vertex
 
 import (
 	context "context"
+	http "net/http"
 	reflect "reflect"
 	time "time"
 
-	manager "github.com/ava-labs/avalanchego/database/manager"
+	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -131,10 +132,10 @@ func (mr *MockLinearizableVMMockRecorder) Connected(arg0, arg1, arg2 interface{}
 }
 
 // CreateHandlers mocks base method.
-func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -146,10 +147,10 @@ func (mr *MockLinearizableVMMockRecorder) CreateHandlers(arg0 interface{}) *gomo
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -262,7 +263,7 @@ func (mr *MockLinearizableVMMockRecorder) HealthCheck(arg0 interface{}) *gomock.
 }
 
 // Initialize mocks base method.
-func (m *MockLinearizableVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 manager.Manager, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
+func (m *MockLinearizableVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)
