@@ -284,7 +284,6 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 		}
 	default:
 		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block %s: %w", childBlkID, err)
-
 	}
 
 	return childBlk.Parent(), childBlk.Height() - 1, nil
