@@ -58,6 +58,10 @@ func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
+	return b.baseTx(tx)
+}
+
 func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 	err := b.b.removeUTXOs(
 		b.ctx,

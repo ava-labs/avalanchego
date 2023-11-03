@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,8 +38,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -71,7 +73,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -92,7 +93,8 @@ var (
 	genesisHashKey     = []byte("genesisID")
 	ungracefulShutdown = []byte("ungracefulShutdown")
 
-	indexerDBPrefix = []byte{0x00}
+	indexerDBPrefix  = []byte{0x00}
+	keystoreDBPrefix = []byte("keystore")
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -109,8 +111,7 @@ type Node struct {
 	ID ids.NodeID
 
 	// Storage for this node
-	DBManager manager.Manager
-	DB        database.Database
+	DB database.Database
 
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
@@ -245,7 +246,7 @@ func (n *Node) initNetworking() error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
@@ -500,40 +501,41 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	// start the db manager
-	var (
-		dbManager manager.Manager
-		err       error
-	)
+	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+		// Prior to v1.10.15, the only on-disk database was leveldb, and its
+		// files went to [dbPath]/[networkID]/v1.4.5.
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
+		var err error
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
+		}
 	case memdb.Name:
-		dbManager = manager.NewMemDB(version.CurrentDatabase)
+		n.DB = memdb.New()
+	case pebble.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
+		var err error
+		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
+		}
 	default:
-		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
+		return fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
+			pebble.Name,
 		)
 	}
+
+	var err error
+	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
 	if err != nil {
 		return err
 	}
-
-	meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	if err != nil {
-		return err
-	}
-
-	n.DBManager = meterDBManager
-
-	currentDB := dbManager.Current()
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", currentDB.Version),
-	)
-	n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -558,6 +560,10 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	n.Log.Info("initializing database",
+		zap.Stringer("genesisHash", genesisHash),
+	)
 
 	ok, err := n.DB.Has(ungracefulShutdown)
 	if err != nil {
@@ -679,7 +685,7 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
@@ -830,7 +836,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
 		TxAcceptorGroup:                         n.TxAcceptorGroup,
 		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DBManager:                               n.DBManager,
+		DB:                                      n.DB,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
@@ -894,8 +900,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// Register the VMs that Avalanche supports
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
@@ -940,8 +945,8 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
-	if errs.Errored() {
-		return errs.Err
+	if err != nil {
+		return err
 	}
 
 	// initialize vm runtime manager
@@ -981,8 +986,7 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	n.keystore = keystore.New(n.Log, keystoreDB)
+	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
 	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
@@ -1548,7 +1552,7 @@ func (n *Node) shutdown() {
 	n.Log.Info("cleaning up plugin runtimes")
 	n.runtimeManager.Stop(context.TODO())
 
-	if n.DBManager != nil {
+	if n.DB != nil {
 		if err := n.DB.Delete(ungracefulShutdown); err != nil {
 			n.Log.Error(
 				"failed to delete ungraceful shutdown key",
@@ -1556,7 +1560,7 @@ func (n *Node) shutdown() {
 			)
 		}
 
-		if err := n.DBManager.Close(); err != nil {
+		if err := n.DB.Close(); err != nil {
 			n.Log.Warn("error during DB shutdown",
 				zap.Error(err),
 			)
