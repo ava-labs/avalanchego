@@ -254,6 +254,11 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(chainreader, config, parent, gap, statedb, b.engine)
 
+		err := ApplyUpgrades(config, &parent.Header().Time, b, statedb)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to configure precompiles %v", err)
+		}
+
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)

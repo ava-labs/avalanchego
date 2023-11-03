@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -911,6 +912,110 @@ func TestTraceChain(t *testing.T) {
 		}
 		if ref != rel {
 			t.Errorf("Ref and deref actions are not equal, ref %d rel %d", ref, rel)
+		}
+	}
+}
+
+func TestTraceBlockPrecompileActivation(t *testing.T) {
+	t.Parallel()
+
+	// Initialize test accounts
+	accounts := newAccounts(3)
+	copyConfig := *params.TestChainConfig
+	genesis := &core.Genesis{
+		Config: &copyConfig,
+		Alloc: core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
+		},
+	}
+	// assumes gap is 10 sec, means 3 block away
+	activateAllowlistBlock := 3
+	activateAllowListTime := uint64(activateAllowlistBlock * 10)
+	activateTxAllowListConfig := params.PrecompileUpgrade{
+		Config: txallowlist.NewConfig(&activateAllowListTime, []common.Address{accounts[0].addr}, nil, nil),
+	}
+
+	deactivateAllowlistBlock := activateAllowlistBlock + 3
+	deactivateAllowListTime := uint64(deactivateAllowlistBlock) * 10
+	deactivateTxAllowListConfig := params.PrecompileUpgrade{
+		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
+	}
+
+	genesis.Config.PrecompileUpgrades = []params.PrecompileUpgrade{
+		activateTxAllowListConfig,
+		deactivateTxAllowListConfig,
+	}
+	genBlocks := 10
+	signer := types.HomesteadSigner{}
+	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+		// Transfer from account[0] to account[1]
+		//    value: 1000 wei
+		//    fee:   0 wei
+		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
+		b.AddTx(tx)
+	})
+	defer backend.chain.Stop()
+	api := NewAPI(backend)
+
+	testSuite := []struct {
+		blockNumber rpc.BlockNumber
+		config      *TraceConfig
+		want        string
+		expectErr   error
+	}{
+		// Trace head block
+		{
+			blockNumber: rpc.BlockNumber(genBlocks),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+		// Trace block before activation
+		{
+			blockNumber: rpc.BlockNumber(activateAllowlistBlock - 1),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+		// Trace block activation
+		{
+			blockNumber: rpc.BlockNumber(activateAllowlistBlock),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+		// Trace block after activation
+		{
+			blockNumber: rpc.BlockNumber(activateAllowlistBlock + 1),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+		// Trace block deactivation
+		{
+			blockNumber: rpc.BlockNumber(deactivateAllowlistBlock),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+		// Trace block after deactivation
+		{
+			blockNumber: rpc.BlockNumber(deactivateAllowlistBlock + 1),
+			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+		},
+	}
+	for i, tc := range testSuite {
+		result, err := api.TraceBlockByNumber(context.Background(), tc.blockNumber, tc.config)
+		if tc.expectErr != nil {
+			if err == nil {
+				t.Errorf("test %d, want error %v", i, tc.expectErr)
+				continue
+			}
+			if !reflect.DeepEqual(err, tc.expectErr) {
+				t.Errorf("test %d: error mismatch, want %v, get %v", i, tc.expectErr, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("test %d, want no error, have %v", i, err)
+			continue
+		}
+		have, _ := json.Marshal(result)
+		want := tc.want
+		if string(have) != want {
+			t.Errorf("test %d, result mismatch, have\n%v\n, want\n%v\n", i, string(have), want)
 		}
 	}
 }

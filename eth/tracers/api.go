@@ -656,6 +656,11 @@ func (api *baseAPI) traceBlock(ctx context.Context, block *types.Block, config *
 	}
 	defer release()
 
+	err = core.ApplyUpgrades(api.backend.ChainConfig(), &parent.Header().Time, block, statedb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure precompiles in block tracing %v", err)
+	}
+
 	// JS tracers have high overhead. In this case run a parallel
 	// process that generates states in one thread and traces txes
 	// in separate worker threads.
