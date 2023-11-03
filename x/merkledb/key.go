@@ -9,30 +9,12 @@ import (
 	"strings"
 	"unsafe"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
 var (
 	ErrInvalidBranchFactor = errors.New("branch factor must match one of the predefined branch factors")
-
-	validTokenSizes = []int{
-		1,
-		2,
-		4,
-		8,
-	}
-
-	validBranchFactors = []BranchFactor{
-		BranchFactor2,
-		BranchFactor4,
-		BranchFactor16,
-		BranchFactor256,
-	}
-
-	BranchFactor2   = BranchFactor(2)
-	BranchFactor4   = BranchFactor(4)
-	BranchFactor16  = BranchFactor(16)
-	BranchFactor256 = BranchFactor(256)
 
 	BranchFactorToTokenSize = map[BranchFactor]int{
 		BranchFactor2:   1,
@@ -41,15 +23,31 @@ var (
 		BranchFactor256: 8,
 	}
 
-	sizeToBf = map[int]BranchFactor{
+	tokenSizeToBranchFactor = map[int]BranchFactor{
 		1: BranchFactor2,
 		2: BranchFactor4,
 		4: BranchFactor16,
 		8: BranchFactor256,
 	}
+
+	validTokenSizes = maps.Keys(tokenSizeToBranchFactor)
+
+	validBranchFactors = []BranchFactor{
+		BranchFactor2,
+		BranchFactor4,
+		BranchFactor16,
+		BranchFactor256,
+	}
 )
 
 type BranchFactor int
+
+const (
+	BranchFactor2   = BranchFactor(2)
+	BranchFactor4   = BranchFactor(4)
+	BranchFactor16  = BranchFactor(16)
+	BranchFactor256 = BranchFactor(256)
+)
 
 // Valid checks if BranchFactor [b] is one of the predefined valid options for BranchFactor
 func (b BranchFactor) Valid() error {
@@ -63,7 +61,10 @@ func (b BranchFactor) Valid() error {
 
 // ToToken creates a key version of the passed byte with bit length equal to tokenSize
 func ToToken(val byte, tokenSize int) Key {
-	return Key{value: string([]byte{val << dualBitIndex(tokenSize)}), length: tokenSize}
+	return Key{
+		value:  string([]byte{val << dualBitIndex(tokenSize)}),
+		length: tokenSize,
+	}
 }
 
 // Token returns the token at the specified index,

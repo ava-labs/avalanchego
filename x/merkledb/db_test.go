@@ -852,7 +852,7 @@ const (
 )
 
 func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
-	db, err := getBasicDBWithBranchFactor(sizeToBf[tokenSize])
+	db, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 	require.NoError(err)
 
 	const (
@@ -938,7 +938,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.NoError(err)
 			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
-			changeProofDB, err := getBasicDBWithBranchFactor(sizeToBf[tokenSize])
+			changeProofDB, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
@@ -996,7 +996,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
 			// Create a view with the same key-values as [db]
-			newDB, err := getBasicDBWithBranchFactor(sizeToBf[tokenSize])
+			newDB, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 			require.NoError(err)
 
 			ops := make([]database.BatchOp, 0, len(values))

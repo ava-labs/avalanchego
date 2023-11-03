@@ -411,7 +411,7 @@ func FuzzKeyDoubleExtend_Tokens(f *testing.F) {
 			if forceSecondOdd && key2.length > ts {
 				key2 = key2.Take(key2.length - ts)
 			}
-			token := byte(int(tokenByte) % int(sizeToBf[ts]))
+			token := byte(int(tokenByte) % int(tokenSizeToBranchFactor[ts]))
 			extendedP := key1.Extend(ToToken(token, ts), key2)
 			require.Equal(key1.length+key2.length+ts, extendedP.length)
 			firstIndex := 0

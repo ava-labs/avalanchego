@@ -871,7 +871,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,
-			BranchFactor:              sizeToBf[size],
+			BranchFactor:              tokenSizeToBranchFactor[size],
 		},
 		&mockMetrics{},
 	)
