@@ -258,13 +258,19 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	return err
 }
 
+type indexedID struct {
+	index byte
+	id    ids.ID
+}
+
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.Maybe[[]byte]) (ids.ID, error) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg sync.WaitGroup
-		eg errgroup.Group
+		wg              sync.WaitGroup
+		eg              errgroup.Group
+		updatedChildren = make(chan indexedID, len(n))
 	)
 
 	for childIndex, child := range n {
@@ -294,15 +300,15 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 			childValue = val
 		}
 
-		childIndex := childIndex
 		wg.Add(1)
+		childIndex := childIndex
 		calculateChildID := func() error {
 			defer wg.Done()
 			id, err := t.calculateNodeIDsHelper(childKey, childrenChange, childValue)
 			if err != nil {
 				return err
 			}
-			n[childIndex].id = id
+			updatedChildren <- indexedID{id: id, index: childIndex}
 			return nil
 		}
 
@@ -324,6 +330,10 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n nodeChildren, val maybe.May
 	wg.Wait()
 	if err := eg.Wait(); err != nil {
 		return ids.Empty, err
+	}
+	close(updatedChildren)
+	for idAndIndex := range updatedChildren {
+		n[idAndIndex.index] = &child{compressedKey: n[idAndIndex.index].compressedKey, id: idAndIndex.id}
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
