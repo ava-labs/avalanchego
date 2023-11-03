@@ -24,7 +24,87 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func TestBlockBackfillEnabled(t *testing.T) {
+func TestBlockBackfillEnabledPreFork(t *testing.T) {
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	// 1. Accept a State summary
+	stateSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: 100,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		HeightV: stateSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+
+	// Block backfilling not enabled before state sync is accepted
+	ctx := context.Background()
+	_, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+
+	stateSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+	_, err = stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	// 2. Signal to the ProposerVM that state sync is done
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerStateSyncedBlk.ID(), nil
+	}
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case innerStateSyncedBlk.ID():
+			return innerStateSyncedBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	// Block backfilling not enabled before innerVM declares state sync done
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+
+	fromInnerVMCh <- common.StateSyncDone
+	<-toEngineCh
+
+	// 3. Finally check that block backfilling is enabled looking at innerVM
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+
+	innerVM.BackfillBlocksEnabledF = func(_ context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		if height == innerStateSyncedBlk.Height() {
+			return innerStateSyncedBlk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(innerStateSyncedBlk.Parent(), blkID)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+}
+
+func TestBlockBackfillEnabledPostFork(t *testing.T) {
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
 	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
@@ -51,7 +131,7 @@ func TestBlockBackfillEnabled(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proVMParentStateSummaryBlk, forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
 
 	// Block backfilling not enabled before state sync is accepted
 	ctx := context.Background()
@@ -105,7 +185,7 @@ func TestBlockBackfillEnabled(t *testing.T) {
 	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
 }
 
-func TestBlockBackfillSuccess(t *testing.T) {
+func TestBlockBackfillPostForkSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
@@ -120,7 +200,7 @@ func TestBlockBackfillSuccess(t *testing.T) {
 		startBlkHeight = uint64(1492)
 
 		// create a list of consecutive blocks and build state summary of top of them
-		proBlks, innerBlks = createTestBlocks(t, vm, blkCount, startBlkHeight)
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
 
 		innerTopBlk        = innerBlks[len(innerBlks)-1]
 		proTopBlk          = proBlks[len(proBlks)-1]
@@ -140,7 +220,7 @@ func TestBlockBackfillSuccess(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
@@ -219,7 +299,7 @@ func TestBlockBackfillSuccess(t *testing.T) {
 	}
 }
 
-func TestBlockBackfillPartialSuccess(t *testing.T) {
+func TestBlockBackfillPostForkPartialSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
@@ -234,7 +314,7 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 		startBlkHeight = uint64(1492)
 
 		// create a list of consecutive blocks and build state summary of top of them
-		proBlks, innerBlks = createTestBlocks(t, vm, blkCount, startBlkHeight)
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
 
 		innerTopBlk        = innerBlks[len(innerBlks)-1]
 		proTopBlk          = proBlks[len(proBlks)-1]
@@ -254,7 +334,7 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
@@ -350,6 +430,7 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 func createTestBlocks(
 	t *testing.T,
 	vm *VM,
+	forkHeight uint64,
 	blkCount int,
 	startBlkHeight uint64,
 ) (
@@ -362,12 +443,14 @@ func createTestBlocks(
 		latestProBlkID   = ids.GenerateTestID()
 
 		dummyBlkTime      = time.Now()
-		dummyPChainHeight = uint64(1492)
+		dummyPChainHeight = startBlkHeight / 2
 
 		innerBlks = make([]snowman.Block, 0, blkCount)
 		proBlks   = make([]snowman.Block, 0, blkCount)
 	)
 	for idx := 0; idx < blkCount; idx++ {
+		blkHeight := startBlkHeight + uint64(idx)
+
 		rndBytes := ids.GenerateTestID()
 		innerBlkTop := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -381,41 +464,50 @@ func createTestBlocks(
 		latestInnerBlkID = innerBlkTop.ID()
 		innerBlks = append(innerBlks, innerBlkTop)
 
-		statelessChild, err := statelessblock.BuildUnsigned(
-			latestProBlkID,
-			dummyBlkTime,
-			dummyPChainHeight,
-			innerBlkTop.Bytes(),
-		)
-		require.NoError(err)
-		proBlkTop := &postForkBlock{
-			SignedBlock: statelessChild,
-			postForkCommonComponents: postForkCommonComponents{
-				vm:       vm,
-				innerBlk: innerBlkTop,
-				status:   choices.Processing,
-			},
+		if blkHeight < forkHeight {
+			proBlks = append(proBlks, &preForkBlock{
+				vm:    vm,
+				Block: innerBlkTop,
+			})
+		} else {
+			statelessChild, err := statelessblock.BuildUnsigned(
+				latestProBlkID,
+				dummyBlkTime,
+				dummyPChainHeight,
+				innerBlkTop.Bytes(),
+			)
+			require.NoError(err)
+			proBlkTop := &postForkBlock{
+				SignedBlock: statelessChild,
+				postForkCommonComponents: postForkCommonComponents{
+					vm:       vm,
+					innerBlk: innerBlkTop,
+					status:   choices.Processing,
+				},
+			}
+			latestProBlkID = proBlkTop.ID()
+			proBlks = append(proBlks, proBlkTop)
 		}
-		latestProBlkID = proBlkTop.ID()
-		proBlks = append(proBlks, proBlkTop)
 	}
 	return proBlks, innerBlks
 }
 
-func createTestStateSummary(
+func createPostForkStateSummary(
 	t *testing.T,
 	vm *VM,
-	proVMParentStateSummaryBlk ids.ID,
 	forkHeight uint64,
+	proVMParentStateSummaryBlk ids.ID,
 	innerVM *fullVM,
 	innerSummary *block.TestStateSummary,
 	innerBlk *snowman.TestBlock,
 ) block.StateSummary {
 	require := require.New(t)
+
+	pchainHeight := innerBlk.Height() / 2
 	slb, err := statelessblock.Build(
 		proVMParentStateSummaryBlk,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		pchainHeight,
 		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,

@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -249,17 +250,26 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block ID at height %d: %w", childBlkHeight, err)
 	}
 
-	childBlk, err := vm.getBlock(ctx, childBlkID)
-	if err != nil {
+	var childBlk snowman.Block
+	childBlk, err = vm.getPostForkBlock(ctx, childBlkID)
+	switch err {
+	case nil:
+		vm.latestBackfilledBlock = childBlkID
+		if err := vm.State.SetLastBackfilledBlkID(childBlkID); err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed storing last backfilled block ID, %w", err)
+		}
+		if err := vm.db.Commit(); err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
+		}
+	case database.ErrNotFound:
+		// proposerVM may not be active yet.
+		childBlk, err = vm.getPreForkBlock(ctx, childBlkID)
+		if err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed retrieving innerVM block %s: %w", childBlkID, err)
+		}
+	default:
 		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block %s: %w", childBlkID, err)
-	}
 
-	vm.latestBackfilledBlock = childBlkID
-	if err := vm.State.SetLastBackfilledBlkID(childBlkID); err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed storing last backfilled block ID, %w", err)
-	}
-	if err := vm.db.Commit(); err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
 	}
 
 	return childBlk.Parent(), innerBlkHeight, nil
