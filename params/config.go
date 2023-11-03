@@ -580,7 +580,7 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Banff Timestamp:                  #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffBlockTimestamp)
 	banner += fmt.Sprintf(" - Cortina Timestamp:                #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.CortinaBlockTimestamp)
 	banner += fmt.Sprintf(" - DUpgrade Timestamp:               #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeBlockTimestamp)
-	banner += fmt.Sprintf(" - Cancun Timestamp:                 #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeBlockTimestamp)
+	banner += fmt.Sprintf(" - Cancun Timestamp:                 #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", c.CancunTime)
 	banner += "\n"
 	return banner
 }
@@ -901,7 +901,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 		return newTimestampCompatError("DUpgrade fork block timestamp", c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp)
 	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
-		return newTimestampCompatError("Cancun fork block timestamp", c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp)
+		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, newcfg.CancunTime)
 	}
 
 	return nil
