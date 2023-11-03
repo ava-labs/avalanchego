@@ -165,7 +165,7 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 }
 
 func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
-	if vm.ssVM == nil || !vm.stateSyncDone.Get() {
+	if vm.ssVM == nil {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
 

@@ -28,7 +28,7 @@ import (
 func TestBlockBackfillEnabledPostFork(t *testing.T) {
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -54,38 +54,14 @@ func TestBlockBackfillEnabledPostFork(t *testing.T) {
 	}
 	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
 
-	// Block backfilling not enabled before state sync is accepted
 	ctx := context.Background()
-	_, _, err := vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
 	}
-	_, err = stateSummary.Accept(ctx)
+	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	// 2. Signal to the ProposerVM that state sync is done
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
-
-	// Block backfilling not enabled before innerVM declares state sync done
-	_, _, err = vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
-
-	// 3. Finally check that block backfilling is enabled looking at innerVM
+	// 2. Check that block backfilling is enabled looking at innerVM
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
@@ -110,7 +86,7 @@ func TestBlockBackfillPostForkSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -151,23 +127,9 @@ func TestBlockBackfillPostForkSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -224,7 +186,7 @@ func TestBlockBackfillPostForkPartialSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -265,23 +227,9 @@ func TestBlockBackfillPostForkPartialSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, height, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -352,7 +300,7 @@ func TestBlockBackfillPostForkPartialSuccess(t *testing.T) {
 func TestBlockBackfillEnabledAcrossFork(t *testing.T) {
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -378,38 +326,14 @@ func TestBlockBackfillEnabledAcrossFork(t *testing.T) {
 	}
 	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
 
-	// Block backfilling not enabled before state sync is accepted
-	ctx := context.Background()
-	_, _, err := vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
 	}
-	_, err = stateSummary.Accept(ctx)
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	// 2. Signal to the ProposerVM that state sync is done
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
-
-	// Block backfilling not enabled before innerVM declares state sync done
-	_, _, err = vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
-
-	// 3. Finally check that block backfilling is enabled looking at innerVM
+	// 2. Check that block backfilling is enabled looking at innerVM
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
@@ -434,7 +358,7 @@ func TestBlockBackfillAcrossForkSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -475,23 +399,9 @@ func TestBlockBackfillAcrossForkSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -556,7 +466,7 @@ func TestBlockBackfillAcrossForkPartialSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -601,23 +511,9 @@ func TestBlockBackfillAcrossForkPartialSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, height, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -701,7 +597,7 @@ func TestBlockBackfillAcrossForkPartialSuccess(t *testing.T) {
 func TestBlockBackfillEnabledPreFork(t *testing.T) {
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -720,38 +616,15 @@ func TestBlockBackfillEnabledPreFork(t *testing.T) {
 		BytesV:  []byte("inner state synced block"),
 	}
 
-	// Block backfilling not enabled before state sync is accepted
-	ctx := context.Background()
-	_, _, err := vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
 	stateSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
 	}
-	_, err = stateSummary.Accept(ctx)
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	// 2. Signal to the ProposerVM that state sync is done
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
-
-	// Block backfilling not enabled before innerVM declares state sync done
-	_, _, err = vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
-
-	// 3. Finally check that block backfilling is enabled looking at innerVM
+	// 2. Check that block backfilling is enabled looking at innerVM
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
@@ -782,7 +655,7 @@ func TestBlockBackfillPreForkSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -833,9 +706,6 @@ func TestBlockBackfillPreForkSuccess(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
@@ -910,7 +780,7 @@ func TestBlockBackfillPreForkPartialSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -961,9 +831,6 @@ func TestBlockBackfillPreForkPartialSuccess(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
@@ -1164,7 +1031,6 @@ func setupBlockBackfillingVM(
 ) (
 	*fullVM,
 	*VM,
-	chan<- common.Message,
 ) {
 	require := require.New(t)
 
@@ -1193,12 +1059,10 @@ func setupBlockBackfillingVM(
 		BytesV:  []byte("genesis state"),
 	}
 
-	toProVMChannel := make(chan<- common.Message)
 	innerVM.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database,
 		_ []byte, _ []byte, _ []byte, ch chan<- common.Message,
 		_ []*common.Fx, _ common.AppSender,
 	) error {
-		toProVMChannel = ch
 		return nil
 	}
 	innerVM.VerifyHeightIndexF = func(context.Context) error {
@@ -1237,5 +1101,5 @@ func setupBlockBackfillingVM(
 		nil,
 	))
 
-	return innerVM, vm, toProVMChannel
+	return innerVM, vm
 }

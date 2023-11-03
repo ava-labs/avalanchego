@@ -10,18 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDelayFromNew(t *testing.T) {
-	var (
-		toEngine           = make(chan common.Message, 10)
-		startTime          = time.Now().Add(50 * time.Millisecond)
-		dummyStateSyncDone = utils.Atomic[bool]{}
-	)
+	toEngine := make(chan common.Message, 10)
+	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine, &dummyStateSyncDone)
+	s, fromVM := New(logging.NoLog{}, toEngine)
 	defer s.Close()
 	go s.Dispatch(startTime)
 
@@ -32,14 +28,11 @@ func TestDelayFromNew(t *testing.T) {
 }
 
 func TestDelayFromSetTime(t *testing.T) {
-	var (
-		toEngine           = make(chan common.Message, 10)
-		now                = time.Now()
-		startTime          = now.Add(50 * time.Millisecond)
-		dummyStateSyncDone = utils.Atomic[bool]{}
-	)
+	toEngine := make(chan common.Message, 10)
+	now := time.Now()
+	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine, &dummyStateSyncDone)
+	s, fromVM := New(logging.NoLog{}, toEngine)
 	defer s.Close()
 	go s.Dispatch(now)
 
@@ -52,14 +45,11 @@ func TestDelayFromSetTime(t *testing.T) {
 }
 
 func TestReceipt(*testing.T) {
-	var (
-		toEngine           = make(chan common.Message, 10)
-		now                = time.Now()
-		startTime          = now.Add(50 * time.Millisecond)
-		dummyStateSyncDone = utils.Atomic[bool]{}
-	)
+	toEngine := make(chan common.Message, 10)
+	now := time.Now()
+	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine, &dummyStateSyncDone)
+	s, fromVM := New(logging.NoLog{}, toEngine)
 	defer s.Close()
 	go s.Dispatch(now)
 
