@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -659,7 +658,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 
@@ -968,7 +966,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 

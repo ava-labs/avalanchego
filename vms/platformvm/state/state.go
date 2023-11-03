@@ -286,11 +286,10 @@ type stateBlk struct {
 type state struct {
 	validatorState
 
-	cfg          *config.Config
-	ctx          *snow.Context
-	metrics      metrics.Metrics
-	rewards      reward.Calculator
-	bootstrapped *utils.Atomic[bool]
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -457,7 +456,6 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
 	s, err := newState(
 		db,
@@ -467,7 +465,6 @@ func New(
 		ctx,
 		metricsReg,
 		rewards,
-		bootstrapped,
 	)
 	if err != nil {
 		return nil, err
@@ -512,7 +509,6 @@ func newState(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
@@ -631,12 +627,11 @@ func newState(
 	return &state{
 		validatorState: newValidatorState(),
 
-		cfg:          cfg,
-		ctx:          ctx,
-		metrics:      metrics,
-		rewards:      rewards,
-		bootstrapped: bootstrapped,
-		baseDB:       baseDB,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+		baseDB:  baseDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
@@ -1689,20 +1684,12 @@ func (s *state) initValidatorSets() error {
 		}
 	}
 
-	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
-	s.cfg.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
-
 	s.metrics.SetLocalStake(s.cfg.Validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
 	totalWeight, err := s.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}
 	s.metrics.SetTotalStake(totalWeight)
-
-	for subnetID := range s.cfg.TrackedSubnets {
-		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
-		s.cfg.Validators.RegisterCallbackListener(subnetID, vl)
-	}
 	return nil
 }
 
