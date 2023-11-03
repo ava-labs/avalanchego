@@ -66,22 +66,12 @@ func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := make([]ids.ShortID, len(addressIndices))
-		for i, child1Index := range addressIndices {
+	for i, child1Index := range addressIndices {
 		child1, err := child0.NewChildKey(child1Index)
 		if err != nil {
 			return nil, err
 		}
 		copy(addresses[i][:], hashing.PubkeyBytesToAddress(child1.Key))
-	}
-		child1, err := child0.NewChildKey(child1Index)
-		if err != nil {
-			return nil, err
-		}
-		shortAddr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(child1.Key))
-		if err != nil {
-			return nil, err
-		}
-		copy(addresses[i][:], shortAddr[:])
 	}
 	return addresses, nil
 }
