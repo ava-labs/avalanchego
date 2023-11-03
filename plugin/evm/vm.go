@@ -1174,9 +1174,6 @@ func (vm *VM) buildBlock(_ context.Context) (snowman.Block, error) {
 		vm.mempool.DiscardCurrentTxs()
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	// Verify is called on a non-wrapped block here, such that this
 	// does not add [blk] to the processing blocks map in ChainState.
