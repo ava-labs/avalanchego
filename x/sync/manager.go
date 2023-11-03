@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -797,29 +798,26 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
 func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte, bool) {
+	// Children indices >= [startIndex] present in at least one of the nodes.
+	childIndices := set.Set[byte]{}
+	for _, node := range []*merkledb.ProofNode{node1, node2} {
+		if node == nil {
+			continue
+		}
+		for key := range node.Children {
+			if int(key) >= startIndex {
+				childIndices.Add(key)
+			}
+		}
+	}
+
+	sortedChildIndices := maps.Keys(childIndices)
+	slices.Sort(sortedChildIndices)
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-
-	keysUnion := map[byte]struct{}{}
-	if node1 != nil {
-		for key := range node1.Children {
-			if int(key) >= startIndex {
-				keysUnion[key] = struct{}{}
-			}
-		}
-	}
-	if node2 != nil {
-		for key := range node2.Children {
-			if int(key) >= startIndex {
-				keysUnion[key] = struct{}{}
-			}
-		}
-	}
-	keys := maps.Keys(keysUnion)
-	slices.Sort(keys)
-	for _, childIndex := range keys {
+	for _, childIndex := range sortedChildIndices {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}
