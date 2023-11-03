@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -22,11 +23,13 @@ var _ Wallet = (*wallet)(nil)
 type Wallet interface {
 	P() p.Wallet
 	X() x.Wallet
+	C() c.Wallet
 }
 
 type wallet struct {
 	p p.Wallet
 	x x.Wallet
+	c c.Wallet
 }
 
 func (w *wallet) P() p.Wallet {
@@ -37,11 +40,16 @@ func (w *wallet) X() x.Wallet {
 	return w.x
 }
 
+func (w *wallet) C() c.Wallet {
+	return w.c
+}
+
 // Creates a new default wallet
-func NewWallet(p p.Wallet, x x.Wallet) Wallet {
+func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
 	return &wallet{
 		p: p,
 		x: x,
+		c: c,
 	}
 }
 
@@ -50,6 +58,7 @@ func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
 		p.NewWalletWithOptions(w.P(), options...),
 		x.NewWalletWithOptions(w.X(), options...),
+		c.NewWalletWithOptions(w.C(), options...),
 	)
 }
 
@@ -58,6 +67,7 @@ type WalletConfig struct {
 	URI string // required
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
+	EthKeychain  c.EthKeychain     // required
 	// Set of P-chain transactions that the wallet should know about to be able
 	// to generate transactions.
 	PChainTxs map[ids.ID]*txs.Tx // optional
@@ -79,6 +89,12 @@ type WalletConfig struct {
 func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	avaxAddrs := config.AVAXKeychain.Addresses()
 	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
+	if err != nil {
+		return nil, err
+	}
+
+	ethAddrs := config.EthKeychain.EthAddresses()
+	ethState, err := FetchEthState(ctx, config.URI, ethAddrs)
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +127,15 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	xBuilder := x.NewBuilder(avaxAddrs, xBackend)
 	xSigner := x.NewSigner(config.AVAXKeychain, xBackend)
 
+	cChainID := avaxState.CCTX.BlockchainID()
+	cUTXOs := NewChainUTXOs(cChainID, avaxState.UTXOs)
+	cBackend := c.NewBackend(avaxState.CCTX, cUTXOs, ethState.Accounts)
+	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, cBackend)
+	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
+
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, avaxState.PClient, pBackend),
 		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
+		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil
 }
