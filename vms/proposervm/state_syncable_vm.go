@@ -206,9 +206,6 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 		if err != nil {
 			return ids.Empty, 0, fmt.Errorf("failed retrieving latest backfilled block, %s, %w", vm.latestBackfilledBlock, err)
 		}
-		if latestBackfilledBlk.Parent() != topBlk.ID() {
-			return ids.Empty, 0, fmt.Errorf("unexpected backfilled block %s, expected child' parent is %s", topBlk.ID(), latestBackfilledBlk.Parent())
-		}
 
 		topBlk = latestBackfilledBlk
 		topIdx = len(blkHeights) - 1
