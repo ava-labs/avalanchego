@@ -14,11 +14,10 @@ import (
 	"github.com/leanovate/gopter/gen"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -68,8 +67,7 @@ var stakersCommands = &commands.ProtoCommands{
 	NewSystemUnderTestFunc: func(initialState commands.State) commands.SystemUnderTest {
 		model := initialState.(*stakersStorageModel)
 
-		baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-		baseDB := versiondb.New(baseDBManager.Current().Database)
+		baseDB := versiondb.New(memdb.New())
 		baseState, err := buildChainState(baseDB, nil)
 		if err != nil {
 			panic(err)
