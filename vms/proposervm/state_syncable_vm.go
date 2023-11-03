@@ -189,17 +189,32 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 		blks[blk.Height()] = blk
 	}
 
-	// 2. Validate outer blocks
+	// 2. Validate blocks, checking that they are continguous
 	blkHeights := maps.Keys(blks)
 	sort.Slice(blkHeights, func(i, j int) bool {
 		return blkHeights[i] < blkHeights[j] // sort in ascending order by heights
 	})
 
-	topBlk, err := vm.getBlock(ctx, vm.latestBackfilledBlock)
-	if err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed retrieving latest backfilled block, %s, %w", vm.latestBackfilledBlock, err)
+	var (
+		topBlk = blks[blkHeights[len(blkHeights)-1]]
+		topIdx = len(blkHeights) - 2
+	)
+
+	// vm.latestBackfilledBlock is non nil only if proposerVM has forked
+	if vm.latestBackfilledBlock != ids.Empty {
+		latestBackfilledBlk, err := vm.getBlock(ctx, vm.latestBackfilledBlock)
+		if err != nil {
+			return ids.Empty, 0, fmt.Errorf("failed retrieving latest backfilled block, %s, %w", vm.latestBackfilledBlock, err)
+		}
+		if latestBackfilledBlk.Parent() != topBlk.ID() {
+			return ids.Empty, 0, fmt.Errorf("unexpected backfilled block %s, expected child' parent is %s", topBlk.ID(), latestBackfilledBlk.Parent())
+		}
+
+		topBlk = latestBackfilledBlk
+		topIdx = len(blkHeights) - 1
 	}
-	for i := len(blkHeights) - 1; i >= 0; i-- {
+
+	for i := topIdx; i >= 0; i-- {
 		blk := blks[blkHeights[i]]
 		if topBlk.Parent() != blk.ID() {
 			return ids.Empty, 0, fmt.Errorf("unexpected backfilled block %s, expected child' parent is %s", blk.ID(), topBlk.Parent())
@@ -272,7 +287,7 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 
 	}
 
-	return childBlk.Parent(), innerBlkHeight, nil
+	return childBlk.Parent(), childBlk.Height() - 1, nil
 }
 
 func (vm *VM) revertBackfilledBlock(blk Block) error {

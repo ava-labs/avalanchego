@@ -135,6 +135,9 @@ type VM struct {
 
 	stateSyncDone utils.Atomic[bool]
 
+	// latestBackfilledBlock track the latest post fork block
+	// indexed via block backfilling. Will be ids.Empty if proposerVM
+	// fork is not active
 	latestBackfilledBlock ids.ID
 }
 
