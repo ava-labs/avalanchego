@@ -6,7 +6,6 @@ package common
 import (
 	"context"
 	"errors"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -27,7 +26,7 @@ var (
 
 // SenderTest is a test sender
 type SenderTest struct {
-	T *testing.T
+	T require.TestingT
 
 	CantAccept,
 	CantSendGetStateSummaryFrontier, CantSendStateSummaryFrontier,
