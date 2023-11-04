@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -164,7 +165,7 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 }
 
 func (vm *VM) BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error) {
-	if vm.ssVM == nil || !vm.stateSyncDone.Get() {
+	if vm.ssVM == nil {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
 
@@ -188,23 +189,45 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 		blks[blk.Height()] = blk
 	}
 
-	// 2. Validate outer blocks
+	// 2. Validate blocks, checking that they are continguous
 	blkHeights := maps.Keys(blks)
 	sort.Slice(blkHeights, func(i, j int) bool {
 		return blkHeights[i] < blkHeights[j] // sort in ascending order by heights
 	})
 
-	topBlk, err := vm.getBlock(ctx, vm.latestBackfilledBlock)
-	if err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed retrieving latest backfilled block, %s, %w", vm.latestBackfilledBlock, err)
+	var (
+		topBlk = blks[blkHeights[len(blkHeights)-1]]
+		topIdx = len(blkHeights) - 2
+	)
+
+	// vm.latestBackfilledBlock is non nil only if proposerVM has forked
+	if vm.latestBackfilledBlock != ids.Empty {
+		latestBackfilledBlk, err := vm.getBlock(ctx, vm.latestBackfilledBlock)
+		if err != nil {
+			return ids.Empty, 0, fmt.Errorf(
+				"failed retrieving latest backfilled block, %s, %w, %w",
+				vm.latestBackfilledBlock,
+				err,
+				block.ErrInternalBlockBackfilling,
+			)
+		}
+
+		topBlk = latestBackfilledBlk
+		topIdx = len(blkHeights) - 1
 	}
-	for i := len(blkHeights) - 1; i >= 0; i-- {
+
+	for i := topIdx; i >= 0; i-- {
 		blk := blks[blkHeights[i]]
 		if topBlk.Parent() != blk.ID() {
 			return ids.Empty, 0, fmt.Errorf("unexpected backfilled block %s, expected child' parent is %s", blk.ID(), topBlk.Parent())
 		}
 		if err := blk.acceptOuterBlk(); err != nil {
-			return ids.Empty, 0, fmt.Errorf("failed indexing backfilled block, blkID %s, %w", blk.ID(), err)
+			return ids.Empty, 0, fmt.Errorf(
+				"failed indexing backfilled block, blkID %s, %w, %w",
+				blk.ID(),
+				err,
+				block.ErrInternalBlockBackfilling,
+			)
 		}
 		topBlk = blk
 	}
@@ -218,10 +241,12 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 	switch err {
 	case block.ErrStopBlockBackfilling:
 		return ids.Empty, 0, err // done backfilling
+	case block.ErrInternalBlockBackfilling:
+		return ids.Empty, 0, err
 	case nil:
-		// check alignment
+		// check proposerVM and innerVM alignment
 	default:
-		return ids.Empty, 0, fmt.Errorf("failed inner VM block backfilling, %w", err)
+		// non-internal error in innerVM, check proposerVM and innerVM alignment
 	}
 
 	// 4. Check alignment
@@ -235,7 +260,12 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 				return ids.Empty, 0, fmt.Errorf("failed reverting backfilled VM block from height index %s, %w", blk.ID(), err)
 			}
 		default:
-			return ids.Empty, 0, fmt.Errorf("failed checking innerVM block %s, %w", innerBlkID, err)
+			return ids.Empty, 0, fmt.Errorf(
+				"failed checking innerVM block %s, %w, %w",
+				innerBlkID,
+				err,
+				block.ErrInternalBlockBackfilling,
+			)
 		}
 	}
 
@@ -246,31 +276,72 @@ func (vm *VM) nextBlockBackfillData(ctx context.Context, innerBlkHeight uint64) 
 	childBlkHeight := innerBlkHeight + 1
 	childBlkID, err := vm.GetBlockIDAtHeight(ctx, childBlkHeight)
 	if err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block ID at height %d: %w", childBlkHeight, err)
+		return ids.Empty, 0, fmt.Errorf(
+			"failed retrieving proposer block ID at height %d: %w, %w",
+			childBlkHeight,
+			err,
+			block.ErrInternalBlockBackfilling,
+		)
 	}
 
-	childBlk, err := vm.getBlock(ctx, childBlkID)
-	if err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed retrieving proposer block %s: %w", childBlkID, err)
+	var childBlk snowman.Block
+	childBlk, err = vm.getPostForkBlock(ctx, childBlkID)
+	switch err {
+	case nil:
+		vm.latestBackfilledBlock = childBlkID
+		if err := vm.State.SetLastBackfilledBlkID(childBlkID); err != nil {
+			return ids.Empty, 0, fmt.Errorf(
+				"failed storing last backfilled block ID: %w, %w",
+				err,
+				block.ErrInternalBlockBackfilling,
+			)
+		}
+		if err := vm.db.Commit(); err != nil {
+			return ids.Empty, 0, fmt.Errorf(
+				"failed committing backfilled blocks reversal: %w, %w",
+				err,
+				block.ErrInternalBlockBackfilling,
+			)
+		}
+	case database.ErrNotFound:
+		// proposerVM may not be active yet.
+		childBlk, err = vm.getPreForkBlock(ctx, childBlkID)
+		if err != nil {
+			return ids.Empty,
+				0,
+				fmt.Errorf("failed retrieving innerVM block %s: %w, %w",
+					childBlkID,
+					err,
+					block.ErrInternalBlockBackfilling,
+				)
+		}
+	default:
+		return ids.Empty, 0, fmt.Errorf(
+			"failed retrieving proposer block %s: %w, %w",
+			childBlkID,
+			err,
+			block.ErrInternalBlockBackfilling,
+		)
 	}
 
-	vm.latestBackfilledBlock = childBlkID
-	if err := vm.State.SetLastBackfilledBlkID(childBlkID); err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed storing last backfilled block ID, %w", err)
-	}
-	if err := vm.db.Commit(); err != nil {
-		return ids.Empty, 0, fmt.Errorf("failed committing backfilled blocks reversal, %w", err)
-	}
-
-	return childBlk.Parent(), innerBlkHeight, nil
+	return childBlk.Parent(), childBlk.Height() - 1, nil
 }
 
 func (vm *VM) revertBackfilledBlock(blk Block) error {
 	if err := vm.State.DeleteBlock(blk.ID()); err != nil {
-		return fmt.Errorf("failed reverting backfilled VM block %s, %w", blk.ID(), err)
+		return fmt.Errorf(
+			"failed reverting backfilled VM block %s: %w, %w",
+			blk.ID(),
+			err,
+			block.ErrInternalBlockBackfilling)
 	}
 	if err := vm.State.DeleteBlockIDAtHeight(blk.Height()); err != nil {
-		return fmt.Errorf("failed reverting backfilled VM block from height index %s, %w", blk.ID(), err)
+		return fmt.Errorf(
+			"failed reverting backfilled VM block from height index %s: %w, %w",
+			blk.ID(),
+			err,
+			block.ErrInternalBlockBackfilling,
+		)
 	}
 	return nil
 }

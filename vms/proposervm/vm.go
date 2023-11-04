@@ -133,8 +133,9 @@ type VM struct {
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
 
-	stateSyncDone utils.Atomic[bool]
-
+	// latestBackfilledBlock track the latest post fork block
+	// indexed via block backfilling. Will be ids.Empty if proposerVM
+	// fork is not active
 	latestBackfilledBlock ids.ID
 }
 
@@ -221,7 +222,7 @@ func (vm *VM) Initialize(
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine, &vm.stateSyncDone)
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
 

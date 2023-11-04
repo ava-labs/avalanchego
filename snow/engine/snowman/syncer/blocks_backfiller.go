@@ -124,6 +124,13 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 		bb.Ctx.Log.Info("block backfilling done")
 		bb.Ctx.StateSyncing.Set(false)
 		return nil
+	case err == block.ErrInternalBlockBackfilling:
+		bb.Ctx.Log.Debug("internal error while backfilling blocks",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
+		return err
 	case err != nil:
 		bb.Ctx.Log.Debug("failed to backfill blocks in Ancestors",
 			zap.Stringer("nodeID", nodeID),

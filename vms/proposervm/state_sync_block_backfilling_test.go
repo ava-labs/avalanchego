@@ -24,10 +24,11 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func TestBlockBackfillEnabled(t *testing.T) {
+// Post Fork section
+func TestBlockBackfillEnabledPostFork(t *testing.T) {
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -51,40 +52,16 @@ func TestBlockBackfillEnabled(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proVMParentStateSummaryBlk, forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
 
-	// Block backfilling not enabled before state sync is accepted
 	ctx := context.Background()
-	_, _, err := vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
 	}
-	_, err = stateSummary.Accept(ctx)
+	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	// 2. Signal to the ProposerVM that state sync is done
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
-
-	// Block backfilling not enabled before innerVM declares state sync done
-	_, _, err = vm.BackfillBlocksEnabled(ctx)
-	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
-
-	// 3. Finally check that block backfilling is enabled looking at innerVM
+	// 2. Check that block backfilling is enabled looking at innerVM
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
 	}
@@ -105,22 +82,22 @@ func TestBlockBackfillEnabled(t *testing.T) {
 	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
 }
 
-func TestBlockBackfillSuccess(t *testing.T) {
+func TestBlockBackfillPostForkSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
 	var (
 		forkHeight     = uint64(100)
-		blkCount       = 10
+		blkCount       = 12
 		startBlkHeight = uint64(1492)
 
 		// create a list of consecutive blocks and build state summary of top of them
-		proBlks, innerBlks = createTestBlocks(t, vm, blkCount, startBlkHeight)
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
 
 		innerTopBlk        = innerBlks[len(innerBlks)-1]
 		proTopBlk          = proBlks[len(proBlks)-1]
@@ -140,7 +117,7 @@ func TestBlockBackfillSuccess(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
@@ -150,23 +127,9 @@ func TestBlockBackfillSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -219,11 +182,11 @@ func TestBlockBackfillSuccess(t *testing.T) {
 	}
 }
 
-func TestBlockBackfillPartialSuccess(t *testing.T) {
+func TestBlockBackfillPostForkPartialSuccess(t *testing.T) {
 	// setup VM with backfill enabled
 	require := require.New(t)
 	toEngineCh := make(chan common.Message)
-	innerVM, vm, fromInnerVMCh := setupBlockBackfillingVM(t, toEngineCh)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -234,7 +197,7 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 		startBlkHeight = uint64(1492)
 
 		// create a list of consecutive blocks and build state summary of top of them
-		proBlks, innerBlks = createTestBlocks(t, vm, blkCount, startBlkHeight)
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
 
 		innerTopBlk        = innerBlks[len(innerBlks)-1]
 		proTopBlk          = proBlks[len(proBlks)-1]
@@ -254,7 +217,7 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 		HeightV: innerSummary.Height(),
 		BytesV:  []byte("inner state synced block"),
 	}
-	stateSummary := createTestStateSummary(t, vm, proTopBlk.ID(), forkHeight, innerVM, innerSummary, innerStateSyncedBlk)
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
 
 	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
@@ -264,23 +227,9 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 	_, err := stateSummary.Accept(ctx)
 	require.NoError(err)
 
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerStateSyncedBlk.ID(), nil
-	}
-	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case innerStateSyncedBlk.ID():
-			return innerStateSyncedBlk, nil
-		default:
-			return nil, database.ErrNotFound
-		}
-	}
 	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
 		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
 	}
-
-	fromInnerVMCh <- common.StateSyncDone
-	<-toEngineCh
 
 	blkID, height, err := vm.BackfillBlocksEnabled(ctx)
 	require.NoError(err)
@@ -347,9 +296,632 @@ func TestBlockBackfillPartialSuccess(t *testing.T) {
 	}
 }
 
+// Across Fork section
+func TestBlockBackfillEnabledAcrossFork(t *testing.T) {
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	// 1. Accept a State summary
+	var (
+		forkHeight                 = uint64(50)
+		stateSummaryHeight         = forkHeight + 1
+		proVMParentStateSummaryBlk = ids.GenerateTestID()
+	)
+
+	innerSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: stateSummaryHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		HeightV: innerSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proVMParentStateSummaryBlk, innerVM, innerSummary, innerStateSyncedBlk)
+
+	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	// 2. Check that block backfilling is enabled looking at innerVM
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(proVMParentStateSummaryBlk, blkID)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+}
+
+func TestBlockBackfillAcrossForkSuccess(t *testing.T) {
+	// setup VM with backfill enabled
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	var (
+		forkHeight     = uint64(100)
+		blkCount       = 4
+		startBlkHeight = forkHeight - uint64(blkCount)/2
+
+		// create a list of consecutive blocks and build state summary of top of them
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
+
+		innerTopBlk        = innerBlks[len(innerBlks)-1]
+		proTopBlk          = proBlks[len(proBlks)-1]
+		stateSummaryHeight = innerTopBlk.Height() + 1
+	)
+
+	innerSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: stateSummaryHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		ParentV: innerTopBlk.ID(),
+		HeightV: innerSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
+
+	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(proTopBlk.ID(), blkID)
+
+	// Backfill some blocks
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if bytes.Equal(b, blk.Bytes()) {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if blkID == blk.ID() {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.BackfillBlocksF = func(_ context.Context, b [][]byte) (ids.ID, uint64, error) {
+		lowestblk := innerBlks[0]
+		for _, blk := range innerBlks {
+			if blk.Height() < lowestblk.Height() {
+				lowestblk = blk
+			}
+		}
+		return lowestblk.Parent(), lowestblk.Height() - 1, nil
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		for _, blk := range innerBlks {
+			if height == blk.Height() {
+				return blk.ID(), nil
+			}
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+
+	blkBytes := make([][]byte, 0, len(proBlks))
+	for _, blk := range proBlks {
+		blkBytes = append(blkBytes, blk.Bytes())
+	}
+	nextBlkID, nextBlkHeight, err := vm.BackfillBlocks(ctx, blkBytes)
+	require.NoError(err)
+	require.Equal(proBlks[0].Parent(), nextBlkID)
+	require.Equal(proBlks[0].Height()-1, nextBlkHeight)
+
+	// check proBlocks have been indexed
+	for _, blk := range proBlks {
+		blkID, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+		require.NoError(err)
+		require.Equal(blk.ID(), blkID)
+
+		_, err = vm.GetBlock(ctx, blkID)
+		require.NoError(err)
+	}
+}
+
+func TestBlockBackfillAcrossForkPartialSuccess(t *testing.T) {
+	// setup VM with backfill enabled
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	var (
+		forkHeight     = uint64(100)
+		blkCount       = 8
+		startBlkHeight = forkHeight - uint64(blkCount)/2
+
+		// simulate that the bottom [idxFailure] blocks will fail
+		// being pushed in innerVM
+		idxFailure = 3
+
+		// create a list of consecutive blocks and build state summary of top of them
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
+
+		innerTopBlk        = innerBlks[len(innerBlks)-1]
+		proTopBlk          = proBlks[len(proBlks)-1]
+		stateSummaryHeight = innerTopBlk.Height() + 1
+	)
+
+	innerSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: stateSummaryHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		ParentV: innerTopBlk.ID(),
+		HeightV: innerSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+	stateSummary := createPostForkStateSummary(t, vm, forkHeight, proTopBlk.ID(), innerVM, innerSummary, innerStateSyncedBlk)
+
+	innerSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+
+	blkID, height, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(proTopBlk.ID(), blkID)
+	require.Equal(proTopBlk.Height(), height)
+
+	// Backfill some blocks
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if bytes.Equal(b, blk.Bytes()) {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+
+	// simulate that lower half of backfilled blocks won't be accepted by innerVM
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if blkID != blk.ID() {
+				continue
+			}
+			// if it's one of the lower half blocks, assume it's not stored
+			// since it was rejected
+			if blk.Height() <= innerBlks[idxFailure].Height() {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		for _, blk := range innerBlks {
+			if height != blk.Height() {
+				continue
+			}
+			// if it's one of the lower half blocks, assume it's not stored
+			// since it was rejected
+			if blk.Height() <= innerBlks[idxFailure].Height() {
+				return ids.Empty, database.ErrNotFound
+			}
+			return blk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+
+	innerVM.BackfillBlocksF = func(_ context.Context, b [][]byte) (ids.ID, uint64, error) {
+		// assume lowest half blocks fails verification
+		return innerBlks[idxFailure].ID(), innerBlks[idxFailure].Height(), nil
+	}
+
+	blkBytes := make([][]byte, 0, len(proBlks))
+	for _, blk := range proBlks {
+		blkBytes = append(blkBytes, blk.Bytes())
+	}
+	nextBlkID, nextBlkHeight, err := vm.BackfillBlocks(ctx, blkBytes)
+	require.NoError(err)
+	require.Equal(proBlks[idxFailure].ID(), nextBlkID)
+	require.Equal(proBlks[idxFailure].Height(), nextBlkHeight)
+
+	// check only upper half of blocks have been indexed
+	for i, blk := range proBlks {
+		if i <= idxFailure {
+			_, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+			require.ErrorIs(err, database.ErrNotFound)
+
+			_, err = vm.GetBlock(ctx, blk.ID())
+			require.ErrorIs(err, database.ErrNotFound)
+		} else {
+			blkID, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+			require.NoError(err)
+			require.Equal(blk.ID(), blkID)
+
+			_, err = vm.GetBlock(ctx, blkID)
+			require.NoError(err)
+		}
+	}
+}
+
+// Pre Fork section
+func TestBlockBackfillEnabledPreFork(t *testing.T) {
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	// 1. Accept a State summary
+	stateSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: 100,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		HeightV: stateSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+
+	stateSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	// 2. Check that block backfilling is enabled looking at innerVM
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+
+	innerVM.BackfillBlocksEnabledF = func(_ context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		if height == innerStateSyncedBlk.Height() {
+			return innerStateSyncedBlk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(innerStateSyncedBlk.Parent(), blkID)
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+	}
+	_, _, err = vm.BackfillBlocksEnabled(ctx)
+	require.ErrorIs(err, block.ErrBlockBackfillingNotEnabled)
+}
+
+func TestBlockBackfillPreForkSuccess(t *testing.T) {
+	// setup VM with backfill enabled
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	var (
+		forkHeight     = uint64(2000)
+		blkCount       = 8
+		startBlkHeight = uint64(100)
+
+		// create a list of consecutive blocks and build state summary of top of them
+		// proBlks should all be preForkBlocks
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
+
+		innerTopBlk        = innerBlks[len(innerBlks)-1]
+		preForkTopBlk      = proBlks[len(proBlks)-1]
+		stateSummaryHeight = innerTopBlk.Height() + 1
+	)
+
+	stateSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: stateSummaryHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		ParentV: innerTopBlk.ID(),
+		HeightV: stateSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+	stateSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerStateSyncedBlk.ID(), nil
+	}
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case innerStateSyncedBlk.ID():
+			return innerStateSyncedBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		if height == innerStateSyncedBlk.Height() {
+			return innerStateSyncedBlk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(preForkTopBlk.ID(), blkID)
+
+	// Backfill some blocks
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if bytes.Equal(b, blk.Bytes()) {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if blkID == blk.ID() {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		for _, blk := range innerBlks {
+			if height == blk.Height() {
+				return blk.ID(), nil
+			}
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+	innerVM.BackfillBlocksF = func(_ context.Context, b [][]byte) (ids.ID, uint64, error) {
+		lowestblk := innerBlks[0]
+		for _, blk := range innerBlks {
+			if blk.Height() < lowestblk.Height() {
+				lowestblk = blk
+			}
+		}
+		return lowestblk.Parent(), lowestblk.Height() - 1, nil
+	}
+
+	blkBytes := make([][]byte, 0, len(proBlks))
+	for _, blk := range proBlks {
+		blkBytes = append(blkBytes, blk.Bytes())
+	}
+	nextBlkID, nextBlkHeight, err := vm.BackfillBlocks(ctx, blkBytes)
+	require.NoError(err)
+	require.Equal(proBlks[0].Parent(), nextBlkID)
+	require.Equal(proBlks[0].Height()-1, nextBlkHeight)
+
+	// check proBlocks have been indexed
+	for _, blk := range proBlks {
+		blkID, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+		require.NoError(err)
+		require.Equal(blk.ID(), blkID)
+
+		_, err = vm.GetBlock(ctx, blkID)
+		require.NoError(err)
+	}
+}
+
+func TestBlockBackfillPreForkPartialSuccess(t *testing.T) {
+	// setup VM with backfill enabled
+	require := require.New(t)
+	toEngineCh := make(chan common.Message)
+	innerVM, vm := setupBlockBackfillingVM(t, toEngineCh)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	var (
+		forkHeight     = uint64(2000)
+		blkCount       = 10
+		startBlkHeight = uint64(100)
+
+		// create a list of consecutive blocks and build state summary of top of them
+		// proBlks should all be preForkBlocks
+		proBlks, innerBlks = createTestBlocks(t, vm, forkHeight, blkCount, startBlkHeight)
+
+		innerTopBlk        = innerBlks[len(innerBlks)-1]
+		preForkTopBlk      = proBlks[len(proBlks)-1]
+		stateSummaryHeight = innerTopBlk.Height() + 1
+	)
+
+	stateSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: stateSummaryHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+	innerStateSyncedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'S', 'y', 'n', 'c', 'e', 'd'},
+		},
+		ParentV: innerTopBlk.ID(),
+		HeightV: stateSummary.Height(),
+		BytesV:  []byte("inner state synced block"),
+	}
+	stateSummary.AcceptF = func(ctx context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	ctx := context.Background()
+	_, err := stateSummary.Accept(ctx)
+	require.NoError(err)
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerStateSyncedBlk.ID(), nil
+	}
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case innerStateSyncedBlk.ID():
+			return innerStateSyncedBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	innerVM.BackfillBlocksEnabledF = func(ctx context.Context) (ids.ID, uint64, error) {
+		return innerStateSyncedBlk.ID(), innerStateSyncedBlk.Height() - 1, nil
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		if height == innerStateSyncedBlk.Height() {
+			return innerStateSyncedBlk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+
+	blkID, _, err := vm.BackfillBlocksEnabled(ctx)
+	require.NoError(err)
+	require.Equal(preForkTopBlk.ID(), blkID)
+
+	// Backfill some blocks
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if bytes.Equal(b, blk.Bytes()) {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	// simulate that lower half of backfilled blocks won't be accepted by innerVM
+	idx := len(innerBlks) / 2
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range innerBlks {
+			if blkID != blk.ID() {
+				continue
+			}
+			// if it's one of the lower half blocks, assume it's not stored
+			// since it was rejected
+			if blk.Height() <= innerBlks[idx].Height() {
+				return nil, database.ErrNotFound
+			}
+			return blk, nil
+		}
+		return nil, database.ErrNotFound
+	}
+	innerVM.GetBlockIDAtHeightF = func(ctx context.Context, height uint64) (ids.ID, error) {
+		for _, blk := range innerBlks {
+			if height != blk.Height() {
+				continue
+			}
+			// if it's one of the lower half blocks, assume it's not stored
+			// since it was rejected
+			if blk.Height() <= innerBlks[idx].Height() {
+				return ids.Empty, database.ErrNotFound
+			}
+			return blk.ID(), nil
+		}
+		return ids.Empty, database.ErrNotFound
+	}
+	innerVM.BackfillBlocksF = func(_ context.Context, b [][]byte) (ids.ID, uint64, error) {
+		// assume lowest half blocks fails verification
+		return innerBlks[idx].ID(), innerBlks[idx].Height(), nil
+	}
+
+	blkBytes := make([][]byte, 0, len(proBlks))
+	for _, blk := range proBlks {
+		blkBytes = append(blkBytes, blk.Bytes())
+	}
+	nextBlkID, nextBlkHeight, err := vm.BackfillBlocks(ctx, blkBytes)
+	require.NoError(err)
+	require.Equal(proBlks[idx].ID(), nextBlkID)
+	require.Equal(proBlks[idx].Height(), nextBlkHeight)
+
+	// check only upper half of blocks have been indexed
+	for i, blk := range proBlks {
+		if i <= idx {
+			_, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+			require.ErrorIs(err, database.ErrNotFound)
+
+			_, err = vm.GetBlock(ctx, blk.ID())
+			require.ErrorIs(err, database.ErrNotFound)
+		} else {
+			blkID, err := vm.GetBlockIDAtHeight(ctx, blk.Height())
+			require.NoError(err)
+			require.Equal(blk.ID(), blkID)
+
+			_, err = vm.GetBlock(ctx, blkID)
+			require.NoError(err)
+		}
+	}
+}
+
 func createTestBlocks(
 	t *testing.T,
 	vm *VM,
+	forkHeight uint64,
 	blkCount int,
 	startBlkHeight uint64,
 ) (
@@ -359,15 +931,16 @@ func createTestBlocks(
 	require := require.New(t)
 	var (
 		latestInnerBlkID = ids.GenerateTestID()
-		latestProBlkID   = ids.GenerateTestID()
 
 		dummyBlkTime      = time.Now()
-		dummyPChainHeight = uint64(1492)
+		dummyPChainHeight = startBlkHeight / 2
 
 		innerBlks = make([]snowman.Block, 0, blkCount)
 		proBlks   = make([]snowman.Block, 0, blkCount)
 	)
 	for idx := 0; idx < blkCount; idx++ {
+		blkHeight := startBlkHeight + uint64(idx)
+
 		rndBytes := ids.GenerateTestID()
 		innerBlkTop := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -381,41 +954,53 @@ func createTestBlocks(
 		latestInnerBlkID = innerBlkTop.ID()
 		innerBlks = append(innerBlks, innerBlkTop)
 
-		statelessChild, err := statelessblock.BuildUnsigned(
-			latestProBlkID,
-			dummyBlkTime,
-			dummyPChainHeight,
-			innerBlkTop.Bytes(),
-		)
-		require.NoError(err)
-		proBlkTop := &postForkBlock{
-			SignedBlock: statelessChild,
-			postForkCommonComponents: postForkCommonComponents{
-				vm:       vm,
-				innerBlk: innerBlkTop,
-				status:   choices.Processing,
-			},
+		if blkHeight < forkHeight {
+			proBlks = append(proBlks, &preForkBlock{
+				vm:    vm,
+				Block: innerBlkTop,
+			})
+		} else {
+			latestProBlkID := ids.GenerateTestID()
+			if len(proBlks) != 0 {
+				latestProBlkID = proBlks[len(proBlks)-1].ID()
+			}
+			statelessChild, err := statelessblock.BuildUnsigned(
+				latestProBlkID,
+				dummyBlkTime,
+				dummyPChainHeight,
+				innerBlkTop.Bytes(),
+			)
+			require.NoError(err)
+			proBlkTop := &postForkBlock{
+				SignedBlock: statelessChild,
+				postForkCommonComponents: postForkCommonComponents{
+					vm:       vm,
+					innerBlk: innerBlkTop,
+					status:   choices.Processing,
+				},
+			}
+			proBlks = append(proBlks, proBlkTop)
 		}
-		latestProBlkID = proBlkTop.ID()
-		proBlks = append(proBlks, proBlkTop)
 	}
 	return proBlks, innerBlks
 }
 
-func createTestStateSummary(
+func createPostForkStateSummary(
 	t *testing.T,
 	vm *VM,
-	proVMParentStateSummaryBlk ids.ID,
 	forkHeight uint64,
+	proVMParentStateSummaryBlk ids.ID,
 	innerVM *fullVM,
 	innerSummary *block.TestStateSummary,
 	innerBlk *snowman.TestBlock,
 ) block.StateSummary {
 	require := require.New(t)
+
+	pchainHeight := innerBlk.Height() / 2
 	slb, err := statelessblock.Build(
 		proVMParentStateSummaryBlk,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		pchainHeight,
 		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -446,7 +1031,6 @@ func setupBlockBackfillingVM(
 ) (
 	*fullVM,
 	*VM,
-	chan<- common.Message,
 ) {
 	require := require.New(t)
 
@@ -475,12 +1059,10 @@ func setupBlockBackfillingVM(
 		BytesV:  []byte("genesis state"),
 	}
 
-	toProVMChannel := make(chan<- common.Message)
 	innerVM.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database,
 		_ []byte, _ []byte, _ []byte, ch chan<- common.Message,
 		_ []*common.Fx, _ common.AppSender,
 	) error {
-		toProVMChannel = ch
 		return nil
 	}
 	innerVM.VerifyHeightIndexF = func(context.Context) error {
@@ -519,5 +1101,5 @@ func setupBlockBackfillingVM(
 		nil,
 	))
 
-	return innerVM, vm, toProVMChannel
+	return innerVM, vm
 }

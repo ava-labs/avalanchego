@@ -117,6 +117,16 @@ func newTransitive(config Config) (*Transitive, error) {
 		config.Params.AlphaPreference,
 		config.Params.AlphaConfidence,
 	)
+	polls, err := poll.NewSet(
+		factory,
+		config.Ctx.Log,
+		"",
+		config.Ctx.Registerer,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	t := &Transitive{
 		Config:                      config,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -128,12 +138,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
-		polls: poll.NewSet(
-			factory,
-			config.Ctx.Log,
-			"",
-			config.Ctx.Registerer,
-		),
+		polls:                       polls,
 	}
 	t.BlockBackfiller = syncer.NewBlockBackfiller(
 		syncer.BlockBackfillerConfig{
