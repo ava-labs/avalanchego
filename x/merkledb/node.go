@@ -11,7 +11,26 @@ import (
 
 const HashLength = 32
 
+type node struct {
+	hasValue bool
+	children nodeChildren
+}
 type nodeChildren map[byte]*child
+
+func newNode(size int) *node {
+	return &node{
+		children: make(nodeChildren, size),
+	}
+}
+
+func (n *node) clone() *node {
+	result := newNode(len(n.children))
+	result.hasValue = n.hasValue
+	for key, childEntry := range n.children {
+		result.children[key] = &child{id: childEntry.id, compressedKey: childEntry.compressedKey}
+	}
+	return result
+}
 
 type child struct {
 	compressedKey Key

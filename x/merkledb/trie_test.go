@@ -87,7 +87,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie := trieIntf.(*trieView)
 
 	var keys []Key
-	require.NoError(trie.visitPathToKey(ToKey(nil), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(nil), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -112,7 +112,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key1), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key1), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -138,7 +138,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -163,7 +163,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key3), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key3), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -174,7 +174,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 
 	// Other key path not affected
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -186,7 +186,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key4), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key4), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -199,7 +199,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
 	keys = []Key{}
-	require.NoError(trie.visitPathToKey(ToKey(key5), func(key Key, n nodeChildren) error {
+	require.NoError(trie.visitPathToKey(ToKey(key5), func(key Key, _ *node) error {
 		keys = append(keys, key)
 		return nil
 	}))
@@ -582,7 +582,7 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// Make sure the branch node with the common prefix was created.
 	// Note it's only created on call to GetMerkleRoot, not in NewView.
-	_, err = view2.getChildren(ToKey(keyPrefix))
+	_, err = view2.getNode(ToKey(keyPrefix))
 	require.NoError(err)
 
 	// only hashes the new branch node, the new child node, and root
@@ -723,9 +723,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getChildren(Key{})
+	root, err := newTrie.getNode(Key{})
 	require.NoError(err)
-	require.Len(root, 1)
+	require.Len(root.children, 1)
 
 	newTrie, err = newTrie.NewView(
 		context.Background(),
@@ -740,10 +740,10 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getChildren(Key{})
+	root, err = newTrie.getNode(Key{})
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
-	require.Empty(root)
+	require.Empty(root.children)
 }
 
 func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
@@ -805,17 +805,17 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getChildren(Key{})
+	root, err := trie.getNode(Key{})
 	require.NoError(err)
-	require.Len(root, 1)
+	require.Len(root.children, 1)
 
-	root, err = trie.getChildren(Key{})
+	root, err = trie.getNode(Key{})
 	require.NoError(err)
-	require.Len(root, 1)
+	require.Len(root.children, 1)
 
-	firstNode, err := trie.getChildren(getSingleChildKey(Key{}, root, dbTrie.tokenSize))
+	firstNode, err := trie.getNode(getSingleChildKey(Key{}, root.children, dbTrie.tokenSize))
 	require.NoError(err)
-	require.Len(firstNode, 1)
+	require.Len(firstNode.children, 1)
 
 	// delete the middle values
 	trie, err = trie.NewView(
@@ -831,13 +831,13 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getChildren(Key{})
+	root, err = trie.getNode(Key{})
 	require.NoError(err)
-	require.Len(root, 1)
+	require.Len(root.children, 1)
 
-	firstNode, err = trie.getChildren(getSingleChildKey(Key{}, root, dbTrie.tokenSize))
+	firstNode, err = trie.getNode(getSingleChildKey(Key{}, root.children, dbTrie.tokenSize))
 	require.NoError(err)
-	require.Len(firstNode, 2)
+	require.Len(firstNode.children, 2)
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {

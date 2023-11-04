@@ -4,9 +4,8 @@
 package merkledb
 
 import (
-	"sync"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -31,7 +30,6 @@ type merkleMetrics interface {
 }
 
 type mockMetrics struct {
-	lock                      sync.Mutex
 	keyReadCount              int64
 	keyWriteCount             int64
 	hashCount                 int64
@@ -46,80 +44,47 @@ type mockMetrics struct {
 }
 
 func (m *mockMetrics) HashCalculated() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.hashCount++
+	atomic.AddInt64(&m.hashCount, 1)
 }
 
 func (m *mockMetrics) DatabaseNodeRead() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.keyReadCount++
+	atomic.AddInt64(&m.keyReadCount, 1)
 }
 
 func (m *mockMetrics) DatabaseNodeWrite() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.keyWriteCount++
+	atomic.AddInt64(&m.keyWriteCount, 1)
 }
 
 func (m *mockMetrics) ViewNodeCacheHit() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.viewNodeCacheHit++
+	atomic.AddInt64(&m.viewNodeCacheHit, 1)
 }
 
 func (m *mockMetrics) ViewValueCacheHit() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.viewValueCacheHit++
+	atomic.AddInt64(&m.viewValueCacheHit, 1)
 }
 
 func (m *mockMetrics) ViewNodeCacheMiss() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.viewNodeCacheMiss++
+	atomic.AddInt64(&m.viewNodeCacheMiss, 1)
 }
 
 func (m *mockMetrics) ViewValueCacheMiss() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.viewValueCacheMiss++
+	atomic.AddInt64(&m.viewValueCacheMiss, 1)
 }
 
 func (m *mockMetrics) ValueNodeCacheHit() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.valueNodeCacheHit++
+	atomic.AddInt64(&m.valueNodeCacheHit, 1)
 }
 
 func (m *mockMetrics) ValueNodeCacheMiss() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.valueNodeCacheMiss++
+	atomic.AddInt64(&m.valueNodeCacheMiss, 1)
 }
 
 func (m *mockMetrics) IntermediateNodeCacheHit() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.intermediateNodeCacheHit++
+	atomic.AddInt64(&m.intermediateNodeCacheHit, 1)
 }
 
 func (m *mockMetrics) IntermediateNodeCacheMiss() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.intermediateNodeCacheMiss++
+	atomic.AddInt64(&m.intermediateNodeCacheMiss, 1)
 }
 
 type metrics struct {

@@ -95,20 +95,21 @@ var valueToInsert = initiateValues(make([]database.BatchOp, 150000), 0)
 func Test_Insert(t *testing.T) {
 	require := require.New(t)
 
+	db, err := newDatabase(
+		context.Background(),
+		memdb.New(),
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
 	for i := 0; i < 10; i++ {
-		db, err := newDatabase(
-			context.Background(),
-			memdb.New(),
-			newDefaultConfig(),
-			&mockMetrics{},
-		)
 		require.NoError(err)
 		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: valueToInsert, ConsumeBytes: true})
 		require.NoError(err)
 		_, err = view.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		require.NoError(db.Close())
 	}
+
+	require.NoError(db.Close())
 }
 
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {

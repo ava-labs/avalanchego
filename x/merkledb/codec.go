@@ -60,8 +60,8 @@ type encoderDecoder interface {
 
 type encoder interface {
 	// Assumes [n] is non-nil.
-	encodeChildren(n nodeChildren) []byte
-	childrenSize(n nodeChildren) int
+	encodeNode(n *node) []byte
+	nodeSize(n *node) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
@@ -70,7 +70,7 @@ type encoder interface {
 
 type decoder interface {
 	// Assumes [n] is non-nil.
-	decodeChildren(bytes []byte) (nodeChildren, error)
+	decodeNode(bytes []byte) (*node, error)
 }
 
 func newCodec() encoderDecoder {
@@ -91,25 +91,32 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) childrenSize(n nodeChildren) int {
-	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n)
+func (c *codecImpl) nodeSize(n *node) int {
+	if n == nil {
+		return 1
+	}
+	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n.children) + 1
 }
 
-func (c *codecImpl) encodeChildren(n nodeChildren) []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, c.childrenSize(n)))
+func (c *codecImpl) encodeNode(n *node) []byte {
+	buf := bytes.NewBuffer(make([]byte, 0, c.nodeSize(n)))
+	c.encodeBool(buf, n.hasValue)
+	c.encodeChildren(buf, n.children)
+	return buf.Bytes()
+}
 
-	c.encodeUint(buf, uint64(len(n)))
+func (c *codecImpl) encodeChildren(dst *bytes.Buffer, n nodeChildren) {
+	c.encodeUint(dst, uint64(len(n)))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	keys := maps.Keys(n)
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n[index]
-		c.encodeUint(buf, uint64(index))
-		c.encodeKey(buf, entry.compressedKey)
-		_, _ = buf.Write(entry.id[:])
+		c.encodeUint(dst, uint64(index))
+		c.encodeKey(dst, entry.compressedKey)
+		_, _ = dst.Write(entry.id[:])
 	}
-	return buf.Bytes()
 }
 
 func (c *codecImpl) encodeHashValues(key Key, n nodeChildren, value maybe.Maybe[[]byte]) []byte {
@@ -136,9 +143,10 @@ func (c *codecImpl) encodeHashValues(key Key, n nodeChildren, value maybe.Maybe[
 	return buf.Bytes()
 }
 
-func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
+func (c *codecImpl) decodeNode(b []byte) (*node, error) {
 	src := bytes.NewReader(b)
 
+	hasValue, err := c.decodeBool(src)
 	numChildren, err := c.decodeUint(src)
 	switch {
 	case err != nil:
@@ -146,7 +154,8 @@ func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 	case numChildren > uint64(src.Len()/minChildLen):
 		return nil, io.ErrUnexpectedEOF
 	}
-	n := make(nodeChildren, numChildren)
+	n := newNode(int(numChildren))
+	n.hasValue = hasValue
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
@@ -166,7 +175,7 @@ func (c *codecImpl) decodeChildren(b []byte) (nodeChildren, error) {
 		if err != nil {
 			return nil, err
 		}
-		n[byte(index)] = &child{
+		n.children[byte(index)] = &child{
 			compressedKey: compressedKey,
 			id:            childID,
 		}

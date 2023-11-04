@@ -98,7 +98,7 @@ func (db *valueDB) Get(key Key) (maybe.Maybe[[]byte], error) {
 		result = maybe.Some(val)
 	}
 
-	db.nodeCache.Put(key, result)
+	//	db.nodeCache.Put(key, result)
 	return result, nil
 }
 

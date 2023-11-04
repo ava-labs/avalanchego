@@ -195,7 +195,7 @@ type merkleDB struct {
 	infoTracer  trace.Tracer
 
 	// The root of this trie.
-	root   nodeChildren
+	root   *node
 	rootID ids.ID
 
 	// Valid children of this trie.
@@ -286,7 +286,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = make(nodeChildren)
+	db.root = newNode(int(sizeToBf[db.tokenSize]))
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -468,7 +468,7 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	return view.visitPathToKey(ToKey(keyBytes), func(key Key, n nodeChildren) error {
+	return view.visitPathToKey(ToKey(keyBytes), func(key Key, n *node) error {
 		return db.nodeDB.Put(key, n)
 	})
 }
@@ -913,17 +913,17 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// move any child views of the committed trie onto the db
 	db.moveChildViewsToDB(trieToCommit)
 
-	if len(trieToCommit.children) == 0 {
+	if len(trieToCommit.nodes) == 0 {
 		return nil
 	}
 
-	rootChange, ok := trieToCommit.children[Key{}]
+	rootChange, ok := trieToCommit.nodes[Key{}]
 	if !ok {
 		return errNoNewRoot
 	}
 
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
-	for key, nodeChange := range trieToCommit.children {
+	for key, nodeChange := range trieToCommit.nodes {
 		if nodeChange != nil {
 			if err := db.nodeDB.Put(key, nodeChange); err != nil {
 				nodesSpan.End()
@@ -1141,7 +1141,6 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-
 	val, err := db.valueDB.Get(Key{})
 	if err != nil {
 		return ids.Empty, nil
@@ -1152,13 +1151,13 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 			return ids.Empty, err
 		}
 		// Root doesn't exist; make a new one.
-		db.root = make(nodeChildren)
+		db.root = &node{children: make(nodeChildren), hasValue: val.HasValue()}
 		if err := db.nodeDB.Put(Key{}, db.root); err != nil {
 			return ids.Empty, err
 		}
 	}
 
-	db.rootID = calculateID(Key{}, db.metrics, db.root, val)
+	db.rootID = calculateID(Key{}, db.metrics, db.root.children, val)
 	return db.rootID, nil
 }
 
@@ -1215,15 +1214,15 @@ func (db *merkleDB) getKeysNotInSet(start, end maybe.Maybe[[]byte], keySet set.S
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getChildren(key Key) (nodeChildren, error) {
+func (db *merkleDB) getNode(key Key) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	n, err := db.getChildrenInternal(key)
+	n, err := db.getNodeInternal(key)
 	if err != nil {
 		return nil, err
 	}
-	return maps.Clone(n), nil
+	return n.clone(), nil
 }
 
 // Returns the node with the given [key].
@@ -1231,7 +1230,7 @@ func (db *merkleDB) getChildren(key Key) (nodeChildren, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getChildrenInternal(key Key) (nodeChildren, error) {
+func (db *merkleDB) getNodeInternal(key Key) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed

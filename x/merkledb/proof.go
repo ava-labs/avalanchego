@@ -824,7 +824,7 @@ func addPathInfo(
 			return err
 		}
 		// load the node associated with the key or create a new one
-		n, err := t.insert(key, proofNode.ValueOrHash)
+		n, err := t.insert(key)
 		if err != nil {
 			return err
 		}
@@ -838,7 +838,7 @@ func addPathInfo(
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
 		compressedPath := Key{}
 		for index, childID := range proofNode.Children {
-			if existingChild, ok := n[index]; ok {
+			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedKey
 			}
 			childPath := key.Extend(ToToken(index, t.tokenSize), compressedPath)
@@ -846,7 +846,7 @@ func addPathInfo(
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
 				// We only need the IDs to be correct so that the calculated hash is correct.
-				n[index] = &child{
+				n.children[index] = &child{
 					id:            childID,
 					compressedKey: compressedPath,
 				}
