@@ -224,11 +224,19 @@ func (a *Admin) Stacktrace(_ *http.Request, _ *struct{}, _ *api.EmptyReply) erro
 	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
 }
 
-// See SetLoggerLevel
 type SetLoggerLevelArgs struct {
 	LoggerName   string         `json:"loggerName"`
 	LogLevel     *logging.Level `json:"logLevel"`
 	DisplayLevel *logging.Level `json:"displayLevel"`
+}
+
+type LogAndDisplayLevels struct {
+	LogLevel     logging.Level `json:"logLevel"`
+	DisplayLevel logging.Level `json:"displayLevel"`
+}
+
+type LoggerLevelReply struct {
+	LoggerLevels map[string]LogAndDisplayLevels `json:"loggerLevels"`
 }
 
 // SetLoggerLevel sets the log level and/or display level for loggers.
@@ -240,7 +248,7 @@ type SetLoggerLevelArgs struct {
 // Sets the display level of these loggers to args.LogLevel.
 // If args.DisplayLevel == nil, doesn't set the display level of these loggers.
 // If args.DisplayLevel != nil, must be a valid string representation of a log level.
-func (a *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, _ *api.EmptyReply) error {
+func (a *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *LoggerLevelReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "setLoggerLevel"),
@@ -256,14 +264,7 @@ func (a *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, _ *api
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	var loggerNames []string
-	if len(args.LoggerName) > 0 {
-		loggerNames = []string{args.LoggerName}
-	} else {
-		// Empty name means all loggers
-		loggerNames = a.LogFactory.GetLoggerNames()
-	}
-
+	loggerNames := a.getLoggerNames(args.LoggerName)
 	for _, name := range loggerNames {
 		if args.LogLevel != nil {
 			if err := a.LogFactory.SetLogLevel(name, *args.LogLevel); err != nil {
@@ -276,26 +277,18 @@ func (a *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, _ *api
 			}
 		}
 	}
-	return nil
+
+	var err error
+	reply.LoggerLevels, err = a.getLogLevels(loggerNames)
+	return err
 }
 
-type LogAndDisplayLevels struct {
-	LogLevel     logging.Level `json:"logLevel"`
-	DisplayLevel logging.Level `json:"displayLevel"`
-}
-
-// See GetLoggerLevel
 type GetLoggerLevelArgs struct {
 	LoggerName string `json:"loggerName"`
 }
 
-// See GetLoggerLevel
-type GetLoggerLevelReply struct {
-	LoggerLevels map[string]LogAndDisplayLevels `json:"loggerLevels"`
-}
-
 // GetLogLevel returns the log level and display level of all loggers.
-func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
+func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *LoggerLevelReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "getLoggerLevels"),
@@ -305,30 +298,11 @@ func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	reply.LoggerLevels = make(map[string]LogAndDisplayLevels)
-	var loggerNames []string
-	// Empty name means all loggers
-	if len(args.LoggerName) > 0 {
-		loggerNames = []string{args.LoggerName}
-	} else {
-		loggerNames = a.LogFactory.GetLoggerNames()
-	}
+	loggerNames := a.getLoggerNames(args.LoggerName)
 
-	for _, name := range loggerNames {
-		logLevel, err := a.LogFactory.GetLogLevel(name)
-		if err != nil {
-			return err
-		}
-		displayLevel, err := a.LogFactory.GetDisplayLevel(name)
-		if err != nil {
-			return err
-		}
-		reply.LoggerLevels[name] = LogAndDisplayLevels{
-			LogLevel:     logLevel,
-			DisplayLevel: displayLevel,
-		}
-	}
-	return nil
+	var err error
+	reply.LoggerLevels, err = a.getLogLevels(loggerNames)
+	return err
 }
 
 // GetConfig returns the config that the node was started with.
@@ -374,4 +348,31 @@ func (a *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error
 	reply.FailedVMs = failedVMsParsed
 	reply.NewVMs, err = ids.GetRelevantAliases(a.VMManager, loadedVMs)
 	return err
+}
+
+func (a *Admin) getLoggerNames(loggerName string) []string {
+	if len(loggerName) == 0 {
+		// Empty name means all loggers
+		return a.LogFactory.GetLoggerNames()
+	}
+	return []string{loggerName}
+}
+
+func (a *Admin) getLogLevels(loggerNames []string) (map[string]LogAndDisplayLevels, error) {
+	loggerLevels := make(map[string]LogAndDisplayLevels)
+	for _, name := range loggerNames {
+		logLevel, err := a.LogFactory.GetLogLevel(name)
+		if err != nil {
+			return nil, err
+		}
+		displayLevel, err := a.LogFactory.GetDisplayLevel(name)
+		if err != nil {
+			return nil, err
+		}
+		loggerLevels[name] = LogAndDisplayLevels{
+			LogLevel:     logLevel,
+			DisplayLevel: displayLevel,
+		}
+	}
+	return loggerLevels, nil
 }
