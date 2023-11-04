@@ -14,6 +14,7 @@ var (
 	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 	ErrBlockBackfillingNotEnabled    = errors.New("vm does not require block backfilling")
 	ErrStopBlockBackfilling          = errors.New("vm required stopping block backfilling")
+	ErrInternalBlockBackfilling      = errors.New("block backfilling internal error")
 )
 
 // StateSyncableVM contains the functionality to allow VMs to sync to a given
@@ -62,6 +63,7 @@ type StateSyncableVM interface {
 	// BackfillBlocks returns the next block ID to be requested and an error
 	// Returns the ID and height of the block it wants to start backfilling from.
 	// Returns [ErrStopBlockBackfilling] if VM has done backfilling; engine will stop requesting blocks.
+	// Returns [ErrInternalBlockBackfilling] if VM has erred in a way that should make block backfilling fail.
 	// If BackfillBlocks returns any other error, engine will issue a GetAncestor call to a different peer
 	// with the previously requested block ID
 	BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error)
