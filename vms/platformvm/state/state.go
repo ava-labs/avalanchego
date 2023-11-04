@@ -1667,15 +1667,15 @@ func (s *state) initValidatorSets() error {
 		}
 
 		for nodeID, validator := range validators {
-			staker := validator.validator
-			if err := s.cfg.Validators.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+			validatorStaker := validator.validator
+			if err := s.cfg.Validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
 				return err
 			}
 
 			delegatorIterator := NewTreeIterator(validator.delegators)
 			for delegatorIterator.Next() {
-				staker := delegatorIterator.Value()
-				if err := s.cfg.Validators.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
+				delegatorStaker := delegatorIterator.Value()
+				if err := s.cfg.Validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
 					delegatorIterator.Release()
 					return err
 				}
