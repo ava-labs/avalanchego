@@ -7,14 +7,22 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/interfaces"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
@@ -126,6 +134,7 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          nodeURI.URI,
 		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
 	})
 	te.require.NoError(err)
 	return primary.NewWalletWithOptions(
@@ -136,6 +145,17 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 			},
 		),
 	)
+}
+
+// Create a new eth client targeting the specified node URI.
+// TODO(marun) Make this a regular function.
+func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
+	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	client, err := ethclient.Dial(uri)
+	te.require.NoError(err)
+	return client
 }
 
 // Create a new private network that is not shared with other tests.
@@ -209,6 +229,50 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 // Wait for the given node to report healthy.
 func WaitForHealthy(node testnet.Node) {
 	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(DefaultContext(), node))
+}
+
+// Sends an eth transaction, waits for the transaction receipt to be issued
+// and checks that the receipt indicates success.
+func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+	require := require.New(ginkgo.GinkgoT())
+
+	txID := signedTx.Hash()
+	tests.Outf(" sending eth transaction with ID: %s\n", txID)
+
+	require.NoError(ethClient.SendTransaction(DefaultContext(), signedTx))
+
+	// Wait for the receipt
+	var receipt *types.Receipt
+	Eventually(func() bool {
+		var err error
+		receipt, err = ethClient.TransactionReceipt(DefaultContext(), txID)
+		if errors.Is(err, interfaces.NotFound) {
+			return false // Transaction is still pending
+		}
+		require.NoError(err)
+		return true
+	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
+
+	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	return receipt
+}
+
+// Determines the suggested gas price for the configured client that will
+// maximize the chances of transaction acceptance.
+func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
+	gasPrice, err := ethClient.SuggestGasPrice(DefaultContext())
+	require.NoError(ginkgo.GinkgoT(), err)
+	// Double the suggested gas price to maximize the chances of
+	// acceptance. Maybe this can be revisited pending resolution of
+	// https://github.com/ava-labs/coreth/issues/314.
+	gasPrice.Add(gasPrice, gasPrice)
+	return gasPrice
+}
+
+// Helper simplifying use via an option of a gas price appropriate for testing.
+func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
+	baseFee := SuggestGasPrice(ethClient)
+	return common.WithBaseFee(baseFee)
 }
 
 // Verify that a new node can bootstrap into the network.

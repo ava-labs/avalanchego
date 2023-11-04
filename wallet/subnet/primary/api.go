@@ -5,6 +5,12 @@ package primary
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/plugin/evm"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
@@ -16,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 )
@@ -52,6 +59,8 @@ type AVAXState struct {
 	PCTX    p.Context
 	XClient avm.Client
 	XCTX    x.Context
+	CClient evm.Client
+	CCTX    c.Context
 	UTXOs   UTXOs
 }
 
@@ -66,6 +75,7 @@ func FetchState(
 	infoClient := info.NewClient(uri)
 	pClient := platformvm.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
+	cClient := evm.NewCChainClient(uri)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
@@ -73,6 +83,11 @@ func FetchState(
 	}
 
 	xCTX, err := x.NewContextFromClients(ctx, infoClient, xClient)
+	if err != nil {
+		return nil, err
+	}
+
+	cCTX, err := c.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +108,11 @@ func FetchState(
 			id:     xCTX.BlockchainID(),
 			client: xClient,
 			codec:  x.Parser.Codec(),
+		},
+		{
+			id:     cCTX.BlockchainID(),
+			client: cClient,
+			codec:  evm.Codec,
 		},
 	}
 	for _, destinationChain := range chains {
@@ -116,7 +136,50 @@ func FetchState(
 		PCTX:    pCTX,
 		XClient: xClient,
 		XCTX:    xCTX,
+		CClient: cClient,
+		CCTX:    cCTX,
 		UTXOs:   utxos,
+	}, nil
+}
+
+type EthState struct {
+	Client   ethclient.Client
+	Accounts map[common.Address]*c.Account
+}
+
+func FetchEthState(
+	ctx context.Context,
+	uri string,
+	addrs set.Set[common.Address],
+) (*EthState, error) {
+	path := fmt.Sprintf(
+		"%s/ext/%s/C/rpc",
+		uri,
+		constants.ChainAliasPrefix,
+	)
+	client, err := ethclient.Dial(path)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make(map[common.Address]*c.Account, addrs.Len())
+	for addr := range addrs {
+		balance, err := client.BalanceAt(ctx, addr, nil)
+		if err != nil {
+			return nil, err
+		}
+		nonce, err := client.NonceAt(ctx, addr, nil)
+		if err != nil {
+			return nil, err
+		}
+		accounts[addr] = &c.Account{
+			Balance: balance,
+			Nonce:   nonce,
+		}
+	}
+	return &EthState{
+		Client:   client,
+		Accounts: accounts,
 	}, nil
 }
 
