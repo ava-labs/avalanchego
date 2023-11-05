@@ -52,7 +52,7 @@ func newIntermediateNodeDB(
 	result.nodeCache = newOnEvictCache(
 		size,
 		func(k Key, n *node) int {
-			return len(k.value) + codec.nodeSize(n)
+			return len(k.value) + codec.encodedNodeSize(n)
 		},
 		result.onEviction,
 	)
