@@ -15,6 +15,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
+	genericMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -61,7 +62,7 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeNode(n *node) []byte
-	nodeSize(n *node) int
+	encodedNodeSize(n *node) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
@@ -91,15 +92,57 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) nodeSize(n *node) int {
-	if n == nil {
+func (c *codecImpl) encodedHashValuesSize(key Key, n nodeChildren, value maybe.Maybe[[]byte]) int {
+	// total is storing the node's value digest + the factor number of children pointers + the child entries for n.childCount children
+	total := valueOrDigestSize(value) + uintSize(uint64(len(n))) + keySize(key)
+	// for each non-nil entry, we add the additional size of the child entry
+	for index, _ := range n {
+		total += uintSize(uint64(index)) + len(ids.Empty)
+	}
+	return total
+}
+
+func (c *codecImpl) encodedNodeSize(n *node) int {
+	// total the number of children pointers + bool indicating if it has a value + the child entries for n.children
+	total := uintSize(uint64(len(n.children))) + boolSize()
+	// for each non-nil entry, we add the additional size of the child entry
+	for index, entry := range n.children {
+		total += childSize(index, entry)
+	}
+	return total
+}
+
+func childSize(index byte, childEntry *child) int {
+	return uintSize(uint64(index)) + len(ids.Empty) + keySize(childEntry.compressedKey) + boolSize()
+}
+
+func valueOrDigestSize(maybeValue maybe.Maybe[[]byte]) int {
+	if maybeValue.HasValue() {
+		valueOrDigestLength := genericMath.Min(len(maybeValue.Value()), HashLength)
+		return boolSize() + valueOrDigestLength + uintSize(uint64(valueOrDigestLength))
+	}
+	return boolSize()
+}
+
+func boolSize() int {
+	return 1
+}
+
+var log128 = math.Log(128)
+
+func uintSize(value uint64) int {
+	if value == 0 {
 		return 1
 	}
-	return estimatedValueLen + minVarIntLen + estimatedNodeChildLen*len(n.children) + 1
+	return 1 + int(math.Log(float64(value))/log128)
+}
+
+func keySize(p Key) int {
+	return uintSize(uint64(p.length)) + bytesNeeded(p.length)
 }
 
 func (c *codecImpl) encodeNode(n *node) []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, c.nodeSize(n)))
+	buf := bytes.NewBuffer(make([]byte, 0, c.encodedNodeSize(n)))
 	c.encodeBool(buf, n.hasValue)
 	c.encodeChildren(buf, n.children)
 	return buf.Bytes()
@@ -120,14 +163,9 @@ func (c *codecImpl) encodeChildren(dst *bytes.Buffer, n nodeChildren) {
 }
 
 func (c *codecImpl) encodeHashValues(key Key, n nodeChildren, value maybe.Maybe[[]byte]) []byte {
-	var (
-		numChildren = len(n)
-		// Estimate size [hv] to prevent memory allocations
-		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
+	buf := bytes.NewBuffer(make([]byte, 0, c.encodedHashValuesSize(key, n, value)))
 
-	c.encodeUint(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(len(n)))
 
 	// ensure that the order of entries is consistent
 	keys := maps.Keys(n)
