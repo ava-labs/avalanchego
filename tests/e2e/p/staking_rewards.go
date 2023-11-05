@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		fundedKey := e2e.Env.AllocateFundedKey()
 		keychain.Add(fundedKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
 		ginkgo.By("retrieving alpha node id and pop")
@@ -261,7 +261,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
 		for _, rewardKey := range rewardKeys {
 			keychain := secp256k1fx.NewKeychain(rewardKey)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 			pWallet := baseWallet.P()
 			balances, err := pWallet.Builder().GetBalance()
 			require.NoError(err)
