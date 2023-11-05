@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -41,10 +43,10 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		EvictionBatchSize:         10,
+		EvictionBatchSize:         units.MiB,
 		HistoryLength:             defaultHistoryLength,
-		ValueNodeCacheSize:        units.MiB,
-		IntermediateNodeCacheSize: units.MiB,
+		ValueNodeCacheSize:        units.GiB,
+		IntermediateNodeCacheSize: units.GiB,
 		Reg:                       prometheus.NewRegistry(),
 		Tracer:                    trace.Noop,
 		BranchFactor:              BranchFactor16,
@@ -90,23 +92,21 @@ func initiateValues(batch []database.BatchOp, seed int64) []database.BatchOp {
 	return batch
 }
 
-var valueToInsert = initiateValues(make([]database.BatchOp, 150000), 0)
-
 func Test_Insert(t *testing.T) {
 	require := require.New(t)
 
+	lvldb, err := leveldb.New(t.TempDir(), nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	db, err := newDatabase(
 		context.Background(),
-		memdb.New(),
+		lvldb,
 		newDefaultConfig(),
 		&mockMetrics{},
 	)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 40; i++ {
 		require.NoError(err)
-		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: valueToInsert, ConsumeBytes: true})
+		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
 		require.NoError(err)
-		_, err = view.GetMerkleRoot(context.Background())
-		require.NoError(err)
+		require.NoError(view.CommitToDB(context.Background()))
 	}
 
 	require.NoError(db.Close())

@@ -236,12 +236,12 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+		_ = t.db.calculateNodeIDsSema.acquire(context.Background())
 		t.changes.rootID, err = t.calculateNodeIDsHelper(Key{}, t.root)
 		if err != nil {
 			return
 		}
-		t.db.calculateNodeIDsSema.Release(1)
+		t.db.calculateNodeIDsSema.release()
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -280,9 +280,9 @@ func (t *trieView) calculateNodeIDsHelper(key Key, n *node) (ids.ID, error) {
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
+		if ok := t.db.calculateNodeIDsSema.tryAcquire(); ok {
 			eg.Go(func() error {
-				defer t.db.calculateNodeIDsSema.Release(1)
+				defer t.db.calculateNodeIDsSema.release()
 				return calculateChildID()
 			})
 		} else {
