@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -238,12 +239,12 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 		innerBlksBytes = append(innerBlksBytes, blk.getInnerBlk().Bytes())
 	}
 	_, nextInnerBlkHeight, err := vm.ssVM.BackfillBlocks(ctx, innerBlksBytes)
-	switch err {
-	case block.ErrStopBlockBackfilling:
+	switch {
+	case errors.Is(err, block.ErrStopBlockBackfilling):
 		return ids.Empty, 0, err // done backfilling
-	case block.ErrInternalBlockBackfilling:
+	case errors.Is(err, block.ErrInternalBlockBackfilling):
 		return ids.Empty, 0, err
-	case nil:
+	case err == nil:
 		// check proposerVM and innerVM alignment
 	default:
 		// non-internal error in innerVM, check proposerVM and innerVM alignment
