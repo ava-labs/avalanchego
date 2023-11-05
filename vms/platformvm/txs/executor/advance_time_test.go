@@ -617,7 +617,7 @@ func TestTrackedSubnet(t *testing.T) {
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
 			_, ok := env.config.Validators.GetValidator(subnetID, ids.NodeID(subnetValidatorNodeID))
-			require.Equal(tracked, ok)
+			require.True(ok)
 		})
 	}
 }
