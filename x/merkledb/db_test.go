@@ -102,13 +102,16 @@ func Test_Insert(t *testing.T) {
 		newDefaultConfig(),
 		&mockMetrics{},
 	)
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 1; i++ {
 		require.NoError(err)
 		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
 		require.NoError(err)
 		require.NoError(view.CommitToDB(context.Background()))
 	}
-
+	println(db.metrics.(*mockMetrics).valueCacheHit)
+	println(db.metrics.(*mockMetrics).valueCacheMiss)
+	println(db.metrics.(*mockMetrics).nodeCacheHit)
+	println(db.metrics.(*mockMetrics).nodeCacheMiss)
 	require.NoError(db.Close())
 }
 

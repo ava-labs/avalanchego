@@ -14,7 +14,7 @@ const defaultBufferLength = 256
 // Holds intermediate nodes. That is, those without values.
 // Changes to this database aren't written to [baseDB] until
 // they're evicted from the [nodeCache] or Flush is called.
-type intermediateNodeDB struct {
+type nodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
 
@@ -41,8 +41,8 @@ func newIntermediateNodeDB(
 	size int,
 	evictionBatchSize int,
 	tokenSize int,
-) *intermediateNodeDB {
-	result := &intermediateNodeDB{
+) *nodeDB {
+	result := &nodeDB{
 		metrics:           metrics,
 		baseDB:            db,
 		bufferPool:        bufferPool,
@@ -60,7 +60,7 @@ func newIntermediateNodeDB(
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
-func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
+func (db *nodeDB) onEviction(key Key, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
 	totalSize := db.nodeCache.size(key, n)
@@ -93,7 +93,7 @@ func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 	return nil
 }
 
-func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) error {
+func (db *nodeDB) addToBatch(b database.Batch, key Key, n *node) error {
 	dbKey := db.constructDBKey(key)
 	defer db.bufferPool.Put(dbKey)
 	db.metrics.DatabaseNodeWrite()
@@ -103,15 +103,15 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) err
 	return b.Put(dbKey, codec.encodeNode(n))
 }
 
-func (db *intermediateNodeDB) Get(key Key) (*node, error) {
+func (db *nodeDB) Get(key Key) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
-		db.metrics.IntermediateNodeCacheHit()
+		db.metrics.NodeCacheHit()
 		if cachedValue == nil {
 			return nil, database.ErrNotFound
 		}
 		return cachedValue, nil
 	}
-	db.metrics.IntermediateNodeCacheMiss()
+	db.metrics.NodeCacheMiss()
 
 	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
@@ -130,8 +130,8 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 // constructDBKey returns a key that can be used in [db.baseDB].
 // We need to be able to differentiate between two keys of equal
 // byte length but different token length, so we add padding to differentiate.
-// Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
-func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
+// Additionally, we add a prefix indicating it is part of the nodeDB.
+func (db *nodeDB) constructDBKey(key Key) []byte {
 	if db.tokenSize == 8 {
 		// For tokens of size byte, no padding is needed since byte length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
@@ -140,14 +140,14 @@ func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
 }
 
-func (db *intermediateNodeDB) Put(key Key, n *node) error {
+func (db *nodeDB) Put(key Key, n *node) error {
 	return db.nodeCache.Put(key, n)
 }
 
-func (db *intermediateNodeDB) Flush() error {
+func (db *nodeDB) Flush() error {
 	return db.nodeCache.Flush()
 }
 
-func (db *intermediateNodeDB) Delete(key Key) error {
+func (db *nodeDB) Delete(key Key) error {
 	return db.nodeCache.Put(key, nil)
 }

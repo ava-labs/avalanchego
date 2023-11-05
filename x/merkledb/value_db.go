@@ -78,10 +78,10 @@ func (db *valueDB) Get(key Key) (maybe.Maybe[[]byte], error) {
 	}
 
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
-		db.metrics.ValueNodeCacheHit()
+		db.metrics.ValueCacheHit()
 		return cachedValue, nil
 	}
-	db.metrics.ValueNodeCacheMiss()
+	db.metrics.ValueCacheMiss()
 
 	prefixedKey := addPrefixToKey(db.bufferPool, valuePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
