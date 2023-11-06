@@ -182,9 +182,9 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisStaker: api.GenesisStaker{
-				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
-				ShortNodeID: nodeID,
+				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,
@@ -251,9 +251,9 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisStaker: api.GenesisStaker{
-				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
-				ShortNodeID: nodeID,
+				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,

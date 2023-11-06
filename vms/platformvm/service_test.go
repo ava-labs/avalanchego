@@ -613,7 +613,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID != ids.NodeIDFromShortNodeID(vdr.ShortNodeID) {
+			if gotVdr.NodeID != ids.NodeIDFromShortNodeID(vdr.NodeID) {
 				continue
 			}
 
@@ -621,7 +621,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(vdr.StartTime, gotVdr.StartTime)
 			found = true
 		}
-		require.True(found, "expected validators to contain %s but didn't", vdr.ShortNodeID)
+		require.True(found, "expected validators to contain %s but didn't", vdr.NodeID)
 	}
 
 	// Add a delegator

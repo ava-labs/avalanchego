@@ -102,11 +102,11 @@ type Staker struct {
 // GenesisStaker should be used to generate genesis content only.
 // APIs should use Staker struct only
 type GenesisStaker struct {
-	TxID        ids.ID          `json:"txID"`
-	StartTime   json.Uint64     `json:"startTime"`
-	EndTime     json.Uint64     `json:"endTime"`
-	Weight      json.Uint64     `json:"weight"`
-	ShortNodeID ids.ShortNodeID `json:"nodeID"`
+	TxID      ids.ID          `json:"txID"`
+	StartTime json.Uint64     `json:"startTime"`
+	EndTime   json.Uint64     `json:"endTime"`
+	Weight    json.Uint64     `json:"weight"`
+	NodeID    ids.ShortNodeID `json:"nodeID"`
 }
 
 // Owner is the repr. of a reward owner sent over APIs.
@@ -345,7 +345,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				BlockchainID: ids.Empty,
 			}},
 			Validator: txs.Validator{
-				NodeID: vdr.ShortNodeID,
+				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,

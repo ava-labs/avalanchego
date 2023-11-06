@@ -851,9 +851,9 @@ func buildCustomGenesis() ([]byte, error) {
 	endTime := mockable.MaxTime
 	genesisValidator := api.GenesisPermissionlessValidator{
 		GenesisStaker: api.GenesisStaker{
-			StartTime:   json.Uint64(starTime.Unix()),
-			EndTime:     json.Uint64(endTime.Unix()),
-			ShortNodeID: nodeID,
+			StartTime: json.Uint64(starTime.Unix()),
+			EndTime:   json.Uint64(endTime.Unix()),
+			NodeID:    nodeID,
 		},
 		RewardOwner: &api.Owner{
 			Threshold: 1,

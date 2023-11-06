@@ -477,15 +477,15 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	nodeID := ids.ShortNodeID(key.PublicKey().Address())
-
+	sNodeID := ids.ShortNodeID(key.PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(sNodeID)
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(newValidatorStartTime.Unix()),
 		uint64(newValidatorEndTime.Unix()),
-		nodeID,
-		ids.ShortID(nodeID),
+		sNodeID,
+		ids.ShortID(sNodeID),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty,
@@ -516,7 +516,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		onAccept, found := vm.manager.GetState(addValidatorStandardBlk.ID())
 		require.True(found)
 
-		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 	}
 
@@ -663,10 +663,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that new validator is now in the current validator set.
 	{
-		_, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+		_, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 
-		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		require.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := newState.GetTimestamp()
@@ -1467,9 +1467,11 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// insert primary network validator
 	var (
-		nodeID = ids.GenerateTestShortNodeID()
+		nodeID = ids.GenerateTestNodeID()
 		addr   = keys[0].PublicKey().Address()
 	)
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
 	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 
@@ -1492,7 +1494,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime.Unix()),
 			End:    uint64(primaryEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1529,7 +1531,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1540,7 +1542,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		1,                              // Weight
 		uint64(subnetStartTime.Unix()), // Start time
 		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
+		sNodeID,                        // Node ID
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
@@ -1556,7 +1558,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1568,7 +1570,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1595,7 +1597,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1623,7 +1625,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryReStartTime.Unix()),
 			End:    uint64(primaryReEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1660,7 +1662,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1745,13 +1747,16 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 
 	// Add a primary network validator with no BLS key
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
+
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(primaryStartTime1.Unix()),
 		uint64(primaryEndTime1.Unix()),
-		nodeID,
+		sNodeID,
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1768,7 +1773,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1795,7 +1800,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1823,7 +1828,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime2.Unix()),
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1860,7 +1865,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	emptySigner := &signer.Empty{}
@@ -1908,13 +1913,15 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 
 	// Add a primary network validator with no BLS key
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(primaryStartTime1.Unix()),
 		uint64(primaryEndTime1.Unix()),
-		nodeID,
+		sNodeID,
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1931,7 +1938,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1942,7 +1949,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		1,                              // Weight
 		uint64(subnetStartTime.Unix()), // Start time
 		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
+		sNodeID,                        // Node ID
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
@@ -1958,7 +1965,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1970,7 +1977,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -1997,7 +2004,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
@@ -2025,7 +2032,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime2.Unix()),
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -2062,7 +2069,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 
 	require.NoError(buildAndAcceptStandardBlock(vm))
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	emptySigner := &signer.Empty{}
@@ -2117,13 +2124,15 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	)
 
 	// Add a primary network validator with no BLS key
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(primaryStartTime1.Unix()),
 		uint64(primaryEndTime1.Unix()),
-		nodeID,
+		sNodeID,
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -2140,7 +2149,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	// insert the subnet validator
@@ -2148,7 +2157,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		1,                              // Weight
 		uint64(subnetStartTime.Unix()), // Start time
 		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
+		sNodeID,                        // Node ID
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
@@ -2164,7 +2173,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
@@ -2176,7 +2185,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	vm.state.SetTimestamp(currentTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetCurrentValidator(subnetID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// move time ahead, terminating primary network validator
@@ -2200,7 +2209,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(commit.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Generating the validator set should not error when re-introducing a
@@ -2228,7 +2237,7 @@ func buildAndAcceptStandardBlock(vm *VM) error {
 
 func checkValidatorBlsKeyIsSet(
 	valState validators.State,
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	subnetID ids.ID,
 	height uint64,
 	expectedBlsKey *bls.PublicKey,
@@ -2238,7 +2247,7 @@ func checkValidatorBlsKeyIsSet(
 		return err
 	}
 
-	val, found := vals[ids.NodeIDFromShortNodeID(nodeID)]
+	val, found := vals[nodeID]
 	switch {
 	case !found:
 		return database.ErrNotFound

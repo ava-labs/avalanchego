@@ -364,9 +364,9 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisStaker: api.GenesisStaker{
-				StartTime:   json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:     json.Uint64(defaultValidateEndTime.Unix()),
-				ShortNodeID: nodeID,
+				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,

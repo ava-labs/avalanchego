@@ -88,7 +88,6 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 	if len(b.StatelessBlock.Certificate) == 0 {
-		b.proposer = ids.EmptyNodeID
 		return nil
 	}
 

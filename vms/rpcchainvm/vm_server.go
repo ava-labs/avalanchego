@@ -366,7 +366,7 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying connection, nodeID %v: %w", req.NodeId, err)
+		return nil, fmt.Errorf("failed marking as connected nodeID %v: %w", req.NodeId, err)
 	}
 	peerVersion, err := version.ParseApplication(req.Version)
 	if err != nil {
@@ -379,7 +379,7 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying disconnection, nodeID %v: %w", req.NodeId, err)
+		return nil, fmt.Errorf("failed marking as disconnected nodeID %v: %w", req.NodeId, err)
 	}
 	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
 }

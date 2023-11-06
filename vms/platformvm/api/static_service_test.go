@@ -29,9 +29,9 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	weight := json.Uint64(987654321)
 	validator := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			EndTime:     15,
-			Weight:      weight,
-			ShortNodeID: nodeID,
+			EndTime: 15,
+			Weight:  weight,
+			NodeID:  nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,
@@ -73,9 +73,9 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	weight := json.Uint64(0)
 	validator := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			StartTime:   0,
-			EndTime:     15,
-			ShortNodeID: nodeID,
+			StartTime: 0,
+			EndTime:   15,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,
@@ -118,9 +118,9 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	weight := json.Uint64(987654321)
 	validator := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			StartTime:   0,
-			EndTime:     5,
-			ShortNodeID: nodeID,
+			StartTime: 0,
+			EndTime:   5,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,
@@ -163,9 +163,9 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	weight := json.Uint64(987654321)
 	validator1 := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			StartTime:   0,
-			EndTime:     20,
-			ShortNodeID: nodeID,
+			StartTime: 0,
+			EndTime:   20,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,
@@ -179,9 +179,9 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 
 	validator2 := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			StartTime:   3,
-			EndTime:     15,
-			ShortNodeID: nodeID,
+			StartTime: 3,
+			EndTime:   15,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,
@@ -195,9 +195,9 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 
 	validator3 := GenesisPermissionlessValidator{
 		GenesisStaker: GenesisStaker{
-			StartTime:   1,
-			EndTime:     10,
-			ShortNodeID: nodeID,
+			StartTime: 1,
+			EndTime:   10,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &Owner{
 			Threshold: 1,

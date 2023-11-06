@@ -67,9 +67,9 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	genesisValidators := []api.GenesisPermissionlessValidator{{
 		GenesisStaker: api.GenesisStaker{
-			StartTime:   json.Uint64(genesisTime.Unix()),
-			EndTime:     json.Uint64(genesisEndTime.Unix()),
-			ShortNodeID: ids.GenerateTestShortNodeID(),
+			StartTime: json.Uint64(genesisTime.Unix()),
+			EndTime:   json.Uint64(genesisEndTime.Unix()),
+			NodeID:    ids.GenerateTestShortNodeID(),
 		},
 		RewardOwner: &api.Owner{
 			Threshold: 1,
