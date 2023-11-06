@@ -201,6 +201,9 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSamp
 
 // AppRequest routes an AppRequest to a Handler based on the handler prefix. The
 // message is dropped if no matching handler can be found.
+//
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(request)
@@ -217,8 +220,6 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 
 	// Call the corresponding handler and send back a response to nodeID.
 	if err := handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg); err != nil {
-		// Any error propagated outside the handler application logic is
-		// considered fatal
 		return err
 	}
 
@@ -229,12 +230,13 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 // AppRequestFailed routes an AppRequestFailed message to the callback
 // corresponding to requestID.
 //
-// ErrUnrequestedResponse is considered fatal.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
-		// Fatal if we get a timeout for a request that we never made
+		// we should never receive a timeout without a corresponding requestID
 		return ErrUnrequestedResponse
 	}
 
@@ -246,12 +248,13 @@ func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 // AppResponse routes an AppResponse message to the callback corresponding to
 // requestID.
 //
-// ErrUnrequestedResponse is considered fatal.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
-		// Fatal if we get a timeout for a request that we never made
+		// we should never receive a timeout without a corresponding requestID
 		return ErrUnrequestedResponse
 	}
 
@@ -261,9 +264,10 @@ func (r *Router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 }
 
 // AppGossip routes an AppGossip message to a Handler based on the handler
-// prefix.
+// prefix. The message is dropped if no matching handler can be found.
 //
-// The message is dropped if no matching handler can be found.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte) error {
 	start := time.Now()
 	parsedMsg, handler, ok := r.parse(gossip)
@@ -283,9 +287,11 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 }
 
 // CrossChainAppRequest routes a CrossChainAppRequest message to a Handler
-// based on the handler prefix.
+// based on the handler prefix. The message is dropped if no matching handler
+// can be found.
 //
-// The message is dropped if no matching handler can be found.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) CrossChainAppRequest(
 	ctx context.Context,
 	chainID ids.ID,
@@ -317,12 +323,13 @@ func (r *Router) CrossChainAppRequest(
 // CrossChainAppRequestFailed routes a CrossChainAppRequestFailed message to
 // the callback corresponding to requestID.
 //
-// ErrUnrequestedResponse is considered fatal.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
-		// Fatal if we get a timeout for a request that we never made
+		// we should never receive a timeout without a corresponding requestID
 		return ErrUnrequestedResponse
 	}
 
@@ -334,12 +341,13 @@ func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 // CrossChainAppResponse routes a CrossChainAppResponse message to the callback
 // corresponding to requestID.
 //
-// ErrUnrequestedResponse is considered fatal.
+// Any error condition propagated outside Handler application logic is
+// considered fatal
 func (r *Router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
-		// Fatal if we get a timeout for a request that we never made
+		// we should never receive a timeout without a corresponding requestID
 		return ErrUnrequestedResponse
 	}
 
