@@ -275,7 +275,6 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
-		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
