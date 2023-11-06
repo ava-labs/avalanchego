@@ -268,7 +268,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
+			if err := trieDB.rebuild(ctx, int(config.NodeCacheSize)); err != nil {
 				return nil, err
 			}
 		}

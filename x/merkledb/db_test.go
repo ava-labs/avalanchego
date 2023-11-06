@@ -45,13 +45,13 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		EvictionBatchSize:         units.MiB,
-		HistoryLength:             defaultHistoryLength,
-		ValueNodeCacheSize:        units.GiB,
-		IntermediateNodeCacheSize: units.GiB,
-		Reg:                       prometheus.NewRegistry(),
-		Tracer:                    trace.Noop,
-		BranchFactor:              BranchFactor16,
+		EvictionBatchSize: units.MiB,
+		HistoryLength:     defaultHistoryLength,
+		ValueCacheSize:    units.GiB,
+		NodeCacheSize:     units.GiB,
+		Reg:               prometheus.NewRegistry(),
+		Tracer:            trace.Noop,
+		BranchFactor:      BranchFactor16,
 	}
 }
 
@@ -252,8 +252,8 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	initialSize := 5_000
 
 	config := newDefaultConfig()
-	config.ValueNodeCacheSize = uint(initialSize)
-	config.IntermediateNodeCacheSize = uint(initialSize)
+	config.ValueCacheSize = uint(initialSize)
+	config.NodeCacheSize = uint(initialSize)
 
 	db, err := newDB(
 		context.Background(),

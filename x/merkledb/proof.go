@@ -863,11 +863,11 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize:         verificationEvictionBatchSize,
-			Tracer:                    trace.Noop,
-			ValueNodeCacheSize:        verificationCacheSize,
-			IntermediateNodeCacheSize: verificationCacheSize,
-			BranchFactor:              sizeToBf[size],
+			EvictionBatchSize: verificationEvictionBatchSize,
+			Tracer:            trace.Noop,
+			ValueCacheSize:    verificationCacheSize,
+			NodeCacheSize:     verificationCacheSize,
+			BranchFactor:      sizeToBf[size],
 		},
 		&mockMetrics{},
 	)
