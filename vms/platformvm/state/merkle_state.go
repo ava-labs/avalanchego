@@ -89,7 +89,6 @@ func NewMerkleState(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
 	res, err := newMerkleState(
 		rawDB,
@@ -99,7 +98,6 @@ func NewMerkleState(
 		ctx,
 		metricsReg,
 		rewards,
-		bootstrapped,
 	)
 	if err != nil {
 		return nil, err
@@ -122,7 +120,6 @@ func newMerkleState(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
 ) (*merkleState, error) {
 	var (
 		baseDB                        = versiondb.New(rawDB)
@@ -234,7 +231,6 @@ func newMerkleState(
 		ctx:          ctx,
 		metrics:      metrics,
 		rewards:      rewards,
-		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
 		baseMerkleDB: baseMerkleDB,
 		merkleDB:     merkleDB,
@@ -291,11 +287,10 @@ func newMerkleState(
 }
 
 type merkleState struct {
-	cfg          *config.Config
-	ctx          *snow.Context
-	metrics      metrics.Metrics
-	rewards      reward.Calculator
-	bootstrapped *utils.Atomic[bool]
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
 
 	baseDB       *versiondb.Database
 	singletonDB  database.Database
@@ -981,26 +976,6 @@ func (ms *merkleState) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 }
 
 // VALIDATORS Section
-func (ms *merkleState) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
-	for nodeID, validator := range ms.currentStakers.validators[subnetID] {
-		staker := validator.validator
-		if err := vdrs.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
-			return err
-		}
-
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(subnetID, nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
-				return err
-			}
-		}
-		delegatorIterator.Release()
-	}
-	return nil
-}
-
 func (ms *merkleState) ApplyValidatorWeightDiffs(
 	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -1726,10 +1701,6 @@ func (ms *merkleState) updateValidatorSet(
 			err           error
 		)
 
-		// We only track the current validator set of tracked subnets.
-		if subnetID != constants.PrimaryNetworkID && !ms.cfg.TrackedSubnets.Contains(subnetID) {
-			continue
-		}
 		if weightDiff.Amount == 0 {
 			// No weight change to record; go to next validator.
 			continue

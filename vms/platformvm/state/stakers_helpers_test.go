@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -87,7 +86,6 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		ctx,
 		metrics.Noop,
 		rewardsCalc,
-		&utils.Atomic[bool]{},
 	)
 }
 

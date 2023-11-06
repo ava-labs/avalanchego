@@ -10,7 +10,6 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -283,17 +282,29 @@ func (ms *merkleState) loadPendingStakers() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (ms *merkleState) initValidatorSets() error {
-	if ms.cfg.Validators.Count(constants.PrimaryNetworkID) != 0 {
-		// Enforce the invariant that the validator set is empty here.
-		return errValidatorSetAlreadyPopulated
-	}
-	err := ms.ApplyCurrentValidators(constants.PrimaryNetworkID, ms.cfg.Validators)
-	if err != nil {
-		return err
-	}
+	for subnetID, validators := range ms.currentStakers.validators {
+		if ms.cfg.Validators.Count(subnetID) != 0 {
+			// Enforce the invariant that the validator set is empty here.
+			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
+		}
 
-	vl := validators.NewLogger(ms.ctx.Log, ms.bootstrapped, constants.PrimaryNetworkID, ms.ctx.NodeID)
-	ms.cfg.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
+		for nodeID, validator := range validators {
+			validatorStaker := validator.validator
+			if err := ms.cfg.Validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
+				return err
+			}
+
+			delegatorIterator := NewTreeIterator(validator.delegators)
+			for delegatorIterator.Next() {
+				delegatorStaker := delegatorIterator.Value()
+				if err := ms.cfg.Validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
+					delegatorIterator.Release()
+					return err
+				}
+			}
+			delegatorIterator.Release()
+		}
+	}
 
 	ms.metrics.SetLocalStake(ms.cfg.Validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
 	totalWeight, err := ms.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
@@ -301,19 +312,5 @@ func (ms *merkleState) initValidatorSets() error {
 		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}
 	ms.metrics.SetTotalStake(totalWeight)
-
-	for subnetID := range ms.cfg.TrackedSubnets {
-		if ms.cfg.Validators.Count(subnetID) != 0 {
-			// Enforce the invariant that the validator set is empty here.
-			return errValidatorSetAlreadyPopulated
-		}
-		err := ms.ApplyCurrentValidators(subnetID, ms.cfg.Validators)
-		if err != nil {
-			return err
-		}
-
-		vl := validators.NewLogger(ms.ctx.Log, ms.bootstrapped, subnetID, ms.ctx.NodeID)
-		ms.cfg.Validators.RegisterCallbackListener(subnetID, vl)
-	}
 	return nil
 }
