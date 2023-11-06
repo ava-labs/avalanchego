@@ -94,13 +94,10 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 		return ErrInvalidMaybe
 	case pbNode.Key == nil:
 		return ErrNilKey
-	}
-	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
-
-	if len(node.Key.value) != bytesNeeded(node.Key.length) {
+	case len(pbNode.Key.Value) != bytesNeeded(int(pbNode.Key.Length)):
 		return ErrInvalidKeyLength
 	}
-
+	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
 		if childIndex > math.MaxUint8 {
@@ -838,12 +835,12 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := Key{}
+		compressedKey := Key{}
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
-				compressedPath = existingChild.compressedKey
+				compressedKey = existingChild.compressedKey
 			}
-			childPath := key.Extend(ToToken(index, t.tokenSize), compressedPath)
+			childPath := key.Extend(ToToken(index, t.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childPath.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childPath.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
@@ -852,7 +849,7 @@ func addPathInfo(
 					index,
 					child{
 						id:            childID,
-						compressedKey: compressedPath,
+						compressedKey: compressedKey,
 					})
 			}
 		}

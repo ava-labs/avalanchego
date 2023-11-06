@@ -36,7 +36,6 @@ type node struct {
 }
 
 // Returns a new node with the given [key] and no value.
-// If [parent] isn't nil, the new node is added as a child of [parent].
 func newNode(key Key) *node {
 	return &node{
 		dbNode: dbNode{

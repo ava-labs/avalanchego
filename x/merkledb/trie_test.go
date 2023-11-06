@@ -486,7 +486,7 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.Equal([]byte("value12"), value)
 }
 
-func Test_Trie_CompressedPaths(t *testing.T) {
+func Test_Trie_compressedKeys(t *testing.T) {
 	require := require.New(t)
 
 	dbTrie, err := getBasicDB()
