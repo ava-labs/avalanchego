@@ -28,7 +28,7 @@ var (
 	vdr5 = ids.NodeID{5}
 )
 
-func TestNewSetErrorOnMetrics(t *testing.T) {
+func TestNewSetErrorOnPollsMetrics(t *testing.T) {
 	require := require.New(t)
 
 	factory := NewEarlyTermNoTraversalFactory(1, 1)
@@ -37,13 +37,29 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 
 	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "polls",
-	})))
-	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "poll_duration",
+		Namespace: namespace,
+		Name:      "polls",
 	})))
 
-	require.NotNil(NewSet(factory, log, namespace, registerer))
+	_, err := NewSet(factory, log, namespace, registerer)
+	require.ErrorIs(err, errFailedPollsMetric)
+}
+
+func TestNewSetErrorOnPollDurationMetrics(t *testing.T) {
+	require := require.New(t)
+
+	factory := NewEarlyTermNoTraversalFactory(1, 1)
+	log := logging.NoLog{}
+	namespace := ""
+	registerer := prometheus.NewRegistry()
+
+	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "poll_duration_count",
+	})))
+
+	_, err := NewSet(factory, log, namespace, registerer)
+	require.ErrorIs(err, errFailedPollDurationMetrics)
 }
 
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
@@ -56,7 +72,8 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -92,7 +109,8 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	// create two polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -128,7 +146,8 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	// create three polls for the two blocks
 	vdrBag := bag.Of(vdrs...)
@@ -172,7 +191,8 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	require.Zero(s.Len())
 
@@ -204,7 +224,8 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	require.Zero(s.Len())
 
@@ -233,7 +254,8 @@ func TestSetString(t *testing.T) {
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, namespace, registerer)
+	require.NoError(err)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
