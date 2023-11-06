@@ -103,6 +103,9 @@ func (c *codecImpl) encodedHashValuesSize(key Key, n nodeChildren, value maybe.M
 }
 
 func (c *codecImpl) encodedNodeSize(n *node) int {
+	if n == nil {
+		return 0
+	}
 	// total the number of children pointers + bool indicating if it has a value + the child entries for n.children
 	total := uintSize(uint64(len(n.children))) + boolSize()
 	// for each non-nil entry, we add the additional size of the child entry

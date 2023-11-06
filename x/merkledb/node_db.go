@@ -13,7 +13,7 @@ const defaultBufferLength = 256
 
 // Holds intermediate nodes. That is, those without values.
 // Changes to this database aren't written to [baseDB] until
-// they're evicted from the [nodeCache] or Flush is called.
+// they're evicted from the [cache] or Flush is called.
 type nodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
@@ -26,7 +26,7 @@ type nodeDB struct {
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
-	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
+	// Keys in [cache] aren't prefixed with [intermediateNodePrefix].
 	nodeCache onEvictCache[Key, *node]
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int

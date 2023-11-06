@@ -25,9 +25,9 @@ type valueDB struct {
 	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	// Paths in [nodeCache] aren't prefixed with [valuePrefix].
-	nodeCache cache.Cacher[Key, maybe.Maybe[[]byte]]
-	metrics   merkleMetrics
+	// Paths in [cache] aren't prefixed with [valuePrefix].
+	cache   cache.Cacher[Key, maybe.Maybe[[]byte]]
+	metrics merkleMetrics
 
 	closed utils.Atomic[bool]
 }
@@ -42,7 +42,7 @@ func newValueDB(
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
-		nodeCache: cache.NewSizedLRU(cacheSize, func(k Key, v maybe.Maybe[[]byte]) int {
+		cache: cache.NewSizedLRU(cacheSize, func(k Key, v maybe.Maybe[[]byte]) int {
 			return len(k.value) + len(v.Value()) + 10
 		}),
 	}
@@ -77,7 +77,7 @@ func (db *valueDB) Get(key Key) (maybe.Maybe[[]byte], error) {
 		return maybe.Nothing[[]byte](), nil
 	}
 
-	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
+	if cachedValue, isCached := db.cache.Get(key); isCached {
 		db.metrics.ValueCacheHit()
 		return cachedValue, nil
 	}
@@ -98,7 +98,6 @@ func (db *valueDB) Get(key Key) (maybe.Maybe[[]byte], error) {
 		result = maybe.Some(val)
 	}
 
-	//	db.nodeCache.Put(key, result)
 	return result, nil
 }
 
@@ -121,7 +120,7 @@ func (b *valueBatch) Write() error {
 	dbBatch := b.db.baseDB.NewBatch()
 	for key, n := range b.ops {
 		b.db.metrics.DatabaseNodeWrite()
-		b.db.nodeCache.Put(key, n)
+		b.db.cache.Put(key, n)
 		prefixedKey := addPrefixToKey(b.db.bufferPool, valuePrefix, key.Bytes())
 		if n.IsNothing() {
 			if err := dbBatch.Delete(prefixedKey); err != nil {

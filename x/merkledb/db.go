@@ -123,6 +123,9 @@ type Prefetcher interface {
 	// Using PrefetchPaths can be more efficient than PrefetchPath because
 	// the underlying view used to compute each path can be reused.
 	PrefetchPaths(keys [][]byte) error
+
+	PrefetchValue(key []byte) error
+	PrefetchValues(keys [][]byte) error
 }
 
 type MerkleDB interface {
@@ -426,6 +429,44 @@ func (db *merkleDB) Close() error {
 
 	// Successfully wrote intermediate nodes.
 	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
+}
+
+func (db *merkleDB) PrefetchValues(keys [][]byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	for _, key := range keys {
+		if err := db.prefetchValue(key); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (db *merkleDB) PrefetchValue(key []byte) error {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	return db.prefetchValue(key)
+}
+
+func (db *merkleDB) prefetchValue(keyBytes []byte) error {
+	key := ToKey(keyBytes)
+	val, err := db.getValueWithoutLock(ToKey(keyBytes))
+	if err != nil {
+		return err
+	}
+	db.valueDB.cache.Put(key, val)
+	return nil
 }
 
 func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
