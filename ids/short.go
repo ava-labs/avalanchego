@@ -43,10 +43,11 @@ func ShortFromString(idStr string) (ShortID, error) {
 // ShortFromPrefixedString returns a ShortID assuming the cb58 format is
 // prefixed
 func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
-	if !strings.HasPrefix(idStr, prefix) {
+	s, found := strings.CutPrefix(idStr, prefix)
+	if !found {
 		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
 	}
-	return ShortFromString(strings.TrimPrefix(idStr, prefix))
+	return ShortFromString(s)
 }
 
 func (id ShortID) MarshalJSON() ([]byte, error) {

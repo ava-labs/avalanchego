@@ -5,7 +5,6 @@ package state
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -22,10 +21,7 @@ const (
 	weightValueLength = database.BoolSize + database.Uint64Size
 )
 
-var (
-	errUnexpectedNegativeLenghtNodeID = errors.New("nodeID has negative length")
-	errUnexpectedWeightValueLength    = fmt.Errorf("expected weight value length %d", weightValueLength)
-)
+var errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 
 // marshalStartDiffKey is used to determine the starting key when iterating.
 //
@@ -49,7 +45,7 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 
 func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) < startDiffKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedNegativeLenghtNodeID
+		return ids.Empty, 0, ids.EmptyNodeID, ids.ErrBadNodeIDLength
 	}
 	var (
 		subnetID ids.ID
@@ -59,11 +55,7 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	height := unpackIterableHeight(key[ids.IDLen:])
 	nodeBytes := key[diffKeyNodeIDOffset:]
 	nodeID, err := ids.ToNodeID(nodeBytes)
-	if err != nil {
-		return ids.Empty, 0, ids.EmptyNodeID, err
-	}
-
-	return subnetID, height, nodeID, nil
+	return subnetID, height, nodeID, err
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {

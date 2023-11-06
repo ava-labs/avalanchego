@@ -117,11 +117,12 @@ func NodeIDFromCert(cert *staking.Certificate) NodeID {
 
 // NodeIDFromString is the inverse of NodeID.String()
 func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	if !strings.HasPrefix(nodeIDStr, NodeIDPrefix) {
+	s, found := strings.CutPrefix(nodeIDStr, NodeIDPrefix)
+	if !found {
 		return EmptyNodeID, fmt.Errorf("ID: %s is missing the prefix: %s", nodeIDStr, NodeIDPrefix)
 	}
 
-	bytes, err := cb58.Decode(strings.TrimPrefix(nodeIDStr, NodeIDPrefix))
+	bytes, err := cb58.Decode(s)
 	if err != nil {
 		return EmptyNodeID, err
 	}

@@ -1050,7 +1050,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 		weight := json.Uint64(pendingStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        pendingStaker.TxID,
-			NodeID:      pendingStaker.NodeID,
+			NodeID:      nodeID,
 			StartTime:   json.Uint64(pendingStaker.StartTime.Unix()),
 			EndTime:     json.Uint64(pendingStaker.EndTime.Unix()),
 			Weight:      weight,
@@ -1157,6 +1157,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 	if err != nil {
 		return fmt.Errorf("sampling %s errored with %w", args.SubnetID, err)
 	}
+
 	if sample == nil {
 		reply.Validators = []ids.NodeID{}
 	} else {
@@ -2638,6 +2639,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 			}
 			vdrJSON.PublicKey = &pk
 		}
+
 		m[vdr.NodeID] = vdrJSON
 	}
 	return stdjson.Marshal(m)

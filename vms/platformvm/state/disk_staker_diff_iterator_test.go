@@ -42,7 +42,7 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 
 		subnetID, height, nodeID, err := unmarshalDiffKey(key)
 		if err != nil {
-			okError := errors.Is(err, ids.ErrBadNodeIDLength) || errors.Is(err, errUnexpectedNegativeLenghtNodeID)
+			okError := errors.Is(err, ids.ErrBadNodeIDLength)
 			require.True(okError)
 			return
 		}
