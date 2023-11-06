@@ -83,7 +83,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
-				baseWallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 				avaxAssetID := baseWallet.X().AVAXAssetID()
 
 				wallets := make([]primary.Wallet, len(testKeys))
