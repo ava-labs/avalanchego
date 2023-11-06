@@ -35,7 +35,7 @@ var (
 	ErrPartialByteLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with partial byte lengths",
 	)
-	ErrGetPathToFailure       = errors.New("GetPathTo failed to return the closest node")
+	ErrVisitPathToKey         = errors.New("failed to visit expected node during insertion")
 	ErrStartAfterEnd          = errors.New("start key > end key")
 	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
 	ErrParentNotDatabase      = errors.New("parent trie is not database")
@@ -814,12 +814,17 @@ func (t *trieView) insert(
 	// find how many tokens are common between the existing child's compressed path and
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
-	commonPrefixLength := getLengthOfCommonPrefix(existingChildEntry.compressedKey, key, closestNode.key.length+t.tokenSize, t.tokenSize)
+	commonPrefixLength := getLengthOfCommonPrefix(
+		existingChildEntry.compressedKey,
+		key,
+		closestNode.key.length+t.tokenSize,
+		t.tokenSize,
+	)
 
-	// If the length of the existing child's compressed path is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted.
-	// Since it matched the key to be inserted, it should have been the last node returned by GetPathTo
 	if existingChildEntry.compressedKey.length <= commonPrefixLength {
-		return nil, ErrGetPathToFailure
+		// Since the compressed key is shorter than the common prefix,
+		// we should have visited [existingChildEntry] in [visitPathToKey].
+		return nil, ErrVisitPathToKey
 	}
 
 	branchNode := newNode(key.Take(closestNode.key.length + t.tokenSize + commonPrefixLength))
