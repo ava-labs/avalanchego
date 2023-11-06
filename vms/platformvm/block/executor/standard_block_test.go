@@ -752,7 +752,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			require.NoError(block.Verify(context.Background()))
 			require.NoError(block.Accept(context.Background()))
 			_, ok := env.config.Validators.GetValidator(subnetID, ids.NodeIDFromShortNodeID(subnetValidatorNodeID))
-			require.Equal(tracked, ok)
+			require.True(ok)
 		})
 	}
 }

@@ -48,10 +48,6 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
-	// ApplyCurrentValidators adds all the current validators and delegators of
-	// [subnetID] into [vdrs].
-	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
-
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
 	// [endHeight]. Applying the diffs modifies [validators].
@@ -346,22 +342,7 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	subnetManager := m.cfg.Validators
-	if subnetManager.Count(subnetID) == 0 {
-		// If this subnet isn't tracked, there will not be any registered
-		// validators. To calculate the current validators we need to first
-		// fetch them from state. We generate a new manager as we don't want to
-		// modify that long-lived reference.
-		//
-		// TODO: remove this once all subnets are included in the validator
-		// manager.
-		subnetManager = validators.NewManager()
-		if err := m.state.ApplyCurrentValidators(subnetID, subnetManager); err != nil {
-			return nil, nil, 0, err
-		}
-	}
-
-	subnetMap := subnetManager.GetMap(subnetID)
+	subnetMap := m.cfg.Validators.GetMap(subnetID)
 	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
 	return subnetMap, primaryMap, currentHeight, err

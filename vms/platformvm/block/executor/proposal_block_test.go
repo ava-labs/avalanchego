@@ -954,7 +954,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
 			_, ok := env.config.Validators.GetValidator(subnetID, ids.NodeIDFromShortNodeID(subnetValidatorNodeID))
-			require.Equal(tracked, ok)
+			require.True(ok)
 		})
 	}
 }

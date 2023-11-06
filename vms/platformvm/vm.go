@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -72,8 +72,8 @@ type VM struct {
 	uptimeManager uptime.Manager
 
 	// The context of this vm
-	ctx       *snow.Context
-	dbManager manager.Manager
+	ctx *snow.Context
+	db  database.Database
 
 	state state.State
 
@@ -95,7 +95,7 @@ type VM struct {
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
@@ -123,7 +123,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.ctx = chainCtx
-	vm.dbManager = dbManager
+	vm.db = db
 
 	vm.codecRegistry = linearcodec.NewDefault()
 	vm.fx = &secp256k1fx.Fx{}
@@ -134,7 +134,7 @@ func (vm *VM) Initialize(
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
 	vm.state, err = state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		genesisBytes,
 		registerer,
 		&vm.Config,
@@ -142,7 +142,6 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
-		&vm.bootstrapped,
 	)
 	if err != nil {
 		return err
@@ -304,17 +303,21 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
 	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
+	vl := validators.NewLogger(vm.ctx.Log, constants.PrimaryNetworkID, vm.ctx.NodeID)
+	vm.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
+
 	for subnetID := range vm.TrackedSubnets {
 		vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
-
 		if err := vm.uptimeManager.StartTracking(vdrIDs, subnetID); err != nil {
 			return err
 		}
+
+		vl := validators.NewLogger(vm.ctx.Log, subnetID, vm.ctx.NodeID)
+		vm.Validators.RegisterCallbackListener(subnetID, vl)
 	}
 
 	if err := vm.state.Commit(); err != nil {
@@ -339,7 +342,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown(context.Context) error {
-	if vm.dbManager == nil {
+	if vm.db == nil {
 		return nil
 	}
 
@@ -365,7 +368,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 	return utils.Err(
 		vm.state.Close(),
-		vm.dbManager.Close(),
+		vm.db.Close(),
 	)
 }
 

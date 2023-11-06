@@ -17,7 +17,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
@@ -80,7 +80,7 @@ func initTestProposerVM(
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
-	manager.Manager,
+	database.Database,
 ) {
 	require := require.New(t)
 
@@ -106,7 +106,7 @@ func initTestProposerVM(
 		},
 	}
 
-	coreVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -183,8 +183,7 @@ func initTestProposerVM(
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	db := prefixdb.New([]byte{0}, memdb.New())
 
 	// signal height index is complete
 	coreVM.VerifyHeightIndexF = func(context.Context) error {
@@ -194,7 +193,7 @@ func initTestProposerVM(
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		db,
 		initialState,
 		nil,
 		nil,
@@ -209,7 +208,7 @@ func initTestProposerVM(
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
-	return coreVM, valState, proVM, coreGenBlk, dummyDBManager
+	return coreVM, valState, proVM, coreGenBlk, db
 }
 
 // VM.BuildBlock tests section
@@ -912,14 +911,13 @@ func TestExpiredBuildBlock(t *testing.T) {
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	toEngine := make(chan common.Message, 1)
 	var toScheduler chan<- common.Message
 
 	coreVM.InitializeF = func(
 		_ context.Context,
 		_ *snow.Context,
-		_ manager.Manager,
+		_ database.Database,
 		_ []byte,
 		_ []byte,
 		_ []byte,
@@ -938,7 +936,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		memdb.New(),
 		nil,
 		nil,
 		nil,
@@ -1208,7 +1206,7 @@ func TestInnerVMRollback(t *testing.T) {
 	coreVM.InitializeF = func(
 		context.Context,
 		*snow.Context,
-		manager.Manager,
+		database.Database,
 		[]byte,
 		[]byte,
 		[]byte,
@@ -1222,7 +1220,7 @@ func TestInnerVMRollback(t *testing.T) {
 		return nil
 	}
 
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
+	db := memdb.New()
 
 	proVM := New(
 		coreVM,
@@ -1237,7 +1235,7 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		db,
 		nil,
 		nil,
 		nil,
@@ -1324,7 +1322,7 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		db,
 		nil,
 		nil,
 		nil,
@@ -1777,7 +1775,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	}
 
-	coreVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -1853,13 +1851,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
 		nil,
 		nil,
@@ -1987,7 +1982,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	}
 
-	coreVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -2063,13 +2058,10 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
 		nil,
 		nil,
@@ -2189,10 +2181,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		pTestCert,
 	)
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-
 	innerVM.EXPECT().Initialize(
 		gomock.Any(),
 		gomock.Any(),
@@ -2220,7 +2208,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		nil,
 		nil,
 		nil,
@@ -2422,9 +2410,8 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		pTestCert,
 	)
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	db := prefixdb.New([]byte{}, memdb.New())
 
 	innerVM.EXPECT().Initialize(
 		gomock.Any(),
@@ -2453,7 +2440,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		snowCtx,
-		dummyDBManager,
+		db,
 		nil,
 		nil,
 		nil,
@@ -2572,7 +2559,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	coreVM := &block.TestVM{
 		TestVM: common.TestVM{
 			T: t,
-			InitializeF: func(context.Context, *snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
 				return nil
 			},
 		},
@@ -2621,9 +2608,8 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		},
 	}
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	db := prefixdb.New([]byte{}, memdb.New())
 
 	proVM := New(
 		coreVM,
@@ -2638,7 +2624,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		db,
 		initialState,
 		nil,
 		nil,
@@ -2736,7 +2722,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		db,
 		initialState,
 		nil,
 		nil,
@@ -2778,7 +2764,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		db,
 		initialState,
 		nil,
 		nil,
