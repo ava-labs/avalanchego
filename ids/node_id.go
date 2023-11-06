@@ -49,7 +49,7 @@ func (n NodeID) String() string {
 }
 
 func (n NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + n.String() + "\""), nil
+	return []byte(`"` + n.String() + `"`), nil
 }
 
 func (n *NodeID) UnmarshalJSON(b []byte) error {
