@@ -138,7 +138,7 @@ type MerkleDB interface {
 }
 
 type Config struct {
-	// TokenConfig determines the branching factor and other aspects of the tokens that make up a key
+	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
 
 	// RootGenConcurrency is the number of goroutines to use when
