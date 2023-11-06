@@ -19,10 +19,6 @@ import (
 )
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
-	return getNodeValueWithBranchFactor(t, key, BranchFactor16)
-}
-
-func getNodeValueWithBranchFactor(t ReadOnlyTrie, key string, bf BranchFactor) ([]byte, error) {
 	var view *trieView
 	if asTrieView, ok := t.(*trieView); ok {
 		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
@@ -38,7 +34,7 @@ func getNodeValueWithBranchFactor(t ReadOnlyTrie, key string, bf BranchFactor) (
 		view = dbView.(*trieView)
 	}
 
-	path := ToKey([]byte(key), bf)
+	path := ToKey([]byte(key))
 	var result *node
 	err := view.visitPathToKey(path, func(n *node) error {
 		result = n
@@ -123,7 +119,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie := trieIntf.(*trieView)
 
 	var nodePath []*node
-	require.NoError(trie.visitPathToKey(ToKey(nil, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(nil), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -148,7 +144,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key1, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key1), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -156,7 +152,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Root and 1 value
 	require.Len(nodePath, 2)
 	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
+	require.Equal(ToKey(key1), nodePath[1].key)
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
@@ -174,14 +170,14 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
-	require.Equal(ToKey(key2, BranchFactor16), nodePath[2].key)
+	require.Equal(ToKey(key1), nodePath[1].key)
+	require.Equal(ToKey(key2), nodePath[2].key)
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
@@ -199,41 +195,43 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key3, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key3), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
+
 	require.Len(nodePath, 2)
 	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key3, BranchFactor16), nodePath[1].key)
+	require.Equal(ToKey(key3), nodePath[1].key)
 
 	// Other key path not affected
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
-	require.Equal(ToKey(key2, BranchFactor16), nodePath[2].key)
+	require.Equal(ToKey(key1), nodePath[1].key)
+	require.Equal(ToKey(key2), nodePath[2].key)
 
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key4, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key4), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
+
 	require.Len(nodePath, 3)
 	require.Equal(trie.root, nodePath[0])
-	require.Equal(ToKey(key1, BranchFactor16), nodePath[1].key)
-	require.Equal(ToKey(key2, BranchFactor16), nodePath[2].key)
+	require.Equal(ToKey(key1), nodePath[1].key)
+	require.Equal(ToKey(key2), nodePath[2].key)
 
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
 	nodePath = make([]*node, 0, 1)
-	require.NoError(trie.visitPathToKey(ToKey(key5, BranchFactor16), func(n *node) error {
+	require.NoError(trie.visitPathToKey(ToKey(key5), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -320,7 +318,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	rawBytes, err := dbTrie.baseDB.Get(prefixedKey)
 	require.NoError(err)
 
-	node, err := parseNode(ToKey(key, BranchFactor16), rawBytes)
+	node, err := parseNode(ToKey(key), rawBytes)
 	require.NoError(err)
 	require.Equal([]byte("value"), node.value.Value())
 }
@@ -488,7 +486,7 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.Equal([]byte("value12"), value)
 }
 
-func Test_Trie_CompressedPaths(t *testing.T) {
+func Test_Trie_compressedKeys(t *testing.T) {
 	require := require.New(t)
 
 	dbTrie, err := getBasicDB()
@@ -619,7 +617,7 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// Make sure the branch node with the common prefix was created.
 	// Note it's only created on call to GetMerkleRoot, not in NewView.
-	_, err = view2.getEditableNode(ToKey(keyPrefix, BranchFactor16), false)
+	_, err = view2.getEditableNode(ToKey(keyPrefix), false)
 	require.NoError(err)
 
 	// only hashes the new branch node, the new child node, and root
@@ -760,7 +758,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(emptyKey(BranchFactor16), false)
+	root, err := newTrie.getEditableNode(Key{}, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
@@ -777,7 +775,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(emptyKey(BranchFactor16), false)
+	root, err = newTrie.getEditableNode(Key{}, false)
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Empty(root.children)
@@ -842,15 +840,15 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(emptyKey(BranchFactor16), false)
+	root, err := trie.getEditableNode(Key{}, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	root, err = trie.getEditableNode(emptyKey(BranchFactor16), false)
+	root, err = trie.getEditableNode(Key{}, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err := trie.getEditableNode(getSingleChildKey(root), true)
+	firstNode, err := trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -868,11 +866,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(emptyKey(BranchFactor16), false)
+	root, err = trie.getEditableNode(Key{}, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err = trie.getEditableNode(getSingleChildKey(root), true)
+	firstNode, err = trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 2)
 }
@@ -1215,9 +1213,9 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 
 // Returns the path of the only child of this node.
 // Assumes this node has exactly one child.
-func getSingleChildKey(n *node) Key {
+func getSingleChildKey(n *node, tokenSize int) Key {
 	for index, entry := range n.children {
-		return n.key.AppendExtend(index, entry.compressedKey)
+		return n.key.Extend(ToToken(index, tokenSize), entry.compressedKey)
 	}
 	return Key{}
 }
