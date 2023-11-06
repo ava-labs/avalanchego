@@ -125,7 +125,7 @@ func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 }
 
 // CrossChainAppRequest calls the underlying handler and sends back the response
-// to nodeID
+// to chainID
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.CrossChainAppRequest(ctx, chainID, deadline, request)
 	if err != nil {
