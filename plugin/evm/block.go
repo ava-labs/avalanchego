@@ -121,7 +121,7 @@ func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *
 			if !ok {
 				continue
 			}
-			if err := accepter.Accept(acceptCtx, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
+			if err := accepter.Accept(acceptCtx, log.BlockHash, log.BlockNumber, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
 				return err
 			}
 		}

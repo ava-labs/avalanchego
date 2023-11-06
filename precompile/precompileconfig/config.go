@@ -75,7 +75,7 @@ type AcceptContext struct {
 // will not maintain backwards compatibility of this interface and your code should not
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
 type Accepter interface {
-	Accept(acceptCtx *AcceptContext, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error
+	Accept(acceptCtx *AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error
 }
 
 // ChainContext defines an interface that provides information to a stateful precompile

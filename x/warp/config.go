@@ -105,12 +105,20 @@ func (c *Config) Equal(s precompileconfig.Config) bool {
 	return equals && c.QuorumNumerator == other.QuorumNumerator
 }
 
-func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error {
+func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error {
 	unsignedMessage, err := UnpackSendWarpEventDataToMessage(logData)
 	if err != nil {
 		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}
-	log.Info("Accepted warp unsigned message", "txHash", txHash, "logIndex", logIndex, "logData", common.Bytes2Hex(logData))
+	log.Info(
+		"Accepted warp unsigned message",
+		"blockHash", blockHash,
+		"blockNumber", blockNumber,
+		"txHash", txHash,
+		"logIndex", logIndex,
+		"logData", common.Bytes2Hex(logData),
+		"warpMessageID", unsignedMessage.ID(),
+	)
 	if err := acceptCtx.Warp.AddMessage(unsignedMessage); err != nil {
 		return fmt.Errorf("failed to add warp message during accept (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}

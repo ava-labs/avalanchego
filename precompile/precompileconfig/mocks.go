@@ -246,15 +246,15 @@ func (m *MockAccepter) EXPECT() *MockAccepterMockRecorder {
 }
 
 // Accept mocks base method.
-func (m *MockAccepter) Accept(arg0 *AcceptContext, arg1 common.Hash, arg2 int, arg3 []common.Hash, arg4 []byte) error {
+func (m *MockAccepter) Accept(arg0 *AcceptContext, arg1 common.Hash, arg2 uint64, arg3 common.Hash, arg4 int, arg5 []common.Hash, arg6 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Accept", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "Accept", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Accept indicates an expected call of Accept.
-func (mr *MockAccepterMockRecorder) Accept(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockAccepterMockRecorder) Accept(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockAccepter)(nil).Accept), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockAccepter)(nil).Accept), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }

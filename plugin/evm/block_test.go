@@ -69,6 +69,8 @@ func TestHandlePrecompileAccept(t *testing.T) {
 	gomock.InOrder(
 		mockAccepter.EXPECT().Accept(
 			gomock.Not(gomock.Nil()),                // acceptCtx
+			ethBlock.Hash(),                         // blockHash
+			ethBlock.NumberU64(),                    // blockNumber
 			ethBlock.Transactions()[txIndex].Hash(), // txHash
 			0,                                       // logIndex
 			receipt.Logs[0].Topics,                  // topics
@@ -76,6 +78,8 @@ func TestHandlePrecompileAccept(t *testing.T) {
 		),
 		mockAccepter.EXPECT().Accept(
 			gomock.Not(gomock.Nil()),                // acceptCtx
+			ethBlock.Hash(),                         // blockHash
+			ethBlock.NumberU64(),                    // blockNumber
 			ethBlock.Transactions()[txIndex].Hash(), // txHash
 			2,                                       // logIndex
 			receipt.Logs[2].Topics,                  // topics
