@@ -11,7 +11,7 @@ import (
 
 const defaultBufferLength = 256
 
-// Holds intermediate nodes. That is, those without values.
+// Holds node information except for the value
 // Changes to this database aren't written to [baseDB] until
 // they're evicted from the [cache] or Flush is called.
 type nodeDB struct {
@@ -19,14 +19,14 @@ type nodeDB struct {
 	bufferPool *sync.Pool
 
 	// The underlying storage.
-	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
+	// Keys written to [baseDB] are prefixed with [nodePrefix].
 	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
-	// Keys in [cache] aren't prefixed with [intermediateNodePrefix].
+	// Keys in [cache] aren't prefixed with [nodePrefix].
 	nodeCache onEvictCache[Key, *node]
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
@@ -34,7 +34,7 @@ type nodeDB struct {
 	tokenSize         int
 }
 
-func newIntermediateNodeDB(
+func newNodeDB(
 	db database.Database,
 	bufferPool *sync.Pool,
 	metrics merkleMetrics,
@@ -134,10 +134,10 @@ func (db *nodeDB) Get(key Key) (*node, error) {
 func (db *nodeDB) constructDBKey(key Key) []byte {
 	if db.tokenSize == 8 {
 		// For tokens of size byte, no padding is needed since byte length == token length
-		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
+		return addPrefixToKey(db.bufferPool, nodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
+	return addPrefixToKey(db.bufferPool, nodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
 }
 
 func (db *nodeDB) Put(key Key, n *node) error {

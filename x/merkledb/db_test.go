@@ -6,8 +6,10 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"math/rand"
 	"strconv"
@@ -102,16 +104,54 @@ func Test_Insert(t *testing.T) {
 		newDefaultConfig(),
 		&mockMetrics{},
 	)
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 5; i++ {
 		require.NoError(err)
 		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
 		require.NoError(err)
 		require.NoError(view.CommitToDB(context.Background()))
 	}
-	println(db.metrics.(*mockMetrics).valueCacheHit)
-	println(db.metrics.(*mockMetrics).valueCacheMiss)
-	println(db.metrics.(*mockMetrics).nodeCacheHit)
-	println(db.metrics.(*mockMetrics).nodeCacheMiss)
+	require.NoError(db.Close())
+}
+
+var (
+	defaultCacheSize = 512 * units.MiB
+	DefaultConfig    = pebble.Config{
+		CacheSize:                   defaultCacheSize,
+		BytesPerSync:                512 * units.KiB,
+		WALBytesPerSync:             0, // Default to no background syncing.
+		MemTableStopWritesThreshold: 8,
+		MemTableSize:                defaultCacheSize / 4,
+		MaxOpenFiles:                4096,
+		MaxConcurrentCompactions:    1,
+	}
+	DefaultConfigBytes []byte
+)
+
+func init() {
+	var err error
+	DefaultConfigBytes, err = json.Marshal(DefaultConfig)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Test_Insert_pebble(t *testing.T) {
+	require := require.New(t)
+
+	pebbleDB, err := pebble.New(t.TempDir(), DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
+
+	db, err := newDatabase(
+		context.Background(),
+		pebbleDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	for i := 0; i < 5; i++ {
+		require.NoError(err)
+		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
+		require.NoError(err)
+		require.NoError(view.CommitToDB(context.Background()))
+	}
 	require.NoError(db.Close())
 }
 

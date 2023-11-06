@@ -32,10 +32,10 @@ import (
 const (
 
 	// TODO: name better
-	rebuildViewSizeFractionOfCacheSize   = 50
-	minRebuildViewSizePerCommit          = 1000
-	rebuildIntermediateDeletionWriteSize = units.MiB
-	valuePrefixLen                       = 1
+	rebuildViewSizeFractionOfCacheSize = 50
+	minRebuildViewSizePerCommit        = 1000
+	rebuildNodeWriteSize               = units.MiB
+	valuePrefixLen                     = 1
 )
 
 var (
@@ -44,9 +44,9 @@ var (
 
 	codec = newCodec()
 
-	metadataPrefix         = []byte{0}
-	valuePrefix            = []byte{1}
-	intermediateNodePrefix = []byte{2}
+	metadataPrefix = []byte{0}
+	valuePrefix    = []byte{1}
+	nodePrefix     = []byte{2}
 
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
@@ -147,16 +147,16 @@ type Config struct {
 	//
 	// If 0 is specified, [runtime.NumCPU] will be used.
 	RootGenConcurrency uint
-	// The number of bytes to write to disk when intermediate nodes are evicted
+	// The number of bytes to write to disk when nodes are evicted
 	// from their cache and written to disk.
 	EvictionBatchSize uint
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
 	HistoryLength uint
-	// The number of bytes to cache nodes with values.
-	ValueNodeCacheSize uint
-	// The number of bytes to cache nodes without values.
-	IntermediateNodeCacheSize uint
+	// The number of bytes used to cache values.
+	ValueCacheSize uint
+	// The number of bytes to cache nodes.
+	NodeCacheSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -177,7 +177,7 @@ type merkleDB struct {
 	commitLock sync.RWMutex
 
 	// Contains all of the key-value pairs stored by this database,
-	// including metadata, intermediate nodes and value nodes.
+	// including metadata and nodes.
 	baseDB database.Database
 
 	valueDB *valueDB
@@ -243,14 +243,14 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		nodeDB:               newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
+		nodeDB:               newNodeDB(db, bufferPool, metrics, int(config.NodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: newLimiter(int32(rootGenConcurrency)),
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
-		valueDB:              newValueDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		valueDB:              newValueDB(db, bufferPool, metrics, int(config.ValueCacheSize)),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -284,13 +284,13 @@ func newDatabase(
 	return trieDB, err
 }
 
-// Deletes every intermediate node and rebuilds them by re-adding every key/value.
+// Deletes every node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = newNode(int(sizeToBf[db.tokenSize]))
 
 	// Delete intermediate nodes.
-	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
+	if err := database.ClearPrefix(db.baseDB, nodePrefix, rebuildNodeWriteSize); err != nil {
 		return err
 	}
 
