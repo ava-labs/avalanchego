@@ -101,7 +101,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
 		if childIndex > math.MaxUint8 {
-			return ErrChildIndexTooLarge
+			return errChildIndexTooLarge
 		}
 		childID, err := ids.ToID(childIDBytes)
 		if err != nil {

@@ -1255,7 +1255,7 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 
 	var unmarshaledNode ProofNode
 	err := unmarshaledNode.UnmarshalProto(protoNode)
-	require.ErrorIs(t, err, ErrChildIndexTooLarge)
+	require.ErrorIs(t, err, errChildIndexTooLarge)
 }
 
 func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {

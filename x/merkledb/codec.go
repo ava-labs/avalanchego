@@ -44,12 +44,12 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	ErrChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
-	ErrLeadingZeroes      = errors.New("varint has leading zeroes")
-	ErrInvalidBool        = errors.New("decoded bool is neither true nor false")
-	ErrNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
-	ErrExtraSpace         = errors.New("trailing buffer space")
-	ErrIntOverflow        = errors.New("value overflows int")
+	errChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
+	errLeadingZeroes      = errors.New("varint has leading zeroes")
+	errInvalidBool        = errors.New("decoded bool is neither true nor false")
+	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
+	errExtraSpace         = errors.New("trailing buffer space")
+	errIntOverflow        = errors.New("value overflows int")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -168,7 +168,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 			return err
 		}
 		if (i != 0 && index <= previousChild) || index > math.MaxUint8 {
-			return ErrChildIndexTooLarge
+			return errChildIndexTooLarge
 		}
 		previousChild = index
 
@@ -191,7 +191,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 	}
 	if src.Len() != 0 {
-		return ErrExtraSpace
+		return errExtraSpace
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	case boolByte == falseByte:
 		return false, nil
 	default:
-		return false, ErrInvalidBool
+		return false, errInvalidBool
 	}
 }
 
@@ -246,7 +246,7 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 			return 0, err
 		}
 		if lastByte == 0x00 {
-			return 0, ErrLeadingZeroes
+			return 0, errLeadingZeroes
 		}
 	}
 
@@ -345,7 +345,7 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 		return Key{}, err
 	}
 	if length > math.MaxInt {
-		return Key{}, ErrIntOverflow
+		return Key{}, errIntOverflow
 	}
 	result := Key{
 		length: int(length),
@@ -367,7 +367,7 @@ func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
 		// Generate a mask where the (result.length % 8) left bits are 0.
 		paddingMask := byte(0xFF >> (result.length % 8))
 		if buffer[keyBytesLen-1]&paddingMask != 0 {
-			return Key{}, ErrNonZeroKeyPadding
+			return Key{}, errNonZeroKeyPadding
 		}
 	}
 	result.value = string(buffer)
