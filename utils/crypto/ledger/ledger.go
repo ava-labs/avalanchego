@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	rootPath          = "m/44'/9000'/0'"
+	rootPath          = "m/44'/9000'/0'" // BIP44: m / purpose' / coin_type' / account'
 	ledgerBufferLimit = 8192
 	ledgerPathSize    = 9
 )
@@ -61,18 +61,19 @@ func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
 			ChainCode: chainCode,
 		}
 	}
-	// get first derivation of 0/v path
-	child0, err := l.epk.NewChildKey(0)
+	// derivation path rootPath/0 (BIP44 change level, when set to 0, known as external chain)
+	externalChain, err := l.epk.NewChildKey(0)
 	if err != nil {
 		return nil, err
 	}
 	addresses := make([]ids.ShortID, len(addressIndices))
-	for i, child1Index := range addressIndices {
-		child1, err := child0.NewChildKey(child1Index)
+	for i, addressIndex := range addressIndices {
+		// derivation path rootPath/0/v (BIP44 address index level)
+		address, err := externalChain.NewChildKey(addressIndex)
 		if err != nil {
 			return nil, err
 		}
-		copy(addresses[i][:], hashing.PubkeyBytesToAddress(child1.Key))
+		copy(addresses[i][:], hashing.PubkeyBytesToAddress(address.Key))
 	}
 	return addresses, nil
 }
