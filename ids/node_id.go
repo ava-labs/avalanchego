@@ -23,9 +23,9 @@ const (
 var (
 	EmptyNodeID = NodeID{}
 
-	ErrBadNodeIDLenght = errors.New("bad nodeID length")
+	ErrBadNodeIDLength = errors.New("bad nodeID length")
 
-	_ utils.Sortable[NodeID] = (*NodeID)(nil)
+	_ utils.Sortable[NodeID] = NodeID{}
 )
 
 // NodeID embeds a string, rather than being a type alias for a string
@@ -89,14 +89,12 @@ func ToNodeID(src []byte) (NodeID, error) {
 		return EmptyNodeID, nil
 
 	case len(src) == ShortIDLen || len(src) == LongNodeIDLen:
-		bytes := make([]byte, len(src))
-		copy(bytes, src)
 		return NodeID{
-			buf: string(bytes),
+			buf: string(src),
 		}, nil
 
 	default:
-		return EmptyNodeID, fmt.Errorf("expected %d or %d bytes but got %d: %w", ShortNodeIDLen, LongNodeIDLen, len(src), ErrBadNodeIDLenght)
+		return EmptyNodeID, fmt.Errorf("%w: expected %d or %d bytes but got %d", ErrBadNodeIDLength, ShortNodeIDLen, LongNodeIDLen, len(src))
 	}
 }
 

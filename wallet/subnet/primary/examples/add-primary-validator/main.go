@@ -59,7 +59,7 @@ func main() {
 	addValidatorStartTime := time.Now()
 	shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
 	if err != nil {
-		log.Fatalf("failed turning NodeID %v into shortNodeID: %s\n", nodeID, err)
+		log.Fatalf("failed turning NodeID %s into shortNodeID: %s\n", nodeID, err)
 	}
 	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{

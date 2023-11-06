@@ -61,7 +61,7 @@ func ShortNodeIDFromNodeID(nodeID NodeID) (ShortNodeID, error) {
 }
 
 func (sn ShortNodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + sn.String() + "\""), nil
+	return []byte(`"` + sn.String() + `"`), nil
 }
 
 func (sn *ShortNodeID) UnmarshalJSON(b []byte) error {

@@ -297,7 +297,7 @@ func (s *vdrSet) prefixedString(prefix string) string {
 		sb.WriteString(fmt.Sprintf(
 			format,
 			i,
-			vdr.NodeID.String(),
+			vdr.NodeID,
 			vdr.Weight,
 		))
 	}

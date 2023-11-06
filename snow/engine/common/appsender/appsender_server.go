@@ -50,7 +50,7 @@ func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppReq
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {
-			return &emptypb.Empty{}, err
+			return nil, err
 		}
 		nodeIDs.Add(nodeID)
 	}
@@ -61,7 +61,7 @@ func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppReq
 func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return &emptypb.Empty{}, err
+		return nil, err
 	}
 	err = s.appSender.SendAppResponse(ctx, nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
@@ -77,7 +77,7 @@ func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.Sen
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {
-			return &emptypb.Empty{}, err
+			return nil, err
 		}
 		nodeIDs.Add(nodeID)
 	}

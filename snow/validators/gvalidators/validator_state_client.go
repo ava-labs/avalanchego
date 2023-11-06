@@ -70,11 +70,10 @@ func (c *Client) GetValidatorSet(
 
 	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
-		shortNodeID, err := ids.ToShortNodeID(validator.NodeId)
+		nodeID, err := ids.ToNodeID(validator.NodeId)
 		if err != nil {
 			return nil, err
 		}
-		nodeID := ids.NodeIDFromShortNodeID(shortNodeID)
 
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
