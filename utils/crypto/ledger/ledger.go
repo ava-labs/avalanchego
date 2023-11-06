@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	ledger "github.com/ava-labs/ledger-avalanche/go"
+
 	bip32 "github.com/tyler-smith/go-bip32"
 
 	"github.com/ava-labs/avalanchego/ids"
