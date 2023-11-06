@@ -218,7 +218,7 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return nil
 	}
 
-	// Call the corresponding handler and send back a response to nodeID.
+	// call the corresponding handler and send back a response to nodeID
 	if err := handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg); err != nil {
 		return err
 	}
