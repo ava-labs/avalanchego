@@ -20,7 +20,7 @@ var (
 // at the given block.
 type SyncSummary struct {
 	BlockNumber uint64 `serialize:"true"`
-	BlockHash   ids.ID `serialize:"true"`
+	BlockID     ids.ID `serialize:"true"`
 	BlockRoot   ids.ID `serialize:"true"`
 
 	// Invariant: non-nil.
@@ -49,10 +49,10 @@ func NewSyncSummaryFromBytes(summaryBytes []byte, acceptImpl func(SyncSummary) (
 	return summary, nil
 }
 
-func NewSyncSummary(blockHash ids.ID, blockNumber uint64, blockRoot ids.ID) (SyncSummary, error) {
+func NewSyncSummary(blockID ids.ID, blockNumber uint64, blockRoot ids.ID) (SyncSummary, error) {
 	summary := SyncSummary{
 		BlockNumber: blockNumber,
-		BlockHash:   blockHash,
+		BlockID:     blockID,
 		BlockRoot:   blockRoot,
 	}
 	bytes, err := Codec.Marshal(Version, &summary)
@@ -84,8 +84,8 @@ func (s SyncSummary) ID() ids.ID {
 
 func (s SyncSummary) String() string {
 	return fmt.Sprintf(
-		"SyncSummary(BlockHash=%s, BlockNumber=%d, BlockRoot=%s)",
-		s.BlockHash, s.BlockNumber, s.BlockRoot,
+		"SyncSummary(BlockID=%s, BlockNumber=%d, BlockRoot=%s)",
+		s.BlockID, s.BlockNumber, s.BlockRoot,
 	)
 }
 

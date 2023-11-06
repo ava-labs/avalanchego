@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (
@@ -19,9 +19,33 @@ var (
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
 
+type ClientConfig struct {
+	sync.ManagerConfig
+	Enabled bool
+}
+
+// [config.TargetRoot] will be set when a summary is accepted.
+// It doesn't need to be set here.
+func NewClient(
+	config ClientConfig,
+	metadataDB database.KeyValueReaderWriterDeleter,
+) *Client {
+	return &Client{
+		enabled:       config.Enabled,
+		managerConfig: config.ManagerConfig,
+		syncErrChan:   make(chan error),
+	}
+}
+
 type Client struct {
-	enabled    bool // TODO set
+	enabled       bool
+	manager       *sync.Manager // Set in acceptSyncSummary
+	managerConfig sync.ManagerConfig
+
 	metadataDB database.KeyValueReaderWriterDeleter
+
+	syncCancel  context.CancelFunc // Set in acceptSyncSummary
+	syncErrChan chan error
 }
 
 func (c *Client) StateSyncEnabled(context.Context) (bool, error) {
@@ -34,11 +58,11 @@ func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	summary, err := message.NewSyncSummaryFromBytes(summaryBytes, nil /*c.acceptSyncSummary TODO uncomment*/)
+	summary, err := NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
 	}
-	// c.resumableSummary = summary TODO uncomment
+
 	return summary, nil
 }
 
@@ -47,9 +71,30 @@ func (c *Client) GetLastStateSummary(context.Context) (block.StateSummary, error
 }
 
 func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	return nil, errors.New("TODO")
+	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
 func (c *Client) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
 	return nil, errors.New("TODO")
+}
+
+// acceptSyncSummary returns true if sync will be performed and launches the state sync process
+// in a goroutine.
+func (c *Client) acceptSyncSummary(proposedSummary SyncSummary) (block.StateSyncMode, error) {
+	c.managerConfig.TargetRoot = proposedSummary.BlockRoot
+
+	manager, err := sync.NewManager(c.managerConfig)
+	if err != nil {
+		return 0, err
+	}
+	c.manager = manager
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c.syncCancel = cancel
+
+	go func() {
+		c.syncErrChan <- c.manager.Start(ctx)
+	}()
+
+	return block.StateSyncStatic, nil
 }
