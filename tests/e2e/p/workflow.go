@@ -36,7 +36,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 			keychain := e2e.Env.NewKeychain(2)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			avaxAssetID := baseWallet.P().AVAXAssetID()
