@@ -794,8 +794,8 @@ func (t *trieView) insert(
 
 	// A node with the exact key doesn't exist so determine the portion of the
 	// key that hasn't been matched yet
-	// Note that [key] has prefix [closestNodeKey] but exactMatch was false,
-	// so [key] must be longer than [key] and the following index and slice won't OOB.
+	// Note that [key] has prefix [closestNode.key], so [key] must be longer
+	// and the following index won't OOB.
 	existingChildEntry, hasChild := closestNode.children[key.Token(closestNode.key.length, t.tokenSize)]
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
