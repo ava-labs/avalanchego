@@ -297,7 +297,6 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
-	delete(s.deletedStakers, staker.TxID)
 }
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
@@ -349,13 +348,11 @@ func (s *diffStakers) PutDelegator(staker *Staker) {
 		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
-	delete(validatorDiff.deletedDelegators, staker.TxID)
 
 	if s.addedStakers == nil {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
-	delete(s.deletedStakers, staker.TxID)
 }
 
 func (s *diffStakers) DeleteDelegator(staker *Staker) {
