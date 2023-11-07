@@ -928,7 +928,8 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 	}
 
 	return node.DatabaseConfig{
-		Name: v.GetString(DBTypeKey),
+		ReadOnly: v.GetBool(DBReadOnlyKey),
+		Name:     v.GetString(DBTypeKey),
 		Path: filepath.Join(
 			GetExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
