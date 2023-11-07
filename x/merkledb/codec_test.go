@@ -87,10 +87,8 @@ func FuzzCodecKey(f *testing.F) {
 			}
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			codec.encodeKey(got)
-			bufBytes := buf.Bytes()
-			require.Equal(b, bufBytes)
+			gotBytes := codec.encodeKey(got)
+			require.Equal(b, gotBytes)
 		},
 	)
 }
