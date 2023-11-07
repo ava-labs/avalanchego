@@ -230,7 +230,6 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 			m.bytesAvailable += len(txBytes)
 			m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
-			m.unissuedTxs.Delete(txID)
 			m.numTxs.Dec()
 
 			inputs := tx.Unsigned.InputIDs()
