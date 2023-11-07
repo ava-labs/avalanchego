@@ -55,11 +55,29 @@ type App interface {
 }
 
 func New(config node.Config) (App, error) {
+	// Set the data directory permissions to be read write.
+	if err := perms.ChmodR(config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
+	}
+	if err := perms.ChmodR(config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("failed to restrict the permissions of the log directory with: %w", err)
+	}
+
 	logFactory := logging.NewFactory(config.LoggingConfig)
 	log, err := logFactory.Make("main")
 	if err != nil {
 		logFactory.Close()
 		return nil, fmt.Errorf("failed to initialize log: %w", err)
+	}
+
+	// update fd limit
+	fdLimit := config.FdLimit
+	if err := ulimit.Set(fdLimit, log); err != nil {
+		log.Fatal("failed to set fd-limit",
+			zap.Error(err),
+		)
+		logFactory.Close()
+		return nil, err
 	}
 
 	n, err := node.New(&config, logFactory, log)
@@ -126,24 +144,6 @@ type app struct {
 // Does not block until the node is done. Errors returned from this method
 // are not logged.
 func (a *app) Start() error {
-	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(a.config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
-	}
-	if err := perms.ChmodR(a.config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the log directory with: %w", err)
-	}
-
-	// update fd limit
-	fdLimit := a.config.FdLimit
-	if err := ulimit.Set(fdLimit, a.log); err != nil {
-		a.log.Fatal("failed to set fd-limit",
-			zap.Error(err),
-		)
-		a.logFactory.Close()
-		return err
-	}
-
 	// Track if sybil control is enforced
 	if !a.config.SybilProtectionEnabled {
 		a.log.Warn("sybil control is not enforced")
