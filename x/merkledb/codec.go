@@ -344,7 +344,15 @@ func (c *codecImpl) encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
 }
 
 func (c *codecImpl) decodeKey(b []byte) (Key, error) {
-	return c.decodeKeyFromReader(bytes.NewReader(b))
+	src := bytes.NewReader(b)
+	key, err := c.decodeKeyFromReader(src)
+	if err != nil {
+		return Key{}, err
+	}
+	if src.Len() != 0 {
+		return Key{}, errExtraSpace
+	}
+	return key, err
 }
 
 func (c *codecImpl) decodeKeyFromReader(src *bytes.Reader) (Key, error) {
