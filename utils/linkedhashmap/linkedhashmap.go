@@ -17,8 +17,7 @@ var _ LinkedHashmap[int, struct{}] = (*linkedHashmap[int, struct{}])(nil)
 type Hashmap[K, V any] interface {
 	Put(key K, val V)
 	Get(key K) (val V, exists bool)
-	// Returns true if the key had existed and now been deleted.
-	Delete(key K) bool
+	Delete(key K) (deleted bool)
 	Len() int
 }
 
@@ -115,7 +114,6 @@ func (lh *linkedHashmap[K, V]) get(key K) (V, bool) {
 	return utils.Zero[V](), false
 }
 
-// returns true if the key had existed
 func (lh *linkedHashmap[K, V]) delete(key K) bool {
 	e, ok := lh.entryMap[key]
 	if ok {
