@@ -1292,7 +1292,6 @@ func (db *merkleDB) Clear() error {
 
 	ops := make([]database.BatchOp, len(keysToDelete))
 	for i, keyToDelete := range keysToDelete {
-		keyToDelete := keyToDelete
 		ops[i] = database.BatchOp{
 			Key:    keyToDelete,
 			Delete: true,
