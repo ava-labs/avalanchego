@@ -111,7 +111,7 @@ type mempool struct {
 	blkTimer BlockTimer
 }
 
-func NewMempool(
+func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	blkTimer BlockTimer,
