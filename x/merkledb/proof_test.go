@@ -634,7 +634,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 
 	require.Len(proof.EndProof, 2)
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[1].Key)
-	require.Equal(ToKey([]byte{}), proof.EndProof[0].Key)
+	require.Equal(ToKey([]byte("key2")).Take(28), proof.EndProof[0].Key)
 
 	require.NoError(proof.Verify(
 		context.Background(),

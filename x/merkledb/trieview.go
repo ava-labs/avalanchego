@@ -160,8 +160,8 @@ func newTrieView(
 		sentinelNode: sentinelNode,
 		db:           db,
 		parentTrie:   parentTrie,
-		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),\
-tokenSize:  db.tokenSize,
+		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		tokenSize:    db.tokenSize,
 	}
 
 	for _, op := range changes.BatchOps {
@@ -208,10 +208,10 @@ func newHistoricalTrieView(
 
 	newView := &trieView{
 		sentinelNode: passedSentinelChange.after,
-		db:         db,
-		parentTrie: db,
-		changes:    changes,
-		tokenSize:  db.tokenSize,
+		db:           db,
+		parentTrie:   db,
+		changes:      changes,
+		tokenSize:    db.tokenSize,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
@@ -911,7 +911,7 @@ func (t *trieView) getRoot() *node {
 	if !isSentinelNodeTheRoot(t.sentinelNode) {
 		// sentinelNode has one child, which is the root
 		for index, childEntry := range t.sentinelNode.children {
-			childPath := t.sentinelNode.key.AppendExtend(index, childEntry.compressedKey)
+			childPath := t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey)
 			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
 			return root
 		}
