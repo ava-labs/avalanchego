@@ -71,7 +71,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -273,7 +272,6 @@ func (vm *VM) Initialize(
 	if err := vm.config.Validate(); err != nil {
 		return err
 	}
-
 	vm.ctx = chainCtx
 
 	// Create logger
@@ -949,17 +947,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := avalancheRPC.NewServer()
-	codec := cjson.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	serviceName := "subnetevm"
-	if err := server.RegisterService(&StaticService{}, serviceName); err != nil {
+	handler := rpc.NewServer(0)
+	if err := handler.RegisterName("static", &StaticService{}); err != nil {
 		return nil, err
 	}
 
 	return map[string]http.Handler{
-		"/rpc": server,
+		"/rpc": handler,
 	}, nil
 }
 

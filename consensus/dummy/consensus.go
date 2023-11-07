@@ -233,6 +233,14 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
+	// Verify the existence / non-existence of excessDataGas
+	cancun := chain.Config().IsCancun(header.Time)
+	if cancun && header.ExcessDataGas == nil {
+		return errors.New("missing excessDataGas")
+	}
+	if !cancun && header.ExcessDataGas != nil {
+		return fmt.Errorf("invalid excessDataGas: have %d, expected nil", header.ExcessDataGas)
+	}
 	return nil
 }
 
@@ -400,7 +408,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(
-		header, txs, uncles, receipts, new(trie.Trie),
+		header, txs, uncles, receipts, trie.NewStackTrie(nil),
 	), nil
 }
 

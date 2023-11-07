@@ -355,16 +355,17 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 			return blockchain, nil
 		}
 
-		targetRoot := blockchain.LastAcceptedBlock().Root()
-		if targetRoot == blockchain.Genesis().Root() {
-			return blockchain, nil
-		}
-
-		tempDir := t.TempDir()
 		if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
 			return nil, err
 		}
+		// get the target root to prune to before stopping the blockchain
+		targetRoot := blockchain.LastAcceptedBlock().Root()
+		if targetRoot == types.EmptyRootHash {
+			return blockchain, nil
+		}
+		blockchain.Stop()
 
+		tempDir := t.TempDir()
 		prunerConfig := pruner.Config{
 			Datadir:   tempDir,
 			BloomSize: 256,
@@ -383,8 +384,8 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		return createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.Name, func(t *testing.T) {
-			tt := tt
 			t.Parallel()
 			tt.testFunc(t, create)
 		})
@@ -469,6 +470,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer blockchain.Stop()
 
 	for _, block := range chain {
 		if !blockchain.HasState(block.Root()) {
@@ -958,6 +960,7 @@ func testCreateThenDelete(t *testing.T, config *params.ChainConfig) {
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
+	defer chain.Stop()
 	// Import the blocks
 	for _, block := range blocks {
 		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
@@ -1044,6 +1047,7 @@ func TestTransientStorageReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
+	defer chain.Stop()
 	// Import the blocks
 	if _, err := chain.InsertChain(blocks); err != nil {
 		t.Fatalf("failed to insert into chain: %v", err)
@@ -1132,6 +1136,7 @@ func TestEIP3651(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
+	defer chain.Stop()
 	if n, err := chain.InsertChain(blocks); err != nil {
 		t.Fatalf("block %d: failed to insert into chain: %v", n, err)
 	}

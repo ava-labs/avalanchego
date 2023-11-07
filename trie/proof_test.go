@@ -30,6 +30,7 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
+	"fmt"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -39,6 +40,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
+
+// Prng is a pseudo random number generator seeded by strong randomness.
+// The randomness is printed on startup in order to make failures reproducible.
+var prng = initRnd()
+
+func initRnd() *mrand.Rand {
+	var seed [8]byte
+	crand.Read(seed[:])
+	rnd := mrand.New(mrand.NewSource(int64(binary.LittleEndian.Uint64(seed[:]))))
+	fmt.Printf("Seed: %x\n", seed)
+	return rnd
+}
+
+func randBytes(n int) []byte {
+	r := make([]byte, n)
+	prng.Read(r)
+	return r
+}
 
 // makeProvers creates Merkle trie provers based on different implementations to
 // test all variations.
@@ -394,7 +413,7 @@ func TestOneElementRangeProof(t *testing.T) {
 	// Test the mini trie with only a single element.
 	tinyTrie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	entry := &kv{randBytes(32), randBytes(20), false}
-	tinyTrie.Update(entry.k, entry.v)
+	tinyTrie.MustUpdate(entry.k, entry.v)
 
 	first = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000").Bytes()
 	last = entry.k
@@ -468,7 +487,7 @@ func TestSingleSideRangeProof(t *testing.T) {
 		var entries entrySlice
 		for i := 0; i < 4096; i++ {
 			value := &kv{randBytes(32), randBytes(20), false}
-			trie.Update(value.k, value.v)
+			trie.MustUpdate(value.k, value.v)
 			entries = append(entries, value)
 		}
 		sort.Sort(entries)
@@ -503,7 +522,7 @@ func TestReverseSingleSideRangeProof(t *testing.T) {
 		var entries entrySlice
 		for i := 0; i < 4096; i++ {
 			value := &kv{randBytes(32), randBytes(20), false}
-			trie.Update(value.k, value.v)
+			trie.MustUpdate(value.k, value.v)
 			entries = append(entries, value)
 		}
 		sort.Sort(entries)
@@ -610,7 +629,7 @@ func TestGappedRangeProof(t *testing.T) {
 	var entries []*kv // Sorted entries
 	for i := byte(0); i < 10; i++ {
 		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
-		trie.Update(value.k, value.v)
+		trie.MustUpdate(value.k, value.v)
 		entries = append(entries, value)
 	}
 	first, last := 2, 8
@@ -684,7 +703,7 @@ func TestHasRightElement(t *testing.T) {
 	var entries entrySlice
 	for i := 0; i < 4096; i++ {
 		value := &kv{randBytes(32), randBytes(20), false}
-		trie.Update(value.k, value.v)
+		trie.MustUpdate(value.k, value.v)
 		entries = append(entries, value)
 	}
 	sort.Sort(entries)
@@ -1038,23 +1057,17 @@ func randomTrie(n int) (*Trie, map[string]*kv) {
 	for i := byte(0); i < 100; i++ {
 		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
 		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), []byte{i}, false}
-		trie.Update(value.k, value.v)
-		trie.Update(value2.k, value2.v)
+		trie.MustUpdate(value.k, value.v)
+		trie.MustUpdate(value2.k, value2.v)
 		vals[string(value.k)] = value
 		vals[string(value2.k)] = value2
 	}
 	for i := 0; i < n; i++ {
 		value := &kv{randBytes(32), randBytes(20), false}
-		trie.Update(value.k, value.v)
+		trie.MustUpdate(value.k, value.v)
 		vals[string(value.k)] = value
 	}
 	return trie, vals
-}
-
-func randBytes(n int) []byte {
-	r := make([]byte, n)
-	crand.Read(r)
-	return r
 }
 
 func nonRandomTrie(n int) (*Trie, map[string]*kv) {
@@ -1068,7 +1081,7 @@ func nonRandomTrie(n int) (*Trie, map[string]*kv) {
 		binary.LittleEndian.PutUint64(value, i-max)
 		//value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
 		elem := &kv{key, value, false}
-		trie.Update(elem.k, elem.v)
+		trie.MustUpdate(elem.k, elem.v)
 		vals[string(elem.k)] = elem
 	}
 	return trie, vals
@@ -1085,7 +1098,7 @@ func TestRangeProofKeysWithSharedPrefix(t *testing.T) {
 	}
 	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	for i, key := range keys {
-		trie.Update(key, vals[i])
+		trie.MustUpdate(key, vals[i])
 	}
 	root := trie.Hash()
 	proof := memorydb.New()

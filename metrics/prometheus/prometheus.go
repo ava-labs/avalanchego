@@ -50,6 +50,17 @@ func (g gatherer) Gather() ([]*dto.MetricFamily, error) {
 					},
 				}},
 			})
+		case metrics.CounterFloat64:
+			val := m.Snapshot().Count()
+			mfs = append(mfs, &dto.MetricFamily{
+				Name: &name,
+				Type: dto.MetricType_COUNTER.Enum(),
+				Metric: []*dto.Metric{{
+					Counter: &dto.Counter{
+						Value: &val,
+					},
+				}},
+			})
 		case metrics.Gauge:
 			val := m.Snapshot().Value()
 			valFloat := float64(val)

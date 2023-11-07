@@ -160,6 +160,10 @@ const (
 	Bls12381PairingPerPairGas uint64 = 23000  // Per-point pair gas price for BLS12-381 elliptic curve pairing check
 	Bls12381MapG1Gas          uint64 = 5500   // Gas price for BLS12-381 mapping field element to G1 operation
 	Bls12381MapG2Gas          uint64 = 110000 // Gas price for BLS12-381 mapping field element to G2 operation
+
+	BlobTxDataGasPerBlob             = 1 << 17 // Gas consumption of a single data blob (== blob byte size)
+	BlobTxMinDataGasprice            = 1       // Minimum gas price for data blobs
+	BlobTxDataGaspriceUpdateFraction = 2225652 // Controls the maximum rate of change for data gas price
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations

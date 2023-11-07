@@ -73,9 +73,10 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
+	SafeBlockNumber     = BlockNumber(-4)
 	AcceptedBlockNumber = BlockNumber(-3)
-	PendingBlockNumber  = BlockNumber(-2)
-	LatestBlockNumber   = BlockNumber(-1)
+	LatestBlockNumber   = BlockNumber(-2)
+	PendingBlockNumber  = BlockNumber(-1)
 	EarliestBlockNumber = BlockNumber(0)
 )
 
@@ -101,10 +102,12 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	// Include "finalized" and "safe" as an option for compatibility with
-	// FinalizedBlockNumber and SafeBlockNumber from geth.
-	case "accepted", "finalized", "safe":
+	// Include "finalized" as an option for compatibility with FinalizedBlockNumber from geth.
+	case "accepted", "finalized":
 		*bn = AcceptedBlockNumber
+		return nil
+	case "safe":
+		*bn = SafeBlockNumber
 		return nil
 	}
 
@@ -119,31 +122,41 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalText implements encoding.TextMarshaler. It marshals:
-// - "accepted", "latest", "earliest" or "pending" as strings
-// - other numbers as hex
-func (bn BlockNumber) MarshalText() ([]byte, error) {
-	switch bn {
-	case EarliestBlockNumber:
-		return []byte("earliest"), nil
-	case LatestBlockNumber:
-		return []byte("latest"), nil
-	case PendingBlockNumber:
-		return []byte("pending"), nil
-	case AcceptedBlockNumber:
-		return []byte("accepted"), nil
-	default:
-		return hexutil.Uint64(bn).MarshalText()
-	}
-}
-
+// Int64 returns the block number as int64.
 func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
 }
 
+// MarshalText implements encoding.TextMarshaler. It marshals:
+// - "accepted", "latest", "earliest" or "pending" as strings
+// - other numbers as hex
+func (bn BlockNumber) MarshalText() ([]byte, error) {
+	return []byte(bn.String()), nil
+}
+
+func (bn BlockNumber) String() string {
+	switch bn {
+	case EarliestBlockNumber:
+		return "earliest"
+	case LatestBlockNumber:
+		return "latest"
+	case PendingBlockNumber:
+		return "pending"
+	case AcceptedBlockNumber:
+		return "accepted"
+	case SafeBlockNumber:
+		return "safe"
+	default:
+		if bn < 0 {
+			return fmt.Sprintf("<invalid %d>", bn)
+		}
+		return hexutil.Uint64(bn).String()
+	}
+}
+
 // IsAccepted returns true if this blockNumber should be treated as a request for the last accepted block
 func (bn BlockNumber) IsAccepted() bool {
-	return bn < EarliestBlockNumber && bn >= AcceptedBlockNumber
+	return bn < EarliestBlockNumber && bn >= SafeBlockNumber
 }
 
 type BlockNumberOrHash struct {
@@ -183,10 +196,13 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-	// Include "finalized" and "safe" as an option for compatibility with
-	// FinalizedBlockNumber and SafeBlockNumber from geth.
-	case "accepted", "finalized", "safe":
+	// Include "finalized" as an option for compatibility with FinalizedBlockNumber from geth.
+	case "accepted", "finalized":
 		bn := AcceptedBlockNumber
+		bnh.BlockNumber = &bn
+		return nil
+	case "safe":
+		bn := SafeBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	default:

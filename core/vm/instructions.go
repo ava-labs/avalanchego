@@ -27,8 +27,6 @@
 package vm
 
 import (
-	"sync/atomic"
-
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -535,7 +533,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 }
 
 func opJump(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if atomic.LoadInt32(&interpreter.evm.abort) != 0 {
+	if interpreter.evm.abort.Load() {
 		return nil, errStopToken
 	}
 	pos := scope.Stack.pop()
@@ -547,7 +545,7 @@ func opJump(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 }
 
 func opJumpi(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if atomic.LoadInt32(&interpreter.evm.abort) != 0 {
+	if interpreter.evm.abort.Load() {
 		return nil, errStopToken
 	}
 	pos, cond := scope.Stack.pop(), scope.Stack.pop()
@@ -677,6 +675,8 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	// Get the arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
+	// Note: this code fails to check that value2 is zero, which was a bug when CALLEX was active.
+	// The CALLEX opcode was de-activated in ApricotPhase2 resolving this issue.
 	if interpreter.readOnly && !value.IsZero() {
 		return nil, vmerrs.ErrWriteProtection
 	}
@@ -827,9 +827,9 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance)
 	interpreter.evm.StateDB.Suicide(scope.Contract.Address())
-	if interpreter.evm.Config.Debug {
-		interpreter.evm.Config.Tracer.CaptureEnter(SELFDESTRUCT, scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance)
-		interpreter.evm.Config.Tracer.CaptureExit([]byte{}, 0, nil)
+	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
+		tracer.CaptureEnter(SELFDESTRUCT, scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance)
+		tracer.CaptureExit([]byte{}, 0, nil)
 	}
 	return nil, errStopToken
 }

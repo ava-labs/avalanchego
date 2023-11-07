@@ -93,6 +93,9 @@ type Header struct {
 	// BlockGasCost was added by SubnetEVM and is ignored in legacy
 	// headers.
 	BlockGasCost *big.Int `json:"blockGasCost" rlp:"optional"`
+
+	// ExcessDataGas was added by EIP-4844 and is ignored in legacy headers.
+	ExcessDataGas *big.Int `json:"excessDataGas" rlp:"optional"`
 }
 
 // field type overrides for gencodec

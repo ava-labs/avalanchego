@@ -79,7 +79,6 @@ var (
 
 		HomesteadBlock:           big.NewInt(0),
 		EIP150Block:              big.NewInt(0),
-		EIP150Hash:               common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
 		EIP155Block:              big.NewInt(0),
 		EIP158Block:              big.NewInt(0),
 		ByzantiumBlock:           big.NewInt(0),
@@ -98,7 +97,6 @@ var (
 		AllowFeeRecipients:  false,
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.Hash{},
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
@@ -121,7 +119,6 @@ var (
 		AllowFeeRecipients:  false,
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.Hash{},
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
@@ -143,7 +140,6 @@ var (
 		AllowFeeRecipients:       false,
 		HomesteadBlock:           big.NewInt(0),
 		EIP150Block:              big.NewInt(0),
-		EIP150Hash:               common.Hash{},
 		EIP155Block:              big.NewInt(0),
 		EIP158Block:              big.NewInt(0),
 		ByzantiumBlock:           big.NewInt(0),
@@ -195,9 +191,7 @@ type ChainConfig struct {
 	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
 
 	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-	EIP150Block *big.Int    `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
-	EIP150Hash  common.Hash `json:"eip150Hash,omitempty"`  // EIP150 HF hash (needed for header only clients as only gas pricing changed)
-
+	EIP150Block *big.Int `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
 	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
 	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
 
@@ -289,6 +283,9 @@ func (c *ChainConfig) Description() string {
 	}
 	if c.DUpgradeTimestamp != nil {
 		banner += fmt.Sprintf(" - DUpgrade Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", *c.DUpgradeTimestamp)
+	}
+	if c.CancunTime != nil {
+		banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", *c.CancunTime)
 	}
 	banner += "\n"
 
@@ -383,6 +380,12 @@ func (c *ChainConfig) IsSubnetEVM(time uint64) bool {
 // with a timestamp after the DUpgrade upgrade time.
 func (c *ChainConfig) IsDUpgrade(time uint64) bool {
 	return utils.IsTimestampForked(c.DUpgradeTimestamp, time)
+}
+
+// IsCancun returns whether [time] represents a block
+// with a timestamp after the Cancun upgrade time.
+func (c *ChainConfig) IsCancun(time uint64) bool {
+	return utils.IsTimestampForked(c.CancunTime, time)
 }
 
 func (r *Rules) PredicatersExist() bool {
@@ -709,6 +712,7 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
+	IsCancun                                                bool
 
 	// Rules for Avalanche releases
 	IsSubnetEVM bool
@@ -734,7 +738,7 @@ func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) rules(num *big.Int) Rules {
+func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -749,13 +753,14 @@ func (c *ChainConfig) rules(num *big.Int) Rules {
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
+		IsCancun:         c.IsCancun(timestamp),
 	}
 }
 
 // AvalancheRules returns the Avalanche modified rules to support Avalanche
 // network upgrades
 func (c *ChainConfig) AvalancheRules(blockNum *big.Int, timestamp uint64) Rules {
-	rules := c.rules(blockNum)
+	rules := c.rules(blockNum, timestamp)
 
 	rules.IsSubnetEVM = c.IsSubnetEVM(timestamp)
 	rules.IsDUpgrade = c.IsDUpgrade(timestamp)

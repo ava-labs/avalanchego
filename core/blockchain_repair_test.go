@@ -537,6 +537,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	if err != nil {
 		t.Fatalf("Failed to create chain: %v", err)
 	}
+	defer chain.Stop()
 	lastAcceptedHash := chain.GetBlockByNumber(0).Hash()
 
 	// If sidechain blocks are needed, make a light chain and import it

@@ -11,14 +11,14 @@ package core
 type BoundedBuffer[K any] struct {
 	lastPos  int
 	size     int
-	callback func(K)
+	callback func(K) error
 	buffer   []K
 
 	cycled bool
 }
 
 // NewBoundedBuffer creates a new [BoundedBuffer].
-func NewBoundedBuffer[K any](size int, callback func(K)) *BoundedBuffer[K] {
+func NewBoundedBuffer[K any](size int, callback func(K) error) *BoundedBuffer[K] {
 	return &BoundedBuffer[K]{
 		lastPos:  -1,
 		size:     size,
@@ -29,7 +29,7 @@ func NewBoundedBuffer[K any](size int, callback func(K)) *BoundedBuffer[K] {
 
 // Insert adds a new value to the buffer. If the buffer is full, the
 // oldest value will be overwritten and [callback] will be invoked.
-func (b *BoundedBuffer[K]) Insert(h K) {
+func (b *BoundedBuffer[K]) Insert(h K) error {
 	nextPos := b.lastPos + 1 // the first item added to the buffer will be at position 0
 	if nextPos == b.size {
 		nextPos = 0
@@ -39,10 +39,13 @@ func (b *BoundedBuffer[K]) Insert(h K) {
 	if b.cycled {
 		// We ensure we have cycled through the buffer once before invoking the
 		// [callback] to ensure we don't call it with unset values.
-		b.callback(b.buffer[nextPos])
+		if err := b.callback(b.buffer[nextPos]); err != nil {
+			return err
+		}
 	}
 	b.buffer[nextPos] = h
 	b.lastPos = nextPos
+	return nil
 }
 
 // Last retrieves the last item added to the buffer.

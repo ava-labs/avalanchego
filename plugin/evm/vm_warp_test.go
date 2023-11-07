@@ -97,7 +97,7 @@ func TestSendWarpMessage(t *testing.T) {
 	// Verify that the constructed block contains the expected log with an unsigned warp message in the log data
 	ethBlock1 := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Len(ethBlock1.Transactions(), 1)
-	receipts := rawdb.ReadReceipts(vm.chaindb, ethBlock1.Hash(), ethBlock1.NumberU64(), vm.chainConfig)
+	receipts := rawdb.ReadReceipts(vm.chaindb, ethBlock1.Hash(), ethBlock1.NumberU64(), ethBlock1.Time(), vm.chainConfig)
 	require.Len(receipts, 1)
 
 	require.Len(receipts[0].Logs, 1)

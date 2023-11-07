@@ -72,8 +72,8 @@ type prestateTracer struct {
 	to        common.Address
 	gasLimit  uint64 // Amount of gas bought for the whole tx
 	config    prestateTracerConfig
-	interrupt uint32 // Atomic flag to signal execution interruption
-	reason    error  // Textual reason for the interruption
+	interrupt atomic.Bool // Atomic flag to signal execution interruption
+	reason    error       // Textual reason for the interruption
 	created   map[common.Address]bool
 	deleted   map[common.Address]bool
 }
@@ -143,6 +143,13 @@ func (t *prestateTracer) CaptureEnd(output []byte, gasUsed uint64, err error) {
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *prestateTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+	if err != nil {
+		return
+	}
+	// Skip if tracing was interrupted
+	if t.interrupt.Load() {
+		return
+	}
 	stack := scope.Stack
 	stackData := stack.Data()
 	stackLen := len(stackData)
@@ -266,7 +273,7 @@ func (t *prestateTracer) GetResult() (json.RawMessage, error) {
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *prestateTracer) Stop(err error) {
 	t.reason = err
-	atomic.StoreUint32(&t.interrupt, 1)
+	t.interrupt.Store(true)
 }
 
 // lookupAccount fetches details of an account and adds it to the prestate
@@ -288,6 +295,14 @@ func (t *prestateTracer) lookupAccount(addr common.Address) {
 // it to the prestate of the given contract. It assumes `lookupAccount`
 // has been performed on the contract before.
 func (t *prestateTracer) lookupStorage(addr common.Address, key common.Hash) {
+	// lookupStorage assumes that lookupAccount has already been called.
+	// This assumption is violated for some historical blocks by the NativeAssetCall
+	// precompile. To fix this, we perform an extra call to lookupAccount here to ensure
+	// that the pre-state account is populated before attempting to read from the Storage
+	// map. When the invariant is maintained properly (since de-activation of the precompile),
+	// lookupAccount is a no-op. When the invariant is broken by the precompile, this avoids
+	// the panic and correctly captures the account prestate before the next opcode is executed.
+	t.lookupAccount(addr)
 	if _, ok := t.pre[addr].Storage[key]; ok {
 		return
 	}

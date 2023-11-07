@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -91,7 +92,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	// Check that the tx hash in the header matches the body
-	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), trie.NewStackTrie(nil))
 	if txsHash != ethHeader.TxHash {
 		return fmt.Errorf("invalid txs hash %v does not match calculated txs hash %v", ethHeader.TxHash, txsHash)
 	}
@@ -136,5 +137,14 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 			return fmt.Errorf("too large blockGasCost: %d", ethHeader.BlockGasCost)
 		}
 	}
+
+	// Verify the existence / non-existence of excessDataGas
+	if rules.IsCancun && ethHeader.ExcessDataGas == nil {
+		return errors.New("missing excessDataGas")
+	}
+	if !rules.IsCancun && ethHeader.ExcessDataGas != nil {
+		return fmt.Errorf("invalid excessDataGas: have %d, expected nil", ethHeader.ExcessDataGas)
+	}
+
 	return nil
 }

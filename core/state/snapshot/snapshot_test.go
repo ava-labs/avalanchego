@@ -121,7 +121,7 @@ func TestDiskLayerExternalInvalidationFullFlatten(t *testing.T) {
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatalf("failed to merge diff layer onto disk: %v", err)
 	}
-	// Since the base layer was modified, ensure that data retrieval on the external reference fail
+	// Since the base layer was modified, ensure that data retrievals on the external reference fail
 	if acc, err := ref.Account(common.HexToHash("0x01")); err != ErrSnapshotStale {
 		t.Errorf("stale reference returned account: %v (err: %v)", acc, err)
 	}
@@ -187,6 +187,10 @@ func TestDiskLayerExternalInvalidationPartialFlatten(t *testing.T) {
 // be returned with junk data. This version of the test retains the bottom diff
 // layer to check the usual mode of operation where the accumulator is retained.
 func TestDiffLayerExternalInvalidationPartialFlatten(t *testing.T) {
+	// Un-commenting this triggers the bloom set to be deterministic. The values below
+	// were used to trigger the flaw described in https://github.com/ethereum/go-ethereum/issues/27254.
+	// bloomDestructHasherOffset, bloomAccountHasherOffset, bloomStorageHasherOffset = 14, 24, 5
+
 	// Create an empty base layer and a snapshot tree out of it
 	snaps := NewTestTree(rawdb.NewMemoryDatabase(), common.HexToHash("0x01"), common.HexToHash("0xff01"))
 	// Commit three diffs on top and retrieve a reference to the bottommost

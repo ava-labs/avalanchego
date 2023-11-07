@@ -51,17 +51,17 @@ import (
 const (
 	// DefaultMaxCallBlockHistory is the number of blocks that can be fetched in
 	// a single call to eth_feeHistory.
-	DefaultMaxCallBlockHistory uint64 = 2048
+	DefaultMaxCallBlockHistory = 2048
 	// DefaultMaxBlockHistory is the number of blocks from the last accepted
 	// block that can be fetched in eth_feeHistory.
 	//
 	// DefaultMaxBlockHistory is chosen to be a value larger than the required
 	// fee lookback window that MetaMask uses (20k blocks).
-	DefaultMaxBlockHistory int = 25_000
+	DefaultMaxBlockHistory = 25_000
 	// DefaultFeeHistoryCacheSize is chosen to be some value larger than
 	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
 	// serving a fee history query.
-	DefaultFeeHistoryCacheSize int = 30_000
+	DefaultFeeHistoryCacheSize = 30_000
 )
 
 var (
@@ -86,7 +86,7 @@ type Config struct {
 	MaxCallBlockHistory uint64
 	// MaxBlockHistory specifies the furthest back behind the last accepted block that can
 	// be requested by fee history.
-	MaxBlockHistory int
+	MaxBlockHistory uint64
 	MaxPrice        *big.Int `toml:",omitempty"`
 	MinPrice        *big.Int `toml:",omitempty"`
 	MinGasUsed      *big.Int `toml:",omitempty"`
@@ -127,7 +127,7 @@ type Oracle struct {
 	checkBlocks, percentile int
 	maxLookbackSeconds      uint64
 	maxCallBlockHistory     uint64
-	maxBlockHistory         int
+	maxBlockHistory         uint64
 	historyCache            *lru.Cache[uint64, *slimBlock]
 	feeInfoProvider         *feeInfoProvider
 }

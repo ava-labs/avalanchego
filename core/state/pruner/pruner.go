@@ -163,9 +163,7 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 			if isCode {
 				checkKey = codeKey
 			}
-			if ok, err := stateBloom.Contain(checkKey); err != nil {
-				return err
-			} else if ok {
+			if stateBloom.Contain(checkKey) {
 				continue
 			}
 			count += 1

@@ -17,12 +17,12 @@ var _ Client = (*client)(nil)
 
 // Client interface for interacting with EVM [chain]
 type Client interface {
-	StartCPUProfiler(ctx context.Context) error
-	StopCPUProfiler(ctx context.Context) error
-	MemoryProfile(ctx context.Context) error
-	LockProfile(ctx context.Context) error
-	SetLogLevel(ctx context.Context, level log.Lvl) error
-	GetVMConfig(ctx context.Context) (*Config, error)
+	StartCPUProfiler(ctx context.Context, options ...rpc.Option) error
+	StopCPUProfiler(ctx context.Context, options ...rpc.Option) error
+	MemoryProfile(ctx context.Context, options ...rpc.Option) error
+	LockProfile(ctx context.Context, options ...rpc.Option) error
+	SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.Option) error
+	GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error)
 }
 
 // Client implementation for interacting with EVM [chain]
@@ -43,32 +43,32 @@ func NewCChainClient(uri string) Client {
 	return NewClient(uri, "C")
 }
 
-func (c *client) StartCPUProfiler(ctx context.Context) error {
-	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{})
+func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) StopCPUProfiler(ctx context.Context) error {
-	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{})
+func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) MemoryProfile(ctx context.Context) error {
-	return c.requester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{})
+func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) LockProfile(ctx context.Context) error {
-	return c.requester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{})
+func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
-func (c *client) SetLogLevel(ctx context.Context, level log.Lvl) error {
+func (c *client) SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.Option) error {
 	return c.requester.SendRequest(ctx, "admin.setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
-	}, &api.EmptyReply{})
+	}, &api.EmptyReply{}, options...)
 }
 
 // GetVMConfig returns the current config of the VM
-func (c *client) GetVMConfig(ctx context.Context) (*Config, error) {
+func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error) {
 	res := &ConfigReply{}
-	err := c.requester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res)
+	err := c.requester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
 }

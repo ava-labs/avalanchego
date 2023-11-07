@@ -113,7 +113,6 @@ Subnet-EVM must activate any precompiles used in the test in the genesis:
     "chainId": 43214,
     "homesteadBlock": 0,
     "eip150Block": 0,
-    "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
     "eip155Block": 0,
     "eip158Block": 0,
     "byzantiumBlock": 0,

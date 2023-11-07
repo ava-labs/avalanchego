@@ -88,7 +88,7 @@ func validate(jt JumpTable) JumpTable {
 }
 
 // newDUpgradeInstructionSet returns the frontier, homestead, byzantium,
-// contantinople, istanbul, petersburg, subnet-evm, d-upgrade instructions.
+// constantinople, istanbul, petersburg, subnet-evm, d-upgrade instructions.
 func newDUpgradeInstructionSet() JumpTable {
 	instructionSet := newSubnetEVMInstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
@@ -97,7 +97,7 @@ func newDUpgradeInstructionSet() JumpTable {
 }
 
 // newSubnetEVMInstructionSet returns the frontier, homestead, byzantium,
-// contantinople, istanbul, petersburg, subnet-evm instructions.
+// constantinople, istanbul, petersburg, subnet-evm instructions.
 func newSubnetEVMInstructionSet() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
 	enable2929(&instructionSet)
@@ -106,7 +106,7 @@ func newSubnetEVMInstructionSet() JumpTable {
 }
 
 // newIstanbulInstructionSet returns the frontier,
-// homestead, byzantium, contantinople and petersburg instructions.
+// homestead, byzantium, constantinople and petersburg instructions.
 func newIstanbulInstructionSet() JumpTable {
 	instructionSet := newConstantinopleInstructionSet()
 
@@ -118,7 +118,7 @@ func newIstanbulInstructionSet() JumpTable {
 }
 
 // newConstantinopleInstructionSet returns the frontier, homestead,
-// byzantium and contantinople instructions.
+// byzantium and constantinople instructions.
 func newConstantinopleInstructionSet() JumpTable {
 	instructionSet := newByzantiumInstructionSet()
 	instructionSet[SHL] = &operation{

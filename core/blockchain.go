@@ -247,7 +247,7 @@ type BlockChain struct {
 	feeConfigCache      *lru.Cache[common.Hash, *cacheableFeeConfig]        // Cache for the most recent feeConfig lookup data.
 	coinbaseConfigCache *lru.Cache[common.Hash, *cacheableCoinbaseConfig]   // Cache for the most recent coinbaseConfig lookup data.
 
-	running int32 // 0 if chain is running, 1 when stopped
+	stopping atomic.Bool // false if chain is running, true when stopped
 
 	engine     consensus.Engine
 	validator  Validator  // Block and state validator interface
@@ -935,14 +935,14 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	return nil
 }
 
-// stop stops the blockchain service. If any imports are currently in progress
+// stopWithoutSaving stops the blockchain service. If any imports are currently in progress
 // it will abort them using the procInterrupt. This method stops all running
 // goroutines, but does not do all the post-stop work of persisting data.
 // OBS! It is generally recommended to use the Stop method!
 // This method has been exposed to allow tests to stop the blockchain while simulating
 // a crash.
 func (bc *BlockChain) stopWithoutSaving() {
-	if !atomic.CompareAndSwapInt32(&bc.running, 0, 1) {
+	if !bc.stopping.CompareAndSwap(false, true) {
 		return
 	}
 
@@ -979,8 +979,8 @@ func (bc *BlockChain) Stop() {
 	}
 	log.Info("State manager shut down", "t", time.Since(start))
 	// Flush the collected preimages to disk
-	if err := bc.stateCache.TrieDB().CommitPreimages(); err != nil {
-		log.Error("Failed to commit trie preimages", "err", err)
+	if err := bc.stateCache.TrieDB().Close(); err != nil {
+		log.Error("Failed to close trie db", "err", err)
 	}
 
 	log.Info("Blockchain stopped")
