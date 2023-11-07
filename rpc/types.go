@@ -73,6 +73,7 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
+	SafeBlockNumber     = BlockNumber(-4)
 	AcceptedBlockNumber = BlockNumber(-3)
 	LatestBlockNumber   = BlockNumber(-2)
 	PendingBlockNumber  = BlockNumber(-1)
@@ -101,10 +102,12 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	// Include "finalized" and "safe" as an option for compatibility with
-	// FinalizedBlockNumber and SafeBlockNumber from geth.
-	case "accepted", "finalized", "safe":
+	// Include "finalized" as an option for compatibility with FinalizedBlockNumber
+	case "accepted", "finalized":
 		*bn = AcceptedBlockNumber
+		return nil
+	case "safe":
+		*bn = SafeBlockNumber
 		return nil
 	}
 
@@ -141,6 +144,8 @@ func (bn BlockNumber) String() string {
 		return "pending"
 	case AcceptedBlockNumber:
 		return "accepted"
+	case SafeBlockNumber:
+		return "safe"
 	default:
 		if bn < 0 {
 			return fmt.Sprintf("<invalid %d>", bn)
@@ -151,7 +156,7 @@ func (bn BlockNumber) String() string {
 
 // IsAccepted returns true if this blockNumber should be treated as a request for the last accepted block
 func (bn BlockNumber) IsAccepted() bool {
-	return bn < EarliestBlockNumber && bn >= AcceptedBlockNumber
+	return bn < EarliestBlockNumber && bn >= SafeBlockNumber
 }
 
 type BlockNumberOrHash struct {
@@ -191,10 +196,13 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-	// Include "finalized" and "safe" as an option for compatibility with
-	// FinalizedBlockNumber and SafeBlockNumber from geth.
-	case "accepted", "finalized", "safe":
+	// Include "finalized" as an option for compatibility with FinalizedBlockNumber from geth.
+	case "accepted", "finalized":
 		bn := AcceptedBlockNumber
+		bnh.BlockNumber = &bn
+		return nil
+	case "safe":
+		bn := SafeBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	default:
