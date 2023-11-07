@@ -668,12 +668,6 @@ func (ec *client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 }
 
 func ToBlockNumArg(number *big.Int) string {
-	// The Ethereum implementation uses a different mapping from
-	// negative numbers to special strings (latest, pending) then is
-	// used on its server side. See rpc/types.go for the comparison.
-	// In Coreth, latest, pending, and accepted are all treated the same
-	// therefore, if [number] is nil or a negative number in [-4, -1]
-	// we want the latest accepted block
 	if number == nil {
 		return "latest"
 	}
