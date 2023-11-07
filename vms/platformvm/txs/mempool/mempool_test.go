@@ -181,7 +181,7 @@ func TestPeekTxsWithLimit(t *testing.T) {
 	txsToPeek := txsN / 2
 	txsToPeekSize := 0
 	for i := 0; i < txsToPeek; i++ {
-		txsToPeekSize += txs[i].Size()
+		txsToPeekSize += len(txs[i].Bytes())
 	}
 
 	peeked := mpool.PeekTxs(0)

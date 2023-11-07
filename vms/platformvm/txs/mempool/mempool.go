@@ -34,10 +34,12 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errDuplicateTx          = errors.New("duplicate tx")
-	errTxTooLarge           = errors.New("tx too large")
-	errMempoolFull          = errors.New("mempool is full")
-	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
+	errDuplicateTx                = errors.New("duplicate tx")
+	errTxTooLarge                 = errors.New("tx too large")
+	errMempoolFull                = errors.New("mempool is full")
+	errConflictsWithOtherTx       = errors.New("tx conflicts with other tx")
+	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
+	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
 type BlockTimer interface {
@@ -98,7 +100,7 @@ type mempool struct {
 	bytesAvailable       int
 
 	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	txsNum      prometheus.Gauge
+	numTxs      prometheus.Gauge
 
 	// Key: Tx ID
 	// Value: Verification error
@@ -123,12 +125,12 @@ func NewMempool(
 		return nil, err
 	}
 
-	txsNum := prometheus.NewGauge(prometheus.GaugeOpts{
+	numTxs := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "txs",
 		Help:      "Number of decision/staker transactions in the mempool",
 	})
-	if err := registerer.Register(txsNum); err != nil {
+	if err := registerer.Register(numTxs); err != nil {
 		return nil, err
 	}
 
@@ -138,7 +140,7 @@ func NewMempool(
 		bytesAvailable:       maxMempoolSize,
 
 		unissuedTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-		txsNum:      txsNum,
+		numTxs:      numTxs,
 
 		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
@@ -158,6 +160,14 @@ func (m *mempool) DisableAdding() {
 func (m *mempool) Add(tx *txs.Tx) error {
 	if m.dropIncoming {
 		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
+	}
+
+	switch tx.Unsigned.(type) {
+	case *txs.AdvanceTimeTx:
+		return errCantIssueAdvanceTimeTx
+	case *txs.RewardValidatorTx:
+		return errCantIssueRewardValidatorTx
+	default:
 	}
 
 	// Note: a previously dropped tx can be re-added
@@ -189,12 +199,9 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
 	}
 
-	if err := tx.Unsigned.Visit(&issuer{
-		m:  m,
-		tx: tx,
-	}); err != nil {
-		return err
-	}
+	m.unissuedTxs.Put(tx.ID(), tx)
+	m.bytesAvailable -= txSize
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
 	// Mark these UTXOs as consumed in the mempool
 	m.consumedUTXOs.Union(inputs)
@@ -216,13 +223,19 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
-	remover := &remover{
-		m: m,
-	}
-
 	for _, tx := range txsToRemove {
-		remover.tx = tx
-		_ = tx.Unsigned.Visit(remover)
+		txID := tx.ID()
+		if m.unissuedTxs.Delete(txID) {
+			txBytes := tx.Bytes()
+			m.bytesAvailable += len(txBytes)
+			m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+
+			m.unissuedTxs.Delete(txID)
+			m.numTxs.Dec()
+
+			inputs := tx.Unsigned.InputIDs()
+			m.consumedUTXOs.Difference(inputs)
+		}
 	}
 }
 
@@ -248,20 +261,6 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	return txs
 }
 
-func (m *mempool) addTx(tx *txs.Tx) {
-	m.unissuedTxs.Put(tx.ID(), tx)
-	m.register(tx)
-}
-
-func (m *mempool) removeTxs(txs ...*txs.Tx) {
-	for _, tx := range txs {
-		txID := tx.ID()
-		if m.unissuedTxs.Delete(txID) {
-			m.deregister(tx)
-		}
-	}
-}
-
 func (m *mempool) GetTxIterator() TxIterator {
 	return m.unissuedTxs.NewIterator()
 }
@@ -273,19 +272,4 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
-}
-
-func (m *mempool) register(tx *txs.Tx) {
-	txBytes := tx.Bytes()
-	m.bytesAvailable -= len(txBytes)
-	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-}
-
-func (m *mempool) deregister(tx *txs.Tx) {
-	txBytes := tx.Bytes()
-	m.bytesAvailable += len(txBytes)
-	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-	inputs := tx.Unsigned.InputIDs()
-	m.consumedUTXOs.Difference(inputs)
 }
