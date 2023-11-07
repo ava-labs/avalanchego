@@ -11,7 +11,7 @@ import (
 	reflect "reflect"
 
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockTxIterator is a mock of TxIterator interface.
