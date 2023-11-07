@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"sync"
+
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -22,16 +24,16 @@ const (
 	falseByte            = 0
 	minVarIntLen         = 1
 	minMaybeByteSliceLen = boolLen
-	minSerializedPathLen = minVarIntLen
+	minKeyLen            = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen + boolLen
+	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
-	estimatedKeyLen            = 64
-	estimatedValueLen          = 64
-	estimatedCompressedPathLen = 8
-	// Child index, child compressed path, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + boolLen
+	estimatedKeyLen           = 64
+	estimatedValueLen         = 64
+	estimatedCompressedKeyLen = 8
+	// Child index, child compressed key, child ID, child has value
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -42,13 +44,12 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
-	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
-	errLeadingZeroes        = errors.New("varint has leading zeroes")
-	errInvalidBool          = errors.New("decoded bool is neither true nor false")
-	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
-	errExtraSpace           = errors.New("trailing buffer space")
-	errIntOverflow          = errors.New("value overflows int")
+	errChildIndexTooLarge = errors.New("invalid child index. Must be less than branching factor")
+	errLeadingZeroes      = errors.New("varint has leading zeroes")
+	errInvalidBool        = errors.New("decoded bool is neither true nor false")
+	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
+	errExtraSpace         = errors.New("trailing buffer space")
+	errIntOverflow        = errors.New("value overflows int")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -61,8 +62,10 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
-	// Assumes [hv] is non-nil.
-	encodeHashValues(hv *hashValues) []byte
+
+	// Returns the bytes that will be hashed to generate [n]'s ID.
+	// Assumes [n] is non-nil.
+	encodeHashValues(n *node) []byte
 }
 
 type decoder interface {
@@ -100,21 +103,21 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < NodeBranchFactor; index++ {
-		if entry, ok := n.children[index]; ok {
-			c.encodeUint(buf, uint64(index))
-			path := entry.compressedPath.Serialize()
-			c.encodeSerializedPath(buf, path)
-			_, _ = buf.Write(entry.id[:])
-			c.encodeBool(buf, entry.hasValue)
-		}
+	keys := maps.Keys(n.children)
+	slices.Sort(keys)
+	for _, index := range keys {
+		entry := n.children[index]
+		c.encodeUint(buf, uint64(index))
+		c.encodeKey(buf, entry.compressedKey)
+		_, _ = buf.Write(entry.id[:])
+		c.encodeBool(buf, entry.hasValue)
 	}
 	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
+func (c *codecImpl) encodeHashValues(n *node) []byte {
 	var (
-		numChildren = len(hv.Children)
+		numChildren = len(n.children)
 		// Estimate size [hv] to prevent memory allocations
 		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
 		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
@@ -123,14 +126,15 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
-	for index := byte(0); index < NodeBranchFactor; index++ {
-		if entry, ok := hv.Children[index]; ok {
-			c.encodeUint(buf, uint64(index))
-			_, _ = buf.Write(entry.id[:])
-		}
+	keys := maps.Keys(n.children)
+	slices.Sort(keys)
+	for _, index := range keys {
+		entry := n.children[index]
+		c.encodeUint(buf, uint64(index))
+		_, _ = buf.Write(entry.id[:])
 	}
-	c.encodeMaybeByteSlice(buf, hv.Value)
-	c.encodeSerializedPath(buf, hv.Key)
+	c.encodeMaybeByteSlice(buf, n.valueDigest)
+	c.encodeKey(buf, n.key)
 
 	return buf.Bytes()
 }
@@ -152,25 +156,23 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	switch {
 	case err != nil:
 		return err
-	case numChildren > NodeBranchFactor:
-		return errTooManyChildren
 	case numChildren > uint64(src.Len()/minChildLen):
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, NodeBranchFactor)
+	n.children = make(map[byte]child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
 		if err != nil {
 			return err
 		}
-		if index >= NodeBranchFactor || (i != 0 && index <= previousChild) {
+		if (i != 0 && index <= previousChild) || index > math.MaxUint8 {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
 
-		compressedPath, err := c.decodeSerializedPath(src)
+		compressedKey, err := c.decodeKey(src)
 		if err != nil {
 			return err
 		}
@@ -183,9 +185,9 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 			return err
 		}
 		n.children[byte(index)] = child{
-			compressedPath: compressedPath.deserialize(),
-			id:             childID,
-			hasValue:       hasValue,
+			compressedKey: compressedKey,
+			id:            childID,
+			hasValue:      hasValue,
 		}
 	}
 	if src.Len() != 0 {
@@ -328,47 +330,46 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s SerializedPath) {
-	c.encodeUint(dst, uint64(s.NibbleLength))
-	_, _ = dst.Write(s.Value)
+func (c *codecImpl) encodeKey(dst *bytes.Buffer, key Key) {
+	c.encodeUint(dst, uint64(key.length))
+	_, _ = dst.Write(key.Bytes())
 }
 
-func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, error) {
-	if minSerializedPathLen > src.Len() {
-		return SerializedPath{}, io.ErrUnexpectedEOF
+func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
+	if minKeyLen > src.Len() {
+		return Key{}, io.ErrUnexpectedEOF
 	}
 
-	nibbleLength, err := c.decodeUint(src)
+	length, err := c.decodeUint(src)
 	if err != nil {
-		return SerializedPath{}, err
+		return Key{}, err
 	}
-	if nibbleLength > math.MaxInt {
-		return SerializedPath{}, errIntOverflow
+	if length > math.MaxInt {
+		return Key{}, errIntOverflow
 	}
-
-	result := SerializedPath{
-		NibbleLength: int(nibbleLength),
+	result := Key{
+		length: int(length),
 	}
-	pathBytesLen := result.NibbleLength >> 1
-	hasOddLen := result.hasOddLength()
-	if hasOddLen {
-		pathBytesLen++
+	keyBytesLen := bytesNeeded(result.length)
+	if keyBytesLen > src.Len() {
+		return Key{}, io.ErrUnexpectedEOF
 	}
-	if pathBytesLen > src.Len() {
-		return SerializedPath{}, io.ErrUnexpectedEOF
-	}
-	result.Value = make([]byte, pathBytesLen)
-	if _, err := io.ReadFull(src, result.Value); err != nil {
+	buffer := make([]byte, keyBytesLen)
+	if _, err := io.ReadFull(src, buffer); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return SerializedPath{}, err
+		return Key{}, err
 	}
-	if hasOddLen {
-		paddedNibble := result.Value[pathBytesLen-1] & 0x0F
-		if paddedNibble != 0 {
-			return SerializedPath{}, errNonZeroNibblePadding
+	if result.hasPartialByte() {
+		// Confirm that the padding bits in the partial byte are 0.
+		// We want to only look at the bits to the right of the last token, which is at index length-1.
+		// Generate a mask where the (result.length % 8) left bits are 0.
+		paddingMask := byte(0xFF >> (result.length % 8))
+		if buffer[keyBytesLen-1]&paddingMask != 0 {
+			return Key{}, errNonZeroKeyPadding
 		}
 	}
+	result.value = string(buffer)
 	return result, nil
 }

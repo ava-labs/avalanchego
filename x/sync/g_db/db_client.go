@@ -20,7 +20,9 @@ import (
 var _ sync.DB = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient) *DBClient {
-	return &DBClient{client: client}
+	return &DBClient{
+		client: client,
+	}
 }
 
 type DBClient struct {

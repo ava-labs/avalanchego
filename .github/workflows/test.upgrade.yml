@@ -23,11 +23,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.8'
+          go-version: '~1.20.10'
           check-latest: true
       - name: Build the avalanchego binary
         shell: bash
         run: ./scripts/build.sh
       - name: Run upgrade tests
         shell: bash
-        run: scripts/tests.upgrade.sh 1.10.1 ./build/avalanchego
+        # 1.10.7 is the first version compatible with the testnet fixture by
+        # virtue of writing a process context file on node start.
+        run: ./scripts/tests.upgrade.sh 1.10.7
+      - name: Upload testnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: testnet-data
+          path: ~/.testnetctl/networks/1000

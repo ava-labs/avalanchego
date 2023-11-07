@@ -16,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -38,7 +36,6 @@ type Info struct {
 	networking   network.Network
 	chainManager chains.Manager
 	vmManager    vms.Manager
-	validators   validators.Set
 	benchlist    benchlist.Manager
 }
 
@@ -59,7 +56,6 @@ type Parameters struct {
 	VMManager                     vms.Manager
 }
 
-// NewService returns a new admin API service
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
@@ -67,29 +63,24 @@ func NewService(
 	vmManager vms.Manager,
 	myIP ips.DynamicIPPort,
 	network network.Network,
-	validators validators.Set,
 	benchlist benchlist.Manager,
-) (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+) (http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Info{
-		Parameters:   parameters,
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		myIP:         myIP,
-		networking:   network,
-		validators:   validators,
-		benchlist:    benchlist,
-	}, "info"); err != nil {
-		return nil, err
-	}
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     newServer,
-	}, nil
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
+	return server, server.RegisterService(
+		&Info{
+			Parameters:   parameters,
+			log:          log,
+			chainManager: chainManager,
+			vmManager:    vmManager,
+			myIP:         myIP,
+			networking:   network,
+			benchlist:    benchlist,
+		},
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
@@ -217,7 +208,7 @@ type PeersArgs struct {
 type Peer struct {
 	peer.Info
 
-	Benched []ids.ID `json:"benched"`
+	Benched []string `json:"benched"`
 }
 
 // PeersReply are the results from calling Peers
@@ -238,9 +229,18 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 	peers := i.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for index, peer := range peers {
+		benchedIDs := i.benchlist.GetBenched(peer.ID)
+		benchedAliases := make([]string, len(benchedIDs))
+		for idx, id := range benchedIDs {
+			alias, err := i.chainManager.PrimaryAlias(id)
+			if err != nil {
+				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
+			}
+			benchedAliases[idx] = alias
+		}
 		peerInfo[index] = Peer{
 			Info:    peer,
-			Benched: i.benchlist.GetBenched(peer.ID),
+			Benched: benchedAliases,
 		}
 	}
 

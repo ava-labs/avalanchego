@@ -15,9 +15,6 @@ import (
 type Consensus interface {
 	fmt.Stringer
 
-	// Takes in alpha, beta1, beta2, and the initial choice
-	Initialize(params Parameters, initialPreference ids.ID)
-
 	// Adds a new choice to vote on
 	Add(newChoice ids.ID)
 
@@ -54,9 +51,6 @@ type NnarySnowball interface{ NnarySnowflake }
 type NnarySnowflake interface {
 	fmt.Stringer
 
-	// Takes in beta1, beta2, and the initial choice
-	Initialize(betaVirtuous, betaRogue int, initialPreference ids.ID)
-
 	// Adds a new possible choice
 	Add(newChoice ids.ID)
 
@@ -66,6 +60,11 @@ type NnarySnowflake interface {
 	// RecordSuccessfulPoll records a successful poll towards finalizing the
 	// specified choice. Assumes the choice was previously added.
 	RecordSuccessfulPoll(choice ids.ID)
+
+	// RecordPollPreference records a poll that preferred the specified choice
+	// but did not contribute towards finalizing the specified choice. Assumes
+	// the choice was previously added.
+	RecordPollPreference(choice ids.ID)
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()
@@ -79,9 +78,6 @@ type NnarySnowflake interface {
 // votes for one of the choices, you should vote for that choice.
 type NnarySlush interface {
 	fmt.Stringer
-
-	// Takes in the initial choice
-	Initialize(initialPreference ids.ID)
 
 	// Returns the currently preferred choice to be finalized
 	Preference() ids.ID
@@ -102,15 +98,16 @@ type BinarySnowball interface{ BinarySnowflake }
 type BinarySnowflake interface {
 	fmt.Stringer
 
-	// Takes in the beta value, and the initial choice
-	Initialize(beta, initialPreference int)
-
 	// Returns the currently preferred choice to be finalized
 	Preference() int
 
 	// RecordSuccessfulPoll records a successful poll towards finalizing the
 	// specified choice
 	RecordSuccessfulPoll(choice int)
+
+	// RecordPollPreference records a poll that preferred the specified choice
+	// but did not contribute towards finalizing the specified choice
+	RecordPollPreference(choice int)
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()
@@ -124,9 +121,6 @@ type BinarySnowflake interface {
 // you should vote for that choice.
 type BinarySlush interface {
 	fmt.Stringer
-
-	// Takes in the initial choice
-	Initialize(initialPreference int)
 
 	// Returns the currently preferred choice to be finalized
 	Preference() int
@@ -142,11 +136,12 @@ type BinarySlush interface {
 type UnarySnowball interface {
 	fmt.Stringer
 
-	// Takes in the beta value
-	Initialize(beta int)
-
 	// RecordSuccessfulPoll records a successful poll towards finalizing
 	RecordSuccessfulPoll()
+
+	// RecordPollPreference records a poll that strengthens the preference but
+	// did not contribute towards finalizing
+	RecordPollPreference()
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
 	RecordUnsuccessfulPoll()
@@ -167,9 +162,6 @@ type UnarySnowball interface {
 // choice, you should vote. Otherwise, you should reset.
 type UnarySnowflake interface {
 	fmt.Stringer
-
-	// Takes in the beta value
-	Initialize(beta int)
 
 	// RecordSuccessfulPoll records a successful poll towards finalizing
 	RecordSuccessfulPoll()

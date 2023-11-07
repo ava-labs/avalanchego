@@ -10,12 +10,15 @@ import (
 	"fmt"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -104,6 +107,7 @@ type Manager struct {
 	// Set to true when StartSyncing is called.
 	syncing   bool
 	closeOnce sync.Once
+	tokenSize int
 }
 
 type ManagerConfig struct {
@@ -112,6 +116,7 @@ type ManagerConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
+	BranchFactor          merkledb.BranchFactor
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
@@ -125,12 +130,16 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
 	}
+	if err := config.BranchFactor.Valid(); err != nil {
+		return nil, err
+	}
 
 	m := &Manager{
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
+		tokenSize:       merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -398,23 +407,20 @@ func (m *Manager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.SerializedPath{
-		Value:        lastReceivedKey,
-		NibbleLength: 2 * len(lastReceivedKey),
-	}
+	proofKeyPath := merkledb.ToKey(lastReceivedKey)
 
 	// If the received proof is an exclusion proof, the last node may be for a
 	// key that is after the [lastReceivedKey].
 	// If the last received node's key is after the [lastReceivedKey], it can
 	// be removed to obtain a valid proof for a prefix of the [lastReceivedKey].
-	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].KeyPath) {
+	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].Key) {
 		endProof = endProof[:len(endProof)-1]
 		// update the proofKeyPath to be for the prefix
-		proofKeyPath = endProof[len(endProof)-1].KeyPath
+		proofKeyPath = endProof[len(endProof)-1].Key
 	}
 
 	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
+	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Bytes())
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
@@ -422,7 +428,7 @@ func (m *Manager) findNextKey(
 
 	// The local proof may also be an exclusion proof with an extra node.
 	// Remove this extra node if it exists to get a proof of the same key as the received proof
-	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].KeyPath) {
+	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].Key) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
@@ -444,7 +450,7 @@ func (m *Manager) findNextKey(
 
 		// select the deepest proof node from the two proofs
 		switch {
-		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
+		case receivedProofNode.Key.Length() > localProofNode.Key.Length():
 			// there was a branch node in the received proof that isn't in the local proof
 			// see if the received proof node has children not present in the local proof
 			deepestNode = &receivedProofNode
@@ -452,7 +458,7 @@ func (m *Manager) findNextKey(
 			// we have dealt with this received node, so move on to the next received node
 			receivedProofNodeIndex--
 
-		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
+		case localProofNode.Key.Length() > receivedProofNode.Key.Length():
 			// there was a branch node in the local proof that isn't in the received proof
 			// see if the local proof node has children not present in the received proof
 			deepestNode = &localProofNode
@@ -474,25 +480,25 @@ func (m *Manager) findNextKey(
 
 		// We only want to look at the children with keys greater than the proofKey.
 		// The proof key has the deepest node's key as a prefix,
-		// so only the next nibble of the proof key needs to be considered.
+		// so only the next token of the proof key needs to be considered.
 
 		// If the deepest node has the same key as [proofKeyPath],
 		// then all of its children have keys greater than the proof key,
-		// so we can start at the 0 nibble.
-		startingChildNibble := byte(0)
+		// so we can start at the 0 token.
+		startingChildToken := 0
 
 		// If the deepest node has a key shorter than the key being proven,
-		// we can look at the next nibble of the proof key to determine which of that
+		// we can look at the next token index of the proof key to determine which of that
 		// node's children have keys larger than [proofKeyPath].
-		// Any child with a nibble greater than the [proofKeyPath]'s nibble at that
+		// Any child with a token greater than the [proofKeyPath]'s token at that
 		// index will have a larger key.
-		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
-			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
+		if deepestNode.Key.Length() < proofKeyPath.Length() {
+			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.tokenSize)) + 1
 		}
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
-			nextKey = maybe.Some(deepestNode.KeyPath.AppendNibble(childIndex).Value)
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
+			nextKey = maybe.Some(deepestNode.Key.Extend(merkledb.ToToken(childIndex, m.tokenSize)).Bytes())
 			break
 		}
 	}
@@ -791,12 +797,27 @@ func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte, bool) {
+	// Children indices >= [startIndex] present in at least one of the nodes.
+	childIndices := set.Set[byte]{}
+	for _, node := range []*merkledb.ProofNode{node1, node2} {
+		if node == nil {
+			continue
+		}
+		for key := range node.Children {
+			if int(key) >= startIndex {
+				childIndices.Add(key)
+			}
+		}
+	}
+
+	sortedChildIndices := maps.Keys(childIndices)
+	slices.Sort(sortedChildIndices)
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
+	for _, childIndex := range sortedChildIndices {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}

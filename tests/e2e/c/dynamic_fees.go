@@ -51,7 +51,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			NodeID: node.GetID(),
 			URI:    node.GetProcessContext().URI,
 		}
-		ethClient := e2e.Env.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("initializing a transaction signer")
 		cChainID, err := ethClient.ChainID(e2e.DefaultContext())
@@ -143,8 +143,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		ginkgo.By("sending funds at the current gas price", func() {
 			// Create a recipient address
-			factory := secp256k1.Factory{}
-			recipientKey, err := factory.NewPrivateKey()
+			recipientKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 			recipientEthAddress := evm.GetEthAddress(recipientKey)
 

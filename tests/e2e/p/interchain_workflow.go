@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
+var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	const (
@@ -48,13 +48,12 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		factory := secp256k1.Factory{}
-		recipientKey, err := factory.NewPrivateKey()
+		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -103,7 +102,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(30 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			const (
@@ -132,6 +131,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
 				delegationShare,
+				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
@@ -143,7 +143,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(15 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
@@ -161,6 +161,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
+				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
@@ -201,7 +202,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("initializing a new eth client")
-		ethClient := e2e.Env.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("importing AVAX from the P-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(

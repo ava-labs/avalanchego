@@ -12,17 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-const (
-	NodeBranchFactor = 16
-	HashLength       = 32
-)
-
-// the values that go into the node's id
-type hashValues struct {
-	Children map[byte]child
-	Value    maybe.Maybe[[]byte]
-	Key      SerializedPath
-}
+const HashLength = 32
 
 // Representation of a node stored in the database.
 type dbNode struct {
@@ -31,37 +21,32 @@ type dbNode struct {
 }
 
 type child struct {
-	compressedPath path
-	id             ids.ID
-	hasValue       bool
+	compressedKey Key
+	id            ids.ID
+	hasValue      bool
 }
 
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
 	id          ids.ID
-	key         path
+	key         Key
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
-// If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key path) *node {
-	newNode := &node{
+func newNode(key Key) *node {
+	return &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, NodeBranchFactor),
+			children: make(map[byte]child, 2),
 		},
 		key: key,
 	}
-	if parent != nil {
-		parent.addChild(newNode)
-	}
-	return newNode
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key path, nodeBytes []byte) (*node, error) {
+func parseNode(key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
@@ -104,11 +89,7 @@ func (n *node) calculateID(metrics merkleMetrics) {
 	}
 
 	metrics.HashCalculated()
-	bytes := codec.encodeHashValues(&hashValues{
-		Children: n.children,
-		Value:    n.valueDigest,
-		Key:      n.key.Serialize(),
-	})
+	bytes := codec.encodeHashValues(n)
 	n.id = hashing.ComputeHash256Array(bytes)
 }
 
@@ -130,29 +111,27 @@ func (n *node) setValueDigest() {
 // Adds [child] as a child of [n].
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(child *node) {
-	n.addChildWithoutNode(
-		child.key[len(n.key)],
-		child.key[len(n.key)+1:],
-		child.id,
-		child.hasValue(),
+func (n *node) addChild(childNode *node, tokenSize int) {
+	n.setChildEntry(
+		childNode.key.Token(n.key.length, tokenSize),
+		child{
+			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
+			id:            childNode.id,
+			hasValue:      childNode.hasValue(),
+		},
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
+func (n *node) setChildEntry(index byte, childEntry child) {
 	n.onNodeChanged()
-	n.children[index] = child{
-		compressedPath: compressedPath,
-		id:             childID,
-		hasValue:       hasValue,
-	}
+	n.children[index] = childEntry
 }
 
 // Removes [child] from [n]'s children.
-func (n *node) removeChild(child *node) {
+func (n *node) removeChild(child *node, tokenSize int) {
 	n.onNodeChanged()
-	delete(n.children, child.key[len(n.key)])
+	delete(n.children, child.key.Token(n.key.length, tokenSize))
 }
 
 // clone Returns a copy of [n].
@@ -175,7 +154,7 @@ func (n *node) clone() *node {
 // Returns the ProofNode representation of this node.
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
-		KeyPath:     n.key.Serialize(),
+		Key:         n.key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
 		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}

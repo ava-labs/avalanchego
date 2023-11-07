@@ -20,7 +20,9 @@ import (
 var _ pb.DBServer = (*DBServer)(nil)
 
 func NewDBServer(db sync.DB) *DBServer {
-	return &DBServer{db: db}
+	return &DBServer{
+		db: db,
+	}
 }
 
 type DBServer struct {
