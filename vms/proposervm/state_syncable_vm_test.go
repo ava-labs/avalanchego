@@ -5,21 +5,21 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -32,9 +32,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 			TestVM: common.TestVM{
 				T: t,
 			},
-		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
@@ -54,7 +51,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		HeightV: 0,
 		BytesV:  []byte("genesis state"),
 	}
-	innerVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -70,26 +67,24 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		return innerGenesisBlk, nil
 	}
 
-	// createVM
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-
+	// create the VM
 	vm := New(
 		innerVM,
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		prefixdb.New([]byte{}, memdb.New()),
 		innerGenesisBlk.Bytes(),
 		nil,
 		nil,
@@ -105,6 +100,9 @@ func TestStateSyncEnabled(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 
 	// ProposerVM State Sync disabled if innerVM State sync is disabled
 	vm.hIndexer.MarkRepaired(true)
@@ -128,6 +126,9 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 
 	innerSummary := &block.TestStateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
@@ -199,7 +200,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
@@ -210,6 +211,9 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 
 	innerSummary := &block.TestStateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
@@ -281,7 +285,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
@@ -292,6 +296,9 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
@@ -366,7 +373,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -376,6 +383,9 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 func TestParseStateSummary(t *testing.T) {
 	require := require.New(t)
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
@@ -436,7 +446,7 @@ func TestParseStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -452,6 +462,9 @@ func TestStateSummaryAccept(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
@@ -469,14 +482,6 @@ func TestStateSummaryAccept(t *testing.T) {
 		TimestampV: vm.Time(),
 		HeightV:    innerSummary.Height(),
 	}
-	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(reqHeight, h)
-		return innerSummary, nil
-	}
-	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(innerBlk.Bytes(), b)
-		return innerBlk, nil
-	}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -488,17 +493,20 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
-	proBlk := &postForkBlock{
-		SignedBlock: slb,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       vm,
-			innerBlk: innerBlk,
-			status:   choices.Accepted,
-		},
-	}
-	require.NoError(vm.storePostForkBlock(proBlk))
 
-	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
+	statelessSummary, err := summary.Build(innerSummary.Height()-1, slb.Bytes(), innerSummary.Bytes())
+	require.NoError(err)
+
+	innerVM.ParseStateSummaryF = func(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+		require.Equal(innerSummary.BytesV, summaryBytes)
+		return innerSummary, nil
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		require.Equal(innerBlk.Bytes(), b)
+		return innerBlk, nil
+	}
+
+	summary, err := vm.ParseStateSummary(context.Background(), statelessSummary.Bytes())
 	require.NoError(err)
 
 	// test Accept accepted
@@ -522,6 +530,9 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
@@ -570,7 +581,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -589,6 +600,10 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	// Note: by default proVM is built such that heightIndex will be considered complete
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
 	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
 	// let coreVM be always ready to serve summaries

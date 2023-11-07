@@ -22,8 +22,7 @@ func TestFetchUTXOs(t *testing.T) {
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
-	addrs := set.Set[ids.ShortID]{}
-	addrs.Add(addr)
+	addrs := set.Of(addr)
 	utxo := &UTXO{
 		UTXOID: UTXOID{
 			TxID:        txID,
@@ -47,7 +46,8 @@ func TestFetchUTXOs(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager, trackChecksum)
+	require.NoError(err)
 
 	require.NoError(s.PutUTXO(utxo))
 
@@ -70,8 +70,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	addr0 := ids.GenerateTestShortID()
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
-	addrs := set.Set[ids.ShortID]{}
-	addrs.Add(addr0, addr1)
+	addrs := set.Of(addr0, addr1)
 
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
@@ -80,7 +79,8 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager, trackChecksum)
+	require.NoError(err)
 
 	// Create 1000 UTXOs each on addr0, addr1, and addr2.
 	for i := 0; i < 1000; i++ {
@@ -140,13 +140,10 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 
 	var (
 		fetchedUTXOs []*UTXO
-		err          error
+		lastAddr     = ids.ShortEmpty
+		lastIdx      = ids.Empty
+		totalUTXOs   []*UTXO
 	)
-
-	lastAddr := ids.ShortEmpty
-	lastIdx := ids.Empty
-
-	var totalUTXOs []*UTXO
 	for i := 0; i <= 10; i++ {
 		fetchedUTXOs, lastAddr, lastIdx, err = GetPaginatedUTXOs(s, addrs, lastAddr, lastIdx, 512)
 		require.NoError(err)

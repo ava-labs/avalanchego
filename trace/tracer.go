@@ -14,9 +14,6 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -36,6 +33,9 @@ type Config struct {
 	// If >= 1 always samples.
 	// If <= 0 never samples.
 	TraceSampleRate float64 `json:"traceSampleRate"`
+
+	AppName string `json:"appName"`
+	Version string `json:"version"`
 }
 
 type Tracer interface {
@@ -57,9 +57,7 @@ func (t *tracer) Close() error {
 
 func New(config Config) (Tracer, error) {
 	if !config.Enabled {
-		return &noOpTracer{
-			t: trace.NewNoopTracerProvider().Tracer(constants.AppName),
-		}, nil
+		return Noop, nil
 	}
 
 	exporter, err := newExporter(config.ExporterConfig)
@@ -70,15 +68,15 @@ func New(config Config) (Tracer, error) {
 	tracerProviderOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
 		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL,
-			attribute.Stringer("version", version.Current),
-			semconv.ServiceNameKey.String(constants.AppName),
+			attribute.String("version", config.Version),
+			semconv.ServiceNameKey.String(config.AppName),
 		)),
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(tracerProviderOpts...)
 	return &tracer{
-		Tracer: tracerProvider.Tracer(constants.AppName),
+		Tracer: tracerProvider.Tracer(config.AppName),
 		tp:     tracerProvider,
 	}, nil
 }

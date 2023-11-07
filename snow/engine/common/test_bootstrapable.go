@@ -26,7 +26,7 @@ type BootstrapableTest struct {
 
 	CantForceAccepted, CantClear bool
 
-	ClearF         func() error
+	ClearF         func(ctx context.Context) error
 	ForceAcceptedF func(ctx context.Context, acceptedContainerIDs []ids.ID) error
 }
 
@@ -35,9 +35,9 @@ func (b *BootstrapableTest) Default(cant bool) {
 	b.CantForceAccepted = cant
 }
 
-func (b *BootstrapableTest) Clear() error {
+func (b *BootstrapableTest) Clear(ctx context.Context) error {
 	if b.ClearF != nil {
-		return b.ClearF()
+		return b.ClearF(ctx)
 	}
 	if b.CantClear && b.T != nil {
 		require.FailNow(b.T, errClear.Error())

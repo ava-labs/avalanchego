@@ -9,11 +9,12 @@ import (
 	"io"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -21,12 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
-
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
@@ -72,7 +70,7 @@ type StateSyncEnabledMock struct {
 	*mocks.MockStateSyncableVM
 }
 
-func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "stateSyncEnabledTestKey"
 
 	// create mock
@@ -91,10 +89,10 @@ func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.Chai
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "getOngoingSyncStateSummaryTestKey"
 
 	// create mock
@@ -112,10 +110,10 @@ func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "getLastStateSummaryTestKey"
 
 	// create mock
@@ -133,10 +131,10 @@ func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.C
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "parseStateSummaryTestKey"
 
 	// create mock
@@ -155,10 +153,10 @@ func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.Cha
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "getStateSummaryTestKey"
 
 	// create mock
@@ -176,10 +174,10 @@ func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.Chain
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "acceptStateSummaryTestKey"
 
 	// create mock
@@ -222,10 +220,10 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.Ch
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
-func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "lastAcceptedBlockPostStateSummaryAcceptTestKey"
 
 	// create mock
@@ -261,7 +259,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 		)
 	}
 
-	return ssVM, ctrl
+	return ssVM
 }
 
 func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, runtime.Stopper) {
@@ -295,7 +293,7 @@ func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, 
 	clientConn, err := grpcutils.Dial(status.Addr)
 	require.NoError(err)
 
-	return NewClient(vmpb.NewVMClient(clientConn)), stopper
+	return NewClient(clientConn), stopper
 }
 
 func TestStateSyncEnabled(t *testing.T) {
@@ -473,10 +471,8 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snow.DefaultContextTest()
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	require.NoError(vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(context.Background(), ctx, prefixdb.New([]byte{}, memdb.New()), nil, nil, nil, nil, nil, nil))
 
 	blkID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)

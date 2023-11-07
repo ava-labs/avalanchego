@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const trackChecksum = false
+
 func TestUTXOState(t *testing.T) {
 	require := require.New(t)
 
@@ -50,9 +52,10 @@ func TestUTXOState(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager, trackChecksum)
+	require.NoError(err)
 
-	_, err := s.GetUTXO(utxoID)
+	_, err = s.GetUTXO(utxoID)
 	require.Equal(database.ErrNotFound, err)
 
 	_, err = s.GetUTXO(utxoID)
@@ -77,7 +80,8 @@ func TestUTXOState(t *testing.T) {
 
 	require.NoError(s.PutUTXO(utxo))
 
-	s = NewUTXOState(db, manager)
+	s, err = NewUTXOState(db, manager, trackChecksum)
+	require.NoError(err)
 
 	readUTXO, err = s.GetUTXO(utxoID)
 	require.NoError(err)

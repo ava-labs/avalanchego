@@ -35,6 +35,9 @@ type Config struct {
 	// True if the node is being run with staking enabled
 	SybilProtectionEnabled bool
 
+	// If true, only the P-chain will be instantiated on the primary network.
+	PartialSyncPrimaryNetwork bool
+
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
 
@@ -101,6 +104,9 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
+	// Time of the D network upgrade
+	DTime time.Time
+
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
 	// window.
@@ -121,6 +127,15 @@ func (c *Config) IsApricotPhase5Activated(timestamp time.Time) bool {
 
 func (c *Config) IsBanffActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.BanffTime)
+}
+
+func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.CortinaTime)
+}
+
+// TODO: Rename
+func (c *Config) IsDActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.DTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

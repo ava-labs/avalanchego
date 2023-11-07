@@ -5,14 +5,13 @@
 package transfer
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/onsi/gomega"
-
 	ginkgo "github.com/onsi/ginkgo/v2"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -33,28 +32,47 @@ const (
 	metricBlksAccepted   = "avalanche_X_blks_accepted_count"
 )
 
-var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
+// This test requires that the network not have ongoing blocks and
+// cannot reliably be run in parallel.
+var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
+	require := require.New(ginkgo.GinkgoT())
+
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"require-network-runner",
-			"x",
-			"virtuous-transfer-tx-avax",
-		),
 		func() {
-			rpcEps := e2e.Env.GetURIs()
-			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
+			rpcEps := make([]string, len(e2e.Env.URIs))
+			for i, nodeURI := range e2e.Env.URIs {
+				rpcEps[i] = nodeURI.URI
+			}
+
+			// Waiting for ongoing blocks to have completed before starting this
+			// test avoids the case of a previous test having initiated block
+			// processing but not having completed it.
+			e2e.Eventually(func() bool {
+				allNodeMetrics, err := tests.GetNodesMetrics(rpcEps, metricBlksProcessing)
+				require.NoError(err)
+				for _, metrics := range allNodeMetrics {
+					if metrics[metricBlksProcessing] > 0 {
+						return false
+					}
+				}
+				return true
+			},
+				e2e.DefaultTimeout,
+				e2e.DefaultPollingInterval,
+				"The cluster is generating ongoing blocks. Is this test being run in parallel?",
+			)
 
 			allMetrics := []string{
 				metricBlksProcessing,
 				metricBlksAccepted,
 			}
 
+			// Ensure the same set of 10 keys is used for all tests
+			// by retrieving them outside of runFunc.
+			testKeys := e2e.Env.AllocateFundedKeys(10)
+
 			runFunc := func(round int) {
 				tests.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
-
-				testKeys, _, _ := e2e.Env.GetTestKeys()
 
 				needPermute := round > 3
 				if needPermute {
@@ -63,19 +81,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 						testKeys[i], testKeys[j] = testKeys[j], testKeys[i]
 					})
 				}
-				keyChain := secp256k1fx.NewKeychain(testKeys...)
 
-				var baseWallet primary.Wallet
-				var err error
-				ginkgo.By("setting up a base wallet", func() {
-					walletURI := rpcEps[0]
-
-					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-					baseWallet, err = primary.NewWalletFromURI(ctx, walletURI, keyChain)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-				})
+				keychain := secp256k1fx.NewKeychain(testKeys...)
+				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 				avaxAssetID := baseWallet.X().AVAXAssetID()
 
 				wallets := make([]primary.Wallet, len(testKeys))
@@ -85,33 +93,22 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 
 					wallets[i] = primary.NewWalletWithOptions(
 						baseWallet,
-						common.WithCustomAddresses(set.Set[ids.ShortID]{
-							testKeys[i].PublicKey().Address(): struct{}{},
-						}),
+						common.WithCustomAddresses(set.Of(
+							testKeys[i].PublicKey().Address(),
+						)),
 					)
 				}
 
-				// URI -> "metric name" -> "metric value"
-				metricsBeforeTx := make(map[string]map[string]float64)
-				for _, u := range rpcEps {
-					ep := u + "/ext/metrics"
-
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
-					gomega.Expect(err).Should(gomega.BeNil())
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
-
-					if mm[metricBlksProcessing] > 0 {
-						tests.Outf("{{red}}{{bold}}%q already has processing block!!!{{/}}\n", u)
-						ginkgo.Skip("the cluster has already ongoing blocks thus skipping to prevent conflicts...")
-					}
-
-					metricsBeforeTx[u] = mm
+				metricsBeforeTx, err := tests.GetNodesMetrics(rpcEps, allMetrics...)
+				require.NoError(err)
+				for _, uri := range rpcEps {
+					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
 				}
 
 				testBalances := make([]uint64, 0)
 				for i, w := range wallets {
 					balances, err := w.X().Builder().GetFTBalance()
-					gomega.Expect(err).Should(gomega.BeNil())
+					require.NoError(err)
 
 					bal := balances[avaxAssetID]
 					testBalances = append(testBalances, bal)
@@ -129,9 +126,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 						break
 					}
 				}
-				if fromIdx < 0 {
-					gomega.Expect(fromIdx).Should(gomega.BeNumerically(">", 0), "no address found with non-zero balance")
-				}
+				require.GreaterOrEqual(fromIdx, 0, "no address found with non-zero balance")
 
 				toIdx := -1
 				for i := range testBalances {
@@ -155,8 +150,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					_, err = wallets[fromIdx].X().IssueBaseTx(
+					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
 							Asset: avax.Asset{
 								ID: avaxAssetID,
@@ -169,10 +163,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 								},
 							},
 						}},
-						common.WithContext(ctx),
+						e2e.WithDefaultContext(),
 					)
-					cancel()
-					gomega.Expect(err.Error()).Should(gomega.ContainSubstring("insufficient funds"))
+					require.Contains(err.Error(), "insufficient funds")
 				})
 
 				fmt.Printf(`===
@@ -198,8 +191,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					receiverNewBal,
 				)
 
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txID, err := wallets[fromIdx].X().IssueBaseTx(
+				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
 							ID: avaxAssetID,
@@ -212,53 +204,48 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 							},
 						},
 					}},
-					common.WithContext(ctx),
+					e2e.WithDefaultContext(),
 				)
-				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 				senderCurBalX := balances[avaxAssetID]
 				tests.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
 
 				balances, err = wallets[toIdx].X().Builder().GetFTBalance()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 				receiverCurBalX := balances[avaxAssetID]
 				tests.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
 
-				gomega.Expect(senderCurBalX).Should(gomega.Equal(senderNewBal))
-				gomega.Expect(receiverCurBalX).Should(gomega.Equal(receiverNewBal))
+				require.Equal(senderCurBalX, senderNewBal)
+				require.Equal(receiverCurBalX, receiverNewBal)
 
+				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
+					require.NoError(err)
+					require.Equal(status, choices.Accepted)
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
+					require.NoError(err)
+					require.Equal(status, choices.Accepted)
 
-					ep := u + "/ext/metrics"
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
-					gomega.Expect(err).Should(gomega.BeNil())
+					mm, err := tests.GetNodeMetrics(u, allMetrics...)
+					require.NoError(err)
 
 					prev := metricsBeforeTx[u]
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					gomega.Expect(mm[metricBlksProcessing]).Should(gomega.Equal(prev[metricBlksProcessing]))
+					require.Equal(mm[metricBlksProcessing], prev[metricBlksProcessing])
 
 					// +1 since X-chain tx must have been accepted by now
-					gomega.Expect(mm[metricBlksAccepted]).Should(gomega.Equal(prev[metricBlksAccepted] + 1))
+					require.Equal(mm[metricBlksAccepted], prev[metricBlksAccepted]+1)
 
 					metricsBeforeTx[u] = mm
 				}

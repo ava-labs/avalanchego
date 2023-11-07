@@ -62,7 +62,10 @@ func StartTestPeer(
 	}
 
 	tlsConfg := TLSConfig(*tlsCert, nil)
-	clientUpgrader := NewTLSClientUpgrader(tlsConfg)
+	clientUpgrader := NewTLSClientUpgrader(
+		tlsConfg,
+		prometheus.NewCounter(prometheus.CounterOpts{}),
+	)
 
 	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
 	if err != nil {
@@ -112,7 +115,7 @@ func StartTestPeer(
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(networkID),
 			MySubnets:            set.Set[ids.ID]{},
-			Beacons:              validators.NewSet(),
+			Beacons:              validators.NewManager(),
 			NetworkID:            networkID,
 			PingFrequency:        constants.DefaultPingFrequency,
 			PongTimeout:          constants.DefaultPingPongTimeout,

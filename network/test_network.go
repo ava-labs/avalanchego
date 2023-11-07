@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -73,7 +74,7 @@ func (*noopListener) Addr() net.Addr {
 func NewTestNetwork(
 	log logging.Logger,
 	networkID uint32,
-	currentValidators validators.Set,
+	currentValidators validators.Manager,
 	trackedSubnets set.Set[ids.ID],
 	router router.ExternalHandler,
 ) (Network, error) {
@@ -166,7 +167,7 @@ func NewTestNetwork(
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
-		AllowPrivateIPs:              constants.DefaultNetworkAllowPrivateIPs,
+		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
 		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,
 
@@ -186,10 +187,9 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	validatorManager := validators.NewManager()
-	beacons := validators.NewSet()
-	networkConfig.Validators = validatorManager
-	networkConfig.Validators.Add(constants.PrimaryNetworkID, currentValidators)
+	ctx := snow.DefaultConsensusContextTest()
+	beacons := validators.NewManager()
+	networkConfig.Validators = currentValidators
 	networkConfig.Beacons = beacons
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
@@ -207,6 +207,7 @@ func NewTestNetwork(
 		return nil, err
 	}
 	networkConfig.CPUTargeter = tracker.NewTargeter(
+		ctx.Log,
 		&tracker.TargeterConfig{
 			VdrAlloc:           float64(runtime.NumCPU()),
 			MaxNonVdrUsage:     .8 * float64(runtime.NumCPU()),
@@ -216,6 +217,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.CPUTracker(),
 	)
 	networkConfig.DiskTargeter = tracker.NewTargeter(
+		ctx.Log,
 		&tracker.TargeterConfig{
 			VdrAlloc:           1000 * units.GiB,
 			MaxNonVdrUsage:     1000 * units.GiB,

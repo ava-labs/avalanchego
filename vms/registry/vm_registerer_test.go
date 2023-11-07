@@ -5,16 +5,16 @@ package registry
 
 import (
 	"context"
+	"net/http"
 	"path"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,7 +26,6 @@ var id = ids.GenerateTestID()
 // Register should succeed even if we can't register a VM
 func TestRegisterRegisterVMFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
@@ -40,7 +39,6 @@ func TestRegisterRegisterVMFails(t *testing.T) {
 // Tests Register if a VM doesn't actually implement VM.
 func TestRegisterBadVM(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := "this is not a vm..."
@@ -56,7 +54,6 @@ func TestRegisterBadVM(t *testing.T) {
 // Tests Register if creating endpoints for a VM fails + shutdown fails
 func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -74,7 +71,6 @@ func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 // Tests Register if creating endpoints for a VM fails + shutdown succeeds
 func TestRegisterCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -92,13 +88,12 @@ func TestRegisterCreateHandlersFails(t *testing.T) {
 // Tests Register if we fail to register the new endpoint on the server.
 func TestRegisterAddRouteFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -108,7 +103,6 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -122,13 +116,12 @@ func TestRegisterAddRouteFails(t *testing.T) {
 // Tests Register we can't find the alias for the newly registered vm
 func TestRegisterAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -138,7 +131,6 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -153,13 +145,12 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 // Tests Register if adding aliases for the newly registered vm fails
 func TestRegisterAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -169,7 +160,6 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -192,13 +182,12 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 // Tests Register if no errors are thrown
 func TestRegisterHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -208,7 +197,6 @@ func TestRegisterHappyCase(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRoute(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -230,7 +218,6 @@ func TestRegisterHappyCase(t *testing.T) {
 // RegisterWithReadLock should succeed even if we can't register a VM
 func TestRegisterWithReadLockRegisterVMFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
@@ -244,7 +231,6 @@ func TestRegisterWithReadLockRegisterVMFails(t *testing.T) {
 // Tests RegisterWithReadLock if a VM doesn't actually implement VM.
 func TestRegisterWithReadLockBadVM(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := "this is not a vm..."
@@ -260,7 +246,6 @@ func TestRegisterWithReadLockBadVM(t *testing.T) {
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown fails
 func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -278,7 +263,6 @@ func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown succeeds
 func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -296,13 +280,12 @@ func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 // Tests RegisterWithReadLock if we fail to register the new endpoint on the server.
 func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -312,7 +295,6 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -326,13 +308,12 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 // Tests RegisterWithReadLock we can't find the alias for the newly registered vm
 func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
@@ -342,7 +323,6 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -357,13 +337,12 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 // Tests RegisterWithReadLock if adding aliases for the newly registered vm fails
 func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -373,7 +352,6 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).
@@ -396,13 +374,12 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 // Tests RegisterWithReadLock if no errors are thrown
 func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
 
-	handlers := map[string]*common.HTTPHandler{
-		"foo": {},
+	handlers := map[string]http.Handler{
+		"foo": nil,
 	}
 	aliases := []string{"alias-1", "alias-2"}
 
@@ -412,7 +389,6 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(
 			handlers["foo"],
-			gomock.Any(),
 			path.Join(constants.VMAliasPrefix, id.String()),
 			"foo",
 		).

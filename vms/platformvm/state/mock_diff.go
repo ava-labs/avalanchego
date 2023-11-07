@@ -13,9 +13,10 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockDiff is a mock of Diff interface.
@@ -337,6 +338,21 @@ func (mr *MockDiffMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockDiff)(nil).GetRewardUTXOs), arg0)
 }
 
+// GetSubnetOwner mocks base method.
+func (m *MockDiff) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetOwner", arg0)
+	ret0, _ := ret[0].(fx.Owner)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetOwner indicates an expected call of GetSubnetOwner.
+func (mr *MockDiffMockRecorder) GetSubnetOwner(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetOwner", reflect.TypeOf((*MockDiff)(nil).GetSubnetOwner), arg0)
+}
+
 // GetSubnetTransformation mocks base method.
 func (m *MockDiff) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -484,6 +500,18 @@ func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64)
 func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetSubnetOwner mocks base method.
+func (m *MockDiff) SetSubnetOwner(arg0 ids.ID, arg1 fx.Owner) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetOwner", arg0, arg1)
+}
+
+// SetSubnetOwner indicates an expected call of SetSubnetOwner.
+func (mr *MockDiffMockRecorder) SetSubnetOwner(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetOwner", reflect.TypeOf((*MockDiff)(nil).SetSubnetOwner), arg0, arg1)
 }
 
 // SetTimestamp mocks base method.

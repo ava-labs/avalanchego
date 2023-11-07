@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -28,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -62,11 +63,12 @@ import (
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
 )
 
+// TODO: Enable these to be configured by the user
 const (
-	decidedCacheSize    = 2048
+	decidedCacheSize    = 64 * units.MiB
 	missingCacheSize    = 2048
-	unverifiedCacheSize = 2048
-	bytesToIDCacheSize  = 2048
+	unverifiedCacheSize = 64 * units.MiB
+	bytesToIDCacheSize  = 64 * units.MiB
 )
 
 var (
@@ -76,7 +78,6 @@ var (
 	_ block.ChainVM                      = (*VMClient)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VMClient)(nil)
 	_ block.BatchedChainVM               = (*VMClient)(nil)
-	_ block.HeightIndexedChainVM         = (*VMClient)(nil)
 	_ block.StateSyncableVM              = (*VMClient)(nil)
 	_ prometheus.Gatherer                = (*VMClient)(nil)
 
@@ -109,9 +110,10 @@ type VMClient struct {
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmpb.VMClient) *VMClient {
+func NewClient(clientConn *grpc.ClientConn) *VMClient {
 	return &VMClient{
-		client: client,
+		client: vmpb.NewVMClient(clientConn),
+		conns:  []*grpc.ClientConn{clientConn},
 	}
 }
 
@@ -126,7 +128,7 @@ func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker 
 func (vm *VMClient) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
@@ -152,33 +154,21 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	// Initialize and serve each database and construct the db manager
-	// initialize request parameters
-	versionedDBs := dbManager.GetDatabases()
-	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
-	for i, semDB := range versionedDBs {
-		dbVersion := semDB.Version.String()
-		serverListener, err := grpcutils.NewListener()
-		if err != nil {
-			return err
-		}
-		serverAddr := serverListener.Addr().String()
-
-		go grpcutils.Serve(serverListener, vm.newDBServer(semDB.Database))
-		chainCtx.Log.Info("grpc: serving database",
-			zap.String("version", dbVersion),
-			zap.String("address", serverAddr),
-		)
-
-		versionedDBServers[i] = &vmpb.VersionedDBServer{
-			ServerAddr: serverAddr,
-			Version:    dbVersion,
-		}
+	// Initialize the database
+	dbServerListener, err := grpcutils.NewListener()
+	if err != nil {
+		return err
 	}
+	dbServerAddr := dbServerListener.Addr().String()
+
+	go grpcutils.Serve(dbServerListener, vm.newDBServer(db))
+	chainCtx.Log.Info("grpc: serving database",
+		zap.String("address", dbServerAddr),
+	)
 
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(chainCtx.Keystore)
-	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, dbManager.Current().Database)
+	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, db)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
 	vm.appSender = appsender.NewServer(appSender)
 	vm.validatorStateServer = gvalidators.NewServer(chainCtx.ValidatorState)
@@ -208,7 +198,7 @@ func (vm *VMClient) Initialize(
 		GenesisBytes: genesisBytes,
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
-		DbServers:    versionedDBServers,
+		DbServerAddr: dbServerAddr,
 		ServerAddr:   serverAddr,
 	})
 	if err != nil {
@@ -366,13 +356,13 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 	return errs.Err
 }
 
-func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	resp, err := vm.client.CreateHandlers(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
 
-	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	handlers := make(map[string]http.Handler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
 		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
@@ -380,21 +370,18 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]*common.HTTP
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = &common.HTTPHandler{
-			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
-		}
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
 	}
 	return handlers, nil
 }
 
-func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*common.HTTPHandler, error) {
+func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	resp, err := vm.client.CreateStaticHandlers(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
 
-	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	handlers := make(map[string]http.Handler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
 		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
@@ -402,10 +389,7 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*commo
 		}
 
 		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = &common.HTTPHandler{
-			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
-		}
+		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
 	}
 	return handlers, nil
 }
@@ -526,7 +510,9 @@ func (vm *VMClient) SetPreference(ctx context.Context, blkID ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck(ctx context.Context) (interface{}, error) {
-	health, err := vm.client.Health(ctx, &emptypb.Empty{})
+	// HealthCheck is a special case, where we want to fail fast instead of block.
+	failFast := grpc.WaitForReady(false)
+	health, err := vm.client.Health(ctx, &emptypb.Empty{}, failFast)
 	if err != nil {
 		return nil, fmt.Errorf("health check failed: %w", err)
 	}

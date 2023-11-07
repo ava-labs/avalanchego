@@ -17,7 +17,7 @@ var (
 	errFailedSecretKeyDeserialize = errors.New("couldn't deserialize secret key")
 
 	// The ciphersuite is more commonly known as G2ProofOfPossession.
-	// There are two digests to ensure that that message space for normal
+	// There are two digests to ensure that message space for normal
 	// signatures and the proof of possession are distinct.
 	ciphersuiteSignature         = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 	ciphersuiteProofOfPossession = []byte("BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
@@ -70,4 +70,12 @@ func Sign(sk *SecretKey, msg []byte) *Signature {
 // Sign [msg] to prove the ownership of this [sk].
 func SignProofOfPossession(sk *SecretKey, msg []byte) *Signature {
 	return new(Signature).Sign(sk, msg, ciphersuiteProofOfPossession)
+}
+
+func DeserializeSecretKey(pkBytes []byte) *SecretKey {
+	return new(SecretKey).Deserialize(pkBytes)
+}
+
+func SerializeSecretKey(key *SecretKey) []byte {
+	return key.Serialize()
 }

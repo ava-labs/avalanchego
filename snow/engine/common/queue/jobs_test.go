@@ -6,6 +6,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"math"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,7 +33,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		},
 		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return set.Set[ids.ID]{parentID: struct{}{}}, nil
+				return set.Of(parentID), nil
 			}
 			return set.Set[ids.ID]{}, nil
 		},
@@ -278,8 +279,7 @@ func TestMissingJobs(t *testing.T) {
 	numMissingIDs := jobs.NumMissingIDs()
 	require.Equal(2, numMissingIDs)
 
-	missingIDSet := set.Set[ids.ID]{}
-	missingIDSet.Add(jobs.MissingIDs()...)
+	missingIDSet := set.Of(jobs.MissingIDs()...)
 
 	containsJob0ID := missingIDSet.Contains(job0ID)
 	require.True(containsJob0ID)
@@ -295,8 +295,7 @@ func TestMissingJobs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(jobs.SetParser(context.Background(), parser))
 
-	missingIDSet = set.Set[ids.ID]{}
-	missingIDSet.Add(jobs.MissingIDs()...)
+	missingIDSet = set.Of(jobs.MissingIDs()...)
 
 	containsJob0ID = missingIDSet.Contains(job0ID)
 	require.True(containsJob0ID)
@@ -451,7 +450,7 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.Equal(uint64(2), jobs.state.numJobs)
 
 	require.NoError(jobs.Commit())
-	require.NoError(database.Clear(jobs.state.metadataDB, jobs.state.metadataDB))
+	require.NoError(database.Clear(jobs.state.metadataDB, math.MaxInt))
 	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())

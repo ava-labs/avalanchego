@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -103,22 +102,14 @@ type keystore struct {
 	// Used to persist users and their data
 	userDB database.Database
 	bcDB   database.Database
-	//           BaseDB
-	//          /      \
-	//    UserDB        BlockchainDB
-	//                 /      |     \
-	//               Usr     Usr    Usr
-	//             /  |  \
-	//          BID  BID  BID
 }
 
-func New(log logging.Logger, dbManager manager.Manager) Keystore {
-	currentDB := dbManager.Current()
+func New(log logging.Logger, db database.Database) Keystore {
 	return &keystore{
 		log:                log,
 		usernameToPassword: make(map[string]*password.Hash),
-		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
-		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
+		userDB:             prefixdb.New(usersPrefix, db),
+		bcDB:               prefixdb.New(bcsPrefix, db),
 	}
 }
 

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 print_usage() {
   printf "Usage: build_avalanche [OPTIONS]
@@ -26,11 +24,10 @@ done
 
 # Changes to the minimum golang version must also be replicated in
 # scripts/build_avalanche.sh (here)
-# scripts/local.Dockerfile
 # Dockerfile
 # README.md
 # go.mod
-go_version_minimum="1.19.6"
+go_version_minimum="1.20.10"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'

@@ -8,12 +8,12 @@
 package server
 
 import (
+	http "net/http"
 	reflect "reflect"
-	sync "sync"
 
 	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockServer is a mock of Server interface.
@@ -78,31 +78,31 @@ func (mr *MockServerMockRecorder) AddAliasesWithReadLock(arg0 interface{}, arg1 
 }
 
 // AddRoute mocks base method.
-func (m *MockServer) AddRoute(arg0 *common.HTTPHandler, arg1 *sync.RWMutex, arg2, arg3 string) error {
+func (m *MockServer) AddRoute(arg0 http.Handler, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRoute", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AddRoute", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRoute indicates an expected call of AddRoute.
-func (mr *MockServerMockRecorder) AddRoute(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRoute(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), arg0, arg1, arg2)
 }
 
 // AddRouteWithReadLock mocks base method.
-func (m *MockServer) AddRouteWithReadLock(arg0 *common.HTTPHandler, arg1 *sync.RWMutex, arg2, arg3 string) error {
+func (m *MockServer) AddRouteWithReadLock(arg0 http.Handler, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRouteWithReadLock", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AddRouteWithReadLock", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRouteWithReadLock indicates an expected call of AddRouteWithReadLock.
-func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), arg0, arg1, arg2)
 }
 
 // Dispatch mocks base method.
@@ -117,20 +117,6 @@ func (m *MockServer) Dispatch() error {
 func (mr *MockServerMockRecorder) Dispatch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockServer)(nil).Dispatch))
-}
-
-// DispatchTLS mocks base method.
-func (m *MockServer) DispatchTLS(arg0, arg1 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DispatchTLS", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DispatchTLS indicates an expected call of DispatchTLS.
-func (mr *MockServerMockRecorder) DispatchTLS(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DispatchTLS", reflect.TypeOf((*MockServer)(nil).DispatchTLS), arg0, arg1)
 }
 
 // RegisterChain mocks base method.

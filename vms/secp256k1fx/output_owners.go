@@ -98,9 +98,7 @@ func (out *OutputOwners) Addresses() [][]byte {
 
 // AddressesSet returns addresses as a set
 func (out *OutputOwners) AddressesSet() set.Set[ids.ShortID] {
-	set := set.NewSet[ids.ShortID](len(out.Addrs))
-	set.Add(out.Addrs...)
-	return set
+	return set.Of(out.Addrs...)
 }
 
 // Equals returns true if the provided owners create the same condition
@@ -128,7 +126,7 @@ func (out *OutputOwners) Verify() error {
 		return ErrOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
 		return ErrOutputUnoptimized
-	case !utils.IsSortedAndUniqueSortable(out.Addrs):
+	case !utils.IsSortedAndUnique(out.Addrs):
 		return ErrAddrsNotSortedUnique
 	default:
 		return nil

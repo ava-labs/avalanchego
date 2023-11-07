@@ -46,6 +46,47 @@ func TestSet(t *testing.T) {
 	require.False(s.Overlaps(s2))
 }
 
+func TestOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []int
+		expected []int
+	}{
+		{
+			name:     "nil",
+			elements: nil,
+			expected: []int{},
+		},
+		{
+			name:     "empty",
+			elements: []int{},
+			expected: []int{},
+		},
+		{
+			name:     "unique elements",
+			elements: []int{1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "duplicate elements",
+			elements: []int{1, 2, 3, 1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := Of(tt.elements...)
+
+			require.Len(s, len(tt.expected))
+			for _, expected := range tt.expected {
+				require.True(s.Contains(expected))
+			}
+		})
+	}
+}
+
 func TestSetCappedList(t *testing.T) {
 	require := require.New(t)
 	s := Set[int]{}
@@ -186,5 +227,31 @@ func TestSetUnmarshalJSON(t *testing.T) {
 		require.NoError(set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
 		require.NoError(set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON)))))
 		require.Equal(set1, set2)
+	}
+}
+
+func TestSetReflectJSONMarshal(t *testing.T) {
+	require := require.New(t)
+	set := Set[int]{}
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal("[]", string(asJSON))
+	}
+	id1JSON, err := json.Marshal(1)
+	require.NoError(err)
+	id2JSON, err := json.Marshal(2)
+	require.NoError(err)
+	set.Add(1)
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal(fmt.Sprintf("[%s]", string(id1JSON)), string(asJSON))
+	}
+	set.Add(2)
+	{
+		asJSON, err := json.Marshal(set)
+		require.NoError(err)
+		require.Equal(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)), string(asJSON))
 	}
 }

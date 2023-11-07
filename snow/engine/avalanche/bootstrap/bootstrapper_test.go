@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -33,12 +35,26 @@ var (
 	errUnknownTx           = errors.New("unknown tx")
 )
 
+type testTx struct {
+	snowstorm.Tx
+
+	tx *snowstorm.TestTx
+}
+
+func (t *testTx) Accept(ctx context.Context) error {
+	if err := t.Tx.Accept(ctx); err != nil {
+		return err
+	}
+	t.tx.DependenciesV = nil
+	return nil
+}
+
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 
-	peers := validators.NewSet()
+	vdrs := validators.NewManager()
 	db := memdb.New()
 	sender := &common.SenderTest{T: t}
 	manager := vertex.NewTestManager(t)
@@ -63,7 +79,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
 	require.NoError(err)
@@ -72,14 +88,16 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	require.NoError(err)
 
 	peerTracker := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
-	peers.RegisterCallbackListener(startupTracker)
+	totalWeight, err := vdrs.TotalWeight(constants.PrimaryNetworkID)
+	require.NoError(err)
+	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
+	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, startupTracker)
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
+		Beacons:                        vdrs,
+		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
+		Alpha:                          totalWeight/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
@@ -354,22 +372,19 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	config, peerID, sender, manager, vm := newConfig(t)
 
-	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-
 	txID0 := ids.GenerateTestID()
 	txID1 := ids.GenerateTestID()
 
 	txBytes0 := []byte{0}
 	txBytes1 := []byte{1}
 
-	tx0 := &snowstorm.TestTx{
+	innerTx0 := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     txID0,
 			StatusV: choices.Processing,
 		},
 		BytesV: txBytes0,
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	// Depends on tx0
 	tx1 := &snowstorm.TestTx{
@@ -377,10 +392,14 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			IDV:     txID1,
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []snowstorm.Tx{tx0},
+		DependenciesV: set.Of(innerTx0.IDV),
 		BytesV:        txBytes1,
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
+
+	tx0 := &testTx{
+		Tx: innerTx0,
+		tx: tx1,
+	}
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()

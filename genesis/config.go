@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -172,30 +171,28 @@ func init() {
 	unparsedFujiConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		json.Unmarshal(mainnetGenesisConfigJSON, &unparsedMainnetConfig),
 		json.Unmarshal(fujiGenesisConfigJSON, &unparsedFujiConfig),
 		json.Unmarshal(localGenesisConfigJSON, &unparsedLocalConfig),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 
-	mainnetConfig, err := unparsedMainnetConfig.Parse()
-	errs.Add(err)
-	MainnetConfig = mainnetConfig
+	MainnetConfig, err = unparsedMainnetConfig.Parse()
+	if err != nil {
+		panic(err)
+	}
 
-	fujiConfig, err := unparsedFujiConfig.Parse()
-	errs.Add(err)
-	FujiConfig = fujiConfig
+	FujiConfig, err = unparsedFujiConfig.Parse()
+	if err != nil {
+		panic(err)
+	}
 
-	localConfig, err := unparsedLocalConfig.Parse()
-	errs.Add(err)
-	LocalConfig = localConfig
-
-	if errs.Errored() {
-		panic(errs.Err)
+	LocalConfig, err = unparsedLocalConfig.Parse()
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -235,7 +232,7 @@ func GetConfigContent(genesisContent string) (*Config, error) {
 func parseGenesisJSONBytesToConfig(bytes []byte) (*Config, error) {
 	var unparsedConfig UnparsedConfig
 	if err := json.Unmarshal(bytes, &unparsedConfig); err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidGenesisJSON, err)
+		return nil, fmt.Errorf("%w: %w", errInvalidGenesisJSON, err)
 	}
 
 	config, err := unparsedConfig.Parse()

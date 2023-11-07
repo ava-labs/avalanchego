@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -53,8 +53,9 @@ var defaultSubnetConfig = subnets.Config{
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -97,7 +98,6 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
@@ -218,36 +218,28 @@ func TestTimeout(t *testing.T) {
 
 	sendAll := func() {
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetStateSummaryFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedStateSummary(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
@@ -268,27 +260,21 @@ func TestTimeout(t *testing.T) {
 			sender.SendGet(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
+			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty, 0)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
+			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil, 0)
 		}
 		{
-			nodeIDs := set.Set[ids.NodeID]{
-				ids.GenerateTestNodeID(): struct{}{},
-			}
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
@@ -324,8 +310,9 @@ func TestTimeout(t *testing.T) {
 func TestReliableMessages(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.NodeID{1}, nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -368,8 +355,6 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-
-	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -458,10 +443,9 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := set.Set[ids.NodeID]{}
-			vdrIDs.Add(ids.NodeID{1})
+			vdrIDs := set.Of(ids.NodeID{1})
 
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -475,8 +459,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require := require.New(t)
 
 	benchlist := benchlist.NewNoBenchlist()
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -518,8 +503,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	))
-
-	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -610,9 +593,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := set.Set[ids.NodeID]{}
-			vdrIDs.Add(ids.GenerateTestNodeID())
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
+			vdrIDs := set.Of(ids.GenerateTestNodeID())
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
 		}
 	}()
 
@@ -683,15 +665,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
-						successNodeID: struct{}{},
-						failedNodeID:  struct{}{},
-					}, // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Set[ids.NodeID]{
-					successNodeID: struct{}{},
-				})
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetStateSummaryFrontier(
@@ -730,15 +708,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
-						successNodeID: struct{}{},
-						failedNodeID:  struct{}{},
-					}, // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Set[ids.NodeID]{
-					successNodeID: struct{}{},
-				})
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
@@ -774,15 +748,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
-						successNodeID: struct{}{},
-						failedNodeID:  struct{}{},
-					}, // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Set[ids.NodeID]{
-					successNodeID: struct{}{},
-				})
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
@@ -820,15 +790,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
-						successNodeID: struct{}{},
-						failedNodeID:  struct{}{},
-					}, // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Set[ids.NodeID]{
-					successNodeID: struct{}{},
-				})
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
@@ -841,19 +807,14 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
 				externalSender = NewMockExternalSender(ctrl)
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
-				nodeIDs        = set.Set[ids.NodeID]{
-					successNodeID: struct{}{},
-					failedNodeID:  struct{}{},
-					myNodeID:      struct{}{},
-				}
-				nodeIDsCopy set.Set[ids.NodeID]
+				nodeIDs        = set.Of(successNodeID, failedNodeID, myNodeID)
+				nodeIDsCopy    set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
 			snowCtx.Registerer = prometheus.NewRegistry()
@@ -963,9 +924,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -993,9 +954,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1021,9 +982,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1051,9 +1012,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1067,7 +1028,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
@@ -1184,8 +1144,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1223,8 +1183,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1239,7 +1199,6 @@ func TestSender_Single_Request(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)

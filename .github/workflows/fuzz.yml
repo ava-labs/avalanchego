@@ -1,0 +1,25 @@
+name: Run fuzz tests
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          ref: 'dev'
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.10'
+          check-latest: true
+      - name: Run fuzz tests
+        shell: bash
+        run: ./scripts/build_fuzz.sh 30 # Run each fuzz test 30 seconds

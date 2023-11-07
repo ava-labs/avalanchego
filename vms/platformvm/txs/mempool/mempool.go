@@ -78,10 +78,9 @@ type Mempool interface {
 
 	GetTxIterator() TxIterator
 
-	// Note: dropped txs are added to droppedTxIDs but not
-	// not evicted from unissued decision/staker txs.
-	// This allows previously dropped txs to be possibly
-	// reissued.
+	// Note: dropped txs are added to droppedTxIDs but are not evicted from
+	// unissued decision/staker txs. This allows previously dropped txs to be
+	// possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
 }

@@ -5,13 +5,13 @@ package warp
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -135,7 +135,6 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
 
@@ -167,7 +166,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: pk0.Serialize(),
+		PublicKeyBytes: bls.SerializePublicKey(pk0),
 		Weight:         1,
 	}
 
@@ -176,7 +175,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: pk1.Serialize(),
+		PublicKeyBytes: bls.SerializePublicKey(pk1),
 		Weight:         2,
 	}
 
@@ -337,7 +336,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			},
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
 				require.NoError(b, err)

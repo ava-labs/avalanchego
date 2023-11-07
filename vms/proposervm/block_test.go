@@ -8,13 +8,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -33,7 +33,6 @@ import (
 func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	pChainHeight := uint64(1337)
 	parentID := ids.GenerateTestID()
@@ -66,7 +65,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			Log:            logging.NoLog{},
 		},
 		Windower:          windower,
-		stakingCertLeaf:   &x509.Certificate{},
+		stakingCertLeaf:   &staking.Certificate{},
 		stakingLeafSigner: pk,
 	}
 

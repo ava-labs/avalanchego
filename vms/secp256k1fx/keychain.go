@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -24,19 +27,21 @@ var (
 
 // Keychain is a collection of keys that can be used to spend outputs
 type Keychain struct {
-	factory        *secp256k1.Factory
-	addrToKeyIndex map[ids.ShortID]int
+	avaxAddrToKeyIndex map[ids.ShortID]int
+	ethAddrToKeyIndex  map[common.Address]int
 
-	// These can be used to iterate over. However, they should not be modified externally.
-	Addrs set.Set[ids.ShortID]
-	Keys  []*secp256k1.PrivateKey
+	// These can be used to iterate over. However, they should not be modified
+	// externally.
+	Addrs    set.Set[ids.ShortID]
+	EthAddrs set.Set[common.Address]
+	Keys     []*secp256k1.PrivateKey
 }
 
 // NewKeychain returns a new keychain containing [keys]
 func NewKeychain(keys ...*secp256k1.PrivateKey) *Keychain {
 	kc := &Keychain{
-		factory:        &secp256k1.Factory{},
-		addrToKeyIndex: make(map[ids.ShortID]int),
+		avaxAddrToKeyIndex: make(map[ids.ShortID]int),
+		ethAddrToKeyIndex:  make(map[common.Address]int),
 	}
 	for _, key := range keys {
 		kc.Add(key)
@@ -46,18 +51,29 @@ func NewKeychain(keys ...*secp256k1.PrivateKey) *Keychain {
 
 // Add a new key to the key chain
 func (kc *Keychain) Add(key *secp256k1.PrivateKey) {
-	addr := key.PublicKey().Address()
-	if _, ok := kc.addrToKeyIndex[addr]; !ok {
-		kc.addrToKeyIndex[addr] = len(kc.Keys)
+	pk := key.PublicKey()
+	avaxAddr := pk.Address()
+	if _, ok := kc.avaxAddrToKeyIndex[avaxAddr]; !ok {
+		kc.avaxAddrToKeyIndex[avaxAddr] = len(kc.Keys)
+		ethAddr := publicKeyToEthAddress(pk)
+		kc.ethAddrToKeyIndex[ethAddr] = len(kc.Keys)
 		kc.Keys = append(kc.Keys, key)
-		kc.Addrs.Add(addr)
+		kc.Addrs.Add(avaxAddr)
+		kc.EthAddrs.Add(ethAddr)
 	}
 }
 
-// Get a key from the keychain. If the key is unknown, return a pointer to an empty key.
-// In both cases also return a boolean telling whether the key is known.
+// Get a key from the keychain and return whether the key existed.
 func (kc Keychain) Get(id ids.ShortID) (keychain.Signer, bool) {
 	return kc.get(id)
+}
+
+// Get a key from the keychain and return whether the key existed.
+func (kc Keychain) GetEth(addr common.Address) (keychain.Signer, bool) {
+	if i, ok := kc.ethAddrToKeyIndex[addr]; ok {
+		return kc.Keys[i], true
+	}
+	return nil, false
 }
 
 // Addresses returns a list of addresses this keychain manages
@@ -65,9 +81,14 @@ func (kc Keychain) Addresses() set.Set[ids.ShortID] {
 	return kc.Addrs
 }
 
+// EthAddresses returns a list of addresses this keychain manages
+func (kc Keychain) EthAddresses() set.Set[common.Address] {
+	return kc.EthAddrs
+}
+
 // New returns a newly generated private key
 func (kc *Keychain) New() (*secp256k1.PrivateKey, error) {
-	sk, err := kc.factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +164,12 @@ func (kc *Keychain) String() string {
 
 // to avoid internals type assertions
 func (kc Keychain) get(id ids.ShortID) (*secp256k1.PrivateKey, bool) {
-	if i, ok := kc.addrToKeyIndex[id]; ok {
+	if i, ok := kc.avaxAddrToKeyIndex[id]; ok {
 		return kc.Keys[i], true
 	}
 	return nil, false
+}
+
+func publicKeyToEthAddress(pk *secp256k1.PublicKey) common.Address {
+	return crypto.PubkeyToAddress(*(pk.ToECDSA()))
 }

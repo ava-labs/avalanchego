@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+const trackChecksums = false
 
 var (
 	chainID = ids.ID{5, 4, 3, 2, 1}
@@ -35,14 +37,14 @@ func TestBaseTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -140,14 +142,14 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -283,14 +285,14 @@ func TestOperationTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := blocks.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser([]fxs.Fx{secpFx})
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

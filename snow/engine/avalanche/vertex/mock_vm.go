@@ -9,17 +9,18 @@ package vertex
 
 import (
 	context "context"
+	http "net/http"
 	reflect "reflect"
 	time "time"
 
-	manager "github.com/ava-labs/avalanchego/database/manager"
+	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	snowstorm "github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	version "github.com/ava-labs/avalanchego/version"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockLinearizableVM is a mock of LinearizableVM interface.
@@ -131,10 +132,10 @@ func (mr *MockLinearizableVMMockRecorder) Connected(arg0, arg1, arg2 interface{}
 }
 
 // CreateHandlers mocks base method.
-func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -146,10 +147,10 @@ func (mr *MockLinearizableVMMockRecorder) CreateHandlers(arg0 interface{}) *gomo
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
+func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
-	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
+	ret0, _ := ret[0].(map[string]http.Handler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -231,19 +232,19 @@ func (mr *MockLinearizableVMMockRecorder) GetBlock(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockLinearizableVM)(nil).GetBlock), arg0, arg1)
 }
 
-// GetTx mocks base method.
-func (m *MockLinearizableVM) GetTx(arg0 context.Context, arg1 ids.ID) (snowstorm.Tx, error) {
+// GetBlockIDAtHeight mocks base method.
+func (m *MockLinearizableVM) GetBlockIDAtHeight(arg0 context.Context, arg1 uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTx", arg0, arg1)
-	ret0, _ := ret[0].(snowstorm.Tx)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0, arg1)
+	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetTx indicates an expected call of GetTx.
-func (mr *MockLinearizableVMMockRecorder) GetTx(arg0, arg1 interface{}) *gomock.Call {
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockLinearizableVMMockRecorder) GetBlockIDAtHeight(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockLinearizableVM)(nil).GetTx), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockLinearizableVM)(nil).GetBlockIDAtHeight), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
@@ -262,7 +263,7 @@ func (mr *MockLinearizableVMMockRecorder) HealthCheck(arg0 interface{}) *gomock.
 }
 
 // Initialize mocks base method.
-func (m *MockLinearizableVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 manager.Manager, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
+func (m *MockLinearizableVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)
@@ -334,20 +335,6 @@ func (mr *MockLinearizableVMMockRecorder) ParseTx(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*MockLinearizableVM)(nil).ParseTx), arg0, arg1)
 }
 
-// PendingTxs mocks base method.
-func (m *MockLinearizableVM) PendingTxs(arg0 context.Context) []snowstorm.Tx {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PendingTxs", arg0)
-	ret0, _ := ret[0].([]snowstorm.Tx)
-	return ret0
-}
-
-// PendingTxs indicates an expected call of PendingTxs.
-func (mr *MockLinearizableVMMockRecorder) PendingTxs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTxs", reflect.TypeOf((*MockLinearizableVM)(nil).PendingTxs), arg0)
-}
-
 // SetPreference mocks base method.
 func (m *MockLinearizableVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
 	m.ctrl.T.Helper()
@@ -388,6 +375,20 @@ func (m *MockLinearizableVM) Shutdown(arg0 context.Context) error {
 func (mr *MockLinearizableVMMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockLinearizableVM)(nil).Shutdown), arg0)
+}
+
+// VerifyHeightIndex mocks base method.
+func (m *MockLinearizableVM) VerifyHeightIndex(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyHeightIndex", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyHeightIndex indicates an expected call of VerifyHeightIndex.
+func (mr *MockLinearizableVMMockRecorder) VerifyHeightIndex(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyHeightIndex", reflect.TypeOf((*MockLinearizableVM)(nil).VerifyHeightIndex), arg0)
 }
 
 // Version mocks base method.

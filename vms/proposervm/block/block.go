@@ -4,12 +4,12 @@
 package block
 
 import (
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -55,7 +55,7 @@ type statelessBlock struct {
 
 	id        ids.ID
 	timestamp time.Time
-	cert      *x509.Certificate
+	cert      *staking.Certificate
 	proposer  ids.NodeID
 	bytes     []byte
 }
@@ -91,9 +91,9 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return nil
 	}
 
-	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
+	cert, err := staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
+		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
 
 	b.cert = cert
@@ -129,5 +129,9 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	}
 
 	headerBytes := header.Bytes()
-	return b.cert.CheckSignature(b.cert.SignatureAlgorithm, headerBytes, b.Signature)
+	return staking.CheckSignature(
+		b.cert,
+		headerBytes,
+		b.Signature,
+	)
 }

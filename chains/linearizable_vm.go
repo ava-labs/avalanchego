@@ -7,13 +7,12 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
-	dbManager "github.com/ava-labs/avalanchego/database/manager"
 )
 
 var (
@@ -32,7 +31,7 @@ type initializeOnLinearizeVM struct {
 
 	registerer   metrics.OptionalGatherer
 	ctx          *snow.Context
-	dbManager    dbManager.Manager
+	db           database.Database
 	genesisBytes []byte
 	upgradeBytes []byte
 	configBytes  []byte
@@ -47,7 +46,7 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,
-		vm.dbManager,
+		vm.db,
 		vm.genesisBytes,
 		vm.upgradeBytes,
 		vm.configBytes,
@@ -65,10 +64,16 @@ type linearizeOnInitializeVM struct {
 	stopVertexID ids.ID
 }
 
+func NewLinearizeOnInitializeVM(vm vertex.LinearizableVMWithEngine) *linearizeOnInitializeVM {
+	return &linearizeOnInitializeVM{
+		LinearizableVMWithEngine: vm,
+	}
+}
+
 func (vm *linearizeOnInitializeVM) Initialize(
 	ctx context.Context,
 	_ *snow.Context,
-	_ dbManager.Manager,
+	_ database.Database,
 	_ []byte,
 	_ []byte,
 	_ []byte,

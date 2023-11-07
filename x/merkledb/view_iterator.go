@@ -24,14 +24,18 @@ func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 }
 
 func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	changes := make([]KeyChange, 0, len(t.changes.values))
-	for path, change := range t.changes.values {
-		key := path.Serialize().Value
-		if (len(start) > 0 && bytes.Compare(start, key) > 0) || !bytes.HasPrefix(key, prefix) {
+	var (
+		changes   = make([]KeyChange, 0, len(t.changes.values))
+		startKey  = ToKey(start)
+		prefixKey = ToKey(prefix)
+	)
+
+	for key, change := range t.changes.values {
+		if len(start) > 0 && startKey.Greater(key) || !key.HasPrefix(prefixKey) {
 			continue
 		}
 		changes = append(changes, KeyChange{
-			Key:   key,
+			Key:   key.Bytes(),
 			Value: change.after,
 		})
 	}
@@ -101,7 +105,7 @@ func (it *viewIterator) Next() bool {
 			// Otherwise go to next loop iteration.
 			if !nextKeyValue.Value.IsNothing() {
 				it.key = nextKeyValue.Key
-				it.value = nextKeyValue.Value.value
+				it.value = nextKeyValue.Value.Value()
 				return true
 			}
 		case len(it.sortedChanges) == 0:
@@ -122,10 +126,10 @@ func (it *viewIterator) Next() bool {
 				it.sortedChanges = it.sortedChanges[1:]
 
 				// If current change is not a deletion, return it.
-				// Otherwise go to next loop iteration.
-				if !memValue.IsNothing() {
+				// Otherwise, go to next loop iteration.
+				if memValue.HasValue() {
 					it.key = memKey
-					it.value = slices.Clone(memValue.value)
+					it.value = slices.Clone(memValue.Value())
 					return true
 				}
 			case 1:
@@ -140,9 +144,9 @@ func (it *viewIterator) Next() bool {
 				it.sortedChanges = it.sortedChanges[1:]
 				it.parentIterExhausted = !it.parentIter.Next()
 
-				if !memValue.IsNothing() {
+				if memValue.HasValue() {
 					it.key = memKey
-					it.value = slices.Clone(memValue.value)
+					it.value = slices.Clone(memValue.Value())
 					return true
 				}
 			}

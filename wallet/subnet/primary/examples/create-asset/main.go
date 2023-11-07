@@ -24,10 +24,14 @@ func main() {
 
 	ctx := context.Background()
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletFromURI(ctx, uri, kc)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:          uri,
+		AVAXKeychain: kc,
+		EthKeychain:  kc,
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
@@ -45,7 +49,7 @@ func main() {
 	}
 
 	createAssetStartTime := time.Now()
-	createAssetTxID, err := xWallet.IssueCreateAssetTx(
+	createAssetTx, err := xWallet.IssueCreateAssetTx(
 		"HI",
 		"HI",
 		1,
@@ -61,5 +65,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue create asset transaction: %s\n", err)
 	}
-	log.Printf("created new asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
+	log.Printf("created new asset %s in %s\n", createAssetTx.ID(), time.Since(createAssetStartTime))
 }

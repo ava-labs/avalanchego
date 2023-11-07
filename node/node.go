@@ -6,12 +6,16 @@ package node
 import (
 	"context"
 	"crypto"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -34,8 +38,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,13 +52,13 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -68,7 +73,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -86,8 +90,11 @@ import (
 )
 
 var (
-	genesisHashKey  = []byte("genesisID")
-	indexerDBPrefix = []byte{0x00}
+	genesisHashKey     = []byte("genesisID")
+	ungracefulShutdown = []byte("ungracefulShutdown")
+
+	indexerDBPrefix  = []byte{0x00}
+	keystoreDBPrefix = []byte("keystore")
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -104,8 +111,7 @@ type Node struct {
 	ID ids.NodeID
 
 	// Storage for this node
-	DBManager manager.Manager
-	DB        database.Database
+	DB database.Database
 
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
@@ -124,6 +130,9 @@ type Node struct {
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
+
+	// Manages network timeouts
+	timeoutManager timeout.Manager
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -144,15 +153,22 @@ type Node struct {
 	networkNamespace string
 	Net              network.Network
 
+	// The staking address will optionally be written to a process context
+	// file to enable other nodes to be configured to use this node as a
+	// beacon.
+	stakingAddress string
+
 	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
 	// session keys. This value should only be non-nil during debugging.
 	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
-	bootstrappers validators.Set
+	bootstrappers validators.Manager
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	apiURI string
 
 	// Handles HTTP API calls
 	APIServer server.Server
@@ -209,8 +225,8 @@ type Node struct {
  */
 
 // Initialize the networking layer.
-// Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
+// Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
+func (n *Node) initNetworking() error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
@@ -230,7 +246,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
@@ -254,6 +270,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
+	// Record the bound address to enable inclusion in process context file.
+	n.stakingAddress = listener.Addr().String()
+
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return errInvalidTLSKey
@@ -274,7 +293,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
@@ -287,7 +305,8 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
-		err := primaryNetVdrs.Add(
+		err := n.vdrs.AddStaker(
+			constants.PrimaryNetworkID,
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
@@ -298,13 +317,14 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 
 		consensusRouter = &insecureValidatorManager{
+			log:    n.Log,
 			Router: consensusRouter,
-			vdrs:   primaryNetVdrs,
+			vdrs:   n.vdrs,
 			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
-	numBootstrappers := n.bootstrappers.Len()
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
@@ -339,7 +359,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	}
 
 	// keep gossip tracker synchronized with the validator set
-	primaryNetVdrs.RegisterCallbackListener(&peer.GossipTrackerCallback{
+	n.vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
 		Log:           n.Log,
 		GossipTracker: gossipTracker,
 	})
@@ -374,19 +394,51 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	return err
 }
 
+type NodeProcessContext struct {
+	// The process id of the node
+	PID int `json:"pid"`
+	// URI to access the node API
+	// Format: [https|http]://[host]:[port]
+	URI string `json:"uri"`
+	// Address other nodes can use to communicate with this node
+	// Format: [host]:[port]
+	StakingAddress string `json:"stakingAddress"`
+}
+
+// Write process context to the configured path. Supports the use of
+// dynamically chosen network ports with local network orchestration.
+func (n *Node) writeProcessContext() error {
+	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
+
+	// Write the process context to disk
+	processContext := &NodeProcessContext{
+		PID:            os.Getpid(),
+		URI:            n.apiURI,
+		StakingAddress: n.stakingAddress, // Set by network initialization
+	}
+	bytes, err := json.MarshalIndent(processContext, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal process context: %w", err)
+	}
+	if err := perms.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write process context: %w", err)
+	}
+	return nil
+}
+
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	if err := n.writeProcessContext(); err != nil {
+		return err
+	}
+
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
-		var err error
-		if n.Config.HTTPSEnabled {
-			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
-		} else {
-			n.Log.Debug("initializing API server without TLS")
-			err = n.APIServer.Dispatch()
-		}
+		n.Log.Info("API server listening",
+			zap.String("uri", n.apiURI),
+		)
+		err := n.APIServer.Dispatch()
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
@@ -429,6 +481,16 @@ func (n *Node) Dispatch() error {
 
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()
+
+	// Remove the process context file to communicate to an orchestrator
+	// that the node is no longer running.
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		n.Log.Error("removal of process context file failed",
+			zap.String("path", n.Config.ProcessContextFilePath),
+			zap.Error(err),
+		)
+	}
+
 	return err
 }
 
@@ -439,40 +501,41 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	// start the db manager
-	var (
-		dbManager manager.Manager
-		err       error
-	)
+	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+		// Prior to v1.10.15, the only on-disk database was leveldb, and its
+		// files went to [dbPath]/[networkID]/v1.4.5.
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
+		var err error
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
+		}
 	case memdb.Name:
-		dbManager = manager.NewMemDB(version.CurrentDatabase)
+		n.DB = memdb.New()
+	case pebble.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
+		var err error
+		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
+		}
 	default:
-		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
+		return fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
+			pebble.Name,
 		)
 	}
+
+	var err error
+	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
 	if err != nil {
 		return err
 	}
-
-	meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	if err != nil {
-		return err
-	}
-
-	n.DBManager = meterDBManager
-
-	currentDB := dbManager.Current()
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", currentDB.Version),
-	)
-	n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -497,17 +560,38 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	n.Log.Info("initializing database",
+		zap.Stringer("genesisHash", genesisHash),
+	)
+
+	ok, err := n.DB.Has(ungracefulShutdown)
+	if err != nil {
+		return fmt.Errorf("failed to read ungraceful shutdown key: %w", err)
+	}
+
+	if ok {
+		n.Log.Warn("detected previous ungraceful shutdown")
+	}
+
+	if err := n.DB.Put(ungracefulShutdown, nil); err != nil {
+		return fmt.Errorf(
+			"failed to write ungraceful shutdown key at: %w",
+			err,
+		)
+	}
+
 	return nil
 }
 
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBootstrappers() error {
-	n.bootstrappers = validators.NewSet()
+	n.bootstrappers = validators.NewManager()
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.AddStaker(constants.PrimaryNetworkID, bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -601,13 +685,34 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
+	listener, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	protocol := "http"
+	if n.Config.HTTPSEnabled {
+		cert, err := tls.X509KeyPair(n.Config.HTTPSCert, n.Config.HTTPSKey)
+		if err != nil {
+			return err
+		}
+		config := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		listener = tls.NewListener(listener, config)
+
+		protocol = "https"
+	}
+	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
+
 	if !n.Config.APIRequireAuthToken {
 		var err error
 		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
-			n.Config.HTTPHost,
-			n.Config.HTTPPort,
+			listener,
 			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
@@ -629,8 +734,7 @@ func (n *Node) initAPIServer() error {
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
-		n.Config.HTTPHost,
-		n.Config.HTTPPort,
+		listener,
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
@@ -648,15 +752,11 @@ func (n *Node) initAPIServer() error {
 
 	// only create auth service if token authorization is required
 	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
-	authService, err := a.CreateHandler()
+	handler, err := a.CreateHandler()
 	if err != nil {
 		return err
 	}
-	handler := &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     authService,
-	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "")
+	return n.APIServer.AddRoute(handler, "auth", "")
 }
 
 // Add the default VM aliases
@@ -691,15 +791,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	cChainID := createEVMTx.ID()
 
 	// If any of these chains die, the node shuts down
-	criticalChains := set.Set[ids.ID]{}
-	criticalChains.Add(
+	criticalChains := set.Of(
 		constants.PlatformChainID,
 		xChainID,
 		cChainID,
 	)
 
-	// Manages network timeouts
-	timeoutManager, err := timeout.NewManager(
+	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		"requests",
@@ -708,13 +806,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		timeoutManager,
+		n.timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Config.SybilProtectionEnabled,
@@ -730,7 +828,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingCert:                             n.Config.StakingTLSCert,
+		StakingTLSCert:                          n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
@@ -738,11 +836,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
 		TxAcceptorGroup:                         n.TxAcceptorGroup,
 		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DBManager:                               n.DBManager,
+		DB:                                      n.DB,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
+		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
@@ -752,7 +851,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                                xChainID,
 		CChainID:                                cChainID,
 		CriticalChains:                          criticalChains,
-		TimeoutManager:                          timeoutManager,
+		TimeoutManager:                          n.timeoutManager,
 		Health:                                  n.health,
 		RetryBootstrap:                          n.Config.RetryBootstrap,
 		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
@@ -791,8 +890,6 @@ func (n *Node) initVMs() error {
 	// allows the node's validator sets to be determined by network connections.
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
-		primaryVdrs := validators.NewSet()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
@@ -803,14 +900,14 @@ func (n *Node) initVMs() error {
 	})
 
 	// Register the VMs that Avalanche supports
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+				PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:                n.Config.TrackedSubnets,
 				TxFee:                         n.Config.TxFee,
 				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -833,6 +930,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
+				DTime:                         version.GetDTime(n.Config.NetworkID),
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
@@ -847,8 +945,8 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
-	if errs.Errored() {
-		return errs.Err
+	if err != nil {
+		return err
 	}
 
 	// initialize vm runtime manager
@@ -888,9 +986,8 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	n.keystore = keystore.New(n.Log, keystoreDB)
-	keystoreHandler, err := n.keystore.CreateHandler()
+	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
+	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
 	}
@@ -899,11 +996,7 @@ func (n *Node) initKeystoreAPI() error {
 		return nil
 	}
 	n.Log.Warn("initializing deprecated keystore API")
-	handler := &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     keystoreHandler,
-	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "")
+	return n.APIServer.AddRoute(handler, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -933,14 +1026,10 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler: promhttp.HandlerFor(
-				n.MetricsGatherer,
-				promhttp.HandlerOpts{},
-			),
-		},
-		&sync.RWMutex{},
+		promhttp.HandlerFor(
+			n.MetricsGatherer,
+			promhttp.HandlerOpts{},
+		),
 		"metrics",
 		"",
 	)
@@ -969,7 +1058,11 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "")
+	return n.APIServer.AddRoute(
+		service,
+		"admin",
+		"",
+	)
 }
 
 // initProfiler initializes the continuous profiling
@@ -1004,7 +1097,6 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
@@ -1027,13 +1119,16 @@ func (n *Node) initInfoAPI() error {
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
-		primaryValidators,
 		n.benchlistManager,
 	)
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "")
+	return n.APIServer.AddRoute(
+		service,
+		"info",
+		"",
+	)
 }
 
 // initHealthAPI initializes the Health API service
@@ -1100,11 +1195,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     handler,
-		},
-		&sync.RWMutex{},
+		handler,
 		"health",
 		"",
 	)
@@ -1113,11 +1204,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Readiness),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Readiness),
 		"health",
 		"/readiness",
 	)
@@ -1126,11 +1213,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Health),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Health),
 		"health",
 		"/health",
 	)
@@ -1139,11 +1222,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	return n.APIServer.AddRoute(
-		&common.HTTPHandler{
-			LockOptions: common.NoLock,
-			Handler:     health.NewGetHandler(healthChecker.Liveness),
-		},
-		&sync.RWMutex{},
+		health.NewGetHandler(healthChecker.Liveness),
 		"health",
 		"/liveness",
 	)
@@ -1157,11 +1236,15 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Warn("initializing deprecated ipc API")
-	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.APIServer, n.IPCs)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.IPCs)
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "")
+	return n.APIServer.AddRoute(
+		service,
+		"ipcs",
+		"",
+	)
 }
 
 // Give chains aliases as specified by the genesis information
@@ -1207,14 +1290,6 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	return nil
 }
 
-// Initializes [n.vdrs] and returns the Primary Network validator set.
-func (n *Node) initVdrs() validators.Set {
-	n.vdrs = validators.NewManager()
-	vdrSet := validators.NewSet()
-	_ = n.vdrs.Add(constants.PrimaryNetworkID, vdrSet)
-	return vdrSet
-}
-
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	resourceManager, err := resource.NewManager(
@@ -1239,11 +1314,11 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.cpuTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.CPUTracker(),
 	)
 }
@@ -1252,11 +1327,11 @@ func (n *Node) initCPUTargeter(
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initDiskTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.diskTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.DiskTracker(),
 	)
 }
@@ -1267,9 +1342,15 @@ func (n *Node) Initialize(
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {
+	tlsCert := config.StakingTLSCert.Leaf
+	stakingCert := staking.CertificateFromX509(tlsCert)
+	if err := staking.ValidateCertificate(stakingCert); err != nil {
+		return fmt.Errorf("invalid staking certificate: %w", err)
+	}
+
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+	n.ID = ids.NodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
@@ -1277,6 +1358,7 @@ func (n *Node) Initialize(
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
+		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
@@ -1340,13 +1422,16 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
-	primaryNetVdrs := n.initVdrs()
+	n.vdrs = validators.NewManager()
+	if !n.Config.SybilProtectionEnabled {
+		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
+	}
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
-	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
-	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
-	if err := n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
+	n.initCPUTargeter(&config.CPUTargeterConfig)
+	n.initDiskTargeter(&config.DiskTargeterConfig)
+	if err := n.initNetworking(); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -1442,6 +1527,7 @@ func (n *Node) shutdown() {
 			)
 		}
 	}
+	n.timeoutManager.Stop()
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
@@ -1466,8 +1552,15 @@ func (n *Node) shutdown() {
 	n.Log.Info("cleaning up plugin runtimes")
 	n.runtimeManager.Stop(context.TODO())
 
-	if n.DBManager != nil {
-		if err := n.DBManager.Close(); err != nil {
+	if n.DB != nil {
+		if err := n.DB.Delete(ungracefulShutdown); err != nil {
+			n.Log.Error(
+				"failed to delete ungraceful shutdown key",
+				zap.Error(err),
+			)
+		}
+
+		if err := n.DB.Close(); err != nil {
 			n.Log.Warn("error during DB shutdown",
 				zap.Error(err),
 			)

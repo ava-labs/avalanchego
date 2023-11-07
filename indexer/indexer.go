@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -39,9 +38,9 @@ const (
 	// Assumes no containers are larger than math.MaxUint32
 	// wrappers.IntLen accounts for the size of the container bytes
 	// wrappers.LongLen accounts for the timestamp of the container
-	// hashing.HashLen accounts for the container ID
+	// ids.IDLen accounts for the container ID
 	// wrappers.ShortLen accounts for the codec version
-	codecMaxSize = int(constants.DefaultMaxMessageSize) + wrappers.IntLen + wrappers.LongLen + hashing.HashLen + wrappers.ShortLen
+	codecMaxSize = int(constants.DefaultMaxMessageSize) + wrappers.IntLen + wrappers.LongLen + ids.IDLen + wrappers.ShortLen
 )
 
 var (
@@ -333,9 +332,9 @@ func (i *indexer) registerChainHelper(
 	name, endpoint string,
 	acceptorGroup snow.AcceptorGroup,
 ) (Index, error) {
-	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	prefix := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
-	prefix[hashing.HashLen] = prefixEnd
+	prefix[ids.IDLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
 	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
 	if err != nil {
@@ -358,8 +357,7 @@ func (i *indexer) registerChainHelper(
 		_ = index.Close()
 		return nil, err
 	}
-	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
-	if err := i.pathAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint); err != nil {
+	if err := i.pathAdder.AddRoute(apiServer, "index/"+name, "/"+endpoint); err != nil {
 		_ = index.Close()
 		return nil, err
 	}
@@ -409,32 +407,32 @@ func (i *indexer) close() error {
 }
 
 func (i *indexer) markIncomplete(chainID ids.ID) error {
-	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	key := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(key, chainID[:])
-	key[hashing.HashLen] = isIncompletePrefix
+	key[ids.IDLen] = isIncompletePrefix
 	return i.db.Put(key, nil)
 }
 
 // Returns true if this chain is incomplete
 func (i *indexer) isIncomplete(chainID ids.ID) (bool, error) {
-	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	key := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(key, chainID[:])
-	key[hashing.HashLen] = isIncompletePrefix
+	key[ids.IDLen] = isIncompletePrefix
 	return i.db.Has(key)
 }
 
 func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
-	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	key := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(key, chainID[:])
-	key[hashing.HashLen] = previouslyIndexedPrefix
+	key[ids.IDLen] = previouslyIndexedPrefix
 	return i.db.Put(key, nil)
 }
 
 // Returns true if this chain is incomplete
 func (i *indexer) previouslyIndexed(chainID ids.ID) (bool, error) {
-	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	key := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(key, chainID[:])
-	key[hashing.HashLen] = previouslyIndexedPrefix
+	key[ids.IDLen] = previouslyIndexedPrefix
 	return i.db.Has(key)
 }
 

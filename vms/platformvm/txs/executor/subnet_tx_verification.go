@@ -16,8 +16,6 @@ import (
 
 var (
 	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
-	errCantFindSubnet                 = errors.New("couldn't find subnet")
-	errIsNotSubnet                    = errors.New("is not a subnet")
 	errIsImmutable                    = errors.New("is immutable")
 	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
 )
@@ -67,23 +65,13 @@ func verifySubnetAuthorization(
 	baseTxCredsLen := len(sTx.Creds) - 1
 	subnetCred := sTx.Creds[baseTxCredsLen]
 
-	subnetIntf, _, err := chainState.GetTx(subnetID)
+	subnetOwner, err := chainState.GetSubnetOwner(subnetID)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"%w %q: %v",
-			errCantFindSubnet,
-			subnetID,
-			err,
-		)
+		return nil, err
 	}
 
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
-	}
-
-	if err := backend.Fx.VerifyPermission(sTx.Unsigned, subnetAuth, subnetCred, subnet.Owner); err != nil {
-		return nil, fmt.Errorf("%w: %v", errUnauthorizedSubnetModification, err)
+	if err := backend.Fx.VerifyPermission(sTx.Unsigned, subnetAuth, subnetCred, subnetOwner); err != nil {
+		return nil, fmt.Errorf("%w: %w", errUnauthorizedSubnetModification, err)
 	}
 
 	return sTx.Creds[:baseTxCredsLen], nil

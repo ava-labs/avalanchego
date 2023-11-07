@@ -5,15 +5,14 @@ package sampler
 
 import (
 	"fmt"
+	"math"
 	"testing"
-
-	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/slices"
 
-	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -87,8 +86,8 @@ func WeightedWithoutReplacementInitializeOverflowTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1, stdmath.MaxUint64})
-	require.ErrorIs(t, err, math.ErrOverflow)
+	err := s.Initialize([]uint64{1, math.MaxUint64})
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
 func WeightedWithoutReplacementOutOfRangeTest(

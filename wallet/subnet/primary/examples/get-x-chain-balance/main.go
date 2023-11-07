@@ -8,7 +8,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -24,22 +23,21 @@ func main() {
 		log.Fatalf("failed to parse address: %s\n", err)
 	}
 
-	addresses := set.Set[ids.ShortID]{}
-	addresses.Add(addr)
+	addresses := set.Of(addr)
 
 	ctx := context.Background()
 
 	fetchStartTime := time.Now()
-	_, xCtx, utxos, err := primary.FetchState(ctx, uri, addresses)
+	state, err := primary.FetchState(ctx, uri, addresses)
 	if err != nil {
 		log.Fatalf("failed to fetch state: %s\n", err)
 	}
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
-	xChainID := xCtx.BlockchainID()
+	xChainID := state.XCTX.BlockchainID()
 
-	xUTXOs := primary.NewChainUTXOs(xChainID, utxos)
-	xBackend := x.NewBackend(xCtx, xUTXOs)
+	xUTXOs := primary.NewChainUTXOs(xChainID, state.UTXOs)
+	xBackend := x.NewBackend(state.XCTX, xUTXOs)
 	xBuilder := x.NewBuilder(addresses, xBackend)
 
 	currentBalances, err := xBuilder.GetFTBalance()
@@ -47,7 +45,7 @@ func main() {
 		log.Fatalf("failed to get the balance: %s\n", err)
 	}
 
-	avaxID := xCtx.AVAXAssetID()
+	avaxID := state.XCTX.AVAXAssetID()
 	avaxBalance := currentBalances[avaxID]
 	log.Printf("current AVAX balance of %s is %d nAVAX\n", addrStr, avaxBalance)
 }

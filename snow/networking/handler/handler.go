@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -17,6 +18,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -24,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
@@ -83,10 +85,9 @@ type handler struct {
 	clock mockable.Clock
 
 	ctx *snow.ConsensusContext
-	// The validator set that validates this chain
 	// TODO: consider using peerTracker instead of validators
 	// since peerTracker is already tracking validators
-	validators validators.Set
+	validators validators.Manager
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
 	preemptTimeouts chan struct{}
@@ -108,14 +109,14 @@ type handler struct {
 	// [unprocessedAsyncMsgsCond.L] must be held while accessing [asyncMessageQueue].
 	asyncMessageQueue MessageQueue
 	// Worker pool for handling asynchronous consensus messages
-	asyncMessagePool worker.Pool
+	asyncMessagePool errgroup.Group
 	timeouts         chan struct{}
 
 	closeOnce            sync.Once
 	startClosingTime     time.Time
 	totalClosingTime     time.Duration
 	closingChan          chan struct{}
-	numDispatchersClosed int
+	numDispatchersClosed atomic.Uint32
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 
@@ -131,7 +132,7 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
-	validators validators.Set,
+	validators validators.Manager,
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
@@ -141,20 +142,20 @@ func New(
 	peerTracker commontracker.Peers,
 ) (Handler, error) {
 	h := &handler{
-		ctx:              ctx,
-		validators:       validators,
-		msgFromVMChan:    msgFromVMChan,
-		preemptTimeouts:  subnet.OnBootstrapCompleted(),
-		gossipFrequency:  gossipFrequency,
-		asyncMessagePool: worker.NewPool(threadPoolSize),
-		timeouts:         make(chan struct{}, 1),
-		closingChan:      make(chan struct{}),
-		closed:           make(chan struct{}),
-		resourceTracker:  resourceTracker,
-		subnetConnector:  subnetConnector,
-		subnet:           subnet,
-		peerTracker:      peerTracker,
+		ctx:             ctx,
+		validators:      validators,
+		msgFromVMChan:   msgFromVMChan,
+		preemptTimeouts: subnet.OnBootstrapCompleted(),
+		gossipFrequency: gossipFrequency,
+		timeouts:        make(chan struct{}, 1),
+		closingChan:     make(chan struct{}),
+		closed:          make(chan struct{}),
+		resourceTracker: resourceTracker,
+		subnetConnector: subnetConnector,
+		subnet:          subnet,
+		peerTracker:     peerTracker,
 	}
+	h.asyncMessagePool.SetLimit(threadPoolSize)
 
 	var err error
 
@@ -163,11 +164,11 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "handler", message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "handler_async", message.AsynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
@@ -179,7 +180,8 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
+	_, ok := h.validators.GetValidator(h.ctx.SubnetID, nodeID)
+	return h.subnet.IsAllowed(nodeID, ok)
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
@@ -214,27 +216,27 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 	}
 
 	// drop bootstrap state from previous runs before starting state sync
-	return engines.StateSyncer, engines.Bootstrapper.Clear()
+	return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
 }
 
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
 		)
-		h.shutdown(ctx)
+		h.shutdown(ctx, h.clock.Time())
 		return
 	}
 
-	if err := gear.Start(ctx, 0); err != nil {
+	h.ctx.Lock.Lock()
+	err = gear.Start(ctx, 0)
+	h.ctx.Lock.Unlock()
+	if err != nil {
 		h.ctx.Log.Error("chain failed to start",
 			zap.Error(err),
 		)
-		h.shutdown(ctx)
+		h.shutdown(ctx, h.clock.Time())
 		return
 	}
 
@@ -301,6 +303,8 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 }
 
 // Note: It is possible for Stop to be called before/concurrently with Start.
+//
+// Invariant: Stop must never block.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
 		h.startClosingTime = h.clock.Time()
@@ -323,7 +327,7 @@ func (h *handler) Stop(ctx context.Context) {
 		state := h.ctx.State.Get()
 		bootstrapper, ok := h.engineManager.Get(state.Type).Get(snow.Bootstrapping)
 		if !ok {
-			h.ctx.Log.Error("bootstrapping engine doesn't exists",
+			h.ctx.Log.Error("bootstrapping engine doesn't exist",
 				zap.Stringer("type", state.Type),
 			)
 			return
@@ -381,7 +385,9 @@ func (h *handler) dispatchSync(ctx context.Context) {
 
 func (h *handler) dispatchAsync(ctx context.Context) {
 	defer func() {
-		h.asyncMessagePool.Shutdown()
+		// We never return an error in any of our functions, so it is safe to
+		// drop any error here.
+		_ = h.asyncMessagePool.Wait()
 		h.closeDispatcher(ctx)
 	}()
 
@@ -686,7 +692,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
 	case *p2p.PushQuery:
-		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
+		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container, msg.RequestedHeight)
 
 	case *p2p.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -701,7 +707,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
+		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
 
 	case *p2p.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
@@ -716,6 +722,20 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
+		preferredIDAtHeight, err := ids.ToID(msg.PreferredIdAtHeight)
+		if err != nil {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.ChitsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "PreferredIDAtHeight"),
+				zap.Error(err),
+			)
+			// TODO: Require this field to be populated correctly after v1.11.x
+			// is activated.
+			preferredIDAtHeight = preferredID
+		}
+
 		acceptedID, err := ids.ToID(msg.AcceptedId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -728,7 +748,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
@@ -760,7 +780,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 }
 
 func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
-	h.asyncMessagePool.Send(func() {
+	h.asyncMessagePool.Go(func() error {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
@@ -768,6 +788,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 				msg,
 			))
 		}
+		return nil
 	})
 }
 
@@ -978,34 +999,26 @@ func (h *handler) popUnexpiredMsg(
 	}
 }
 
+// Invariant: if closeDispatcher is called, Stop has already been called.
 func (h *handler) closeDispatcher(ctx context.Context) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
-	h.numDispatchersClosed++
-	if h.numDispatchersClosed < numDispatchersToClose {
+	if h.numDispatchersClosed.Add(1) < numDispatchersToClose {
 		return
 	}
 
-	h.shutdown(ctx)
+	h.shutdown(ctx, h.startClosingTime)
 }
 
-// Note: shutdown is only called after all message dispatchers have exited.
-func (h *handler) shutdown(ctx context.Context) {
+// Note: shutdown is only called after all message dispatchers have exited or if
+// no message dispatchers ever started.
+func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
 	defer func() {
 		if h.onStopped != nil {
 			go h.onStopped()
 		}
 
-		h.totalClosingTime = h.clock.Time().Sub(h.startClosingTime)
+		h.totalClosingTime = h.clock.Time().Sub(startClosingTime)
 		close(h.closed)
 	}()
-
-	// shutdown may be called during Start, so we populate the start closing
-	// time here in case Stop was never called.
-	if h.startClosingTime.IsZero() {
-		h.startClosingTime = h.clock.Time()
-	}
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)

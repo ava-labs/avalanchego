@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -36,7 +35,7 @@ func testSetup(
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
 	ctx := snow.DefaultConsensusContextTest()
 
-	peers := validators.NewSet()
+	peers := validators.NewManager()
 	sender := &common.SenderTest{}
 	vm := StateSyncEnabledMock{
 		TestVM:              &block.TestVM{},
@@ -61,13 +60,15 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, peers.AddStaker(ctx.SubnetID, peer, nil, ids.Empty, 1))
+	totalWeight, err := peers.TotalWeight(ctx.SubnetID)
+	require.NoError(t, err)
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
+		SampleK:                        peers.Count(ctx.SubnetID),
+		Alpha:                          totalWeight/2 + 1,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
@@ -81,9 +82,7 @@ func testSetup(
 
 func TestAcceptedFrontier(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	vm, sender, config := testSetup(t, ctrl)
 
@@ -122,9 +121,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	vm, sender, config := testSetup(t, ctrl)
 
@@ -176,11 +173,8 @@ func TestFilterAccepted(t *testing.T) {
 
 	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
 
-	acceptedSet := set.Set[ids.ID]{}
-	acceptedSet.Add(accepted...)
-
-	require.Len(acceptedSet, 2)
-	require.Contains(acceptedSet, blkID0)
-	require.Contains(acceptedSet, blkID1)
-	require.NotContains(acceptedSet, blkID2)
+	require.Len(accepted, 2)
+	require.Contains(accepted, blkID0)
+	require.Contains(accepted, blkID1)
+	require.NotContains(accepted, blkID2)
 }

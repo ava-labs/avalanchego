@@ -13,7 +13,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockWindower is a mock of Windower interface.

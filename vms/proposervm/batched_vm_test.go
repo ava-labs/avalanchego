@@ -6,13 +6,14 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -22,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -30,6 +30,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	blkID := ids.Empty
 	maxBlocksNum := 1000               // a high value to get all built blocks
@@ -52,6 +55,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -195,6 +201,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -347,8 +356,12 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	preForkTime := currentTime.Add(5 * time.Minute)
 	forkTime := currentTime.Add(10 * time.Minute)
 	postForkTime := currentTime.Add(15 * time.Minute)
+
 	// enable ProBlks in next future
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
@@ -546,6 +559,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -664,6 +680,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -773,8 +792,12 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	preForkTime := currentTime.Add(5 * time.Minute)
 	forkTime := currentTime.Add(10 * time.Minute)
 	postForkTime := currentTime.Add(15 * time.Minute)
+
 	// enable ProBlks in next future
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
@@ -962,7 +985,7 @@ func initTestRemoteProposerVM(
 	coreVM.InitializeF = func(
 		context.Context,
 		*snow.Context,
-		manager.Manager,
+		database.Database,
 		[]byte,
 		[]byte,
 		[]byte,
@@ -991,14 +1014,18 @@ func initTestRemoteProposerVM(
 			return nil, errUnknownBlock
 		}
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	proVM := New(
 		coreVM,
 		proBlkStartTime,
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -1032,16 +1059,13 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	// make sure that DBs are compressed correctly
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
 		nil,
 		nil,

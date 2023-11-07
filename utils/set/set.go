@@ -23,6 +23,13 @@ var _ stdjson.Marshaler = (*Set[int])(nil)
 // Set is a set of elements.
 type Set[T comparable] map[T]struct{}
 
+// Of returns a Set initialized with [elts]
+func Of[T comparable](elts ...T) Set[T] {
+	s := NewSet[T](len(elts))
+	s.Add(elts...)
+	return s
+}
+
 // Return a new set with initial capacity [size].
 // More or less than [size] elements can be added to this set.
 // Using NewSet() rather than Set[T]{} is just an optimization that can
@@ -161,13 +168,13 @@ func (s *Set[T]) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (s *Set[_]) MarshalJSON() ([]byte, error) {
+func (s Set[_]) MarshalJSON() ([]byte, error) {
 	var (
-		eltBytes = make([][]byte, len(*s))
+		eltBytes = make([][]byte, len(s))
 		i        int
 		err      error
 	)
-	for elt := range *s {
+	for elt := range s {
 		eltBytes[i], err = stdjson.Marshal(elt)
 		if err != nil {
 			return nil, err

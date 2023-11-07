@@ -7,6 +7,8 @@ on:
       - master
       - dev
   pull_request:
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   run_static_analysis:
@@ -18,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: '~1.19.6'
+          go-version: '~1.20.10'
           check-latest: true
       - name: Run static analysis tests
         shell: bash

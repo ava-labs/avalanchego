@@ -13,7 +13,7 @@ import (
 
 	sync "github.com/ava-labs/avalanchego/proto/pb/sync"
 	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.
@@ -40,10 +40,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *sync.SyncGetChangeProofRequest, arg2 SyncableDB) (*merkledb.ChangeProof, error) {
+func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *sync.SyncGetChangeProofRequest, arg2 DB) (*merkledb.ChangeOrRangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*merkledb.ChangeProof)
+	ret0, _ := ret[0].(*merkledb.ChangeOrRangeProof)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

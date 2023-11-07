@@ -44,24 +44,6 @@ func (t *ImportTx) InputIDs() set.Set[ids.ID] {
 	return inputs
 }
 
-// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *ImportTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.ImportedIns {
-		assets.Add(in.AssetID())
-	}
-	return assets
-}
-
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *ImportTx) AssetIDs() set.Set[ids.ID] {
-	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.ImportedIns {
-		assets.Add(in.AssetID())
-	}
-	return assets
-}
-
 // NumCredentials returns the number of expected credentials
 func (t *ImportTx) NumCredentials() int {
 	return t.BaseTx.NumCredentials() + len(t.ImportedIns)

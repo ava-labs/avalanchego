@@ -13,7 +13,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockState is a mock of State interface.
@@ -51,6 +51,34 @@ func (m *MockState) Commit() error {
 func (mr *MockStateMockRecorder) Commit() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit))
+}
+
+// DeleteBlock mocks base method.
+func (m *MockState) DeleteBlock(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBlock indicates an expected call of DeleteBlock.
+func (mr *MockStateMockRecorder) DeleteBlock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlock", reflect.TypeOf((*MockState)(nil).DeleteBlock), arg0)
+}
+
+// DeleteBlockIDAtHeight mocks base method.
+func (m *MockState) DeleteBlockIDAtHeight(arg0 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBlockIDAtHeight", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBlockIDAtHeight indicates an expected call of DeleteBlockIDAtHeight.
+func (mr *MockStateMockRecorder) DeleteBlockIDAtHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).DeleteBlockIDAtHeight), arg0)
 }
 
 // DeleteCheckpoint mocks base method.
@@ -155,6 +183,21 @@ func (m *MockState) GetLastAccepted() (ids.ID, error) {
 func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
+}
+
+// GetMinimumHeight mocks base method.
+func (m *MockState) GetMinimumHeight() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMinimumHeight")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMinimumHeight indicates an expected call of GetMinimumHeight.
+func (mr *MockStateMockRecorder) GetMinimumHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight))
 }
 
 // PutBlock mocks base method.

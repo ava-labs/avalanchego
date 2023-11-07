@@ -8,6 +8,8 @@ on:
       - master
       - dev
   pull_request:
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -17,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: bufbuild/buf-setup-action@v1.19.0
+      - uses: bufbuild/buf-setup-action@v1.26.1
         with:
           github_token: ${{ github.token }}
       - uses: bufbuild/buf-lint-action@v1

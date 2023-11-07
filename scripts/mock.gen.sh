@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 if ! [[ "$0" =~ scripts/mock.gen.sh ]]; then
   echo "must be run from repository root"
@@ -10,8 +10,8 @@ fi
 if ! command -v mockgen &> /dev/null
 then
   echo "mockgen not found, installing..."
-  # https://github.com/golang/mock
-  go install -v github.com/golang/mock/mockgen@v1.6.0
+  # https://github.com/uber-go/mock
+  go install -v go.uber.org/mock/mockgen@v0.2.0
 fi
 
 if ! command -v go-license &> /dev/null
@@ -20,6 +20,8 @@ then
   # https://github.com/palantir/go-license
   go install -v github.com/palantir/go-license@v1.25.0
 fi
+
+source ./scripts/constants.sh
 
 # tuples of (source interface import path, comma-separated interface names, output file path)
 input="scripts/mocks.mockgen.txt"

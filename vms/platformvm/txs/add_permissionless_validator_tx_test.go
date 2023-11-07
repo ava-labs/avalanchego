@@ -5,20 +5,18 @@ package txs
 
 import (
 	"encoding/hex"
+	"math"
 	"testing"
 
-	stdmath "math"
-
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -27,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestAddPermissionlessPrimaryValidator(t *testing.T) {
@@ -1604,7 +1604,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 								ID: assetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
-								Amt: stdmath.MaxUint64,
+								Amt: math.MaxUint64,
 							},
 						},
 						{
@@ -1621,7 +1621,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "multiple staked assets",
@@ -1822,7 +1822,6 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
