@@ -48,8 +48,7 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Peek returns the next first tx that was added to the mempool whose size
-	// is less than or equal to maxTxSize.
+	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
 	Peek(maxTxSize int) *txs.Tx
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
@@ -162,27 +161,23 @@ func (m *mempool) Has(txID ids.ID) bool {
 }
 
 func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	unissuedTxs, _ := m.unissuedTxs.Get(txID)
-	return unissuedTxs
+	tx, _ := m.unissuedTxs.Get(txID)
+	return tx
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	for _, tx := range txsToRemove {
 		txID := tx.ID()
-		if _, ok := m.unissuedTxs.Get(txID); !ok {
-			// If tx isn't in the mempool, there is nothing to do.
-			continue
+		if m.unissuedTxs.Delete(txID) {
+			txBytes := tx.Bytes()
+			m.bytesAvailable += len(txBytes)
+			m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+
+			m.numTxs.Dec()
+
+			inputs := tx.Unsigned.InputIDs()
+			m.consumedUTXOs.Difference(inputs)
 		}
-
-		txBytes := tx.Bytes()
-		m.bytesAvailable += len(txBytes)
-		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-		m.unissuedTxs.Delete(txID)
-		m.numTxs.Dec()
-
-		inputs := tx.Unsigned.InputIDs()
-		m.consumedUTXOs.Difference(inputs)
 	}
 }
 
