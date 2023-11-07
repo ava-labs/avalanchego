@@ -73,7 +73,7 @@ type client struct {
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
 	metrics             SyncMetrics
-	branchFactor        merkledb.BranchFactor
+	tokenSize           int
 }
 
 type ClientConfig struct {
@@ -95,7 +95,7 @@ func NewClient(config *ClientConfig) (Client, error) {
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-		branchFactor:        config.BranchFactor,
+		tokenSize:           merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}, nil
 }
 
@@ -124,7 +124,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
 			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof, c.branchFactor); err != nil {
+			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
 				return nil, err
 			}
 
@@ -158,7 +158,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_RangeProof:
 
 			var rangeProof merkledb.RangeProof
-			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof, c.branchFactor); err != nil {
+			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
 				return nil, err
 			}
 
@@ -171,7 +171,7 @@ func (c *client) GetChangeProof(
 				startKey,
 				endKey,
 				req.EndRootHash,
-				c.branchFactor,
+				c.tokenSize,
 			)
 			if err != nil {
 				return nil, err
@@ -209,7 +209,7 @@ func verifyRangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
-	branchFactor merkledb.BranchFactor,
+	tokenSize int,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -229,7 +229,7 @@ func verifyRangeProof(
 		start,
 		end,
 		root,
-		branchFactor,
+		tokenSize,
 	); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
@@ -257,7 +257,7 @@ func (c *client) GetRangeProof(
 		}
 
 		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(&rangeProofProto, c.branchFactor); err != nil {
+		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
 		}
 
@@ -268,7 +268,7 @@ func (c *client) GetRangeProof(
 			maybeBytesToMaybe(req.StartKey),
 			maybeBytesToMaybe(req.EndKey),
 			req.RootHash,
-			c.branchFactor,
+			c.tokenSize,
 		); err != nil {
 			return nil, err
 		}

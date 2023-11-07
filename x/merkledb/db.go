@@ -216,7 +216,7 @@ type merkleDB struct {
 	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 
-	toKey func(p []byte) Key
+	tokenSize int
 }
 
 // New returns a new merkle database.
@@ -234,17 +234,13 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	rootGenConcurrency := uint(runtime.NumCPU())
-	if config.RootGenConcurrency != 0 {
-		rootGenConcurrency = config.RootGenConcurrency
-	}
-
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 
-	toKey := func(b []byte) Key {
-		return ToKey(b, config.BranchFactor)
+	rootGenConcurrency := uint(runtime.NumCPU())
+	if config.RootGenConcurrency != 0 {
+		rootGenConcurrency = config.RootGenConcurrency
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
@@ -257,14 +253,14 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize), config.BranchFactor),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
-		history:              newTrieHistory(int(config.HistoryLength), toKey),
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
+		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		toKey:                toKey,
+		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
 
 	if err := trieDB.initializeRootIfNeeded(); err != nil {
@@ -486,7 +482,7 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	return view.visitPathToKey(db.toKey(keyBytes), func(n *node) error {
+	return view.visitPathToKey(ToKey(keyBytes), func(n *node) error {
 		if !n.hasValue() {
 			return db.intermediateNodeDB.nodeCache.Put(n.key, n)
 		}
@@ -515,7 +511,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(db.toKey(key))
+		values[i], errors[i] = db.getValueCopy(ToKey(key))
 	}
 	return values, errors
 }
@@ -529,7 +525,7 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(db.toKey(key))
+	return db.getValueCopy(ToKey(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
@@ -802,7 +798,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(db.toKey(k))
+	_, err := db.getValueWithoutLock(ToKey(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -1042,7 +1038,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestKey := maybe.Bind(start, db.toKey)
+	smallestKey := maybe.Bind(start, ToKey)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestKey); err != nil {
@@ -1052,12 +1048,12 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestKey] is also used when we add children of proof nodes to [trie] below.
-	largestKey := maybe.Bind(end, db.toKey)
+	largestKey := maybe.Bind(end, ToKey)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = maybe.Some(db.toKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+		largestKey = maybe.Some(ToKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
@@ -1067,7 +1063,7 @@ func (db *merkleDB) VerifyChangeProof(
 
 	keyValues := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[db.toKey(keyValue.Key)] = keyValue.Value
+		keyValues[ToKey(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads
@@ -1188,7 +1184,6 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 		rootBytes,
 		&rootKey,
 		&rootHasValue,
-		db.valueNodeDB.branchFactor,
 	); err != nil {
 		return err
 	}

@@ -593,10 +593,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 	)
 	require.NoError(err)
 
+	config := newDefaultDBConfig()
 	localDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		newDefaultDBConfig(),
+		config,
 	)
 	require.NoError(err)
 
@@ -684,7 +685,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.Key.Append(childIdx),
+					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}
@@ -695,7 +696,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.Key.Append(childIdx),
+					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}

@@ -23,7 +23,7 @@ import (
 func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
-	n := newNode(nil, ToKey([]byte{0x00}, BranchFactor16))
+	n := newNode(ToKey([]byte{0x00}))
 	n.setValue(maybe.Some([]byte{byte(0x02)}))
 	nodeSize := cacheEntrySize(n.key, n)
 
@@ -39,11 +39,12 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
+		4,
 	)
 
 	// Put a key-node pair
-	node1Key := ToKey([]byte{0x01}, BranchFactor16)
-	node1 := newNode(nil, node1Key)
+	node1Key := ToKey([]byte{0x01})
+	node1 := newNode(node1Key)
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
 
@@ -53,7 +54,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.Equal(node1, node1Read)
 
 	// Overwrite the key-node pair
-	node1Updated := newNode(nil, node1Key)
+	node1Updated := newNode(node1Key)
 	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
 	require.NoError(db.Put(node1Key, node1Updated))
 
@@ -73,8 +74,8 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	expectedSize := 0
 	added := 0
 	for {
-		key := ToKey([]byte{byte(added)}, BranchFactor16)
-		node := newNode(nil, emptyKey(BranchFactor16))
+		key := ToKey([]byte{byte(added)})
+		node := newNode(Key{})
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -93,8 +94,8 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key := ToKey([]byte{byte(added)}, BranchFactor16)
-	node := newNode(nil, emptyKey(BranchFactor16))
+	key := ToKey([]byte{byte(added)})
+	node := newNode(Key{})
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
@@ -102,7 +103,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.Equal(1, db.nodeCache.fifo.Len())
 	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(ToKey([]byte{byte(added)}, BranchFactor16), gotKey)
+	require.Equal(ToKey([]byte{byte(added)}), gotKey)
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache
@@ -134,41 +135,45 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	cacheSize := 200
 	evictionBatchSize := cacheSize
 	baseDB := memdb.New()
-	db := newIntermediateNodeDB(
-		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
-		&mockMetrics{},
-		cacheSize,
-		evictionBatchSize,
-	)
+
 	f.Fuzz(func(
 		t *testing.T,
 		key []byte,
 		tokenLength uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range branchFactors {
-			p := ToKey(key, branchFactor)
-			if p.tokenLength <= int(tokenLength) {
+		for _, tokenSize := range validTokenSizes {
+			db := newIntermediateNodeDB(
+				baseDB,
+				&sync.Pool{
+					New: func() interface{} { return make([]byte, 0) },
+				},
+				&mockMetrics{},
+				cacheSize,
+				evictionBatchSize,
+				tokenSize,
+			)
+
+			p := ToKey(key)
+			uBitLength := tokenLength * uint(tokenSize)
+			if uBitLength >= uint(p.length) {
 				t.SkipNow()
 			}
-			p = p.Take(int(tokenLength))
+			p = p.Take(int(uBitLength))
 			constructedKey := db.constructDBKey(p)
 			baseLength := len(p.value) + len(intermediateNodePrefix)
 			require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 			switch {
-			case branchFactor == BranchFactor256:
+			case tokenSize == 8:
 				// for keys with tokens of size byte, no padding is added
 				require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
 				require.Len(constructedKey, baseLength)
-				require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
 				require.Len(constructedKey, baseLength+1)
-				require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 			}
 		}
 	})
@@ -187,10 +192,11 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		&mockMetrics{},
 		cacheSize,
 		evictionBatchSize,
+		4,
 	)
 
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	constructedKey := db.constructDBKey(ToKey([]byte{}, BranchFactor16))
+	constructedKey := db.constructDBKey(ToKey([]byte{}))
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 	require.Equal(byte(16), constructedKey[len(constructedKey)-1])
@@ -201,9 +207,9 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 	}
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
-	p := ToKey([]byte{0xF0}, BranchFactor16).Take(1)
+	p := ToKey([]byte{0xF0}).Take(4)
 	constructedKey = db.constructDBKey(p)
 	require.Len(constructedKey, 2)
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(p.Append(1).Bytes(), constructedKey[len(intermediateNodePrefix):])
+	require.Equal(p.Extend(ToToken(1, 4)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 }
