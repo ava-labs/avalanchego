@@ -26,7 +26,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
@@ -158,7 +158,7 @@ func setupGenesis(
 	t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
-	manager.Manager,
+	database.Database,
 	[]byte,
 	chan commonEng.Message,
 	*atomic.Memory,
@@ -169,33 +169,25 @@ func setupGenesis(
 	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
-	baseDBManager := manager.NewMemDB(&version.Semantic{
-		Major: 1,
-		Minor: 4,
-		Patch: 5,
-	})
+	baseDB := memdb.New()
 
 	// initialize the atomic memory
-	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(&version.Semantic{
-		Major: 1,
-		Minor: 4,
-		Patch: 5,
-	}))
+	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan commonEng.Message, 1)
-	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
-	return ctx, prefixedDBManager, genesisBytes, issuer, atomicMemory
+	prefixedDB := prefixdb.New([]byte{1}, baseDB)
+	return ctx, prefixedDB, genesisBytes, issuer, atomicMemory
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
@@ -208,7 +200,7 @@ func GenesisVM(t *testing.T,
 	configJSON string,
 	upgradeJSON string,
 ) (chan commonEng.Message,
-	*VM, manager.Manager,
+	*VM, database.Database,
 	*commonEng.SenderTest,
 ) {
 	vm := &VM{}

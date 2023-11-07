@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -129,7 +129,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	if err := syncDisabledVM.Initialize(
 		context.Background(),
 		vmSetup.syncerVM.ctx,
-		vmSetup.syncerDBManager,
+		vmSetup.syncerDB,
 		[]byte(genesisJSONLatest),
 		nil,
 		[]byte(stateSyncDisabledConfigJSON),
@@ -192,7 +192,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	if err := syncReEnabledVM.Initialize(
 		context.Background(),
 		vmSetup.syncerVM.ctx,
-		vmSetup.syncerDBManager,
+		vmSetup.syncerDB,
 		[]byte(genesisJSONLatest),
 		nil,
 		[]byte(configJSON),
@@ -331,7 +331,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 
 	// initialise [syncerVM] with blank genesis state
 	stateSyncEnabledJSON := fmt.Sprintf("{\"state-sync-enabled\":true, \"state-sync-min-blocks\": %d}", test.stateSyncMinBlocks)
-	syncerEngineChan, syncerVM, syncerDBManager, syncerAppSender := GenesisVM(t, false, genesisJSONLatest, stateSyncEnabledJSON, "")
+	syncerEngineChan, syncerVM, syncerDB, syncerAppSender := GenesisVM(t, false, genesisJSONLatest, stateSyncEnabledJSON, "")
 	if err := syncerVM.SetState(context.Background(), snow.StateSyncing); err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 		serverAppSender:  serverAppSender,
 		fundedAccounts:   accounts,
 		syncerVM:         syncerVM,
-		syncerDBManager:  syncerDBManager,
+		syncerDB:         syncerDB,
 		syncerEngineChan: syncerEngineChan,
 	}
 }
@@ -386,7 +386,7 @@ type syncVMSetup struct {
 	fundedAccounts map[*keystore.Key]*types.StateAccount
 
 	syncerVM         *VM
-	syncerDBManager  manager.Manager
+	syncerDB         database.Database
 	syncerEngineChan <-chan commonEng.Message
 }
 
