@@ -22,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -927,9 +928,18 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	}
 
+	var (
+		dbName   = v.GetString(DBTypeKey)
+		readOnly = v.GetBool(DBReadOnlyKey)
+	)
+
+	if readOnly && dbName == memdb.Name {
+		return node.DatabaseConfig{}, fmt.Errorf("database type %s cannot be read only", dbName)
+	}
+
 	return node.DatabaseConfig{
-		ReadOnly: v.GetBool(DBReadOnlyKey),
-		Name:     v.GetString(DBTypeKey),
+		ReadOnly: readOnly,
+		Name:     dbName,
 		Path: filepath.Join(
 			GetExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
