@@ -81,21 +81,16 @@ func FuzzCodecKey(f *testing.F) {
 		) {
 			require := require.New(t)
 			codec := codec.(*codecImpl)
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := codec.decodeKey(reader)
+			got, err := codec.decodeKey(b)
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
-			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeKey(&buf, got)
+			codec.encodeKey(got)
 			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			require.Equal(b, bufBytes)
 		},
 	)
 }
@@ -248,37 +243,6 @@ func FuzzEncodeHashValues(f *testing.F) {
 
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	codec := codec.(*codecImpl)
-	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
-	_, err := codec.decodeKey(bytes)
+	_, err := codec.decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-}
-
-func FuzzEncodeDecodeKeyAndNode(f *testing.F) {
-	codec := newCodec()
-
-	f.Fuzz(
-		func(
-			t *testing.T,
-			keyBytes []byte,
-			hasValue bool,
-			removeToken bool,
-		) {
-			require := require.New(t)
-
-			key := ToKey(keyBytes)
-
-			if removeToken && key.length > 0 {
-				key = key.Skip(1)
-			}
-
-			b := codec.encodeKeyAndHasValue(key, hasValue)
-			var (
-				gotKey      Key
-				gotHasValue bool
-			)
-			require.NoError(codec.decodeKeyAndHasValue(b, &gotKey, &gotHasValue))
-			require.Equal(key, gotKey)
-			require.Equal(hasValue, gotHasValue)
-		},
-	)
 }

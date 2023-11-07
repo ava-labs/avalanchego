@@ -66,13 +66,13 @@ type encoder interface {
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
 	encodeHashValues(n *node) []byte
-	encodeKeyAndHasValue(key Key, hasValue bool) []byte
+	encodeKey(key Key) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode) error
-	decodeKeyAndHasValue(bytes []byte, key *Key, hasValue *bool) error
+	decodeKey(bytes []byte) (Key, error)
 }
 
 func newCodec() encoderDecoder {
@@ -109,7 +109,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	for _, index := range keys {
 		entry := n.children[index]
 		c.encodeUint(buf, uint64(index))
-		c.encodeKey(buf, entry.compressedKey)
+		c.encodeKeyToBuffer(buf, entry.compressedKey)
 		_, _ = buf.Write(entry.id[:])
 		c.encodeBool(buf, entry.hasValue)
 	}
@@ -135,19 +135,8 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 		_, _ = buf.Write(entry.id[:])
 	}
 	c.encodeMaybeByteSlice(buf, n.valueDigest)
-	c.encodeKey(buf, n.key)
+	c.encodeKeyToBuffer(buf, n.key)
 
-	return buf.Bytes()
-}
-
-func (c *codecImpl) encodeKeyAndHasValue(key Key, hasValue bool) []byte {
-	var (
-		estimatedLen = binary.MaxVarintLen64 + len(key.Bytes()) + boolLen
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
-
-	c.encodeKey(buf, key)
-	c.encodeBool(buf, hasValue)
 	return buf.Bytes()
 }
 
@@ -184,7 +173,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		compressedKey, err := c.decodeKey(src)
+		compressedKey, err := c.decodeKeyFromReader(src)
 		if err != nil {
 			return err
 		}
@@ -206,25 +195,6 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		return errExtraSpace
 	}
 	return nil
-}
-
-func (c *codecImpl) decodeKeyAndHasValue(b []byte, key *Key, hasValue *bool) error {
-	if minKeyLen+boolLen > len(b) {
-		return io.ErrUnexpectedEOF
-	}
-
-	var (
-		src = bytes.NewReader(b)
-		err error
-	)
-
-	*key, err = c.decodeKey(src)
-	if err != nil {
-		return err
-	}
-
-	*hasValue, err = c.decodeBool(src)
-	return err
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
@@ -361,12 +331,23 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodeKey(dst *bytes.Buffer, key Key) {
+func (c *codecImpl) encodeKey(key Key) []byte {
+	estimatedLen := binary.MaxVarintLen64 + len(key.Bytes())
+	dst := bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	c.encodeKeyToBuffer(dst, key)
+	return dst.Bytes()
+}
+
+func (c *codecImpl) encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
 	c.encodeUint(dst, uint64(key.length))
 	_, _ = dst.Write(key.Bytes())
 }
 
-func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
+func (c *codecImpl) decodeKey(b []byte) (Key, error) {
+	return c.decodeKeyFromReader(bytes.NewReader(b))
+}
+
+func (c *codecImpl) decodeKeyFromReader(src *bytes.Reader) (Key, error) {
 	if minKeyLen > src.Len() {
 		return Key{}, io.ErrUnexpectedEOF
 	}

@@ -981,10 +981,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 
 	db.root = maybe.Some(changes.rootChange.after)
-	rootKeyAndNodeBytes := codec.encodeKeyAndHasValue(
-		changes.rootChange.after.key,
-		changes.rootChange.after.value.HasValue(),
-	)
+	rootKeyAndNodeBytes := codec.encodeKey(changes.rootChange.after.key)
 	return db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes)
 }
 
@@ -1176,20 +1173,25 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 	}
 
 	// Root is on disk.
-	var (
-		rootKey      Key
-		rootHasValue bool
-	)
-	if err := codec.decodeKeyAndHasValue(
-		rootBytes,
-		&rootKey,
-		&rootHasValue,
-	); err != nil {
-		return err
-	}
-	root, err := db.getEditableNode(rootKey, rootHasValue)
+	rootKey, err := codec.decodeKey(rootBytes)
 	if err != nil {
 		return err
+	}
+
+	var root *node
+
+	// First, see if root is an intermediate node.
+	root, err = db.getEditableNode(rootKey, false /* hasValue */)
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			return err
+		}
+
+		// The root must be a value node.
+		root, err = db.getEditableNode(rootKey, true /* hasValue */)
+		if err != nil {
+			return err
+		}
 	}
 	root.calculateID(db.metrics)
 	db.root = maybe.Some(root)
