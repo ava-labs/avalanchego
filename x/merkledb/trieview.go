@@ -197,12 +197,8 @@ func newHistoricalTrieView(
 		return nil, ErrNoChanges
 	}
 
-	root := maybe.Nothing[*node]()
-	if changes.rootChange.after != nil {
-		root = maybe.Some(changes.rootChange.after)
-	}
 	newView := &trieView{
-		root:       root,
+		root:       changes.rootChange.after,
 		db:         db,
 		parentTrie: db,
 		changes:    changes,
@@ -230,10 +226,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 		defer t.nodesAlreadyCalculated.Set(true)
 
-		oldRoot := t.root.Value()
-		if oldRoot != nil {
-			oldRoot = oldRoot.clone()
-		}
+		oldRoot := maybe.Bind(t.root, (*node).clone)
 
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
@@ -264,9 +257,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			t.changes.rootID = ids.Empty
 		}
 
-		t.changes.rootChange = change[*node]{
+		t.changes.rootChange = change[maybe.Maybe[*node]]{
 			before: oldRoot,
-			after:  t.root.Value(),
+			after:  t.root,
 		}
 
 		// ensure no ancestor changes occurred during execution

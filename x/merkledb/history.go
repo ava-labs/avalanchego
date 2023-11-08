@@ -54,10 +54,8 @@ type changeSummary struct {
 	// The ID of the trie after these changes.
 	rootID ids.ID
 	// The root before/after this change.
-	// If the trie is empty before (after) this change, its root
-	// is nil for the before (after) field.
 	// Set in [calculateNodeIDs].
-	rootChange change[*node]
+	rootChange change[maybe.Maybe[*node]]
 	nodes      map[Key]*change[*node]
 	values     map[Key]*change[maybe.Maybe[[]byte]]
 }
@@ -66,7 +64,7 @@ func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
 		nodes:      make(map[Key]*change[*node], estimatedSize),
 		values:     make(map[Key]*change[maybe.Maybe[[]byte]], estimatedSize),
-		rootChange: change[*node]{},
+		rootChange: change[maybe.Maybe[*node]]{},
 	}
 }
 
