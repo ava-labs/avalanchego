@@ -147,10 +147,8 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root := maybe.Bind(parentTrie.getRoot(), (*node).clone)
-
 	newView := &trieView{
-		root:       root,
+		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
 		db:         db,
 		parentTrie: parentTrie,
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
