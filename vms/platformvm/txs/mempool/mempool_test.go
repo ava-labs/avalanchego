@@ -5,7 +5,6 @@ package mempool
 
 import (
 	"errors"
-	"math"
 	"testing"
 	"time"
 
@@ -64,9 +63,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	decisionTxs, err := createTestDecisionTxs(2)
 	require.NoError(err)
 
-	// txs must not already there before we start
-	require.False(mpool.HasTxs())
-
 	for _, tx := range decisionTxs {
 		// tx not already there
 		require.False(mpool.Has(tx.ID()))
@@ -80,20 +76,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		// we can peek it
-		peeked := mpool.PeekTxs(math.MaxInt)
-
-		// tx will be among those peeked,
-		// in NO PARTICULAR ORDER
-		found := false
-		for _, pk := range peeked {
-			if pk.ID() == tx.ID() {
-				found = true
-				break
-			}
-		}
-		require.True(found)
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
@@ -113,45 +95,21 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
-	// The proposal txs are ordered by decreasing start time. This means after
-	// each insertion, the last inserted transaction should be on the top of the
-	// heap.
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
-	// txs should not be already there
-	require.False(mpool.HasTxs())
-
-	for i, tx := range proposalTxs {
+	for _, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.HasTxs())
 		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		{
-			// we can peek it
-			peeked := mpool.PeekTxs(math.MaxInt)
-			require.Len(peeked, i+1)
-
-			// tx will be among those peeked,
-			// in NO PARTICULAR ORDER
-			found := false
-			for _, pk := range peeked {
-				if pk.ID() == tx.ID() {
-					found = true
-					break
-				}
-			}
-			require.True(found)
-		}
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
@@ -162,39 +120,6 @@ func TestProposalTxsInMempool(t *testing.T) {
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
 	}
-}
-
-func TestPeekTxsWithLimit(t *testing.T) {
-	require := require.New(t)
-
-	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, &noopBlkTimer{})
-	require.NoError(err)
-
-	txsN := 20
-	txs, err := createTestDecisionTxs(10)
-	require.NoError(err)
-	for _, tx := range txs {
-		require.NoError(mpool.Add(tx))
-	}
-
-	txsToPeek := txsN / 2
-	txsToPeekSize := 0
-	for i := 0; i < txsToPeek; i++ {
-		txsToPeekSize += len(txs[i].Bytes())
-	}
-
-	peeked := mpool.PeekTxs(0)
-	require.Nil(peeked)
-
-	peeked = mpool.PeekTxs(1)
-	require.Nil(peeked)
-
-	peeked = mpool.PeekTxs(txsToPeekSize)
-	require.Equal(txs[:txsToPeek], peeked)
-
-	peeked = mpool.PeekTxs(math.MaxInt)
-	require.Equal(txs, peeked)
 }
 
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {

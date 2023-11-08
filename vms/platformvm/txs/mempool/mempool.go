@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -49,45 +50,25 @@ type BlockTimer interface {
 	ResetBlockTimer()
 }
 
-// Defines transaction iterator with mempool.
-type TxIterator interface {
-	// Moves the iterator to the next transaction.
-	// Returns false once there's no more transaction to return.
-	Next() bool
-
-	// Returns the current transaction.
-	// Should only be called after a call to Next which returned true.
-	Value() *txs.Tx
-}
-
 type Mempool interface {
-	// we may want to be able to stop valid transactions
-	// from entering the mempool, e.g. during blocks creation
-	EnableAdding()
-	DisableAdding()
-
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Following Banff activation, all mempool transactions,
-	// (both decision and staker) are included into Standard blocks.
-	// HasTxs allow to check for availability of any mempool transaction.
-	HasTxs() bool
+	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
+	Peek(maxTxSize int) *txs.Tx
 
-	// PeekTxs returns the next txs for Banff blocks
-	// up to maxTxsBytes without removing them from the mempool.
-	// TODO: remove this
-	PeekTxs(maxTxsBytes int) []*txs.Tx
-
-	GetTxIterator() TxIterator
-
-	// Note: dropped txs are added to droppedTxIDs but are not evicted from
-	// unissued decision/staker txs. This allows previously dropped txs to be
-	// possibly reissued.
+	// Note: Dropped txs are added to droppedTxIDs but not evicted from
+	// unissued. This allows previously dropped txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Drops all [txs.Staker] transactions whose [StartTime] is before
+	// [minStartTime]. The dropped tx ids are returned.
+	//
+	// TODO: Remove once [StartTime] field is ignored in staker txs
+	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -149,19 +130,7 @@ func New(
 	}, nil
 }
 
-func (m *mempool) EnableAdding() {
-	m.dropIncoming = false
-}
-
-func (m *mempool) DisableAdding() {
-	m.dropIncoming = true
-}
-
 func (m *mempool) Add(tx *txs.Tx) error {
-	if m.dropIncoming {
-		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
-	}
-
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
@@ -238,30 +207,16 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) HasTxs() bool {
-	return m.unissuedTxs.Len() > 0
-}
-
-// TODO: remove this
-func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	var txs []*txs.Tx
-	txsSizeSum := 0
-
+func (m *mempool) Peek(maxTxSize int) *txs.Tx {
 	txIter := m.unissuedTxs.NewIterator()
 	for txIter.Next() {
 		tx := txIter.Value()
-		txsSizeSum += len(tx.Bytes())
-		if txsSizeSum > maxTxsBytes {
-			break
+		txSize := len(tx.Bytes())
+		if txSize <= maxTxSize {
+			return tx
 		}
-		txs = append(txs, tx)
 	}
-
-	return txs
-}
-
-func (m *mempool) GetTxIterator() TxIterator {
-	return m.unissuedTxs.NewIterator()
+	return nil
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
@@ -271,4 +226,35 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
+	var droppedTxIDs []ids.ID
+
+	txIter := m.unissuedTxs.NewIterator()
+	for txIter.Next() {
+		tx := txIter.Value()
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		if !ok {
+			continue
+		}
+
+		startTime := stakerTx.StartTime()
+		if !startTime.Before(minStartTime) {
+			continue
+		}
+
+		txID := tx.ID()
+		err := fmt.Errorf(
+			"synchrony bound (%s) is later than staker start time (%s)",
+			minStartTime,
+			startTime,
+		)
+
+		m.Remove([]*txs.Tx{tx})
+		m.MarkDropped(txID, err) // cache tx as dropped
+		droppedTxIDs = append(droppedTxIDs, txID)
+	}
+
+	return droppedTxIDs
 }

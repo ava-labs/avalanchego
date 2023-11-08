@@ -161,9 +161,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	b.Mempool.DisableAdding()
 	defer func() {
-		b.Mempool.EnableAdding()
 		b.ResetBlockTimer()
 	}()
 
@@ -242,42 +240,6 @@ func (b *builder) ResetBlockTimer() {
 	// Next time the context lock is released, we can attempt to reset the block
 	// timer.
 	b.timer.SetTimeoutIn(0)
-}
-
-// dropExpiredStakerTxs drops add validator/delegator transactions in the
-// mempool whose start time is not sufficiently far in the future
-// (i.e. within local time plus [MaxFutureStartFrom]).
-func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
-	minStartTime := timestamp.Add(txexecutor.SyncBound)
-	iter := b.Mempool.GetTxIterator()
-	for iter.Next() {
-		tx := iter.Value()
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
-		if !ok {
-			continue
-		}
-
-		startTime := stakerTx.StartTime()
-		if !startTime.Before(minStartTime) {
-			// The next proposal tx in the mempool starts sufficiently far in
-			// the future.
-			return
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		b.Mempool.Remove([]*txs.Tx{tx})
-		b.Mempool.MarkDropped(txID, err) // cache tx as dropped
-		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
 }
 
 func (b *builder) setNextBuildBlockTime() {
@@ -374,10 +336,30 @@ func buildBlock(
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredStakerTxs(timestamp)
+	droppedStakerTxIDs := builder.Mempool.DropExpiredStakerTxs(timestamp.Add(txexecutor.SyncBound))
+	for _, txID := range droppedStakerTxIDs {
+		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+	}
 
-	// If there is no reason to build a block, don't.
-	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+	var (
+		blockTxs      []*txs.Tx
+		remainingSize = targetBlockSize
+	)
+	for {
+		tx := builder.Mempool.Peek(remainingSize)
+		if tx == nil {
+			break
+		}
+		builder.Mempool.Remove([]*txs.Tx{tx})
+
+		remainingSize -= len(tx.Bytes())
+		blockTxs = append(blockTxs, tx)
+	}
+
+	if len(blockTxs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -387,7 +369,7 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		builder.Mempool.PeekTxs(targetBlockSize),
+		blockTxs,
 	)
 }
 
