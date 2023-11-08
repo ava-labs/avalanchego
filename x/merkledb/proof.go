@@ -126,8 +126,8 @@ type Proof struct {
 	// This is a proof that [key] exists/doesn't exist.
 	Key Key
 
-	// Nothing if [Key] isn't in the trie
-	// otherwise, the value corresponding to [Key].
+	// Nothing if [Key] isn't in the trie.
+	// Otherwise, the value corresponding to [Key].
 	Value maybe.Maybe[[]byte]
 }
 
