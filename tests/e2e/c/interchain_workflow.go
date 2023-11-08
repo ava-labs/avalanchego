@@ -34,7 +34,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		// the wallet to avoid having to verify that all nodes are at
 		// the same height before initializing the wallet.
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		ethClient := e2e.Env.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		senderKey := e2e.Env.AllocateFundedKey()
@@ -79,7 +79,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		// matches on-chain state.
 		ginkgo.By("initializing a keychain and associated wallet")
 		keychain := secp256k1fx.NewKeychain(senderKey, recipientKey)
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()

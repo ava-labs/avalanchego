@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -529,6 +530,10 @@ func (n *Node) initDatabase() error {
 			memdb.Name,
 			pebble.Name,
 		)
+	}
+
+	if n.Config.ReadOnly && n.Config.DatabaseConfig.Name != memdb.Name {
+		n.DB = versiondb.New(n.DB)
 	}
 
 	var err error

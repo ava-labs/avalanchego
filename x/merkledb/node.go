@@ -14,13 +14,6 @@ import (
 
 const HashLength = 32
 
-// the values that go into the node's id
-type hashValues struct {
-	Children map[byte]child
-	Value    maybe.Maybe[[]byte]
-	Key      Key
-}
-
 // Representation of a node stored in the database.
 type dbNode struct {
 	value    maybe.Maybe[[]byte]
@@ -43,24 +36,19 @@ type node struct {
 }
 
 // Returns a new node with the given [key] and no value.
-// If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key Key) *node {
-	newNode := &node{
+func newNode(key Key) *node {
+	return &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, key.branchFactor),
+			children: make(map[byte]child, 2),
 		},
 		key: key,
 	}
-	if parent != nil {
-		parent.addChild(newNode)
-	}
-	return newNode
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := codec.decodeDBNode(nodeBytes, &n, key.branchFactor); err != nil {
+	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -101,11 +89,7 @@ func (n *node) calculateID(metrics merkleMetrics) {
 	}
 
 	metrics.HashCalculated()
-	bytes := codec.encodeHashValues(&hashValues{
-		Children: n.children,
-		Value:    n.valueDigest,
-		Key:      n.key,
-	})
+	bytes := codec.encodeHashValues(n)
 	n.id = hashing.ComputeHash256Array(bytes)
 }
 
@@ -127,11 +111,11 @@ func (n *node) setValueDigest() {
 // Adds [child] as a child of [n].
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(childNode *node) {
+func (n *node) addChild(childNode *node, tokenSize int) {
 	n.setChildEntry(
-		childNode.key.Token(n.key.tokenLength),
+		childNode.key.Token(n.key.length, tokenSize),
 		child{
-			compressedKey: childNode.key.Skip(n.key.tokenLength + 1),
+			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
 			id:            childNode.id,
 			hasValue:      childNode.hasValue(),
 		},
@@ -145,9 +129,9 @@ func (n *node) setChildEntry(index byte, childEntry child) {
 }
 
 // Removes [child] from [n]'s children.
-func (n *node) removeChild(child *node) {
+func (n *node) removeChild(child *node, tokenSize int) {
 	n.onNodeChanged()
-	delete(n.children, child.key.Token(n.key.tokenLength))
+	delete(n.children, child.key.Token(n.key.length, tokenSize))
 }
 
 // clone Returns a copy of [n].
