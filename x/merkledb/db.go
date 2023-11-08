@@ -1263,11 +1263,11 @@ func (db *merkleDB) Clear() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if err := db.valueNodeDB.Clear(); err != nil {
+	if err := db.intermediateNodeDB.Clear(); err != nil {
 		return err
 	}
 
-	if err := db.intermediateNodeDB.Clear(); err != nil {
+	if err := db.valueNodeDB.Clear(); err != nil {
 		return err
 	}
 
