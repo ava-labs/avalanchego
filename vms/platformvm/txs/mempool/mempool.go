@@ -194,16 +194,17 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	for _, tx := range txsToRemove {
 		txID := tx.ID()
-		if m.unissuedTxs.Delete(txID) {
-			txBytes := tx.Bytes()
-			m.bytesAvailable += len(txBytes)
-			m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-			m.numTxs.Dec()
-
-			inputs := tx.Unsigned.InputIDs()
-			m.consumedUTXOs.Difference(inputs)
+		if !m.unissuedTxs.Delete(txID) {
+			continue
 		}
+
+		m.bytesAvailable += len(tx.Bytes())
+		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+
+		m.numTxs.Dec()
+
+		inputs := tx.Unsigned.InputIDs()
+		m.consumedUTXOs.Difference(inputs)
 	}
 }
 
