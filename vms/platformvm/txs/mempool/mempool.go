@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	// targetTxSize is the maximum number of bytes a transaction can use to be
+	// MaxTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
-	targetTxSize = 64 * units.KiB
+	MaxTxSize = 64 * units.KiB
 
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 64
@@ -34,7 +34,10 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errMempoolFull = errors.New("mempool is full")
+	errDuplicateTx          = errors.New("duplicate tx")
+	errTxTooLarge           = errors.New("tx too large")
+	errMempoolFull          = errors.New("mempool is full")
+	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
 type BlockTimer interface {
@@ -158,25 +161,30 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return fmt.Errorf("duplicate tx %s", txID)
+		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
 	}
 
-	txBytes := tx.Bytes()
-	if len(txBytes) > targetTxSize {
-		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), targetTxSize)
+	txSize := len(tx.Bytes())
+	if txSize > MaxTxSize {
+		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
+			errTxTooLarge,
+			txID,
+			txSize,
+			MaxTxSize,
+		)
 	}
-	if len(txBytes) > m.bytesAvailable {
-		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
+	if txSize > m.bytesAvailable {
+		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
 			errMempoolFull,
 			txID,
-			len(txBytes),
+			txSize,
 			m.bytesAvailable,
 		)
 	}
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
+		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
 	}
 
 	if err := tx.Unsigned.Visit(&issuer{
