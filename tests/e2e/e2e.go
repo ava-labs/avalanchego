@@ -127,37 +127,6 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 	return secp256k1fx.NewKeychain(keys...)
 }
 
-// Create a new wallet for the provided keychain against the specified node URI.
-// TODO(marun) Make this a regular function.
-func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
-	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
-		URI:          nodeURI.URI,
-		AVAXKeychain: keychain,
-		EthKeychain:  keychain,
-	})
-	te.require.NoError(err)
-	return primary.NewWalletWithOptions(
-		baseWallet,
-		common.WithPostIssuanceFunc(
-			func(id ids.ID) {
-				tests.Outf(" issued transaction with ID: %s\n", id)
-			},
-		),
-	)
-}
-
-// Create a new eth client targeting the specified node URI.
-// TODO(marun) Make this a regular function.
-func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
-	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
-	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
-	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
-	client, err := ethclient.Dial(uri)
-	te.require.NoError(err)
-	return client
-}
-
 // Create a new private network that is not shared with other tests.
 func (te *TestEnvironment) NewPrivateNetwork() testnet.Network {
 	// Load the shared network to retrieve its path and exec path
@@ -170,6 +139,35 @@ func (te *TestEnvironment) NewPrivateNetwork() testnet.Network {
 	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
 	return StartLocalNetwork(sharedNetwork.ExecPath, privateNetworksDir)
+}
+
+// Create a new wallet for the provided keychain against the specified node URI.
+func NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
+	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
+		URI:          nodeURI.URI,
+		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
+	})
+	require.NoError(ginkgo.GinkgoT(), err)
+	return primary.NewWalletWithOptions(
+		baseWallet,
+		common.WithPostIssuanceFunc(
+			func(id ids.ID) {
+				tests.Outf(" issued transaction with ID: %s\n", id)
+			},
+		),
+	)
+}
+
+// Create a new eth client targeting the specified node URI.
+func NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
+	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	client, err := ethclient.Dial(uri)
+	require.NoError(ginkgo.GinkgoT(), err)
+	return client
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
