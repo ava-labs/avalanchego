@@ -114,6 +114,11 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
+type Clearer interface {
+	// Deletes all key/value pairs from the database.
+	Clear() error
+}
+
 type Prefetcher interface {
 	// PrefetchPath attempts to load all trie nodes on the path of [key]
 	// into the cache.
@@ -129,6 +134,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
+	Clearer
 	Trie
 	MerkleRootGetter
 	ProofGetter
@@ -1248,6 +1254,27 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)
+}
+
+func (db *merkleDB) Clear() error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if err := db.valueNodeDB.Clear(); err != nil {
+		return err
+	}
+
+	if err := db.intermediateNodeDB.Clear(); err != nil {
+		return err
+	}
+
+	db.root = newNode(Key{})
+	db.root.calculateID(db.metrics)
+
+	return db.intermediateNodeDB.Put(db.root.key, db.root)
 }
 
 // Returns [key] prefixed by [prefix].
