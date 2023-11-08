@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -74,6 +75,12 @@ type Mempool interface {
 	// possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Drops all [txs.Staker] transactions whose [StartTime] is before
+	// [minStartTime]. The dropped tx ids are returned.
+	//
+	// TODO: Remove once [StartTime] field is ignored in staker txs
+	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -296,4 +303,31 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
+}
+
+func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
+	var droppedTxIDs []ids.ID
+
+	for m.HasStakerTx() {
+		tx := m.PeekStakerTx()
+		startTime := tx.Unsigned.(txs.Staker).StartTime()
+		if !startTime.Before(minStartTime) {
+			// The next proposal tx in the mempool starts sufficiently far in
+			// the future.
+			break
+		}
+
+		txID := tx.ID()
+		err := fmt.Errorf(
+			"synchrony bound (%s) is later than staker start time (%s)",
+			minStartTime,
+			startTime,
+		)
+
+		m.Remove([]*txs.Tx{tx})
+		m.MarkDropped(txID, err) // cache tx as dropped
+		droppedTxIDs = append(droppedTxIDs, txID)
+	}
+
+	return droppedTxIDs
 }
