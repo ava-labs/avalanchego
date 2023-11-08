@@ -43,7 +43,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if result.key != path || result == nil {
+	if result == nil || result.key != path {
 		return nil, database.ErrNotFound
 	}
 
