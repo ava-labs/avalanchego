@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -304,4 +305,35 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
+}
+
+// Drops all [txs.Staker] transactions whose [StartTime] is before
+// [minStartTime] from [mempool]. The dropped tx ids are returned.
+//
+// TODO: Remove once [StartTime] field is ignored in staker txs
+func DropExpiredStakerTxs(mempool Mempool, minStartTime time.Time) []ids.ID {
+	var droppedTxIDs []ids.ID
+
+	for mempool.HasStakerTx() {
+		tx := mempool.PeekStakerTx()
+		startTime := tx.Unsigned.(txs.Staker).StartTime()
+		if !startTime.Before(minStartTime) {
+			// The next proposal tx in the mempool starts sufficiently far in
+			// the future.
+			break
+		}
+
+		txID := tx.ID()
+		err := fmt.Errorf(
+			"synchrony bound (%s) is later than staker start time (%s)",
+			minStartTime,
+			startTime,
+		)
+
+		mempool.Remove([]*txs.Tx{tx})
+		mempool.MarkDropped(txID, err) // cache tx as dropped
+		droppedTxIDs = append(droppedTxIDs, txID)
+	}
+
+	return droppedTxIDs
 }
