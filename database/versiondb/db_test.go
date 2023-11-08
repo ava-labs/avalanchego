@@ -27,6 +27,10 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	database.FuzzNewIteratorWithPrefix(f, New(memdb.New()))
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithStartAndPrefix(f, New(memdb.New()))
+}
+
 func TestIterate(t *testing.T) {
 	require := require.New(t)
 
