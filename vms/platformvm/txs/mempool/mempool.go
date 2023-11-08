@@ -70,7 +70,7 @@ type Mempool interface {
 	GetDropReason(txID ids.ID) error
 
 	// Drops all [txs.Staker] transactions whose [StartTime] is before
-	// [minStartTime]. The dropped tx ids are returned.
+	// [minStartTime] from [mempool]. The dropped tx ids are returned.
 	//
 	// TODO: Remove once [StartTime] field is ignored in staker txs
 	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
@@ -172,7 +172,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		)
 	}
 	if txSize > m.bytesAvailable {
-		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
+		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
 			errMempoolFull,
 			txID,
 			txSize,
@@ -256,10 +256,11 @@ func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 		if !ok {
 			continue
 		}
-
 		startTime := stakerTx.StartTime()
 		if !startTime.Before(minStartTime) {
-			continue
+			// The next proposal tx in the mempool starts sufficiently far in
+			// the future.
+			break
 		}
 
 		txID := tx.ID()
