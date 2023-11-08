@@ -1260,21 +1260,27 @@ func (db *merkleDB) Clear() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
-	if err := db.intermediateNodeDB.Clear(); err != nil {
+	// TODO is it faster to clear another way?
+	keysToDelete, err := db.getKeysNotInSet(maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), set.Set[string]{})
+	if err != nil {
 		return err
 	}
 
-	if err := db.valueNodeDB.Clear(); err != nil {
+	ops := make([]database.BatchOp, len(keysToDelete))
+	for i, keyToDelete := range keysToDelete {
+		ops[i] = database.BatchOp{
+			Key:    keyToDelete,
+			Delete: true,
+		}
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
+	if err != nil {
 		return err
 	}
 
-	db.root = newNode(Key{})
-	db.root.calculateID(db.metrics)
-
-	return db.intermediateNodeDB.Put(db.root.key, db.root)
+	return view.commitToDB(context.Background())
 }
 
 // Returns [key] prefixed by [prefix].
