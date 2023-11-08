@@ -161,7 +161,9 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
+	b.Mempool.DisableAdding()
 	defer func() {
+		b.Mempool.EnableAdding()
 		b.ResetBlockTimer()
 	}()
 

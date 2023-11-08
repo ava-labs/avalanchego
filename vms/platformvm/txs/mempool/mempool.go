@@ -51,6 +51,11 @@ type BlockTimer interface {
 }
 
 type Mempool interface {
+	// we may want to be able to stop valid transactions
+	// from entering the mempool, e.g. during blocks creation
+	EnableAdding()
+	DisableAdding()
+
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
@@ -130,7 +135,19 @@ func New(
 	}, nil
 }
 
+func (m *mempool) EnableAdding() {
+	m.dropIncoming = false
+}
+
+func (m *mempool) DisableAdding() {
+	m.dropIncoming = true
+}
+
 func (m *mempool) Add(tx *txs.Tx) error {
+	if m.dropIncoming {
+		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
+	}
+
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
