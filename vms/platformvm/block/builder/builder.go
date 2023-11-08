@@ -338,7 +338,7 @@ func buildBlock(
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
-	droppedStakerTxIDs := builder.Mempool.DropExpiredStakerTxs(timestamp.Add(txexecutor.SyncBound))
+	droppedStakerTxIDs := mempool.DropExpiredStakerTxs(builder.Mempool, timestamp.Add(txexecutor.SyncBound))
 	for _, txID := range droppedStakerTxIDs {
 		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
 			zap.Stringer("txID", txID),

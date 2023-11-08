@@ -75,12 +75,6 @@ type Mempool interface {
 	// possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
-
-	// Drops all [txs.Staker] transactions whose [StartTime] is before
-	// [minStartTime]. The dropped tx ids are returned.
-	//
-	// TODO: Remove once [StartTime] field is ignored in staker txs
-	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -305,11 +299,15 @@ func (m *mempool) deregister(tx *txs.Tx) {
 	m.consumedUTXOs.Difference(inputs)
 }
 
-func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
+// Drops all [txs.Staker] transactions whose [StartTime] is before
+// [minStartTime] from [mempool]. The dropped tx ids are returned.
+//
+// TODO: Remove once [StartTime] field is ignored in staker txs
+func DropExpiredStakerTxs(mempool Mempool, minStartTime time.Time) []ids.ID {
 	var droppedTxIDs []ids.ID
 
-	for m.HasStakerTx() {
-		tx := m.PeekStakerTx()
+	for mempool.HasStakerTx() {
+		tx := mempool.PeekStakerTx()
 		startTime := tx.Unsigned.(txs.Staker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
@@ -324,8 +322,8 @@ func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 			startTime,
 		)
 
-		m.Remove([]*txs.Tx{tx})
-		m.MarkDropped(txID, err) // cache tx as dropped
+		mempool.Remove([]*txs.Tx{tx})
+		mempool.MarkDropped(txID, err) // cache tx as dropped
 		droppedTxIDs = append(droppedTxIDs, txID)
 	}
 
