@@ -53,7 +53,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -202,7 +202,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("initializing a new eth client")
-		ethClient := e2e.Env.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("importing AVAX from the P-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(
