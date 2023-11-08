@@ -28,11 +28,10 @@ func TestValueNodeDB(t *testing.T) {
 		},
 		&mockMetrics{},
 		size,
-		BranchFactor16,
 	)
 
 	// Getting a key that doesn't exist should return an error.
-	key := ToKey([]byte{0x01}, BranchFactor16)
+	key := ToKey([]byte{0x01})
 	_, err := db.Get(key)
 	require.ErrorIs(err, database.ErrNotFound)
 
@@ -124,12 +123,11 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
-		BranchFactor16,
 	)
 
 	// Put key-node pairs.
 	for i := 0; i < cacheSize; i++ {
-		key := ToKey([]byte{byte(i)}, BranchFactor16)
+		key := ToKey([]byte{byte(i)})
 		node := &node{
 			dbNode: dbNode{
 				value: maybe.Some([]byte{byte(i)}),
@@ -167,7 +165,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	it.Release()
 
 	// Put key-node pairs with a common prefix.
-	key := ToKey([]byte{0xFF, 0x00}, BranchFactor16)
+	key := ToKey([]byte{0xFF, 0x00})
 	n := &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x00}),
@@ -178,7 +176,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	batch.Put(key, n)
 	require.NoError(batch.Write())
 
-	key = ToKey([]byte{0xFF, 0x01}, BranchFactor16)
+	key = ToKey([]byte{0xFF, 0x01})
 	n = &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x01}),

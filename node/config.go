@@ -131,6 +131,9 @@ type BootstrapConfig struct {
 }
 
 type DatabaseConfig struct {
+	// If true, all writes are to memory and are discarded at node shutdown.
+	ReadOnly bool `json:"readOnly"`
+
 	// Path to database
 	Path string `json:"path"`
 
