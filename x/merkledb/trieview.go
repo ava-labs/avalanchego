@@ -709,7 +709,6 @@ func (t *trieView) remove(key Key) error {
 	// i.e. There's the root and at least one more node.
 
 	// if the removed node has no children, the node can be removed from the trie
-	// <<<<<<< HEAD
 	if len(nodeToDelete.children) == 0 {
 		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
 			return err
