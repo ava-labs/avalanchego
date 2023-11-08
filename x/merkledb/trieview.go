@@ -349,7 +349,10 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}); err != nil {
 		return nil, err
 	}
-	root := t.getRoot()
+	root, err := t.getRoot()
+	if err != nil {
+		return nil, err
+	}
 
 	// The sentinel node is always the first node in the path.
 	// If the sentinel node is not the root, remove it from the proofPath.
@@ -474,7 +477,11 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, t.getRoot().key.Bytes())
+		root, err := t.getRoot()
+		if err != nil {
+			return nil, err
+		}
+		rootProof, err := t.getProof(ctx, root.key.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -561,11 +568,17 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.getRoot().id, nil
+	return t.getMerkleRoot(), nil
 }
 
 func (t *trieView) getMerkleRoot() ids.ID {
-	return t.getRoot().id
+	if !isSentinelNodeTheRoot(t.sentinelNode) {
+		for _, childEntry := range t.sentinelNode.children {
+			return childEntry.id
+		}
+	}
+
+	return t.sentinelNode.id
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -907,17 +920,18 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
-func (t *trieView) getRoot() *node {
+func (t *trieView) getRoot() (*node, error) {
 	if !isSentinelNodeTheRoot(t.sentinelNode) {
 		// sentinelNode has one child, which is the root
 		for index, childEntry := range t.sentinelNode.children {
-			childPath := t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey)
-			root, _ := t.getNodeWithID(childEntry.id, childPath, childEntry.hasValue)
-			return root
+			return t.getNodeWithID(
+				childEntry.id,
+				t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey),
+				childEntry.hasValue)
 		}
 	}
 
-	return t.sentinelNode
+	return t.sentinelNode, nil
 }
 
 // Records that the node associated with the given key has been changed.
