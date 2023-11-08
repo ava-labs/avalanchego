@@ -87,7 +87,7 @@ type networkClient struct {
 	// controls maximum number of active outbound requests
 	activeRequests *semaphore.Weighted
 	// tracking of peers & bandwidth usage
-	peers *peerTracker
+	peers PeerTracker
 	// For sending messages to peers
 	appSender common.AppSender
 }
@@ -100,7 +100,7 @@ func NewNetworkClient(
 	metricsNamespace string,
 	registerer prometheus.Registerer,
 ) (NetworkClient, error) {
-	peerTracker, err := newPeerTracker(log, metricsNamespace, registerer)
+	peerTracker, err := NewPeerTracker(log, metricsNamespace, registerer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
 	}
@@ -281,8 +281,7 @@ func (c *networkClient) request(
 		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ctx.Err()
 	case response = <-handler.responseChan:
-		elapsedSeconds := time.Since(startTime).Seconds()
-		bandwidth := float64(len(response))/elapsedSeconds + epsilon
+		bandwidth := EstimateBandwidth(len(response), startTime)
 		c.peers.TrackBandwidth(nodeID, bandwidth)
 	}
 	if handler.failed {
@@ -296,6 +295,11 @@ func (c *networkClient) request(
 		zap.Int("responseLen", len(response)),
 	)
 	return response, nil
+}
+
+func EstimateBandwidth(msgSize int, requestTime time.Time) float64 {
+	elapsedSeconds := time.Since(requestTime).Seconds()
+	return float64(msgSize)/elapsedSeconds + epsilon
 }
 
 func (c *networkClient) Connected(

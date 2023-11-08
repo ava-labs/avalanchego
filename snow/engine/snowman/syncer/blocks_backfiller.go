@@ -7,16 +7,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 var (
@@ -29,8 +30,6 @@ type BlockBackfillerConfig struct {
 	Ctx                            *snow.ConsensusContext
 	VM                             block.ChainVM
 	Sender                         common.Sender
-	Validators                     validators.Manager
-	Peers                          tracker.Peers
 	AncestorsMaxContainersSent     int
 	AncestorsMaxContainersReceived int
 
@@ -43,18 +42,25 @@ type BlockBackfillerConfig struct {
 type BlockBackfiller struct {
 	BlockBackfillerConfig
 
-	fetchFrom           set.Set[ids.NodeID] // picked from bootstrapper
-	outstandingRequests common.Requests     // tracks which validators were asked for which block in which requests
-	interrupted         bool                // flag to allow backfilling restart after recovering from validators disconnections
+	peers               sync.PeerTracker
+	requestTimes        map[uint32]time.Time // requestID --> time of request issuance. Used to track bandwidth
+	outstandingRequests common.Requests      // tracks which validators were asked for which block in which requests
+	interrupted         bool                 // flag to allow backfilling restart after recovering from validators disconnections
 }
 
-func NewBlockBackfiller(cfg BlockBackfillerConfig) *BlockBackfiller {
+func NewBlockBackfiller(cfg BlockBackfillerConfig) (*BlockBackfiller, error) {
+	pt, err := sync.NewPeerTracker(cfg.Ctx.Log, "blockBackfillingPeerTracker", prometheus.NewRegistry())
+	if err != nil {
+		return nil, err
+	}
+
 	return &BlockBackfiller{
 		BlockBackfillerConfig: cfg,
 
-		fetchFrom:   set.Of[ids.NodeID](cfg.Validators.GetValidatorIDs(cfg.Ctx.SubnetID)...),
-		interrupted: len(cfg.Peers.PreferredPeers()) > 0,
-	}
+		peers:        pt,
+		requestTimes: make(map[uint32]time.Time),
+		interrupted:  false,
+	}, nil
 }
 
 func (bb *BlockBackfiller) Start(ctx context.Context) error {
@@ -95,15 +101,21 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-
-		bb.markUnavailable(nodeID)
+		bb.peers.TrackBandwidth(nodeID, 0)
+		delete(bb.requestTimes, requestID)
 
 		// Send another request for this
 		return bb.fetch(ctx, wantedBlkID)
 	}
 
-	// This node has responded - so add it back into the set
-	bb.fetchFrom.Add(nodeID)
+	// track bandwidth
+	responseSize := 0
+	for _, blkBytes := range blks {
+		responseSize += len(blkBytes)
+	}
+	bandwidth := sync.EstimateBandwidth(responseSize, bb.requestTimes[requestID])
+	bb.peers.TrackBandwidth(nodeID, bandwidth)
+	delete(bb.requestTimes, requestID)
 
 	if lenBlks > bb.AncestorsMaxContainersReceived {
 		blks = blks[:bb.AncestorsMaxContainersReceived]
@@ -152,9 +164,8 @@ func (bb *BlockBackfiller) GetAncestorsFailed(ctx context.Context, nodeID ids.No
 		)
 		return nil
 	}
-
-	// This node timed out their request, so we can add them back to [fetchFrom]
-	bb.fetchFrom.Add(nodeID)
+	bb.peers.TrackBandwidth(nodeID, 0)
+	delete(bb.requestTimes, requestID)
 
 	// Send another request for this
 	return bb.fetch(ctx, blkID)
@@ -162,35 +173,21 @@ func (bb *BlockBackfiller) GetAncestorsFailed(ctx context.Context, nodeID ids.No
 
 // Get block [blkID] and its ancestors from a peer
 func (bb *BlockBackfiller) fetch(ctx context.Context, blkID ids.ID) error {
-	validatorID, ok := bb.fetchFrom.Peek()
-	if !ok {
+	peerID, found := bb.peers.GetAnyPeer(version.MinimumCompatibleVersion)
+	if !found {
+		bb.interrupted = true
 		return fmt.Errorf("dropping request for %s: %w", blkID, ErrNoPeersToDownloadBlocksFrom)
 	}
 
-	// We only allow one outbound request at a time from a node
-	bb.markUnavailable(validatorID)
 	*bb.SharedRequestID++
-	bb.outstandingRequests.Add(validatorID, *bb.SharedRequestID, blkID)
-	bb.Sender.SendGetAncestors(ctx, validatorID, *bb.SharedRequestID, blkID)
+	bb.outstandingRequests.Add(peerID, *bb.SharedRequestID, blkID)
+	bb.Sender.SendGetAncestors(ctx, peerID, *bb.SharedRequestID, blkID)
+	bb.requestTimes[*bb.SharedRequestID] = time.Now()
 	return nil
 }
 
-func (bb *BlockBackfiller) markUnavailable(nodeID ids.NodeID) {
-	bb.fetchFrom.Remove(nodeID)
-
-	// if [fetchFrom] has become empty, reset it to the currently preferred
-	// peers
-	if bb.fetchFrom.Len() == 0 {
-		bb.fetchFrom = bb.Peers.PreferredPeers()
-	}
-}
-
-func (bb *BlockBackfiller) Connected(ctx context.Context, nodeID ids.NodeID) error {
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := bb.Validators.GetValidator(bb.Ctx.SubnetID, nodeID); ok {
-		bb.fetchFrom.Add(nodeID)
-	}
-
+func (bb *BlockBackfiller) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	bb.peers.Connected(nodeID, nodeVersion)
 	if !bb.interrupted {
 		return nil
 	}
@@ -201,9 +198,7 @@ func (bb *BlockBackfiller) Connected(ctx context.Context, nodeID ids.NodeID) err
 }
 
 func (bb *BlockBackfiller) Disconnected(nodeID ids.NodeID) error {
-	bb.markUnavailable(nodeID)
-
-	// if there is no validator left, flag that blocks backfilling is interrupted.
-	bb.interrupted = len(bb.fetchFrom) == 0
+	bb.peers.Disconnected(nodeID)
+	bb.interrupted = (bb.peers.Size() == 0)
 	return nil
 }

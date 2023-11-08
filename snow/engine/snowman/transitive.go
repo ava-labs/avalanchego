@@ -140,18 +140,19 @@ func newTransitive(config Config) (*Transitive, error) {
 		acceptedFrontiers:           acceptedFrontiers,
 		polls:                       polls,
 	}
-	t.BlockBackfiller = syncer.NewBlockBackfiller(
+	t.BlockBackfiller, err = syncer.NewBlockBackfiller(
 		syncer.BlockBackfillerConfig{
 			Ctx:                            config.Ctx,
 			VM:                             config.VM,
 			Sender:                         config.Sender,
-			Validators:                     config.Validators,
-			Peers:                          config.Peers,
 			AncestorsMaxContainersSent:     config.AncestorsMaxContainersSent,
 			AncestorsMaxContainersReceived: config.AncestorsMaxContainersReceived,
 			SharedRequestID:                &t.RequestID,
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating block backfiller: %w", err)
+	}
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
@@ -1013,7 +1014,7 @@ func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersi
 	if err := t.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
-	return t.BlockBackfiller.Connected(ctx, nodeID)
+	return t.BlockBackfiller.Connected(ctx, nodeID, nodeVersion)
 }
 
 func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {

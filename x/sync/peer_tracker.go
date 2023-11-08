@@ -36,6 +36,18 @@ const (
 	randomPeerProbability = 0.2
 )
 
+var _ PeerTracker = (*peerTracker)(nil)
+
+type PeerTracker interface {
+	Connected(nodeID ids.NodeID, nodeVersion *version.Application)
+	Disconnected(nodeID ids.NodeID)
+
+	GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool)
+	TrackPeer(nodeID ids.NodeID)
+	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	Size() int
+}
+
 // information we track on a given peer
 type peerInfo struct {
 	version   *version.Application
@@ -64,11 +76,11 @@ type peerTracker struct {
 	averageBandwidthMetric prometheus.Gauge
 }
 
-func newPeerTracker(
+func NewPeerTracker(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
-) (*peerTracker, error) {
+) (PeerTracker, error) {
 	t := &peerTracker{
 		peers:           make(map[ids.NodeID]*peerInfo),
 		trackedPeers:    make(set.Set[ids.NodeID]),
