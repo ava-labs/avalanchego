@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/sync"
 )
@@ -47,10 +48,16 @@ type BlockBackfiller struct {
 	interrupted         bool                 // flag to allow backfilling restart after recovering from validators disconnections
 }
 
-func NewBlockBackfiller(cfg BlockBackfillerConfig) (*BlockBackfiller, error) {
+func NewBlockBackfiller(cfg BlockBackfillerConfig, vals validators.Manager) (*BlockBackfiller, error) {
 	pt, err := sync.NewPeerTracker(cfg.Ctx.Log, "", cfg.Ctx.Registerer)
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO: pt must be initialized with the peers already connected, as well as their version
+	valList := vals.GetValidatorIDs(cfg.Ctx.SubnetID)
+	for _, val := range valList {
+		pt.Connected(val, version.MinimumCompatibleVersion) // fake version, find a way to fix it
 	}
 
 	return &BlockBackfiller{
@@ -58,7 +65,7 @@ func NewBlockBackfiller(cfg BlockBackfillerConfig) (*BlockBackfiller, error) {
 
 		peers:        pt,
 		requestTimes: make(map[uint32]time.Time),
-		interrupted:  false,
+		interrupted:  pt.Size() == 0,
 	}, nil
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -152,10 +151,6 @@ func TestAncestorsProcessing(t *testing.T) {
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
 
-	// for current test we need a single validator. Disconnect the other
-	dummyCtx := context.Background()
-	require.NoError(te.Disconnected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]))
-
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
 	dummyHeight := uint64(1492)
@@ -168,6 +163,7 @@ func TestAncestorsProcessing(t *testing.T) {
 	}
 
 	// issue blocks request
+	dummyCtx := context.Background()
 	startReqNum := uint32(0)
 	require.NoError(te.Start(dummyCtx, startReqNum))
 
@@ -201,10 +197,6 @@ func TestAncestorsProcessing(t *testing.T) {
 	}
 	{
 		// handle empty Ancestor response
-
-		// Connect second validator, to allow requesting it the block following faulty response from first validator
-		require.NoError(te.Connected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1], version.CurrentApp))
-
 		emptyBlkBytes := [][]byte{}
 		require.NoError(te.Ancestors(dummyCtx, nodeID, responseReqID, emptyBlkBytes))
 		require.Nil(pushedBlks)               // blocks from wrong NodeID are not pushed to VM
@@ -212,7 +204,6 @@ func TestAncestorsProcessing(t *testing.T) {
 	}
 	{
 		// success
-		nodeID := engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]
 		responseReqID++ // previous consumed by empty Ancestor response case
 
 		require.NoError(te.Ancestors(dummyCtx, nodeID, responseReqID, blkBytes))
@@ -290,10 +281,6 @@ func TestBackfillingTerminatedCleanlyByVM(t *testing.T) {
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
 
-	// for current test we need a single validator. Disconnect the other
-	dummyCtx := context.Background()
-	require.NoError(te.Disconnected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]))
-
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
 	dummyHeight := uint64(1492)
@@ -302,6 +289,7 @@ func TestBackfillingTerminatedCleanlyByVM(t *testing.T) {
 	}
 
 	// start the engine
+	dummyCtx := context.Background()
 	startReqNum := uint32(0)
 	require.NoError(te.Start(dummyCtx, startReqNum))
 
@@ -399,10 +387,6 @@ func TestBackfillingTerminatedWithErrorByVM(t *testing.T) {
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
 
-	// for current test we need a single validator. Disconnect the other
-	dummyCtx := context.Background()
-	require.NoError(te.Disconnected(dummyCtx, engCfg.Validators.GetValidatorIDs(engCfg.Ctx.SubnetID)[1]))
-
 	// enable block backfilling
 	reqBlkFirst := ids.GenerateTestID()
 	dummyHeight := uint64(1492)
@@ -411,6 +395,7 @@ func TestBackfillingTerminatedWithErrorByVM(t *testing.T) {
 	}
 
 	// start the engine
+	dummyCtx := context.Background()
 	startReqNum := uint32(0)
 	require.NoError(te.Start(dummyCtx, startReqNum))
 
@@ -528,12 +513,5 @@ func setupBlockBackfillingTests(t *testing.T) (Config, *fullVM, *common.SenderTe
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
-	errs := wrappers.Errs{}
-	errs.Add(
-		vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1),
-		vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1),
-	)
-
-	return engCfg, vm, sender, errs.Err
+	return engCfg, vm, sender, vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1)
 }

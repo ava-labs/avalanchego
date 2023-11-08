@@ -149,6 +149,7 @@ func newTransitive(config Config) (*Transitive, error) {
 			AncestorsMaxContainersReceived: config.AncestorsMaxContainersReceived,
 			SharedRequestID:                &t.RequestID,
 		},
+		config.Validators,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating block backfiller: %w", err)
