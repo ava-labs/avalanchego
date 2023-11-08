@@ -127,4 +127,4 @@ While state sync is faster than normal bootstrapping, the process may take sever
 | `state-sync-skip-resume` | `bool` | set to true to avoid resuming an ongoing sync | `false` |
 | `state-sync-min-blocks` | `uint64` | Minimum number of blocks the chain must be ahead of local state to prefer state sync over bootstrapping | `300,000` |
 | `state-sync-server-trie-cache` | `int` | Size of trie cache to serve state sync data in MB. Should be set to multiples of `64`. | `64` |
-| `state-sync-ids` | `string` | a comma seperated list of `NodeID-` prefixed node IDs to sync data from. If not provided, peers are randomly selected. | |
+| `state-sync-ids` | `string` | a comma separated list of `NodeID-` prefixed node IDs to sync data from. If not provided, peers are randomly selected. | |
