@@ -26,8 +26,8 @@ func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	var (
 		changes   = make([]KeyChange, 0, len(t.changes.values))
-		startKey  = t.db.toKey(start)
-		prefixKey = t.db.toKey(prefix)
+		startKey  = ToKey(start)
+		prefixKey = ToKey(prefix)
 	)
 
 	for key, change := range t.changes.values {

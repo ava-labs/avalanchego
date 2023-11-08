@@ -32,8 +32,6 @@ type trieHistory struct {
 
 	// Each change is tagged with this monotonic increasing number.
 	nextInsertNumber uint64
-
-	toKey func([]byte) Key
 }
 
 // Tracks the beginning and ending state of a value.
@@ -65,12 +63,11 @@ func newChangeSummary(estimatedSize int) *changeSummary {
 	}
 }
 
-func newTrieHistory(maxHistoryLookback int, toKey func([]byte) Key) *trieHistory {
+func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	return &trieHistory{
 		maxHistoryLen: maxHistoryLookback,
 		history:       buffer.NewUnboundedDeque[*changeSummaryAndInsertNumber](maxHistoryLookback),
 		lastChanges:   make(map[ids.ID]*changeSummaryAndInsertNumber),
-		toKey:         toKey,
 	}
 }
 
@@ -158,8 +155,8 @@ func (th *trieHistory) getValueChanges(
 		// in order to stay within the [maxLength] limit if necessary.
 		changedKeys = set.Set[Key]{}
 
-		startKey = maybe.Bind(start, th.toKey)
-		endKey   = maybe.Bind(end, th.toKey)
+		startKey = maybe.Bind(start, ToKey)
+		endKey   = maybe.Bind(end, ToKey)
 
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -237,8 +234,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	}
 
 	var (
-		startKey                     = maybe.Bind(start, th.toKey)
-		endKey                       = maybe.Bind(end, th.toKey)
+		startKey                     = maybe.Bind(start, ToKey)
+		endKey                       = maybe.Bind(end, ToKey)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
