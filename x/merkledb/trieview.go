@@ -358,12 +358,12 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// If the sentinel node is not the root, remove it from the proofPath.
 	if root != t.sentinelNode {
 		proof.Path = proof.Path[1:]
-	}
 
-	// if there are no nodes in the proof path, add the root to serve as an exclusion proof
-	if len(proof.Path) == 0 {
-		proof.Path = []ProofNode{root.asProofNode()}
-		return proof, nil
+		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
+		if len(proof.Path) == 0 {
+			proof.Path = []ProofNode{root.asProofNode()}
+			return proof, nil
+		}
 	}
 
 	if closestNode.key == proof.Key {
