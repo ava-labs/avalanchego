@@ -264,7 +264,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			t.changes.rootID = ids.Empty
 		}
 
-		t.changes.rootChange = &change[*node]{
+		t.changes.rootChange = change[*node]{
 			before: oldRoot,
 			after:  t.root.Value(),
 		}

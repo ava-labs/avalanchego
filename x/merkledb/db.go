@@ -270,7 +270,7 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: trieDB.getMerkleRoot(),
-		rootChange: &change[*node]{
+		rootChange: change[*node]{
 			after: trieDB.root.Value(),
 		},
 		values: map[Key]*change[maybe.Maybe[[]byte]]{},
