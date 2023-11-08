@@ -48,7 +48,7 @@ func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 
 // Put an element into this cache. If this causes an element
 // to be evicted, calls [c.onEviction] on the evicted element
-// and returns the error from [c.onEviction]. Otherwise returns nil.
+// and returns the error from [c.onEviction]. Otherwise, returns nil.
 func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
