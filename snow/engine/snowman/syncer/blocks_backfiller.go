@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -49,7 +48,7 @@ type BlockBackfiller struct {
 }
 
 func NewBlockBackfiller(cfg BlockBackfillerConfig) (*BlockBackfiller, error) {
-	pt, err := sync.NewPeerTracker(cfg.Ctx.Log, "blockBackfillingPeerTracker", prometheus.NewRegistry())
+	pt, err := sync.NewPeerTracker(cfg.Ctx.Log, "", cfg.Ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
