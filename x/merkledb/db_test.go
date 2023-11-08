@@ -773,6 +773,37 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 }
 
+func TestMerkleDBClear(t *testing.T) {
+	require := require.New(t)
+
+	// Make a database and insert some key-value pairs.
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	emptyRootID := db.getMerkleRoot()
+
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+
+	insertRandomKeyValues(
+		require,
+		r,
+		[]database.Database{db},
+		1_000,
+		0.25,
+	)
+
+	// Clear the database.
+	require.NoError(db.Clear())
+
+	// Assert that the database is empty.
+	iter := db.NewIterator()
+	defer iter.Release()
+	require.False(iter.Next())
+	require.Equal(emptyRootID, db.getMerkleRoot())
+}
+
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 	f.Fuzz(
 		func(
