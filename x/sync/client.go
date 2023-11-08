@@ -256,9 +256,6 @@ func (c *client) GetRangeProof(
 			return nil, err
 		}
 
-		startKey := maybeBytesToMaybe(req.StartKey)
-		endKey := maybeBytesToMaybe(req.EndKey)
-
 		var rangeProof merkledb.RangeProof
 		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
@@ -268,8 +265,8 @@ func (c *client) GetRangeProof(
 			ctx,
 			&rangeProof,
 			int(req.KeyLimit),
-			startKey,
-			endKey,
+			maybeBytesToMaybe(req.StartKey),
+			maybeBytesToMaybe(req.EndKey),
 			req.RootHash,
 			c.tokenSize,
 		); err != nil {
