@@ -36,6 +36,7 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
+	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 )
@@ -120,7 +121,8 @@ type RangeProofer interface {
 }
 
 type Clearer interface {
-	// Deletes all key/value pairs from the database.
+	// Deletes all key/value pairs from the database
+	// and clears the change history.
 	Clear() error
 }
 
@@ -1286,27 +1288,28 @@ func (db *merkleDB) Clear() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	// TODO is it faster to clear another way?
-	keysToDelete, err := db.getKeysNotInSet(maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), set.Set[string]{})
-	if err != nil {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	// Clear nodes from disk and caches
+	if err := db.valueNodeDB.Clear(); err != nil {
+		return err
+	}
+	if err := db.intermediateNodeDB.Clear(); err != nil {
 		return err
 	}
 
-	ops := make([]database.BatchOp, len(keysToDelete))
-	for i, keyToDelete := range keysToDelete {
-		ops[i] = database.BatchOp{
-			Key:    keyToDelete,
-			Delete: true,
-		}
-	}
+	// Clear root
+	db.root = maybe.Nothing[*node]()
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
-	if err != nil {
-		return err
-	}
-
-	return view.commitToDB(context.Background())
+	// Clear history
+	db.history = newTrieHistory(db.history.maxHistoryLen)
+	db.history.record(&changeSummary{
+		rootID: db.getMerkleRoot(),
+		values: map[Key]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Key]*change[*node]{},
+	})
+	return nil
 }
 
 // Returns [key] prefixed by [prefix].
