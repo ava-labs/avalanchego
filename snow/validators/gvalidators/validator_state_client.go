@@ -74,7 +74,6 @@ func (c *Client) GetValidatorSet(
 		if err != nil {
 			return nil, err
 		}
-
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
 			// This is a performance optimization to avoid the cost of compression

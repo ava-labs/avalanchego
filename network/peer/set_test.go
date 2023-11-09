@@ -16,6 +16,7 @@ func TestSet(t *testing.T) {
 	require := require.New(t)
 
 	set := NewSet()
+
 	peer1 := &peer{
 		id:              ids.BuildTestNodeID([]byte{0x01}),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
