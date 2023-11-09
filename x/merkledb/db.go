@@ -36,6 +36,7 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
+	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 )
@@ -1260,26 +1261,28 @@ func (db *merkleDB) Clear() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	keysToDelete, err := db.getKeysNotInSet(maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), set.Set[string]{})
-	if err != nil {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	// Clear nodes from disk
+	if err := database.ClearPrefix(db.baseDB, valueNodePrefix, clearBatchSize); err != nil {
+		return err
+	}
+	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, clearBatchSize); err != nil {
 		return err
 	}
 
-	ops := make([]database.BatchOp, len(keysToDelete))
-	for i, keyToDelete := range keysToDelete {
-		ops[i] = database.BatchOp{
-			Key:    keyToDelete,
-			Delete: true,
-		}
-	}
+	db.root = newNode(Key{})
+	db.root.calculateID(db.metrics)
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
-	if err != nil {
-		return err
-	}
-
-	return view.commitToDB(context.Background())
+	// Reset history
+	db.history = newTrieHistory(db.history.maxHistoryLen)
+	db.history.record(&changeSummary{
+		rootID: db.getMerkleRoot(),
+		values: map[Key]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Key]*change[*node]{},
+	})
+	return nil
 }
 
 // Returns [key] prefixed by [prefix].

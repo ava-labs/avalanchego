@@ -796,83 +796,22 @@ func TestMerkleDBClear(t *testing.T) {
 		0.25,
 	)
 
-	// Write intermediate nodes to disk so that we can copy the
-	// state to inspect later.
-	require.NoError(db.intermediateNodeDB.Flush())
-
-	// Record the key-value pairs that exist.
-	var (
-		valueKeys = []Key{}
-		values    = [][]byte{}
-		valueIter = db.NewIterator()
-	)
-	for valueIter.Next() {
-		valueKeys = append(valueKeys, ToKey(valueIter.Key()))
-		values = append(values, valueIter.Value())
-	}
-	valueIter.Release()
-
-	var (
-		intermediateNodes    = map[string][]byte{}
-		intermediateNodeIter = db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
-	)
-	for intermediateNodeIter.Next() {
-		intermediateNodes[string(intermediateNodeIter.Key())] = intermediateNodeIter.Value()
-	}
-
 	// Clear the database.
 	require.NoError(db.Clear())
 
 	// Assert that the database is empty.
-	valueIter = db.NewIterator()
-	defer valueIter.Release()
-	require.False(valueIter.Next())
+	iter := db.NewIterator()
+	defer iter.Release()
+	require.False(iter.Next())
 	require.Equal(emptyRootID, db.getMerkleRoot())
 	require.Equal(emptyKey, db.root.key)
 
-	// Assert value nodes and value changes were recorded.
-	changes, ok := db.history.lastChanges[emptyRootID]
+	// Assert history has only the clearing change.
+	require.Len(db.history.lastChanges, 1)
+	change, ok := db.history.lastChanges[emptyRootID]
 	require.True(ok)
-	require.Len(changes.values, len(valueKeys))
-	for i, valueKey := range valueKeys {
-		valueChange, ok := changes.values[valueKey]
-		require.True(ok)
-		require.True(valueChange.after.IsNothing())
-		// Use bytes.Equal so nil and empty byte slices are treated the same.
-		require.True(bytes.Equal(values[i], valueChange.before.Value()))
-
-		nodeChange, ok := changes.nodes[valueKey]
-		require.True(ok)
-
-		if valueKey == emptyKey {
-			// The root had a value. The root should
-			// still exist after clearing the database.
-			require.NotNil(nodeChange.after)
-		} else {
-			require.Nil(nodeChange.after)
-		}
-
-		delete(changes.nodes, valueKey)
-	}
-	// [changes.nodes] only has intermediate nodes now.
-
-	for intermediateNodeKey, intermediateNodeChange := range changes.nodes {
-		dbKey := string(db.intermediateNodeDB.constructDBKey(intermediateNodeKey))
-
-		intermediateNodeBytes, ok := intermediateNodes[dbKey]
-		require.True(ok)
-
-		intermediateNode, err := parseNode(intermediateNodeKey, intermediateNodeBytes)
-		require.NoError(err)
-
-		intermediateNodeChange.before.calculateID(&mockMetrics{})
-		intermediateNode.calculateID(&mockMetrics{})
-
-		require.Equal(intermediateNode, intermediateNodeChange.before)
-
-		delete(intermediateNodes, dbKey)
-	}
-	require.Empty(intermediateNodes)
+	require.Empty(change.nodes)
+	require.Empty(change.values)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
