@@ -177,7 +177,7 @@ func (vm *VM) Initialize(
 
 	// Note: There is a circular dependency between the mempool and block
 	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	mempool, err := mempool.New("mempool", registerer, vm)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
