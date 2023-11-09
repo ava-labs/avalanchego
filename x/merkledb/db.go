@@ -1265,6 +1265,14 @@ func (db *merkleDB) Clear() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
+	// Clear caches
+	if err := db.valueNodeDB.Clear(); err != nil {
+		return err
+	}
+	if err := db.intermediateNodeDB.Clear(); err != nil {
+		return err
+	}
+
 	// Clear nodes from disk
 	if err := database.ClearPrefix(db.baseDB, valueNodePrefix, clearBatchSize); err != nil {
 		return err
@@ -1273,10 +1281,11 @@ func (db *merkleDB) Clear() error {
 		return err
 	}
 
+	// Clear root
 	db.root = newNode(Key{})
 	db.root.calculateID(db.metrics)
 
-	// Reset history
+	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
 		rootID: db.getMerkleRoot(),
