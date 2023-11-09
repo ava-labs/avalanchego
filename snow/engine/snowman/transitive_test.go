@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -50,7 +51,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	vm.T = t
 	engCfg.VM = vm
 
-	snowGetHandler, err := getter.New(vm, commonCfg)
+	snowGetHandler, err := getter.New(commonCfg.Ctx, vm, sender, time.Second, 2000)
 	require.NoError(err)
 	engCfg.AllGetsServer = snowGetHandler
 

@@ -6,6 +6,7 @@ package syncer
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -83,7 +84,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			T: t,
 		},
 	}
-	dummyGetter, err := getter.New(fullVM, *commonCfg)
+	dummyGetter, err := getter.New(commonCfg.Ctx, fullVM, commonCfg.Sender, time.Second, 2000)
 	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
