@@ -66,7 +66,7 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 	i := 0
 	for _, vdr := range vdrs {
 		vdrPB := &pb.Validator{
-			NodeId: vdr.NodeID[:],
+			NodeId: vdr.NodeID.Bytes(),
 			Weight: vdr.Weight,
 		}
 		if vdr.PublicKey != nil {

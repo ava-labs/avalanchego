@@ -277,8 +277,8 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	)
 
 	for childIndex, child := range n.children {
-		childPath := n.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
-		childNodeChange, ok := t.changes.nodes[childPath]
+		childKey := n.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
+		childNodeChange, ok := t.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
 			continue
@@ -909,7 +909,7 @@ func (t *trieView) insert(
 	// have the existing path node and the value being inserted as children.
 
 	// generate the new branch node
-	// find how many tokens are common between the existing child's compressed path and
+	// find how many tokens are common between the existing child's compressed key and
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
 	commonPrefixLength := getLengthOfCommonPrefix(
@@ -1004,7 +1004,7 @@ func (t *trieView) recordKeyChange(key Key, after *node, hadValue bool, newNode 
 	}
 
 	before, err := t.getParentTrie().getEditableNode(key, hadValue)
-	if err != nil && err != database.ErrNotFound {
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return err
 	}
 	t.changes.nodes[key] = &change[*node]{

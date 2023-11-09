@@ -2030,7 +2030,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					//
 					// Note: We store the compressed public key here.
 					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
-					if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
+					if err := nestedPKDiffDB.Put(nodeID.Bytes(), pkBytes); err != nil {
 						return err
 					}
 				}
@@ -2069,7 +2069,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
-			if err := nestedWeightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
+			if err := nestedWeightDiffDB.Put(nodeID.Bytes(), weightDiffBytes); err != nil {
 				return err
 			}
 

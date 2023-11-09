@@ -67,7 +67,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: ErrEmptyProof,
 		},
 		{
-			name: "odd length key with value",
+			name: "odd length key path with value",
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
@@ -203,7 +203,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			expectedErr: ErrProofValueDoesntMatch,
 		},
 		{
-			name: "EndProof: odd length key with value",
+			name: "EndProof: odd length key path with value",
 			malform: func(proof *RangeProof) {
 				proof.EndProof[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
@@ -271,6 +271,7 @@ func Test_Proof(t *testing.T) {
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
+				{Key: []byte("key"), Value: []byte("value")},
 				{Key: []byte("key0"), Value: []byte("value0")},
 				{Key: []byte("key1"), Value: []byte("value1")},
 				{Key: []byte("key2"), Value: []byte("value2")},
@@ -287,13 +288,14 @@ func Test_Proof(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.Len(proof.Path, 2)
+	require.Len(proof.Path, 3)
 
-	require.Equal(ToKey([]byte("key1")), proof.Path[1].Key)
-	require.Equal(maybe.Some([]byte("value1")), proof.Path[1].ValueOrHash)
-
-	require.Equal(ToKey([]byte("key1")).Take(28), proof.Path[0].Key)
-	require.False(proof.Path[0].ValueOrHash.HasValue())
+	require.Equal(ToKey([]byte("key")), proof.Path[0].Key)
+	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
+	require.Equal(ToKey([]byte("key0")).Take(28), proof.Path[1].Key)
+	require.True(proof.Path[1].ValueOrHash.IsNothing()) // intermediate node
+	require.Equal(ToKey([]byte("key1")), proof.Path[2].Key)
+	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)

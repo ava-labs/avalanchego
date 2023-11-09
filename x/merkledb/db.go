@@ -75,7 +75,7 @@ type ChangeProofer interface {
 		maxLength int,
 	) (*ChangeProof, error)
 
-	// Returns nil iff all of the following hold:
+	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
@@ -186,7 +186,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	// Contains all of the key-value pairs stored by this database,
+	// Contains all the key-value pairs stored by this database,
 	// including metadata, intermediate nodes and value nodes.
 	baseDB database.Database
 
@@ -509,11 +509,11 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	defer db.lock.RUnlock()
 
 	values := make([][]byte, len(keys))
-	errors := make([]error, len(keys))
+	getErrors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(ToKey(key))
+		values[i], getErrors[i] = db.getValueCopy(ToKey(key))
 	}
-	return values, errors
+	return values, getErrors
 }
 
 // GetValue returns the value associated with [key].
@@ -799,7 +799,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 	}
 
 	_, err := db.getValueWithoutLock(ToKey(k))
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	return err == nil, err
@@ -883,7 +883,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	return view.commitToDB(ctx)
 }
 
-// Assumes values inside of [ops] are safe to reference after the function
+// Assumes values inside [ops] are safe to reference after the function
 // returns. Assumes [db.lock] isn't held.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
