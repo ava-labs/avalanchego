@@ -141,13 +141,13 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			}
 		}
 
-		genesisValidators := make([]api.PermissionlessValidator, len(keys))
+		genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := address.FormatBech32(hrp, id.Bytes())
 			require.NoError(err)
-			genesisValidators[i] = api.PermissionlessValidator{
-				Staker: api.Staker{
+			genesisValidators[i] = api.GenesisPermissionlessValidator{
+				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
 					NodeID:    ids.NodeID(id),
