@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -83,7 +83,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
-				baseWallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 				avaxAssetID := baseWallet.X().AVAXAssetID()
 
 				wallets := make([]primary.Wallet, len(testKeys))

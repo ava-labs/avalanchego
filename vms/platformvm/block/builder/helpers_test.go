@@ -157,7 +157,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, res)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
