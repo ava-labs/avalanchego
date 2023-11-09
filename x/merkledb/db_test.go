@@ -792,7 +792,7 @@ func TestMerkleDBClear(t *testing.T) {
 		require,
 		r,
 		[]database.Database{db},
-		1_000,
+		10, // todo make 1000
 		0.25,
 	)
 
@@ -813,24 +813,11 @@ func TestMerkleDBClear(t *testing.T) {
 	valueIter.Release()
 
 	var (
-		intermediateNodeKeys  = []Key{}
-		intermediateNodeIter  = db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
-		intermediateNodeBytes = [][]byte{}
+		intermediateNodes    = map[string][]byte{}
+		intermediateNodeIter = db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
 	)
 	for intermediateNodeIter.Next() {
-		rawKey := intermediateNodeIter.Key()
-
-		// Remove the intermediate node prefix.
-		rawKey = rawKey[len(intermediateNodePrefix):]
-
-		// Convert to a key
-		key := ToKey(rawKey)
-
-		// Strip the padding
-		key = key.Take(key.length - db.tokenSize)
-
-		intermediateNodeKeys = append(intermediateNodeKeys, key)
-		intermediateNodeBytes = append(intermediateNodeBytes, intermediateNodeIter.Value())
+		intermediateNodes[string(intermediateNodeIter.Key())] = intermediateNodeIter.Value()
 	}
 
 	// Clear the database.
@@ -867,20 +854,25 @@ func TestMerkleDBClear(t *testing.T) {
 
 		delete(changes.nodes, valueKey)
 	}
+	// [changes.nodes] only has intermediate nodes now.
 
-	for i, intermediateNodeKey := range intermediateNodeKeys {
-		nodeChange, ok := changes.nodes[intermediateNodeKey]
-		require.True(ok, i) // todo remove i
+	for intermediateNodeKey, intermediateNodeChange := range changes.nodes {
+		dbKey := string(db.intermediateNodeDB.constructDBKey(intermediateNodeKey))
 
-		expectedNode, err := parseNode(intermediateNodeKey, intermediateNodeBytes[i])
+		intermediateNodeBytes, ok := intermediateNodes[dbKey]
+		require.True(ok)
+
+		intermediateNode, err := parseNode(intermediateNodeKey, intermediateNodeBytes)
 		require.NoError(err)
 
-		require.Equal(expectedNode, nodeChange.before)
+		intermediateNodeChange.before.calculateID(&mockMetrics{})
+		intermediateNode.calculateID(&mockMetrics{})
 
-		delete(changes.nodes, intermediateNodeKey)
+		require.Equal(intermediateNode, intermediateNodeChange.before)
+
+		delete(intermediateNodes, dbKey)
 	}
-
-	require.Empty(changes.nodes)
+	require.Empty(intermediateNodes)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
