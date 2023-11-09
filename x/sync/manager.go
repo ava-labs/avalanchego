@@ -434,10 +434,32 @@ func (m *Manager) findNextKey(
 
 	nextKey := maybe.Nothing[[]byte]()
 
+	// Add sentinel node back into the localProofNodes, if it is missing.
+	// Required to ensure that a common node exists in both proofs
+	if len(localProofNodes) > 0 && localProofNodes[0].Key.Length() != 0 {
+		sentinel := merkledb.ProofNode{
+			Children: map[byte]ids.ID{
+				localProofNodes[0].Key.Token(0, m.tokenSize): ids.Empty,
+			},
+		}
+		localProofNodes = append([]merkledb.ProofNode{sentinel}, localProofNodes...)
+	}
+
+	// Add sentinel node back into the endProof, if it is missing.
+	// Required to ensure that a common node exists in both proofs
+	if len(endProof) > 0 && endProof[0].Key.Length() != 0 {
+		sentinel := merkledb.ProofNode{
+			Children: map[byte]ids.ID{
+				endProof[0].Key.Token(0, m.tokenSize): ids.Empty,
+			},
+		}
+		endProof = append([]merkledb.ProofNode{sentinel}, endProof...)
+	}
+
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(endProof) - 1
 
-	// traverse the two proofs from the deepest nodes up to the root until a difference is found
+	// traverse the two proofs from the deepest nodes up to the sentinel node until a difference is found
 	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := endProof[receivedProofNodeIndex]
