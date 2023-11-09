@@ -28,5 +28,7 @@ func GenerateTestNodeID() NodeID {
 // It must not be used in production code. In production code we should
 // use ToNodeID, which performs proper length checking.
 func BuildTestNodeID(src []byte) NodeID {
-	return NodeID(src)
+	res := NodeID{}
+	copy(res[:], src)
+	return res
 }

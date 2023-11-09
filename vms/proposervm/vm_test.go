@@ -900,7 +900,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			{1}: {
-				NodeID: ids.NodeID{1},
+				NodeID: ids.BuildTestNodeID([]byte{1}),
 				Weight: 100,
 			},
 		}, nil
