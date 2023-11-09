@@ -99,7 +99,7 @@ type Staker struct {
 }
 
 // GenesisValidator should to be used for genesis validators only.
-type GenesisValidator = Staker
+type GenesisValidator Staker
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
