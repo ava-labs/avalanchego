@@ -56,7 +56,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	genesisState, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis()
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
@@ -69,7 +69,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	s, err := state.New(
 		db,
-		genesisState,
+		genesis,
 		prometheus.NewRegistry(),
 		&config.Config{
 			Validators: vdrs,

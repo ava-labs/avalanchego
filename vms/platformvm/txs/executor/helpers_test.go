@@ -182,7 +182,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisState, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis()
 	if err != nil {
 		panic(err)
 	}
@@ -190,7 +190,7 @@ func defaultState(
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
-		genesisState,
+		genesis,
 		prometheus.NewRegistry(),
 		cfg,
 		execCfg,
