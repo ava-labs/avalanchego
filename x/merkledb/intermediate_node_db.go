@@ -155,5 +155,5 @@ func (db *intermediateNodeDB) Clear() error {
 		db.nodeCache.size,
 		db.nodeCache.onEviction,
 	)
-	return database.AtomicClearPrefix(db.baseDB, db.baseDB, valueNodePrefix)
+	return database.AtomicClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix)
 }

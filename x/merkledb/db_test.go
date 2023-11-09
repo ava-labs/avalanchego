@@ -804,7 +804,7 @@ func TestMerkleDBClear(t *testing.T) {
 	defer iter.Release()
 	require.False(iter.Next())
 	require.Equal(emptyRootID, db.getMerkleRoot())
-	require.Equal(emptyKey, db.root.key)
+	require.Equal(emptyKey, db.sentinelNode.key)
 
 	// Assert caches are empty.
 	require.Zero(db.valueNodeDB.nodeCache.Len())
