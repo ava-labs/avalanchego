@@ -30,6 +30,8 @@ import (
 
 const defaultHistoryLength = 300
 
+var emptyKey Key
+
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
 	db, err := New(ctx, db, config)
@@ -794,14 +796,91 @@ func TestMerkleDBClear(t *testing.T) {
 		0.25,
 	)
 
+	// Write intermediate nodes to disk so that we can copy the
+	// state to inspect later.
+	require.NoError(db.intermediateNodeDB.Flush())
+
+	// Record the key-value pairs that exist.
+	var (
+		valueKeys = []Key{}
+		values    = [][]byte{}
+		valueIter = db.NewIterator()
+	)
+	for valueIter.Next() {
+		valueKeys = append(valueKeys, ToKey(valueIter.Key()))
+		values = append(values, valueIter.Value())
+	}
+	valueIter.Release()
+
+	var (
+		intermediateNodeKeys  = []Key{}
+		intermediateNodeIter  = db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
+		intermediateNodeBytes = [][]byte{}
+	)
+	for intermediateNodeIter.Next() {
+		rawKey := intermediateNodeIter.Key()
+
+		// Remove the intermediate node prefix.
+		rawKey = rawKey[len(intermediateNodePrefix):]
+
+		// Convert to a key
+		key := ToKey(rawKey)
+
+		// Strip the padding
+		key = key.Take(key.length - db.tokenSize)
+
+		intermediateNodeKeys = append(intermediateNodeKeys, key)
+		intermediateNodeBytes = append(intermediateNodeBytes, intermediateNodeIter.Value())
+	}
+
 	// Clear the database.
 	require.NoError(db.Clear())
 
 	// Assert that the database is empty.
-	iter := db.NewIterator()
-	defer iter.Release()
-	require.False(iter.Next())
+	valueIter = db.NewIterator()
+	defer valueIter.Release()
+	require.False(valueIter.Next())
 	require.Equal(emptyRootID, db.getMerkleRoot())
+	require.Equal(emptyKey, db.root.key)
+
+	// Assert value nodes and value changes were recorded.
+	changes, ok := db.history.lastChanges[emptyRootID]
+	require.True(ok)
+	require.Len(changes.values, len(valueKeys))
+	for i, valueKey := range valueKeys {
+		valueChange, ok := changes.values[valueKey]
+		require.True(ok)
+		require.True(valueChange.after.IsNothing())
+		// Use bytes.Equal so nil and empty byte slices are treated the same.
+		require.True(bytes.Equal(values[i], valueChange.before.Value()))
+
+		nodeChange, ok := changes.nodes[valueKey]
+		require.True(ok)
+
+		if valueKey == emptyKey {
+			// The root had a value. The root should
+			// still exist after clearing the database.
+			require.NotNil(nodeChange.after)
+		} else {
+			require.Nil(nodeChange.after)
+		}
+
+		delete(changes.nodes, valueKey)
+	}
+
+	for i, intermediateNodeKey := range intermediateNodeKeys {
+		nodeChange, ok := changes.nodes[intermediateNodeKey]
+		require.True(ok, i) // todo remove i
+
+		expectedNode, err := parseNode(intermediateNodeKey, intermediateNodeBytes[i])
+		require.NoError(err)
+
+		require.Equal(expectedNode, nodeChange.before)
+
+		delete(changes.nodes, intermediateNodeKey)
+	}
+
+	require.Empty(changes.nodes)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {

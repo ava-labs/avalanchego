@@ -1260,7 +1260,6 @@ func (db *merkleDB) Clear() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	// TODO is it faster to clear another way?
 	keysToDelete, err := db.getKeysNotInSet(maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), set.Set[string]{})
 	if err != nil {
 		return err
