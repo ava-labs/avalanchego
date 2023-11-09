@@ -116,7 +116,8 @@ type RangeProofer interface {
 }
 
 type Clearer interface {
-	// Deletes all key/value pairs from the database.
+	// Deletes all key/value pairs from the database
+	// and clears the change history.
 	Clear() error
 }
 
