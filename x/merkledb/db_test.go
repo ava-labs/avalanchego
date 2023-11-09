@@ -792,7 +792,7 @@ func TestMerkleDBClear(t *testing.T) {
 		require,
 		r,
 		[]database.Database{db},
-		10, // todo make 1000
+		1_000,
 		0.25,
 	)
 
