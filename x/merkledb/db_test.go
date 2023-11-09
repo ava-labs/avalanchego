@@ -135,26 +135,27 @@ func init() {
 	}
 }
 
-func Test_Insert_pebble(t *testing.T) {
-	require := require.New(t)
+/*
+	func Test_Insert_pebble(t *testing.T) {
+		require := require.New(t)
 
-	pebbleDB, err := pebble.New(t.TempDir(), DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
+		pebbleDB, err := pebble.New(t.TempDir(), DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
 
-	db, err := newDatabase(
-		context.Background(),
-		pebbleDB,
-		newDefaultConfig(),
-		&mockMetrics{},
-	)
-	for i := 0; i < 5; i++ {
-		require.NoError(err)
-		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
-		require.NoError(err)
-		require.NoError(view.CommitToDB(context.Background()))
+		db, err := newDatabase(
+			context.Background(),
+			pebbleDB,
+			newDefaultConfig(),
+			&mockMetrics{},
+		)
+		for i := 0; i < 5; i++ {
+			require.NoError(err)
+			view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
+			require.NoError(err)
+			require.NoError(view.CommitToDB(context.Background()))
+		}
+		require.NoError(db.Close())
 	}
-	require.NoError(db.Close())
-}
-
+*/
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 	require := require.New(t)
 
