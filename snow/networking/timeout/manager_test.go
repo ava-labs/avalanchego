@@ -39,7 +39,7 @@ func TestManagerFire(t *testing.T) {
 	wg.Add(1)
 
 	manager.RegisterRequest(
-		ids.NodeID{},
+		ids.EmptyNodeID,
 		ids.ID{},
 		true,
 		ids.RequestID{},
