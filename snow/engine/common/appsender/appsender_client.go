@@ -53,7 +53,7 @@ func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	i := 0
 	for nodeID := range nodeIDs {
 		nodeID := nodeID // Prevent overwrite in next iteration
-		nodeIDsBytes[i] = nodeID[:]
+		nodeIDsBytes[i] = nodeID.Bytes()
 		i++
 	}
 	_, err := c.client.SendAppRequest(
@@ -71,7 +71,7 @@ func (c *Client) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	_, err := c.client.SendAppResponse(
 		ctx,
 		&appsenderpb.SendAppResponseMsg{
-			NodeId:    nodeID[:],
+			NodeId:    nodeID.Bytes(),
 			RequestId: requestID,
 			Response:  response,
 		},
@@ -94,7 +94,7 @@ func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.
 	i := 0
 	for nodeID := range nodeIDs {
 		nodeID := nodeID // Prevent overwrite in next iteration
-		nodeIDsBytes[i] = nodeID[:]
+		nodeIDsBytes[i] = nodeID.Bytes()
 		i++
 	}
 	_, err := c.client.SendAppGossipSpecific(
