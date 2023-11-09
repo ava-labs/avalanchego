@@ -23,7 +23,7 @@ func TestByStartTime(t *testing.T) {
 
 	utx0 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.ShortNodeID{0},
+			NodeID: ids.BuildTestShortNodeID([]byte{0}),
 			Start:  uint64(baseTime.Unix()) + 1,
 			End:    uint64(baseTime.Unix()) + 1,
 		},
@@ -34,7 +34,7 @@ func TestByStartTime(t *testing.T) {
 
 	utx1 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.ShortNodeID{1},
+			NodeID: ids.BuildTestShortNodeID([]byte{1}),
 			Start:  uint64(baseTime.Unix()) + 2,
 			End:    uint64(baseTime.Unix()) + 2,
 		},
@@ -45,7 +45,7 @@ func TestByStartTime(t *testing.T) {
 
 	utx2 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.ShortNodeID{1},
+			NodeID: ids.BuildTestShortNodeID([]byte{1}),
 			Start:  uint64(baseTime.Unix()) + 3,
 			End:    uint64(baseTime.Unix()) + 3,
 		},

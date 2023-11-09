@@ -16,9 +16,9 @@ import (
 func TestSet(t *testing.T) {
 	require := require.New(t)
 
-	id0 := ids.BuildTestShortNodeID([]byte{0})
-	id1 := ids.BuildTestShortNodeID([]byte{1})
-	id2 := ids.BuildTestShortNodeID([]byte{2})
+	id0 := ids.BuildTestNodeID([]byte{0})
+	id1 := ids.BuildTestNodeID([]byte{1})
+	id2 := ids.BuildTestNodeID([]byte{2})
 
 	ip0 := ips.IPPort{
 		IP:   net.IPv4zero,
@@ -45,38 +45,38 @@ func TestSet(t *testing.T) {
 
 	require.NoError(s.Add(b0))
 
-	require.Equal("NodeID-111111111111111111116DBWJs", s.IDsArg())
+	require.Equal("NodeID-11111111111111111111111111111111LpoYY", s.IDsArg())
 	require.Equal("0.0.0.0:0", s.IPsArg())
 	require.Equal(1, s.Len())
 
 	err := s.Add(b0)
 	require.ErrorIs(err, errDuplicateID)
 
-	require.Equal("NodeID-111111111111111111116DBWJs", s.IDsArg())
+	require.Equal("NodeID-11111111111111111111111111111111LpoYY", s.IDsArg())
 	require.Equal("0.0.0.0:0", s.IPsArg())
 	require.Equal(1, s.Len())
 
 	require.NoError(s.Add(b1))
 
-	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", s.IDsArg())
+	require.Equal("NodeID-11111111111111111111111111111111LpoYY,NodeID-SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg", s.IDsArg())
 	require.Equal("0.0.0.0:0,0.0.0.0:1", s.IPsArg())
 	require.Equal(2, s.Len())
 
 	require.NoError(s.Add(b2))
 
-	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt,NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", s.IDsArg())
+	require.Equal("NodeID-11111111111111111111111111111111LpoYY,NodeID-SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg,NodeID-t64jLxDRmxo8y48WjbRALPAZuSDZ6qPVaaeDzxHA4oSojhLt", s.IDsArg())
 	require.Equal("0.0.0.0:0,0.0.0.0:1,0.0.0.0:2", s.IPsArg())
 	require.Equal(3, s.Len())
 
 	require.NoError(s.RemoveByID(b0.ID()))
 
-	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", s.IDsArg())
+	require.Equal("NodeID-t64jLxDRmxo8y48WjbRALPAZuSDZ6qPVaaeDzxHA4oSojhLt,NodeID-SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg", s.IDsArg())
 	require.Equal("0.0.0.0:2,0.0.0.0:1", s.IPsArg())
 	require.Equal(2, s.Len())
 
 	require.NoError(s.RemoveByIP(b1.IP()))
 
-	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", s.IDsArg())
+	require.Equal("NodeID-t64jLxDRmxo8y48WjbRALPAZuSDZ6qPVaaeDzxHA4oSojhLt", s.IDsArg())
 	require.Equal("0.0.0.0:2", s.IPsArg())
 	require.Equal(1, s.Len())
 }

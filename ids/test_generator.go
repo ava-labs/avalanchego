@@ -43,10 +43,8 @@ func BuildTestNodeID(src []byte) NodeID {
 // BuildNodeID is an utility to build NodeID from bytes in UTs
 // It must not be used in production code. In production code we should
 // use ToNodeID, which performs proper length checking.
-func BuildTestShortNodeID(src []byte) NodeID {
-	bytes := make([]byte, ShortNodeIDLen)
-	copy(bytes, src)
-	return NodeID{
-		buf: string(bytes),
-	}
+func BuildTestShortNodeID(src []byte) ShortNodeID {
+	res := ShortNodeID{}
+	copy(res[:], src)
+	return res
 }

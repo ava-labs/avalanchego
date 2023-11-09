@@ -21,11 +21,11 @@ var (
 	blkID3 = ids.ID{3}
 	blkID4 = ids.ID{4}
 
-	vdr1 = ids.BuildTestShortNodeID([]byte{0x01})
-	vdr2 = ids.BuildTestShortNodeID([]byte{0x02})
-	vdr3 = ids.BuildTestShortNodeID([]byte{0x03})
-	vdr4 = ids.BuildTestShortNodeID([]byte{0x04})
-	vdr5 = ids.BuildTestShortNodeID([]byte{0x05}) // k = 5
+	vdr1 = ids.BuildTestNodeID([]byte{0x01})
+	vdr2 = ids.BuildTestNodeID([]byte{0x02})
+	vdr3 = ids.BuildTestNodeID([]byte{0x03})
+	vdr4 = ids.BuildTestNodeID([]byte{0x04})
+	vdr5 = ids.BuildTestNodeID([]byte{0x05}) // k = 5
 )
 
 func TestNewSetErrorOnPollsMetrics(t *testing.T) {
@@ -260,7 +260,7 @@ func TestSetString(t *testing.T) {
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag[ids.NodeID]: (Size = 1)
-            NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
+            NodeID-SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1
         received Bag[ids.ID]: (Size = 0)`
 	require.True(s.Add(0, vdrs))
 	require.Equal(expected, s.String())
