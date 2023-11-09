@@ -65,7 +65,7 @@ var (
 )
 
 type VM struct {
-	network.Atomic
+	common.AtomicAppHandler
 
 	config.Config
 
@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
-	vm.Atomic = network.NewAtomic(noopMessageHandler)
+	vm.AtomicAppHandler = common.NewAtomicAppHandler(noopMessageHandler)
 
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
@@ -435,7 +435,7 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	// Note: It's important only to switch the networking stack after the full
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
-	vm.Atomic.Set(vm.network)
+	vm.AtomicAppHandler.Set(vm.network)
 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)

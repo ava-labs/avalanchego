@@ -1,36 +1,35 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package common
 
 import (
 	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ Atomic = (*atomic)(nil)
+var _ AtomicAppHandler = (*atomicAppHandler)(nil)
 
-type Atomic interface {
-	common.AppHandler
+type AtomicAppHandler interface {
+	AppHandler
 
-	Set(common.AppHandler)
+	Set(AppHandler)
 }
 
-type atomic struct {
-	handler utils.Atomic[common.AppHandler]
+type atomicAppHandler struct {
+	handler utils.Atomic[AppHandler]
 }
 
-func NewAtomic(h common.AppHandler) Atomic {
-	a := &atomic{}
+func NewAtomicAppHandler(h AppHandler) AtomicAppHandler {
+	a := &atomicAppHandler{}
 	a.handler.Set(h)
 	return a
 }
 
-func (a *atomic) CrossChainAppRequest(
+func (a *atomicAppHandler) CrossChainAppRequest(
 	ctx context.Context,
 	chainID ids.ID,
 	requestID uint32,
@@ -47,7 +46,7 @@ func (a *atomic) CrossChainAppRequest(
 	)
 }
 
-func (a *atomic) CrossChainAppRequestFailed(
+func (a *atomicAppHandler) CrossChainAppRequestFailed(
 	ctx context.Context,
 	chainID ids.ID,
 	requestID uint32,
@@ -60,7 +59,7 @@ func (a *atomic) CrossChainAppRequestFailed(
 	)
 }
 
-func (a *atomic) CrossChainAppResponse(
+func (a *atomicAppHandler) CrossChainAppResponse(
 	ctx context.Context,
 	chainID ids.ID,
 	requestID uint32,
@@ -75,7 +74,7 @@ func (a *atomic) CrossChainAppResponse(
 	)
 }
 
-func (a *atomic) AppRequest(
+func (a *atomicAppHandler) AppRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -92,7 +91,7 @@ func (a *atomic) AppRequest(
 	)
 }
 
-func (a *atomic) AppRequestFailed(
+func (a *atomicAppHandler) AppRequestFailed(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -105,7 +104,7 @@ func (a *atomic) AppRequestFailed(
 	)
 }
 
-func (a *atomic) AppResponse(
+func (a *atomicAppHandler) AppResponse(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -120,7 +119,7 @@ func (a *atomic) AppResponse(
 	)
 }
 
-func (a *atomic) AppGossip(
+func (a *atomicAppHandler) AppGossip(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	msg []byte,
@@ -133,6 +132,6 @@ func (a *atomic) AppGossip(
 	)
 }
 
-func (a *atomic) Set(h common.AppHandler) {
+func (a *atomicAppHandler) Set(h AppHandler) {
 	a.handler.Set(h)
 }
