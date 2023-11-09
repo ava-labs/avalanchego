@@ -50,12 +50,6 @@ type ClientOptions struct {
 	NodeSampler NodeSampler
 }
 
-// peers contains a set of nodes that we are connected to.
-type peers struct {
-	lock  sync.RWMutex
-	peers set.SampleableSet[ids.NodeID]
-}
-
 // NewNetwork returns an instance of Network
 func NewNetwork(
 	log logging.Logger,
