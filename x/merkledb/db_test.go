@@ -104,9 +104,11 @@ func Test_Insert(t *testing.T) {
 		newDefaultConfig(),
 		&mockMetrics{},
 	)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		require.NoError(err)
 		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
+		require.NoError(err)
+		_, err = view.GetMerkleRoot(context.Background())
 		require.NoError(err)
 		require.NoError(view.CommitToDB(context.Background()))
 	}
