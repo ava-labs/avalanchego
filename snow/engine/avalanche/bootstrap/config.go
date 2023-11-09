@@ -4,21 +4,23 @@
 package bootstrap
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 )
 
 type Config struct {
-	common.Config
 	common.AllGetsServer
+
+	common.Config
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	VtxBlocked *queue.JobsWithMissing
 	// TxBlocked tracks operations that are blocked on transactions
 	TxBlocked *queue.Jobs
 
-	Manager            vertex.Manager
-	VM                 vertex.LinearizableVM
-	LinearizeOnStartup bool
+	Manager      vertex.Manager
+	VM           vertex.LinearizableVM
+	StopVertexID ids.ID // If this ID is empty, the ID is not well known
 }

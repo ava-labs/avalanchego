@@ -935,16 +935,16 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// create bootstrap gear
-	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
-	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
 	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config:             avalancheCommonCfg,
-		AllGetsServer:      avaGetHandler,
-		VtxBlocked:         vtxBlocker,
-		TxBlocked:          txBlocker,
-		Manager:            vtxManager,
-		VM:                 linearizableVM,
-		LinearizeOnStartup: !specifiedLinearizationTime,
+		Config:        avalancheCommonCfg,
+		AllGetsServer: avaGetHandler,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       vtxManager,
+		VM:            linearizableVM,
+	}
+	if ctx.ChainID == m.XChainID {
+		avalancheBootstrapperConfig.StopVertexID = version.CortinaXChainStopVertexID[ctx.NetworkID]
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
