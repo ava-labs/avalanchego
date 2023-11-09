@@ -443,7 +443,7 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := set.Of(ids.NodeID{1})
+			vdrIDs := set.Of(ids.BuildTestNodeID([]byte{1}))
 
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
