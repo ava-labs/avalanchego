@@ -332,10 +332,10 @@ func TestSetString(t *testing.T) {
 	require := require.New(t)
 
 	nodeID0 := ids.EmptyNodeID
-	nodeID1 := ids.TestNodeIDFromBytes([]byte{
+	nodeID1 := ids.BuildShortNodeID([]byte{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	}, ids.ShortNodeIDLen)
+	})
 
 	s := newSet()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))

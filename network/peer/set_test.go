@@ -17,24 +17,24 @@ func TestSet(t *testing.T) {
 
 	set := NewSet()
 	peer1 := &peer{
-		id:              ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen),
+		id:              ids.BuildNodeID([]byte{0x01}),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
 	}
 	updatedPeer1 := &peer{
-		id:              ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen),
+		id:              ids.BuildNodeID([]byte{0x01}),
 		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 1},
 	}
 	peer2 := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0x02}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0x02}),
 	}
 	unknownPeer := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0xff}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0xff}),
 	}
 	peer3 := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0x03}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0x03}),
 	}
 	peer4 := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0x04}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0x04}),
 	}
 
 	// add of first peer is handled
@@ -104,10 +104,10 @@ func TestSetSample(t *testing.T) {
 	set := NewSet()
 
 	peer1 := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0x01}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0x01}),
 	}
 	peer2 := &peer{
-		id: ids.TestNodeIDFromBytes([]byte{0x02}, ids.ShortNodeIDLen),
+		id: ids.BuildNodeID([]byte{0x02}),
 	}
 
 	// Case: Empty
