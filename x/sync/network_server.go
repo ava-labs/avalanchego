@@ -39,7 +39,6 @@ const (
 	// TODO: refine this estimate. This is almost certainly a large overestimate.
 	estimatedMessageOverhead = 4 * units.KiB
 	maxByteSizeLimit         = constants.DefaultMaxMessageSize - estimatedMessageOverhead
-	endProofSizeBufferAmount = 2 * units.KiB
 )
 
 var (

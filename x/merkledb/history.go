@@ -49,7 +49,7 @@ type changeSummaryAndInsertNumber struct {
 	insertNumber uint64
 }
 
-// Tracks all of the node and value changes that resulted in the rootID.
+// Tracks all the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	rootID ids.ID
 	nodes  map[Key]*change[*node]

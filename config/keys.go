@@ -34,6 +34,7 @@ const (
 	StakeMintingPeriodKey                              = "stake-minting-period"
 	StakeSupplyCapKey                                  = "stake-supply-cap"
 	DBTypeKey                                          = "db-type"
+	DBReadOnlyKey                                      = "db-read-only"
 	DBPathKey                                          = "db-dir"
 	DBConfigFileKey                                    = "db-config-file"
 	DBConfigContentKey                                 = "db-config-file-content"
