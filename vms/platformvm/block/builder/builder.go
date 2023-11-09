@@ -150,7 +150,15 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if !b.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		b.txExecutorBackend.Ctx.Log.Debug("adding tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+		)
+
 		if err := b.Mempool.Add(tx); err != nil {
+			b.txExecutorBackend.Ctx.Log.Debug("failed to add tx to mempool",
+				zap.Stringer("txID", tx.ID()),
+			)
+
 			return err
 		}
 	}
@@ -175,10 +183,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	// Remove selected txs from mempool now that we are returning the block to
-	// the consensus engine.
-	txs := statelessBlk.Txs()
-	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
