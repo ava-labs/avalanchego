@@ -154,9 +154,9 @@ func initTestProposerVM(
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildNodeID([]byte{1})
-			nodeID2  = ids.BuildNodeID([]byte{2})
-			nodeID3  = ids.BuildNodeID([]byte{3})
+			nodeID1  = ids.BuildTestNodeID([]byte{1})
+			nodeID2  = ids.BuildTestNodeID([]byte{2})
+			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -1167,7 +1167,7 @@ func TestInnerVMRollback(t *testing.T) {
 		return defaultPChainHeight, nil
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		nodeID := ids.BuildNodeID([]byte{1})
+		nodeID := ids.BuildTestNodeID([]byte{1})
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			nodeID: {
 				NodeID: nodeID,
@@ -1823,9 +1823,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildNodeID([]byte{1})
-			nodeID2  = ids.BuildNodeID([]byte{2})
-			nodeID3  = ids.BuildNodeID([]byte{3})
+			nodeID1  = ids.BuildTestNodeID([]byte{1})
+			nodeID2  = ids.BuildTestNodeID([]byte{2})
+			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -2030,9 +2030,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildNodeID([]byte{1})
-			nodeID2  = ids.BuildNodeID([]byte{2})
-			nodeID3  = ids.BuildNodeID([]byte{3})
+			nodeID1  = ids.BuildTestNodeID([]byte{1})
+			nodeID2  = ids.BuildTestNodeID([]byte{2})
+			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
