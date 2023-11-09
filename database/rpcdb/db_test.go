@@ -75,6 +75,13 @@ func FuzzNewIteratorWithPrefix(f *testing.F) {
 	db.closeFn()
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	db := setupDB(f)
+	database.FuzzNewIteratorWithStartAndPrefix(f, db.client)
+
+	db.closeFn()
+}
+
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
