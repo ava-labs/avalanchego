@@ -353,7 +353,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		zap.Stringer("vtxID", stopVertexID),
 	)
 
-	return b.ForceAccepted(ctx, []ids.ID{stopVertexID})
+	return b.ForceAccepted(ctx, nil)
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
