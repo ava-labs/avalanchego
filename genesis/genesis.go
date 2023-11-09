@@ -419,7 +419,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
 			api.GenesisPermissionlessValidator{
-				GenesisStaker: api.GenesisStaker{
+				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,

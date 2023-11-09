@@ -98,9 +98,8 @@ type Staker struct {
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
-// GenesisStaker is structurally identical to Staker. For the time being it is
-// a placeholder type to be used for genesis validators only.
-type GenesisStaker = Staker
+// GenesisValidator should to be used for genesis validators only.
+type GenesisValidator = Staker
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
@@ -136,8 +135,9 @@ type PermissionlessValidator struct {
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
+// GenesisPermissionlessValidator should to be used for genesis validators only.
 type GenesisPermissionlessValidator struct {
-	GenesisStaker
+	GenesisValidator
 	RewardOwner        *Owner       `json:"rewardOwner,omitempty"`
 	DelegationFee      json.Float32 `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32 `json:"exactDelegationFee,omitempty"`
