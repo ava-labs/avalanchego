@@ -98,6 +98,10 @@ type Staker struct {
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
+// GenesisStaker is structurally identical to Staker. For the time being it is
+// a placeholder type to be used for genesis validators only.
+type GenesisStaker = Staker
+
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
 	Locktime  json.Uint64 `json:"locktime"`
@@ -130,6 +134,14 @@ type PermissionlessValidator struct {
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
 	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
+}
+
+type GenesisPermissionlessValidator struct {
+	GenesisStaker
+	RewardOwner        *Owner       `json:"rewardOwner,omitempty"`
+	DelegationFee      json.Float32 `json:"delegationFee"`
+	ExactDelegationFee *json.Uint32 `json:"exactDelegationFee,omitempty"`
+	Staked             []UTXO       `json:"staked,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.
@@ -170,15 +182,15 @@ type Chain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID   ids.ID                    `json:"avaxAssetID"`
-	NetworkID     json.Uint32               `json:"networkID"`
-	UTXOs         []UTXO                    `json:"utxos"`
-	Validators    []PermissionlessValidator `json:"validators"`
-	Chains        []Chain                   `json:"chains"`
-	Time          json.Uint64               `json:"time"`
-	InitialSupply json.Uint64               `json:"initialSupply"`
-	Message       string                    `json:"message"`
-	Encoding      formatting.Encoding       `json:"encoding"`
+	AvaxAssetID   ids.ID                           `json:"avaxAssetID"`
+	NetworkID     json.Uint32                      `json:"networkID"`
+	UTXOs         []UTXO                           `json:"utxos"`
+	Validators    []GenesisPermissionlessValidator `json:"validators"`
+	Chains        []Chain                          `json:"chains"`
+	Time          json.Uint64                      `json:"time"`
+	InitialSupply json.Uint64                      `json:"initialSupply"`
+	Message       string                           `json:"message"`
+	Encoding      formatting.Encoding              `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
