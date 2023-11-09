@@ -82,6 +82,13 @@ type bootstrapper struct {
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU[ids.ID, struct{}]
+
+	// Tracks the last requestID that was used in a request
+	requestID uint32
+}
+
+func (b *bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
 }
 
 func (b *bootstrapper) Clear(context.Context) error {
@@ -313,7 +320,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	b.Config.SharedCfg.RequestID = startReqID
+	b.requestID = startReqID
 
 	// If the network was already linearized, don't attempt to linearize it
 	// again.
@@ -396,10 +403,10 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}
 		validatorID := validatorIDs[0]
-		b.Config.SharedCfg.RequestID++
+		b.requestID++
 
-		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		b.OutstandingRequests.Add(validatorID, b.requestID, vtxID)
+		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
 }
@@ -484,15 +491,9 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
 			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				if !b.Config.SharedCfg.Restarted {
-					b.Ctx.Log.Info("fetched vertices",
-						zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
-					)
-				} else {
-					b.Ctx.Log.Debug("fetched vertices",
-						zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
-					)
-				}
+				b.Ctx.Log.Info("fetched vertices",
+					zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
+				)
 			}
 
 			parents, err := vtx.Parents()
@@ -564,40 +565,29 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *bootstrapper) checkFinish(ctx context.Context) error {
-	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.IsBootstrapped() || len(pendingJobs) > 0 {
+	// If we still need to fetch vertices, we can't finish
+	if len(b.VtxBlocked.MissingIDs()) > 0 {
 		return nil
 	}
 
-	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("executing transactions")
-	} else {
-		b.Ctx.Log.Debug("executing transactions")
-	}
-
+	b.Ctx.Log.Info("executing transactions")
 	_, err := b.TxBlocked.ExecuteAll(
 		ctx,
 		b.Config.Ctx,
 		b,
-		b.Config.SharedCfg.Restarted,
+		false,
 		b.Ctx.TxAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
 	}
 
-	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("executing vertices")
-	} else {
-		b.Ctx.Log.Debug("executing vertices")
-	}
-
+	b.Ctx.Log.Info("executing vertices")
 	_, err = b.VtxBlocked.ExecuteAll(
 		ctx,
 		b.Config.Ctx,
 		b,
-		b.Config.SharedCfg.Restarted,
+		false,
 		b.Ctx.VertexAcceptor,
 	)
 	if err != nil || b.Halted() {
@@ -612,7 +602,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.requestID)
 }
 
 // A vertex is less than another vertex if it is unknown. Ties are broken by

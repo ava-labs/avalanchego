@@ -928,25 +928,16 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config: common.Config{
-			Ctx:                            ctx,
-			Beacons:                        vdrs,
-			SampleK:                        sampleK,
-			StartupTracker:                 startupTracker,
-			Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-			Sender:                         avalancheMessageSender,
-			BootstrapTracker:               sb,
-			Timer:                          h,
-			RetryBootstrap:                 m.RetryBootstrap,
-			RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			SharedCfg:                      &common.SharedConfig{},
-		},
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       vtxManager,
-		VM:            linearizableVM,
+		AllGetsServer:                  avaGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        vdrs,
+		StartupTracker:                 startupTracker,
+		Sender:                         avalancheMessageSender,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		VtxBlocked:                     vtxBlocker,
+		TxBlocked:                      txBlocker,
+		Manager:                        vtxManager,
+		VM:                             linearizableVM,
 	}
 	if ctx.ChainID == m.XChainID {
 		avalancheBootstrapperConfig.StopVertexID = version.CortinaXChainStopVertexID[ctx.NetworkID]

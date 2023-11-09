@@ -62,22 +62,9 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	vm := &vertex.TestVM{}
 	vm.T = t
 
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
 	sender.Default(true)
 	manager.Default(true)
 	vm.Default(true)
-
-	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
@@ -94,29 +81,19 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
 	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, startupTracker)
 
-	commonConfig := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        vdrs,
-		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
-		Alpha:                          totalWeight/2 + 1,
-		StartupTracker:                 startupTracker,
-		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
 	avaGetHandler, err := getter.New(ctx, manager, sender, time.Second, 2000)
 	require.NoError(err)
 
 	return Config{
-		Config:        commonConfig,
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       manager,
-		VM:            vm,
+		AllGetsServer:  avaGetHandler,
+		Ctx:            ctx,
+		Beacons:        vdrs,
+		StartupTracker: startupTracker,
+		Sender:         sender,
+		VtxBlocked:     vtxBlocker,
+		TxBlocked:      txBlocker,
+		Manager:        manager,
+		VM:             vm,
 	}, peer, sender, manager, vm
 }
 
