@@ -816,7 +816,6 @@ func TestMerkleDBClear(t *testing.T) {
 	require.True(ok)
 	require.Empty(change.nodes)
 	require.Empty(change.values)
-
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
