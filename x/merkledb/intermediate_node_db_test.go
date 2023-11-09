@@ -242,12 +242,3 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 
 	require.Zero(db.nodeCache.currentSize)
 }
-
-func TestDeleteMe(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	t.Fatal(db.intermediateNodeDB.constructDBKey(Key{}))
-}
