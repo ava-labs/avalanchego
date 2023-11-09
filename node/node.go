@@ -304,7 +304,7 @@ func (n *Node) initNetworking() error {
 		// a validator. Because each validator needs a txID associated with it,
 		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
-		copy(dummyTxID[:], n.ID[:])
+		copy(dummyTxID[:], n.ID.Bytes())
 
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,

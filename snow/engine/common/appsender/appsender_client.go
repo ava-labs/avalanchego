@@ -92,7 +92,6 @@ func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
-		nodeID := nodeID // Prevent overwrite in next iteration
 		nodeIDsBytes[i] = nodeID.Bytes()
 		i++
 	}
