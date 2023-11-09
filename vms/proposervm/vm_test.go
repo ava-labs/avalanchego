@@ -159,19 +159,19 @@ func initTestProposerVM(
 			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
+			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
+			nodeID1: {
 				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
+			nodeID2: {
 				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
+			nodeID3: {
 				NodeID: nodeID3,
 				Weight: 7,
 			},
@@ -898,9 +898,10 @@ func TestExpiredBuildBlock(t *testing.T) {
 		return defaultPChainHeight, nil
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		nodeID := ids.BuildTestNodeID([]byte{1})
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			{1}: {
-				NodeID: ids.BuildTestNodeID([]byte{1}),
+			nodeID: {
+				NodeID: nodeID,
 				Weight: 100,
 			},
 		}, nil
@@ -1168,7 +1169,7 @@ func TestInnerVMRollback(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		nodeID := ids.BuildTestNodeID([]byte{1})
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			{1}: {
+			nodeID: {
 				NodeID: nodeID,
 				Weight: 100,
 			},
@@ -1827,19 +1828,19 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
+			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
+			nodeID1: {
 				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
+			nodeID2: {
 				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
+			nodeID3: {
 				NodeID: nodeID3,
 				Weight: 7,
 			},
@@ -2034,19 +2035,19 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
+			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
+			nodeID1: {
 				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
+			nodeID2: {
 				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
+			nodeID3: {
 				NodeID: nodeID3,
 				Weight: 7,
 			},

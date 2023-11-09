@@ -1045,19 +1045,19 @@ func initTestRemoteProposerVM(
 			nodeID3  = ids.BuildTestNodeID([]byte{3})
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
+			thisNode: {
 				NodeID: thisNode,
 				Weight: 10,
 			},
-			{1}: {
+			nodeID1: {
 				NodeID: nodeID1,
 				Weight: 5,
 			},
-			{2}: {
+			nodeID2: {
 				NodeID: nodeID2,
 				Weight: 6,
 			},
-			{3}: {
+			nodeID3: {
 				NodeID: nodeID3,
 				Weight: 7,
 			},
