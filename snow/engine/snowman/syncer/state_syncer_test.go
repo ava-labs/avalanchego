@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -45,7 +46,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	nonStateSyncableVM := &block.TestVM{
 		TestVM: common.TestVM{T: t},
 	}
-	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
+	dummyGetter, err := getter.New(commonCfg.Ctx, nonStateSyncableVM, sender, time.Second, 2000)
 	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
@@ -69,7 +70,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 			T: t,
 		},
 	}
-	dummyGetter, err = getter.New(fullVM, *commonCfg)
+	dummyGetter, err = getter.New(commonCfg.Ctx, fullVM, sender, time.Second, 2000)
 	require.NoError(err)
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)

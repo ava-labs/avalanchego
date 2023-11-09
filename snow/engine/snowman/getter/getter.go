@@ -5,10 +5,12 @@ package getter
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -21,16 +23,20 @@ import (
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
+	ctx *snow.ConsensusContext,
 	vm block.ChainVM,
-	commonCfg common.Config,
+	sender common.Sender,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
-		vm:     vm,
-		ssVM:   ssVM,
-		sender: commonCfg.Sender,
-		cfg:    commonCfg,
-		log:    commonCfg.Ctx.Log,
+		vm:                        vm,
+		ssVM:                      ssVM,
+		log:                       ctx.Log,
+		sender:                    sender,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
@@ -38,18 +44,23 @@ func New(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
-		commonCfg.Ctx.Registerer,
+		ctx.Registerer,
 	)
 	return gh, err
 }
 
 type getter struct {
-	vm     block.ChainVM
-	ssVM   block.StateSyncableVM // can be nil
-	sender common.Sender
-	cfg    common.Config
+	vm   block.ChainVM
+	ssVM block.StateSyncableVM // can be nil
 
-	log              logging.Logger
+	log    logging.Logger
+	sender common.Sender
+	// Max time to spend fetching a container and its ancestors when responding
+	// to a GetAncestors
+	maxTimeGetAncestors time.Duration
+	// Max number of containers in an ancestors message sent by this node.
+	maxContainersGetAncestors int
+
 	getAncestorsBlks metric.Averager
 }
 
@@ -153,9 +164,9 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.log,
 		gh.vm,
 		blkID,
-		gh.cfg.AncestorsMaxContainersSent,
+		gh.maxContainersGetAncestors,
 		constants.MaxContainersLen,
-		gh.cfg.MaxTimeGetAncestors,
+		gh.maxTimeGetAncestors,
 	)
 	if err != nil {
 		gh.log.Verbo("dropping GetAncestors message",

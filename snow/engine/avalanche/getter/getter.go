@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -25,12 +26,19 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
-func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer, error) {
+func New(
+	ctx *snow.ConsensusContext,
+	storage vertex.Storage,
+	sender common.Sender,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
+) (common.AllGetsServer, error) {
 	gh := &getter{
-		storage: storage,
-		sender:  commonCfg.Sender,
-		cfg:     commonCfg,
-		log:     commonCfg.Ctx.Log,
+		log:                       ctx.Log,
+		storage:                   storage,
+		sender:                    sender,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
@@ -38,17 +46,18 @@ func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer,
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
-		commonCfg.Ctx.AvalancheRegisterer,
+		ctx.AvalancheRegisterer,
 	)
 	return gh, err
 }
 
 type getter struct {
-	storage vertex.Storage
-	sender  common.Sender
-	cfg     common.Config
+	log                       logging.Logger
+	storage                   vertex.Storage
+	sender                    common.Sender
+	maxTimeGetAncestors       time.Duration
+	maxContainersGetAncestors int
 
-	log              logging.Logger
 	getAncestorsVtxs metric.Averager
 }
 
@@ -106,13 +115,13 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, gh.cfg.AncestorsMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, gh.maxContainersGetAncestors) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := set.Of(vertex.ID())                                         // IDs of vertices that have been in queue before
+	ancestorsBytesLen := 0                                            // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, gh.maxContainersGetAncestors) // vertex and its ancestors in BFS order
+	visited := set.Of(vertex.ID())                                    // IDs of vertices that have been in queue before
 
-	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < gh.maxContainersGetAncestors && len(queue) > 0 && time.Since(startTime) < gh.maxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
