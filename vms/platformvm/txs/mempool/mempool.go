@@ -239,7 +239,7 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	txIter := m.unissuedTxs.NewIterator()
 	for txIter.Next() {
 		tx := txIter.Value()
-		txsSizeSum += tx.Size()
+		txsSizeSum += len(tx.Bytes())
 		if txsSizeSum > maxTxsBytes {
 			break
 		}
@@ -298,8 +298,10 @@ func (m *mempool) deregister(tx *txs.Tx) {
 func DropExpiredStakerTxs(mempool Mempool, minStartTime time.Time) []ids.ID {
 	var droppedTxIDs []ids.ID
 
-	for mempool.HasStakerTx() {
-		tx := mempool.PeekStakerTx()
+	txIter := mempool.GetTxIterator()
+
+	for txIter.Next() {
+		tx := txIter.Value()
 		startTime := tx.Unsigned.(txs.Staker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in

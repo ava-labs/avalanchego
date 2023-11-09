@@ -58,12 +58,12 @@ func (r *remover) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (r *remover) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeTxs(r.tx)
 	return nil
 }
 
 func (r *remover) BaseTx(*txs.BaseTx) error {
-	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeTxs(r.tx)
 	return nil
 }
 

@@ -75,12 +75,12 @@ func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (i *issuer) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) BaseTx(*txs.BaseTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
