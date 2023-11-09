@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -449,7 +448,7 @@ func blockSize(_ ids.ID, blk block.Block) int {
 
 func New(
 	db database.Database,
-	genesisBytes []byte,
+	g *genesis.Genesis,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
@@ -470,7 +469,7 @@ func New(
 		return nil, err
 	}
 
-	if err := s.sync(genesisBytes); err != nil {
+	if err := s.sync(g); err != nil {
 		// Drop any errors on close to return the first error
 		_ = s.Close()
 
@@ -1737,7 +1736,7 @@ func (s *state) Close() error {
 	)
 }
 
-func (s *state) sync(genesis []byte) error {
+func (s *state) sync(g *genesis.Genesis) error {
 	shouldInit, err := s.shouldInit()
 	if err != nil {
 		return fmt.Errorf(
@@ -1749,7 +1748,7 @@ func (s *state) sync(genesis []byte) error {
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := s.init(genesis); err != nil {
+		if err := s.init(g); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
@@ -1766,21 +1765,16 @@ func (s *state) sync(genesis []byte) error {
 	return nil
 }
 
-func (s *state) init(genesisBytes []byte) error {
+func (s *state) init(g *genesis.Genesis) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
-	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	genesisBlock, err := block.NewApricotCommitBlock(g.GenesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
 
-	genesis, err := genesis.Parse(genesisBytes)
-	if err != nil {
-		return err
-	}
-	if err := s.syncGenesis(genesisBlock, genesis); err != nil {
+	if err := s.syncGenesis(genesisBlock, g); err != nil {
 		return err
 	}
 

@@ -19,19 +19,19 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // BenchmarkGetValidatorSet generates 10k diffs and calculates the time to
@@ -58,48 +58,13 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	avaxAssetID := ids.GenerateTestID()
-	genesisTime := time.Now().Truncate(time.Second)
-	genesisEndTime := genesisTime.Add(28 * 24 * time.Hour)
+	var (
+		avaxAssetID    = ids.GenerateTestID()
+		genesisTime    = time.Now().Truncate(time.Second)
+		genesisEndTime = genesisTime.Add(28 * 24 * time.Hour)
+	)
 
-	addr, err := address.FormatBech32(constants.UnitTestHRP, ids.GenerateTestShortID().Bytes())
-	require.NoError(err)
-
-	genesisValidators := []api.PermissionlessValidator{{
-		Staker: api.Staker{
-			StartTime: json.Uint64(genesisTime.Unix()),
-			EndTime:   json.Uint64(genesisEndTime.Unix()),
-			NodeID:    ids.GenerateTestNodeID(),
-		},
-		RewardOwner: &api.Owner{
-			Threshold: 1,
-			Addresses: []string{addr},
-		},
-		Staked: []api.UTXO{{
-			Amount:  json.Uint64(2 * units.KiloAvax),
-			Address: addr,
-		}},
-		DelegationFee: reward.PercentDenominator,
-	}}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
-		UTXOs:         nil,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(genesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
+	genesis := buildGenesisTest(avaxAssetID, genesisTime, genesisEndTime)
 	vdrs := validators.NewManager()
 
 	execConfig, err := config.GetExecutionConfig(nil)
@@ -110,7 +75,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	s, err := state.New(
 		db,
-		genesisBytes,
+		genesis,
 		prometheus.NewRegistry(),
 		&config.Config{
 			Validators: vdrs,
@@ -174,6 +139,56 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}
 
 	b.StopTimer()
+}
+
+func buildGenesisTest(avaxAssetID ids.ID, genesisTime, validatorEndTime time.Time) *genesis.Genesis {
+	addr := ids.GenerateTestShortID()
+	utxo := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 2 * units.KiloAvax,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+
+	owner := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}
+
+	tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: constants.PlatformChainID,
+		}},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  uint64(genesisTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   2 * units.KiloAvax,
+		},
+		StakeOuts:        []*avax.TransferableOutput{utxo},
+		RewardsOwner:     owner,
+		DelegationShares: reward.PercentDenominator,
+	}}
+
+	if err := tx.Initialize(txs.GenesisCodec); err != nil {
+		panic(err)
+	}
+
+	return &genesis.Genesis{
+		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
+		UTXOs:         []*genesis.UTXO{},
+		Validators:    []*txs.Tx{tx},
+		Chains:        nil,
+		Timestamp:     uint64(genesisTime.Unix()),
+		InitialSupply: 360 * units.MegaAvax,
+	}
 }
 
 func addPrimaryValidator(
