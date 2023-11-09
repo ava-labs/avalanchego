@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -23,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+var _ NodeSampler = (*testNodeSampler)(nil)
 
 func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
@@ -219,81 +220,81 @@ func TestAppRequestResponse(t *testing.T) {
 	}
 }
 
-func TestRouterDropMessage(t *testing.T) {
+func TestNetworkDropMessage(t *testing.T) {
 	unregistered := byte(0x0)
 
 	tests := []struct {
 		name        string
-		requestFunc func(router *router) error
+		requestFunc func(network *Network) error
 		err         error
 	}{
 		{
 			name: "drop unregistered app request message",
-			requestFunc: func(router *router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
+			requestFunc: func(network *Network) error {
+				return network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty app request message",
-			requestFunc: func(router *router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
+			requestFunc: func(network *Network) error {
+				return network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
 			},
 			err: nil,
 		},
 		{
 			name: "drop unregistered cross-chain app request message",
-			requestFunc: func(router *router) error {
-				return router.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{unregistered})
+			requestFunc: func(network *Network) error {
+				return network.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty cross-chain app request message",
-			requestFunc: func(router *router) error {
-				return router.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{})
+			requestFunc: func(network *Network) error {
+				return network.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{})
 			},
 			err: nil,
 		},
 		{
 			name: "drop unregistered gossip message",
-			requestFunc: func(router *router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
+			requestFunc: func(network *Network) error {
+				return network.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
 			},
 			err: nil,
 		},
 		{
 			name: "drop empty gossip message",
-			requestFunc: func(router *router) error {
-				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
+			requestFunc: func(network *Network) error {
+				return network.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
 			},
 			err: nil,
 		},
 		{
 			name: "drop unrequested app request failed",
-			requestFunc: func(router *router) error {
-				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
+			requestFunc: func(network *Network) error {
+				return network.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
 			},
 			err: ErrUnrequestedResponse,
 		},
 		{
 			name: "drop unrequested app response",
-			requestFunc: func(router *router) error {
-				return router.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, nil)
+			requestFunc: func(network *Network) error {
+				return network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},
 		{
 			name: "drop unrequested cross-chain request failed",
-			requestFunc: func(router *router) error {
-				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
+			requestFunc: func(network *Network) error {
+				return network.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
 			},
 			err: ErrUnrequestedResponse,
 		},
 		{
 			name: "drop unrequested cross-chain response",
-			requestFunc: func(router *router) error {
-				return router.CrossChainAppResponse(context.Background(), ids.GenerateTestID(), 0, nil)
+			requestFunc: func(network *Network) error {
+				return network.CrossChainAppResponse(context.Background(), ids.GenerateTestID(), 0, nil)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -303,9 +304,9 @@ func TestRouterDropMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			router := newRouter(logging.NoLog{})
+			network := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
 
-			err := tt.requestFunc(router)
+			err := tt.requestFunc(network)
 			require.ErrorIs(err, tt.err)
 		})
 	}
@@ -319,7 +320,11 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	handler := mocks.NewMockHandler(ctrl)
-	sender := &common.SenderTest{}
+	sender := &common.SenderTest{
+		SendAppResponseF: func(context.Context, ids.NodeID, uint32, []byte) error {
+			return nil
+		},
+	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	nodeID := ids.GenerateTestNodeID()
 
@@ -495,4 +500,46 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			require.ErrorIs(err, tt.expected)
 		})
 	}
+}
+
+func TestNodeSamplerClientOption(t *testing.T) {
+	require := require.New(t)
+
+	nodeID := ids.GenerateTestNodeID()
+	sent := make(chan struct{})
+
+	sender := &common.SenderTest{
+		SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
+			require.Len(nodeIDs, 1)
+			require.Contains(nodeIDs, nodeID)
+
+			close(sent)
+			return nil
+		},
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+
+	nodeSampler := &testNodeSampler{
+		sampleF: func(context.Context, int) []ids.NodeID {
+			return []ids.NodeID{nodeID}
+		},
+	}
+
+	client, err := network.RegisterAppProtocol(0x0, nil, WithNodeSampler(nodeSampler))
+	require.NoError(err)
+
+	require.NoError(client.AppRequestAny(context.Background(), []byte("request"), nil))
+	<-sent
+}
+
+type testNodeSampler struct {
+	sampleF func(ctx context.Context, limit int) []ids.NodeID
+}
+
+func (t *testNodeSampler) Sample(ctx context.Context, limit int) []ids.NodeID {
+	if t.sampleF == nil {
+		return nil
+	}
+
+	return t.sampleF(ctx, limit)
 }

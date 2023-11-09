@@ -103,6 +103,7 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
+// Sample returns a pseudo-random sample of up to limit peers
 func (n *Network) Sample(_ context.Context, limit int) []ids.NodeID {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
