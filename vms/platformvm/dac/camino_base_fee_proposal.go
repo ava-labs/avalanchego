@@ -164,7 +164,7 @@ func (p *BaseFeeProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) 
 }
 
 // Will return modified proposal with added vote ignoring allowed voters, original proposal will not be modified!
-func (p *BaseFeeProposalState) ForceAddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) { //nolint:revive
+func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote

@@ -1940,8 +1940,6 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 	}
 	isExpirationTime := expirationTime.Equal(chainTime)
 
-	// TODO@ if chainTime == expirationTime, then all expired proposals must be in tx
-
 	switch {
 	case len(e.Tx.Creds) != 0:
 		return errWrongCredentialsNumber
@@ -1989,10 +1987,6 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 	}
 
 	// processing tx proposal IDs
-
-	// TODO@ what if early finished proposal expires at the finishTx block?
-	// TODO@ meaning that its id will be both in expired and early finished
-	// TODO@ prevent failing
 
 	for _, proposalID := range tx.EarlyFinishedSuccessfulProposalIDs {
 		proposal, err := e.State.GetProposal(proposalID)

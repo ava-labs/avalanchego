@@ -12,10 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const (
-	addMemberProposalDuration     = uint64(time.Hour * 24 * 30 * 2 / time.Second) // 2 month
-	addMemberProposalOptionsCount = 2
-)
+const AddMemberProposalDuration = uint64(time.Hour * 24 * 30 * 2 / time.Second) // 2 month
 
 var (
 	_ Proposal      = (*AddMemberProposal)(nil)
@@ -44,8 +41,8 @@ func (p *AddMemberProposal) Verify() error {
 	switch {
 	case p.Start >= p.End:
 		return errEndNotAfterStart
-	case p.End-p.Start != addMemberProposalDuration:
-		return fmt.Errorf("%w (expected: %d, actual: %d)", errWrongDuration, addMemberProposalDuration, p.End-p.Start)
+	case p.End-p.Start != AddMemberProposalDuration:
+		return fmt.Errorf("%w (expected: %d, actual: %d)", errWrongDuration, AddMemberProposalDuration, p.End-p.Start)
 	}
 	return nil
 }
@@ -157,7 +154,7 @@ func (p *AddMemberProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote
 }
 
 // Will return modified proposal with added vote ignoring allowed voters, original proposal will not be modified!
-func (p *AddMemberProposalState) ForceAddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) { //nolint:revive
+func (p *AddMemberProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote
