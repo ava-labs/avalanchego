@@ -28,7 +28,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	}
 	weight := json.Uint64(987654321)
 	validator := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			EndTime: 15,
 			Weight:  weight,
 			NodeID:  nodeID,
@@ -72,7 +72,7 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	}
 	weight := json.Uint64(0)
 	validator := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			StartTime: 0,
 			EndTime:   15,
 			NodeID:    nodeID,
@@ -117,7 +117,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 	weight := json.Uint64(987654321)
 	validator := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			StartTime: 0,
 			EndTime:   5,
 			NodeID:    nodeID,
@@ -162,7 +162,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 
 	weight := json.Uint64(987654321)
 	validator1 := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
@@ -178,7 +178,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	validator2 := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			StartTime: 3,
 			EndTime:   15,
 			NodeID:    nodeID,
@@ -194,7 +194,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	validator3 := GenesisPermissionlessValidator{
-		GenesisStaker: GenesisStaker{
+		GenesisValidator: GenesisValidator{
 			StartTime: 1,
 			EndTime:   10,
 			NodeID:    nodeID,

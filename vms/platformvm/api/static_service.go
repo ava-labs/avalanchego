@@ -98,10 +98,10 @@ type Staker struct {
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
-// GenesisStaker is very similar to Staker, but it explicitly uses a ShortNodeID
-// GenesisStaker should be used to generate genesis content only.
+// GenesisValidator is very similar to Staker, but it explicitly uses a ShortNodeID
+// GenesisValidator should be used to generate genesis content only.
 // APIs should use Staker struct only
-type GenesisStaker struct {
+type GenesisValidator struct {
 	TxID      ids.ID          `json:"txID"`
 	StartTime json.Uint64     `json:"startTime"`
 	EndTime   json.Uint64     `json:"endTime"`
@@ -141,10 +141,9 @@ type PermissionlessValidator struct {
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
+// GenesisPermissionlessValidator should to be used for genesis validators only.
 type GenesisPermissionlessValidator struct {
-	GenesisStaker
-	// Deprecated: RewardOwner has been replaced by ValidationRewardOwner and
-	//             DelegationRewardOwner.
+	GenesisValidator
 	RewardOwner        *Owner       `json:"rewardOwner,omitempty"`
 	DelegationFee      json.Float32 `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32 `json:"exactDelegationFee,omitempty"`

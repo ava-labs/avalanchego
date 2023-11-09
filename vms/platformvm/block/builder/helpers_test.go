@@ -363,7 +363,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisStaker: api.GenesisStaker{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
