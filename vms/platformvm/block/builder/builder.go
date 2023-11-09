@@ -244,36 +244,6 @@ func (b *builder) ResetBlockTimer() {
 	b.timer.SetTimeoutIn(0)
 }
 
-// dropExpiredStakerTxs drops add validator/delegator transactions in the
-// mempool whose start time is not sufficiently far in the future
-// (i.e. within local time plus [MaxFutureStartFrom]).
-func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
-	minStartTime := timestamp.Add(txexecutor.SyncBound)
-	for b.Mempool.HasStakerTx() {
-		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
-		if !startTime.Before(minStartTime) {
-			// The next proposal tx in the mempool starts sufficiently far in
-			// the future.
-			return
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		b.Mempool.Remove([]*txs.Tx{tx})
-		b.Mempool.MarkDropped(txID, err) // cache tx as dropped
-		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
-}
-
 func (b *builder) setNextBuildBlockTime() {
 	ctx := b.txExecutorBackend.Ctx
 
@@ -368,7 +338,13 @@ func buildBlock(
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredStakerTxs(timestamp)
+	droppedStakerTxIDs := mempool.DropExpiredStakerTxs(builder.Mempool, timestamp.Add(txexecutor.SyncBound))
+	for _, txID := range droppedStakerTxIDs {
+		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+	}
 
 	// If there is no reason to build a block, don't.
 	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
