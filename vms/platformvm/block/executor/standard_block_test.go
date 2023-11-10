@@ -364,38 +364,38 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	// Staker4:            |------------------------|
 	// Staker5:                                 |--------------------|
 	staker1 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xf1}),
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
 		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xf2}),
 		startTime:     staker1.startTime.Add(1 * time.Minute),
 		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
 	}
 	staker3 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xf3}),
 		startTime:     staker2.startTime.Add(1 * time.Minute),
 		endTime:       staker2.endTime.Add(1 * time.Minute),
 	}
 	staker3Sub := staker{
-		nodeID:        staker3.nodeID,
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xff}),
 		startTime:     staker3.startTime.Add(1 * time.Minute),
 		endTime:       staker3.endTime.Add(-1 * time.Minute),
 	}
 	staker4 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf4}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xf4}),
 		startTime:     staker3.startTime,
 		endTime:       staker3.endTime,
 	}
 	staker5 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf5}),
+		rewardAddress: ids.BuildTestShortID([]byte{0xf5}),
 		startTime:     staker2.endTime,
 		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
 	}
