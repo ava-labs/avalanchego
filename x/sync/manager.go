@@ -8,12 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
-	"golang.org/x/exp/maps"
-
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -811,7 +809,10 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte
 		}
 	}
 
-	sortedChildIndices := maps.Keys(childIndices)
+	sortedChildIndices := make([]byte, 0, len(childIndices))
+	for index := range childIndices {
+		sortedChildIndices = append(sortedChildIndices, index)
+	}
 	slices.Sort(sortedChildIndices)
 	var (
 		child1, child2 ids.ID

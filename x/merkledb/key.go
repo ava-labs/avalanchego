@@ -170,6 +170,17 @@ func (k Key) Less(other Key) bool {
 	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }
 
+func (k Key) Compare(other Key) int {
+	switch {
+	case k == other:
+		return 0
+	case k.Less(other):
+		return -1
+	default:
+		return 1
+	}
+}
+
 // Extend returns a new Key that is the in-order aggregation of Key [k] with [keys]
 func (k Key) Extend(keys ...Key) Key {
 	totalBitLength := k.length

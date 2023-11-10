@@ -7,14 +7,13 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -696,11 +695,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}
 
 		// Sort in ascending order by key prefix.
-		serializedPathLess := func(i, j keyAndID) bool {
-			return i.key.Less(j.key)
+		serializedPathCompare := func(i, j keyAndID) int {
+			return i.key.Compare(j.key)
 		}
-		slices.SortFunc(remoteKeyIDs, serializedPathLess)
-		slices.SortFunc(localKeyIDs, serializedPathLess)
+		slices.SortFunc(remoteKeyIDs, serializedPathCompare)
+		slices.SortFunc(localKeyIDs, serializedPathCompare)
 
 		// Filter out keys that are before the last received key
 		findBounds := func(keyIDs []keyAndID) (int, int) {
@@ -738,7 +737,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
 			// See if the keys are different.
 			smaller, bigger := remoteKeyIDs[i], localKeyIDs[i]
-			if serializedPathLess(localKeyIDs[i], remoteKeyIDs[i]) {
+			if serializedPathCompare(localKeyIDs[i], remoteKeyIDs[i]) == -1 {
 				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
 
@@ -1194,8 +1193,8 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		}
 		i++
 	}
-	slices.SortFunc(allKeys, func(a, b []byte) bool {
-		return bytes.Compare(a, b) < 0
+	slices.SortFunc(allKeys, func(a, b []byte) int {
+		return bytes.Compare(a, b)
 	})
 	return db, allKeys, batch.Write()
 }
