@@ -53,10 +53,7 @@ func NewManager(
 			validators:   validatorManager,
 			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
-		rejector: &rejector{
-			backend:         backend,
-			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
-		},
+		regossipRejectedBlockTxs: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 	}
 }
 
@@ -64,7 +61,8 @@ type manager struct {
 	*backend
 	verifier block.Visitor
 	acceptor block.Visitor
-	rejector block.Visitor
+
+	regossipRejectedBlockTxs bool
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -81,7 +79,8 @@ func (m *manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
 
 func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	return &Block{
-		manager: m,
-		Block:   blk,
+		manager:                  m,
+		Block:                    blk,
+		regossipRejectedBlockTxs: m.regossipRejectedBlockTxs,
 	}
 }

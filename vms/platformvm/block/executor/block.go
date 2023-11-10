@@ -24,7 +24,9 @@ var (
 // Exported for testing in platformvm package.
 type Block struct {
 	block.Block
-	manager *manager
+	manager                  *manager
+	rejected                 bool
+	regossipRejectedBlockTxs bool
 }
 
 func (b *Block) Verify(context.Context) error {
@@ -42,7 +44,33 @@ func (b *Block) Accept(context.Context) error {
 }
 
 func (b *Block) Reject(context.Context) error {
-	return b.Visit(b.manager.rejector)
+	blkID := b.ID()
+	defer b.manager.free(blkID)
+
+	b.manager.ctx.Log.Verbo(
+		"rejecting block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parentID", b.Parent()),
+	)
+
+	if !b.regossipRejectedBlockTxs {
+		return nil
+	}
+
+	for _, tx := range b.Txs() {
+		if err := b.manager.Mempool.Add(tx); err != nil {
+			b.manager.ctx.Log.Debug(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
+		}
+	}
+
+	b.rejected = true
+	return nil
 }
 
 func (b *Block) Status() choices.Status {
