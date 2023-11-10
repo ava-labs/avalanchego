@@ -53,7 +53,6 @@ func NewManager(
 	metrics metrics.Metrics,
 	state states.State,
 	backend *executor.Backend,
-	clk *mockable.Clock,
 	onAccept func(*txs.Tx) error,
 ) Manager {
 	lastAccepted := state.GetLastAccepted()
@@ -62,7 +61,6 @@ func NewManager(
 		state:        state,
 		metrics:      metrics,
 		mempool:      mempool,
-		clk:          clk,
 		onAccept:     onAccept,
 		blkIDToState: map[ids.ID]*blockState{},
 		lastAccepted: lastAccepted,

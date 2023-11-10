@@ -529,7 +529,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	state, err := states.New(baseDB, parser, registerer, trackChecksums)
 	require.NoError(err)
 
-	clk := &mockable.Clock{}
 	onAccept := func(*txs.Tx) error { return nil }
 	now := time.Now()
 	parentTimestamp := now.Add(-2 * time.Second)
@@ -545,11 +544,11 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	manager := blkexecutor.NewManager(mempool, metrics, state, backend, clk, onAccept)
+	manager := blkexecutor.NewManager(mempool, metrics, state, backend, onAccept)
 
 	manager.SetPreference(parentBlk.ID())
 
-	builder := New(backend, manager, clk, mempool)
+	builder := New(backend, manager, &mockable.Clock{}, mempool)
 
 	// show that build block fails if tx is invalid
 	_, err = builder.BuildBlock(context.Background())

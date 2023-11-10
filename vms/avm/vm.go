@@ -218,7 +218,7 @@ func (vm *VM) Initialize(
 
 	codec := vm.parser.Codec()
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
-	vm.Spender = utxo.NewSpender(&vm.clock, codec)
+	vm.Spender = utxo.NewSpender(codec)
 
 	state, err := states.New(
 		vm.db,
@@ -413,7 +413,6 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		vm.metrics,
 		vm.state,
 		vm.txBackend,
-		&vm.clock,
 		vm.onAccept,
 	)
 

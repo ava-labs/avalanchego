@@ -91,12 +91,8 @@ type Spender interface {
 	)
 }
 
-func NewSpender(
-	clk *mockable.Clock,
-	codec codec.Manager,
-) Spender {
+func NewSpender(codec codec.Manager) Spender {
 	return &spender{
-		clock: clk,
 		codec: codec,
 	}
 }
