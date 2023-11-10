@@ -99,7 +99,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(rewardAddress[:])
+	nodeID := genesisNodeIDs[0]
 
 	newValidatorID := ids.GenerateTestNodeID()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
@@ -380,8 +380,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	nodeIDBytes := preFundedKeys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	nodeID := genesisNodeIDs[0]
 	env.config.BanffTime = env.state.GetTimestamp()
 
 	{

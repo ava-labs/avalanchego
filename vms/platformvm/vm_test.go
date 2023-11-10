@@ -100,6 +100,9 @@ var (
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = secp256k1.TestKeys()
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	defaultMinValidatorStake = 5 * units.MilliAvax
 	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
@@ -118,6 +121,15 @@ var (
 
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	for _, key := range keys {
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
+		genesisNodeIDs = append(genesisNodeIDs, nodeID)
+	}
+}
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -175,10 +187,8 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
-	for i, key := range keys {
-		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
@@ -234,7 +244,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	require := require.New(t)
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
-		id := key.Address()
+		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
@@ -244,10 +254,8 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
-	for i, key := range keys {
-		nodeIDBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
@@ -422,10 +430,7 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
-	for _, key := range keys {
-		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
-
+	for _, nodeID := range genesisNodeIDs {
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 		require.True(ok)
 	}
@@ -591,8 +596,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	nodeIDBytes := keys[0].PublicKey().Address()
-	repeatNodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	repeatNodeID := genesisNodeIDs[0]
 
 	startTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
@@ -627,9 +631,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-
-	nodeIDBytes := keys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	nodeID := genesisNodeIDs[0]
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -675,9 +677,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-
-	nodeIDBytes := keys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	nodeID := genesisNodeIDs[0]
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -928,9 +928,8 @@ func TestCreateSubnet(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-	nodeIDBytes := keys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
+	nodeID := genesisNodeIDs[0]
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ // control keys
@@ -1750,8 +1749,7 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeIDBytes := keys[0].PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+	nodeID := genesisNodeIDs[0]
 
 	tests := []struct {
 		description string

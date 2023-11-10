@@ -462,8 +462,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
-	nodeBytes := preFundedKeys[0].Address()
-	subnetValidatorNodeID := ids.BuildTestNodeID(nodeBytes[:])
+	subnetValidatorNodeID := genesisNodeIDs[0]
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
@@ -492,8 +491,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	nodeBytes = preFundedKeys[1].Address()
-	subnetVdr2NodeID := ids.BuildTestNodeID(nodeBytes[:])
+	subnetVdr2NodeID := genesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
@@ -568,8 +566,7 @@ func TestTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			nodeIDBytes := preFundedKeys[0].PublicKey().Address()
-			subnetValidatorNodeID := ids.BuildTestNodeID(nodeIDBytes[:])
+			subnetValidatorNodeID := genesisNodeIDs[0]
 
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)

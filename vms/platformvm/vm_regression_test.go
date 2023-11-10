@@ -1004,12 +1004,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeIDs := make([]ids.NodeID, 0, len(keys))
-	for _, key := range keys {
-		nodeIDBytes := key.PublicKey().Address()
-		nodeIDs = append(nodeIDs, ids.BuildTestNodeID(nodeIDBytes[:]))
-	}
-
+	nodeIDs := genesisNodeIDs
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
