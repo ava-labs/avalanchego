@@ -23,7 +23,7 @@ import (
 
 var errUnknownVertex = errors.New("unknown vertex")
 
-func new(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.SenderTest) {
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 
@@ -47,7 +47,7 @@ func new(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.Sende
 
 func TestAcceptedFrontier(t *testing.T) {
 	require := require.New(t)
-	bs, manager, sender := new(t)
+	bs, manager, sender := newTest(t)
 
 	vtxID := ids.GenerateTestID()
 	manager.EdgeF = func(context.Context) []ids.ID {
@@ -66,7 +66,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
-	bs, manager, sender := new(t)
+	bs, manager, sender := newTest(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
