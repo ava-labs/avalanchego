@@ -496,11 +496,9 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	nodeID := ids.GenerateTestNodeID()
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := secp256k1.NewPrivateKey()
-	nodeBytes := key.PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeBytes[:])
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
