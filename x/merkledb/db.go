@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/semaphore"
 	"runtime"
 	"slices"
 	"sync"
@@ -199,7 +200,7 @@ type merkleDB struct {
 
 	// calculateNodeIDsSema controls the number of goroutines inside
 	// [calculateNodeIDsHelper] at any given time.
-	calculateNodeIDsSema *semaphore
+	calculateNodeIDsSema *semaphore.Weighted
 
 	tokenSize int
 }
@@ -244,7 +245,7 @@ func newDatabase(
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:           make([]*trieView, 0, defaultPreallocationSize),
-		calculateNodeIDsSema: newSemaphore(int32(rootGenConcurrency)),
+		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
 

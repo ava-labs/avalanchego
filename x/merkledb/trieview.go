@@ -248,9 +248,11 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		_ = t.db.calculateNodeIDsSema.Acquire(context.Background())
+		if err = t.db.calculateNodeIDsSema.Acquire(ctx, 1); err != nil {
+			return
+		}
 		t.calculateNodeIDsHelper(t.root)
-		t.db.calculateNodeIDsSema.Release()
+		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.root.id
 
 		// ensure no ancestor changes occurred during execution
@@ -290,10 +292,10 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := t.db.calculateNodeIDsSema.TryAcquire(); ok {
+		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
 			go func() {
 				calculateChildID()
-				t.db.calculateNodeIDsSema.Release()
+				t.db.calculateNodeIDsSema.Release(1)
 			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
