@@ -17,7 +17,7 @@ import (
 const (
 	NodeIDPrefix = "NodeID-"
 
-	LongNodeIDLen = 32
+	NodeIDLen = 32
 )
 
 var (
@@ -88,13 +88,13 @@ func ToNodeID(src []byte) (NodeID, error) {
 	case len(src) == 0:
 		return EmptyNodeID, nil
 
-	case len(src) == ShortIDLen || len(src) == LongNodeIDLen:
+	case len(src) == ShortIDLen || len(src) == NodeIDLen:
 		return NodeID{
 			buf: string(src),
 		}, nil
 
 	default:
-		return EmptyNodeID, fmt.Errorf("%w: expected %d or %d bytes but got %d", ErrBadNodeIDLength, ShortNodeIDLen, LongNodeIDLen, len(src))
+		return EmptyNodeID, fmt.Errorf("%w: expected %d or %d bytes but got %d", ErrBadNodeIDLength, ShortNodeIDLen, NodeIDLen, len(src))
 	}
 }
 
