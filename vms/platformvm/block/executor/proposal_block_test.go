@@ -394,7 +394,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// Staker0 it's here just to allow to issue a proposal block with the chosen endTime.
 	staker0RewardAddress := ids.ShortID{2}
 	staker0 := staker{
-		nodeID:        ids.NodeID(staker0RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker0RewardAddress[:]),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
 		endTime:       time.Time{}, // actual endTime depends on specific test
@@ -402,7 +402,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker1RewardAddress := ids.GenerateTestShortID()
 	staker1 := staker{
-		nodeID:        ids.NodeID(staker1RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker1RewardAddress[:]),
 		rewardAddress: staker1RewardAddress,
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
 		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
@@ -410,7 +410,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker2RewardAddress := ids.ShortID{1}
 	staker2 := staker{
-		nodeID:        ids.NodeID(staker2RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker2RewardAddress[:]),
 		rewardAddress: staker2RewardAddress,
 		startTime:     staker1.startTime.Add(1 * time.Minute),
 		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
@@ -418,7 +418,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker3RewardAddress := ids.GenerateTestShortID()
 	staker3 := staker{
-		nodeID:        ids.NodeID(staker3RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker3RewardAddress[:]),
 		rewardAddress: staker3RewardAddress,
 		startTime:     staker2.startTime.Add(1 * time.Minute),
 		endTime:       staker2.endTime.Add(1 * time.Minute),
@@ -433,7 +433,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker4RewardAddress := ids.GenerateTestShortID()
 	staker4 := staker{
-		nodeID:        ids.NodeID(staker4RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker4RewardAddress[:]),
 		rewardAddress: staker4RewardAddress,
 		startTime:     staker3.startTime,
 		endTime:       staker3.endTime,
@@ -441,7 +441,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 	staker5RewardAddress := ids.GenerateTestShortID()
 	staker5 := staker{
-		nodeID:        ids.NodeID(staker5RewardAddress),
+		nodeID:        ids.BuildTestNodeID(staker5RewardAddress[:]),
 		rewardAddress: staker5RewardAddress,
 		startTime:     staker2.endTime,
 		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
@@ -1147,7 +1147,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeIDKey, _ := secp256k1.NewPrivateKey()
 	rewardAddress := nodeIDKey.PublicKey().Address()
-	nodeID := ids.NodeID(rewardAddress)
+	nodeID := ids.BuildTestNodeID(rewardAddress[:])
 
 	_, err := addPendingValidator(
 		env,
