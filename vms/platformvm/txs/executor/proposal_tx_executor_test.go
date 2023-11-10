@@ -25,7 +25,7 @@ import (
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
-	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(rewardAddress))
+	nodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 
 	newValidatorID := ids.GenerateTestNodeID()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
@@ -288,8 +288,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(preFundedKeys[0].PublicKey().Address()))
-
+	nodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	{
 		// Case: Proposed validator currently validating primary network
 		// but stops validating subnet after stops validating primary network
@@ -353,11 +352,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
-	pendingDSValidatorID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(key.PublicKey().Address()))
-
-	// starts validating primary network 10 seconds after genesis
+	// Starts validating primary network 10 seconds after genesis
+	pendingDSValidatorID := ids.GenerateTestNodeID()
 	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
@@ -784,12 +780,14 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 
 	{
+		nodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
+
 		// Case: Validator already validating primary network
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeIDFromShortNodeID(ids.ShortNodeID(preFundedKeys[0].Address())),
+			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},

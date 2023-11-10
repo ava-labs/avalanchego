@@ -81,13 +81,23 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.ShortNodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	for range preFundedKeys {
+		nodeID := ids.GenerateTestShortNodeID()
+		genesisNodeIDs = append(genesisNodeIDs, nodeID)
+	}
+}
 
 type stakerStatus uint
 
 type staker struct {
-	nodeID             ids.NodeID
+	nodeID             ids.ShortNodeID
 	rewardAddress      ids.ShortID
 	startTime, endTime time.Time
 }
@@ -97,8 +107,8 @@ type test struct {
 	stakers               []staker
 	subnetStakers         []staker
 	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.NodeID]stakerStatus
-	expectedSubnetStakers map[ids.NodeID]stakerStatus
+	expectedStakers       map[ids.ShortNodeID]stakerStatus
+	expectedSubnetStakers map[ids.ShortNodeID]stakerStatus
 }
 
 type environment struct {
@@ -399,9 +409,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.ShortNodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)

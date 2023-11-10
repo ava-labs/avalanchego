@@ -462,9 +462,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
-	shortSubnetValidatorNodeID := ids.ShortNodeID(preFundedKeys[0].PublicKey().Address())
-	subnetValidatorNodeID := ids.NodeIDFromShortNodeID(shortSubnetValidatorNodeID)
-	// Starts after the corre
+	subnetValidatorNodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
@@ -493,7 +491,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(preFundedKeys[1].PublicKey().Address()))
+	subnetVdr2NodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[1])
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
@@ -568,7 +566,7 @@ func TestTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(preFundedKeys[0].PublicKey().Address()))
+			subnetValidatorNodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
@@ -919,17 +917,12 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
-	if err != nil {
-		return nil, err
-	}
-
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(shortNodeID),
+		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		keys,
 		ids.ShortEmpty,
