@@ -74,10 +74,21 @@ func (b *Block) Reject(context.Context) error {
 }
 
 func (b *Block) Status() choices.Status {
+	// If this block's reference was rejected, we should report it as rejected.
+	//
+	// We don't persist the rejection, but that's fine. The consensus engine
+	// will hold the same reference to the block until it no longer needs it.
+	// After the consensus engine has released the reference to the block that
+	// was verified, it may get a new reference that isn't marked as rejected.
+	// The consensus engine may then try to issue the block, but will discover
+	// that it was rejected due to a conflicting block having been accepted.
+	if b.rejected {
+		return choices.Rejected
+	}
+
 	blkID := b.ID()
-	// If this block is an accepted Proposal block with no accepted children, it
-	// will be in [blkIDToState], but we should return accepted, not processing,
-	// so we do this check.
+	// If this block is the last accepted block, we don't need to go to disk to
+	// check the status.
 	if b.manager.lastAccepted == blkID {
 		return choices.Accepted
 	}
