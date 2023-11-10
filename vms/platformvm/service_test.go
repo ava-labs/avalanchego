@@ -494,7 +494,8 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeIDBytes := keys[0].PublicKey().Address()
+	delegatorNodeID := ids.NodeID(nodeIDBytes)
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -626,7 +627,8 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
+	nodeIDBytes := keys[1].PublicKey().Address()
+	validatorNodeID := ids.NodeID(nodeIDBytes)
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 

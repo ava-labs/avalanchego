@@ -20,11 +20,15 @@ var keys = secp256k1.TestKeys()
 func TestBoundedBy(t *testing.T) {
 	require := require.New(t)
 
+	nodeBytes := keys[0].PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
+
 	a := &Validator{
-		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
+		NodeID: nodeID,
 		Start:  aStartTime,
 		End:    aEndTIme,
 		Wght:   defaultWeight,
@@ -33,7 +37,7 @@ func TestBoundedBy(t *testing.T) {
 	bStartTime := uint64(2)
 	bEndTime := uint64(3)
 	b := &Validator{
-		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
+		NodeID: nodeID,
 		Start:  bStartTime,
 		End:    bEndTime,
 		Wght:   defaultWeight,

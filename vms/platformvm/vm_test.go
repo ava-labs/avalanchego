@@ -177,7 +177,8 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.NodeID(nodeBytes[:])
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
@@ -233,7 +234,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	require := require.New(t)
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
-		id := key.PublicKey().Address()
+		id := key.Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
@@ -245,7 +246,8 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+		nodeIDBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
@@ -421,7 +423,9 @@ func TestGenesis(t *testing.T) {
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
 	for _, key := range keys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 		require.True(ok)
 	}
@@ -490,7 +494,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := secp256k1.NewPrivateKey()
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeBytes := key.PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeBytes[:])
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -586,7 +591,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeIDBytes := keys[0].PublicKey().Address()
+	repeatNodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
 	startTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
@@ -621,7 +627,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+
+	nodeIDBytes := keys[0].PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -667,7 +675,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+
+	nodeIDBytes := keys[0].PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -918,8 +928,8 @@ func TestCreateSubnet(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeIDBytes := keys[0].PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
@@ -1740,7 +1750,8 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	nodeIDBytes := keys[0].PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeIDBytes[:])
 
 	tests := []struct {
 		description string

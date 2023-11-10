@@ -477,7 +477,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeBytes := key.PublicKey().Address()
+	nodeID := ids.BuildTestNodeID(nodeBytes[:])
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -1002,22 +1003,22 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID0 := ids.NodeID(keys[0].PublicKey().Address())
-	nodeID1 := ids.NodeID(keys[1].PublicKey().Address())
-	nodeID2 := ids.NodeID(keys[2].PublicKey().Address())
-	nodeID3 := ids.NodeID(keys[3].PublicKey().Address())
-	nodeID4 := ids.NodeID(keys[4].PublicKey().Address())
+	nodeIDs := make([]ids.NodeID, 0, len(keys))
+	for _, key := range keys {
+		nodeIDBytes := key.PublicKey().Address()
+		nodeIDs = append(nodeIDs, ids.BuildTestNodeID(nodeIDBytes[:]))
+	}
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		nodeID0: defaultWeight,
-		nodeID1: defaultWeight,
-		nodeID2: defaultWeight,
-		nodeID3: defaultWeight,
-		nodeID4: defaultWeight,
+		nodeIDs[0]: defaultWeight,
+		nodeIDs[1]: defaultWeight,
+		nodeIDs[2]: defaultWeight,
+		nodeIDs[3]: defaultWeight,
+		nodeIDs[4]: defaultWeight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1111,12 +1112,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		nodeID0: defaultWeight,
-		nodeID1: defaultWeight,
-		nodeID2: defaultWeight,
-		nodeID3: defaultWeight,
-		nodeID4: defaultWeight,
-		nodeID5: vm.MaxValidatorStake,
+		nodeIDs[0]: defaultWeight,
+		nodeIDs[1]: defaultWeight,
+		nodeIDs[2]: defaultWeight,
+		nodeIDs[3]: defaultWeight,
+		nodeIDs[4]: defaultWeight,
+		nodeID5:    vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1152,7 +1153,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	id := key.PublicKey().Address()
+	id := key.Address()
 	changeAddr := keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -1236,7 +1237,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	id := key.PublicKey().Address()
+	id := key.Address()
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(

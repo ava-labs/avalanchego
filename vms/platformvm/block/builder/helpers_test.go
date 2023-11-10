@@ -359,7 +359,8 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{

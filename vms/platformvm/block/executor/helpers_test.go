@@ -401,7 +401,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.NodeID(nodeBytes[:])
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
