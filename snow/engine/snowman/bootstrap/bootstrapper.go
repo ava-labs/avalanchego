@@ -38,6 +38,7 @@ var (
 // called, so it must be guaranteed the VM is not used until after Start.
 type bootstrapper struct {
 	Config
+	common.Halter
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
 	common.StateSummaryFrontierHandler

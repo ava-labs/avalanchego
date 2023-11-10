@@ -36,7 +36,6 @@ var _ Bootstrapper = (*bootstrapper)(nil)
 type Bootstrapper interface {
 	AcceptedFrontierHandler
 	AcceptedHandler
-	Haltable
 	Startup(context.Context) error
 	Restart(ctx context.Context, reset bool) error
 }
@@ -44,7 +43,6 @@ type Bootstrapper interface {
 // It collects mechanisms common to both snowman and avalanche bootstrappers
 type bootstrapper struct {
 	Config
-	Halter
 
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Manager
