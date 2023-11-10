@@ -88,6 +88,7 @@ type environment struct {
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
+	network    Network
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -166,6 +167,14 @@ func newEnvironment(t *testing.T) *environment {
 		res.state,
 		&res.backend,
 		pvalidators.TestManager,
+	)
+
+	res.network = NewNetwork(
+		res.backend.Ctx,
+		res.blkManager,
+		res.mempool,
+		res.backend.Config.PartialSyncPrimaryNetwork,
+		res.sender,
 	)
 
 	res.Builder = New(

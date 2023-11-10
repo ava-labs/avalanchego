@@ -61,6 +61,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
+	blockbuilder.Network
 	validators.State
 
 	metrics            metrics.Metrics
@@ -188,6 +189,13 @@ func (vm *VM) Initialize(
 		vm.state,
 		txExecutorBackend,
 		validatorManager,
+	)
+	vm.Network = blockbuilder.NewNetwork(
+		txExecutorBackend.Ctx,
+		vm.manager,
+		mempool,
+		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+		appSender,
 	)
 	vm.Builder = blockbuilder.New(
 		mempool,
