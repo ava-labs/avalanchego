@@ -290,7 +290,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
-					ids.GenerateTestShortNodeID(),
+					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
@@ -494,7 +494,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	delegatorNodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[0].PublicKey().Address()))
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -546,7 +546,7 @@ func TestGetStake(t *testing.T) {
 	// Make sure this works for pending stakers
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
-	pendingStakerNodeID := ids.GenerateTestShortNodeID()
+	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
@@ -626,7 +626,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.ShortNodeID(keys[1].PublicKey().Address())
+	validatorNodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[1].PublicKey().Address()))
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
@@ -665,7 +665,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != ids.NodeIDFromShortNodeID(validatorNodeID) {
+		if vdr.NodeID != validatorNodeID {
 			continue
 		}
 		found = true
@@ -712,7 +712,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	for _, vdr := range response.Validators {
 		castVdr := vdr.(pchainapi.PermissionlessValidator)
-		if castVdr.NodeID != ids.NodeIDFromShortNodeID(validatorNodeID) {
+		if castVdr.NodeID != validatorNodeID {
 			continue
 		}
 		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))

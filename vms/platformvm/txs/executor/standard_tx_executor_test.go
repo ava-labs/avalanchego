@@ -75,7 +75,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(startTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
-			ids.EmptyShortNodeID,
+			ids.EmptyNodeID,
 			ids.GenerateTestShortID(),
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -99,9 +99,9 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
-	nodeID := ids.ShortNodeID(rewardAddress)
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(rewardAddress))
 
-	newValidatorID := ids.GenerateTestShortNodeID()
+	newValidatorID := ids.GenerateTestNodeID()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
@@ -169,7 +169,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		stakeAmount          uint64
 		startTime            uint64
 		endTime              uint64
-		nodeID               ids.ShortNodeID
+		nodeID               ids.NodeID
 		rewardAddress        ids.ShortID
 		feeKeys              []*secp256k1.PrivateKey
 		setup                func(*environment)
@@ -380,7 +380,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	nodeID := preFundedKeys[0].PublicKey().Address()
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(preFundedKeys[0].PublicKey().Address()))
 	env.config.BanffTime = env.state.GetTimestamp()
 
 	{
@@ -392,7 +392,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,
 			uint64(startTime.Unix()),
 			uint64(defaultValidateEndTime.Unix())+1,
-			ids.ShortNodeID(nodeID),
+			nodeID,
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -420,7 +420,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,
 			uint64(defaultValidateStartTime.Unix()+1),
 			uint64(defaultValidateEndTime.Unix()),
-			ids.ShortNodeID(nodeID),
+			nodeID,
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -442,7 +442,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	pendingDSValidatorID := ids.ShortNodeID(key.PublicKey().Address())
+	pendingDSValidatorID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(key.PublicKey().Address()))
 
 	// starts validating primary network 10 seconds after genesis
 	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
@@ -453,7 +453,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		uint64(dsStartTime.Unix()),   // start time
 		uint64(dsEndTime.Unix()),     // end time
 		pendingDSValidatorID,         // node ID
-		nodeID,                       // reward address
+		ids.GenerateTestShortID(),    // reward address
 		reward.PercentDenominator,    // shares
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
@@ -586,8 +586,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,               // weight
 			uint64(newTimestamp.Unix()), // start time
 			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.ShortNodeID(nodeID), // node ID
-			testSubnet1.ID(),        // subnet ID
+			nodeID,           // node ID
+			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -614,7 +614,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		ids.ShortNodeID(nodeID),                 // node ID
+		nodeID,                                  // node ID
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
@@ -640,7 +640,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,                         // weight
 			uint64(startTime.Unix()),              // start time
 			uint64(defaultValidateEndTime.Unix()), // end time
-			ids.ShortNodeID(nodeID),               // node ID
+			nodeID,                                // node ID
 			testSubnet1.ID(),                      // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
@@ -670,8 +670,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,            // weight
 			uint64(startTime.Unix()), // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.ShortNodeID(nodeID), // node ID
-			testSubnet1.ID(),        // subnet ID
+			nodeID,           // node ID
+			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
@@ -703,8 +703,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,            // weight
 			uint64(startTime.Unix()), // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.ShortNodeID(nodeID),                                 // node ID
-			testSubnet1.ID(),                                        // subnet ID
+			nodeID,           // node ID
+			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
@@ -736,8 +736,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,            // weight
 			uint64(startTime.Unix()), // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.ShortNodeID(nodeID),                                 // node ID
-			testSubnet1.ID(),                                        // subnet ID
+			nodeID,           // node ID
+			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -768,8 +768,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			defaultWeight,              // weight
 			uint64(startTime.Unix())+1, // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.ShortNodeID(nodeID), // node ID
-			testSubnet1.ID(),        // subnet ID
+			nodeID,           // node ID
+			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -808,7 +808,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
 
 	env.config.BanffTime = env.state.GetTimestamp()
 

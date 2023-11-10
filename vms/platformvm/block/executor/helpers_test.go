@@ -480,7 +480,7 @@ func addPendingValidator(
 	env *environment,
 	startTime time.Time,
 	endTime time.Time,
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {

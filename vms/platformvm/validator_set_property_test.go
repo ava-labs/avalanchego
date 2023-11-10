@@ -82,7 +82,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				_ = vm.Shutdown(context.Background())
 				vm.ctx.Lock.Unlock()
 			}()
-			nodeID := ids.GenerateTestShortNodeID()
+			nodeID := ids.GenerateTestNodeID()
 
 			currentTime := defaultGenesisTime
 			vm.clock.Set(currentTime)
@@ -312,6 +312,11 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("could not create secret key: %w", err)
 	}
 
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(data.nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create shortNodeID from nodeID: %w", err)
+	}
+
 	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -320,7 +325,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: data.nodeID,
+			NodeID: shortNodeID,
 			Start:  uint64(data.startTime.Unix()),
 			End:    uint64(data.endTime.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -482,13 +487,13 @@ type validatorInputData struct {
 	eventType uint8
 	startTime time.Time
 	endTime   time.Time
-	nodeID    ids.ShortNodeID
+	nodeID    ids.NodeID
 	publicKey *bls.PublicKey
 }
 
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of validatorInputData
-func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.ShortNodeID) ([]*validatorInputData, error) {
+func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
 	res := make([]*validatorInputData, 0, len(events))
 
 	currentTime = currentTime.Add(txexecutor.SyncBound)
@@ -579,7 +584,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("primary validators are returned in sequence", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestShortNodeID()
+			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence: %s", err.Error())
@@ -631,7 +636,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("subnet validators are returned in sequence", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestShortNodeID()
+			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence: %s", err.Error())
@@ -683,7 +688,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("subnet validators' times are bound by a primary validator's times", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestShortNodeID()
+			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence: %s", err.Error())

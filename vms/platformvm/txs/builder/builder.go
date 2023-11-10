@@ -118,7 +118,7 @@ type ProposalTxBuilder interface {
 		stakeAmount,
 		startTime,
 		endTime uint64,
-		nodeID ids.ShortNodeID,
+		nodeID ids.NodeID,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -136,7 +136,7 @@ type ProposalTxBuilder interface {
 		stakeAmount,
 		startTime,
 		endTime uint64,
-		nodeID ids.ShortNodeID,
+		nodeID ids.NodeID,
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -153,7 +153,7 @@ type ProposalTxBuilder interface {
 		weight,
 		startTime,
 		endTime uint64,
-		nodeID ids.ShortNodeID,
+		nodeID ids.NodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -164,7 +164,7 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for removing the validator
 	// changeAddr: address to send change to, if there is any
 	NewRemoveSubnetValidatorTx(
-		nodeID ids.ShortNodeID,
+		nodeID ids.NodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -453,12 +453,16 @@ func (b *builder) NewAddValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -472,7 +476,7 @@ func (b *builder) NewAddValidatorTx(
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  startTime,
 			End:    endTime,
 			Wght:   stakeAmount,
@@ -496,11 +500,15 @@ func (b *builder) NewAddDelegatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -514,7 +522,7 @@ func (b *builder) NewAddDelegatorTx(
 			Outs:         unlockedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  startTime,
 			End:    endTime,
 			Wght:   stakeAmount,
@@ -537,11 +545,15 @@ func (b *builder) NewAddSubnetValidatorTx(
 	weight,
 	startTime,
 	endTime uint64,
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -563,7 +575,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		}},
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: sNodeID,
 				Start:  startTime,
 				End:    endTime,
 				Wght:   weight,
@@ -580,11 +592,15 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -605,7 +621,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 			Outs:         outs,
 		}},
 		Subnet:     subnetID,
-		NodeID:     nodeID,
+		NodeID:     sNodeID,
 		SubnetAuth: subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

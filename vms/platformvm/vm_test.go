@@ -444,7 +444,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
@@ -474,7 +474,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
 
@@ -491,7 +491,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := secp256k1.NewPrivateKey()
-	nodeID := ids.ShortNodeID(key.PublicKey().Address())
+	sNodeID := ids.ShortNodeID(key.PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(sNodeID)
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -499,7 +500,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		ids.ShortID(sNodeID),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
@@ -544,7 +545,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.GenerateTestShortNodeID()
+	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
@@ -572,7 +573,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -587,7 +588,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	repeatNodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	sRepeatNodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	repeatNodeID := ids.NodeIDFromShortNodeID(sRepeatNodeID)
 
 	startTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
@@ -598,7 +600,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		repeatNodeID,
-		ids.ShortID(repeatNodeID),
+		ids.ShortID(sRepeatNodeID),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
@@ -622,7 +624,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[0].PublicKey().Address()))
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -652,7 +654,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
 	require.NoError(err)
 }
 
@@ -668,7 +670,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	nodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[0].PublicKey().Address()))
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -697,7 +699,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -920,7 +922,7 @@ func TestCreateSubnet(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[0].PublicKey().Address()))
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
@@ -988,7 +990,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
 	// Advance time to when new validator should start validating
@@ -1001,10 +1003,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Accept(context.Background())) // move validator addValidatorTx from pending to current
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1014,10 +1016,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), ids.NodeIDFromShortNodeID(nodeID))
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1741,7 +1743,7 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.ShortNodeID(keys[0].PublicKey().Address())
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(keys[0].PublicKey().Address()))
 
 	tests := []struct {
 		description string
@@ -1773,7 +1775,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(nodeID))
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
@@ -2038,12 +2040,13 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
+	nodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(id))
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.ShortNodeID(id),
+		nodeID,
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -2077,11 +2080,12 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
+	subnetNodeID := ids.NodeIDFromShortNodeID(ids.ShortNodeID(id))
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.ShortNodeID(id),
+		subnetNodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[1]},
 		keys[1].Address(),
@@ -2089,7 +2093,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
-		ids.ShortNodeID(id),
+		subnetNodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
 		keys[2].Address(),

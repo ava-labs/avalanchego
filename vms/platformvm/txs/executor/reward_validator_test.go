@@ -236,7 +236,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortNodeID()
+	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt
@@ -287,7 +287,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(vdrNodeID))
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -339,7 +339,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
-	stake = env.config.Validators.GetWeight(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(vdrNodeID))
+	stake = env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake, stake)
 }
 
@@ -356,7 +356,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortNodeID()
+	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
@@ -417,7 +417,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// test validator stake
-	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, ids.NodeIDFromShortNodeID(vdrNodeID))
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -571,7 +571,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortNodeID()
+	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt
@@ -732,7 +732,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestShortNodeID()
+	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stakeAmt

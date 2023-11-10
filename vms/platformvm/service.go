@@ -1213,17 +1213,9 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	}
 
 	// Parse the node ID
-	var (
-		nodeID ids.ShortNodeID
-		err    error
-	)
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID, err = ids.ShortNodeIDFromNodeID(s.vm.ctx.NodeID)
-	} else {
-		nodeID, err = ids.ShortNodeIDFromNodeID(args.NodeID)
-	}
-	if err != nil {
-		return err
+	nodeID := s.vm.ctx.NodeID // default if node's ID not specified
+	if args.NodeID != ids.EmptyNodeID {
+		nodeID = args.NodeID
 	}
 
 	// Parse the from addresses
@@ -1330,17 +1322,9 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		return errStartTimeTooLate
 	}
 
-	var (
-		nodeID ids.ShortNodeID
-		err    error
-	)
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID, err = ids.ShortNodeIDFromNodeID(s.vm.ctx.NodeID)
-	} else {
-		nodeID, err = ids.ShortNodeIDFromNodeID(args.NodeID)
-	}
-	if err != nil {
-		return err
+	nodeID := s.vm.ctx.NodeID // // default if node's ID is not specified
+	if args.NodeID != ids.EmptyNodeID {
+		nodeID = args.NodeID
 	}
 
 	// Parse the reward address
@@ -1493,16 +1477,12 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 		args.Weight = *args.StakeAmount
 	}
 
-	shortNodeID, err := ids.ShortNodeIDFromNodeID(args.NodeID)
-	if err != nil {
-		return fmt.Errorf("couldn't create shortNodeID from nodeID %v: %w", args.NodeID, err)
-	}
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddSubnetValidatorTx(
 		uint64(args.Weight),    // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
-		shortNodeID,            // Node ID
+		args.NodeID,            // Node ID
 		subnetID,               // Subnet ID
 		keys.Keys,
 		changeAddr,
