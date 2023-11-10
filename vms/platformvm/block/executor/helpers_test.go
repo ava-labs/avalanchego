@@ -81,8 +81,20 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	for _, key := range preFundedKeys {
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
+		genesisNodeIDs = append(genesisNodeIDs, nodeID)
+	}
+}
 
 type stakerStatus uint
 
@@ -399,10 +411,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
