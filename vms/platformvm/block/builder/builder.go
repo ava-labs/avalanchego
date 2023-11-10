@@ -73,7 +73,6 @@ func New(
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
-	appSender common.AppSender,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,

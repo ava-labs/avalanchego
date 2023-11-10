@@ -204,7 +204,6 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		vm.manager,
 		toEngine,
-		appSender,
 	)
 
 	// Create all of the chains that the database says exist
