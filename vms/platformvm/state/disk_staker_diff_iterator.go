@@ -43,7 +43,7 @@ func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
-	copy(key[diffKeyNodeIDOffset:], nodeID[:])
+	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
 	return key
 }
 
