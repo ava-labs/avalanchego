@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package network
 
 import (
 	"context"
@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -49,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -85,11 +85,11 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	Builder
+	builder.Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
-	network    network.Network
+	network    Network
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -170,7 +170,7 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
-	res.network = network.New(
+	res.network = New(
 		res.backend.Ctx,
 		res.blkManager,
 		res.mempool,
@@ -178,7 +178,7 @@ func newEnvironment(t *testing.T) *environment {
 		res.sender,
 	)
 
-	res.Builder = New(
+	res.Builder = builder.New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
@@ -429,18 +429,4 @@ func shutdownEnvironment(env *environment) error {
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-}
-
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		constants.AVMID,
-		nil,
-		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	require.NoError(t, err)
-	return tx
 }

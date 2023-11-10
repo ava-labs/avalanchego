@@ -3,7 +3,7 @@
 
 // TODO: consider moving the network implementation to a separate package
 
-package builder
+package network
 
 import (
 	"context"
@@ -52,7 +52,7 @@ type network struct {
 	recentTxs     *cache.LRU[ids.ID, struct{}]
 }
 
-func NewNetwork(
+func New(
 	ctx *snow.Context,
 	manager executor.Manager,
 	mempool mempool.Mempool,

@@ -1,10 +1,11 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package network
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,8 @@ import (
 
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
+
+var errTestingDropped = errors.New("testing dropped")
 
 func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 	tx, err := txBuilder.NewCreateChainTx(
