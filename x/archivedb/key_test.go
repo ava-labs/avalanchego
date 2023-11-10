@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"testing"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/slices"
 )
 
 func TestNaturalDescSortingForSameKey(t *testing.T) {
