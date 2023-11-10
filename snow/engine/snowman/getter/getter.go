@@ -7,10 +7,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -23,18 +24,19 @@ import (
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
-	ctx *snow.ConsensusContext,
 	vm block.ChainVM,
 	sender common.Sender,
+	log logging.Logger,
 	maxTimeGetAncestors time.Duration,
 	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
 		vm:                        vm,
 		ssVM:                      ssVM,
-		log:                       ctx.Log,
 		sender:                    sender,
+		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
@@ -44,7 +46,7 @@ func New(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
-		ctx.Registerer,
+		reg,
 	)
 	return gh, err
 }
@@ -53,8 +55,8 @@ type getter struct {
 	vm   block.ChainVM
 	ssVM block.StateSyncableVM // can be nil
 
-	log    logging.Logger
 	sender common.Sender
+	log    logging.Logger
 	// Max time to spend fetching a container and its ancestors when responding
 	// to a GetAncestors
 	maxTimeGetAncestors time.Duration

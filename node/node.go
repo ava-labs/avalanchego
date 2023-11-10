@@ -101,6 +101,157 @@ var (
 	errShuttingDown  = errors.New("server shutting down")
 )
 
+// New returns an instance of Node
+func New(
+	config *Config,
+	logFactory logging.Factory,
+	logger logging.Logger,
+) (*Node, error) {
+	tlsCert := config.StakingTLSCert.Leaf
+	stakingCert := staking.CertificateFromX509(tlsCert)
+	if err := staking.ValidateCertificate(stakingCert); err != nil {
+		return nil, fmt.Errorf("invalid staking certificate: %w", err)
+	}
+
+	n := &Node{
+		Log:        logger,
+		LogFactory: logFactory,
+		ID:         ids.NodeIDFromCert(stakingCert),
+		Config:     config,
+	}
+
+	n.DoneShuttingDown.Add(1)
+
+	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	logger.Info("initializing node",
+		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("nodeID", n.ID),
+		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
+		zap.Reflect("nodePOP", pop),
+		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
+		zap.Reflect("config", n.Config),
+	)
+
+	var err error
+	n.VMFactoryLog, err = logFactory.Make("vm-factory")
+	if err != nil {
+		return nil, fmt.Errorf("problem creating vm logger: %w", err)
+	}
+
+	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+
+	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
+		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
+	}
+
+	// Set up tracer
+	n.tracer, err = trace.New(n.Config.TraceConfig)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
+	}
+
+	if n.Config.TraceConfig.Enabled {
+		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
+	}
+
+	n.initMetrics()
+
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
+	}
+
+	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
+		return nil, fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
+
+	if err := n.initDatabase(); err != nil { // Set up the node's database
+		return nil, fmt.Errorf("problem initializing database: %w", err)
+	}
+
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return nil, fmt.Errorf("couldn't initialize keystore API: %w", err)
+	}
+
+	n.initSharedMemory() // Initialize shared memory
+
+	// message.Creator is shared between networking, chainManager and the engine.
+	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
+	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	// message.Creator currently record metrics under network namespace
+	n.networkNamespace = "network"
+	n.msgCreator, err = message.NewCreator(
+		n.Log,
+		n.MetricsRegisterer,
+		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionType,
+		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing message creator: %w", err)
+	}
+
+	n.vdrs = validators.NewManager()
+	if !n.Config.SybilProtectionEnabled {
+		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
+	}
+	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
+		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
+	}
+	n.initCPUTargeter(&config.CPUTargeterConfig)
+	n.initDiskTargeter(&config.DiskTargeterConfig)
+	if err := n.initNetworking(); err != nil { // Set up networking layer.
+		return nil, fmt.Errorf("problem initializing networking: %w", err)
+	}
+
+	n.initEventDispatchers()
+
+	// Start the Health API
+	// Has to be initialized before chain manager
+	// [n.Net] must already be set
+	if err := n.initHealthAPI(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize health API: %w", err)
+	}
+	if err := n.addDefaultVMAliases(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize API aliases: %w", err)
+	}
+	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
+		return nil, fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
+	if err := n.initVMs(); err != nil { // Initialize the VM registry.
+		return nil, fmt.Errorf("couldn't initialize VM registry: %w", err)
+	}
+	if err := n.initAdminAPI(); err != nil { // Start the Admin API
+		return nil, fmt.Errorf("couldn't initialize admin API: %w", err)
+	}
+	if err := n.initInfoAPI(); err != nil { // Start the Info API
+		return nil, fmt.Errorf("couldn't initialize info API: %w", err)
+	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return nil, fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
+	if err := n.initIPCAPI(); err != nil { // Start the IPC API
+		return nil, fmt.Errorf("couldn't initialize the IPC API: %w", err)
+	}
+	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize chain aliases: %w", err)
+	}
+	if err := n.initAPIAliases(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize API aliases: %w", err)
+	}
+	if err := n.initIndexer(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize indexer: %w", err)
+	}
+
+	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
+	n.initProfiler()
+
+	// Start the Platform chain
+	if err := n.initChains(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize chains: %w", err)
+	}
+	return n, nil
+}
+
 // Node is an instance of an Avalanche node.
 type Node struct {
 	Log          logging.Logger
@@ -1339,154 +1490,6 @@ func (n *Node) initDiskTargeter(
 		n.vdrs,
 		n.resourceTracker.DiskTracker(),
 	)
-}
-
-// Initialize this node
-func (n *Node) Initialize(
-	config *Config,
-	logger logging.Logger,
-	logFactory logging.Factory,
-) error {
-	tlsCert := config.StakingTLSCert.Leaf
-	stakingCert := staking.CertificateFromX509(tlsCert)
-	if err := staking.ValidateCertificate(stakingCert); err != nil {
-		return fmt.Errorf("invalid staking certificate: %w", err)
-	}
-
-	n.Log = logger
-	n.Config = config
-	n.ID = ids.NodeIDFromCert(stakingCert)
-	n.LogFactory = logFactory
-	n.DoneShuttingDown.Add(1)
-
-	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
-	n.Log.Info("initializing node",
-		zap.Stringer("version", version.CurrentApp),
-		zap.Stringer("nodeID", n.ID),
-		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
-		zap.Reflect("nodePOP", pop),
-		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
-		zap.Reflect("config", n.Config),
-	)
-
-	var err error
-	n.VMFactoryLog, err = logFactory.Make("vm-factory")
-	if err != nil {
-		return fmt.Errorf("problem creating vm logger: %w", err)
-	}
-
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
-
-	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
-		return fmt.Errorf("problem initializing node beacons: %w", err)
-	}
-
-	// Set up tracer
-	n.tracer, err = trace.New(n.Config.TraceConfig)
-	if err != nil {
-		return fmt.Errorf("couldn't initialize tracer: %w", err)
-	}
-
-	if n.Config.TraceConfig.Enabled {
-		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
-	}
-
-	n.initMetrics()
-
-	if err := n.initAPIServer(); err != nil { // Start the API Server
-		return fmt.Errorf("couldn't initialize API server: %w", err)
-	}
-
-	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
-		return fmt.Errorf("couldn't initialize metrics API: %w", err)
-	}
-
-	if err := n.initDatabase(); err != nil { // Set up the node's database
-		return fmt.Errorf("problem initializing database: %w", err)
-	}
-
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return fmt.Errorf("couldn't initialize keystore API: %w", err)
-	}
-
-	n.initSharedMemory() // Initialize shared memory
-
-	// message.Creator is shared between networking, chainManager and the engine.
-	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
-	// and the engine (initChains) but after the metrics (initMetricsAPI)
-	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = "network"
-	n.msgCreator, err = message.NewCreator(
-		n.Log,
-		n.MetricsRegisterer,
-		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionType,
-		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
-	)
-	if err != nil {
-		return fmt.Errorf("problem initializing message creator: %w", err)
-	}
-
-	n.vdrs = validators.NewManager()
-	if !n.Config.SybilProtectionEnabled {
-		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
-	}
-	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
-		return fmt.Errorf("problem initializing resource manager: %w", err)
-	}
-	n.initCPUTargeter(&config.CPUTargeterConfig)
-	n.initDiskTargeter(&config.DiskTargeterConfig)
-	if err := n.initNetworking(); err != nil { // Set up networking layer.
-		return fmt.Errorf("problem initializing networking: %w", err)
-	}
-
-	n.initEventDispatchers()
-
-	// Start the Health API
-	// Has to be initialized before chain manager
-	// [n.Net] must already be set
-	if err := n.initHealthAPI(); err != nil {
-		return fmt.Errorf("couldn't initialize health API: %w", err)
-	}
-	if err := n.addDefaultVMAliases(); err != nil {
-		return fmt.Errorf("couldn't initialize API aliases: %w", err)
-	}
-	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
-		return fmt.Errorf("couldn't initialize chain manager: %w", err)
-	}
-	if err := n.initVMs(); err != nil { // Initialize the VM registry.
-		return fmt.Errorf("couldn't initialize VM registry: %w", err)
-	}
-	if err := n.initAdminAPI(); err != nil { // Start the Admin API
-		return fmt.Errorf("couldn't initialize admin API: %w", err)
-	}
-	if err := n.initInfoAPI(); err != nil { // Start the Info API
-		return fmt.Errorf("couldn't initialize info API: %w", err)
-	}
-	if err := n.initIPCs(); err != nil { // Start the IPCs
-		return fmt.Errorf("couldn't initialize IPCs: %w", err)
-	}
-	if err := n.initIPCAPI(); err != nil { // Start the IPC API
-		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
-	}
-	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize chain aliases: %w", err)
-	}
-	if err := n.initAPIAliases(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize API aliases: %w", err)
-	}
-	if err := n.initIndexer(); err != nil {
-		return fmt.Errorf("couldn't initialize indexer: %w", err)
-	}
-
-	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
-	n.initProfiler()
-
-	// Start the Platform chain
-	if err := n.initChains(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
-	return nil
 }
 
 // Shutdown this node

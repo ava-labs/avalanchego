@@ -9,17 +9,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -29,10 +31,8 @@ type StateSyncEnabledMock struct {
 	*mocks.MockStateSyncableVM
 }
 
-func new(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
 	ctrl := gomock.NewController(t)
-
-	ctx := snow.DefaultConsensusContextTest()
 
 	vm := StateSyncEnabledMock{
 		TestVM:              &block.TestVM{},
@@ -44,7 +44,14 @@ func new(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.Send
 	}
 	sender.Default(true)
 
-	bs, err := New(ctx, vm, sender, time.Second, 2000)
+	bs, err := New(
+		vm,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err)
 
 	return bs, vm, sender
@@ -52,7 +59,7 @@ func new(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.Send
 
 func TestAcceptedFrontier(t *testing.T) {
 	require := require.New(t)
-	bs, vm, sender := new(t)
+	bs, vm, sender := newTest(t)
 
 	blkID := ids.GenerateTestID()
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
@@ -70,7 +77,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
-	bs, vm, sender := new(t)
+	bs, vm, sender := newTest(t)
 
 	blkID0 := ids.GenerateTestID()
 	blkID1 := ids.GenerateTestID()

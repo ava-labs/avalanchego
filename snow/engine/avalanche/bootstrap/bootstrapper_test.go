@@ -81,19 +81,20 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
 	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, startupTracker)
 
-	avaGetHandler, err := getter.New(ctx, manager, sender, time.Second, 2000)
+	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, ctx.AvalancheRegisterer)
 	require.NoError(err)
 
 	return Config{
-		AllGetsServer:  avaGetHandler,
-		Ctx:            ctx,
-		Beacons:        vdrs,
-		StartupTracker: startupTracker,
-		Sender:         sender,
-		VtxBlocked:     vtxBlocker,
-		TxBlocked:      txBlocker,
-		Manager:        manager,
-		VM:             vm,
+		AllGetsServer:                  avaGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        vdrs,
+		StartupTracker:                 startupTracker,
+		Sender:                         sender,
+		AncestorsMaxContainersReceived: 2000,
+		VtxBlocked:                     vtxBlocker,
+		TxBlocked:                      txBlocker,
+		Manager:                        manager,
+		VM:                             vm,
 	}, peer, sender, manager, vm
 }
 

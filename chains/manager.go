@@ -842,11 +842,12 @@ func (m *manager) createAvalancheChain(
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
-		ctx,
 		vmWrappingProposerVM,
 		snowmanMessageSender,
+		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -910,11 +911,12 @@ func (m *manager) createAvalancheChain(
 	}
 
 	avaGetHandler, err := avagetter.New(
-		ctx,
 		vtxManager,
 		avalancheMessageSender,
+		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		ctx.AvalancheRegisterer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -1187,11 +1189,12 @@ func (m *manager) createSnowmanChain(
 	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
-		ctx,
 		vm,
 		messageSender,
+		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)

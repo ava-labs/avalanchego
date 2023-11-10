@@ -88,7 +88,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := getter.New(ctx, vm, sender, time.Second, 2000)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
@@ -135,7 +135,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	snowGetHandler, err := getter.New(ctx, vm, sender, time.Second, 2000)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 	cfg := Config{
 		Config:        commonCfg,
@@ -1371,7 +1371,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := getter.New(ctx, vm, sender, time.Second, 2000)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
 	queueDB := memdb.New()
