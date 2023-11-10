@@ -28,6 +28,15 @@ func TestStatus(t *testing.T) {
 
 	tests := []test{
 		{
+			name: "rejected",
+			blockF: func(ctrl *gomock.Controller) *Block {
+				return &Block{
+					rejected: true,
+				}
+			},
+			expectedStatus: choices.Rejected,
+		},
+		{
 			name: "last accepted",
 			blockF: func(ctrl *gomock.Controller) *Block {
 				blkID := ids.GenerateTestID()
