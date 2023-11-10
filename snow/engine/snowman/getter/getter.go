@@ -35,8 +35,8 @@ func New(
 	gh := &getter{
 		vm:                        vm,
 		ssVM:                      ssVM,
-		log:                       log,
 		sender:                    sender,
+		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
