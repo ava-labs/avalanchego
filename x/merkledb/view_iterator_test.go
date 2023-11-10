@@ -13,8 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -223,7 +221,10 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	}
 
 	iter := view3.NewIterator()
-	uniqueKeys := maps.Keys(uniqueKeyChanges)
+	uniqueKeys := make([]string, 0, len(uniqueKeyChanges))
+	for key := range uniqueKeyChanges {
+		uniqueKeys = append(uniqueKeys, key)
+	}
 	sort.Strings(uniqueKeys)
 	i := 0
 	for iter.Next() {

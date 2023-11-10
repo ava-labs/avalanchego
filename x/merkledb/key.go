@@ -6,11 +6,9 @@ package merkledb
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unsafe"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -30,7 +28,7 @@ var (
 		8: BranchFactor256,
 	}
 
-	validTokenSizes = maps.Keys(tokenSizeToBranchFactor)
+	validTokenSizes = []int{1, 2, 4, 8}
 
 	validBranchFactors = []BranchFactor{
 		BranchFactor2,

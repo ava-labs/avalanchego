@@ -8,13 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -249,9 +248,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+		_ = t.db.calculateNodeIDsSema.Acquire(context.Background())
 		t.calculateNodeIDsHelper(t.root)
-		t.db.calculateNodeIDsSema.Release(1)
+		t.db.calculateNodeIDsSema.Release()
 		t.changes.rootID = t.root.id
 
 		// ensure no ancestor changes occurred during execution
@@ -291,10 +290,10 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
+		if ok := t.db.calculateNodeIDsSema.TryAcquire(); ok {
 			go func() {
 				calculateChildID()
-				t.db.calculateNodeIDsSema.Release(1)
+				t.db.calculateNodeIDsSema.Release()
 			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.

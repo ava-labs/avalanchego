@@ -9,10 +9,8 @@ import (
 	"errors"
 	"io"
 	"math"
+	"slices"
 	"sync"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -103,9 +101,12 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 	// Note we insert children in order of increasing index
 	// for determinism.
-	keys := maps.Keys(n.children)
-	slices.Sort(keys)
-	for _, index := range keys {
+	indexes := make([]byte, 0, len(n.children))
+	for index := range n.children {
+		indexes = append(indexes, index)
+	}
+	slices.Sort(indexes)
+	for _, index := range indexes {
 		entry := n.children[index]
 		c.encodeUint(buf, uint64(index))
 		c.encodeKey(buf, entry.compressedKey)
@@ -126,9 +127,12 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 	c.encodeUint(buf, uint64(numChildren))
 
 	// ensure that the order of entries is consistent
-	keys := maps.Keys(n.children)
-	slices.Sort(keys)
-	for _, index := range keys {
+	indexes := make([]byte, 0, len(n.children))
+	for index := range n.children {
+		indexes = append(indexes, index)
+	}
+	slices.Sort(indexes)
+	for _, index := range indexes {
 		entry := n.children[index]
 		c.encodeUint(buf, uint64(index))
 		_, _ = buf.Write(entry.id[:])
