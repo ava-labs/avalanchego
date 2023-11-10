@@ -184,7 +184,6 @@ func newEnvironment(t *testing.T) *environment {
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
 	)
 
 	res.blkManager.SetPreference(genesisID)
