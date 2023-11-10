@@ -36,7 +36,6 @@ var (
 
 	ErrEndOfTime       = errors.New("program time is suspiciously far in the future")
 	ErrNoPendingBlocks = errors.New("no pending blocks")
-	ErrChainNotSynced  = errors.New("chain not synced")
 )
 
 type Builder interface {
@@ -103,10 +102,6 @@ func New(
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	if !b.txExecutorBackend.Bootstrapped.Get() {
-		return ErrChainNotSynced
-	}
-
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -114,13 +109,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	verifier := txexecutor.MempoolTxVerifier{
-		Backend:       b.txExecutorBackend,
-		ParentID:      b.blkManager.Preferred(), // We want to build off of the preferred block
-		StateVersions: b.blkManager,
-		Tx:            tx,
-	}
-	if err := tx.Unsigned.Visit(&verifier); err != nil {
+	if err := b.blkManager.VerifyTx(tx); err != nil {
 		b.MarkDropped(txID, err)
 		return err
 	}

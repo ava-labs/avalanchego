@@ -14,6 +14,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
+	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -139,4 +140,18 @@ func (m *MockManager) SetPreference(arg0 ids.ID) bool {
 func (mr *MockManagerMockRecorder) SetPreference(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockManager)(nil).SetPreference), arg0)
+}
+
+// VerifyTx mocks base method.
+func (m *MockManager) VerifyTx(arg0 *txs.Tx) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyTx", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyTx indicates an expected call of VerifyTx.
+func (mr *MockManagerMockRecorder) VerifyTx(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTx", reflect.TypeOf((*MockManager)(nil).VerifyTx), arg0)
 }
