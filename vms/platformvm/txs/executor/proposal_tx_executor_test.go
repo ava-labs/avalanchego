@@ -784,12 +784,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 
 	{
+		nodeBytes := preFundedKeys[0].Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
 		// Case: Validator already validating primary network
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(preFundedKeys[0].Address()),
+			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
