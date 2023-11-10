@@ -219,7 +219,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			id := key.PublicKey().Address()
-			nodeID := ids.BuildTestNodeID(id[:])
+			nodeID := ids.GenerateTestNodeID()
 			changeAddr := keys[0].PublicKey().Address()
 
 			// create valid tx
@@ -472,14 +472,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
-
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
-
-	nodeBytes := key.PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(nodeBytes[:])
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -1150,7 +1145,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	id := key.Address()
-	nodeID := ids.BuildTestNodeID(id[:])
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -1235,7 +1230,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(err)
 
 	id := key.Address()
-	nodeID := ids.BuildTestNodeID(id[:])
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -1353,7 +1348,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
-	nodeID := ids.BuildTestNodeID(id[:])
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
