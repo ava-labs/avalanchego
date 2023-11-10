@@ -80,10 +80,8 @@ var (
 )
 
 func init() {
-	for _, key := range preFundedKeys {
-		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
-
+	for range preFundedKeys {
+		nodeID := ids.GenerateTestNodeID()
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
 }

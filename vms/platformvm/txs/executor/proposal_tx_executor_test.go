@@ -352,13 +352,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
-
-	nodeIDBytes := key.PublicKey().Address()
-	pendingDSValidatorID := ids.BuildTestNodeID(nodeIDBytes[:])
-
-	// starts validating primary network 10 seconds after genesis
+	// Starts validating primary network 10 seconds after genesis
+	pendingDSValidatorID := ids.GenerateTestNodeID()
 	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
