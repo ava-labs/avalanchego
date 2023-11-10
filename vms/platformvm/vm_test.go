@@ -1482,7 +1482,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
-	snowGetHandler, err := snowgetter.New(consensusCtx, vm, sender, time.Second, 2000)
+	snowGetHandler, err := snowgetter.New(
+		vm,
+		sender,
+		consensusCtx.Log,
+		time.Second,
+		2000,
+		consensusCtx.Registerer,
+	)
 	require.NoError(err)
 
 	commonCfg := common.Config{

@@ -7,11 +7,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -27,16 +28,17 @@ import (
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
-	ctx *snow.ConsensusContext,
 	storage vertex.Storage,
 	sender common.Sender,
+	log logging.Logger,
 	maxTimeGetAncestors time.Duration,
 	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	gh := &getter{
-		log:                       ctx.Log,
 		storage:                   storage,
 		sender:                    sender,
+		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
@@ -46,15 +48,15 @@ func New(
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
-		ctx.AvalancheRegisterer,
+		reg,
 	)
 	return gh, err
 }
 
 type getter struct {
-	log                       logging.Logger
 	storage                   vertex.Storage
 	sender                    common.Sender
+	log                       logging.Logger
 	maxTimeGetAncestors       time.Duration
 	maxContainersGetAncestors int
 

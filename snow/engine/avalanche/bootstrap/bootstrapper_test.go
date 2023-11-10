@@ -107,7 +107,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	avaGetHandler, err := getter.New(ctx, manager, sender, time.Second, 2000)
+	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, ctx.AvalancheRegisterer)
 	require.NoError(err)
 
 	return Config{

@@ -9,21 +9,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
 
 func new(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.SenderTest) {
-	ctx := snow.DefaultConsensusContextTest()
-
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 
@@ -32,7 +32,14 @@ func new(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.Sende
 	}
 	sender.Default(true)
 
-	bs, err := New(ctx, manager, sender, time.Second, 2000)
+	bs, err := New(
+		manager,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err)
 
 	return bs, manager, sender
