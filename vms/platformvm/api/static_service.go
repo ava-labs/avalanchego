@@ -131,8 +131,10 @@ type PermissionlessValidator struct {
 	PotentialReward        *json.Uint64              `json:"potentialReward,omitempty"`
 	AccruedDelegateeReward *json.Uint64              `json:"accruedDelegateeReward,omitempty"`
 	DelegationFee          json.Float32              `json:"delegationFee"`
+	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
 	Uptime                 *json.Float32             `json:"uptime,omitempty"`
 	Connected              bool                      `json:"connected"`
+	Staked                 []UTXO                    `json:"staked,omitempty"`
 	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
 	// The delegators delegating to this validator
