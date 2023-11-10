@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -73,7 +72,6 @@ type manager struct {
 	state   states.State
 	metrics metrics.Metrics
 	mempool mempool.Mempool
-	clk     *mockable.Clock
 	// Invariant: onAccept is called when [tx] is being marked as accepted, but
 	// before its state changes are applied.
 	// Invariant: any error returned by onAccept should be considered fatal.
