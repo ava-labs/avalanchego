@@ -150,7 +150,15 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if !b.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		b.txExecutorBackend.Ctx.Log.Debug("adding tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+		)
+
 		if err := b.Mempool.Add(tx); err != nil {
+			b.txExecutorBackend.Ctx.Log.Debug("failed to add tx to mempool",
+				zap.Stringer("txID", tx.ID()),
+			)
+
 			return err
 		}
 	}
@@ -175,10 +183,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	// Remove selected txs from mempool now that we are returning the block to
-	// the consensus engine.
-	txs := statelessBlk.Txs()
-	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
@@ -338,7 +342,7 @@ func buildBlock(
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
-	droppedStakerTxIDs := mempool.DropExpiredStakerTxs(builder.Mempool, timestamp.Add(txexecutor.SyncBound))
+	droppedStakerTxIDs := builder.Mempool.DropExpiredStakerTxs(timestamp.Add(txexecutor.SyncBound))
 	for _, txID := range droppedStakerTxIDs {
 		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
 			zap.Stringer("txID", txID),
@@ -346,8 +350,22 @@ func buildBlock(
 		)
 	}
 
-	// If there is no reason to build a block, don't.
-	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+	var (
+		blockTxs      []*txs.Tx
+		remainingSize = targetBlockSize
+	)
+	for {
+		tx := builder.Mempool.Peek(remainingSize)
+		if tx == nil {
+			break
+		}
+		builder.Mempool.Remove([]*txs.Tx{tx})
+
+		remainingSize -= len(tx.Bytes())
+		blockTxs = append(blockTxs, tx)
+	}
+
+	if len(blockTxs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -357,7 +375,7 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		builder.Mempool.PeekTxs(targetBlockSize),
+		blockTxs,
 	)
 }
 
