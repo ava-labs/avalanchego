@@ -206,17 +206,18 @@ func CheckBootstrapIsPossible(network testnet.Network) {
 	}
 	ginkgo.By("checking if bootstrap is possible with the current network state")
 
-	// Call network.AddEphemeralNode instead of AddEphemeralNode for compatibility
+	// Call network.AddEphemeralNode instead of AddEphemeralNode to support
+	// checking for bootstrap implicitly on teardown via a function registered
 	// with ginkgo.DeferCleanup. It's not possible to call DeferCleanup from
 	// within a function called by DeferCleanup.
 	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, testnet.FlagsMap{})
-	defer func() {
-		if node != nil {
-			tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
-			require.NoError(node.Stop())
-		}
-	}()
 	require.NoError(err)
+
+	defer func() {
+		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
+		require.NoError(node.Stop())
+	}()
+
 	WaitForHealthy(node)
 }
 
