@@ -4,6 +4,8 @@
 package executor
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -15,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-var _ Manager = (*manager)(nil)
+var (
+	_ Manager = (*manager)(nil)
+
+	ErrChainNotSynced = errors.New("chain not synced")
+)
 
 type Manager interface {
 	state.Versions
