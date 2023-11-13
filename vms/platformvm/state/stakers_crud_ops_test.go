@@ -12,10 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -35,9 +34,9 @@ func TestCurrentValidatorsCRUD(t *testing.T) {
 		{
 			name: "base state",
 			stakersStore: func() (Stakers, error) {
-				baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-				baseDB := versiondb.New(baseDBManager.Current().Database)
-				return buildChainState(baseDB, nil)
+				baseDB := memdb.New()
+				chainDB := versiondb.New(baseDB)
+				return buildChainState(chainDB, nil)
 			},
 		},
 		{
@@ -137,9 +136,9 @@ func TestCurrentDelegatorsCRUD(t *testing.T) {
 		{
 			name: "base state",
 			stakersStore: func() (Stakers, error) {
-				baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-				baseDB := versiondb.New(baseDBManager.Current().Database)
-				return buildChainState(baseDB, nil)
+				baseDB := memdb.New()
+				chainDB := versiondb.New(baseDB)
+				return buildChainState(chainDB, nil)
 			},
 		},
 		{
@@ -235,9 +234,9 @@ func TestPendingValidatorsCRUD(t *testing.T) {
 		{
 			name: "base state",
 			stakersStore: func() (Stakers, error) {
-				baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-				baseDB := versiondb.New(baseDBManager.Current().Database)
-				return buildChainState(baseDB, nil)
+				baseDB := memdb.New()
+				chainDB := versiondb.New(baseDB)
+				return buildChainState(chainDB, nil)
 			},
 		},
 		{
@@ -337,9 +336,9 @@ func TestPendingDelegatorsCRUD(t *testing.T) {
 		{
 			name: "base state",
 			stakersStore: func() (Stakers, error) {
-				baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-				baseDB := versiondb.New(baseDBManager.Current().Database)
-				return buildChainState(baseDB, nil)
+				baseDB := memdb.New()
+				chainDB := versiondb.New(baseDB)
+				return buildChainState(chainDB, nil)
 			},
 		},
 		{

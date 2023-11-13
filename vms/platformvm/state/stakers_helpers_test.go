@@ -11,18 +11,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -70,7 +68,6 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		ctx,
 		metrics.Noop,
 		rewardsCalc,
-		&utils.Atomic[bool]{},
 	)
 }
 
@@ -137,9 +134,9 @@ func buildGenesisTest(ctx *snow.Context) ([]byte, error) {
 }
 
 func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, error) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-	baseState, err := buildChainState(baseDB, trackedSubnets)
+	baseDB := memdb.New()
+	chainDB := versiondb.New(baseDB)
+	baseState, err := buildChainState(chainDB, trackedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while creating chain base state, err %w", err)
 	}
