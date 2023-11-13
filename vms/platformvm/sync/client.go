@@ -5,7 +5,6 @@ package sync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,10 +13,17 @@ import (
 )
 
 var (
-	_ block.StateSyncableVM = (*Client)(nil)
+	_ ClientIntf = (*Client)(nil)
 
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
+
+type ClientIntf interface {
+	// methods that implement the client side of [block.StateSyncableVM]
+	StateSyncEnabled(context.Context) (bool, error)
+	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
+	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
+}
 
 type ClientConfig struct {
 	sync.ManagerConfig
@@ -66,16 +72,8 @@ func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 	return summary, nil
 }
 
-func (c *Client) GetLastStateSummary(context.Context) (block.StateSummary, error) {
-	return nil, errors.New("TODO")
-}
-
 func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
-}
-
-func (c *Client) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
-	return nil, errors.New("TODO")
 }
 
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
@@ -94,6 +92,10 @@ func (c *Client) acceptSyncSummary(proposedSummary SyncSummary) (block.StateSync
 
 	go func() {
 		c.syncErrChan <- c.manager.Start(ctx)
+
+		// TODO initialize the VM with the state on disk.
+
+		// TODO send message to engine that syncing is done.
 	}()
 
 	return block.StateSyncStatic, nil
