@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -48,13 +48,12 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		factory := secp256k1.Factory{}
-		recipientKey, err := factory.NewPrivateKey()
+		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -103,7 +102,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(30 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			const (
@@ -144,7 +143,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			// doesn't break interchain transfer.
 			endTime := startTime.Add(15 * time.Second)
 
-			rewardKey, err := factory.NewPrivateKey()
+			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
@@ -203,7 +202,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("initializing a new eth client")
-		ethClient := e2e.Env.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("importing AVAX from the P-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(

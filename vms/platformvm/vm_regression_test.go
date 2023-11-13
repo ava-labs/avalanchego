@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -25,11 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -217,7 +215,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			key, err := testKeyFactory.NewPrivateKey()
+			key, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
 			id := key.PublicKey().Address()
@@ -343,8 +341,8 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require := require.New(t)
 	_, genesisBytes := defaultGenesis(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -367,7 +365,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		baseDBManager,
+		baseDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -476,7 +474,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -652,7 +650,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm.Config.Validators = validators.NewManager()
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -660,7 +658,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 
@@ -961,7 +958,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm.Config.Validators = validators.NewManager()
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -969,7 +966,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 
@@ -1153,7 +1149,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1237,7 +1233,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1354,7 +1350,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1397,9 +1393,6 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(createSubnetBlock.Verify(context.Background()))
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	vm.TrackedSubnets.Add(createSubnetTx.ID())
-	require.NoError(vm.state.ApplyCurrentValidators(createSubnetTx.ID(), vm.Validators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
@@ -2255,7 +2248,7 @@ func checkValidatorBlsKeyIsSet(
 		return errors.New("unexpected BLS key")
 	case expectedBlsKey != nil && val.PublicKey == nil:
 		return errors.New("missing BLS key")
-	case !bytes.Equal(expectedBlsKey.Serialize(), val.PublicKey.Serialize()):
+	case !bytes.Equal(bls.SerializePublicKey(expectedBlsKey), bls.SerializePublicKey(val.PublicKey)):
 		return errors.New("incorrect BLS key")
 	default:
 		return nil

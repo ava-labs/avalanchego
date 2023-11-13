@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,8 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -116,8 +114,7 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.baseDB = versiondb.New(memdb.New())
 	res.ctx, res.msm = defaultCtx(res.baseDB)
 
 	res.ctx.Lock.Lock()
@@ -160,7 +157,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, res)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -239,7 +236,6 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 
@@ -361,13 +357,13 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
@@ -419,10 +415,8 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-	return errs.Err
 }

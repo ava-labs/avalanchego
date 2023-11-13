@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,8 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -51,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -135,8 +133,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.baseDB = versiondb.New(memdb.New())
 	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
@@ -192,7 +189,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -278,7 +275,6 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
-		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
@@ -403,15 +399,15 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
@@ -470,12 +466,14 @@ func shutdownEnvironment(t *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
+	var err error
 	if t.state != nil {
-		errs.Add(t.state.Close())
+		err = t.state.Close()
 	}
-	errs.Add(t.baseDB.Close())
-	return errs.Err
+	return utils.Err(
+		err,
+		t.baseDB.Close(),
+	)
 }
 
 func addPendingValidator(

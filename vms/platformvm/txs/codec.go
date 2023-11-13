@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -41,6 +42,10 @@ func init() {
 		c.SkipRegistrations(5)
 
 		errs.Add(RegisterUnsignedTxsTypes(c))
+
+		c.SkipRegistrations(4)
+
+		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
 	errs.Add(
 		Codec.RegisterCodec(Version, c),
@@ -96,4 +101,11 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
 	return errs.Err
+}
+
+func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+	return utils.Err(
+		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
+		targetCodec.RegisterType(&BaseTx{}),
+	)
 }
