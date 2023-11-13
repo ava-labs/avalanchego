@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf("failed to parse subnet ID: %s\n", err)
 	}
 
-	nodeID, err := ids.ShortNodeIDFromString(nodeIDStr)
+	nodeID, err := ids.NodeIDFromString(nodeIDStr)
 	if err != nil {
 		log.Fatalf("failed to parse node ID: %s\n", err)
 	}

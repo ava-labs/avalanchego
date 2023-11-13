@@ -90,7 +90,7 @@ type Builder interface {
 	// NewRemoveSubnetValidatorTx removes [nodeID] from the validator
 	// set [subnetID].
 	NewRemoveSubnetValidatorTx(
-		nodeID ids.ShortNodeID,
+		nodeID ids.NodeID,
 		subnetID ids.ID,
 		options ...common.Option,
 	) (*txs.RemoveSubnetValidatorTx, error)
@@ -391,7 +391,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
-	nodeID ids.ShortNodeID,
+	nodeID ids.NodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
@@ -410,6 +410,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &txs.RemoveSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -419,7 +424,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 			Memo:         ops.Memo(),
 		}},
 		Subnet:     subnetID,
-		NodeID:     nodeID,
+		NodeID:     shortNodeID,
 		SubnetAuth: subnetAuth,
 	}, nil
 }
