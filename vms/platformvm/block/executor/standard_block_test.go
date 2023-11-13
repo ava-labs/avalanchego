@@ -474,12 +474,11 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			},
 		},
 		{
-			description:   "advance time to staker5 end",
+			description:   "advance time to staker5 start",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
-				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
 				staker5.nodeID: current,
