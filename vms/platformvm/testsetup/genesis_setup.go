@@ -53,10 +53,10 @@ var (
 
 // [BuildGenesis] is a good default to build genesis for platformVM unit tests
 func BuildGenesis() (*genesis.Genesis, error) {
-	genesisUtxos := make([]*genesis.UTXO, len(Keys))
+	genesisUTXOs := make([]*genesis.UTXO, len(Keys))
 	for i, key := range Keys {
 		addr := key.PublicKey().Address()
-		genesisUtxos[i] = &genesis.UTXO{
+		genesisUTXOs[i] = &genesis.UTXO{
 			UTXO: avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
@@ -123,7 +123,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 
 	return &genesis.Genesis{
 		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
-		UTXOs:         genesisUtxos,
+		UTXOs:         genesisUTXOs,
 		Validators:    vdrs.List(),
 		Chains:        nil,
 		Timestamp:     uint64(GenesisTime.Unix()),
