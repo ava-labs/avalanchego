@@ -83,9 +83,9 @@ var (
 )
 
 func init() {
-	for range preFundedKeys {
-		nodeID := ids.GenerateTestNodeID()
-		genesisNodeIDs = append(genesisNodeIDs, nodeID)
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
 

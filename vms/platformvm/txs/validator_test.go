@@ -21,7 +21,6 @@ func TestBoundedBy(t *testing.T) {
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
-
 	a := &Validator{
 		NodeID: nodeID,
 		Start:  aStartTime,
