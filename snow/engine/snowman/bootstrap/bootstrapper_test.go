@@ -405,7 +405,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID+1, [][]byte{blkBytes1})) // respond with wrong request ID
 	require.Equal(oldReqID, *requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), ids.NodeID{1, 2, 3}, *requestID, [][]byte{blkBytes1})) // respond from wrong peer
+	require.NoError(bs.Ancestors(context.Background(), ids.BuildTestNodeID([]byte{1, 2, 3}), *requestID, [][]byte{blkBytes1})) // respond from wrong peer
 	require.Equal(oldReqID, *requestID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes0})) // respond with wrong block
