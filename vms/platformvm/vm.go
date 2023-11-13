@@ -142,7 +142,6 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
-		&vm.bootstrapped,
 	)
 	if err != nil {
 		return err
@@ -178,7 +177,7 @@ func (vm *VM) Initialize(
 
 	// Note: There is a circular dependency between the mempool and block
 	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	mempool, err := mempool.New("mempool", registerer, vm)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -304,17 +303,21 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
 	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
+	vl := validators.NewLogger(vm.ctx.Log, constants.PrimaryNetworkID, vm.ctx.NodeID)
+	vm.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
+
 	for subnetID := range vm.TrackedSubnets {
 		vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
-
 		if err := vm.uptimeManager.StartTracking(vdrIDs, subnetID); err != nil {
 			return err
 		}
+
+		vl := validators.NewLogger(vm.ctx.Log, subnetID, vm.ctx.NodeID)
+		vm.Validators.RegisterCallbackListener(subnetID, vl)
 	}
 
 	if err := vm.state.Commit(); err != nil {

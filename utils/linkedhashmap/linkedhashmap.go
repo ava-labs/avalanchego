@@ -17,7 +17,7 @@ var _ LinkedHashmap[int, struct{}] = (*linkedHashmap[int, struct{}])(nil)
 type Hashmap[K, V any] interface {
 	Put(key K, val V)
 	Get(key K) (val V, exists bool)
-	Delete(key K)
+	Delete(key K) (deleted bool)
 	Len() int
 }
 
@@ -63,11 +63,11 @@ func (lh *linkedHashmap[K, V]) Get(key K) (V, bool) {
 	return lh.get(key)
 }
 
-func (lh *linkedHashmap[K, V]) Delete(key K) {
+func (lh *linkedHashmap[K, V]) Delete(key K) bool {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
-	lh.delete(key)
+	return lh.delete(key)
 }
 
 func (lh *linkedHashmap[K, V]) Len() int {
@@ -114,11 +114,13 @@ func (lh *linkedHashmap[K, V]) get(key K) (V, bool) {
 	return utils.Zero[V](), false
 }
 
-func (lh *linkedHashmap[K, V]) delete(key K) {
-	if e, ok := lh.entryMap[key]; ok {
+func (lh *linkedHashmap[K, V]) delete(key K) bool {
+	e, ok := lh.entryMap[key]
+	if ok {
 		lh.entryList.Remove(e)
 		delete(lh.entryMap, key)
 	}
+	return ok
 }
 
 func (lh *linkedHashmap[K, V]) len() int {
