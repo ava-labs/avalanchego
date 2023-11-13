@@ -8,7 +8,6 @@ package builder
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -20,11 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// We allow [recentCacheSize] to be fairly large because we only store hashes
-	// in the cache, not entire transactions.
-	recentCacheSize = 512
-)
+// We allow [recentCacheSize] to be fairly large because we only store hashes
+// in the cache, not entire transactions.
+const recentCacheSize = 512
 
 var _ Network = (*network)(nil)
 
@@ -36,6 +33,9 @@ type Network interface {
 }
 
 type network struct {
+	// We embed a noop handler for all unhandled messages
+	common.AppHandler
+
 	ctx        *snow.Context
 	blkBuilder *builder
 
@@ -50,47 +50,13 @@ func NewNetwork(
 	appSender common.AppSender,
 ) Network {
 	return &network{
+		AppHandler: common.NewNoOpAppHandler(ctx.Log),
+
 		ctx:        ctx,
 		blkBuilder: blkBuilder,
 		appSender:  appSender,
 		recentTxs:  &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 	}
-}
-
-func (*network) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
 }
 
 func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
