@@ -175,13 +175,13 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
@@ -243,14 +243,14 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
@@ -1388,7 +1388,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
-	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
+	peerID := ids.BuildTestNodeID([]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	beacons := validators.NewManager()
 	require.NoError(beacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1))
 
@@ -1482,7 +1482,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
-	consensus := &smcon.Topological{}
+	snowGetHandler, err := snowgetter.New(
+		vm,
+		sender,
+		consensusCtx.Log,
+		time.Second,
+		2000,
+		consensusCtx.Registerer,
+	)
+	require.NoError(err)
+
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -1491,13 +1500,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
 	}
-
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
-	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
 		Config:        commonCfg,
@@ -1545,7 +1550,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: consensus,
+		Consensus: &smcon.Topological{},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)

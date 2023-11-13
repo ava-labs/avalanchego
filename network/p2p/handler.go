@@ -50,6 +50,7 @@ type Handler interface {
 	) ([]byte, error)
 }
 
+// NoOpHandler drops all messages
 type NoOpHandler struct{}
 
 func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) error {
@@ -94,6 +95,7 @@ type responder struct {
 	sender    common.AppSender
 }
 
+// AppRequest calls the underlying handler and sends back the response to nodeID
 func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.AppRequest(ctx, nodeID, deadline, request)
 	if err != nil {
@@ -122,6 +124,8 @@ func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 	}
 }
 
+// CrossChainAppRequest calls the underlying handler and sends back the response
+// to chainID
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.CrossChainAppRequest(ctx, chainID, deadline, request)
 	if err != nil {
