@@ -30,8 +30,6 @@ import (
 
 const defaultHistoryLength = 300
 
-var emptyKey Key
-
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
 	db, err := New(ctx, db, config)
@@ -803,8 +801,8 @@ func TestMerkleDBClear(t *testing.T) {
 	iter := db.NewIterator()
 	defer iter.Release()
 	require.False(iter.Next())
-	require.Equal(emptyRootID, db.getMerkleRoot())
-	require.Equal(emptyKey, db.root.Value().key)
+	require.Equal(ids.Empty, db.getMerkleRoot())
+	require.True(db.root.IsNothing())
 
 	// Assert caches are empty.
 	require.Zero(db.valueNodeDB.nodeCache.Len())
