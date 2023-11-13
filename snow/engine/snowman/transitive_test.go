@@ -2530,7 +2530,6 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	sendReqID := new(uint32)
 	reqVdr := new(ids.NodeID)
-	*reqVdr = ids.NodeIDFromShortNodeID(ids.EmptyShortNodeID)
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
