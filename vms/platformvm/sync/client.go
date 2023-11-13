@@ -18,6 +18,7 @@ var (
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
 
+// TODO rename
 type ClientIntf interface {
 	// methods that implement the client side of [block.StateSyncableVM]
 	StateSyncEnabled(context.Context) (bool, error)
