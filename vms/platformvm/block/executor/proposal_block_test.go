@@ -392,6 +392,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// Staker5:                                     |--------------------|
 
 	// Staker0 it's here just to allow to issue a proposal block with the chosen endTime.
+
+	// In this test multiple stakers may join and leave the staker set at the same time.
+	// The order in which they do it is asserted; the order may depend on the staker.TxID,
+	// which in turns depend on every feature of the transaction creating the staker.
+	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
+	// so that TxID does not depend on the order we run tests.
 	staker0 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf0}),
 		rewardAddress: ids.BuildTestShortID([]byte{0xf0}),
