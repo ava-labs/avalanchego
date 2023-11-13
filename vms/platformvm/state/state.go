@@ -1162,6 +1162,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 
 		prevHeight = parsedHeight
+
 		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
 		if err != nil {
 			return err
@@ -1197,8 +1198,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		defer diffIter.Release()
 
 		for diffIter.Next() {
-			key := diffIter.Key()
-			nodeID, err := ids.ToNodeID(key)
+			nodeID, err := ids.ToNodeID(diffIter.Key())
 			if err != nil {
 				return err
 			}
