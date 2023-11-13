@@ -342,10 +342,10 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 func buildGenesisTest(t *testing.T, ctx *snow.Context) *genesis.Genesis {
 	require := require.New(t)
 
-	genesisUtxos := make([]*genesis.UTXO, len(preFundedKeys))
+	genesisUTXOs := make([]*genesis.UTXO, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		addr := key.PublicKey().Address()
-		genesisUtxos[i] = &genesis.UTXO{
+		genesisUTXOs[i] = &genesis.UTXO{
 			UTXO: avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
@@ -409,7 +409,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) *genesis.Genesis {
 
 	return &genesis.Genesis{
 		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
-		UTXOs:         genesisUtxos,
+		UTXOs:         genesisUTXOs,
 		Validators:    vdrs.List(),
 		Chains:        nil,
 		Timestamp:     uint64(defaultGenesisTime.Unix()),
