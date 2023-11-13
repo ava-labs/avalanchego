@@ -13,7 +13,6 @@ func TestNodeIDShortNodeIDConversion(t *testing.T) {
 	require := require.New(t)
 
 	nonEmptyInputs := []ShortNodeID{
-		// EmptyShortNodeID,
 		{24},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
