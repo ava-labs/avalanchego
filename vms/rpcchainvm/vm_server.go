@@ -108,7 +108,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed initializing vm, nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	publicKey, err := bls.PublicKeyFromBytes(req.PublicKey)
 	if err != nil {
@@ -366,8 +366,9 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed marking as connected nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
+
 	peerVersion, err := version.ParseApplication(req.Version)
 	if err != nil {
 		return nil, err
@@ -379,7 +380,7 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed marking as disconnected nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
 }
@@ -549,7 +550,7 @@ func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossCh
 func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying app request, nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
 	if err != nil {
@@ -561,7 +562,7 @@ func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*e
 func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying app request failed, nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId)
 }
@@ -569,7 +570,7 @@ func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFa
 func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying app response, nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppResponse(ctx, nodeID, req.RequestId, req.Response)
 }
@@ -577,7 +578,7 @@ func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (
 func (vm *VMServer) AppGossip(ctx context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("failed notifying app gossip, nodeID %v: %w", req.NodeId, err)
+		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppGossip(ctx, nodeID, req.Msg)
 }
