@@ -108,6 +108,10 @@ func New(
 	}
 }
 
+func (ss *stateSyncer) Context() *snow.ConsensusContext {
+	return ss.Ctx
+}
+
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {

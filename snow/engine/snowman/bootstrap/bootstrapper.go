@@ -154,6 +154,10 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	return b.Startup(ctx)
 }
 
+func (b *bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
@@ -557,7 +561,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.Ctx.State.Get().State == snow.NormalOp || b.awaitingTimeout {
 		return nil
 	}
 
