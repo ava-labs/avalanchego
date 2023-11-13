@@ -55,6 +55,7 @@ type bootstrapper struct {
 	failedAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet set.Set[ids.ID]
+	acceptedFrontier    []ids.ID
 
 	// IDs of validators we should request filtering the accepted frontier from
 	pendingSendAccepted set.Set[ids.NodeID]
@@ -66,8 +67,7 @@ type bootstrapper struct {
 	failedAccepted set.Set[ids.NodeID]
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
-	acceptedVotes    map[ids.ID]uint64
-	acceptedFrontier []ids.ID
+	acceptedVotes map[ids.ID]uint64
 
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int
