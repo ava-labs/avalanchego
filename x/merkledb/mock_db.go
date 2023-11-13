@@ -40,6 +40,20 @@ func (m *MockMerkleDB) EXPECT() *MockMerkleDBMockRecorder {
 	return m.recorder
 }
 
+// Clear mocks base method.
+func (m *MockMerkleDB) Clear() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Clear")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Clear indicates an expected call of Clear.
+func (mr *MockMerkleDBMockRecorder) Clear() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockMerkleDB)(nil).Clear))
+}
+
 // Close mocks base method.
 func (m *MockMerkleDB) Close() error {
 	m.ctrl.T.Helper()
