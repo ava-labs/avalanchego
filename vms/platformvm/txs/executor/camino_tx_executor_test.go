@@ -1659,7 +1659,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: bob,
 			txFlag:        as.AddressStateBitRoleKYC,
 			existingState: as.AddressStateRoleKYC,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has KYC role, and he is trying to give himself Admin role
@@ -1668,7 +1668,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: bob,
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateRoleKYC,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has Admin role, and he is trying to give Alice Admin role
@@ -1714,7 +1714,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateRoleAdmin,
 			expectedState: 0,
-			expectedErrs:  []error{errAdminCannotBeDeleted, errAdminCannotBeDeleted},
+			expectedErrs:  []error{errAdminCannotBeDeleted, errAdminCannotBeDeleted, errAdminCannotBeDeleted},
 			remove:        true,
 		},
 		// Bob has Admin role, and he is trying to give Alice the KYC Verified state
@@ -1743,6 +1743,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			existingState: as.AddressStateRoleAdmin,
 			expectedState: as.AddressStateConsortiumMember,
 			remove:        false,
+			expectedErrs:  []error{nil, nil, errAddrStateNotPermitted},
 		},
 		// Bob has KYC role, and he is trying to give Alice KYC Expired state
 		"State: KYC, Flag: KYC Expired, Add, Different Address": {
@@ -1768,7 +1769,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// An Empty Address has Admin role, and he is trying to give Alice Admin role
@@ -1777,7 +1778,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has Admin role, and he is trying to give Admin role to an Empty Address
@@ -1786,7 +1787,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: ids.ShortEmpty,
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{txs.ErrEmptyAddress, txs.ErrEmptyAddress},
+			expectedErrs:  []error{txs.ErrEmptyAddress, txs.ErrEmptyAddress, txs.ErrEmptyAddress},
 			remove:        false,
 		},
 		// Bob has empty addr state, and he is trying to give Alice Admin role
@@ -1796,7 +1797,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateEmpty,
 			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove Admin role from Alice
 		"State: none, Flag: Admin role, Remove, Different Address": {
@@ -1805,7 +1806,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitRoleAdmin,
 			existingState: as.AddressStateEmpty,
 			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to give Alice KYC role
 		"State: none, Flag: KYC role, Add, Different Address": {
@@ -1814,7 +1815,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitRoleKYC,
 			existingState: as.AddressStateEmpty,
 			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove KYC role from Alice
 		"State: none, Flag: KYC role, Remove, Different Address": {
@@ -1823,7 +1824,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitRoleKYC,
 			existingState: as.AddressStateEmpty,
 			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to give Alice KYC Verified state
 		"State: none, Flag: KYC Verified, Add, Different Address": {
@@ -1832,7 +1833,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitKYCVerified,
 			existingState: as.AddressStateEmpty,
 			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove KYC Verified state from Alice
 		"State: none, Flag: KYC Verified, Remove, Different Address": {
@@ -1841,7 +1842,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        as.AddressStateBitKYCVerified,
 			existingState: as.AddressStateEmpty,
 			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has KYC role, and he is trying to give Alice KYC Expired state
 		"Upgrade: 1, State: KYC, Flag: KYC Expired, Add, Different Address": {
@@ -1864,7 +1865,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:         as.AddressStateBitKYCExpired,
 			existingState:  as.AddressStateRoleKYC,
 			expectedState:  as.AddressStateKYCExpired,
-			expectedErrs:   []error{errNotAthensPhase, errSignatureMissing},
+			expectedErrs:   []error{errNotAthensPhase, errSignatureMissing, errSignatureMissing},
 			remove:         false,
 			executor:       alice,
 			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1882,15 +1883,30 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		},
 	}}
 
-	athensPhaseTimes := []time.Time{
-		env.state.GetTimestamp().Add(24 * time.Hour), // AthensPhase not yet active (> chainTime)
-		env.state.GetTimestamp(),                     // AthensPhase active (<= chainTime)
+	chainTime := env.state.GetTimestamp()
+
+	fnSetPhaseTimes := []func() string{
+		func() string {
+			env.config.AthensPhaseTime = chainTime.Add(1 * time.Second) // not yet active
+			env.config.BerlinPhaseTime = chainTime.Add(2 * time.Second) // not yet active
+			return "Sunrise"
+		},
+		func() string {
+			env.config.AthensPhaseTime = chainTime                      // active
+			env.config.BerlinPhaseTime = chainTime.Add(1 * time.Second) // not yet active
+			return "Athens"
+		},
+		func() string {
+			env.config.AthensPhaseTime = chainTime.Add(-1 * time.Second) // active
+			env.config.BerlinPhaseTime = chainTime                       // active
+			return "Berlin"
+		},
 	}
 
-	for phase := 0; phase < 2; phase++ {
-		env.config.AthensPhaseTime = athensPhaseTimes[phase]
+	for phase := 0; phase < 3; phase++ {
+		phaseName := fnSetPhaseTimes[phase]()
 		for name, tt := range tests {
-			t.Run(fmt.Sprintf("Phase %d; %s", phase, name), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s; %s", phaseName, name), func(t *testing.T) {
 				addressStateTx := &txs.AddressStateTx{
 					UpgradeVersionID: codec.BuildUpgradeVersionID(tt.UpgradeVersion),
 					BaseTx:           baseTx,

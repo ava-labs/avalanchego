@@ -47,6 +47,8 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
+	rootAdminKey := caminoPreFundedKeys[0]
+	adminProposerKey := caminoPreFundedKeys[0]
 	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
 
@@ -81,14 +83,28 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Set consortium member
 	tx, err := vm.txBuilder.NewAddressStateTx(
-		consortiumMemberKey.Address(),
+		adminProposerKey.Address(),
 		false,
-		as.AddressStateBitConsortium,
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		as.AddressStateBitRoleConsortiumAdminProposer,
+		[]*secp256k1.PrivateKey{rootAdminKey},
 		outputOwners,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	proposalTx := buildAddMemberProposalTx(
+		t,
+		vm,
+		caminoPreFundedKeys[0],
+		vm.Config.CaminoConfig.DACProposalBondAmount,
+		defaultTxFee,
+		adminProposerKey, // AdminProposer
+		consortiumMemberKey.Address(),
+		vm.clock.Time(),
+		true,
+	)
+	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
+	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
+
 	// Register node
 	tx, err = vm.txBuilder.NewRegisterNodeTx(
 		ids.EmptyNodeID,
@@ -217,6 +233,8 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
+	rootAdminKey := caminoPreFundedKeys[0]
+	adminProposerKey := caminoPreFundedKeys[0]
 	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
 
@@ -251,14 +269,27 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 
 	// Set consortium member
 	tx, err := vm.txBuilder.NewAddressStateTx(
-		consortiumMemberKey.Address(),
+		adminProposerKey.Address(),
 		false,
-		as.AddressStateBitConsortium,
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		as.AddressStateBitRoleConsortiumAdminProposer,
+		[]*secp256k1.PrivateKey{rootAdminKey},
 		outputOwners,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	proposalTx := buildAddMemberProposalTx(
+		t,
+		vm,
+		caminoPreFundedKeys[0],
+		vm.Config.CaminoConfig.DACProposalBondAmount,
+		defaultTxFee,
+		adminProposerKey, // AdminProposer
+		consortiumMemberKey.Address(),
+		vm.clock.Time(),
+		true,
+	)
+	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
+	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
 	// Register node
 	tx, err = vm.txBuilder.NewRegisterNodeTx(

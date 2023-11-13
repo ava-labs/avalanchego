@@ -2149,8 +2149,11 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	roles := as.AddressStateEmpty
 	creds := e.Tx.Creds
 
+	chainTime := e.State.GetTimestamp()
+	isAthensPhase := e.Config.IsAthensPhaseActivated(chainTime)
+
 	if tx.UpgradeVersionID.Version() > 0 {
-		if !e.Config.IsAthensPhaseActivated(e.State.GetTimestamp()) {
+		if !isAthensPhase {
 			return errNotAthensPhase
 		}
 		if err = e.Backend.Fx.VerifyMultisigPermission(
@@ -2199,9 +2202,15 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 	statesBit := as.AddressState(1) << tx.State
 
-	// Check for AthensPhase Bits if we time has not passed yet
-	if (statesBit&as.AddressStateAthensPhaseBits) != 0 &&
-		!e.Config.IsAthensPhaseActivated(e.State.GetTimestamp()) {
+	// Check for bits that was affected or introduced in AthensPhase
+	if !isAthensPhase && statesBit&as.AddressStateAthensPhaseBits != 0 {
+		return errAddrStateNotPermitted
+	}
+
+	// Check for bits that was affected or introduced in BerlinPhase
+	isBerlinPhase := e.Config.IsBerlinPhaseActivated(chainTime)
+	if !isBerlinPhase && statesBit&as.AddressStateBerlinPhaseBits != 0 ||
+		isBerlinPhase && tx.State == as.AddressStateBitConsortium { // Berlin phase moved consortium handling to admin proposals
 		return errAddrStateNotPermitted
 	}
 
