@@ -9,6 +9,9 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -45,7 +49,14 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	nonStateSyncableVM := &block.TestVM{
 		TestVM: common.TestVM{T: t},
 	}
-	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
+	dummyGetter, err := getter.New(
+		nonStateSyncableVM,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
@@ -59,8 +70,6 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	require.False(enabled)
 
 	// State syncableVM case
-	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
-
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{T: t},
@@ -69,7 +78,13 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 			T: t,
 		},
 	}
-	dummyGetter, err = getter.New(fullVM, *commonCfg)
+	dummyGetter, err = getter.New(
+		fullVM,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry())
 	require.NoError(err)
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
