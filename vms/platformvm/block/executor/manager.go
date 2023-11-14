@@ -21,6 +21,10 @@ type Manager interface {
 
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
+
+	SetPreference(blkID ids.ID) (updated bool)
+	Preferred() ids.ID
+
 	GetBlock(blkID ids.ID) (snowman.Block, error)
 	GetStatelessBlock(blkID ids.ID) (block.Block, error)
 	NewBlock(block.Block) snowman.Block
@@ -33,9 +37,10 @@ func NewManager(
 	txExecutorBackend *executor.Backend,
 	validatorManager validators.Manager,
 ) Manager {
+	lastAccepted := s.GetLastAccepted()
 	backend := &backend{
 		Mempool:      mempool,
-		lastAccepted: s.GetLastAccepted(),
+		lastAccepted: lastAccepted,
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -57,6 +62,7 @@ func NewManager(
 			backend:         backend,
 			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
+		preferred: lastAccepted,
 	}
 }
 
@@ -65,6 +71,8 @@ type manager struct {
 	verifier block.Visitor
 	acceptor block.Visitor
 	rejector block.Visitor
+
+	preferred ids.ID
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -84,4 +92,14 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 		manager: m,
 		Block:   blk,
 	}
+}
+
+func (m *manager) SetPreference(blockID ids.ID) (updated bool) {
+	updated = m.preferred == blockID
+	m.preferred = blockID
+	return updated
+}
+
+func (m *manager) Preferred() ids.ID {
+	return m.preferred
 }
