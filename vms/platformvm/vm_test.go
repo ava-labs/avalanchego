@@ -1482,7 +1482,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
-	consensus := &smcon.Topological{}
+	snowGetHandler, err := snowgetter.New(
+		vm,
+		sender,
+		consensusCtx.Log,
+		time.Second,
+		2000,
+		consensusCtx.Registerer,
+	)
+	require.NoError(err)
+
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -1491,13 +1500,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
 	}
-
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
-	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
 		Config:        commonCfg,
@@ -1546,7 +1551,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: consensus,
+		Consensus: &smcon.Topological{},
 
 		Peers:                          peers,
 		AncestorsMaxContainersSent:     2000,
