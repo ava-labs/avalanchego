@@ -5,6 +5,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,6 +18,7 @@ var (
 	_ ClientIntf = (*Client)(nil)
 
 	stateSyncSummaryKey = []byte("stateSyncSummary")
+	errShutdown         = errors.New("client has been shut down")
 )
 
 // TODO rename
@@ -51,13 +53,11 @@ type Client struct {
 	lock sync.Mutex
 
 	enabled       bool
+	shutdown      bool
 	onDone        func(err error)
 	managerConfig xsync.ManagerConfig
 
 	metadataDB database.KeyValueReaderWriterDeleter
-
-	// Set in acceptSyncSummary.
-	manager *xsync.Manager
 
 	// Set in acceptSyncSummary.
 	// Calling [c.syncCancel] will stop syncing.
@@ -81,13 +81,17 @@ func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (bl
 	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
-// Aynschronously starts syncing to the root in [summary].
-// Populates [c.manager] and [c.syncCancel].
-// Sets [c.syncErr] and closes [c.syncDone] when syncing is done.
+// Starts asynchronously syncing to the root in [summary].
+// Populates [c.syncCancel].
+// [c.onDone] is guaranteed to eventually be called iff this function returns nil.
 // Must only be called once.
 func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	if c.shutdown {
+		return 0, errShutdown
+	}
 
 	c.managerConfig.TargetRoot = summary.BlockRoot
 
@@ -95,7 +99,6 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 	if err != nil {
 		return 0, err
 	}
-	c.manager = manager
 
 	if err := c.metadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
 		return 0, err
@@ -106,8 +109,8 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 
 	go func() {
 		var err error
-		if err = c.manager.Start(ctx); err == nil {
-			err = c.manager.Wait(ctx)
+		if err = manager.Start(ctx); err == nil {
+			err = manager.Wait(ctx)
 		}
 		c.onDone(err)
 	}()
