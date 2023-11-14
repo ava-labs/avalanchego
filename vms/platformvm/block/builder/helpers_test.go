@@ -88,8 +88,8 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
-	sender     *common.SenderTest
 	network    network.Network
+	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
