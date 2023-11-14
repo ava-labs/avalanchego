@@ -12,22 +12,22 @@ import (
 )
 
 // Returns a new Server that stores at most the last [maxSummaries] summaries.
-func NewServer(maxSummaries int) *Server {
+func NewServer(maxSummaryHistoryLen int) *Server {
 	return &Server{
-		maxSummaries: maxSummaries,
-		summaries:    linkedhashmap.New[uint64, block.StateSummary](),
+		maxSummaryHistoryLen: maxSummaryHistoryLen,
+		summaries:            linkedhashmap.New[uint64, block.StateSummary](),
 	}
 }
 
 type Server struct {
-	maxSummaries int
-	summaries    linkedhashmap.LinkedHashmap[uint64, block.StateSummary]
+	maxSummaryHistoryLen int
+	summaries            linkedhashmap.LinkedHashmap[uint64, block.StateSummary]
 }
 
 func (s *Server) RecordSummary(summary block.StateSummary) {
 	s.summaries.Put(summary.Height(), summary)
 
-	if s.summaries.Len() > s.maxSummaries {
+	if s.summaries.Len() > s.maxSummaryHistoryLen {
 		oldestKey, _, _ := s.summaries.Oldest()
 		_ = s.summaries.Delete(oldestKey)
 	}

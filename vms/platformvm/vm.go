@@ -52,11 +52,14 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
+const maxSummaryHistoryLen = 128 // TODO what should this be?
+
 var (
-	_ snowmanblock.ChainVM       = (*VM)(nil)
-	_ secp256k1fx.VM             = (*VM)(nil)
-	_ validators.State           = (*VM)(nil)
-	_ validators.SubnetConnector = (*VM)(nil)
+	_ snowmanblock.ChainVM         = (*VM)(nil)
+	_ secp256k1fx.VM               = (*VM)(nil)
+	_ validators.State             = (*VM)(nil)
+	_ validators.SubnetConnector   = (*VM)(nil)
+	_ snowmanblock.StateSyncableVM = (*VM)(nil)
 
 	_ SyncClient = (*psync.Client)(nil)
 	_ SyncServer = (*psync.Server)(nil)
@@ -80,6 +83,9 @@ type VM struct {
 	config.Config
 	blockbuilder.Builder
 	validators.State
+
+	syncClient SyncClient
+	syncServer SyncServer
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
@@ -231,6 +237,11 @@ func (vm *VM) Initialize(
 	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
 		return err
 	}
+
+	// TODO pass args
+	vm.syncClient = psync.NewClient(psync.ClientConfig{}, nil)
+	// TODO call RecordSummary on syncServer
+	vm.syncServer = psync.NewServer(maxSummaryHistoryLen)
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
@@ -490,4 +501,24 @@ func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
+	return vm.syncClient.StateSyncEnabled(ctx)
+}
+
+func (vm *VM) GetOngoingSyncStateSummary(ctx context.Context) (snowmanblock.StateSummary, error) {
+	return vm.syncClient.GetOngoingSyncStateSummary(ctx)
+}
+
+func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (snowmanblock.StateSummary, error) {
+	return vm.syncClient.ParseStateSummary(ctx, summaryBytes)
+}
+
+func (vm *VM) GetLastStateSummary(ctx context.Context) (snowmanblock.StateSummary, error) {
+	return vm.syncServer.GetLastStateSummary(ctx)
+}
+
+func (vm *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (snowmanblock.StateSummary, error) {
+	return vm.syncServer.GetStateSummary(ctx, summaryHeight)
 }
