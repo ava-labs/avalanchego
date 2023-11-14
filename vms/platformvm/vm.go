@@ -71,6 +71,7 @@ type SyncClient interface {
 }
 
 type SyncServer interface {
+	RecordSummary(summary snowmanblock.StateSummary)
 	GetLastStateSummary(context.Context) (snowmanblock.StateSummary, error)
 	GetStateSummary(_ context.Context, summaryHeight uint64) (snowmanblock.StateSummary, error)
 }
