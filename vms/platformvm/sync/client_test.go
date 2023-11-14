@@ -97,7 +97,6 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 		now              = time.Now().UnixNano()
 		r                = rand.New(rand.NewSource(now))
 		ctrl             = gomock.NewController(t)
-		metadataDB       = memdb.New()
 		onDoneErrChan    = make(chan error)
 		onGotSummaryChan = make(chan struct{})
 		syncClient       = xsync.NewMockClient(ctrl)
@@ -187,7 +186,7 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 		OnDone: func(err error) {
 			onDoneErrChan <- err
 		},
-	}, metadataDB)
+	}, memdb.New())
 
 	// Make a new rawSummary whose root ID is [targetRootID].
 	rawSummary, err := NewSyncSummary(ids.GenerateTestID(), 1337, targetRootID)
@@ -221,4 +220,129 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 	// Make sure the ongoing sync was removed.
 	_, err = client.GetOngoingSyncStateSummary(context.Background())
 	require.ErrorIs(err, database.ErrNotFound)
+}
+
+func TestClientShutdown(t *testing.T) {
+	var (
+		require        = require.New(t)
+		now            = time.Now().UnixNano()
+		r              = rand.New(rand.NewSource(now))
+		ctrl           = gomock.NewController(t)
+		onDoneErrChan  = make(chan error)
+		syncClient     = xsync.NewMockClient(ctrl)
+		onShutdownChan = make(chan struct{})
+	)
+
+	newDBConfig := func() merkledb.Config {
+		return merkledb.Config{
+			BranchFactor:              merkledb.BranchFactor16,
+			EvictionBatchSize:         1_000,
+			HistoryLength:             1_000,
+			ValueNodeCacheSize:        1_000,
+			IntermediateNodeCacheSize: 1_000,
+			// Need a new [Reg] for each database to avoid
+			// duplicate metrics collector registration error.
+			Reg:        prometheus.NewRegistry(),
+			TraceLevel: merkledb.NoTrace,
+			Tracer:     trace.Noop,
+		}
+	}
+
+	// Make a database that will be synced.
+	syncDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDBConfig(),
+	)
+	require.NoError(err)
+
+	// Make a target database.
+	targetDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDBConfig(),
+	)
+	require.NoError(err)
+
+	// Populate the target database.
+	for i := 0; i < 1_000; i++ {
+		key := make([]byte, 32)
+		_, _ = r.Read(key)
+		value := make([]byte, 32)
+		_, _ = r.Read(value)
+		require.NoError(targetDB.Put(key, value))
+	}
+	targetRootID, err := targetDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	syncClient.EXPECT().GetRangeProof(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(_ context.Context, req *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
+		// Don't serve sync requests until we've called Shutdown,
+		// to ensure we don't finish syncing before Shutdown is called.
+		<-onShutdownChan
+
+		rootID, err := ids.ToID(req.RootHash)
+		require.NoError(err)
+		require.Equal(targetRootID, rootID)
+
+		start := maybe.Nothing[[]byte]()
+		if req.StartKey != nil && !req.StartKey.IsNothing {
+			start = maybe.Some(req.StartKey.Value)
+		}
+
+		end := maybe.Nothing[[]byte]()
+		if req.EndKey != nil && !req.EndKey.IsNothing {
+			end = maybe.Some(req.EndKey.Value)
+		}
+
+		return targetDB.GetRangeProof(
+			context.Background(),
+			start,
+			end,
+			int(req.KeyLimit),
+		)
+	}).AnyTimes()
+
+	client := NewClient(ClientConfig{
+		ManagerConfig: xsync.ManagerConfig{
+			DB:                    syncDB,
+			Client:                syncClient,
+			SimultaneousWorkLimit: 1,
+			Log:                   logging.NoLog{},
+			BranchFactor:          merkledb.BranchFactor16,
+		},
+		Enabled: true,
+		OnDone: func(err error) {
+			onDoneErrChan <- err
+		},
+	}, memdb.New())
+
+	// Make a new rawSummary whose root ID is [targetRootID].
+	rawSummary, err := NewSyncSummary(ids.GenerateTestID(), 1337, targetRootID)
+	require.NoError(err)
+	// Need to make the summary like this so that its onAccept callback is set.
+	summary, err := client.ParseStateSummary(context.Background(), rawSummary.Bytes())
+	require.NoError(err)
+
+	// Start syncing.
+	syncMode, err := summary.Accept(context.Background())
+	require.Equal(block.StateSyncStatic, syncMode)
+	require.NoError(err)
+
+	// Interrupt syncing with a shutdown.
+	client.Shutdown()
+
+	// Allow syncing to finish.
+	close(onShutdownChan)
+
+	// Wait for syncing to finish / assert that
+	// the OnDone callback was called.
+	require.ErrorIs(<-onDoneErrChan, context.Canceled)
+
+	// Make sure the ongoing sync remains.
+	ongoingSummary, err := client.GetOngoingSyncStateSummary(context.Background())
+	require.NoError(err)
+	require.Equal(summary.ID(), ongoingSummary.ID())
 }

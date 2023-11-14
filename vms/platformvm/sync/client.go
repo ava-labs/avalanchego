@@ -26,6 +26,7 @@ type ClientIntf interface {
 	StateSyncEnabled(context.Context) (bool, error)
 	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
+	// Stops syncing. No-op if syncing hasn't begun or is done.
 	Shutdown()
 }
 
