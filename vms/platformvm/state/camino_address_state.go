@@ -8,17 +8,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 )
 
 // Set a new state assigned to the address id
-func (cs *caminoState) SetAddressStates(address ids.ShortID, states txs.AddressState) {
+func (cs *caminoState) SetAddressStates(address ids.ShortID, states as.AddressState) {
 	cs.modifiedAddressStates[address] = states
 	cs.addressStateCache.Evict(address)
 }
 
 // Return the current state (if exists) for an address
-func (cs *caminoState) GetAddressStates(address ids.ShortID) (txs.AddressState, error) {
+func (cs *caminoState) GetAddressStates(address ids.ShortID) (as.AddressState, error) {
 	// Try to get from modified state
 	item, ok := cs.modifiedAddressStates[address]
 	// Try to get from cache
@@ -30,11 +30,11 @@ func (cs *caminoState) GetAddressStates(address ids.ShortID) (txs.AddressState, 
 		uintBytes, err := cs.addressStateDB.Get(address[:])
 		switch err {
 		case nil:
-			item = txs.AddressState(binary.LittleEndian.Uint64(uintBytes))
+			item = as.AddressState(binary.LittleEndian.Uint64(uintBytes))
 		case database.ErrNotFound:
-			item = txs.AddressStateEmpty
+			item = as.AddressStateEmpty
 		default:
-			return txs.AddressStateEmpty, err
+			return as.AddressStateEmpty, err
 		}
 		cs.addressStateCache.Put(address, item)
 	}

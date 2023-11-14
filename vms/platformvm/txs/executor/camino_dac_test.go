@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -59,7 +60,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 		"Proposer isn't caminoProposer": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(txs.AddressStateEmpty, nil) // not AddressStateCaminoProposer
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
 				return s
 			},
 			utx: func() *txs.AddProposalTx {
@@ -83,7 +84,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Value().Return(&dac.BaseFeeProposalState{}, nil)
 				proposalsIterator.EXPECT().Release()
 
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(txs.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -108,7 +109,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(txs.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -237,7 +238,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 		"Applicant address is consortium member": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(applicantAddress).Return(txs.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateConsortiumMember, nil)
 				return s
 			},
 			utx: func() *txs.AddProposalTx {
@@ -261,7 +262,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Value().Return(&dac.AddMemberProposalState{ApplicantAddress: applicantAddress}, nil)
 				proposalsIterator.EXPECT().Release()
 
-				s.EXPECT().GetAddressStates(applicantAddress).Return(txs.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -286,7 +287,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetAddressStates(applicantAddress).Return(txs.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -337,7 +338,7 @@ func TestProposalExecutorAddMemberProposal(t *testing.T) {
 	}
 
 	applicantAddress := ids.ShortID{1}
-	applicantAddressState := txs.AddressStateCaminoProposer // just not empty
+	applicantAddressState := as.AddressStateCaminoProposer // just not empty
 
 	tests := map[string]struct {
 		state       func(*gomock.Controller) *state.MockDiff
@@ -358,7 +359,7 @@ func TestProposalExecutorAddMemberProposal(t *testing.T) {
 			state: func(c *gomock.Controller) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(applicantAddress).Return(applicantAddressState, nil)
-				s.EXPECT().SetAddressStates(applicantAddress, applicantAddressState|txs.AddressStateConsortiumMember)
+				s.EXPECT().SetAddressStates(applicantAddress, applicantAddressState|as.AddressStateConsortiumMember)
 				return s
 			},
 			proposal: &dac.AddMemberProposalState{

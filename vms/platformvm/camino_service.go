@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -251,10 +252,10 @@ type SetAddressStateArgs struct {
 	api.UserPass
 	api.JSONFromAddrs
 
-	Change  platformapi.Owner   `json:"change"`
-	Address string              `json:"address"`
-	State   txs.AddressStateBit `json:"state"`
-	Remove  bool                `json:"remove"`
+	Change  platformapi.Owner  `json:"change"`
+	Address string             `json:"address"`
+	State   as.AddressStateBit `json:"state"`
+	Remove  bool               `json:"remove"`
 }
 
 // AddAdressState issues an AddAdressStateTx

@@ -322,3 +322,88 @@ func TestBaseFeeProposalStateAddVote(t *testing.T) {
 		})
 	}
 }
+
+func TestBaseFeeProposalCreateFinishedProposalState(t *testing.T) {
+	tests := map[string]struct {
+		proposal                 *BaseFeeProposal
+		optionIndex              uint32
+		expectedProposalState    ProposalState
+		expectedOriginalProposal *BaseFeeProposal
+		expectedErr              error
+	}{
+		"Fail: option 2 out of bonds": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+			optionIndex: 2,
+			expectedOriginalProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+			expectedErr: errWrongOptionIndex,
+		},
+		"OK: option 0": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+			optionIndex: 0,
+			expectedProposalState: &BaseFeeProposalState{
+				Start:         100,
+				End:           101,
+				AllowedVoters: []ids.ShortID{},
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 10, Weight: 1},
+						{Value: 20},
+					},
+				},
+			},
+			expectedOriginalProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+		},
+		"OK: option 1": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+			optionIndex: 1,
+			expectedProposalState: &BaseFeeProposalState{
+				Start:         100,
+				End:           101,
+				AllowedVoters: []ids.ShortID{},
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 10},
+						{Value: 20, Weight: 1},
+					},
+				},
+			},
+			expectedOriginalProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{10, 20},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			proposalState, err := tt.proposal.CreateFinishedProposalState(tt.optionIndex)
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedProposalState, proposalState)
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
+			if tt.expectedErr == nil {
+				require.True(t, proposalState.CanBeFinished())
+				require.True(t, proposalState.IsSuccessful())
+			}
+		})
+	}
+}

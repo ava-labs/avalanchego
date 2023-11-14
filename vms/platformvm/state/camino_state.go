@@ -11,11 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func (s *state) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID], lockState locked.State) ([]*avax.UTXO, error) {
@@ -50,11 +50,11 @@ func (s *state) CaminoConfig() (*CaminoConfig, error) {
 	return s.caminoState.CaminoConfig(), nil
 }
 
-func (s *state) SetAddressStates(address ids.ShortID, states txs.AddressState) {
+func (s *state) SetAddressStates(address ids.ShortID, states as.AddressState) {
 	s.caminoState.SetAddressStates(address, states)
 }
 
-func (s *state) GetAddressStates(address ids.ShortID) (txs.AddressState, error) {
+func (s *state) GetAddressStates(address ids.ShortID) (as.AddressState, error) {
 	return s.caminoState.GetAddressStates(address)
 }
 

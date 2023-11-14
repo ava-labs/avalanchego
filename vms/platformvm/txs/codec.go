@@ -132,6 +132,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&dac.SimpleVote{}),
 		targetCodec.RegisterCustomType(&dac.AddMemberProposal{}),
 		targetCodec.RegisterCustomType(&dac.AddMemberProposalState{}),
+		targetCodec.RegisterCustomType(&dac.AdminProposal{}),
 	)
 	return errs.Err
 }

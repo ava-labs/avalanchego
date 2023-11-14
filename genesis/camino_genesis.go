@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -364,12 +365,12 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	// Getting args from allocations
 
 	for _, allocation := range config.Camino.Allocations {
-		var addrState pchaintxs.AddressState
+		var addrState as.AddressState
 		if allocation.AddressStates.ConsortiumMember {
-			addrState |= pchaintxs.AddressStateConsortiumMember
+			addrState |= as.AddressStateConsortiumMember
 		}
 		if allocation.AddressStates.KYCVerified {
-			addrState |= pchaintxs.AddressStateKYCVerified
+			addrState |= as.AddressStateKYCVerified
 		}
 		if addrState != 0 {
 			platformvmArgs.Camino.AddressStates = append(platformvmArgs.Camino.AddressStates, genesis.AddressState{

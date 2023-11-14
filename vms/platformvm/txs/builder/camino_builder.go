@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -60,7 +61,7 @@ type CaminoTxBuilder interface {
 	NewAddressStateTx(
 		address ids.ShortID,
 		remove bool,
-		state txs.AddressStateBit,
+		state as.AddressStateBit,
 		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -300,7 +301,7 @@ func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 func (b *caminoBuilder) NewAddressStateTx(
 	address ids.ShortID,
 	remove bool,
-	state txs.AddressStateBit,
+	state as.AddressStateBit,
 	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {

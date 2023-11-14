@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -45,8 +46,8 @@ type ConsortiumMemberNodeID struct {
 }
 
 type AddressState struct {
-	Address ids.ShortID      `serialize:"true"`
-	State   txs.AddressState `serialize:"true"`
+	Address ids.ShortID     `serialize:"true"`
+	State   as.AddressState `serialize:"true"`
 }
 
 type Block struct {

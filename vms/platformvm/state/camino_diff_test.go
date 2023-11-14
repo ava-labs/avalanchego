@@ -14,11 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -2024,15 +2024,15 @@ func TestDiffSetAddressStates(t *testing.T) {
 	tests := map[string]struct {
 		diff         *diff
 		address      ids.ShortID
-		states       txs.AddressState
+		states       as.AddressState
 		expectedDiff *diff
 	}{
 		"OK": {
-			diff:    &diff{caminoDiff: &caminoDiff{modifiedAddressStates: map[ids.ShortID]txs.AddressState{}}},
+			diff:    &diff{caminoDiff: &caminoDiff{modifiedAddressStates: map[ids.ShortID]as.AddressState{}}},
 			address: addr1,
 			states:  111,
 			expectedDiff: &diff{caminoDiff: &caminoDiff{
-				modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+				modifiedAddressStates: map[ids.ShortID]as.AddressState{
 					addr1: 111,
 				},
 			}},
@@ -2055,13 +2055,13 @@ func TestDiffGetAddressStates(t *testing.T) {
 		diff                 func(*gomock.Controller) *diff
 		address              ids.ShortID
 		expectedDiff         func(actualDiff *diff) *diff
-		expectedAddresStates txs.AddressState
+		expectedAddresStates as.AddressState
 		expectedErr          error
 	}{
 		"OK: modified": {
 			diff: func(c *gomock.Controller) *diff {
 				return &diff{caminoDiff: &caminoDiff{
-					modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+					modifiedAddressStates: map[ids.ShortID]as.AddressState{
 						addr1: 111,
 					},
 				}}
@@ -2069,7 +2069,7 @@ func TestDiffGetAddressStates(t *testing.T) {
 			address: addr1,
 			expectedDiff: func(actualDiff *diff) *diff {
 				return &diff{caminoDiff: &caminoDiff{
-					modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+					modifiedAddressStates: map[ids.ShortID]as.AddressState{
 						addr1: 111,
 					},
 				}}
@@ -2079,7 +2079,7 @@ func TestDiffGetAddressStates(t *testing.T) {
 		"OK: removed": {
 			diff: func(c *gomock.Controller) *diff {
 				return &diff{caminoDiff: &caminoDiff{
-					modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+					modifiedAddressStates: map[ids.ShortID]as.AddressState{
 						addr1: 0,
 					},
 				}}
@@ -2087,7 +2087,7 @@ func TestDiffGetAddressStates(t *testing.T) {
 			address: addr1,
 			expectedDiff: func(actualDiff *diff) *diff {
 				return &diff{caminoDiff: &caminoDiff{
-					modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+					modifiedAddressStates: map[ids.ShortID]as.AddressState{
 						addr1: 0,
 					},
 				}}
@@ -2097,7 +2097,7 @@ func TestDiffGetAddressStates(t *testing.T) {
 		"OK: in parent": {
 			diff: func(c *gomock.Controller) *diff {
 				parentState := NewMockChain(c)
-				parentState.EXPECT().GetAddressStates(addr1).Return(txs.AddressState(111), nil)
+				parentState.EXPECT().GetAddressStates(addr1).Return(as.AddressState(111), nil)
 				return &diff{
 					stateVersions: newMockStateVersions(c, parentStateID, parentState),
 					parentID:      parentStateID,
@@ -2117,7 +2117,7 @@ func TestDiffGetAddressStates(t *testing.T) {
 		"Fail: parent errored": {
 			diff: func(c *gomock.Controller) *diff {
 				parentState := NewMockChain(c)
-				parentState.EXPECT().GetAddressStates(addr1).Return(txs.AddressStateEmpty, testErr)
+				parentState.EXPECT().GetAddressStates(addr1).Return(as.AddressStateEmpty, testErr)
 				return &diff{
 					stateVersions: newMockStateVersions(c, parentStateID, parentState),
 					parentID:      parentStateID,
@@ -5132,7 +5132,7 @@ func TestDiffApplyCaminoState(t *testing.T) {
 	}{
 		"OK": {
 			diff: &diff{caminoDiff: &caminoDiff{
-				modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+				modifiedAddressStates: map[ids.ShortID]as.AddressState{
 					{1}: 101,
 					{2}: 0,
 				},
@@ -5243,7 +5243,7 @@ func TestDiffApplyCaminoState(t *testing.T) {
 				return s
 			},
 			expectedDiff: &diff{caminoDiff: &caminoDiff{
-				modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+				modifiedAddressStates: map[ids.ShortID]as.AddressState{
 					{1}: 101,
 					{2}: 0,
 				},

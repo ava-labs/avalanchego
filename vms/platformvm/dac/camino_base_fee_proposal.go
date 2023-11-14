@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"golang.org/x/exp/slices"
 )
 
@@ -41,6 +42,10 @@ func (p *BaseFeeProposal) GetOptions() any {
 	return p.Options
 }
 
+func (*BaseFeeProposal) AdminProposer() as.AddressState {
+	return as.AddressStateEmpty // for now its forbidden, until we'll introduce dedicated role for it
+}
+
 func (p *BaseFeeProposal) Verify() error {
 	switch {
 	case len(p.Options) > baseFeeProposalMaxOptionsCount:
@@ -70,6 +75,15 @@ func (p *BaseFeeProposal) CreateProposalState(allowedVoters []ids.ShortID) Propo
 		stateProposal.Options[i].Value = p.Options[i]
 	}
 	return stateProposal
+}
+
+func (p *BaseFeeProposal) CreateFinishedProposalState(optionIndex uint32) (ProposalState, error) {
+	if optionIndex >= uint32(len(p.Options)) {
+		return nil, fmt.Errorf("%w (expected: less than %d, actual: %d)", errWrongOptionIndex, len(p.Options), optionIndex)
+	}
+	proposalState := p.CreateProposalState([]ids.ShortID{}).(*BaseFeeProposalState)
+	proposalState.Options[optionIndex].Weight++
+	return proposalState, nil
 }
 
 func (p *BaseFeeProposal) Visit(visitor VerifierVisitor) error {

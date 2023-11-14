@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
+	dac "github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
@@ -97,6 +99,7 @@ var (
 	errProposalsAreNotExpiredYet         = errors.New("proposals are not expired yet")
 	errEarlyFinishedProposalsMismatch    = errors.New("early proposals mismatch")
 	errExpiredProposalsMismatch          = errors.New("expired proposals mismatch")
+	errWrongAdminProposal                = errors.New("this type of proposal can't be admin-proposal")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -596,7 +599,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		if err != nil {
 			return err
 		}
-		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^txs.AddressStateNodeDeferred)
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^as.AddressStateNodeDeferred)
 
 		// Reset deferred bit on node owner address for onAbortState
 		nodeOwnerAddressOnAbort, err := e.OnAbortState.GetShortIDLink(
@@ -610,7 +613,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		if err != nil {
 			return err
 		}
-		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^txs.AddressStateNodeDeferred)
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^as.AddressStateNodeDeferred)
 	}
 
 	txID := e.Tx.ID()
@@ -1155,7 +1158,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		return err
 	}
 
-	if consortiumMemberAddressState.IsNot(txs.AddressStateConsortiumMember) {
+	if consortiumMemberAddressState.IsNot(as.AddressStateConsortiumMember) {
 		return errNotConsortiumMember
 	}
 
@@ -1634,7 +1637,7 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 		return err
 	}
 
-	if depositOfferCreatorAddressState.IsNot(txs.AddressStateOffersCreator) {
+	if depositOfferCreatorAddressState.IsNot(as.AddressStateOffersCreator) {
 		return errNotOfferCreator
 	}
 
@@ -1718,6 +1721,9 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return err
 	}
 
+	adminProposal, isAdminProposal := txProposal.(*dac.AdminProposal)
+	adminProposerAddressState := txProposal.AdminProposer()
+
 	// verify proposal and proposer credential
 
 	switch {
@@ -1729,6 +1735,18 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return errProposalToFarInFuture
 	case len(e.Tx.Creds) < 2:
 		return errWrongCredentialsNumber
+	case isAdminProposal && adminProposerAddressState == as.AddressStateEmpty:
+		return errWrongAdminProposal
+	}
+
+	if isAdminProposal {
+		addrState, err := e.State.GetAddressStates(tx.ProposerAddress)
+		if err != nil {
+			return err
+		}
+		if addrState.IsNot(adminProposerAddressState) {
+			return errNotPermittedToCreateProposal
+		}
 	}
 
 	if err := e.Fx.VerifyMultisigPermission(
@@ -1770,41 +1788,58 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
-	// Getting active validators
-	// Only validators who were active when the proposal was created can vote
+	// Get allowed voters and create proposalState
 
-	currentStakerIterator, err := e.State.GetCurrentStakerIterator()
-	if err != nil {
-		return err
-	}
-	defer currentStakerIterator.Release()
-
+	txID := e.Tx.ID()
 	allowedVoters := []ids.ShortID{}
-	for currentStakerIterator.Next() {
-		staker := currentStakerIterator.Value()
-		if staker.SubnetID != constants.PrimaryNetworkID {
-			continue
-		}
+	var proposalState dac.ProposalState
 
-		consortiumMemberAddress, err := e.State.GetShortIDLink(ids.ShortID(staker.NodeID), state.ShortLinkKeyRegisterNode)
+	if isAdminProposal {
+		// currently we only have addMember and excludeMember proposals, and their option 0 is "success" option
+		proposalState, err = txProposal.CreateFinishedProposalState(adminProposal.OptionIndex)
+		if err != nil {
+			// should never happen
+			// could error only if proposal can't be admin proposal
+			// but it was checked above
+			return err
+		}
+		// its admin proposal, must be finished and executed
+		e.State.AddProposalIDToFinish(txID)
+	} else {
+		// Getting active validators
+		// Only validators who were active when the proposal was created can vote
+		currentStakerIterator, err := e.State.GetCurrentStakerIterator()
 		if err != nil {
 			return err
 		}
+		defer currentStakerIterator.Release()
 
-		desiredPos, _ := slices.BinarySearchFunc(allowedVoters, consortiumMemberAddress, func(id, other ids.ShortID) int {
-			return bytes.Compare(id[:], other[:])
-		})
-		allowedVoters = append(allowedVoters, consortiumMemberAddress)
-		if desiredPos < len(allowedVoters)-1 {
-			copy(allowedVoters[desiredPos+1:], allowedVoters[desiredPos:])
-			allowedVoters[desiredPos] = consortiumMemberAddress
+		for currentStakerIterator.Next() {
+			staker := currentStakerIterator.Value()
+			if staker.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
+
+			consortiumMemberAddress, err := e.State.GetShortIDLink(ids.ShortID(staker.NodeID), state.ShortLinkKeyRegisterNode)
+			if err != nil {
+				return err
+			}
+
+			desiredPos, _ := slices.BinarySearchFunc(allowedVoters, consortiumMemberAddress, func(id, other ids.ShortID) int {
+				return bytes.Compare(id[:], other[:])
+			})
+			allowedVoters = append(allowedVoters, consortiumMemberAddress)
+			if desiredPos < len(allowedVoters)-1 {
+				copy(allowedVoters[desiredPos+1:], allowedVoters[desiredPos:])
+				allowedVoters[desiredPos] = consortiumMemberAddress
+			}
 		}
+		proposalState = txProposal.CreateProposalState(allowedVoters)
 	}
 
 	// update state
 
-	txID := e.Tx.ID()
-	e.State.AddProposal(txID, txProposal.CreateProposalState(allowedVoters))
+	e.State.AddProposal(txID, proposalState)
 	avax.Consume(e.State, tx.Ins)
 	return utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateBonded)
 }
@@ -1847,7 +1882,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 		return err
 	}
 
-	if voterAddressState.IsNot(txs.AddressStateConsortiumMember) {
+	if voterAddressState.IsNot(as.AddressStateConsortiumMember) {
 		return errNotConsortiumMember
 	}
 
@@ -2111,7 +2146,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		return err
 	}
 
-	roles := txs.AddressStateEmpty
+	roles := as.AddressStateEmpty
 	creds := e.Tx.Creds
 
 	if tx.UpgradeVersionID.Version() > 0 {
@@ -2136,7 +2171,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		if err != nil {
 			return err
 		}
-		if tx.Remove && tx.State == txs.AddressStateBitRoleAdmin && tx.Address == tx.Executor {
+		if tx.Remove && tx.State == as.AddressStateBitRoleAdmin && tx.Address == tx.Executor {
 			return errAdminCannotBeDeleted
 		}
 	} else {
@@ -2150,7 +2185,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		}
 
 		// Accumulate roles over all signers
-		checkSelfRemove := tx.Remove && tx.State == txs.AddressStateBitRoleAdmin
+		checkSelfRemove := tx.Remove && tx.State == as.AddressStateBitRoleAdmin
 		for address := range addresses {
 			states, err := e.State.GetAddressStates(address)
 			if err != nil {
@@ -2162,10 +2197,10 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 			roles |= states
 		}
 	}
-	statesBit := txs.AddressState(1) << tx.State
+	statesBit := as.AddressState(1) << tx.State
 
 	// Check for AthensPhase Bits if we time has not passed yet
-	if (statesBit&txs.AddressStateAthensPhaseBits) != 0 &&
+	if (statesBit&as.AddressStateAthensPhaseBits) != 0 &&
 		!e.Config.IsAthensPhaseActivated(e.State.GetTimestamp()) {
 		return errAddrStateNotPermitted
 	}
@@ -2209,7 +2244,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 
 	txID := e.Tx.ID()
 
-	if tx.State == txs.AddressStateBitNodeDeferred {
+	if tx.State == as.AddressStateBitNodeDeferred {
 		nodeShortID, err := e.State.GetShortIDLink(tx.Address, state.ShortLinkKeyRegisterNode)
 		if err != nil {
 			return fmt.Errorf("couldn't get consortium member registered nodeID: %w", err)
@@ -2247,11 +2282,11 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 }
 
 // [state] must have only one bit set
-func verifyAccess(roles, state txs.AddressState) bool {
+func verifyAccess(roles, state as.AddressState) bool {
 	switch {
-	case roles.Is(txs.AddressStateRoleAdmin): // admin can do anything
-	case txs.AddressStateKYCAll&state != 0 && roles.Is(txs.AddressStateRoleKYC): // kyc role can change kyc status
-	case state == txs.AddressStateOffersCreator && roles.Is(txs.AddressStateRoleOffersAdmin): // offers admin can assign offers creator role
+	case roles.Is(as.AddressStateRoleAdmin): // admin can do anything
+	case as.AddressStateKYCAll&state != 0 && roles.Is(as.AddressStateRoleKYC): // kyc role can change kyc status
+	case state == as.AddressStateOffersCreator && roles.Is(as.AddressStateRoleOffersAdmin): // offers admin can assign offers creator role
 	default:
 		return false
 	}

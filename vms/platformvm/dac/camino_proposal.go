@@ -9,13 +9,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 )
 
 var (
+	errWrongOptionIndex           = errors.New("wrong option index")
 	errEndNotAfterStart           = errors.New("proposal end-time is not after start-time")
 	errWrongDuration              = errors.New("wrong proposal duration")
 	ErrWrongVote                  = errors.New("this proposal can't be voted with this vote")
 	ErrNotAllowedToVoteOnProposal = errors.New("this address has already voted or not allowed to vote on this proposal")
+
+	_ Proposal = (*AdminProposal)(nil)
 )
 
 type VerifierVisitor interface {
@@ -33,7 +37,10 @@ type Proposal interface {
 
 	StartTime() time.Time
 	EndTime() time.Time
+	// AddressStateEmpty means that this proposal can't be used as admin proposal
+	AdminProposer() as.AddressState
 	CreateProposalState(allowedVoters []ids.ShortID) ProposalState
+	CreateFinishedProposalState(optionIndex uint32) (ProposalState, error)
 	Visit(VerifierVisitor) error
 
 	// Returns proposal options. (used in magellan)
@@ -65,4 +72,9 @@ type ProposalState interface {
 	// cause it contains internal proposal logic that affects success state.
 	// We don't want to care about that in magellan.
 	ForceAddVote(voteIntf Vote) (ProposalState, error)
+}
+
+type AdminProposal struct {
+	OptionIndex uint32 `serialize:"true"`
+	Proposal    `serialize:"true"`
 }

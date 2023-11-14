@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
@@ -82,22 +83,12 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateBitConsortium,
+		as.AddressStateBitConsortium,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
-
+	_ = buildAndAcceptBlock(t, vm, tx)
 	// Register node
 	tx, err = vm.txBuilder.NewRegisterNodeTx(
 		ids.EmptyNodeID,
@@ -107,16 +98,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Add the validator
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -154,21 +136,12 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateBitNodeDeferred,
+		as.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Verify that the validator is deferred (moved from current to deferred stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -178,11 +151,11 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state and consortium member is true
 	ownerState, _ := vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, txs.AddressStateNodeDeferred|txs.AddressStateConsortiumMember)
+	require.Equal(ownerState, as.AddressStateNodeDeferred|as.AddressStateConsortiumMember)
 
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
-	blk, err = vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	err = blk.Verify(context.Background())
 	require.NoError(err)
@@ -229,7 +202,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state is false
 	ownerState, _ = vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, txs.AddressStateConsortiumMember)
+	require.Equal(ownerState, as.AddressStateConsortiumMember)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
@@ -280,21 +253,12 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateBitConsortium,
+		as.AddressStateBitConsortium,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Register node
 	tx, err = vm.txBuilder.NewRegisterNodeTx(
@@ -305,16 +269,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Add the validator
 	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
@@ -353,21 +308,12 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateBitNodeDeferred,
+		as.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Verify that the validator is deferred (moved from current to deferred stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -379,21 +325,12 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		true,
-		txs.AddressStateBitNodeDeferred,
+		as.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
-	err = blk.Accept(context.Background())
-	require.NoError(err)
-	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
-	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 
 	// Verify that the validator is activated again (moved from deferred to current stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -403,7 +340,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
-	blk, err = vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	err = blk.Verify(context.Background())
 	require.NoError(err)
@@ -631,7 +568,7 @@ func TestProposals(t *testing.T) {
 			addrStateTx, err := vm.txBuilder.NewAddressStateTx(
 				proposerAddr,
 				false,
-				txs.AddressStateBitCaminoProposer,
+				as.AddressStateBitCaminoProposer,
 				[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 				nil,
 			)
@@ -645,7 +582,9 @@ func TestProposals(t *testing.T) {
 			proposalTx := buildBaseFeeProposalTx(t, vm, proposerKey, proposalBondAmount, fee,
 				proposerKey, tt.feeOptions, chainTime.Add(100*time.Second), chainTime.Add(200*time.Second))
 			proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish := makeProposalWithTx(t, vm, proposalTx)
-			require.EqualValues(5, proposalState.TotalAllowedVoters)          // all 5 validators must vote
+			baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
+			require.True(ok)
+			require.EqualValues(5, baseFeeProposalState.TotalAllowedVoters)   // all 5 validators must vote
 			require.Equal([]ids.ID{proposalTx.ID()}, nextProposalIDsToExpire) // we have only one proposal
 			require.Equal(proposalState.EndTime(), nexExpirationTime)
 			require.Empty(proposalIDsToFinish) // no early-finished proposals
@@ -658,16 +597,18 @@ func TestProposals(t *testing.T) {
 
 			// Fast-forward clock to time a bit forward, but still before proposals start
 			// Try to vote on proposal, expect to fail
-			vm.clock.Set(proposalState.StartTime().Add(-time.Second))
+			vm.clock.Set(baseFeeProposalState.StartTime().Add(-time.Second))
 			addVoteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[0], 0)
 			require.Error(vm.Builder.AddUnverifiedTx(addVoteTx))
-			vm.clock.Set(proposalState.StartTime())
+			vm.clock.Set(baseFeeProposalState.StartTime())
 
-			optionWeights := make([]uint32, len(proposalState.Options))
+			optionWeights := make([]uint32, len(baseFeeProposalState.Options))
 			for i, vote := range tt.votes {
 				optionWeights[vote.option]++
 				voteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[i], vote.option)
-				proposalIDsToFinish, proposalState = voteOnBaseFeeWithTx(t, vm, voteTx, proposalTx.ID(), optionWeights)
+				proposalState = voteWithTx(t, vm, voteTx, proposalTx.ID(), optionWeights)
+				proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
+				require.NoError(err)
 				if tt.earlyFinish && i == len(tt.votes)-1 {
 					require.Equal([]ids.ID{proposalTx.ID()}, proposalIDsToFinish) // proposal has finished early
 				} else {
@@ -722,6 +663,102 @@ func TestProposals(t *testing.T) {
 			)
 		})
 	}
+}
+
+func TestAdminProposals(t *testing.T) {
+	require := require.New(t)
+
+	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	require.NoError(err)
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	require.NoError(err)
+
+	applicantAddr := proposerAddr
+
+	defaultConfig := defaultCaminoConfig(true)
+	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
+	balance := proposalBondAmount + defaultTxFee
+
+	// Prepare vm
+	vm := newCaminoVM(api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+		InitialAdmin:        caminoPreFundedKeys[0].Address(),
+	}, []api.UTXO{
+		{
+			Amount:  json.Uint64(balance),
+			Address: proposerAddrStr,
+		},
+		{
+			Amount:  json.Uint64(defaultTxFee),
+			Address: caminoPreFundedKey0AddrStr,
+		},
+	}, &defaultConfig.BanffTime)
+	vm.ctx.Lock.Lock()
+	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+	checkBalance(t, vm.state, proposerAddr,
+		balance,          // total
+		0, 0, 0, balance, // unlocked
+	)
+
+	fee := defaultTxFee
+	burnedAmt := uint64(0)
+
+	// Give proposer address role to make admin proposals
+	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+		proposerAddr,
+		false,
+		as.AddressStateBitRoleConsortiumAdminProposer,
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		nil,
+	)
+	require.NoError(err)
+	blk := buildAndAcceptBlock(t, vm, addrStateTx)
+	require.Len(blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), addrStateTx.ID())
+	applicantAddrState, err := vm.state.GetAddressStates(applicantAddr)
+	require.NoError(err)
+	require.True(applicantAddrState.IsNot(as.AddressStateConsortiumMember))
+
+	// Add admin proposal
+	chainTime := vm.state.GetTimestamp()
+	proposalTx := buildAddMemberProposalTx(t, vm, proposerKey, proposalBondAmount, fee,
+		proposerKey, applicantAddr, chainTime.Add(100*time.Second), true)
+	proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish := makeProposalWithTx(t, vm, proposalTx)
+	addMemberProposalState, ok := proposalState.(*dac.AddMemberProposalState)
+	require.True(ok)
+	require.EqualValues(0, addMemberProposalState.TotalAllowedVoters) // its admin proposal
+	require.Equal([]ids.ID{proposalTx.ID()}, nextProposalIDsToExpire) // we have only one proposal
+	require.Equal(proposalState.EndTime(), nexExpirationTime)
+	require.Equal([]ids.ID{proposalTx.ID()}, proposalIDsToFinish) // admin proposal must be immediately finished
+	burnedAmt += fee
+	checkBalance(t, vm.state, proposerAddr,
+		balance-burnedAmt,                          // total
+		proposalBondAmount,                         // bonded
+		0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
+	)
+
+	// build block that will execute proposal
+	blk = buildAndAcceptBlock(t, vm, nil)
+	require.Len(blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), blk.Txs()[0].ID())
+	_, err = vm.state.GetProposal(proposalTx.ID())
+	require.ErrorIs(err, database.ErrNotFound)
+	_, _, err = vm.state.GetNextToExpireProposalIDsAndTime(nil)
+	require.ErrorIs(err, database.ErrNotFound)
+	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
+	require.NoError(err)
+	require.Empty(proposalIDsToFinish)
+	checkBalance(t, vm.state, proposerAddr,
+		balance-burnedAmt,          // total
+		0, 0, 0, balance-burnedAmt, // unlocked
+	)
+
+	// check that applicant became c-member
+	applicantAddrState, err = vm.state.GetAddressStates(applicantAddr)
+	require.NoError(err)
+	require.True(applicantAddrState.Is(as.AddressStateConsortiumMember))
 }
 
 func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
@@ -846,12 +883,59 @@ func buildBaseFeeProposalTx(
 	return proposalTx
 }
 
+func buildAddMemberProposalTx(
+	t *testing.T,
+	vm *VM,
+	fundsKey *secp256k1.PrivateKey,
+	amountToBond uint64,
+	amountToBurn uint64,
+	proposerKey *secp256k1.PrivateKey,
+	applicantAddress ids.ShortID,
+	startTime time.Time,
+	adminProposal bool,
+) *txs.Tx {
+	t.Helper()
+	ins, outs, signers, _, err := vm.txBuilder.Lock(
+		vm.state,
+		[]*secp256k1.PrivateKey{fundsKey},
+		amountToBond,
+		amountToBurn,
+		locked.StateBonded,
+		nil, nil, 0,
+	)
+	require.NoError(t, err)
+	var proposal dac.Proposal = &dac.AddMemberProposal{
+		Start:            uint64(startTime.Unix()),
+		End:              uint64(startTime.Unix()) + dac.AddMemberProposalDuration,
+		ApplicantAddress: applicantAddress,
+	}
+	if adminProposal {
+		proposal = &dac.AdminProposal{Proposal: proposal}
+	}
+	wrapper := &txs.ProposalWrapper{Proposal: proposal}
+	proposalBytes, err := txs.Codec.Marshal(txs.Version, wrapper)
+	require.NoError(t, err)
+	proposalTx, err := txs.NewSigned(&txs.AddProposalTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		ProposalPayload: proposalBytes,
+		ProposerAddress: proposerKey.Address(),
+		ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+	}, txs.Codec, append(signers, []*secp256k1.PrivateKey{proposerKey}))
+	require.NoError(t, err)
+	return proposalTx
+}
+
 func makeProposalWithTx(
 	t *testing.T,
 	vm *VM,
 	tx *txs.Tx,
 ) (
-	proposal *dac.BaseFeeProposalState,
+	proposal dac.ProposalState,
 	nextProposalIDsToExpire []ids.ID,
 	nexExpirationTime time.Time,
 	proposalIDsToFinish []ids.ID,
@@ -862,13 +946,11 @@ func makeProposalWithTx(
 	checkTx(t, vm, blk.ID(), tx.ID())
 	proposalState, err := vm.state.GetProposal(tx.ID())
 	require.NoError(t, err)
-	baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
-	require.True(t, ok)
 	nextProposalIDsToExpire, nexExpirationTime, err = vm.state.GetNextToExpireProposalIDsAndTime(nil)
 	require.NoError(t, err)
 	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
 	require.NoError(t, err)
-	return baseFeeProposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish
+	return proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish
 }
 
 func buildSimpleVoteTx(
@@ -908,28 +990,29 @@ func buildSimpleVoteTx(
 	return addVoteTx
 }
 
-func voteOnBaseFeeWithTx(
+func voteWithTx(
 	t *testing.T,
 	vm *VM,
 	tx *txs.Tx,
 	proposalID ids.ID,
 	expectedVoteWeights []uint32,
-) (proposalIDsToFinish []ids.ID, baseFeeProposalState *dac.BaseFeeProposalState) {
+) (proposalState dac.ProposalState) {
 	t.Helper()
 	blk := buildAndAcceptBlock(t, vm, tx)
 	require.Len(t, blk.Txs(), 1)
 	checkTx(t, vm, blk.ID(), tx.ID())
 	proposalState, err := vm.state.GetProposal(proposalID)
 	require.NoError(t, err)
-	baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
-	require.True(t, ok)
-	require.Len(t, baseFeeProposalState.Options, len(expectedVoteWeights))
-	for i := range baseFeeProposalState.Options {
-		require.Equal(t, expectedVoteWeights[i], baseFeeProposalState.Options[i].Weight)
+	switch proposalState := proposalState.(type) {
+	case *dac.BaseFeeProposalState:
+		require.Len(t, proposalState.Options, len(expectedVoteWeights))
+		for i := range proposalState.Options {
+			require.Equal(t, expectedVoteWeights[i], proposalState.Options[i].Weight)
+		}
+	default:
+		require.Fail(t, "unexpected proposalState type")
 	}
-	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
-	require.NoError(t, err)
-	return proposalIDsToFinish, baseFeeProposalState
+	return proposalState
 }
 
 func buildAndAcceptBaseTx(

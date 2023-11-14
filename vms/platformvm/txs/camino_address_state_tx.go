@@ -10,65 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
-
-type (
-	AddressState    uint64
-	AddressStateBit uint8
-)
-
-// AddressState flags, max 63
-const (
-	// Bits
-
-	AddressStateBitRoleAdmin       AddressStateBit = 0
-	AddressStateBitRoleKYC         AddressStateBit = 1
-	AddressStateBitRoleOffersAdmin AddressStateBit = 2
-
-	AddressStateBitKYCVerified    AddressStateBit = 32
-	AddressStateBitKYCExpired     AddressStateBit = 33
-	AddressStateBitConsortium     AddressStateBit = 38
-	AddressStateBitNodeDeferred   AddressStateBit = 39
-	AddressStateBitOffersCreator  AddressStateBit = 50
-	AddressStateBitCaminoProposer AddressStateBit = 51
-	AddressStateBitMax            AddressStateBit = 63
-
-	// States
-
-	AddressStateEmpty AddressState = 0
-
-	AddressStateRoleAdmin       AddressState = AddressState(1) << AddressStateBitRoleAdmin                               // 0b1
-	AddressStateRoleKYC         AddressState = AddressState(1) << AddressStateBitRoleKYC                                 // 0b10
-	AddressStateRoleOffersAdmin AddressState = AddressState(1) << AddressStateBitRoleOffersAdmin                         // 0b100
-	AddressStateRoleAll         AddressState = AddressStateRoleAdmin | AddressStateRoleKYC | AddressStateRoleOffersAdmin // 0b111
-
-	AddressStateKYCVerified AddressState = AddressState(1) << AddressStateBitKYCVerified    // 0b0100000000000000000000000000000000
-	AddressStateKYCExpired  AddressState = AddressState(1) << AddressStateBitKYCExpired     // 0b1000000000000000000000000000000000
-	AddressStateKYCAll      AddressState = AddressStateKYCVerified | AddressStateKYCExpired // 0b1100000000000000000000000000000000
-
-	AddressStateConsortiumMember AddressState = AddressState(1) << AddressStateBitConsortium            // 0b0100000000000000000000000000000000000000
-	AddressStateNodeDeferred     AddressState = AddressState(1) << AddressStateBitNodeDeferred          // 0b1000000000000000000000000000000000000000
-	AddressStateVotableBits      AddressState = AddressStateConsortiumMember | AddressStateNodeDeferred // 0b1100000000000000000000000000000000000000
-
-	AddressStateOffersCreator  AddressState = AddressState(1) << AddressStateBitOffersCreator  // 0b0100000000000000000000000000000000000000000000000000
-	AddressStateCaminoProposer AddressState = AddressState(1) << AddressStateBitCaminoProposer // 0b1000000000000000000000000000000000000000000000000000
-
-	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
-	AddressStateBerlinPhaseBits = AddressStateCaminoProposer
-
-	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits |
-		AddressStateAthensPhaseBits |
-		AddressStateBerlinPhaseBits // 0b1100000000001100001100000000000000000000000000000111
-)
-
-func (as AddressState) Is(state AddressState) bool {
-	return as&state == state
-}
-
-func (as AddressState) IsNot(state AddressState) bool {
-	return as&state != state
-}
 
 var (
 	_ UnsignedTx = (*AddressStateTx)(nil)
@@ -86,7 +30,7 @@ type AddressStateTx struct {
 	// The address to add / remove state
 	Address ids.ShortID `serialize:"true" json:"address"`
 	// The state to set / unset
-	State AddressStateBit `serialize:"true" json:"state"`
+	State as.AddressStateBit `serialize:"true" json:"state"`
 	// Remove or add the flag ?
 	Remove bool `serialize:"true" json:"remove"`
 	// The executor of this TX (needs access role)
@@ -104,7 +48,7 @@ func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.Address == ids.ShortEmpty:
 		return ErrEmptyAddress
-	case tx.State > AddressStateBitMax || AddressStateValidBits&AddressState(uint64(1)<<tx.State) == 0:
+	case tx.State > as.AddressStateBitMax || as.AddressStateValidBits&as.AddressState(uint64(1)<<tx.State) == 0:
 		return ErrInvalidState
 	}
 

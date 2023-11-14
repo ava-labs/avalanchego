@@ -11,14 +11,14 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetAddressStates(t *testing.T) {
 	address := ids.ShortID{1}
-	addressStates := txs.AddressState(12345)
+	addressStates := as.AddressState(12345)
 	addressStatesBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(addressStatesBytes, uint64(addressStates))
 	testError := errors.New("test error")
@@ -27,14 +27,14 @@ func TestGetAddressStates(t *testing.T) {
 		caminoState           func(*gomock.Controller) *caminoState
 		address               ids.ShortID
 		expectedCaminoState   func(*caminoState) *caminoState
-		expectedAddressStates txs.AddressState
+		expectedAddressStates as.AddressState
 		expectedErr           error
 	}{
 		"OK: address states added or modified": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				return &caminoState{
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{address: addressStates},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{address: addressStates},
 					},
 				}
 			},
@@ -43,7 +43,7 @@ func TestGetAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateCache: actualCaminoState.addressStateCache,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{address: addressStates},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{address: addressStates},
 					},
 				}
 			},
@@ -51,7 +51,7 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: address states in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher[ids.ShortID, txs.AddressState](c)
+				cache := cache.NewMockCacher[ids.ShortID, as.AddressState](c)
 				cache.EXPECT().Get(address).Return(addressStates, true)
 				return &caminoState{
 					addressStateCache: cache,
@@ -69,8 +69,8 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: address states in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher[ids.ShortID, txs.AddressState](c)
-				cache.EXPECT().Get(address).Return(txs.AddressStateEmpty, false)
+				cache := cache.NewMockCacher[ids.ShortID, as.AddressState](c)
+				cache.EXPECT().Get(address).Return(as.AddressStateEmpty, false)
 				cache.EXPECT().Put(address, addressStates)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(addressStatesBytes, nil)
@@ -92,9 +92,9 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: not found in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher[ids.ShortID, txs.AddressState](c)
-				cache.EXPECT().Get(address).Return(txs.AddressStateEmpty, false)
-				cache.EXPECT().Put(address, txs.AddressStateEmpty)
+				cache := cache.NewMockCacher[ids.ShortID, as.AddressState](c)
+				cache.EXPECT().Get(address).Return(as.AddressStateEmpty, false)
+				cache.EXPECT().Put(address, as.AddressStateEmpty)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(nil, database.ErrNotFound)
 				return &caminoState{
@@ -114,8 +114,8 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher[ids.ShortID, txs.AddressState](c)
-				cache.EXPECT().Get(address).Return(txs.AddressStateEmpty, false)
+				cache := cache.NewMockCacher[ids.ShortID, as.AddressState](c)
+				cache.EXPECT().Get(address).Return(as.AddressStateEmpty, false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(nil, testError)
 				return &caminoState{
@@ -150,21 +150,21 @@ func TestGetAddressStates(t *testing.T) {
 
 func TestSetAddressStates(t *testing.T) {
 	address := ids.ShortID{1}
-	addressStates := txs.AddressState(12345)
+	addressStates := as.AddressState(12345)
 
 	tests := map[string]struct {
 		caminoState         func(*gomock.Controller) *caminoState
 		address             ids.ShortID
-		addressStates       txs.AddressState
+		addressStates       as.AddressState
 		expectedCaminoState func(*caminoState) *caminoState
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher[ids.ShortID, txs.AddressState](c)
+				cache := cache.NewMockCacher[ids.ShortID, as.AddressState](c)
 				cache.EXPECT().Evict(address)
 				return &caminoState{
 					addressStateCache: cache,
-					caminoDiff:        &caminoDiff{modifiedAddressStates: map[ids.ShortID]txs.AddressState{}},
+					caminoDiff:        &caminoDiff{modifiedAddressStates: map[ids.ShortID]as.AddressState{}},
 				}
 			},
 			address:       address,
@@ -173,7 +173,7 @@ func TestSetAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateCache: actualCaminoState.addressStateCache,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{address: addressStates},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{address: addressStates},
 					},
 				}
 			},
@@ -194,7 +194,7 @@ func TestWriteAddressStates(t *testing.T) {
 	testError := errors.New("test error")
 	address1 := ids.ShortID{1}
 	address2 := ids.ShortID{2}
-	addressStates1 := txs.AddressState(12345)
+	addressStates1 := as.AddressState(12345)
 	addressStatesBytes1 := make([]byte, 8)
 	binary.LittleEndian.PutUint64(addressStatesBytes1, uint64(addressStates1))
 
@@ -210,7 +210,7 @@ func TestWriteAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateDB: addressStateDB,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{
 							address1: addressStates1,
 						},
 					},
@@ -220,7 +220,7 @@ func TestWriteAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateDB: actualState.addressStateDB,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{},
 					},
 				}
 			},
@@ -232,7 +232,7 @@ func TestWriteAddressStates(t *testing.T) {
 				addressStateDB.EXPECT().Delete(address1[:]).Return(testError)
 				return &caminoState{
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{
 							address1: 0,
 						},
 					},
@@ -242,7 +242,7 @@ func TestWriteAddressStates(t *testing.T) {
 			expectedCaminoState: func(actualState *caminoState) *caminoState {
 				return &caminoState{
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{},
 					},
 					addressStateDB: actualState.addressStateDB,
 				}
@@ -257,7 +257,7 @@ func TestWriteAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateDB: addressStateDB,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{
 							address1: addressStates1,
 							address2: 0,
 						},
@@ -268,7 +268,7 @@ func TestWriteAddressStates(t *testing.T) {
 				return &caminoState{
 					addressStateDB: actualState.addressStateDB,
 					caminoDiff: &caminoDiff{
-						modifiedAddressStates: map[ids.ShortID]txs.AddressState{},
+						modifiedAddressStates: map[ids.ShortID]as.AddressState{},
 					},
 				}
 			},

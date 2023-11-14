@@ -306,3 +306,92 @@ func TestAddMemberProposalStateAddVote(t *testing.T) {
 		})
 	}
 }
+
+func TestAddMemberProposalCreateFinishedProposalState(t *testing.T) {
+	applicantAddress := ids.ShortID{1}
+
+	tests := map[string]struct {
+		proposal                 *AddMemberProposal
+		optionIndex              uint32
+		expectedProposalState    ProposalState
+		expectedOriginalProposal *AddMemberProposal
+		expectedErr              error
+	}{
+		"Fail: option 2 out of bonds": {
+			proposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+			optionIndex: 2,
+			expectedOriginalProposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+			expectedErr: errWrongOptionIndex,
+		},
+		"OK: option 0": {
+			proposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+			optionIndex: 0,
+			expectedProposalState: &AddMemberProposalState{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+				AllowedVoters:    []ids.ShortID{},
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 1},
+						{Value: false},
+					},
+				},
+			},
+			expectedOriginalProposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+		},
+		"OK: option 1": {
+			proposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+			optionIndex: 1,
+			expectedProposalState: &AddMemberProposalState{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+				AllowedVoters:    []ids.ShortID{},
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true},
+						{Value: false, Weight: 1},
+					},
+				},
+			},
+			expectedOriginalProposal: &AddMemberProposal{
+				Start:            100,
+				End:              101,
+				ApplicantAddress: applicantAddress,
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			proposalState, err := tt.proposal.CreateFinishedProposalState(tt.optionIndex)
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedProposalState, proposalState)
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
+			if tt.expectedErr == nil {
+				require.True(t, proposalState.CanBeFinished())
+				require.True(t, proposalState.IsSuccessful())
+			}
+		})
+	}
+}

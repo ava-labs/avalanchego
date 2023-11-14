@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"golang.org/x/exp/slices"
 )
 
@@ -37,6 +38,10 @@ func (*AddMemberProposal) GetOptions() any {
 	return []bool{true, false}
 }
 
+func (*AddMemberProposal) AdminProposer() as.AddressState {
+	return as.AddressStateRoleConsortiumAdminProposer
+}
+
 func (p *AddMemberProposal) Verify() error {
 	switch {
 	case p.Start >= p.End:
@@ -62,6 +67,15 @@ func (p *AddMemberProposal) CreateProposalState(allowedVoters []ids.ShortID) Pro
 		TotalAllowedVoters: uint32(len(allowedVoters)),
 	}
 	return stateProposal
+}
+
+func (p *AddMemberProposal) CreateFinishedProposalState(optionIndex uint32) (ProposalState, error) {
+	if optionIndex >= 2 {
+		return nil, fmt.Errorf("%w (expected: less than 2, actual: %d)", errWrongOptionIndex, optionIndex)
+	}
+	proposalState := p.CreateProposalState([]ids.ShortID{}).(*AddMemberProposalState)
+	proposalState.Options[optionIndex].Weight++
+	return proposalState, nil
 }
 
 func (p *AddMemberProposal) Visit(visitor VerifierVisitor) error {

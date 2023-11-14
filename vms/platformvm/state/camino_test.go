@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	pvm_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -248,17 +249,17 @@ func TestSyncGenesis(t *testing.T) {
 				g: defaultGenesisState([]pvm_genesis.AddressState{
 					{
 						Address: initialAdmin,
-						State:   txs.AddressStateRoleAdmin,
+						State:   as.AddressStateRoleAdmin,
 					},
 					{
 						Address: shortID,
-						State:   txs.AddressStateRoleKYC,
+						State:   as.AddressStateRoleKYC,
 					},
 				}, depositTxs, initialAdmin),
 			},
 			cs: *wrappers.IgnoreError(newCaminoState(baseDB, validatorsDB, prometheus.NewRegistry())).(*caminoState),
 			want: caminoDiff{
-				modifiedAddressStates: map[ids.ShortID]txs.AddressState{initialAdmin: txs.AddressStateRoleAdmin, shortID: txs.AddressStateRoleKYC},
+				modifiedAddressStates: map[ids.ShortID]as.AddressState{initialAdmin: as.AddressStateRoleAdmin, shortID: as.AddressStateRoleKYC},
 				modifiedDepositOffers: map[ids.ID]*deposit.Offer{
 					depositOffers[0].ID: depositOffers[0],
 					depositOffers[1].ID: depositOffers[1],

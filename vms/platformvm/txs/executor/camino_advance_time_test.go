@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -374,7 +375,7 @@ func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *s
 	tx, err := env.txBuilder.NewAddressStateTx(
 		nodeOwnerAddress,
 		false,
-		txs.AddressStateBitNodeDeferred,
+		as.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{key},
 		outputOwners,
 	)

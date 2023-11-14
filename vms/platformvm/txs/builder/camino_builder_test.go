@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
@@ -55,37 +56,37 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 
 	tests := map[string]struct {
 		remove      bool
-		state       txs.AddressStateBit
+		state       as.AddressStateBit
 		address     ids.ShortID
 		expectedErr error
 	}{
 		"KYC Role: Add": {
 			remove:      false,
-			state:       txs.AddressStateBitRoleKYC,
+			state:       as.AddressStateBitRoleKYC,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"KYC Role: Remove": {
 			remove:      true,
-			state:       txs.AddressStateBitRoleKYC,
+			state:       as.AddressStateBitRoleKYC,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Admin Role: Add": {
 			remove:      false,
-			state:       txs.AddressStateBitRoleAdmin,
+			state:       as.AddressStateBitRoleAdmin,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Admin Role: Remove": {
 			remove:      true,
-			state:       txs.AddressStateBitRoleAdmin,
+			state:       as.AddressStateBitRoleAdmin,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Empty Address": {
 			remove:      false,
-			state:       txs.AddressStateBitRoleKYC,
+			state:       as.AddressStateBitRoleKYC,
 			address:     ids.ShortEmpty,
 			expectedErr: txs.ErrEmptyAddress,
 		},

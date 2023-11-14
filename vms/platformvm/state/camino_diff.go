@@ -14,11 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func NewCaminoDiff(
@@ -95,11 +95,11 @@ func (d *diff) CaminoConfig() (*CaminoConfig, error) {
 	return parentState.CaminoConfig()
 }
 
-func (d *diff) SetAddressStates(address ids.ShortID, states txs.AddressState) {
+func (d *diff) SetAddressStates(address ids.ShortID, states as.AddressState) {
 	d.caminoDiff.modifiedAddressStates[address] = states
 }
 
-func (d *diff) GetAddressStates(address ids.ShortID) (txs.AddressState, error) {
+func (d *diff) GetAddressStates(address ids.ShortID) (as.AddressState, error) {
 	if states, ok := d.caminoDiff.modifiedAddressStates[address]; ok {
 		return states, nil
 	}

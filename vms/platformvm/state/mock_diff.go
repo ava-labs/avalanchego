@@ -15,6 +15,7 @@ import (
 	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	multisig "github.com/ava-labs/avalanchego/vms/components/multisig"
+	addrstate "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	dac "github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -246,10 +247,10 @@ func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetAddressStates mocks base method.
-func (m *MockDiff) GetAddressStates(arg0 ids.ShortID) (txs.AddressState, error) {
+func (m *MockDiff) GetAddressStates(arg0 ids.ShortID) (addrstate.AddressState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAddressStates", arg0)
-	ret0, _ := ret[0].(txs.AddressState)
+	ret0, _ := ret[0].(addrstate.AddressState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -815,7 +816,7 @@ func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.Ca
 }
 
 // SetAddressStates mocks base method.
-func (m *MockDiff) SetAddressStates(arg0 ids.ShortID, arg1 txs.AddressState) {
+func (m *MockDiff) SetAddressStates(arg0 ids.ShortID, arg1 addrstate.AddressState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetAddressStates", arg0, arg1)
 }

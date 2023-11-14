@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
@@ -80,8 +81,8 @@ type CaminoDiff interface {
 
 	// Address State
 
-	SetAddressStates(ids.ShortID, txs.AddressState)
-	GetAddressStates(ids.ShortID) (txs.AddressState, error)
+	SetAddressStates(ids.ShortID, as.AddressState)
+	GetAddressStates(ids.ShortID) (as.AddressState, error)
 
 	// Deposit offers
 
@@ -169,7 +170,7 @@ type CaminoConfig struct {
 
 type caminoDiff struct {
 	deferredStakerDiffs                   diffStakers
-	modifiedAddressStates                 map[ids.ShortID]txs.AddressState
+	modifiedAddressStates                 map[ids.ShortID]as.AddressState
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*depositDiff
 	modifiedMultisigAliases               map[ids.ShortID]*multisig.AliasWithNonce
@@ -196,7 +197,7 @@ type caminoState struct {
 	deferredValidatorList linkeddb.LinkedDB
 
 	// Address State
-	addressStateCache cache.Cacher[ids.ShortID, txs.AddressState]
+	addressStateCache cache.Cacher[ids.ShortID, as.AddressState]
 	addressStateDB    database.Database
 
 	// Deposit offers
@@ -234,7 +235,7 @@ type caminoState struct {
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:       make(map[ids.ShortID]txs.AddressState),
+		modifiedAddressStates:       make(map[ids.ShortID]as.AddressState),
 		modifiedDepositOffers:       make(map[ids.ID]*deposit.Offer),
 		modifiedDeposits:            make(map[ids.ID]*depositDiff),
 		modifiedMultisigAliases:     make(map[ids.ShortID]*multisig.AliasWithNonce),
@@ -246,10 +247,10 @@ func newCaminoDiff() *caminoDiff {
 }
 
 func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
-	addressStateCache, err := metercacher.New[ids.ShortID, txs.AddressState](
+	addressStateCache, err := metercacher.New[ids.ShortID, as.AddressState](
 		"address_state_cache",
 		metricsReg,
-		&cache.LRU[ids.ShortID, txs.AddressState]{Size: addressStateCacheSize},
+		&cache.LRU[ids.ShortID, as.AddressState]{Size: addressStateCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -376,11 +377,11 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		return err
 	}
 	cs.SetAddressStates(g.Camino.InitialAdmin,
-		initalAdminAddressState|txs.AddressStateRoleAdmin)
+		initalAdminAddressState|as.AddressStateRoleAdmin)
 
 	addrStateTx, err := txs.NewSigned(&txs.AddressStateTx{
 		Address: g.Camino.InitialAdmin,
-		State:   txs.AddressStateBitRoleAdmin,
+		State:   as.AddressStateBitRoleAdmin,
 		Remove:  false,
 	}, txs.Codec, nil)
 	if err != nil {

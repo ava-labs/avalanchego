@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -90,7 +91,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   AddressStateBitRoleAdmin,
+		State:   as.AddressStateBitRoleAdmin,
 		Remove:  false,
 	}
 
@@ -106,7 +107,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   AddressStateBitRoleAdmin,
+		State:   as.AddressStateBitRoleAdmin,
 		Remove:  false,
 	}
 
@@ -120,7 +121,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   AddressStateBitRoleAdmin,
+		State:   as.AddressStateBitRoleAdmin,
 		Remove:  false,
 	}
 
@@ -136,7 +137,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 		}},
 		UpgradeVersionID: codec.BuildUpgradeVersionID(1),
 		Address:          preFundedKeys[0].PublicKey().Address(),
-		State:            AddressStateBitRoleAdmin,
+		State:            as.AddressStateBitRoleAdmin,
 		Remove:           false,
 		Executor:         ids.ShortEmpty,
 		ExecutorAuth:     &executorAuth,
@@ -163,7 +164,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err, ErrInvalidState)
-	addressStateTx.State = AddressStateBitRoleAdmin
+	addressStateTx.State = as.AddressStateBitRoleAdmin
 
 	// Locked out
 	stx, err = NewSigned(addressStateTxLocked, Codec, signers)

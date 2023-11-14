@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -60,7 +61,7 @@ func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
 		return err
 	}
 
-	if proposerAddressState.IsNot(txs.AddressStateCaminoProposer) {
+	if proposerAddressState.IsNot(as.AddressStateCaminoProposer) {
 		return errNotPermittedToCreateProposal
 	}
 
@@ -102,7 +103,7 @@ func (e *proposalVerifier) AddMemberProposal(proposal *dac.AddMemberProposal) er
 		return err
 	}
 
-	if applicantAddress.Is(txs.AddressStateConsortiumMember) {
+	if applicantAddress.Is(as.AddressStateConsortiumMember) {
 		return errConsortiumMember
 	}
 
@@ -136,7 +137,11 @@ func (e *proposalExecutor) AddMemberProposal(proposal *dac.AddMemberProposalStat
 		if err != nil {
 			return err
 		}
-		e.state.SetAddressStates(proposal.ApplicantAddress, addrState|txs.AddressStateConsortiumMember)
+		newAddrState := addrState | as.AddressStateConsortiumMember
+		if newAddrState == addrState { // c-member was already added via admin action after proposal creation
+			return nil
+		}
+		e.state.SetAddressStates(proposal.ApplicantAddress, newAddrState)
 	}
 	return nil
 }
