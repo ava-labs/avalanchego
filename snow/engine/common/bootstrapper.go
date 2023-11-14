@@ -42,7 +42,8 @@ type bootstrapper struct {
 	Config
 	Halter
 
-	bootstrapper smbootstrapper.Bootstrapper
+	minority smbootstrapper.Poll
+	majority smbootstrapper.Poll
 
 	// number of times the bootstrap has been attempted
 	bootstrapAttempts int
@@ -50,8 +51,9 @@ type bootstrapper struct {
 
 func NewCommonBootstrapper(config Config) Bootstrapper {
 	return &bootstrapper{
-		Config:       config,
-		bootstrapper: smbootstrapper.Noop,
+		Config:   config,
+		minority: smbootstrapper.Noop,
+		majority: smbootstrapper.Noop,
 	}
 }
 
@@ -65,7 +67,9 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 
-	b.bootstrapper.RecordAcceptedFrontier(ctx, nodeID, containerID)
+	if err := b.minority.RecordOpinion(ctx, nodeID, containerID); err != nil {
+		return err
+	}
 	return b.sendMessagesOrFinish(ctx)
 }
 
@@ -79,7 +83,9 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 		return nil
 	}
 
-	b.bootstrapper.RecordAcceptedFrontier(ctx, nodeID)
+	if err := b.minority.RecordOpinion(ctx, nodeID); err != nil {
+		return err
+	}
 	return b.sendMessagesOrFinish(ctx)
 }
 
@@ -93,7 +99,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		return nil
 	}
 
-	if err := b.bootstrapper.RecordAccepted(ctx, nodeID, containerIDs); err != nil {
+	if err := b.majority.RecordOpinion(ctx, nodeID, containerIDs...); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)
@@ -109,7 +115,7 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 		return nil
 	}
 
-	if err := b.bootstrapper.RecordAccepted(ctx, nodeID, nil); err != nil {
+	if err := b.majority.RecordOpinion(ctx, nodeID); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)
@@ -132,15 +138,19 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 		zap.Int("numNodes", len(nodeWeights)),
 	)
 
-	b.bootstrapper = smbootstrapper.New(
+	b.minority = smbootstrapper.NewMinority(
 		b.Ctx.Log,
 		frontierNodes,
+		MaxOutstandingBroadcastRequests,
+	)
+	b.majority = smbootstrapper.NewMajority(
+		b.Ctx.Log,
 		nodeWeights,
 		MaxOutstandingBroadcastRequests,
 	)
 
 	b.bootstrapAttempts++
-	if accepted, finalized := b.bootstrapper.GetAccepted(ctx); finalized {
+	if accepted, finalized := b.majority.Result(ctx); finalized {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
@@ -171,24 +181,24 @@ func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 }
 
 func (b *bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
-	if peers := b.bootstrapper.GetAcceptedFrontiersToSend(ctx); peers.Len() > 0 {
+	if peers := b.minority.GetPeers(ctx); peers.Len() > 0 {
 		b.Sender.SendGetAcceptedFrontier(ctx, peers, b.Config.SharedCfg.RequestID)
 		return nil
 	}
 
-	potentialAccepted, finalized := b.bootstrapper.GetAcceptedFrontier(ctx)
+	potentialAccepted, finalized := b.minority.Result(ctx)
 	if !finalized {
 		// We haven't finalized the accepted frontier, so we should wait for the
 		// outstanding requests.
 		return nil
 	}
 
-	if peers := b.bootstrapper.GetAcceptedToSend(ctx); peers.Len() > 0 {
+	if peers := b.majority.GetPeers(ctx); peers.Len() > 0 {
 		b.Sender.SendGetAccepted(ctx, peers, b.Config.SharedCfg.RequestID, potentialAccepted)
 		return nil
 	}
 
-	accepted, finalized := b.bootstrapper.GetAccepted(ctx)
+	accepted, finalized := b.majority.Result(ctx)
 	if !finalized {
 		// We haven't finalized the accepted set, so we should wait for the
 		// outstanding requests.

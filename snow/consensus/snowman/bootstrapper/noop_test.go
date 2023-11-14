@@ -19,19 +19,11 @@ func TestNoop(t *testing.T) {
 		nodeID  = ids.GenerateTestNodeID()
 	)
 
-	require.Empty(Noop.GetAcceptedFrontiersToSend(ctx))
+	require.Empty(Noop.GetPeers(ctx))
 
-	Noop.RecordAcceptedFrontier(ctx, nodeID)
+	Noop.RecordOpinion(ctx, nodeID)
 
-	blkIDs, finalized := Noop.GetAcceptedFrontier(ctx)
-	require.Empty(blkIDs)
-	require.False(finalized)
-
-	require.Empty(Noop.GetAcceptedToSend(ctx))
-
-	require.NoError(Noop.RecordAccepted(ctx, nodeID, nil))
-
-	blkIDs, finalized = Noop.GetAccepted(ctx)
+	blkIDs, finalized := Noop.Result(ctx)
 	require.Empty(blkIDs)
 	require.False(finalized)
 }

@@ -17,93 +17,48 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Bootstrapper = (*Majority)(nil)
+var _ Poll = (*Majority)(nil)
 
+// Majority implements the bootstrapping poll to filter the initial set of
+// potentially accaptable blocks into a set of accepted blocks to sync to.
+//
+// Once the last accepted blocks have been fetched from the initial set of
+// peers, the set of blocks are sent to all peers. Each peer is expected to
+// filter the provided blocks and report which of them they consider accepted.
+// If a majority of the peers report that a block is accepted, then the node
+// will consider that block to be accepted by the network. This assumes that a
+// majority of the network is correct. If a majority of the network is
+// malicious, the node may accept an incorrect block.
 type Majority struct {
-	log            logging.Logger
-	nodeWeights    map[ids.NodeID]uint64
-	maxOutstanding int
+	requests
 
-	pendingSendAcceptedFrontier set.Set[ids.NodeID]
-	outstandingAcceptedFrontier set.Set[ids.NodeID]
-	receivedAcceptedFrontierSet set.Set[ids.ID]
-	receivedAcceptedFrontier    []ids.ID
+	log         logging.Logger
+	nodeWeights map[ids.NodeID]uint64
 
-	pendingSendAccepted set.Set[ids.NodeID]
-	outstandingAccepted set.Set[ids.NodeID]
-	// receivedAccepted maps the blockID to the total sum of weight that has
-	// reported that block as accepted.
-	receivedAccepted map[ids.ID]uint64
-	accepted         []ids.ID
+	// received maps the blockID to the total sum of weight that has reported
+	// that block as accepted.
+	received map[ids.ID]uint64
+	accepted []ids.ID
 }
 
-func New(
+func NewMajority(
 	log logging.Logger,
-	frontierNodes set.Set[ids.NodeID],
 	nodeWeights map[ids.NodeID]uint64,
 	maxOutstanding int,
 ) *Majority {
 	return &Majority{
-		log:                         log,
-		nodeWeights:                 nodeWeights,
-		maxOutstanding:              maxOutstanding,
-		pendingSendAcceptedFrontier: frontierNodes,
-		pendingSendAccepted:         set.Of(maps.Keys(nodeWeights)...),
-		receivedAccepted:            make(map[ids.ID]uint64),
+		requests: requests{
+			maxOutstanding: maxOutstanding,
+			pendingSend:    set.Of(maps.Keys(nodeWeights)...),
+		},
+		log:         log,
+		nodeWeights: nodeWeights,
+		received:    make(map[ids.ID]uint64),
 	}
 }
 
-func (m *Majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeID] {
-	return getPeersToSend(
-		&m.pendingSendAcceptedFrontier,
-		&m.outstandingAcceptedFrontier,
-		m.maxOutstanding,
-	)
-}
-
-func (m *Majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) {
-	if !m.outstandingAcceptedFrontier.Contains(nodeID) {
-		// The chain router should have already dropped unexpected messages.
-		m.log.Error("received unexpected message",
-			zap.Stringer("messageOp", message.AcceptedFrontierOp),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringers("blkIDs", blkIDs),
-		)
-		return
-	}
-
-	m.outstandingAcceptedFrontier.Remove(nodeID)
-	m.receivedAcceptedFrontierSet.Add(blkIDs...)
-
-	if !m.finishedFetchingAcceptedFrontiers() {
-		return
-	}
-
-	m.receivedAcceptedFrontier = m.receivedAcceptedFrontierSet.List()
-
-	m.log.Debug("finalized bootstrapping frontier",
-		zap.Stringers("frontier", m.receivedAcceptedFrontier),
-	)
-}
-
-func (m *Majority) GetAcceptedFrontier(context.Context) ([]ids.ID, bool) {
-	return m.receivedAcceptedFrontier, m.finishedFetchingAcceptedFrontiers()
-}
-
-func (m *Majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
-	if !m.finishedFetchingAcceptedFrontiers() {
-		return nil
-	}
-
-	return getPeersToSend(
-		&m.pendingSendAccepted,
-		&m.outstandingAccepted,
-		m.maxOutstanding,
-	)
-}
-
-func (m *Majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs []ids.ID) error {
-	if !m.outstandingAccepted.Contains(nodeID) {
+func (m *Majority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) error {
+	if !m.recordResponse(nodeID) {
 		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected message",
 			zap.Stringer("messageOp", message.AcceptedOp),
@@ -113,18 +68,16 @@ func (m *Majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs [
 		return nil
 	}
 
-	m.outstandingAccepted.Remove(nodeID)
-
 	weight := m.nodeWeights[nodeID]
 	for _, blkID := range blkIDs {
-		newWeight, err := math.Add64(m.receivedAccepted[blkID], weight)
+		newWeight, err := math.Add64(m.received[blkID], weight)
 		if err != nil {
 			return err
 		}
-		m.receivedAccepted[blkID] = newWeight
+		m.received[blkID] = newWeight
 	}
 
-	if !m.finishedFetchingAccepted() {
+	if !m.finished() {
 		return nil
 	}
 
@@ -140,7 +93,7 @@ func (m *Majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs [
 	}
 
 	requiredWeight := totalWeight/2 + 1
-	for blkID, weight := range m.receivedAccepted {
+	for blkID, weight := range m.received {
 		if weight >= requiredWeight {
 			m.accepted = append(m.accepted, blkID)
 		}
@@ -152,35 +105,6 @@ func (m *Majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs [
 	return nil
 }
 
-func (m *Majority) GetAccepted(context.Context) ([]ids.ID, bool) {
-	return m.accepted, m.finishedFetchingAccepted()
-}
-
-func (m *Majority) finishedFetchingAcceptedFrontiers() bool {
-	return m.pendingSendAcceptedFrontier.Len() == 0 &&
-		m.outstandingAcceptedFrontier.Len() == 0
-}
-
-func (m *Majority) finishedFetchingAccepted() bool {
-	return m.pendingSendAccepted.Len() == 0 &&
-		m.outstandingAccepted.Len() == 0
-}
-
-func getPeersToSend(pendingSend, outstanding *set.Set[ids.NodeID], maxOutstanding int) set.Set[ids.NodeID] {
-	numPending := outstanding.Len()
-	if numPending >= maxOutstanding {
-		return nil
-	}
-
-	numToSend := math.Min(
-		maxOutstanding-numPending,
-		pendingSend.Len(),
-	)
-	nodeIDs := set.NewSet[ids.NodeID](numToSend)
-	for i := 0; i < numToSend; i++ {
-		nodeID, _ := pendingSend.Pop()
-		nodeIDs.Add(nodeID)
-	}
-	outstanding.Union(nodeIDs)
-	return nodeIDs
+func (m *Majority) Result(context.Context) ([]ids.ID, bool) {
+	return m.accepted, m.finished()
 }
