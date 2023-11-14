@@ -66,7 +66,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	}
 
 	b.bootstrapper.RecordAcceptedFrontier(ctx, nodeID, containerID)
-	return b.receivedAcceptedFrontier(ctx)
+	return b.sendMessagesOrFinish(ctx)
 }
 
 func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -80,7 +80,7 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 	}
 
 	b.bootstrapper.RecordAcceptedFrontier(ctx, nodeID)
-	return b.receivedAcceptedFrontier(ctx)
+	return b.sendMessagesOrFinish(ctx)
 }
 
 func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
@@ -96,7 +96,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	if err := b.bootstrapper.RecordAccepted(ctx, nodeID, containerIDs); err != nil {
 		return err
 	}
-	return b.receivedAccepted(ctx)
+	return b.sendMessagesOrFinish(ctx)
 }
 
 func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -112,7 +112,7 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	if err := b.bootstrapper.RecordAccepted(ctx, nodeID, nil); err != nil {
 		return err
 	}
-	return b.receivedAccepted(ctx)
+	return b.sendMessagesOrFinish(ctx)
 }
 
 func (b *bootstrapper) Startup(ctx context.Context) error {
@@ -148,7 +148,7 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	}
 
 	b.Config.SharedCfg.RequestID++
-	return b.receivedAcceptedFrontier(ctx)
+	return b.sendMessagesOrFinish(ctx)
 }
 
 func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
@@ -170,36 +170,20 @@ func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 	return b.Startup(ctx)
 }
 
-func (b *bootstrapper) receivedAcceptedFrontier(ctx context.Context) error {
-	peers := b.bootstrapper.GetAcceptedFrontiersToSend(ctx)
-	if peers.Len() > 0 {
+func (b *bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
+	if peers := b.bootstrapper.GetAcceptedFrontiersToSend(ctx); peers.Len() > 0 {
 		b.Sender.SendGetAcceptedFrontier(ctx, peers, b.Config.SharedCfg.RequestID)
 		return nil
 	}
 
-	// We haven't finalized the accepted frontier, so we should wait for the
-	// outstanding requests.
-	_, finalized := b.bootstrapper.GetAcceptedFrontier(ctx)
-	if !finalized {
-		return nil
-	}
-
-	b.Config.SharedCfg.RequestID++
-	return b.receivedAccepted(ctx)
-}
-
-func (b *bootstrapper) receivedAccepted(ctx context.Context) error {
 	potentialAccepted, finalized := b.bootstrapper.GetAcceptedFrontier(ctx)
 	if !finalized {
-		// We should never receive an accepted message when the frontier isn't
-		// finalized, as we should have never sent any GetAccepted messages
-		// before the frontier is finalized.
-		b.Ctx.Log.Error("bootstrapping frontier unexpectedly not finalized")
+		// We haven't finalized the accepted frontier, so we should wait for the
+		// outstanding requests.
 		return nil
 	}
 
-	peers := b.bootstrapper.GetAcceptedToSend(ctx)
-	if peers.Len() > 0 {
+	if peers := b.bootstrapper.GetAcceptedToSend(ctx); peers.Len() > 0 {
 		b.Sender.SendGetAccepted(ctx, peers, b.Config.SharedCfg.RequestID, potentialAccepted)
 		return nil
 	}
