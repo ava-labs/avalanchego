@@ -19,7 +19,7 @@ func TestSample(t *testing.T) {
 	tests := []struct {
 		name            string
 		elements        map[ids.NodeID]uint64
-		size            int
+		maxSize         int
 		expectedSampled set.Set[ids.NodeID]
 		expectedErr     error
 	}{
@@ -29,7 +29,7 @@ func TestSample(t *testing.T) {
 				nodeID0: 1,
 				nodeID1: 1,
 			},
-			size:            2,
+			maxSize:         2,
 			expectedSampled: set.Of(nodeID0, nodeID1),
 			expectedErr:     nil,
 		},
@@ -38,7 +38,7 @@ func TestSample(t *testing.T) {
 			elements: map[ids.NodeID]uint64{
 				nodeID0: 1,
 			},
-			size:            2,
+			maxSize:         2,
 			expectedSampled: set.Of(nodeID0),
 			expectedErr:     nil,
 		},
@@ -48,7 +48,7 @@ func TestSample(t *testing.T) {
 				nodeID0: math.MaxUint64 - 1,
 				nodeID1: 1,
 			},
-			size:            1,
+			maxSize:         1,
 			expectedSampled: set.Of(nodeID0),
 			expectedErr:     nil,
 		},
@@ -58,7 +58,7 @@ func TestSample(t *testing.T) {
 				nodeID0: math.MaxUint64,
 				nodeID1: 1,
 			},
-			size:            1,
+			maxSize:         1,
 			expectedSampled: nil,
 			expectedErr:     safemath.ErrOverflow,
 		},
@@ -67,7 +67,7 @@ func TestSample(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			sampled, err := Sample(test.elements, test.size)
+			sampled, err := Sample(test.elements, test.maxSize)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedSampled, sampled)
 		})

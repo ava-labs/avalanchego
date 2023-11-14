@@ -9,7 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func Sample[T comparable](elements map[T]uint64, size int) (set.Set[T], error) {
+// Sample keys from [elements] uniformly by weight without replacement. The
+// returned set will have size less than or equal to [maxSize]. This function
+// will error if the sum of all weights overflows.
+func Sample[T comparable](elements map[T]uint64, maxSize int) (set.Set[T], error) {
 	var (
 		keys        = make([]T, len(elements))
 		weights     = make([]uint64, len(elements))
@@ -32,13 +35,13 @@ func Sample[T comparable](elements map[T]uint64, size int) (set.Set[T], error) {
 		return nil, err
 	}
 
-	size = int(math.Min(uint64(size), totalWeight))
-	indicies, err := sampler.Sample(size)
+	maxSize = int(math.Min(uint64(maxSize), totalWeight))
+	indicies, err := sampler.Sample(maxSize)
 	if err != nil {
 		return nil, err
 	}
 
-	sampledElements := set.NewSet[T](size)
+	sampledElements := set.NewSet[T](maxSize)
 	for _, index := range indicies {
 		sampledElements.Add(keys[index])
 	}
