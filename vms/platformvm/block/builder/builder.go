@@ -121,7 +121,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 			return err
 		}
 	}
-	return b.GossipTx(tx)
+	return b.GossipTx(context.TODO(), tx)
 }
 
 // BuildBlock builds a block to be added to consensus.
