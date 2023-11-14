@@ -149,7 +149,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
-	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx := txs.NewMockPostDurangoStaker(ctrl)
 	stakerTx.EXPECT().Duration().Return(duration)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)

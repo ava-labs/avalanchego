@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	_ DelegatorTx    = (*AddPermissionlessDelegatorTx)(nil)
+	_ DelegatorTx       = (*AddPermissionlessDelegatorTx)(nil)
 	_ PostDurangoStaker = (*AddPermissionlessDelegatorTx)(nil)
 )
 

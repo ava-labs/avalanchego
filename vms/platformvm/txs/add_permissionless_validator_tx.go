@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	_ ValidatorTx    = (*AddPermissionlessValidatorTx)(nil)
+	_ ValidatorTx       = (*AddPermissionlessValidatorTx)(nil)
 	_ PostDurangoStaker = (*AddPermissionlessDelegatorTx)(nil)
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")

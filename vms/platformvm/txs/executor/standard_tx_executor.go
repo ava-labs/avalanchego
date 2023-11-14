@@ -291,7 +291,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
@@ -320,7 +320,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
@@ -340,7 +340,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
@@ -437,7 +437,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
@@ -469,7 +469,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
@@ -534,10 +534,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 }
 
 // addStakerFromStakerTx creates the staker and adds it to state.
-func (e *StandardTxExecutor) addStakerFromStakerTx(
-	stakerTx txs.Staker,
-	chainTime time.Time,
-) error {
+func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.Staker) error {
 	// Pre Durango fork, stakers were added as pending first, then promoted
 	// to current when chainTime reaches their start time.
 	// Post Durango fork, stakers will be immediately marked as current.
