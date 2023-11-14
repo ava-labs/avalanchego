@@ -28,8 +28,11 @@ var _ Network = (*network)(nil)
 type Network interface {
 	common.AppHandler
 
-	// GossipTx gossips the transaction to some of the connected peers
-	GossipTx(ctx context.Context, tx *txs.Tx) error
+	// IssueTx verifies the transaction at the currently preferred state, adds
+	// it to the mempool, and gossips it to the network.
+	//
+	// Invariant: Assumes the context lock is held.
+	IssueTx(ctx context.Context, tx *txs.Tx) error
 }
 
 type network struct {
@@ -121,7 +124,27 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	return nil
 }
 
-func (n *network) GossipTx(ctx context.Context, tx *txs.Tx) error {
+func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
+	txID := tx.ID()
+	if n.blkBuilder.Mempool.Has(txID) {
+		// If the transaction is already in the mempool - then it looks the same
+		// as if it was successfully added
+		return nil
+	}
+
+	if err := n.blkBuilder.blkManager.VerifyTx(tx); err != nil {
+		n.blkBuilder.Mempool.MarkDropped(txID, err)
+		return err
+	}
+
+	// If we are partially syncing the Primary Network, we should not be
+	// maintaining the transaction mempool locally.
+	if !n.blkBuilder.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		if err := n.blkBuilder.Mempool.Add(tx); err != nil {
+			return err
+		}
+	}
+
 	txBytes := tx.Bytes()
 	msg := &message.Tx{
 		Tx: txBytes,
@@ -131,7 +154,6 @@ func (n *network) GossipTx(ctx context.Context, tx *txs.Tx) error {
 		return err
 	}
 
-	txID := tx.ID()
 	n.gossipTx(ctx, txID, msgBytes)
 	return nil
 }
