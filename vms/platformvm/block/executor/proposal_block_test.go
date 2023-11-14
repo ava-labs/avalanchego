@@ -596,7 +596,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 			for _, subStaker := range test.subnetStakers {
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-					env.config.MaxValidatorStake, // Weight
+					10, // Weight
 					uint64(subStaker.startTime.Unix()),
 					uint64(subStaker.endTime.Unix()),
 					subStaker.nodeID, // validator ID
