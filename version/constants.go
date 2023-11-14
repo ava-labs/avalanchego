@@ -125,11 +125,43 @@ func init() {
 		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
 
+	// The mainnet stop vertex is well known. It can be verified on any fully
+	// synced node by calling the X-chain's `avm.getBlockByHeight` API on the
+	// genesis block and looking at the parentID. Ex:
+	/*
+		curl 'https://api.avax.network/ext/bc/X' \
+		--header 'Content-Type: application/json' \
+		--data '{
+		    "jsonrpc":"2.0",
+		    "id"     :1,
+		    "method" :"avm.getBlockByHeight",
+		    "params" :{
+		        "height":"0",
+		        "encoding": "json"
+		    }
+		}'
+	*/
 	mainnetXChainStopVertexID, err := ids.FromString("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga")
 	if err != nil {
 		panic(err)
 	}
 
+	// The fuji stop vertex is well known. It can be verified on any fully
+	// synced node by calling the X-chain's `avm.getBlockByHeight` API on the
+	// genesis block and looking at the parentID. Ex:
+	/*
+		curl 'https://api.avax-test.network/ext/bc/X' \
+		--header 'Content-Type: application/json' \
+		--data '{
+		    "jsonrpc":"2.0",
+		    "id"     :1,
+		    "method" :"avm.getBlockByHeight",
+		    "params" :{
+		        "height":"0",
+		        "encoding": "json"
+		    }
+		}'
+	*/
 	fujiXChainStopVertexID, err := ids.FromString("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ")
 	if err != nil {
 		panic(err)

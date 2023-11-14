@@ -31,7 +31,10 @@ type Config struct {
 	// TxBlocked tracks operations that are blocked on transactions
 	TxBlocked *queue.Jobs
 
-	Manager      vertex.Manager
-	VM           vertex.LinearizableVM
-	StopVertexID ids.ID // If this ID is empty, the ID is not well known
+	Manager vertex.Manager
+	VM      vertex.LinearizableVM
+
+	// If StopVertexID is empty, the engine will generate the stop vertex based
+	// on the current state.
+	StopVertexID ids.ID
 }
