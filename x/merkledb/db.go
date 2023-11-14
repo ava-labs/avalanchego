@@ -212,7 +212,8 @@ type merkleDB struct {
 
 	tokenSize int
 
-	forceRebuild bool
+	// true if the intermediate nodes have been invalidated due to an error while committing
+	invalid bool
 }
 
 // New returns a new merkle database.
@@ -345,7 +346,7 @@ func (db *merkleDB) rebuild(ctx context.Context, batchSize int) error {
 	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
-	db.forceRebuild = false
+	db.invalid = false
 	return db.Compact(nil, nil)
 }
 
@@ -436,7 +437,7 @@ func (db *merkleDB) Close() error {
 	db.valueNodeDB.Close()
 
 	// if we need to rebuild, skip flushing the cache and don't write the clean shutdown flag
-	if db.forceRebuild {
+	if db.invalid {
 		return nil
 	}
 
@@ -955,7 +956,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
 	// if we don't finish writing all data to the cache and the disk, we will need to rebuild the intermediate nodes
-	db.forceRebuild = true
+	db.invalid = true
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
@@ -992,7 +993,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 
 	// we successfully wrote all node data, so we don't need to rebuild the intermediate nodes
-	db.forceRebuild = false
+	db.invalid = false
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.

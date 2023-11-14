@@ -225,7 +225,7 @@ func newHistoricalTrieView(
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	var err error
 	t.calculateNodesOnce.Do(func() {
-		if t.isInvalid() {
+		if t.isInvalid() || t.db.invalid {
 			err = ErrInvalid
 			return
 		}
