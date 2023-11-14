@@ -29,8 +29,10 @@ type majority struct {
 
 	pendingSendAccepted set.Set[ids.NodeID]
 	outstandingAccepted set.Set[ids.NodeID]
-	receivedAccepted    map[ids.ID]uint64
-	accepted            []ids.ID
+	// receivedAccepted maps the blockID to the total sum of weight that has
+	// reported that block as accepted.
+	receivedAccepted map[ids.ID]uint64
+	accepted         []ids.ID
 }
 
 func New(
