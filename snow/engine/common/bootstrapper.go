@@ -190,6 +190,8 @@ func (b *bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
 
 	accepted, finalized := b.bootstrapper.GetAccepted(ctx)
 	if !finalized {
+		// We haven't finalized the accepted set, so we should wait for the
+		// outstanding requests.
 		return nil
 	}
 
