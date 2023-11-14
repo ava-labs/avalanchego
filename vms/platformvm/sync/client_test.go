@@ -95,7 +95,7 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 	var (
 		require          = require.New(t)
 		now              = time.Now().UnixNano()
-		r                = rand.New(rand.NewSource(now))
+		r                = rand.New(rand.NewSource(now)) // #nosec G404
 		ctrl             = gomock.NewController(t)
 		onDoneErrChan    = make(chan error)
 		onGotSummaryChan = make(chan struct{})
@@ -226,7 +226,7 @@ func TestClientShutdown(t *testing.T) {
 	var (
 		require        = require.New(t)
 		now            = time.Now().UnixNano()
-		r              = rand.New(rand.NewSource(now))
+		r              = rand.New(rand.NewSource(now)) // #nosec G404
 		ctrl           = gomock.NewController(t)
 		onDoneErrChan  = make(chan error)
 		syncClient     = xsync.NewMockClient(ctrl)
