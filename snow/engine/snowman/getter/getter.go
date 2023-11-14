@@ -5,6 +5,9 @@ package getter
 
 import (
 	"context"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
@@ -22,15 +25,20 @@ var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
 	vm block.ChainVM,
-	commonCfg common.Config,
+	sender common.Sender,
+	log logging.Logger,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
-		vm:     vm,
-		ssVM:   ssVM,
-		sender: commonCfg.Sender,
-		cfg:    commonCfg,
-		log:    commonCfg.Ctx.Log,
+		vm:                        vm,
+		ssVM:                      ssVM,
+		sender:                    sender,
+		log:                       log,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
@@ -38,18 +46,23 @@ func New(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
-		commonCfg.Ctx.Registerer,
+		reg,
 	)
 	return gh, err
 }
 
 type getter struct {
-	vm     block.ChainVM
-	ssVM   block.StateSyncableVM // can be nil
-	sender common.Sender
-	cfg    common.Config
+	vm   block.ChainVM
+	ssVM block.StateSyncableVM // can be nil
 
-	log              logging.Logger
+	sender common.Sender
+	log    logging.Logger
+	// Max time to spend fetching a container and its ancestors when responding
+	// to a GetAncestors
+	maxTimeGetAncestors time.Duration
+	// Max number of containers in an ancestors message sent by this node.
+	maxContainersGetAncestors int
+
 	getAncestorsBlks metric.Averager
 }
 
@@ -153,9 +166,9 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.log,
 		gh.vm,
 		blkID,
-		gh.cfg.AncestorsMaxContainersSent,
+		gh.maxContainersGetAncestors,
 		constants.MaxContainersLen,
-		gh.cfg.MaxTimeGetAncestors,
+		gh.maxTimeGetAncestors,
 	)
 	if err != nil {
 		gh.log.Verbo("dropping GetAncestors message",
