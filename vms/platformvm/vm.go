@@ -60,7 +60,6 @@ var (
 	_ SyncClient                 = (*psync.Client)(nil)
 )
 
-// TODO rename
 type SyncClient interface {
 	StateSyncEnabled(context.Context) (bool, error)
 	GetOngoingSyncStateSummary(context.Context) (snowmanblock.StateSummary, error)
