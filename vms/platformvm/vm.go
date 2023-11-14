@@ -57,7 +57,9 @@ var (
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
-	_ SyncClient                 = (*psync.Client)(nil)
+
+	_ SyncClient = (*psync.Client)(nil)
+	_ SyncServer = (*psync.Server)(nil)
 )
 
 type SyncClient interface {
@@ -66,6 +68,11 @@ type SyncClient interface {
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (snowmanblock.StateSummary, error)
 	// Stops syncing. No-op if syncing hasn't begun or is done.
 	Shutdown()
+}
+
+type SyncServer interface {
+	GetLastStateSummary(context.Context) (snowmanblock.StateSummary, error)
+	GetStateSummary(_ context.Context, summaryHeight uint64) (snowmanblock.StateSummary, error)
 }
 
 type VM struct {
