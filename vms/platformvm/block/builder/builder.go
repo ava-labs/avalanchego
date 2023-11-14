@@ -43,9 +43,6 @@ type Builder interface {
 	mempool.BlockTimer
 	Network
 
-	// AddUnverifiedTx verifier the tx before adding it to mempool
-	AddUnverifiedTx(tx *txs.Tx) error
-
 	// BuildBlock is called on timer clock to attempt to create
 	// next block
 	BuildBlock(context.Context) (snowman.Block, error)
@@ -98,11 +95,6 @@ func New(
 
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
-}
-
-// AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	return b.Network.IssueTx(context.TODO(), tx)
 }
 
 // BuildBlock builds a block to be added to consensus.
