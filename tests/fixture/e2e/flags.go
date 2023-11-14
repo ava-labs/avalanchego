@@ -8,28 +8,31 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet/local"
 )
 
 type FlagVars struct {
-	avalancheGoExecPath  string
-	persistentNetworkDir string
-	usePersistentNetwork bool
+	avalancheGoExecPath string
+	networkDir          string
+	useExistingNetwork  bool
 }
 
-func (v *FlagVars) PersistentNetworkDir() string {
-	if v.usePersistentNetwork && len(v.persistentNetworkDir) == 0 {
-		return os.Getenv(local.NetworkDirEnvName)
+func (v *FlagVars) NetworkDir() string {
+	if !v.useExistingNetwork {
+		return ""
 	}
-	return v.persistentNetworkDir
+	if len(v.networkDir) > 0 {
+		return v.networkDir
+	}
+	return os.Getenv(local.NetworkDirEnvName)
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
 	return v.avalancheGoExecPath
 }
 
-func (v *FlagVars) UsePersistentNetwork() bool {
-	return v.usePersistentNetwork
+func (v *FlagVars) UseExistingNetwork() bool {
+	return v.useExistingNetwork
 }
 
 func RegisterFlags() *FlagVars {
@@ -38,19 +41,19 @@ func RegisterFlags() *FlagVars {
 		&vars.avalancheGoExecPath,
 		"avalanchego-path",
 		os.Getenv(local.AvalancheGoPathEnvName),
-		fmt.Sprintf("avalanchego executable path (required if not using a persistent network). Also possible to configure via the %s env variable.", local.AvalancheGoPathEnvName),
+		fmt.Sprintf("avalanchego executable path (required if not using an existing network). Also possible to configure via the %s env variable.", local.AvalancheGoPathEnvName),
 	)
 	flag.StringVar(
-		&vars.persistentNetworkDir,
+		&vars.networkDir,
 		"network-dir",
 		"",
-		fmt.Sprintf("[optional] the dir containing the configuration of a persistent network to target for testing. Useful for speeding up test development. Also possible to configure via the %s env variable.", local.NetworkDirEnvName),
+		fmt.Sprintf("[optional] the dir containing the configuration of an existing network to target for testing. Will only be used if --use-existing-network is specified. Also possible to configure via the %s env variable.", local.NetworkDirEnvName),
 	)
 	flag.BoolVar(
-		&vars.usePersistentNetwork,
-		"use-persistent-network",
+		&vars.useExistingNetwork,
+		"use-existing-network",
 		false,
-		"[optional] whether to target the persistent network identified by --network-dir.",
+		"[optional] whether to target the existing network identified by --network-dir.",
 	)
 
 	return &vars

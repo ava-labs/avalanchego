@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -47,7 +47,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		ginkgo.By("initializing a coreth client")
 		node := privateNetwork.GetNodes()[0]
-		nodeURI := testnet.NodeURI{
+		nodeURI := ephnet.NodeURI{
 			NodeID: node.GetID(),
 			URI:    node.GetProcessContext().URI,
 		}

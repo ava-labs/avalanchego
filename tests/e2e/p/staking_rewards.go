@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -43,13 +43,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
-			require.Equal(testnet.DefaultMinStakeDuration, minStakeDuration)
+			require.Equal(ephnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
 		ginkgo.By("adding alpha node, whose uptime should result in a staking reward")
-		alphaNode := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		alphaNode := e2e.AddEphemeralNode(network, ephnet.FlagsMap{})
 		ginkgo.By("adding beta node, whose uptime should not result in a staking reward")
-		betaNode := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		betaNode := e2e.AddEphemeralNode(network, ephnet.FlagsMap{})
 
 		// Wait to check health until both nodes have started to minimize the duration
 		// required for both nodes to report healthy.

@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -48,7 +48,7 @@ func GetDefaultRootDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".testnetctl", "networks"), nil
+	return filepath.Join(homeDir, ".ephnet", "networks"), nil
 }
 
 // Find the next available network ID by attempting to create a
@@ -83,7 +83,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 
 // Defines the configuration required for a local network (i.e. one composed of local processes).
 type LocalNetwork struct {
-	testnet.NetworkConfig
+	ephnet.NetworkConfig
 	LocalConfig
 
 	// Nodes with local configuration
@@ -94,13 +94,13 @@ type LocalNetwork struct {
 }
 
 // Returns the configuration of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetConfig() testnet.NetworkConfig {
+func (ln *LocalNetwork) GetConfig() ephnet.NetworkConfig {
 	return ln.NetworkConfig
 }
 
 // Returns the nodes of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetNodes() []testnet.Node {
-	nodes := make([]testnet.Node, 0, len(ln.Nodes))
+func (ln *LocalNetwork) GetNodes() []ephnet.Node {
+	nodes := make([]ephnet.Node, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		nodes = append(nodes, node)
 	}
@@ -108,12 +108,12 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 }
 
 // Adds a backend-agnostic ephemeral node to the network
-func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags ephnet.FlagsMap) (ephnet.Node, error) {
 	if flags == nil {
-		flags = testnet.FlagsMap{}
+		flags = ephnet.FlagsMap{}
 	}
 	return ln.AddLocalNode(w, &LocalNode{
-		NodeConfig: testnet.NodeConfig{
+		NodeConfig: ephnet.NodeConfig{
 			Flags: flags,
 		},
 	}, true /* isEphemeral */)
@@ -298,7 +298,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 
 	// Set values common to all nodes
 	flags.SetDefaults(ln.DefaultFlags)
-	flags.SetDefaults(testnet.FlagsMap{
+	flags.SetDefaults(ephnet.FlagsMap{
 		config.GenesisFileKey:    ln.GetGenesisPath(),
 		config.ChainConfigDirKey: ln.GetChainConfigDir(),
 	})
@@ -385,7 +385,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, testnet.ErrNotRunning) {
+			if err != nil && !errors.Is(err, ephnet.ErrNotRunning) {
 				return err
 			}
 			if !healthy {
@@ -409,14 +409,14 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 // Retrieve API URIs for all running primary validator nodes. URIs for
 // ephemeral nodes are not returned.
-func (ln *LocalNetwork) GetURIs() []testnet.NodeURI {
-	uris := make([]testnet.NodeURI, 0, len(ln.Nodes))
+func (ln *LocalNetwork) GetURIs() []ephnet.NodeURI {
+	uris := make([]ephnet.NodeURI, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
-			uris = append(uris, testnet.NodeURI{
+			uris = append(uris, ephnet.NodeURI{
 				NodeID: node.NodeID,
 				URI:    node.URI,
 			})
@@ -458,7 +458,7 @@ func (ln *LocalNetwork) ReadGenesis() error {
 }
 
 func (ln *LocalNetwork) WriteGenesis() error {
-	bytes, err := testnet.DefaultJSONMarshal(ln.Genesis)
+	bytes, err := ephnet.DefaultJSONMarshal(ln.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
@@ -477,7 +477,7 @@ func (ln *LocalNetwork) GetCChainConfigPath() string {
 }
 
 func (ln *LocalNetwork) ReadCChainConfig() error {
-	chainConfig, err := testnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
+	chainConfig, err := ephnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
 	if err != nil {
 		return err
 	}
@@ -496,7 +496,7 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent local network defaults.
 type localDefaults struct {
-	Flags      testnet.FlagsMap
+	Flags      ephnet.FlagsMap
 	ExecPath   string
 	FundedKeys []*secp256k1.PrivateKey
 }
@@ -526,7 +526,7 @@ func (ln *LocalNetwork) WriteDefaults() error {
 		ExecPath:   ln.ExecPath,
 		FundedKeys: ln.FundedKeys,
 	}
-	bytes, err := testnet.DefaultJSONMarshal(defaults)
+	bytes, err := ephnet.DefaultJSONMarshal(defaults)
 	if err != nil {
 		return fmt.Errorf("failed to marshal defaults: %w", err)
 	}

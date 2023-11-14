@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -44,7 +44,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
-			require.Equal(testnet.DefaultMinStakeDuration, minStakeDuration)
+			require.Equal(ephnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
@@ -87,7 +87,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		}
 
 		ginkgo.By("adding new node and waiting for it to report healthy")
-		node := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		node := e2e.AddEphemeralNode(network, ephnet.FlagsMap{})
 		e2e.WaitForHealthy(node)
 
 		ginkgo.By("retrieving new node's id and pop")

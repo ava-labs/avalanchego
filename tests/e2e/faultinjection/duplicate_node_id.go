@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -27,7 +27,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		nodes := network.GetNodes()
 
 		ginkgo.By("creating new node")
-		node1 := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		node1 := e2e.AddEphemeralNode(network, ephnet.FlagsMap{})
 		e2e.WaitForHealthy(node1)
 
 		ginkgo.By("checking that the new node is connected to its peers")
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 
 		ginkgo.By("creating a second new node with the same staking keypair as the first new node")
 		node1Flags := node1.GetConfig().Flags
-		node2Flags := testnet.FlagsMap{
+		node2Flags := ephnet.FlagsMap{
 			config.StakingTLSKeyContentKey: node1Flags[config.StakingTLSKeyContentKey],
 			config.StakingCertContentKey:   node1Flags[config.StakingCertContentKey],
 			// Construct a unique data dir to ensure the two nodes' data will be stored
@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		node2 := e2e.AddEphemeralNode(network, node2Flags)
 
 		ginkgo.By("checking that the second new node fails to become healthy before timeout")
-		err := testnet.WaitForHealthy(e2e.DefaultContext(), node2)
+		err := ephnet.WaitForHealthy(e2e.DefaultContext(), node2)
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		ginkgo.By("stopping the first new node")
@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 })
 
 // Check that a new node is connected to existing nodes and vice versa
-func checkConnectedPeers(existingNodes []testnet.Node, newNode testnet.Node) {
+func checkConnectedPeers(existingNodes []ephnet.Node, newNode ephnet.Node) {
 	require := require.New(ginkgo.GinkgoT())
 
 	// Collect the node ids of the new node's peers

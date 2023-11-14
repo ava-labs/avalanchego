@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
 )
 
 const (
 	// Constants defining the names of shell variables whose value can
 	// configure local network orchestration.
 	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
-	NetworkDirEnvName      = "TESTNETCTL_NETWORK_DIR"
-	RootDirEnvName         = "TESTNETCTL_ROOT_DIR"
+	NetworkDirEnvName      = "EPHNET_NETWORK_DIR"
+	RootDirEnvName         = "EPHNET_ROOT_DIR"
 
 	DefaultNetworkStartTimeout = 2 * time.Minute
 	DefaultNodeInitTimeout     = 10 * time.Second
@@ -23,9 +23,9 @@ const (
 )
 
 // A set of flags appropriate for local testing.
-func LocalFlags() testnet.FlagsMap {
+func LocalFlags() ephnet.FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
-	return testnet.FlagsMap{
+	return ephnet.FlagsMap{
 		config.NetworkPeerListGossipFreqKey: "250ms",
 		config.NetworkMaxReconnectDelayKey:  "1s",
 		config.PublicIPKey:                  "127.0.0.1",
@@ -37,16 +37,16 @@ func LocalFlags() testnet.FlagsMap {
 		config.IndexEnabledKey:              true,
 		config.LogDisplayLevelKey:           "INFO",
 		config.LogLevelKey:                  "DEBUG",
-		config.MinStakeDurationKey:          testnet.DefaultMinStakeDuration.String(),
+		config.MinStakeDurationKey:          ephnet.DefaultMinStakeDuration.String(),
 	}
 }
 
 // C-Chain config for local testing.
-func LocalCChainConfig() testnet.FlagsMap {
+func LocalCChainConfig() ephnet.FlagsMap {
 	// Supply only non-default configuration to ensure that default
 	// values will be used. Available C-Chain configuration options are
 	// defined in the `github.com/ava-labs/coreth/evm` package.
-	return testnet.FlagsMap{
+	return ephnet.FlagsMap{
 		"log-level": "trace",
 	}
 }
