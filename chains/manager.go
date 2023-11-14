@@ -841,23 +841,14 @@ func (m *manager) createAvalancheChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
-	snowmanCommonCfg := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        vdrs,
-		SampleK:                        sampleK,
-		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		StartupTracker:                 startupTracker,
-		Sender:                         snowmanMessageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
-		RetryBootstrap:                 m.RetryBootstrap,
-		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
-		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
-		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-	snowGetHandler, err := snowgetter.New(vmWrappingProposerVM, snowmanCommonCfg)
+	snowGetHandler, err := snowgetter.New(
+		vmWrappingProposerVM,
+		snowmanMessageSender,
+		ctx.Log,
+		m.BootstrapMaxTimeGetAncestors,
+		m.BootstrapAncestorsMaxContainersSent,
+		ctx.Registerer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
@@ -870,10 +861,10 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:           snowmanCommonCfg.Ctx,
+		Ctx:           ctx,
 		AllGetsServer: snowGetHandler,
 		VM:            vmWrappingProposerVM,
-		Sender:        snowmanCommonCfg.Sender,
+		Sender:        snowmanMessageSender,
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
@@ -889,7 +880,20 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Config:        snowmanCommonCfg,
+		Config: common.Config{
+			Ctx:                            ctx,
+			Beacons:                        vdrs,
+			SampleK:                        sampleK,
+			Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+			StartupTracker:                 startupTracker,
+			Sender:                         snowmanMessageSender,
+			BootstrapTracker:               sb,
+			Timer:                          h,
+			RetryBootstrap:                 m.RetryBootstrap,
+			RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+			SharedCfg:                      &common.SharedConfig{},
+		},
 		AllGetsServer: snowGetHandler,
 		Blocked:       blockBlocker,
 		VM:            vmWrappingProposerVM,
@@ -906,24 +910,14 @@ func (m *manager) createAvalancheChain(
 		snowmanBootstrapper = common.TraceBootstrapableEngine(snowmanBootstrapper, m.Tracer)
 	}
 
-	avalancheCommonCfg := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        vdrs,
-		SampleK:                        sampleK,
-		StartupTracker:                 startupTracker,
-		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         avalancheMessageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
-		RetryBootstrap:                 m.RetryBootstrap,
-		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
-		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
-		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	avaGetHandler, err := avagetter.New(vtxManager, avalancheCommonCfg)
+	avaGetHandler, err := avagetter.New(
+		vtxManager,
+		avalancheMessageSender,
+		ctx.Log,
+		m.BootstrapMaxTimeGetAncestors,
+		m.BootstrapAncestorsMaxContainersSent,
+		ctx.AvalancheRegisterer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
@@ -938,7 +932,20 @@ func (m *manager) createAvalancheChain(
 	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
 	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
 	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config:             avalancheCommonCfg,
+		Config: common.Config{
+			Ctx:                            ctx,
+			Beacons:                        vdrs,
+			SampleK:                        sampleK,
+			StartupTracker:                 startupTracker,
+			Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+			Sender:                         avalancheMessageSender,
+			BootstrapTracker:               sb,
+			Timer:                          h,
+			RetryBootstrap:                 m.RetryBootstrap,
+			RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+			SharedCfg:                      &common.SharedConfig{},
+		},
 		AllGetsServer:      avaGetHandler,
 		VtxBlocked:         vtxBlocker,
 		TxBlocked:          txBlocker,
@@ -1190,24 +1197,14 @@ func (m *manager) createSnowmanChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
-	commonCfg := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        beacons,
-		SampleK:                        sampleK,
-		StartupTracker:                 startupTracker,
-		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         messageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
-		RetryBootstrap:                 m.RetryBootstrap,
-		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
-		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
-		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
-		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := snowgetter.New(
+		vm,
+		messageSender,
+		ctx.Log,
+		m.BootstrapMaxTimeGetAncestors,
+		m.BootstrapAncestorsMaxContainersSent,
+		ctx.Registerer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
@@ -1220,14 +1217,14 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:           commonCfg.Ctx,
+		Ctx:           ctx,
 		AllGetsServer: snowGetHandler,
 		VM:            vm,
-		Sender:        commonCfg.Sender,
+		Sender:        messageSender,
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
-		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
+		PartialSync:   m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1236,6 +1233,21 @@ func (m *manager) createSnowmanChain(
 
 	if m.TracingEnabled {
 		engine = smeng.TraceEngine(engine, m.Tracer)
+	}
+
+	commonCfg := common.Config{
+		Ctx:                            ctx,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupTracker:                 startupTracker,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Sender:                         messageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
 	}
 
 	// create bootstrap gear
