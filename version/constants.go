@@ -125,11 +125,19 @@ func init() {
 		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
 
+	// The mainnet stop vertex is well known. It can be verified on any fully
+	// synced node by looking at the parentID of the genesis block.
+	//
+	// Ref: https://subnets.avax.network/x-chain/block/0
 	mainnetXChainStopVertexID, err := ids.FromString("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga")
 	if err != nil {
 		panic(err)
 	}
 
+	// The fuji stop vertex is well known. It can be verified on any fully
+	// synced node by looking at the parentID of the genesis block.
+	//
+	// Ref: https://subnets-test.avax.network/x-chain/block/0
 	fujiXChainStopVertexID, err := ids.FromString("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ")
 	if err != nil {
 		panic(err)
