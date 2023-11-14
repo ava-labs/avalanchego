@@ -30,15 +30,14 @@ type ClientIntf interface {
 }
 
 type ClientConfig struct {
+	// [config.TargetRoot] will be set by the Client when a summary is accepted.
 	xsync.ManagerConfig
 	Enabled bool
 	// Called when syncing is done, where [err] is the result of syncing.
-	// Called iff a summary is accepted, regardless of whether syncing succeeds.
+	// Called iff acceptSyncSummary returns nil, regardless of whether syncing succeeds.
 	OnDone func(err error)
 }
 
-// [config.TargetRoot] will be set when a summary is accepted.
-// It doesn't need to be set here.
 func NewClient(
 	config ClientConfig,
 	metadataDB database.KeyValueReaderWriterDeleter,
@@ -95,17 +94,17 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 
 	c.managerConfig.TargetRoot = summary.BlockRoot
 
-	manager, err := xsync.NewManager(c.managerConfig)
-	if err != nil {
-		return 0, err
-	}
-
 	if err := c.metadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
 		return 0, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.syncCancel = cancel
+
+	manager, err := xsync.NewManager(c.managerConfig)
+	if err != nil {
+		return 0, err
+	}
 
 	go func() {
 		var err error
