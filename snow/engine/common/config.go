@@ -4,8 +4,6 @@
 package common
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -30,13 +28,6 @@ type Config struct {
 
 	// Max number of times to retry bootstrap before warning the node operator
 	RetryBootstrapWarnFrequency int
-
-	// Max time to spend fetching a container and its ancestors when responding
-	// to a GetAncestors
-	MaxTimeGetAncestors time.Duration
-
-	// Max number of containers in an ancestors message sent by this node.
-	AncestorsMaxContainersSent int
 
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
