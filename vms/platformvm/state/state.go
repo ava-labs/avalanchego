@@ -1457,14 +1457,13 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := stakerTx.StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
 			// in case they are not stored in the database
 			// Note: we don't provide [LastUpdated] here because we expect it to
 			// always be present on disk.
-			StakerStartTime: defaultStartTime.Unix(),
+			StakerStartTime: stakerTx.StartTime().Unix(),
 		}
 		err = parseValidatorMetadata(metadataBytes, metadata)
 		if err != nil {
@@ -1507,13 +1506,13 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := stakerTx.StartTime()
+		defaultStartTime := stakerTx.StartTime().Unix()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
-			StakerStartTime: defaultStartTime.Unix(),
-			LastUpdated:     uint64(defaultStartTime.Unix()),
+			StakerStartTime: defaultStartTime,
+			LastUpdated:     uint64(defaultStartTime),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1554,17 +1553,16 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.StakerTx)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := stakerTx.StartTime()
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
-				StakerStartTime: defaultStartTime.Unix(),
+				StakerStartTime: stakerTx.StartTime().Unix(),
 				txID:            txID,
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
