@@ -37,7 +37,6 @@ func DefaultConfigTest() Config {
 		Bootstrapable:                  &BootstrapableTest{},
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &TimerTest{},
-		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &SharedConfig{},
 	}
