@@ -41,7 +41,6 @@ var (
 type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
-	Network
 
 	// BuildBlock is called on timer clock to attempt to create
 	// next block
@@ -54,7 +53,6 @@ type Builder interface {
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
 	mempool.Mempool
-	Network
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
@@ -75,7 +73,6 @@ func New(
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
-	appSender common.AppSender,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
@@ -86,12 +83,6 @@ func New(
 	}
 
 	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
-
-	builder.Network = NewNetwork(
-		txExecutorBackend.Ctx,
-		builder,
-		appSender,
-	)
 
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder

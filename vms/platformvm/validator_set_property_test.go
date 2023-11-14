@@ -374,7 +374,7 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	if err := vm.Builder.IssueTx(context.Background(), signedTx); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -802,7 +802,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Builder.IssueTx(context.Background(), testSubnet1); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), testSubnet1); err != nil {
 		return nil, ids.Empty, err
 	}
 
