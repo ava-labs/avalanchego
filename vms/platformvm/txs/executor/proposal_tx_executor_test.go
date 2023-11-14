@@ -46,9 +46,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			addValTx.StartTime(),
 			0,
 		)
 		require.NoError(t, err)
@@ -74,9 +76,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			addValTx.StartTime(),
 			0,
 		)
 		require.NoError(t, err)
@@ -402,9 +406,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.ErrorIs(err, ErrNotValidator)
 	}
 
+	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
-		addDSTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -555,9 +561,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
-		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -684,9 +692,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
+		addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
-			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+			addSubnetValTx,
+			addSubnetValTx.StartTime(),
 			0,
 		)
 		require.NoError(err)

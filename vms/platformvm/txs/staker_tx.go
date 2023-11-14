@@ -42,15 +42,27 @@ type PermissionlessStaker interface {
 	Stake() []*avax.TransferableOutput
 }
 
-type Staker interface {
+type commonStaker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
 	// PublicKey returns the BLS public key registered by this transaction. If
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)
+	Weight() uint64
+	CurrentPriority() Priority
+}
+
+// TODO: Rename this to Staker and Starker below to PreDurangoStaker
+// Current naming is only functional to slicing up the whole change
+// into smaller parts which are easier to review
+type PostDurangoStaker interface {
+	commonStaker
+	Duration() time.Duration
+}
+
+type Staker interface {
+	commonStaker
+	PendingPriority() Priority
 	StartTime() time.Time
 	EndTime() time.Time
-	Weight() uint64
-	PendingPriority() Priority
-	CurrentPriority() Priority
 }
