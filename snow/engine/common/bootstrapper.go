@@ -122,16 +122,22 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 		nodeWeights[nodeID] = beacon.Weight
 	}
 
-	bootstrapper, err := smbootstrapper.New(
-		b.Ctx.Log,
-		nodeWeights,
-		b.Config.SampleK,
-		MaxOutstandingBroadcastRequests,
-	)
+	frontierNodes, err := smbootstrapper.Sample(nodeWeights, b.SampleK)
 	if err != nil {
 		return err
 	}
-	b.bootstrapper = bootstrapper
+
+	b.Ctx.Log.Debug("sampled nodes to seed bootstrapping frontier",
+		zap.Reflect("sampledNodes", frontierNodes),
+		zap.Int("numNodes", len(nodeWeights)),
+	)
+
+	b.bootstrapper = smbootstrapper.New(
+		b.Ctx.Log,
+		frontierNodes,
+		nodeWeights,
+		MaxOutstandingBroadcastRequests,
+	)
 
 	b.bootstrapAttempts++
 	if accepted, finalized := b.bootstrapper.GetAccepted(ctx); finalized {

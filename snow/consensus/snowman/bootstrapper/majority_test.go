@@ -27,18 +27,15 @@ var (
 )
 
 func TestNew(t *testing.T) {
-	require := require.New(t)
-
-	bootstrapper, err := New(
-		logging.NoLog{},
+	bootstrapper := New(
+		logging.NoLog{}, // log
+		set.Of(nodeID0), // frontierNodes
 		map[ids.NodeID]uint64{
 			nodeID0: 1,
 			nodeID1: 1,
 		}, // nodeWeights
-		2, // maxFrontiers
 		2, // maxOutstanding
 	)
-	require.NoError(err)
 
 	expectedBootstrapper := &majority{
 		log: logging.NoLog{},
@@ -47,45 +44,11 @@ func TestNew(t *testing.T) {
 			nodeID1: 1,
 		},
 		maxOutstanding:              2,
-		pendingSendAcceptedFrontier: set.Of(nodeID0, nodeID1),
+		pendingSendAcceptedFrontier: set.Of(nodeID0),
 		pendingSendAccepted:         set.Of(nodeID0, nodeID1),
 		receivedAccepted:            make(map[ids.ID]uint64),
 	}
-	require.Equal(expectedBootstrapper, bootstrapper)
-}
-
-func TestNewSampling(t *testing.T) {
-	require := require.New(t)
-
-	bootstrapper, err := New(
-		logging.NoLog{},
-		map[ids.NodeID]uint64{
-			nodeID0: 1,
-			nodeID1: 1,
-		}, // nodeWeights
-		1, // maxFrontiers
-		2, // maxOutstanding
-	)
-	require.NoError(err)
-
-	peers := bootstrapper.GetAcceptedFrontiersToSend(context.Background())
-	require.Len(peers, 1)
-}
-
-func TestNewEmpty(t *testing.T) {
-	require := require.New(t)
-
-	bootstrapper, err := New(
-		logging.NoLog{},
-		map[ids.NodeID]uint64{}, // nodeWeights
-		1,                       // maxFrontiers
-		2,                       // maxOutstanding
-	)
-	require.NoError(err)
-
-	accepted, finalized := bootstrapper.GetAccepted(context.Background())
-	require.Empty(accepted)
-	require.True(finalized)
+	require.Equal(t, expectedBootstrapper, bootstrapper)
 }
 
 func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {

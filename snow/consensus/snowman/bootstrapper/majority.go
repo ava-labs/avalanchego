@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -36,33 +35,18 @@ type majority struct {
 
 func New(
 	log logging.Logger,
+	frontierNodes set.Set[ids.NodeID],
 	nodeWeights map[ids.NodeID]uint64,
-	maxFrontiers int,
 	maxOutstanding int,
-) (Bootstrapper, error) {
-	nodeIDs := maps.Keys(nodeWeights)
-	m := &majority{
-		log:                 log,
-		nodeWeights:         nodeWeights,
-		maxOutstanding:      maxOutstanding,
-		pendingSendAccepted: set.Of(nodeIDs...),
-		receivedAccepted:    make(map[ids.ID]uint64),
+) Bootstrapper {
+	return &majority{
+		log:                         log,
+		nodeWeights:                 nodeWeights,
+		maxOutstanding:              maxOutstanding,
+		pendingSendAcceptedFrontier: frontierNodes,
+		pendingSendAccepted:         set.Of(maps.Keys(nodeWeights)...),
+		receivedAccepted:            make(map[ids.ID]uint64),
 	}
-
-	maxFrontiers = math.Min(maxFrontiers, len(nodeIDs))
-	sampler := sampler.NewUniform()
-	sampler.Initialize(uint64(len(nodeIDs)))
-	indicies, err := sampler.Sample(maxFrontiers)
-	for _, index := range indicies {
-		m.pendingSendAcceptedFrontier.Add(nodeIDs[index])
-	}
-
-	log.Debug("sampled nodes to seed bootstrapping frontier",
-		zap.Reflect("sampledNodes", m.pendingSendAcceptedFrontier),
-		zap.Int("numNodes", len(nodeIDs)),
-	)
-
-	return m, err
 }
 
 func (m *majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeID] {
