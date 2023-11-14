@@ -999,17 +999,16 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeIDs := genesisNodeIDs
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		nodeIDs[0]: defaultWeight,
-		nodeIDs[1]: defaultWeight,
-		nodeIDs[2]: defaultWeight,
-		nodeIDs[3]: defaultWeight,
-		nodeIDs[4]: defaultWeight,
+		genesisNodeIDs[0]: defaultWeight,
+		genesisNodeIDs[1]: defaultWeight,
+		genesisNodeIDs[2]: defaultWeight,
+		genesisNodeIDs[3]: defaultWeight,
+		genesisNodeIDs[4]: defaultWeight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1020,14 +1019,14 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
-	nodeID5 := ids.GenerateTestNodeID()
+	extraNode := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
-		nodeID5,
+		extraNode,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1103,12 +1102,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		nodeIDs[0]: defaultWeight,
-		nodeIDs[1]: defaultWeight,
-		nodeIDs[2]: defaultWeight,
-		nodeIDs[3]: defaultWeight,
-		nodeIDs[4]: defaultWeight,
-		nodeID5:    vm.MaxValidatorStake,
+		genesisNodeIDs[0]: defaultWeight,
+		genesisNodeIDs[1]: defaultWeight,
+		genesisNodeIDs[2]: defaultWeight,
+		genesisNodeIDs[3]: defaultWeight,
+		genesisNodeIDs[4]: defaultWeight,
+		extraNode:         vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
