@@ -5,10 +5,12 @@ package sync
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/x/sync"
+
+	xsync "github.com/ava-labs/avalanchego/x/sync" // TODO how to alias this?
 )
 
 var (
@@ -22,11 +24,15 @@ type ClientIntf interface {
 	StateSyncEnabled(context.Context) (bool, error)
 	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
+	Shutdown()
 }
 
 type ClientConfig struct {
-	sync.ManagerConfig
+	xsync.ManagerConfig
 	Enabled bool
+	// Called when syncing is done, where [err] is the result of syncing.
+	// Called iff a summary is accepted, regardless of whether syncing succeeds.
+	OnDone func(err error)
 }
 
 // [config.TargetRoot] will be set when a summary is accepted.
@@ -42,17 +48,20 @@ func NewClient(
 }
 
 type Client struct {
+	lock sync.Mutex
+
 	enabled       bool
-	manager       *sync.Manager // Set in acceptSyncSummary
-	managerConfig sync.ManagerConfig
+	onDone        func(err error)
+	managerConfig xsync.ManagerConfig
 
 	metadataDB database.KeyValueReaderWriterDeleter
 
 	// Set in acceptSyncSummary.
+	manager *xsync.Manager
+
+	// Set in acceptSyncSummary.
 	// Calling [c.syncCancel] will stop syncing.
 	syncCancel context.CancelFunc
-	// Set when syncing is done.
-	syncErr error
 }
 
 func (c *Client) StateSyncEnabled(context.Context) (bool, error) {
@@ -74,11 +83,15 @@ func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (bl
 
 // Aynschronously starts syncing to the root in [summary].
 // Populates [c.manager] and [c.syncCancel].
-// Sets [c.syncErr] when syncing is done.
+// Sets [c.syncErr] and closes [c.syncDone] when syncing is done.
+// Must only be called once.
 func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	c.managerConfig.TargetRoot = summary.BlockRoot
 
-	manager, err := sync.NewManager(c.managerConfig)
+	manager, err := xsync.NewManager(c.managerConfig)
 	if err != nil {
 		return 0, err
 	}
@@ -88,12 +101,18 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 	c.syncCancel = cancel
 
 	go func() {
-		c.syncErr = c.manager.Start(ctx)
-
-		// TODO initialize the VM with the state on disk.
-
-		// TODO send message to engine that syncing is done.
+		err := c.manager.Start(ctx)
+		c.onDone(err)
 	}()
 
 	return block.StateSyncStatic, nil
+}
+
+func (c *Client) Shutdown() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.syncCancel != nil {
+		c.syncCancel()
+	}
 }
