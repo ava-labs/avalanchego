@@ -113,8 +113,8 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 			err = manager.Wait(ctx)
 		}
 
-		// TODO what to do with this error?
 		if err == nil {
+			// TODO what to do with this error?
 			_ = c.metadataDB.Delete(stateSyncSummaryKey)
 		}
 
