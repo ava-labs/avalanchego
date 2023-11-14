@@ -5,7 +5,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -20,7 +19,6 @@ var (
 
 // TODO rename
 type ClientIntf interface {
-	// methods that implement the client side of [block.StateSyncableVM]
 	StateSyncEnabled(context.Context) (bool, error)
 	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
@@ -40,7 +38,6 @@ func NewClient(
 	return &Client{
 		enabled:       config.Enabled,
 		managerConfig: config.ManagerConfig,
-		syncErrChan:   make(chan error),
 	}
 }
 
@@ -51,8 +48,11 @@ type Client struct {
 
 	metadataDB database.KeyValueReaderWriterDeleter
 
-	syncCancel  context.CancelFunc // Set in acceptSyncSummary
-	syncErrChan chan error
+	// Set in acceptSyncSummary.
+	// Calling [c.syncCancel] will stop syncing.
+	syncCancel context.CancelFunc
+	// Set when syncing is done.
+	syncErr error
 }
 
 func (c *Client) StateSyncEnabled(context.Context) (bool, error) {
@@ -65,22 +65,18 @@ func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	summary, err := NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
-	}
-
-	return summary, nil
+	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
 func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
-// acceptSyncSummary returns true if sync will be performed and launches the state sync process
-// in a goroutine.
-func (c *Client) acceptSyncSummary(proposedSummary SyncSummary) (block.StateSyncMode, error) {
-	c.managerConfig.TargetRoot = proposedSummary.BlockRoot
+// Aynschronously starts syncing to the root in [summary].
+// Populates [c.manager] and [c.syncCancel].
+// Sets [c.syncErr] when syncing is done.
+func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, error) {
+	c.managerConfig.TargetRoot = summary.BlockRoot
 
 	manager, err := sync.NewManager(c.managerConfig)
 	if err != nil {
@@ -92,7 +88,7 @@ func (c *Client) acceptSyncSummary(proposedSummary SyncSummary) (block.StateSync
 	c.syncCancel = cancel
 
 	go func() {
-		c.syncErrChan <- c.manager.Start(ctx)
+		c.syncErr = c.manager.Start(ctx)
 
 		// TODO initialize the VM with the state on disk.
 
