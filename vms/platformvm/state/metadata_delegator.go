@@ -9,17 +9,35 @@ import (
 )
 
 type delegatorMetadata struct {
-	PotentialReward uint64
+	PotentialReward uint64 `v0:"true"`
+	StakerStartTime int64  `          v1:"true"`
 
 	txID ids.ID
 }
 
 func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
-	var err error
-	metadata.PotentialReward, err = database.ParseUInt64(bytes)
-	return err
+	switch len(bytes) {
+	case database.Uint64Size:
+		// only potential reward was stored
+		var err error
+		metadata.PotentialReward, err = database.ParseUInt64(bytes)
+		if err != nil {
+			return err
+		}
+
+	default:
+		_, err := metadataCodec.Unmarshal(bytes, metadata)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata) error {
-	return database.PutUInt64(db, metadata.txID[:], metadata.PotentialReward)
+	metadataBytes, err := metadataCodec.Marshal(v1, metadata)
+	if err != nil {
+		return err
+	}
+	return db.Put(metadata.txID[:], metadataBytes)
 }
