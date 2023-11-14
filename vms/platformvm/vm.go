@@ -46,6 +46,7 @@ import (
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	psync "github.com/ava-labs/avalanchego/vms/platformvm/sync"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -56,7 +57,17 @@ var (
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
+	_ SyncClient                 = (*psync.Client)(nil)
 )
+
+// TODO rename
+type SyncClient interface {
+	StateSyncEnabled(context.Context) (bool, error)
+	GetOngoingSyncStateSummary(context.Context) (snowmanblock.StateSummary, error)
+	ParseStateSummary(ctx context.Context, summaryBytes []byte) (snowmanblock.StateSummary, error)
+	// Stops syncing. No-op if syncing hasn't begun or is done.
+	Shutdown()
+}
 
 type VM struct {
 	config.Config
