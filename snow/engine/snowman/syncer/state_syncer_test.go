@@ -558,13 +558,11 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true,
-		RetryBootstrapWarnFrequency: 1,
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -1114,13 +1112,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true, // this sets RetryStateSyncing too
-		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -1378,13 +1374,11 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true, // this sets RetryStateSyncing too
-		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 	_ = fullVM

@@ -38,7 +38,7 @@ type Bootstrapper interface {
 	AcceptedHandler
 	Haltable
 	Startup(context.Context) error
-	Restart(ctx context.Context, reset bool) error
+	Restart(ctx context.Context) error
 }
 
 // It collects mechanisms common to both snowman and avalanche bootstrappers
@@ -70,9 +70,6 @@ type bootstrapper struct {
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
 	acceptedFrontier []ids.ID
-
-	// number of times the bootstrap has been attempted
-	bootstrapAttempts int
 }
 
 func NewCommonBootstrapper(config Config) Bootstrapper {
@@ -161,20 +158,12 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(totalSampledWeight)-newAlpha < float64(failedBeaconWeight) {
-		if b.Config.RetryBootstrap {
-			b.Ctx.Log.Debug("restarting bootstrap",
-				zap.String("reason", "not enough frontiers received"),
-				zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
-				zap.Int("numFailedBootstrappers", b.failedAcceptedFrontier.Len()),
-				zap.Int("numBootstrapAttemps", b.bootstrapAttempts),
-			)
-			return b.Restart(ctx, false)
-		}
-
-		b.Ctx.Log.Debug("didn't receive enough frontiers",
-			zap.Int("numFailedValidators", b.failedAcceptedFrontier.Len()),
-			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
+		b.Ctx.Log.Debug("restarting bootstrap",
+			zap.String("reason", "not enough frontiers received"),
+			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
+			zap.Int("numFailedBootstrappers", b.failedAcceptedFrontier.Len()),
 		)
+		return b.Startup(ctx)
 	}
 
 	b.Config.SharedCfg.RequestID++
@@ -253,14 +242,13 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 			return fmt.Errorf("failed to get total weight of failed beacons for subnet %s: %w", b.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconTotalWeight - failedBeaconWeight
-		if b.Config.RetryBootstrap && votingStakes < b.Alpha {
+		if votingStakes < b.Alpha {
 			b.Ctx.Log.Debug("restarting bootstrap",
 				zap.String("reason", "not enough votes received"),
 				zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
 				zap.Int("numFailedBootstrappers", b.failedAccepted.Len()),
-				zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
 			)
-			return b.Restart(ctx, false)
+			return b.Startup(ctx)
 		}
 	}
 
@@ -329,7 +317,6 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	b.failedAccepted.Clear()
 	b.acceptedVotes = make(map[ids.ID]uint64)
 
-	b.bootstrapAttempts++
 	if b.pendingSendAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
@@ -342,22 +329,9 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	return nil
 }
 
-func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
-	if reset {
-		b.Ctx.Log.Debug("Checking for new frontiers")
-
-		b.Config.SharedCfg.Restarted = true
-		b.bootstrapAttempts = 0
-	}
-
-	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
-		b.Ctx.Log.Debug("check internet connection",
-			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
-		)
-	}
-
+func (b *bootstrapper) Restart(ctx context.Context) error {
+	b.Ctx.Log.Debug("Checking for new frontiers")
+	b.Config.SharedCfg.Restarted = true
 	return b.Startup(ctx)
 }
 

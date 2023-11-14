@@ -163,8 +163,6 @@ const (
 	RouterHealthMaxOutstandingRequestsKey              = "router-health-max-outstanding-requests"
 	HealthCheckFreqKey                                 = "health-check-frequency"
 	HealthCheckAveragerHalflifeKey                     = "health-check-averager-halflife"
-	RetryBootstrapKey                                  = "bootstrap-retry-enabled"
-	RetryBootstrapWarnFrequencyKey                     = "bootstrap-retry-warn-frequency"
 	PluginDirKey                                       = "plugin-dir"
 	BootstrapBeaconConnectionTimeoutKey                = "bootstrap-beacon-connection-timeout"
 	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"

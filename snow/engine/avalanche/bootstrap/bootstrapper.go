@@ -626,7 +626,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 	if !linearized {
 		b.Ctx.Log.Debug("checking for stop vertex before finishing bootstrapping")
-		return b.Restart(ctx, true)
+		return b.Restart(ctx)
 	}
 
 	// Invariant: edge will only be the stop vertex after its acceptance.

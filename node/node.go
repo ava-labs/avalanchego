@@ -1009,8 +1009,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:                          criticalChains,
 		TimeoutManager:                          n.timeoutManager,
 		Health:                                  n.health,
-		RetryBootstrap:                          n.Config.RetryBootstrap,
-		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                        n.Shutdown,
 		MeterVMEnabled:                          n.Config.MeterVMEnabled,
 		Metrics:                                 n.MetricsGatherer,
