@@ -127,15 +127,11 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&AddVoteTx{}),
 		targetCodec.RegisterCustomType(&FinishProposalsTx{}),
 		targetCodec.RegisterCustomType(&dac.BaseFeeProposal{}),
-		targetCodec.RegisterCustomType(&dac.BaseFeeProposalState{}),
 		targetCodec.RegisterCustomType(&dac.DummyVote{}),
 		targetCodec.RegisterCustomType(&dac.SimpleVote{}),
 		targetCodec.RegisterCustomType(&dac.AddMemberProposal{}),
-		targetCodec.RegisterCustomType(&dac.AddMemberProposalState{}),
 		targetCodec.RegisterCustomType(&dac.AdminProposal{}),
 		targetCodec.RegisterCustomType(&dac.ExcludeMemberProposal{}),
-		targetCodec.RegisterCustomType(&dac.ExcludeMemberProposalState{}),
-		// TODO@ maybe move proposal states to their own codec? not part of the txs! only used in state
 	)
 	return errs.Err
 }

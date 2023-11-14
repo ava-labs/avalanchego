@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type proposalStateWrapper struct {
@@ -66,7 +65,7 @@ func (cs *caminoState) GetProposal(proposalID ids.ID) (dac.ProposalState, error)
 	}
 
 	proposal := &proposalStateWrapper{}
-	if _, err := txs.Codec.Unmarshal(proposalBytes, proposal); err != nil {
+	if _, err := dac.Codec.Unmarshal(proposalBytes, proposal); err != nil {
 		return nil, err
 	}
 
@@ -199,7 +198,7 @@ func (cs *caminoState) writeProposals() error {
 				return err
 			}
 		} else {
-			proposalBytes, err := txs.Codec.Marshal(blocks.Version, &proposalStateWrapper{ProposalState: proposalDiff.Proposal})
+			proposalBytes, err := dac.Codec.Marshal(blocks.Version, &proposalStateWrapper{ProposalState: proposalDiff.Proposal})
 			if err != nil {
 				return fmt.Errorf("failed to serialize deposit: %w", err)
 			}
@@ -386,7 +385,7 @@ func (it *proposalsIterator) Value() (dac.ProposalState, error) {
 	}
 
 	proposal := &proposalStateWrapper{}
-	if _, err := txs.Codec.Unmarshal(it.dbIterator.Value(), proposal); err != nil {
+	if _, err := dac.Codec.Unmarshal(it.dbIterator.Value(), proposal); err != nil {
 		return nil, err
 	}
 
