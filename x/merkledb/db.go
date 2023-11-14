@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -34,9 +33,7 @@ import (
 const (
 
 	// TODO: name better
-	rebuildViewSizeFractionOfCacheSize   = 50
-	minRebuildViewSizePerCommit          = 1000
-	clearBatchSize                       = units.MiB
+	rebuildBatchSize                     = 50_000
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 )
@@ -214,6 +211,8 @@ type merkleDB struct {
 	calculateNodeIDsSema *semaphore.Weighted
 
 	tokenSize int
+
+	forceRebuild bool
 }
 
 // New returns a new merkle database.
@@ -276,7 +275,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
+			if err := trieDB.rebuild(ctx, rebuildBatchSize); err != nil {
 				return nil, err
 			}
 		}
@@ -292,9 +291,17 @@ func newDatabase(
 	return trieDB, err
 }
 
-// Deletes every intermediate node and rebuilds them by re-adding every key/value.
+// Rebuild deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
-func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
+func (db *merkleDB) Rebuild(ctx context.Context, batchSize int) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+	return db.rebuild(ctx, batchSize)
+}
+
+// rebuild deletes every intermediate node and rebuilds them by re-adding every key/value.
+// TODO: make this more efficient by only clearing out the stale portions of the trie.
+func (db *merkleDB) rebuild(ctx context.Context, batchSize int) error {
 	db.sentinelNode = newNode(Key{})
 
 	// Delete intermediate nodes.
@@ -303,15 +310,11 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	}
 
 	// Add all key-value pairs back into the database.
-	opsSizeLimit := math.Max(
-		cacheSize/rebuildViewSizeFractionOfCacheSize,
-		minRebuildViewSizePerCommit,
-	)
-	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
+	currentOps := make([]database.BatchOp, 0, batchSize)
 	valueIt := db.NewIterator()
 	defer valueIt.Release()
 	for valueIt.Next() {
-		if len(currentOps) >= opsSizeLimit {
+		if len(currentOps) >= batchSize {
 			view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
@@ -319,7 +322,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 			if err := view.commitToDB(ctx); err != nil {
 				return err
 			}
-			currentOps = make([]database.BatchOp, 0, opsSizeLimit)
+			currentOps = make([]database.BatchOp, 0, batchSize)
 			// reset the iterator to prevent memory bloat
 			nextValue := valueIt.Key()
 			valueIt.Release()
@@ -342,6 +345,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
+	db.forceRebuild = false
 	return db.Compact(nil, nil)
 }
 
@@ -430,6 +434,12 @@ func (db *merkleDB) Close() error {
 
 	db.closed = true
 	db.valueNodeDB.Close()
+
+	// if we need to rebuild, skip flushing the cache and don't write the clean shutdown flag
+	if db.forceRebuild {
+		return nil
+	}
+
 	// Flush intermediary nodes to disk.
 	if err := db.intermediateNodeDB.Flush(); err != nil {
 		return err
@@ -944,6 +954,8 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
+	// if we don't finish writing all data to the cache and the disk, we will need to rebuild the intermediate nodes
+	db.forceRebuild = true
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
@@ -978,6 +990,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	if err != nil {
 		return err
 	}
+
+	// we successfully wrote all node data, so we don't need to rebuild the intermediate nodes
+	db.forceRebuild = false
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
