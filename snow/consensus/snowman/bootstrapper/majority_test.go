@@ -37,7 +37,7 @@ func TestNew(t *testing.T) {
 		2, // maxOutstanding
 	)
 
-	expectedBootstrapper := &majority{
+	expectedBootstrapper := &Majority{
 		log: logging.NoLog{},
 		nodeWeights: map[ids.NodeID]uint64{
 			nodeID0: 1,
@@ -60,7 +60,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 	}{
 		{
 			name: "max outstanding",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -71,7 +71,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 				outstandingAcceptedFrontier: set.Of(nodeID1),
 				receivedAccepted:            make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -86,7 +86,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 		},
 		{
 			name: "send until max outstanding",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -96,7 +96,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 				pendingSendAcceptedFrontier: set.Of(nodeID0, nodeID1),
 				receivedAccepted:            make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -111,7 +111,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 		},
 		{
 			name: "send until no more to send",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -120,7 +120,7 @@ func TestMajorityGetAcceptedFrontiersToSend(t *testing.T) {
 				pendingSendAcceptedFrontier: set.Of(nodeID0),
 				receivedAccepted:            make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -154,7 +154,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 	}{
 		{
 			name: "unexpected response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -167,7 +167,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 			},
 			nodeID: nodeID0,
 			blkIDs: nil,
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -181,7 +181,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 		},
 		{
 			name: "unfinished after response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -194,7 +194,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 			},
 			nodeID: nodeID1,
 			blkIDs: []ids.ID{blkID0},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -209,7 +209,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 		},
 		{
 			name: "finished after response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -221,7 +221,7 @@ func TestMajorityRecordAcceptedFrontier(t *testing.T) {
 			},
 			nodeID: nodeID1,
 			blkIDs: []ids.ID{blkID0},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -252,7 +252,7 @@ func TestMajorityGetAcceptedFrontier(t *testing.T) {
 	}{
 		{
 			name: "not finalized",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -268,7 +268,7 @@ func TestMajorityGetAcceptedFrontier(t *testing.T) {
 		},
 		{
 			name: "finalized",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -301,7 +301,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 	}{
 		{
 			name: "still fetching frontiers",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -311,7 +311,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 				outstandingAcceptedFrontier: set.Of(nodeID1),
 				receivedAccepted:            make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -325,7 +325,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 		},
 		{
 			name: "max outstanding",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -336,7 +336,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 				outstandingAccepted: set.Of(nodeID1),
 				receivedAccepted:    make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -351,7 +351,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 		},
 		{
 			name: "send until max outstanding",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -361,7 +361,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 				pendingSendAccepted: set.Of(nodeID0, nodeID1),
 				receivedAccepted:    make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -376,7 +376,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 		},
 		{
 			name: "send until no more to send",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -385,7 +385,7 @@ func TestMajorityGetAcceptedToSend(t *testing.T) {
 				pendingSendAccepted: set.Of(nodeID0),
 				receivedAccepted:    make(map[ids.ID]uint64),
 			},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -420,7 +420,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 	}{
 		{
 			name: "unexpected response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -433,7 +433,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 			},
 			nodeID: nodeID0,
 			blkIDs: nil,
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -448,7 +448,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 		},
 		{
 			name: "unfinished after response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 2,
@@ -461,7 +461,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 			},
 			nodeID: nodeID1,
 			blkIDs: []ids.ID{blkID0},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 2,
@@ -478,7 +478,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 		},
 		{
 			name: "overflow during response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -492,7 +492,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 			},
 			nodeID: nodeID1,
 			blkIDs: []ids.ID{blkID0},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -508,7 +508,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 		},
 		{
 			name: "overflow during final response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -520,7 +520,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 			},
 			nodeID: nodeID1,
 			blkIDs: []ids.ID{blkID0},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -536,7 +536,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 		},
 		{
 			name: "finished after response",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -552,7 +552,7 @@ func TestMajorityRecordAccepted(t *testing.T) {
 			},
 			nodeID: nodeID2,
 			blkIDs: []ids.ID{blkID1},
-			expectedState: &majority{
+			expectedState: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -590,7 +590,7 @@ func TestMajorityGetAccepted(t *testing.T) {
 	}{
 		{
 			name: "not finalized",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,
@@ -606,7 +606,7 @@ func TestMajorityGetAccepted(t *testing.T) {
 		},
 		{
 			name: "finalized",
-			bootstrapper: &majority{
+			bootstrapper: &Majority{
 				log: logging.NoLog{},
 				nodeWeights: map[ids.NodeID]uint64{
 					nodeID0: 1,

@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-type majority struct {
+var _ Bootstrapper = (*Majority)(nil)
+
+type Majority struct {
 	log            logging.Logger
 	nodeWeights    map[ids.NodeID]uint64
 	maxOutstanding int
@@ -40,8 +42,8 @@ func New(
 	frontierNodes set.Set[ids.NodeID],
 	nodeWeights map[ids.NodeID]uint64,
 	maxOutstanding int,
-) Bootstrapper {
-	return &majority{
+) *Majority {
+	return &Majority{
 		log:                         log,
 		nodeWeights:                 nodeWeights,
 		maxOutstanding:              maxOutstanding,
@@ -51,7 +53,7 @@ func New(
 	}
 }
 
-func (m *majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeID] {
+func (m *Majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeID] {
 	return getPeersToSend(
 		&m.pendingSendAcceptedFrontier,
 		&m.outstandingAcceptedFrontier,
@@ -59,7 +61,7 @@ func (m *majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeI
 	)
 }
 
-func (m *majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) {
+func (m *Majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) {
 	if !m.outstandingAcceptedFrontier.Contains(nodeID) {
 		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected message",
@@ -84,11 +86,11 @@ func (m *majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, 
 	)
 }
 
-func (m *majority) GetAcceptedFrontier(context.Context) ([]ids.ID, bool) {
+func (m *Majority) GetAcceptedFrontier(context.Context) ([]ids.ID, bool) {
 	return m.receivedAcceptedFrontier, m.finishedFetchingAcceptedFrontiers()
 }
 
-func (m *majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
+func (m *Majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
 	if !m.finishedFetchingAcceptedFrontiers() {
 		return nil
 	}
@@ -100,7 +102,7 @@ func (m *majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
 	)
 }
 
-func (m *majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs []ids.ID) error {
+func (m *Majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs []ids.ID) error {
 	if !m.outstandingAccepted.Contains(nodeID) {
 		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected message",
@@ -150,16 +152,16 @@ func (m *majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs [
 	return nil
 }
 
-func (m *majority) GetAccepted(context.Context) ([]ids.ID, bool) {
+func (m *Majority) GetAccepted(context.Context) ([]ids.ID, bool) {
 	return m.accepted, m.finishedFetchingAccepted()
 }
 
-func (m *majority) finishedFetchingAcceptedFrontiers() bool {
+func (m *Majority) finishedFetchingAcceptedFrontiers() bool {
 	return m.pendingSendAcceptedFrontier.Len() == 0 &&
 		m.outstandingAcceptedFrontier.Len() == 0
 }
 
-func (m *majority) finishedFetchingAccepted() bool {
+func (m *Majority) finishedFetchingAccepted() bool {
 	return m.pendingSendAccepted.Len() == 0 &&
 		m.outstandingAccepted.Len() == 0
 }
