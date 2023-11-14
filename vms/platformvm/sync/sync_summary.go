@@ -38,7 +38,7 @@ func NewSyncSummaryFromBytes(summaryBytes []byte, acceptImpl func(SyncSummary) (
 	}
 
 	summary.bytes = summaryBytes
-	summaryID, err := ids.ToID(summaryBytes)
+	summaryID, err := ids.ToID(hashing.ComputeHash256(summaryBytes))
 	if err != nil {
 		return SyncSummary{}, err
 	}
