@@ -97,11 +97,18 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 	}
 	c.manager = manager
 
+	if err := c.metadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
+		return 0, err
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	c.syncCancel = cancel
 
 	go func() {
-		err := c.manager.Start(ctx)
+		var err error
+		if err = c.manager.Start(ctx); err == nil {
+			err = c.manager.Wait(ctx)
+		}
 		c.onDone(err)
 	}()
 
