@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -74,6 +75,11 @@ func (m *majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeI
 
 func (m *majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) {
 	if !m.outstandingAcceptedFrontier.Contains(nodeID) {
+		m.log.Error("received unexpected message",
+			zap.Stringer("messageOp", message.AcceptedFrontierOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringers("blkIDs", blkIDs),
+		)
 		return
 	}
 
@@ -109,6 +115,11 @@ func (m *majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
 
 func (m *majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs []ids.ID) error {
 	if !m.outstandingAccepted.Contains(nodeID) {
+		m.log.Error("received unexpected message",
+			zap.Stringer("messageOp", message.AcceptedOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringers("blkIDs", blkIDs),
+		)
 		return nil
 	}
 
