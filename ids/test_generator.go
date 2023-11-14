@@ -19,15 +19,6 @@ func GenerateTestShortID() ShortID {
 	return newShortID
 }
 
-// BuildTestShortID is an utility to build ShortID from bytes in UTs
-// It must not be used in production code. In production code we should
-// use ToShortID, which performs proper length checking.
-func BuildTestShortID(src []byte) ShortID {
-	res := ShortID{}
-	copy(res[:], src)
-	return res
-}
-
 // GenerateTestNodeID returns a new ID that should only be used for testing
 func GenerateTestNodeID() NodeID {
 	return NodeID(GenerateTestShortID())
