@@ -43,18 +43,17 @@ func NewClient(
 	metadataDB database.KeyValueReaderWriterDeleter,
 ) *Client {
 	return &Client{
-		enabled:       config.Enabled,
-		managerConfig: config.ManagerConfig,
+		config:     config,
+		metadataDB: metadataDB,
 	}
 }
 
 type Client struct {
 	lock sync.Mutex
 
-	enabled       bool
-	shutdown      bool
-	onDone        func(err error)
-	managerConfig xsync.ManagerConfig
+	config ClientConfig
+
+	shutdown bool
 
 	metadataDB database.KeyValueReaderWriterDeleter
 
@@ -64,7 +63,7 @@ type Client struct {
 }
 
 func (c *Client) StateSyncEnabled(context.Context) (bool, error) {
-	return c.enabled, nil
+	return c.config.Enabled, nil
 }
 
 func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
@@ -76,7 +75,7 @@ func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
-func (c *Client) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+func (c *Client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
 }
 
@@ -92,7 +91,7 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 		return 0, errShutdown
 	}
 
-	c.managerConfig.TargetRoot = summary.BlockRoot
+	c.config.TargetRoot = summary.BlockRoot
 
 	if err := c.metadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
 		return 0, err
@@ -101,7 +100,7 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 	ctx, cancel := context.WithCancel(context.Background())
 	c.syncCancel = cancel
 
-	manager, err := xsync.NewManager(c.managerConfig)
+	manager, err := xsync.NewManager(c.config.ManagerConfig)
 	if err != nil {
 		return 0, err
 	}
@@ -117,7 +116,7 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 			_ = c.metadataDB.Delete(stateSyncSummaryKey)
 		}
 
-		c.onDone(err)
+		c.config.OnDone(err)
 	}()
 
 	return block.StateSyncStatic, nil

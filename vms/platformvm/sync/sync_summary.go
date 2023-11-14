@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var (
-	_ block.StateSummary = &SyncSummary{}
-)
+var _ block.StateSummary = (*SyncSummary)(nil)
 
 // SyncSummary provides the information necessary to sync a node starting
 // at the given block.
