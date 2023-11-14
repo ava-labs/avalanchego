@@ -75,6 +75,7 @@ func (m *majority) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeI
 
 func (m *majority) RecordAcceptedFrontier(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) {
 	if !m.outstandingAcceptedFrontier.Contains(nodeID) {
+		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected message",
 			zap.Stringer("messageOp", message.AcceptedFrontierOp),
 			zap.Stringer("nodeID", nodeID),
@@ -115,6 +116,7 @@ func (m *majority) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
 
 func (m *majority) RecordAccepted(_ context.Context, nodeID ids.NodeID, blkIDs []ids.ID) error {
 	if !m.outstandingAccepted.Contains(nodeID) {
+		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected message",
 			zap.Stringer("messageOp", message.AcceptedOp),
 			zap.Stringer("nodeID", nodeID),
