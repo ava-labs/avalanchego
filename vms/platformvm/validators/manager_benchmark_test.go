@@ -112,9 +112,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		&config.Config{
-			Validators: vdrs,
-		},
+		vdrs,
 		execConfig,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
