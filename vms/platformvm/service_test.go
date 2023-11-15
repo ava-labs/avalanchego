@@ -72,8 +72,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T, addSubnet bool) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, latestFork, addSubnet)
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -131,7 +131,7 @@ func TestExportKey(t *testing.T) {
 	args := ExportKeyArgs{}
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
@@ -151,7 +151,7 @@ func TestImportKey(t *testing.T) {
 	args := ImportKeyArgs{}
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
 		require.NoError(service.vm.Shutdown(context.Background()))
@@ -166,7 +166,7 @@ func TestImportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory := defaultService(t, false /*addSubnet*/)
+	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -320,7 +320,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _ := defaultService(t, true /*addSubnet*/)
+				service, _ := defaultService(t)
 				defaultAddress(t, service)
 				service.vm.ctx.Lock.Lock()
 
@@ -390,7 +390,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
@@ -400,7 +400,7 @@ func TestGetBalance(t *testing.T) {
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t)
-	for _, utxo := range genesis.UTXOs {
+	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
 				fmt.Sprintf("P-%s", utxo.Address),
@@ -409,9 +409,16 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
-
-		require.Equal(json.Uint64(defaultBalance), reply.Balance)
-		require.Equal(json.Uint64(defaultBalance), reply.Unlocked)
+		balance := defaultBalance
+		if idx == 0 {
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			balance = defaultBalance - service.vm.Config.GetCreateBlockchainTxFee(service.vm.clock.Time())
+		}
+		require.Equal(json.Uint64(balance), reply.Balance)
+		require.Equal(json.Uint64(balance), reply.Unlocked)
+		require.Equal(json.Uint64(balance), reply.Balance)
+		require.Equal(json.Uint64(balance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
 		require.Equal(json.Uint64(0), reply.LockedNotStakeable)
 	}
@@ -419,7 +426,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
@@ -595,7 +602,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
@@ -726,7 +733,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, false /*addSubnet*/)
+	service, _ := defaultService(t)
 	defer func() {
 		service.vm.ctx.Lock.Lock()
 		require.NoError(service.vm.Shutdown(context.Background()))
@@ -767,7 +774,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _ := defaultService(t, true /*addSubnet*/)
+			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 			defer func() {
 				service.vm.ctx.Lock.Lock()

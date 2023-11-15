@@ -42,11 +42,7 @@ func (v *Validator) EndTime() time.Time {
 
 // Duration is the amount of time that this validator will be in the validator set
 func (v *Validator) Duration() time.Duration {
-	var (
-		endTime   = time.Unix(int64(v.End), 0)
-		startTime = time.Unix(int64(v.Start), 0)
-	)
-	return endTime.Sub(startTime)
+	return v.EndTime().Sub(v.StartTime())
 }
 
 // Weight is this validator's weight when sampling
