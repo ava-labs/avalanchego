@@ -102,7 +102,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				// appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any())
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any())
 				return appSender
 			},
 		},
@@ -195,7 +195,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Should gossip the tx
 				appSender := common.NewMockSender(ctrl)
-				// appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -244,6 +244,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Has(gomock.Any()).Return(false)
 				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
+				mempool.EXPECT().MarkDropped(gomock.Any(), errTest)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
