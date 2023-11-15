@@ -1553,7 +1553,7 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.StakerTx)
+			stakerTx, ok := tx.Unsigned.(txs.Staker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
