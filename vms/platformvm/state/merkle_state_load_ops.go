@@ -23,6 +23,8 @@ import (
 
 // var errNotYetImplemented = errors.New("NOT YET IMPLEMENTED")
 
+// If [ms] isn't initialized, initializes it with [genesis].
+// Then loads [ms] from disk.
 func (ms *merkleState) sync(genesis []byte) error {
 	shouldInit, err := ms.shouldInit()
 	if err != nil {
@@ -55,6 +57,7 @@ func (ms *merkleState) doneInit() error {
 	return ms.singletonDB.Put(initializedKey, nil)
 }
 
+// Creates a genesis from [genesisBytes] and initializes [ms] with it.
 func (ms *merkleState) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
@@ -80,9 +83,9 @@ func (ms *merkleState) init(genesisBytes []byte) error {
 	return ms.Commit()
 }
 
+// Loads the state from [genesisBls] and [genesis] into [ms].
 func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
-	genesisBlkID := genesisBlk.ID()
-	ms.SetLastAccepted(genesisBlkID)
+	ms.SetLastAccepted(genesisBlk.ID())
 	ms.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	ms.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
 	ms.AddStatelessBlock(genesisBlk)
