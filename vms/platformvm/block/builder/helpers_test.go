@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -87,6 +88,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
+	network    network.Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -168,16 +170,23 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
+	res.network = network.New(
+		res.backend.Ctx,
+		res.blkManager,
+		res.mempool,
+		res.backend.Config.PartialSyncPrimaryNetwork,
+		res.sender,
+	)
+
 	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
 	)
 
-	res.Builder.SetPreference(genesisID)
+	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
 	return res
@@ -419,4 +428,18 @@ func shutdownEnvironment(env *environment) error {
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
+}
+
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(t, err)
+	return tx
 }

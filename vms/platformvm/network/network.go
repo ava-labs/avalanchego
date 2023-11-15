@@ -13,15 +13,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-// We allow [recentTxsCacheSize] to be fairly large because we only store hashes
+// We allow [recentCacheSize] to be fairly large because we only store hashes
 // in the cache, not entire transactions.
-const recentTxsCacheSize = 512
+const recentCacheSize = 512
 
 var _ Network = (*network)(nil)
 
@@ -39,11 +39,11 @@ type network struct {
 	// We embed a noop handler for all unhandled messages
 	common.AppHandler
 
-	ctx       *snow.Context
-	parser    txs.Parser
-	manager   executor.Manager
-	mempool   mempool.Mempool
-	appSender common.AppSender
+	ctx                       *snow.Context
+	manager                   executor.Manager
+	mempool                   mempool.Mempool
+	partialSyncPrimaryNetwork bool
+	appSender                 common.AppSender
 
 	// gossip related attributes
 	recentTxsLock sync.Mutex
@@ -52,23 +52,20 @@ type network struct {
 
 func New(
 	ctx *snow.Context,
-	parser txs.Parser,
 	manager executor.Manager,
 	mempool mempool.Mempool,
+	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 ) Network {
 	return &network{
 		AppHandler: common.NewNoOpAppHandler(ctx.Log),
 
-		ctx:       ctx,
-		parser:    parser,
-		manager:   manager,
-		mempool:   mempool,
-		appSender: appSender,
-
-		recentTxs: &cache.LRU[ids.ID, struct{}]{
-			Size: recentTxsCacheSize,
-		},
+		ctx:                       ctx,
+		manager:                   manager,
+		mempool:                   mempool,
+		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
+		appSender:                 appSender,
+		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 	}
 }
 
@@ -77,6 +74,13 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
+
+	if n.partialSyncPrimaryNetwork {
+		n.ctx.Log.Debug("dropping AppGossip message",
+			zap.String("reason", "primary network is not being fully synced"),
+		)
+		return nil
+	}
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
@@ -94,7 +98,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	tx, err := n.parser.ParseTx(msg.Tx)
+	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
 		n.ctx.Log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
@@ -111,6 +115,10 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	// Invariant: tx should not be referenced again without the context lock
 	// held to avoid any data races.
 	n.ctx.Lock.Lock()
+	if reason := n.mempool.GetDropReason(txID); reason != nil {
+		// If the tx is being dropped - just ignore it
+		return nil
+	}
 	err = n.issueTx(tx)
 	n.ctx.Lock.Unlock()
 	if err == nil {
@@ -146,14 +154,6 @@ func (n *network) issueTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	if reason := n.mempool.GetDropReason(txID); reason != nil {
-		// If the tx is being dropped - just ignore it
-		//
-		// TODO: Should we allow re-verification of the transaction even if it
-		// failed previously?
-		return reason
-	}
-
 	// Verify the tx at the currently preferred state
 	if err := n.manager.VerifyTx(tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
@@ -163,6 +163,12 @@ func (n *network) issueTx(tx *txs.Tx) error {
 
 		n.mempool.MarkDropped(txID, err)
 		return err
+	}
+
+	// If we are partially syncing the Primary Network, we should not be
+	// maintaining the transaction mempool locally.
+	if n.partialSyncPrimaryNetwork {
+		return nil
 	}
 
 	if err := n.mempool.Add(tx); err != nil {
@@ -175,7 +181,6 @@ func (n *network) issueTx(tx *txs.Tx) error {
 		return err
 	}
 
-	n.mempool.RequestBuildBlock()
 	return nil
 }
 
