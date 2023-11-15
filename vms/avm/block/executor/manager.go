@@ -39,8 +39,8 @@ type Manager interface {
 	GetStatelessBlock(blkID ids.ID) (block.Block, error)
 	NewBlock(block.Block) snowman.Block
 
-	// VerifyTx verifies that the transaction can be issued based on the
-	// currently preferred state.
+	// VerifyTx verifies that the transaction can be issued based on the currently
+	// preferred state. This should *not* be used to verify transactions in a block.
 	VerifyTx(tx *txs.Tx) error
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
