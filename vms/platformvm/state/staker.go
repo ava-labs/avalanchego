@@ -85,7 +85,7 @@ func (s *Staker) Less(than *Staker) bool {
 
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.PostDurangoStaker,
+	staker txs.Staker,
 	startTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
@@ -94,8 +94,7 @@ func NewCurrentStaker(
 		return nil, err
 	}
 
-	stakingDuration := staker.Duration()
-	endTime := startTime.Add(stakingDuration)
+	endTime := staker.EndTime()
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),
@@ -110,7 +109,7 @@ func NewCurrentStaker(
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker txs.PreDurangoStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

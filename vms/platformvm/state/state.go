@@ -1457,22 +1457,22 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
+		defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
 			// in case they are not stored in the database
 			// Note: we don't provide [LastUpdated] here because we expect it to
 			// always be present on disk.
-			StakerStartTime: stakerTx.StartTime().Unix(),
+			StakerStartTime: defaultStartTime.Unix(),
 		}
-		err = parseValidatorMetadata(metadataBytes, metadata)
-		if err != nil {
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
 
 		staker, err := NewCurrentStaker(
 			txID,
-			stakerTx.(txs.PostDurangoStaker),
+			stakerTx,
 			time.Unix(metadata.StakerStartTime, 0),
 			metadata.PotentialReward)
 		if err != nil {
@@ -1506,7 +1506,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := stakerTx.StartTime().Unix()
+		defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime().Unix()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
@@ -1520,7 +1520,7 @@ func (s *state) loadCurrentValidators() error {
 
 		staker, err := NewCurrentStaker(
 			txID,
-			stakerTx.(txs.PostDurangoStaker),
+			stakerTx,
 			time.Unix(metadata.StakerStartTime, 0),
 			metadata.PotentialReward,
 		)
@@ -1559,10 +1559,11 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
+			defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime()
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
-				StakerStartTime: stakerTx.StartTime().Unix(),
+				StakerStartTime: defaultStartTime.Unix(),
 				txID:            txID,
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
@@ -1572,7 +1573,7 @@ func (s *state) loadCurrentValidators() error {
 
 			staker, err := NewCurrentStaker(
 				txID,
-				stakerTx.(txs.PostDurangoStaker),
+				stakerTx,
 				time.Unix(metadata.StakerStartTime, 0),
 				metadata.PotentialReward,
 			)
@@ -1619,7 +1620,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1654,7 +1655,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
