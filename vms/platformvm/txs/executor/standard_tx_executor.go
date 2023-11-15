@@ -489,6 +489,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	if err != nil {
 		return err
 	}
+
 	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
 
 	txID := e.Tx.ID()
