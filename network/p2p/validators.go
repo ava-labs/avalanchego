@@ -22,7 +22,7 @@ var (
 )
 
 type ValidatorSet interface {
-	Has(ctx context.Context, nodeID ids.NodeID) bool
+	Has(ctx context.Context, nodeID ids.NodeID) bool // TODO return error
 }
 
 func NewValidators(

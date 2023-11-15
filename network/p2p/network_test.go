@@ -17,13 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/mocks"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
-
-var _ NodeSampler = (*testNodeSampler)(nil)
 
 func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
@@ -451,7 +450,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
-			sampled := network.Sample(context.Background(), tt.limit)
+			sampled := network.peers.Sample(context.Background(), tt.limit)
 			require.Len(sampled, math.Min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
@@ -503,43 +502,93 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 }
 
 func TestNodeSamplerClientOption(t *testing.T) {
-	require := require.New(t)
+	nodeID0 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
 
-	nodeID := ids.GenerateTestNodeID()
-	sent := make(chan struct{})
+	tests := []struct {
+		name        string
+		peers       []ids.NodeID
+		option      func(t *testing.T, n *Network) ClientOption
+		expected    []ids.NodeID
+		expectedErr error
+	}{
+		{
+			name:  "peers",
+			peers: []ids.NodeID{nodeID0},
+			option: func(_ *testing.T, n *Network) ClientOption {
+				return WithPeerSampling(n)
+			},
+			expected: []ids.NodeID{nodeID0},
+		},
+		{
+			name:  "validator connected",
+			peers: []ids.NodeID{nodeID0, nodeID1},
+			option: func(t *testing.T, n *Network) ClientOption {
+				state := &snowvalidators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
+						return map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+							nodeID1: nil,
+						}, nil
+					},
+				}
 
-	sender := &common.SenderTest{
-		SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-			require.Len(nodeIDs, 1)
-			require.Contains(nodeIDs, nodeID)
+				validators := NewValidators(n, ids.Empty, state, 0)
+				return WithValidatorSampling(validators)
+			},
+			expected: []ids.NodeID{nodeID1},
+		},
+		{
+			name:  "validator disconnected",
+			peers: []ids.NodeID{nodeID0},
+			option: func(t *testing.T, n *Network) ClientOption {
+				state := &snowvalidators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
+						return map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+							nodeID1: nil,
+						}, nil
+					},
+				}
 
-			close(sent)
-			return nil
+				validators := NewValidators(n, ids.Empty, state, 0)
+				return WithValidatorSampling(validators)
+			},
+			expectedErr: ErrNoPeers,
 		},
 	}
-	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 
-	nodeSampler := &testNodeSampler{
-		sampleF: func(context.Context, int) []ids.NodeID {
-			return []ids.NodeID{nodeID}
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			done := make(chan struct{})
+			sender := &common.SenderTest{
+				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
+					require.Equal(tt.expected, nodeIDs.List())
+					close(done)
+					return nil
+				},
+			}
+			network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			ctx := context.Background()
+			for _, peer := range tt.peers {
+				require.NoError(network.Connected(ctx, peer, nil))
+			}
+
+			client, err := network.RegisterAppProtocol(0x0, nil, tt.option(t, network))
+			require.NoError(err)
+
+			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {
+				close(done)
+			}
+
+			require.ErrorIs(tt.expectedErr, err)
+			<-done
+		})
 	}
-
-	client, err := network.RegisterAppProtocol(0x0, nil, WithNodeSampler(nodeSampler))
-	require.NoError(err)
-
-	require.NoError(client.AppRequestAny(context.Background(), []byte("request"), nil))
-	<-sent
-}
-
-type testNodeSampler struct {
-	sampleF func(ctx context.Context, limit int) []ids.NodeID
-}
-
-func (t *testNodeSampler) Sample(ctx context.Context, limit int) []ids.NodeID {
-	if t.sampleF == nil {
-		return nil
-	}
-
-	return t.sampleF(ctx, limit)
 }

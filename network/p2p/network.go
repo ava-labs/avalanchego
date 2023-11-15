@@ -38,7 +38,7 @@ func (o clientOptionFunc) apply(options *ClientOptions) {
 }
 
 // WithPeerSampling configures Client.AppRequestAny to sample peers
-func WithPeerSampling(network Network) ClientOption {
+func WithPeerSampling(network *Network) ClientOption {
 	return clientOptionFunc(func(options *ClientOptions) {
 		options.NodeSampler = network.peers
 	})
