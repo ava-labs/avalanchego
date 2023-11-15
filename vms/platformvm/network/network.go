@@ -136,6 +136,11 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	if err := n.manager.VerifyTx(tx); err != nil {
+		n.ctx.Log.Debug("tx failed verification",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		n.mempool.MarkDropped(txID, err)
 		return err
 	}
@@ -162,8 +167,6 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 }
 
 func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
-	// This lock is just to ensure there isn't racy behavior between checking if
-	// the tx was gossiped and marking the tx as gossiped.
 	n.recentTxsLock.Lock()
 	_, has := n.recentTxs.Get(txID)
 	n.recentTxs.Put(txID, struct{}{})
