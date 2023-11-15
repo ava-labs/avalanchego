@@ -399,11 +399,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
 	preferredChainTime := preferred.Timestamp()
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
 	statelessStandardBlk, err := block.NewBanffStandardBlock(
@@ -482,11 +481,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	// Create the standard block to add the new validator
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
 	preferredChainTime := preferred.Timestamp()
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := block.NewBanffStandardBlock(
@@ -695,11 +693,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create the standard block to add the first new validator
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
 	preferredChainTime := preferred.Timestamp()
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
 	statelessAddValidatorStandardBlk0, err := block.NewBanffStandardBlock(
@@ -1033,11 +1030,10 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.NoError(err)
 
 	// Create the standard block to add the first new validator
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
 	preferredChainTime := preferred.Timestamp()
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
 	statelessStandardBlk, err := block.NewBanffStandardBlock(
@@ -1070,7 +1066,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the standard block that moves the first new validator from the
 	// pending validator set into the current validator set.
-	preferred, err = vm.Builder.Preferred()
+	preferredID = vm.manager.Preferred()
+	preferred, err = vm.manager.GetBlock(preferredID)
 	require.NoError(err)
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
