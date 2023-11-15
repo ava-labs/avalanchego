@@ -4,13 +4,9 @@
 package handler
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
-
-var errDuplicatedID = errors.New("inbound message contains duplicated ID")
 
 func getIDs(idsBytes [][]byte) (set.Set[ids.ID], error) {
 	var res set.Set[ids.ID]
@@ -20,9 +16,6 @@ func getIDs(idsBytes [][]byte) (set.Set[ids.ID], error) {
 			return nil, err
 		}
 		res.Add(id)
-	}
-	if res.Len() != len(idsBytes) {
-		return nil, errDuplicatedID
 	}
 	return res, nil
 }
