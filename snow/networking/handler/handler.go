@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
@@ -556,23 +557,11 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAcceptedStateSummary:
-		// TODO: Enforce that the numbers are sorted to make this verification
-		//       more efficient.
-		if !utils.IsUnique(msg.Heights) {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
-				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "Heights"),
-			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
-		}
-
 		return engine.GetAcceptedStateSummary(
 			ctx,
 			nodeID,
 			msg.RequestId,
-			msg.Heights,
+			set.Of(msg.Heights...),
 		)
 
 	case *p2p.AcceptedStateSummary:
