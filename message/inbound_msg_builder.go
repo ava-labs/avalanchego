@@ -294,7 +294,7 @@ func InboundAppRequestFailed(
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     AppRequestFailedOp,
-		message: &p2p.AppRequestFailed{
+		message: &p2p.AppError{
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ErrorCode:    errorCode,

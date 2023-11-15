@@ -18,15 +18,9 @@ import (
 var (
 	_ error = (*AppError)(nil)
 
-	// ErrUnexpected is a default error used to signal unexpected behavior
-	ErrUnexpected = &AppError{
-		Code:    0,
-		Message: "unexpected error",
-	}
-
 	// ErrTimeout is used to signal a response timeout
 	ErrTimeout = &AppError{
-		Code:    1,
+		Code:    -1,
 		Message: "timed out",
 	}
 )
@@ -519,7 +513,7 @@ type InternalHandler interface {
 // AppError is an application-defined error
 type AppError struct {
 	// Code is application-defined and should be used for error matching
-	Code uint32
+	Code int32
 	// Message is a human-readable error message
 	Message string
 }
