@@ -10,28 +10,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var Noop Bootstrapper = noop{}
+var Noop Poll = noop{}
 
 type noop struct{}
 
-func (noop) GetAcceptedFrontiersToSend(context.Context) set.Set[ids.NodeID] {
+func (noop) GetPeers(context.Context) set.Set[ids.NodeID] {
 	return nil
 }
 
-func (noop) RecordAcceptedFrontier(context.Context, ids.NodeID, ...ids.ID) {}
-
-func (noop) GetAcceptedFrontier(context.Context) ([]ids.ID, bool) {
-	return nil, false
-}
-
-func (noop) GetAcceptedToSend(context.Context) set.Set[ids.NodeID] {
+func (noop) RecordOpinion(context.Context, ids.NodeID, ...ids.ID) error {
 	return nil
 }
 
-func (noop) RecordAccepted(context.Context, ids.NodeID, []ids.ID) error {
-	return nil
-}
-
-func (noop) GetAccepted(context.Context) ([]ids.ID, bool) {
+func (noop) Result(context.Context) ([]ids.ID, bool) {
 	return nil, false
 }
