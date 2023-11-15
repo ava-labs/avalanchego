@@ -673,7 +673,19 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 	if err := node.WriteConfig(); err != nil {
 		return nil, err
 	}
-	return node, node.Start(w, ln.ExecPath)
+
+	err = node.Start(w, ln.ExecPath)
+	if err != nil {
+		// Attempt to stop an unhealthy node to provide some assurance to the caller
+		// that an error condition will not result in a lingering process.
+		stopErr := node.Stop()
+		if stopErr != nil {
+			err = errors.Join(err, stopErr)
+		}
+		return nil, err
+	}
+
+	return node, nil
 }
 
 func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
