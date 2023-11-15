@@ -557,6 +557,17 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAcceptedStateSummary:
+		heights := set.Of(msg.Heights...)
+		if heights.Len() != len(msg.Heights) {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "Heights"),
+			)
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
+		}
+
 		return engine.GetAcceptedStateSummary(
 			ctx,
 			nodeID,
