@@ -401,11 +401,11 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	)
 	require.NoError(err)
 
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
+
 	statelessBlk, err := block.NewBanffStandardBlock(
 		preferred.Timestamp(),
 		preferredID,
@@ -1033,10 +1033,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}}
 	require.NoError(tx.Initialize(txs.Codec))
 
-	preferred, err := vm.Builder.Preferred()
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
-
-	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := block.NewBanffStandardBlock(
@@ -1103,13 +1102,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	genesisID, err := firstVM.LastAccepted(context.Background())
 	require.NoError(err)
 
-	nextChainTime := initialClkTime.Add(time.Second)
-	firstVM.clock.Set(initialClkTime)
-	preferred, err := firstVM.Builder.Preferred()
-	require.NoError(err)
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
-
 	// include a tx to make the block be accepted
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -1129,6 +1121,14 @@ func TestRestartFullyAccepted(t *testing.T) {
 		}},
 	}}
 	require.NoError(tx.Initialize(txs.Codec))
+
+	nextChainTime := initialClkTime.Add(time.Second)
+	firstVM.clock.Set(initialClkTime)
+
+	preferredID := firstVM.manager.Preferred()
+	preferred, err := firstVM.manager.GetBlock(preferredID)
+	require.NoError(err)
+	preferredHeight := preferred.Height()
 
 	statelessBlk, err := block.NewBanffStandardBlock(
 		nextChainTime,
@@ -1221,9 +1221,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 	))
 
-	preferred, err := vm.Builder.Preferred()
-	require.NoError(err)
-
 	// include a tx to make the block be accepted
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -1245,8 +1242,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(tx.Initialize(txs.Codec))
 
 	nextChainTime := initialClkTime.Add(time.Second)
-	preferredID := preferred.ID()
+
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
+	require.NoError(err)
 	preferredHeight := preferred.Height()
+
 	statelessBlk, err := block.NewBanffStandardBlock(
 		nextChainTime,
 		preferredID,
@@ -1494,11 +1495,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.CantSend = false
 
 	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
-
-	preferred, err = vm.Builder.Preferred()
-	require.NoError(err)
-
-	require.Equal(advanceTimeBlk.ID(), preferred.ID())
+	require.Equal(advanceTimeBlk.ID(), vm.manager.Preferred())
 
 	ctx.Lock.Unlock()
 	chainRouter.Shutdown(context.Background())
@@ -1560,10 +1557,11 @@ func TestUnverifiedParent(t *testing.T) {
 	}}
 	require.NoError(tx1.Initialize(txs.Codec))
 
-	preferred, err := vm.Builder.Preferred()
-	require.NoError(err)
 	nextChainTime := initialClkTime.Add(time.Second)
-	preferredID := preferred.ID()
+
+	preferredID := vm.manager.Preferred()
+	preferred, err := vm.manager.GetBlock(preferredID)
+	require.NoError(err)
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := block.NewBanffStandardBlock(
