@@ -11,7 +11,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -60,8 +59,8 @@ func NewMajority(
 func (m *Majority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) error {
 	if !m.recordResponse(nodeID) {
 		// The chain router should have already dropped unexpected messages.
-		m.log.Error("received unexpected message",
-			zap.Stringer("messageOp", message.AcceptedOp),
+		m.log.Error("received unexpected opinion",
+			zap.String("pollType", "majority"),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringers("blkIDs", blkIDs),
 		)
