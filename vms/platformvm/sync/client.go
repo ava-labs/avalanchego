@@ -45,6 +45,7 @@ type Client struct {
 
 	shutdown bool
 
+	// Stores the ongoing sync summary ID.
 	metadataDB database.KeyValueReaderWriterDeleter
 
 	// Set in acceptSyncSummary.
