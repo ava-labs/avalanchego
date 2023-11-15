@@ -2014,11 +2014,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 					UpDuration:               0,
 					LastUpdated:              uint64(staker.StartTime.Unix()),
+					StakerStartTime:          staker.StartTime.Unix(),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := metadataCodec.Marshal(v0, metadata)
+				metadataBytes, err := metadataCodec.Marshal(v1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}

@@ -237,7 +237,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := metadataCodec.Marshal(v0, metadata)
+			metadataBytes, err := metadataCodec.Marshal(v1, metadata)
 			if err != nil {
 				return err
 			}
