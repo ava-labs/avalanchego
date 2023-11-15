@@ -175,3 +175,8 @@ func (c *DBClient) CommitRangeProof(
 	})
 	return err
 }
+
+func (c *DBClient) Clear() error {
+	_, err := c.client.Clear(context.Background(), &emptypb.Empty{})
+	return err
+}

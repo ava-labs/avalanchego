@@ -213,3 +213,32 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
 	require.Equal(p.Extend(ToToken(1, 4)).Bytes(), constructedKey[len(intermediateNodePrefix):])
 }
+
+func TestIntermediateNodeDBClear(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	evictionBatchSize := cacheSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		evictionBatchSize,
+		4,
+	)
+
+	for _, b := range [][]byte{{1}, {2}, {3}} {
+		require.NoError(db.Put(ToKey(b), newNode(ToKey(b))))
+	}
+
+	require.NoError(db.Clear())
+
+	iter := baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
+	defer iter.Release()
+	require.False(iter.Next())
+
+	require.Zero(db.nodeCache.currentSize)
+}
