@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
@@ -94,10 +95,10 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights set.Set[uint64]) error {
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
-	if len(heights) == 0 {
+	if heights.Len() == 0 {
 		gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, nil)
 		return nil
 	}
@@ -114,8 +115,8 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		return nil
 	}
 
-	summaryIDs := make([]ids.ID, 0, len(heights))
-	for _, height := range heights {
+	summaryIDs := make([]ids.ID, 0, heights.Len())
+	for height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(ctx, height)
 		if err == block.ErrStateSyncableVMNotImplemented {
 			gh.log.Debug("dropping GetAcceptedStateSummary message",
@@ -148,9 +149,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, blkID := range containerIDs {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	acceptedIDs := make([]ids.ID, 0, containerIDs.Len())
+	for blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
 		if err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)

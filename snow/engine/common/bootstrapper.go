@@ -184,7 +184,7 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 	return nil
 }
 
-func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync Accepted message",
@@ -205,7 +205,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	b.pendingReceiveAccepted.Remove(nodeID)
 
 	weight := b.Beacons.GetWeight(b.Ctx.SubnetID, nodeID)
-	for _, containerID := range containerIDs {
+	for containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := safemath.Add64(weight, previousWeight)
 		if err != nil {
