@@ -290,11 +290,11 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
 	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -319,13 +319,12 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	txID := e.Tx.ID()
 	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -339,13 +338,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
 	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -436,11 +434,11 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
 	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -468,13 +466,12 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
 	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -498,7 +495,6 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -535,9 +531,9 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 // addStakerFromStakerTx creates the staker and adds it to state.
 func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.Staker) error {
-	// Pre Durango fork, stakers were added as pending first, then promoted
+	// Pre Durango fork, stakers are added as pending first, then promoted
 	// to current when chainTime reaches their start time.
-	// Post Durango fork, stakers will be immediately marked as current.
+	// Post Durango fork, stakers are immediately marked as current.
 	// Their start time is current chain time.
 
 	var (
