@@ -36,13 +36,13 @@ func Sample[T comparable](elements map[T]uint64, maxSize int) (set.Set[T], error
 	}
 
 	maxSize = int(math.Min(uint64(maxSize), totalWeight))
-	indicies, err := sampler.Sample(maxSize)
+	indices, err := sampler.Sample(maxSize)
 	if err != nil {
 		return nil, err
 	}
 
 	sampledElements := set.NewSet[T](maxSize)
-	for _, index := range indicies {
+	for _, index := range indices {
 		sampledElements.Add(keys[index])
 	}
 	return sampledElements, nil
