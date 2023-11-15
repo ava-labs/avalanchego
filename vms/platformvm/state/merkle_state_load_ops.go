@@ -164,13 +164,15 @@ func (ms *merkleState) load(hasSynced bool) error {
 	)
 }
 
+// Loads the chain time and last accepted block ID from disk
+// and populates them in [ms].
 func (ms *merkleState) loadMerkleMetadata() error {
-	// load chainTime
+	// load chain time
 	chainTimeBytes, err := ms.merkleDB.Get(merkleChainTimeKey)
 	if err != nil {
 		return err
 	}
-	chainTime := time.Time{}
+	var chainTime time.Time
 	if err := chainTime.UnmarshalBinary(chainTimeBytes); err != nil {
 		return err
 	}
@@ -187,12 +189,13 @@ func (ms *merkleState) loadMerkleMetadata() error {
 	ms.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
 	ms.SetLastAccepted(lastAcceptedBlkID)
 
-	// wen don't need to load supplies. Unlike chainTime and lastBlkID
-	// which have the persisted* attribute, we signal supplies have not
-	// been modified by having an empty map.
+	// We don't need to load supplies. Unlike chain time and last block ID,
+	// which have the persisted* attribute, we signify that a supply hasn't
+	// been modified by making it nil.
 	return nil
 }
 
+// Loads current stakes from disk and populates them in [ms].
 func (ms *merkleState) loadCurrentStakers() error {
 	// TODO ABENEGIA: Check missing metadata
 	ms.currentStakers = newBaseStakers()
