@@ -45,12 +45,7 @@ func TestSummary(t *testing.T) {
 	parsedSummary, err := NewSummaryFromBytes(summary.bytes, onAcceptFunc)
 	require.NoError(err)
 
-	// require.Equal(summary, parsedSummary) won't work because of onAcceptFunc.
-	// Compare fields manually instead.
-	require.Equal(summary.summaryID, parsedSummary.summaryID)
-	require.Equal(summary.bytes, parsedSummary.bytes)
-	require.Equal(summary.BlockID, parsedSummary.BlockID)
-	require.Equal(summary.BlockHeight, parsedSummary.BlockHeight)
+	assertSummaryEquals(require, summary, parsedSummary)
 
 	mode, err = parsedSummary.Accept(context.Background())
 	require.NoError(err)

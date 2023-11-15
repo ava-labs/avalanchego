@@ -7,10 +7,22 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/stretchr/testify/require"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
+
+// Compares the equality of two summaries, other than their acceptFunc,
+// which can't be compared.
+func assertSummaryEquals(require *require.Assertions, s1, s2 Summary) {
+	require.Equal(s1.Bytes(), s2.Bytes())
+	require.Equal(s1.Height(), s2.Height())
+	require.Equal(s1.ID(), s2.ID())
+	require.Equal(s1.String(), s2.String())
+	require.Equal(s1.BlockRootID, s2.BlockRootID)
+}
 
 func TestServer(t *testing.T) {
 	require := require.New(t)
@@ -44,11 +56,11 @@ func TestServer(t *testing.T) {
 	// Assert server returns the correct summary
 	gotSummary, err := s.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary1, gotSummary)
+	assertSummaryEquals(require, summary1, gotSummary.(Summary))
 
 	gotSummary, err = s.GetStateSummary(context.Background(), 0)
 	require.NoError(err)
-	require.Equal(summary1, gotSummary)
+	assertSummaryEquals(require, summary1, gotSummary.(Summary))
 
 	// Still don't have summary at height 2
 	_, err = s.GetStateSummary(context.Background(), 2)
@@ -71,23 +83,28 @@ func TestServer(t *testing.T) {
 	// Assert server returns the correct summary
 	gotSummary, err = s.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary2, gotSummary)
+	assertSummaryEquals(require, summary2, gotSummary.(Summary))
 
 	gotSummary, err = s.GetStateSummary(context.Background(), 2)
 	require.NoError(err)
-	require.Equal(summary2, gotSummary)
+	assertSummaryEquals(require, summary2, gotSummary.(Summary))
 
 	// Still have previous summary
 	gotSummary, err = s.GetStateSummary(context.Background(), 0)
 	require.NoError(err)
-	require.Equal(summary1, gotSummary)
+	assertSummaryEquals(require, summary1, gotSummary.(Summary))
 
+	calledOnAcceptFunc := 0
+	onAcceptFunc := func(Summary) (block.StateSyncMode, error) {
+		calledOnAcceptFunc++
+		return block.StateSyncStatic, nil
+	}
 	// Record a third summary
 	summary3, err := NewSummary(
 		ids.GenerateTestID(),
 		4,
 		ids.GenerateTestID(),
-		noopOnAcceptFunc,
+		onAcceptFunc,
 	)
 	require.NoError(err)
 
@@ -99,16 +116,27 @@ func TestServer(t *testing.T) {
 	// Assert server returns the correct summary
 	gotSummary, err = s.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary3, gotSummary)
+	assertSummaryEquals(require, summary3, gotSummary.(Summary))
+
+	// Assert onAcceptFunc is called on summaries fetched from [s].
+	mode, err := gotSummary.Accept(context.Background())
+	require.NoError(err)
+	require.Equal(block.StateSyncStatic, mode)
+	require.Equal(1, calledOnAcceptFunc)
 
 	gotSummary, err = s.GetStateSummary(context.Background(), 4)
 	require.NoError(err)
-	require.Equal(summary3, gotSummary)
+	assertSummaryEquals(require, summary3, gotSummary.(Summary))
+
+	mode, err = gotSummary.Accept(context.Background())
+	require.NoError(err)
+	require.Equal(block.StateSyncStatic, mode)
+	require.Equal(2, calledOnAcceptFunc)
 
 	// Still have previous summary
 	gotSummary, err = s.GetStateSummary(context.Background(), 2)
 	require.NoError(err)
-	require.Equal(summary2, gotSummary)
+	assertSummaryEquals(require, summary2, gotSummary.(Summary))
 
 	// No longer have first summary
 	_, err = s.GetStateSummary(context.Background(), 0)
