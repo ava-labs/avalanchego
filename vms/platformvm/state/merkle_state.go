@@ -60,7 +60,7 @@ var (
 	merkleTxPrefix          = []byte{0x04}
 	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
 	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix  = []byte{0x07} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
 	merkleBlsKeyDiffPrefix  = []byte{0x08}
 	merkleRewardUtxosPrefix = []byte{0x09}
 
@@ -286,6 +286,31 @@ func newMerkleState(
 	}, nil
 }
 
+// Stores global state in a merkle trie. This means that each state corresponds
+// to a unique merkle root. Specifically, the following state is merkleized.
+// - Delegatee Rewards
+// - UTXOs
+// - Current Supply
+// - Subnet Creation Transactions
+// - Subnet Owners
+// - Subnet Transformation Transactions
+// - Chain Creation Transactions
+// - Chain time
+// - Last Accepted Block ID
+// - Current Staker Set
+// - Pending Staker Set
+//
+// Changing any of the above state will cause the merkle root to change.
+//
+// The following state is not merkleized:
+// - Database Initialization Status
+// - Blocks
+// - Block IDs
+// - Transactions (note some transactions are also stored merkleized)
+// - Uptimes
+// - Weight Diffs
+// - BLS Key Diffs
+// - Reward UTXOs
 type merkleState struct {
 	cfg     *config.Config
 	ctx     *snow.Context
@@ -295,7 +320,7 @@ type merkleState struct {
 	baseDB       *versiondb.Database
 	singletonDB  database.Database
 	baseMerkleDB database.Database
-	merkleDB     merkledb.MerkleDB // meklelized state
+	merkleDB     merkledb.MerkleDB // Stores merkleized state
 
 	// stakers section (missing Delegatee piece)
 	// TODO: Consider moving delegatee to UTXOs section
