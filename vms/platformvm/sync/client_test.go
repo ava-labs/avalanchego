@@ -80,7 +80,7 @@ func TestClientParseStateSummary(t *testing.T) {
 		rootID      = ids.GenerateTestID()
 		client      = NewClient(ClientConfig{}, memdb.New())
 	)
-	summary, err := NewSyncSummary(blockID, blockNumber, rootID)
+	summary, err := NewSummary(blockID, blockNumber, rootID)
 	require.NoError(err)
 	summaryBytes := summary.Bytes()
 
@@ -189,7 +189,7 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 	}, memdb.New())
 
 	// Make a new rawSummary whose root ID is [targetRootID].
-	rawSummary, err := NewSyncSummary(ids.GenerateTestID(), 1337, targetRootID)
+	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID)
 	require.NoError(err)
 	// Need to make the summary like this so that its onAccept callback is set.
 	summary, err := client.ParseStateSummary(context.Background(), rawSummary.Bytes())
@@ -320,7 +320,7 @@ func TestClientShutdown(t *testing.T) {
 	}, memdb.New())
 
 	// Make a new rawSummary whose root ID is [targetRootID].
-	rawSummary, err := NewSyncSummary(ids.GenerateTestID(), 1337, targetRootID)
+	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID)
 	require.NoError(err)
 	// Need to make the summary like this so that its onAccept callback is set.
 	summary, err := client.ParseStateSummary(context.Background(), rawSummary.Bytes())

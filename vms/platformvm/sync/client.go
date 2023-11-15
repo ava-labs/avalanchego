@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	stateSyncSummaryKey = []byte("stateSyncSummary")
-	errShutdown         = errors.New("client has been shut down")
+	ongoingSummaryKey = []byte("ongoingSummary")
+	errShutdown       = errors.New("client has been shut down")
 )
 
 type ClientConfig struct {
@@ -24,7 +24,7 @@ type ClientConfig struct {
 	xsync.ManagerConfig
 	Enabled bool
 	// Called when syncing is done, where [err] is the result of syncing.
-	// Called iff acceptSyncSummary returns nil, regardless of whether syncing succeeds.
+	// Called iff acceptSummary returns nil, regardless of whether syncing succeeds.
 	OnDone func(err error)
 }
 
@@ -48,7 +48,7 @@ type Client struct {
 	// Stores the ongoing sync summary ID.
 	metadataDB database.KeyValueReaderWriterDeleter
 
-	// Set in acceptSyncSummary.
+	// Set in acceptSummary.
 	// Calling [c.syncCancel] will stop syncing.
 	syncCancel context.CancelFunc
 }
@@ -58,23 +58,23 @@ func (c *Client) StateSyncEnabled(context.Context) (bool, error) {
 }
 
 func (c *Client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
-	summaryBytes, err := c.metadataDB.Get(stateSyncSummaryKey)
+	summaryBytes, err := c.metadataDB.Get(ongoingSummaryKey)
 	if err != nil {
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
+	return NewSummaryFromBytes(summaryBytes, c.acceptSummary)
 }
 
 func (c *Client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	return NewSyncSummaryFromBytes(summaryBytes, c.acceptSyncSummary)
+	return NewSummaryFromBytes(summaryBytes, c.acceptSummary)
 }
 
 // Starts asynchronously syncing to the root in [summary].
 // Populates [c.syncCancel].
 // [c.onDone] is guaranteed to eventually be called iff this function returns nil.
 // Must only be called once.
-func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, error) {
+func (c *Client) acceptSummary(summary Summary) (block.StateSyncMode, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -84,7 +84,7 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 
 	c.config.TargetRoot = summary.BlockRoot
 
-	if err := c.metadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
+	if err := c.metadataDB.Put(ongoingSummaryKey, summary.Bytes()); err != nil {
 		return 0, err
 	}
 
@@ -104,7 +104,7 @@ func (c *Client) acceptSyncSummary(summary SyncSummary) (block.StateSyncMode, er
 
 		if err == nil {
 			// TODO what to do with this error?
-			_ = c.metadataDB.Delete(stateSyncSummaryKey)
+			_ = c.metadataDB.Delete(ongoingSummaryKey)
 		}
 
 		c.config.OnDone(err)

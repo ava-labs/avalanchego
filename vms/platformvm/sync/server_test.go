@@ -28,7 +28,7 @@ func TestServer(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Record a summary
-	summary1, err := NewSyncSummary(
+	summary1, err := NewSummary(
 		ids.GenerateTestID(),
 		0,
 		ids.GenerateTestID(),
@@ -54,7 +54,7 @@ func TestServer(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Record a second summary
-	summary2, err := NewSyncSummary(
+	summary2, err := NewSummary(
 		ids.GenerateTestID(),
 		2, // Note non-consecutive height
 		ids.GenerateTestID(),
@@ -81,7 +81,7 @@ func TestServer(t *testing.T) {
 	require.Equal(summary1, gotSummary)
 
 	// Record a third summary
-	summary3, err := NewSyncSummary(
+	summary3, err := NewSummary(
 		ids.GenerateTestID(),
 		4,
 		ids.GenerateTestID(),

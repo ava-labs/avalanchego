@@ -12,11 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ block.StateSummary = (*SyncSummary)(nil)
+var _ block.StateSummary = (*Summary)(nil)
 
-// SyncSummary provides the information necessary to sync a node starting
+// Summary provides the information necessary to sync a node starting
 // at the given block.
-type SyncSummary struct {
+type Summary struct {
 	BlockNumber uint64 `serialize:"true"`
 	BlockID     ids.ID `serialize:"true"`
 	BlockRoot   ids.ID `serialize:"true"`
@@ -26,67 +26,67 @@ type SyncSummary struct {
 	// Invariant: non-nil.
 	bytes []byte
 	// Invariant: non-nil.
-	acceptFunc func(SyncSummary) (block.StateSyncMode, error)
+	acceptFunc func(Summary) (block.StateSyncMode, error)
 }
 
-func NewSyncSummaryFromBytes(summaryBytes []byte, acceptImpl func(SyncSummary) (block.StateSyncMode, error)) (SyncSummary, error) {
-	var summary SyncSummary
+func NewSummaryFromBytes(summaryBytes []byte, acceptImpl func(Summary) (block.StateSyncMode, error)) (Summary, error) {
+	var summary Summary
 	if codecVersion, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
-		return SyncSummary{}, err
+		return Summary{}, err
 	} else if codecVersion != Version {
-		return SyncSummary{}, fmt.Errorf("failed to parse syncable summary due to unexpected codec version (%d != %d)", codecVersion, Version)
+		return Summary{}, fmt.Errorf("failed to parse syncable summary due to unexpected codec version (%d != %d)", codecVersion, Version)
 	}
 
 	summary.bytes = summaryBytes
 	summaryID, err := ids.ToID(hashing.ComputeHash256(summaryBytes))
 	if err != nil {
-		return SyncSummary{}, err
+		return Summary{}, err
 	}
 	summary.summaryID = summaryID
 	summary.acceptFunc = acceptImpl
 	return summary, nil
 }
 
-func NewSyncSummary(blockID ids.ID, blockNumber uint64, blockRoot ids.ID) (SyncSummary, error) {
-	summary := SyncSummary{
+func NewSummary(blockID ids.ID, blockNumber uint64, blockRoot ids.ID) (Summary, error) {
+	summary := Summary{
 		BlockNumber: blockNumber,
 		BlockID:     blockID,
 		BlockRoot:   blockRoot,
 	}
 	bytes, err := Codec.Marshal(Version, &summary)
 	if err != nil {
-		return SyncSummary{}, err
+		return Summary{}, err
 	}
 
 	summary.bytes = bytes
 	summaryID, err := ids.ToID(hashing.ComputeHash256(bytes))
 	if err != nil {
-		return SyncSummary{}, err
+		return Summary{}, err
 	}
 	summary.summaryID = summaryID
 
 	return summary, nil
 }
 
-func (s SyncSummary) Bytes() []byte {
+func (s Summary) Bytes() []byte {
 	return s.bytes
 }
 
-func (s SyncSummary) Height() uint64 {
+func (s Summary) Height() uint64 {
 	return s.BlockNumber
 }
 
-func (s SyncSummary) ID() ids.ID {
+func (s Summary) ID() ids.ID {
 	return s.summaryID
 }
 
-func (s SyncSummary) String() string {
+func (s Summary) String() string {
 	return fmt.Sprintf(
-		"SyncSummary(BlockID=%s, BlockNumber=%d, BlockRoot=%s)",
+		"Summary(BlockID=%s, BlockNumber=%d, BlockRoot=%s)",
 		s.BlockID, s.BlockNumber, s.BlockRoot,
 	)
 }
 
-func (s SyncSummary) Accept(context.Context) (block.StateSyncMode, error) {
+func (s Summary) Accept(context.Context) (block.StateSyncMode, error) {
 	return s.acceptFunc(s)
 }
