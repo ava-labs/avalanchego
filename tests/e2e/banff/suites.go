@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 	ginkgo.It("can send custom assets X->P and P->X",
 		func() {
 			keychain := e2e.Env.NewKeychain(1)
-			wallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+			wallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()

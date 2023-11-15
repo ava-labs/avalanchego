@@ -36,19 +36,12 @@ var (
 
 	ErrEndOfTime       = errors.New("program time is suspiciously far in the future")
 	ErrNoPendingBlocks = errors.New("no pending blocks")
-	ErrChainNotSynced  = errors.New("chain not synced")
 )
 
 type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
 	Network
-
-	// set preferred block on top of which we'll build next
-	SetPreference(blockID ids.ID)
-
-	// get preferred block on top of which we'll build next
-	Preferred() (snowman.Block, error)
 
 	// AddUnverifiedTx verifier the tx before adding it to mempool
 	AddUnverifiedTx(tx *txs.Tx) error
@@ -69,9 +62,6 @@ type builder struct {
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
-
-	// ID of the preferred block to build on top of
-	preferredBlockID ids.ID
 
 	// channel to send messages to the consensus engine
 	toEngine chan<- common.Message
@@ -110,25 +100,8 @@ func New(
 	return builder
 }
 
-func (b *builder) SetPreference(blockID ids.ID) {
-	if blockID == b.preferredBlockID {
-		// If the preference didn't change, then this is a noop
-		return
-	}
-	b.preferredBlockID = blockID
-	b.ResetBlockTimer()
-}
-
-func (b *builder) Preferred() (snowman.Block, error) {
-	return b.blkManager.GetBlock(b.preferredBlockID)
-}
-
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	if !b.txExecutorBackend.Bootstrapped.Get() {
-		return ErrChainNotSynced
-	}
-
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -136,13 +109,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	verifier := txexecutor.MempoolTxVerifier{
-		Backend:       b.txExecutorBackend,
-		ParentID:      b.preferredBlockID, // We want to build off of the preferred block
-		StateVersions: b.blkManager,
-		Tx:            tx,
-	}
-	if err := tx.Unsigned.Visit(&verifier); err != nil {
+	if err := b.blkManager.VerifyTx(tx); err != nil {
 		b.MarkDropped(txID, err)
 		return err
 	}
@@ -154,7 +121,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 			return err
 		}
 	}
-	return b.GossipTx(tx)
+	return b.GossipTx(context.TODO(), tx)
 }
 
 // BuildBlock builds a block to be added to consensus.
@@ -186,11 +153,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 // Only modifies state to remove expired proposal txs.
 func (b *builder) buildBlock() (block.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
-	preferred, err := b.Preferred()
+	preferredID := b.blkManager.Preferred()
+	preferred, err := b.blkManager.GetBlock(preferredID)
 	if err != nil {
 		return nil, err
 	}
-	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -244,36 +211,6 @@ func (b *builder) ResetBlockTimer() {
 	b.timer.SetTimeoutIn(0)
 }
 
-// dropExpiredStakerTxs drops add validator/delegator transactions in the
-// mempool whose start time is not sufficiently far in the future
-// (i.e. within local time plus [MaxFutureStartFrom]).
-func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
-	minStartTime := timestamp.Add(txexecutor.SyncBound)
-	for b.Mempool.HasStakerTx() {
-		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
-		if !startTime.Before(minStartTime) {
-			// The next proposal tx in the mempool starts sufficiently far in
-			// the future.
-			return
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		b.Mempool.Remove([]*txs.Tx{tx})
-		b.Mempool.MarkDropped(txID, err) // cache tx as dropped
-		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
-}
-
 func (b *builder) setNextBuildBlockTime() {
 	ctx := b.txExecutorBackend.Ctx
 
@@ -296,11 +233,12 @@ func (b *builder) setNextBuildBlockTime() {
 	}
 
 	// Wake up when it's time to add/remove the next validator/delegator
-	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
+	preferredID := b.blkManager.Preferred()
+	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("preferredID", preferredID),
 			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 		)
 		return
@@ -309,7 +247,7 @@ func (b *builder) setNextBuildBlockTime() {
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
-			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("preferredID", preferredID),
 			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
@@ -368,7 +306,13 @@ func buildBlock(
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredStakerTxs(timestamp)
+	droppedStakerTxIDs := mempool.DropExpiredStakerTxs(builder.Mempool, timestamp.Add(txexecutor.SyncBound))
+	for _, txID := range droppedStakerTxIDs {
+		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+	}
 
 	// If there is no reason to build a block, don't.
 	if !builder.Mempool.HasTxs() && !forceAdvanceTime {

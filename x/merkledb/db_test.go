@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
@@ -29,6 +30,8 @@ import (
 )
 
 const defaultHistoryLength = 300
+
+var emptyKey Key
 
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
@@ -63,7 +66,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val, err := db.Get(keyBytes)
 	require.NoError(err)
 
-	n, err := db.getNode(ToKey(keyBytes, BranchFactor16), true)
+	n, err := db.getNode(ToKey(keyBytes), true)
 	require.NoError(err)
 
 	// node's value shouldn't be affected by the edit
@@ -96,7 +99,7 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
-	for _, bf := range branchFactors {
+	for _, bf := range validBranchFactors {
 		for _, test := range database.Tests {
 			db, err := getBasicDBWithBranchFactor(bf)
 			require.NoError(t, err)
@@ -108,7 +111,7 @@ func Test_MerkleDB_DB_Interface(t *testing.T) {
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bf := range branchFactors {
+		for _, bf := range validBranchFactors {
 			for _, bench := range database.Benchmarks {
 				db, err := getBasicDBWithBranchFactor(bf)
 				require.NoError(b, err)
@@ -773,6 +776,49 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 }
 
+func TestMerkleDBClear(t *testing.T) {
+	require := require.New(t)
+
+	// Make a database and insert some key-value pairs.
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	emptyRootID := db.getMerkleRoot()
+
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+
+	insertRandomKeyValues(
+		require,
+		r,
+		[]database.Database{db},
+		1_000,
+		0.25,
+	)
+
+	// Clear the database.
+	require.NoError(db.Clear())
+
+	// Assert that the database is empty.
+	iter := db.NewIterator()
+	defer iter.Release()
+	require.False(iter.Next())
+	require.Equal(emptyRootID, db.getMerkleRoot())
+	require.Equal(emptyKey, db.sentinelNode.key)
+
+	// Assert caches are empty.
+	require.Zero(db.valueNodeDB.nodeCache.Len())
+	require.Zero(db.intermediateNodeDB.nodeCache.currentSize)
+
+	// Assert history has only the clearing change.
+	require.Len(db.history.lastChanges, 1)
+	change, ok := db.history.lastChanges[emptyRootID]
+	require.True(ok)
+	require.Empty(change.nodes)
+	require.Empty(change.values)
+}
+
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -785,7 +831,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 			}
 			require := require.New(t)
 			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-			for _, bf := range branchFactors {
+			for _, ts := range validTokenSizes {
 				runRandDBTest(
 					require,
 					r,
@@ -795,7 +841,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 						size,
 						0.01, /*checkHashProbability*/
 					),
-					bf,
+					ts,
 				)
 			}
 		})
@@ -813,7 +859,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 		}
 		require := require.New(t)
 		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
-		for _, bf := range branchFactors {
+		for _, ts := range validTokenSizes {
 			runRandDBTest(
 				require,
 				r,
@@ -824,7 +870,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 					numSteps,
 					0.001, /*checkHashProbability*/
 				),
-				bf,
+				ts,
 			)
 		}
 	})
@@ -851,8 +897,8 @@ const (
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf BranchFactor) {
-	db, err := getBasicDBWithBranchFactor(bf)
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
+	db, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 	require.NoError(err)
 
 	const (
@@ -877,13 +923,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
 
-			uncommittedKeyValues[ToKey(step.key, bf)] = step.value
-			uncommittedDeletes.Remove(ToKey(step.key, bf))
+			uncommittedKeyValues[ToKey(step.key)] = step.value
+			uncommittedDeletes.Remove(ToKey(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
 
-			uncommittedDeletes.Add(ToKey(step.key, bf))
-			delete(uncommittedKeyValues, ToKey(step.key, bf))
+			uncommittedDeletes.Add(ToKey(step.key))
+			delete(uncommittedKeyValues, ToKey(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -910,6 +956,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				start,
 				end,
 				root,
+				tokenSize,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
@@ -937,7 +984,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 			require.NoError(err)
 			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
-			changeProofDB, err := getBasicDBWithBranchFactor(bf)
+			changeProofDB, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 			require.NoError(err)
 
 			require.NoError(changeProofDB.VerifyChangeProof(
@@ -984,10 +1031,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			want := values[ToKey(step.key, bf)]
+			want := values[ToKey(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 
-			trieValue, err := getNodeValueWithBranchFactor(db, string(step.key), bf)
+			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
@@ -995,7 +1042,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, bf Br
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
 			// Create a view with the same key-values as [db]
-			newDB, err := getBasicDBWithBranchFactor(bf)
+			newDB, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
 			require.NoError(err)
 
 			ops := make([]database.BatchOp, 0, len(values))
@@ -1093,7 +1140,7 @@ func generateRandTestWithKeys(
 			step.value = genEnd(step.key)
 		case opCheckhash:
 			// this gets really expensive so control how often it happens
-			if r.Float64() < checkHashProbability {
+			if r.Float64() > checkHashProbability {
 				continue
 			}
 		}

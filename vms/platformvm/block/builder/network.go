@@ -7,8 +7,7 @@ package builder
 
 import (
 	"context"
-	"fmt"
-	"time"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -20,11 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// We allow [recentCacheSize] to be fairly large because we only store hashes
-	// in the cache, not entire transactions.
-	recentCacheSize = 512
-)
+// We allow [recentCacheSize] to be fairly large because we only store hashes
+// in the cache, not entire transactions.
+const recentCacheSize = 512
 
 var _ Network = (*network)(nil)
 
@@ -32,16 +29,20 @@ type Network interface {
 	common.AppHandler
 
 	// GossipTx gossips the transaction to some of the connected peers
-	GossipTx(tx *txs.Tx) error
+	GossipTx(ctx context.Context, tx *txs.Tx) error
 }
 
 type network struct {
+	// We embed a noop handler for all unhandled messages
+	common.AppHandler
+
 	ctx        *snow.Context
 	blkBuilder *builder
+	appSender  common.AppSender
 
 	// gossip related attributes
-	appSender common.AppSender
-	recentTxs *cache.LRU[ids.ID, struct{}]
+	recentTxsLock sync.Mutex
+	recentTxs     *cache.LRU[ids.ID, struct{}]
 }
 
 func NewNetwork(
@@ -50,47 +51,13 @@ func NewNetwork(
 	appSender common.AppSender,
 ) Network {
 	return &network{
+		AppHandler: common.NewNoOpAppHandler(ctx.Log),
+
 		ctx:        ctx,
 		blkBuilder: blkBuilder,
 		appSender:  appSender,
 		recentTxs:  &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 	}
-}
-
-func (*network) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
-}
-
-func (*network) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
-	// This VM currently only supports gossiping of txs, so there are no
-	// requests.
-	return nil
 }
 
 func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
@@ -154,22 +121,40 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	return nil
 }
 
-func (n *network) GossipTx(tx *txs.Tx) error {
-	txID := tx.ID()
-	// Don't gossip a transaction if it has been recently gossiped.
-	if _, has := n.recentTxs.Get(txID); has {
-		return nil
+func (n *network) GossipTx(ctx context.Context, tx *txs.Tx) error {
+	txBytes := tx.Bytes()
+	msg := &message.Tx{
+		Tx: txBytes,
 	}
+	msgBytes, err := message.Build(msg)
+	if err != nil {
+		return err
+	}
+
+	txID := tx.ID()
+	n.gossipTx(ctx, txID, msgBytes)
+	return nil
+}
+
+func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
+	n.recentTxsLock.Lock()
+	_, has := n.recentTxs.Get(txID)
 	n.recentTxs.Put(txID, struct{}{})
+	n.recentTxsLock.Unlock()
+
+	// Don't gossip a transaction if it has been recently gossiped.
+	if has {
+		return
+	}
 
 	n.ctx.Log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
 	)
 
-	msg := &message.Tx{Tx: tx.Bytes()}
-	msgBytes, err := message.Build(msg)
-	if err != nil {
-		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
+	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
+		n.ctx.Log.Error("failed to gossip tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
 	}
-	return n.appSender.SendAppGossip(context.TODO(), msgBytes)
 }
