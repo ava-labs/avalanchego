@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Also tests NewSummaryFromBytes
-func TestNewSummary(t *testing.T) {
+// Tests NewSummary, NewSummaryFromBytes and all the methods on Summary.
+func TestSummary(t *testing.T) {
 	var (
 		require            = require.New(t)
 		blockID            = ids.GenerateTestID()
@@ -56,8 +56,4 @@ func TestNewSummary(t *testing.T) {
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, mode)
 	require.Equal(2, calledOnAcceptFunc)
-}
-
-func TestNewSummaryFromBytes(t *testing.T) {
-
 }
