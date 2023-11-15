@@ -212,7 +212,7 @@ func (b *bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
 			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
 			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
 		)
-		return b.Restart(ctx, false)
+		return b.Restart(ctx, false /*=reset*/)
 	}
 
 	if !b.Config.SharedCfg.Restarted {
