@@ -8,22 +8,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestNoop(t *testing.T) {
-	var (
-		require = require.New(t)
-		ctx     = context.Background()
-		nodeID  = ids.GenerateTestNodeID()
-	)
+	require := require.New(t)
 
-	require.Empty(Noop.GetPeers(ctx))
+	require.Empty(Noop.GetPeers(context.Background()))
 
-	require.NoError(Noop.RecordOpinion(ctx, nodeID))
+	require.NoError(Noop.RecordOpinion(context.Background(), nodeID0))
 
-	blkIDs, finalized := Noop.Result(ctx)
+	blkIDs, finalized := Noop.Result(context.Background())
 	require.Empty(blkIDs)
 	require.False(finalized)
 }
