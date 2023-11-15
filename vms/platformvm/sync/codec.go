@@ -12,13 +12,10 @@ import (
 
 const (
 	Version        = uint16(0)
-	maxMessageSize = 1 * units.MiB
+	maxMessageSize = 1 * units.MiB // TODO what should this be?
 )
 
-var (
-	Codec           codec.Manager
-	CrossChainCodec codec.Manager
-)
+var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
