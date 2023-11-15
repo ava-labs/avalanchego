@@ -530,7 +530,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 }
 
 // addStakerFromStakerTx creates the staker and adds it to state.
-func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.Staker) error {
+func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.PreDurangoStaker) error {
 	// Pre Durango fork, stakers are added as pending first, then promoted
 	// to current when chainTime reaches their start time.
 	// Post Durango fork, stakers are immediately marked as current.

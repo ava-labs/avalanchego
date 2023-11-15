@@ -1460,15 +1460,14 @@ func (s *state) loadCurrentValidators() error {
 			// Note: we don't provide [LastUpdated] here because we expect it to
 			// always be present on disk.
 		}
-		err = parseValidatorMetadata(metadataBytes, metadata)
-		if err != nil {
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
 
 		staker, err := NewCurrentStaker(
 			txID,
-			stakerTx.(txs.PostDurangoStaker),
-			stakerTx.StartTime(),
+			stakerTx,
+			stakerTx.(txs.PreDurangoStaker).StartTime(),
 			metadata.PotentialReward)
 		if err != nil {
 			return err
@@ -1501,11 +1500,12 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
+		startTime := stakerTx.(txs.PreDurangoStaker).StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
-			LastUpdated: uint64(stakerTx.StartTime().Unix()),
+			LastUpdated: uint64(startTime.Unix()),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1513,8 +1513,8 @@ func (s *state) loadCurrentValidators() error {
 
 		staker, err := NewCurrentStaker(
 			txID,
-			stakerTx.(txs.PostDurangoStaker),
-			stakerTx.StartTime(),
+			stakerTx,
+			startTime,
 			metadata.PotentialReward,
 		)
 		if err != nil {
@@ -1561,8 +1561,8 @@ func (s *state) loadCurrentValidators() error {
 
 			staker, err := NewCurrentStaker(
 				txID,
-				stakerTx.(txs.PostDurangoStaker),
-				stakerTx.StartTime(),
+				stakerTx,
+				stakerTx.(txs.PreDurangoStaker).StartTime(),
 				metadata.PotentialReward,
 			)
 			if err != nil {
@@ -1608,7 +1608,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1643,7 +1643,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}

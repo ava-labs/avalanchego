@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	_ DelegatorTx       = (*AddPermissionlessDelegatorTx)(nil)
-	_ PostDurangoStaker = (*AddPermissionlessDelegatorTx)(nil)
+	_ DelegatorTx      = (*AddPermissionlessDelegatorTx)(nil)
+	_ PreDurangoStaker = (*AddPermissionlessDelegatorTx)(nil)
 )
 
 // AddPermissionlessDelegatorTx is an unsigned addPermissionlessDelegatorTx

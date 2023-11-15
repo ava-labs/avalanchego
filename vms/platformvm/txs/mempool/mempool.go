@@ -316,7 +316,7 @@ func DropExpiredStakerTxs(mempool Mempool, minStartTime time.Time) []ids.ID {
 
 	for mempool.HasStakerTx() {
 		tx := mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
+		startTime := tx.Unsigned.(txs.PreDurangoStaker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.
