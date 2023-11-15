@@ -17,7 +17,7 @@ type Poll interface {
 	GetPeers(ctx context.Context) (peers set.Set[ids.NodeID])
 	// RecordOpinion of a node whose opinion was requested.
 	RecordOpinion(ctx context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) error
-	// Result returns evaluation of all the peer's opinions along with a flag to
-	// identify that the frontier has finished being calculated.
+	// Result returns the evaluation of all the peer's opinions along with a
+	// flag to identify that the result has finished being calculated.
 	Result(ctx context.Context) (blkIDs []ids.ID, finalized bool)
 }
