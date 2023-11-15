@@ -219,6 +219,7 @@ func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options
 	}, nil
 }
 
+// peers contains the set of nodes we are connected to
 type peers struct {
 	lock sync.RWMutex
 	set  set.SampleableSet[ids.NodeID]
