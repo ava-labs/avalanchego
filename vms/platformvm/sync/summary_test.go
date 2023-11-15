@@ -12,20 +12,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Also tests NewSummaryFromBytes
 func TestNewSummary(t *testing.T) {
 	var (
 		require            = require.New(t)
 		blockID            = ids.GenerateTestID()
 		blockNumber        = uint64(1337)
 		rootID             = ids.GenerateTestID()
-		calledOnAcceptFunc bool
-		acceptFunc         = func(Summary) (block.StateSyncMode, error) {
-			calledOnAcceptFunc = true
+		calledOnAcceptFunc int
+		onAcceptFunc       = func(Summary) (block.StateSyncMode, error) {
+			calledOnAcceptFunc++
 			return block.StateSyncStatic, nil
 		}
 	)
 
-	summary, err := NewSummary(blockID, blockNumber, rootID, acceptFunc)
+	summary, err := NewSummary(blockID, blockNumber, rootID, onAcceptFunc)
 	require.NoError(err)
 
 	require.NotEqual(ids.ID{}, summary.summaryID)
@@ -39,5 +40,24 @@ func TestNewSummary(t *testing.T) {
 	mode, err := summary.Accept(context.Background())
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, mode)
-	require.True(calledOnAcceptFunc)
+	require.Equal(1, calledOnAcceptFunc)
+
+	parsedSummary, err := NewSummaryFromBytes(summary.bytes, onAcceptFunc)
+	require.NoError(err)
+
+	// require.Equal(summary, parsedSummary) won't work because of onAcceptFunc.
+	// Compare fields manually instead.
+	require.Equal(summary.summaryID, parsedSummary.summaryID)
+	require.Equal(summary.bytes, parsedSummary.bytes)
+	require.Equal(summary.BlockID, parsedSummary.BlockID)
+	require.Equal(summary.BlockHeight, parsedSummary.BlockHeight)
+
+	mode, err = parsedSummary.Accept(context.Background())
+	require.NoError(err)
+	require.Equal(block.StateSyncStatic, mode)
+	require.Equal(2, calledOnAcceptFunc)
+}
+
+func TestNewSummaryFromBytes(t *testing.T) {
+
 }
