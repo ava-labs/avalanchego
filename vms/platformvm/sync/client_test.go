@@ -26,6 +26,10 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
+var noopOnAcceptFunc = func(Summary) (block.StateSyncMode, error) {
+	return block.StateSyncStatic, nil
+}
+
 func TestNewClient(t *testing.T) {
 	var (
 		require       = require.New(t)
@@ -80,7 +84,7 @@ func TestClientParseStateSummary(t *testing.T) {
 		rootID      = ids.GenerateTestID()
 		client      = NewClient(ClientConfig{}, memdb.New())
 	)
-	summary, err := NewSummary(blockID, blockNumber, rootID)
+	summary, err := NewSummary(blockID, blockNumber, rootID, noopOnAcceptFunc)
 	require.NoError(err)
 	summaryBytes := summary.Bytes()
 
@@ -189,7 +193,7 @@ func TestClientAcceptSyncSummary(t *testing.T) {
 	}, memdb.New())
 
 	// Make a new rawSummary whose root ID is [targetRootID].
-	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID)
+	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID, noopOnAcceptFunc)
 	require.NoError(err)
 	// Need to make the summary like this so that its onAccept callback is set.
 	summary, err := client.ParseStateSummary(context.Background(), rawSummary.Bytes())
@@ -320,7 +324,7 @@ func TestClientShutdown(t *testing.T) {
 	}, memdb.New())
 
 	// Make a new rawSummary whose root ID is [targetRootID].
-	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID)
+	rawSummary, err := NewSummary(ids.GenerateTestID(), 1337, targetRootID, noopOnAcceptFunc)
 	require.NoError(err)
 	// Need to make the summary like this so that its onAccept callback is set.
 	summary, err := client.ParseStateSummary(context.Background(), rawSummary.Bytes())

@@ -32,6 +32,7 @@ func TestServer(t *testing.T) {
 		ids.GenerateTestID(),
 		0,
 		ids.GenerateTestID(),
+		noopOnAcceptFunc,
 	)
 	require.NoError(err)
 
@@ -58,6 +59,7 @@ func TestServer(t *testing.T) {
 		ids.GenerateTestID(),
 		2, // Note non-consecutive height
 		ids.GenerateTestID(),
+		noopOnAcceptFunc,
 	)
 	require.NoError(err)
 
@@ -85,6 +87,7 @@ func TestServer(t *testing.T) {
 		ids.GenerateTestID(),
 		4,
 		ids.GenerateTestID(),
+		noopOnAcceptFunc,
 	)
 	require.NoError(err)
 

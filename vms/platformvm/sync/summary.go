@@ -17,9 +17,9 @@ var _ block.StateSummary = (*Summary)(nil)
 // Summary provides the information necessary to sync a node starting
 // at the given block.
 type Summary struct {
-	BlockNumber uint64 `serialize:"true"`
+	BlockHeight uint64 `serialize:"true"`
 	BlockID     ids.ID `serialize:"true"`
-	BlockRoot   ids.ID `serialize:"true"`
+	BlockRootID ids.ID `serialize:"true"`
 
 	// Invariant: non-nil.
 	summaryID ids.ID
@@ -29,7 +29,10 @@ type Summary struct {
 	acceptFunc func(Summary) (block.StateSyncMode, error)
 }
 
-func NewSummaryFromBytes(summaryBytes []byte, acceptImpl func(Summary) (block.StateSyncMode, error)) (Summary, error) {
+func NewSummaryFromBytes(
+	summaryBytes []byte,
+	acceptFunc func(Summary) (block.StateSyncMode, error),
+) (Summary, error) {
 	var summary Summary
 	if codecVersion, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
 		return Summary{}, err
@@ -43,15 +46,21 @@ func NewSummaryFromBytes(summaryBytes []byte, acceptImpl func(Summary) (block.St
 		return Summary{}, err
 	}
 	summary.summaryID = summaryID
-	summary.acceptFunc = acceptImpl
+	summary.acceptFunc = acceptFunc
 	return summary, nil
 }
 
-func NewSummary(blockID ids.ID, blockNumber uint64, blockRoot ids.ID) (Summary, error) {
+func NewSummary(
+	blockID ids.ID,
+	blockNumber uint64,
+	blockRootID ids.ID,
+	acceptFunc func(Summary) (block.StateSyncMode, error),
+) (Summary, error) {
 	summary := Summary{
-		BlockNumber: blockNumber,
+		BlockHeight: blockNumber,
 		BlockID:     blockID,
-		BlockRoot:   blockRoot,
+		BlockRootID: blockRootID,
+		acceptFunc:  acceptFunc,
 	}
 	bytes, err := Codec.Marshal(Version, &summary)
 	if err != nil {
@@ -73,7 +82,7 @@ func (s Summary) Bytes() []byte {
 }
 
 func (s Summary) Height() uint64 {
-	return s.BlockNumber
+	return s.BlockHeight
 }
 
 func (s Summary) ID() ids.ID {
@@ -82,8 +91,8 @@ func (s Summary) ID() ids.ID {
 
 func (s Summary) String() string {
 	return fmt.Sprintf(
-		"Summary(BlockID=%s, BlockNumber=%d, BlockRoot=%s)",
-		s.BlockID, s.BlockNumber, s.BlockRoot,
+		"Summary(BlockID=%s, BlockNumber=%d, BlockRootID=%s)",
+		s.BlockID, s.BlockHeight, s.BlockRootID,
 	)
 }
 

@@ -82,7 +82,7 @@ func (c *Client) acceptSummary(summary Summary) (block.StateSyncMode, error) {
 		return 0, errShutdown
 	}
 
-	c.config.TargetRoot = summary.BlockRoot
+	c.config.TargetRoot = summary.BlockRootID
 
 	if err := c.metadataDB.Put(ongoingSummaryKey, summary.Bytes()); err != nil {
 		return 0, err
