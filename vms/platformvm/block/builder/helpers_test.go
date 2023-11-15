@@ -177,7 +177,7 @@ func newEnvironment(t *testing.T) *environment {
 		res.sender,
 	)
 
-	res.Builder.SetPreference(genesisID)
+	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
 	return res
