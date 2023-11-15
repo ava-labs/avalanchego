@@ -562,7 +562,7 @@ func (e *EngineTest) CrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	return errCrossChainAppRequest
 }
 
-func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
+func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err *AppError) error {
 	if e.CrossChainAppRequestFailedF != nil {
 		return e.CrossChainAppRequestFailedF(ctx, chainID, requestID, err)
 	}
@@ -614,7 +614,7 @@ func (e *EngineTest) AppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return errAppResponse
 }
 
-func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
+func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err *AppError) error {
 	if e.AppRequestFailedF != nil {
 		return e.AppRequestFailedF(ctx, nodeID, requestID, err)
 	}

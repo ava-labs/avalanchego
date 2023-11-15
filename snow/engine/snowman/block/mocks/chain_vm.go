@@ -74,7 +74,7 @@ func (mr *MockChainVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg4 inter
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
+func (m *MockChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 common.AppError) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -175,7 +175,7 @@ func (mr *MockChainVMMockRecorder) CrossChainAppRequest(arg0, arg1, arg2, arg3, 
 }
 
 // CrossChainAppRequestFailed mocks base method.
-func (m *MockChainVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 error) error {
+func (m *MockChainVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 *common.AppError) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)

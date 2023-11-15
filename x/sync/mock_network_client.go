@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	version "github.com/ava-labs/avalanchego/version"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -37,7 +38,7 @@ func (m *MockNetworkClient) EXPECT() *MockNetworkClientMockRecorder {
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
+func (m *MockNetworkClient) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 *common.AppError) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)

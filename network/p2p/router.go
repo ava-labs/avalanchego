@@ -232,7 +232,7 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
+func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
@@ -325,7 +325,7 @@ func (r *Router) CrossChainAppRequest(
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
+func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {

@@ -185,7 +185,7 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err *AppError) error {
 	if vm.AppRequestFailedF != nil {
 		return vm.AppRequestFailedF(ctx, nodeID, requestID, err)
 	}
@@ -237,7 +237,7 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
+func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err *AppError) error {
 	if vm.CrossChainAppRequestFailedF != nil {
 		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, err)
 	}

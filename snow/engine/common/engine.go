@@ -413,7 +413,7 @@ type AppResponseHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		err error,
+		err *AppError,
 	) error
 }
 
@@ -480,7 +480,7 @@ type CrossChainAppResponseHandler interface {
 		ctx context.Context,
 		chainID ids.ID,
 		requestID uint32,
-		err error,
+		err *AppError,
 	) error
 }
 

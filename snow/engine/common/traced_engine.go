@@ -291,7 +291,7 @@ func (e *tracedEngine) AppResponse(ctx context.Context, nodeID ids.NodeID, reque
 	return e.engine.AppResponse(ctx, nodeID, requestID, response)
 }
 
-func (e *tracedEngine) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
+func (e *tracedEngine) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err *AppError) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AppRequestFailed", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -333,7 +333,7 @@ func (e *tracedEngine) CrossChainAppResponse(ctx context.Context, chainID ids.ID
 	return e.engine.CrossChainAppResponse(ctx, chainID, requestID, response)
 }
 
-func (e *tracedEngine) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
+func (e *tracedEngine) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err *AppError) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.CrossChainAppRequestFailed", oteltrace.WithAttributes(
 		attribute.Stringer("chainID", chainID),
 		attribute.Int64("requestID", int64(requestID)),
