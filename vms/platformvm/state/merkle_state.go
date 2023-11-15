@@ -227,14 +227,15 @@ func newMerkleState(
 	}
 
 	return &merkleState{
-		cfg:          cfg,
-		ctx:          ctx,
-		metrics:      metrics,
-		rewards:      rewards,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+
 		baseDB:       baseDB,
+		singletonDB:  singletonDB,
 		baseMerkleDB: baseMerkleDB,
 		merkleDB:     merkleDB,
-		singletonDB:  singletonDB,
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -259,10 +260,6 @@ func newMerkleState(
 		addedChains: make(map[ids.ID][]*txs.Tx),
 		chainCache:  chainCache,
 
-		addedTxs: make(map[ids.ID]*txAndStatus),
-		txCache:  txCache,
-		txDB:     txDB,
-
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
 		blockDB:     blockDB,
@@ -270,6 +267,10 @@ func newMerkleState(
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
 		blockIDDB:     blockIDsDB,
+
+		addedTxs: make(map[ids.ID]*txAndStatus),
+		txCache:  txCache,
+		txDB:     txDB,
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
