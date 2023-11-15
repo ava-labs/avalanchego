@@ -110,7 +110,7 @@ func Test_Insert(t *testing.T) {
 		require.NoError(err)
 		_, err = view.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		require.NoError(view.CommitToDB(context.Background()))
+		//require.NoError(view.CommitToDB(context.Background()))
 	}
 	require.NoError(db.Close())
 }

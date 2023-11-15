@@ -727,9 +727,18 @@ func (t *trieView) compressNodePath(parent *node, parentKey Key, node *node, nod
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
 func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) error {
+	return visitPathToKey(key, t.root, t.tokenSize, t.getNodeInternal, visitNode)
+}
+
+// Returns the nodes along the path to [key].
+// The first node is the root, and the last node is either the node with the
+// given [key], if it's in the trie, or the node with the largest prefix of
+// the [key] if it isn't in the trie.
+// Always returns at least the root node.
+func visitPathToKey(key Key, root *node, tokenSize int, getNode func(Key) (*node, error), visitNode func(Key, *node) error) error {
 	var (
 		// all node paths start at the root
-		currentNode = t.root
+		currentNode = root
 		currentKey  = Key{}
 		err         error
 	)
@@ -739,15 +748,15 @@ func (t *trieView) visitPathToKey(key Key, visitNode func(Key, *node) error) err
 	// while the entire path hasn't been matched
 	for currentKey.length < key.length {
 		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentKey.length, t.tokenSize)]
+		nextChildEntry, hasChild := currentNode.children[key.Token(currentKey.length, tokenSize)]
 
-		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentKey.length+t.tokenSize, t.tokenSize) {
+		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentKey.length+tokenSize, tokenSize) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nil
 		}
 		// grab the next node along the path
-		currentKey = key.Take(currentKey.length + t.tokenSize + nextChildEntry.compressedKey.length)
-		currentNode, err = t.getNodeInternal(currentKey)
+		currentKey = key.Take(currentKey.length + tokenSize + nextChildEntry.compressedKey.length)
+		currentNode, err = getNode(currentKey)
 		if err != nil {
 			return err
 		}

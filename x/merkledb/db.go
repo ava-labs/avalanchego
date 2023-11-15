@@ -477,13 +477,8 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 		return database.ErrClosed
 	}
 
-	// reuse the view so that it can keep repeated nodes in memory
-	tempView, err := newTrieView(db, db, ViewChanges{})
-	if err != nil {
-		return err
-	}
 	for _, key := range keys {
-		if err := db.prefetchPath(tempView, key); err != nil {
+		if err := db.prefetchPath(key); err != nil {
 			return err
 		}
 	}
@@ -498,16 +493,11 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 	if db.closed {
 		return database.ErrClosed
 	}
-	tempView, err := newTrieView(db, db, ViewChanges{})
-	if err != nil {
-		return err
-	}
-
-	return db.prefetchPath(tempView, key)
+	return db.prefetchPath(key)
 }
 
-func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
-	return view.visitPathToKey(ToKey(keyBytes), func(key Key, n *node) error {
+func (db *merkleDB) prefetchPath(keyBytes []byte) error {
+	return visitPathToKey(ToKey(keyBytes), db.root, db.tokenSize, db.getNodeInternal, func(key Key, n *node) error {
 		return db.nodeDB.Put(key, n)
 	})
 }
