@@ -118,7 +118,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	}
 
 	// add to mempool
-	if err := n.IssueTx(context.TODO(), tx); err != nil {
+	if err := n.IssueTx(ctx, tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
