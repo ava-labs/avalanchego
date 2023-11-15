@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -21,9 +21,9 @@ import (
 )
 
 var (
-	_ validators.Connector = (*Network)(nil)
-	_ common.AppHandler    = (*Network)(nil)
-	_ NodeSampler          = (*Network)(nil)
+	_ snowvalidators.Connector = (*Network)(nil)
+	_ common.AppHandler        = (*Network)(nil)
+	_ NodeSampler              = (*peers)(nil)
 )
 
 // ClientOption configures Client
@@ -37,10 +37,17 @@ func (o clientOptionFunc) apply(options *ClientOptions) {
 	o(options)
 }
 
-// WithNodeSampler configures the sampling strategy for Client.AppRequestAny
-func WithNodeSampler(nodeSampler NodeSampler) ClientOption {
+// WithPeerSampling configures Client.AppRequestAny to sample peers
+func WithPeerSampling(network Network) ClientOption {
 	return clientOptionFunc(func(options *ClientOptions) {
-		options.NodeSampler = nodeSampler
+		options.NodeSampler = network.peers
+	})
+}
+
+// WithValidatorSampling configures Client.AppRequestAny to sample validators
+func WithValidatorSampling(validators *Validators) ClientOption {
+	return clientOptionFunc(func(options *ClientOptions) {
+		options.NodeSampler = validators
 	})
 }
 
@@ -63,7 +70,7 @@ func NewNetwork(
 		metrics:   metrics,
 		namespace: namespace,
 		router:    newRouter(log),
-		peers:     set.SampleableSet[ids.NodeID]{},
+		peers:     &peers{},
 	}
 }
 
@@ -76,16 +83,14 @@ type Network struct {
 	namespace string
 
 	*router
-
-	lock  sync.RWMutex
-	peers set.SampleableSet[ids.NodeID]
+	peers *peers
 }
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	n.peers.Add(nodeID)
+	n.peers.set.Add(nodeID)
 	return nil
 }
 
@@ -93,16 +98,8 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	n.peers.Remove(nodeID)
+	n.peers.set.Remove(nodeID)
 	return nil
-}
-
-// Sample returns a pseudo-random sample of up to limit peers
-func (n *Network) Sample(_ context.Context, limit int) []ids.NodeID {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
-	return n.peers.Sample(limit)
 }
 
 // RegisterAppProtocol reserves an identifier for an application protocol and
@@ -206,7 +203,7 @@ func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options
 	}
 
 	clientOptions := &ClientOptions{
-		NodeSampler: n,
+		NodeSampler: n.peers,
 	}
 
 	for _, option := range options {
@@ -220,4 +217,24 @@ func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options
 		router:        n.router,
 		options:       clientOptions,
 	}, nil
+}
+
+type peers struct {
+	lock sync.RWMutex
+	set  set.SampleableSet[ids.NodeID]
+}
+
+func (p *peers) has(nodeID ids.NodeID) bool {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.set.Contains(nodeID)
+}
+
+// Sample returns a pseudo-random sample of up to limit peers
+func (p *peers) Sample(_ context.Context, limit int) []ids.NodeID {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.set.Sample(limit)
 }

@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -25,9 +25,15 @@ type ValidatorSet interface {
 	Has(ctx context.Context, nodeID ids.NodeID) bool
 }
 
-func NewValidators(log logging.Logger, subnetID ids.ID, validators validators.State, maxValidatorSetStaleness time.Duration) *Validators {
+func NewValidators(
+	network *Network,
+	subnetID ids.ID,
+	validators snowvalidators.State,
+	maxValidatorSetStaleness time.Duration,
+) *Validators {
 	return &Validators{
-		log:                      log,
+		peers:                    network.peers,
+		log:                      network.log, // TODO remove
 		subnetID:                 subnetID,
 		validators:               validators,
 		maxValidatorSetStaleness: maxValidatorSetStaleness,
@@ -36,9 +42,10 @@ func NewValidators(log logging.Logger, subnetID ids.ID, validators validators.St
 
 // Validators contains a set of nodes that are staking.
 type Validators struct {
+	peers      *peers
 	log        logging.Logger
 	subnetID   ids.ID
-	validators validators.State
+	validators snowvalidators.State
 
 	lock                     sync.Mutex
 	validatorIDs             set.SampleableSet[ids.NodeID]
@@ -71,20 +78,33 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
+// Sample returns a random sample of connected validators
 func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	v.refresh(ctx)
 
-	return v.validatorIDs.Sample(limit)
+	sampled := make([]ids.NodeID, 0, limit)
+	validatorIDs := v.validatorIDs.Sample(limit)
+
+	for _, validatorID := range validatorIDs {
+		if !v.peers.has(validatorID) {
+			continue
+		}
+
+		sampled = append(sampled, validatorID)
+	}
+
+	return sampled
 }
 
+// Has returns if nodeID is a connected validator
 func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	v.refresh(ctx)
 
-	return v.validatorIDs.Contains(nodeID)
+	return v.peers.has(nodeID) && v.validatorIDs.Contains(nodeID)
 }
