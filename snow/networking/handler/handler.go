@@ -455,7 +455,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Verbo("forwarding sync message to consensus",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding sync message to consensus",
@@ -488,7 +488,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", body),
+				zap.Stringer("message", body),
 			)
 		}
 	}()
@@ -793,7 +793,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Verbo("forwarding async message to consensus",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding async message to consensus",
@@ -893,7 +893,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	if h.ctx.Log.Enabled(logging.Verbo) {
 		h.ctx.Log.Verbo("forwarding chan message to consensus",
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding chan message to consensus",
@@ -922,7 +922,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 				zap.Duration("processingTime", processingTime),
 				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", body),
+				zap.Stringer("message", body),
 			)
 		}
 	}()
