@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	_ DelegatorTx       = (*AddDelegatorTx)(nil)
-	_ PostDurangoStaker = (*AddDelegatorTx)(nil)
+	_ DelegatorTx      = (*AddDelegatorTx)(nil)
+	_ PreDurangoStaker = (*AddDelegatorTx)(nil)
 
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 	errStakeMustBeAVAX         = errors.New("stake must be AVAX")

@@ -993,13 +993,12 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 	var (
 		nodeID            = ids.GenerateTestNodeID()
 		validatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Unix(0, 0)
-		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
+		dummyEndTime      = env.state.GetTimestamp().Add(validatorDuration)
 	)
 
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
-		uint64(dummyStartTime.Unix()),
+		0,
 		uint64(dummyEndTime.Unix()),
 		nodeID,
 		ids.ShortEmpty,

@@ -65,15 +65,13 @@ func verifySubnetValidatorPrimaryNetworkRequirements(backend *Backend, chainStat
 	var (
 		currentChainTime = chainState.GetTimestamp()
 		stakerStart      = subnetValidator.StartTime()
-		stakerEnd        = subnetValidator.EndTime()
 	)
 	if backend.Config.IsDActivated(currentChainTime) {
 		stakerStart = currentChainTime
-		stakerEnd = currentChainTime.Add(subnetValidator.Duration())
 	}
 	if !txs.BoundedBy(
 		stakerStart,
-		stakerEnd,
+		subnetValidator.EndTime(),
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
@@ -100,7 +98,14 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		duration         = tx.EndTime().Sub(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDurangoActive {
+		duration = tx.EndTime().Sub(tx.StartTime())
+	}
 
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -134,18 +139,14 @@ func verifyAddValidatorTx(
 
 	// Pre Durango activation, start time must be after current chain time.
 	// Post Durango activation, start time is not validated
-	var (
-		currentTimestamp    = chainState.GetTimestamp()
-		preDurangoStartTime = tx.StartTime()
-		isDurangoActive     = backend.Config.IsDActivated(currentTimestamp)
-	)
+
 	if !isDurangoActive {
-		if !currentTimestamp.Before(preDurangoStartTime) {
+		if !currentTimestamp.Before(tx.StartTime()) {
 			return nil, fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
-				preDurangoStartTime,
+				tx.StartTime(),
 			)
 		}
 	}
@@ -184,7 +185,7 @@ func verifyAddValidatorTx(
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if preDurangoStartTime.After(maxStartTime) {
+		if tx.StartTime().After(maxStartTime) {
 			return nil, ErrFutureStakeTime
 		}
 	}
@@ -205,7 +206,15 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		duration         = tx.EndTime().Sub(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDurangoActive {
+		duration = tx.EndTime().Sub(tx.StartTime())
+	}
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -223,18 +232,13 @@ func verifyAddSubnetValidatorTx(
 	// Pre Durango activation, start time must be after current chain time.
 	// Post Durango activation, only staking duration matters, hence start time
 	// is not validated
-	var (
-		currentTimestamp    = chainState.GetTimestamp()
-		preDurangoStartTime = tx.StartTime()
-		isDurangoActive     = backend.Config.IsDActivated(currentTimestamp)
-	)
 	if !isDurangoActive {
-		if !currentTimestamp.Before(preDurangoStartTime) {
+		if !currentTimestamp.Before(tx.StartTime()) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
-				preDurangoStartTime,
+				tx.StartTime(),
 			)
 		}
 	}
@@ -283,7 +287,7 @@ func verifyAddSubnetValidatorTx(
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if preDurangoStartTime.After(maxStartTime) {
+		if tx.StartTime().After(maxStartTime) {
 			return ErrFutureStakeTime
 		}
 	}
@@ -375,7 +379,15 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		duration         = tx.EndTime().Sub(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+	)
+	if !isDurangoActive {
+		duration = tx.EndTime().Sub(tx.StartTime())
+	}
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -401,18 +413,13 @@ func verifyAddDelegatorTx(
 	// Pre Durango activation, start time must be after current chain time.
 	// Post Durango activation, only staking duration matters, hence start time
 	// is not validated
-	var (
-		currentTimestamp    = chainState.GetTimestamp()
-		preDurangoStartTime = tx.StartTime()
-		isDurangoActive     = backend.Config.IsDActivated(currentTimestamp)
-	)
 	if !isDurangoActive {
-		if !currentTimestamp.Before(preDurangoStartTime) {
+		if !currentTimestamp.Before(tx.StartTime()) {
 			return nil, fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
-				preDurangoStartTime,
+				tx.StartTime(),
 			)
 		}
 	}
@@ -481,7 +488,7 @@ func verifyAddDelegatorTx(
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if preDurangoStartTime.After(maxStartTime) {
+		if tx.StartTime().After(maxStartTime) {
 			return nil, ErrFutureStakeTime
 		}
 	}
@@ -510,17 +517,18 @@ func verifyAddPermissionlessValidatorTx(
 	// Post Durango activation, only staking duration matters, hence start time
 	// is not validated
 	var (
-		currentTimestamp    = chainState.GetTimestamp()
-		preDurangoStartTime = tx.StartTime()
-		isDurangoActive     = backend.Config.IsDActivated(currentTimestamp)
+		currentTimestamp = chainState.GetTimestamp()
+		duration         = tx.EndTime().Sub(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
-		if !currentTimestamp.Before(preDurangoStartTime) {
+		duration = tx.EndTime().Sub(tx.StartTime())
+		if !currentTimestamp.Before(tx.StartTime()) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
-				preDurangoStartTime,
+				tx.StartTime(),
 			)
 		}
 	}
@@ -530,7 +538,6 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
@@ -614,7 +621,7 @@ func verifyAddPermissionlessValidatorTx(
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if preDurangoStartTime.After(maxStartTime) {
+		if tx.StartTime().After(maxStartTime) {
 			return ErrFutureStakeTime
 		}
 	}
@@ -643,16 +650,17 @@ func verifyAddPermissionlessDelegatorTx(
 	// Post Durango activation, only staking duration matters, hence start time
 	// is not validated
 	var (
-		currentTimestamp    = chainState.GetTimestamp()
-		preDurangoStartTime = tx.StartTime()
-		isDurangoActive     = backend.Config.IsDActivated(currentTimestamp)
+		currentTimestamp = chainState.GetTimestamp()
+		duration         = tx.EndTime().Sub(currentTimestamp) // post Durango duration
+		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
-		if !currentTimestamp.Before(preDurangoStartTime) {
+		duration = tx.EndTime().Sub(tx.StartTime()) // pre Durango duration
+		if !currentTimestamp.Before(tx.StartTime()) {
 			return fmt.Errorf(
 				"chain timestamp (%s) not before validator's start time (%s)",
 				currentTimestamp,
-				preDurangoStartTime,
+				tx.StartTime(),
 			)
 		}
 	}
@@ -662,7 +670,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
@@ -773,7 +780,7 @@ func verifyAddPermissionlessDelegatorTx(
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if preDurangoStartTime.After(maxStartTime) {
+		if tx.StartTime().After(maxStartTime) {
 			return ErrFutureStakeTime
 		}
 	}

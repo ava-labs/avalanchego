@@ -990,9 +990,10 @@ func TestCreateSubnet(t *testing.T) {
 
 	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
-	// should contain proposal to create subnet
+	// should contain standard block to create subnet
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
 
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
@@ -1035,7 +1036,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // add the validator to pending validator set
+	require.NoError(blk.Accept(context.Background())) // add the validator to current validator set
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	txID := blk.(block.Block).Txs()[0].ID()
@@ -1050,7 +1051,6 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
-	endTime = vm.clock.Time().Add(defaultMinStakingDuration)
 	vm.clock.Set(endTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)

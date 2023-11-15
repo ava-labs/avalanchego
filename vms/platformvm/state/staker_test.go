@@ -144,13 +144,12 @@ func TestNewCurrentStaker(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	weight := uint64(12345)
 	startTime := time.Now()
-	duration := time.Hour
-	endTime := startTime.Add(duration)
+	endTime := startTime.Add(time.Hour)
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
-	stakerTx := txs.NewMockPostDurangoStaker(ctrl)
-	stakerTx.EXPECT().Duration().Return(duration)
+	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
@@ -192,7 +191,7 @@ func TestNewPendingStaker(t *testing.T) {
 	endTime := time.Now()
 	pendingPriority := txs.SubnetPermissionedValidatorPendingPriority
 
-	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx := txs.NewMockPreDurangoStaker(ctrl)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
