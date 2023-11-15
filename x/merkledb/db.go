@@ -432,8 +432,8 @@ func (db *merkleDB) Close() error {
 }
 
 func (db *merkleDB) PrefetchValues(keys [][]byte) error {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
@@ -449,8 +449,8 @@ func (db *merkleDB) PrefetchValues(keys [][]byte) error {
 }
 
 func (db *merkleDB) PrefetchValue(key []byte) error {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
@@ -470,8 +470,8 @@ func (db *merkleDB) prefetchValue(keyBytes []byte) error {
 }
 
 func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
@@ -492,8 +492,8 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 }
 
 func (db *merkleDB) PrefetchPath(key []byte) error {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
