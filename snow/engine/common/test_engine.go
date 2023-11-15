@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -119,15 +120,15 @@ type EngineTest struct {
 	PushQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error
 	AncestorsF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF            func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
-	GetAcceptedF, AcceptedF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID) error
+	GetAcceptedF, AcceptedF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs set.Set[ids.ID]) error
 	ChitsF                       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
-	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys []uint64) error
-	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
+	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys set.Set[uint64]) error
+	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthF                     func(context.Context) (interface{}, error)
@@ -314,7 +315,7 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validato
 	return errGetStateSummaryFrontierFailed
 }
 
-func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys []uint64) error {
+func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys set.Set[uint64]) error {
 	if e.GetAcceptedStateSummaryF != nil {
 		return e.GetAcceptedStateSummaryF(ctx, validatorID, requestID, keys)
 	}
@@ -327,7 +328,7 @@ func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID id
 	return errGetAcceptedStateSummary
 }
 
-func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
 	if e.AcceptedStateSummaryF != nil {
 		return e.AcceptedStateSummaryF(ctx, validatorID, requestID, summaryIDs)
 	}
@@ -392,7 +393,7 @@ func (e *EngineTest) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	return errAcceptedFrontier
 }
 
-func (e *EngineTest) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (e *EngineTest) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
 	if e.GetAcceptedF != nil {
 		return e.GetAcceptedF(ctx, nodeID, requestID, containerIDs)
 	}
@@ -418,7 +419,7 @@ func (e *EngineTest) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, r
 	return errGetAcceptedFailed
 }
 
-func (e *EngineTest) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (e *EngineTest) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
 	if e.AcceptedF != nil {
 		return e.AcceptedF(ctx, nodeID, requestID, containerIDs)
 	}
