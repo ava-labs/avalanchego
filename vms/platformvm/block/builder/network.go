@@ -16,7 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/components/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 // We allow [recentCacheSize] to be fairly large because we only store hashes
@@ -39,9 +41,11 @@ type network struct {
 	// We embed a noop handler for all unhandled messages
 	common.AppHandler
 
-	ctx        *snow.Context
-	blkBuilder *builder
-	appSender  common.AppSender
+	ctx                       *snow.Context
+	manager                   executor.Manager
+	mempool                   mempool.Mempool
+	partialSyncPrimaryNetwork bool
+	appSender                 common.AppSender
 
 	// gossip related attributes
 	recentTxsLock sync.Mutex
@@ -50,16 +54,20 @@ type network struct {
 
 func NewNetwork(
 	ctx *snow.Context,
-	blkBuilder *builder,
+	manager executor.Manager,
+	mempool mempool.Mempool,
+	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 ) Network {
 	return &network{
 		AppHandler: common.NewNoOpAppHandler(ctx.Log),
 
-		ctx:        ctx,
-		blkBuilder: blkBuilder,
-		appSender:  appSender,
-		recentTxs:  &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
+		ctx:                       ctx,
+		manager:                   manager,
+		mempool:                   mempool,
+		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
+		appSender:                 appSender,
+		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 	}
 }
 
@@ -69,7 +77,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		zap.Int("messageLen", len(msgBytes)),
 	)
 
-	if n.blkBuilder.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+	if n.partialSyncPrimaryNetwork {
 		n.ctx.Log.Debug("dropping AppGossip message",
 			zap.String("reason", "primary network is not being fully synced"),
 		)
@@ -109,7 +117,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
-	if reason := n.blkBuilder.GetDropReason(txID); reason != nil {
+	if reason := n.mempool.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
@@ -126,21 +134,21 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	txID := tx.ID()
-	if n.blkBuilder.Mempool.Has(txID) {
+	if n.mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added
 		return nil
 	}
 
-	if err := n.blkBuilder.blkManager.VerifyTx(tx); err != nil {
-		n.blkBuilder.Mempool.MarkDropped(txID, err)
+	if err := n.manager.VerifyTx(tx); err != nil {
+		n.mempool.MarkDropped(txID, err)
 		return err
 	}
 
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
-	if !n.blkBuilder.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
-		if err := n.blkBuilder.Mempool.Add(tx); err != nil {
+	if !n.partialSyncPrimaryNetwork {
+		if err := n.mempool.Add(tx); err != nil {
 			return err
 		}
 	}
