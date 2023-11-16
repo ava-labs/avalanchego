@@ -1694,7 +1694,7 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
-	d, err := s.calculateDiffs()
+	diffs, err := s.calculateDiffs()
 	if err != nil {
 		return err
 	}
@@ -1702,8 +1702,8 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	return utils.Err(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators),
-		s.writeWeightDiffs(height, d.weightDiffs),
-		s.writeBlsKeyDiffs(height, d.blsKeyDiffs),
+		s.writeWeightDiffs(height, diffs.weightDiffs),
+		s.writeBlsKeyDiffs(height, diffs.blsKeyDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1756,9 +1756,13 @@ func (s *state) writeWeightDiffs(height uint64, weightDiffs map[subnetNodeKey]*V
 }
 
 func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.PublicKey) error {
+	heightBytes := database.PackUInt64(height)
+	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
+	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
+
 	for nodeID, blsKey := range blsKeyDiffs {
 		key := marshalDiffKey(constants.PrimaryNetworkID, height, nodeID)
-		blsKeyBytes := []byte{}
+		var blsKeyBytes []byte
 		if blsKey != nil {
 			// Note: in flatValidatorPublicKeyDiffsDB we store the
 			// uncompressed public key here as it is
@@ -1771,10 +1775,6 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 
 		// TODO: Remove this once we no longer support version rollbacks.
 		if blsKey != nil {
-			heightBytes := database.PackUInt64(height)
-			rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
-			nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
-
 			// Note: We store the compressed public key here.
 			pkBytes := bls.PublicKeyToBytes(blsKey)
 			if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
@@ -1822,12 +1822,12 @@ func (s *state) calculateDiffs() (diffs, error) {
 			case added:
 				var (
 					weight = validatorDiff.validator.Weight
-					blkKey = validatorDiff.validator.PublicKey
+					blsKey = validatorDiff.validator.PublicKey
 				)
 
 				outputWeights[weightKey].Amount = weight
 
-				if blkKey != nil {
+				if blsKey != nil {
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
@@ -1856,7 +1856,7 @@ func (s *state) calculateDiffs() (diffs, error) {
 			// memory till the outer loop is done.
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
-				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
+				if err := outputWeights[weightKey].Add(false /*negative*/, staker.Weight); err != nil {
 					addedDelegatorIterator.Release()
 					return diffs{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
@@ -1864,7 +1864,7 @@ func (s *state) calculateDiffs() (diffs, error) {
 			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
+				if err := outputWeights[weightKey].Add(true /*negative*/, staker.Weight); err != nil {
 					return diffs{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
