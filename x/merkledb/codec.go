@@ -29,11 +29,8 @@ const (
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
-	estimatedKeyLen           = 64
-	estimatedValueLen         = 64
-	estimatedCompressedKeyLen = 8
-	// Child index, child compressed key, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
+	estimatedKeyLen   = 64
+	estimatedValueLen = 64
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -62,7 +59,7 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
-	encodeDBNodeSize(n dbNode) int
+	encodedDBNodeSize(n *dbNode) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
@@ -92,9 +89,9 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNodeSize(n dbNode) int {
-	// total the number of children pointers + bool indicating if it has a value + the child entries for n.children
-	total := uintSize(uint64(len(n.children))) + c.mayb
+func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
+	// total the number of children pointers + bool indicating if it has a value + the value + the child entries for n.children
+	total := uintSize(uint64(len(n.children))) + boolSize() + len(n.value.Value())
 	// for each non-nil entry, we add the additional size of the child entry
 	for index, entry := range n.children {
 		total += childSize(index, entry)
@@ -124,15 +121,9 @@ func keySize(p Key) int {
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
-
+	buf := bytes.NewBuffer(make([]byte, 0, c.encodedDBNodeSize(n)))
 	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(len(n.children)))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	keys := maps.Keys(n.children)
