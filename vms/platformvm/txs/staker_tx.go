@@ -53,7 +53,7 @@ type Staker interface {
 	CurrentPriority() Priority
 }
 
-type PreDurangoStaker interface {
+type ScheduledStaker interface {
 	Staker
 	StartTime() time.Time
 	PendingPriority() Priority

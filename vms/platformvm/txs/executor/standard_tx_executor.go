@@ -544,7 +544,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.Staker) error {
 	)
 
 	if !e.Config.IsDActivated(chainTime) {
-		staker, err = state.NewPendingStaker(txID, stakerTx.(txs.PreDurangoStaker))
+		staker, err = state.NewPendingStaker(txID, stakerTx.(txs.ScheduledStaker))
 	} else {
 		var (
 			potentialReward = uint64(0)

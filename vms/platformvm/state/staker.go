@@ -93,7 +93,6 @@ func NewCurrentStaker(
 	if err != nil {
 		return nil, err
 	}
-
 	endTime := staker.EndTime()
 	return &Staker{
 		TxID:            txID,
@@ -109,7 +108,7 @@ func NewCurrentStaker(
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.PreDurangoStaker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

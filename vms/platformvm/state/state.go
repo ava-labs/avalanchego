@@ -1457,7 +1457,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime().Unix()
+		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
@@ -1506,7 +1506,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime().Unix()
+		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
@@ -1559,7 +1559,7 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := stakerTx.(txs.PreDurangoStaker).StartTime().Unix()
+			defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
@@ -1620,7 +1620,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1655,7 +1655,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
