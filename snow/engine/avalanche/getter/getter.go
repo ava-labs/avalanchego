@@ -73,7 +73,7 @@ func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[uint64]) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -96,9 +96,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 }
 
 // TODO: Remove support for GetAccepted messages after v1.11.x is activated.
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	acceptedVtxIDs := make([]ids.ID, 0, containerIDs.Len())
+	for vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
