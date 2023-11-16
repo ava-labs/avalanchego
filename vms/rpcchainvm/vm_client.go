@@ -598,7 +598,7 @@ func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, req
 		ErrorMessage: appErr.Message,
 	}
 
-	_, err = vm.client.AppRequestFailed(ctx, msg)
+	_, err := vm.client.AppRequestFailed(ctx, msg)
 	return err
 }
 

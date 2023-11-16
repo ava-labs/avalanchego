@@ -1264,7 +1264,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		inMsg := message.InboundAppRequestFailed(
+		inMsg := message.InboundAppError(
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
@@ -1312,7 +1312,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
-			inMsg := message.InboundAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
@@ -1372,7 +1372,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := message.InboundAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,

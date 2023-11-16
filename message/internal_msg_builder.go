@@ -412,7 +412,7 @@ type CrossChainAppRequestFailed struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
-	ErrorCode          uint32 `json:"error_code,omitempty"`
+	ErrorCode          int32  `json:"error_code,omitempty"`
 	ErrorMessage       string `json:"error_message,omitempty"`
 }
 
@@ -440,7 +440,7 @@ func InternalCrossChainAppRequestFailed(
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
-	errorCode uint32,
+	errorCode int32,
 	errorMessage string,
 ) InboundMessage {
 	return &inboundMessage{

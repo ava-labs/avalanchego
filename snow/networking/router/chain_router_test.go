@@ -643,7 +643,7 @@ func TestRouterTimeout(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InboundAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,
@@ -1071,7 +1071,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
-			message.InboundAppRequestFailed(
+			message.InboundAppError(
 				nodeID,
 				ctx.ChainID,
 				requestID,

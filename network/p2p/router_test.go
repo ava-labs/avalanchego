@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +34,10 @@ func TestAppRequestResponse(t *testing.T) {
 	*ctxKey = "foo"
 	*ctxVal = "bar"
 
-	errFoo := errors.New("foo")
+	errFoo := &common.AppError{
+		Code:    0,
+		Message: "foobar",
+	}
 
 	tests := []struct {
 		name        string

@@ -842,7 +842,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	case *p2p.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-	case *p2p.AppRequestFailed:
+	case *p2p.AppError:
 		err := &common.AppError{
 			Code:    m.ErrorCode,
 			Message: m.ErrorMessage,

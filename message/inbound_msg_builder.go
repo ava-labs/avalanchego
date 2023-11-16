@@ -284,11 +284,11 @@ func InboundAppRequest(
 	}
 }
 
-func InboundAppRequestFailed(
+func InboundAppError(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-	errorCode uint32,
+	errorCode int32,
 	errorMessage string,
 ) InboundMessage {
 	return &inboundMessage{

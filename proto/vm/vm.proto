@@ -260,7 +260,7 @@ message AppRequestFailedMsg {
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
   // Application-defined error code
-  uint32 error_code = 3;
+  sint32 error_code = 3;
   // Application-defined error message
   string error_message = 4;
 }
@@ -298,7 +298,7 @@ message CrossChainAppRequestFailedMsg {
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
   // Application-defined error code
-  uint32 error_code = 3;
+  sint32 error_code = 3;
   // Application-defined error message
   string error_message = 4;
 }
