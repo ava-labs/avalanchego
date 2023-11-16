@@ -78,8 +78,8 @@ func (p *AddMemberProposal) CreateFinishedProposalState(optionIndex uint32) (Pro
 	return proposalState, nil
 }
 
-func (p *AddMemberProposal) Visit(visitor VerifierVisitor) error {
-	return visitor.AddMemberProposal(p)
+func (p *AddMemberProposal) VerifyWith(verifier Verifier) error {
+	return verifier.AddMemberProposal(p)
 }
 
 type AddMemberProposalState struct {
@@ -192,10 +192,10 @@ func (p *AddMemberProposalState) ForceAddVote(voteIntf Vote) (ProposalState, err
 	return updatedProposal, nil
 }
 
-func (p *AddMemberProposalState) Visit(visitor ExecutorVisitor) error {
-	return visitor.AddMemberProposal(p)
+func (p *AddMemberProposalState) ExecuteWith(executor Executor) error {
+	return executor.AddMemberProposal(p)
 }
 
-func (p *AddMemberProposalState) GetBondTxIDs(visitor BondTxIDsGetter) ([]ids.ID, error) {
-	return visitor.AddMemberProposal(p)
+func (p *AddMemberProposalState) GetBondTxIDsWith(bondTxIDsGetter BondTxIDsGetter) ([]ids.ID, error) {
+	return bondTxIDsGetter.AddMemberProposal(p)
 }

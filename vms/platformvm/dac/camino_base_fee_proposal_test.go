@@ -331,7 +331,7 @@ func TestBaseFeeProposalCreateFinishedProposalState(t *testing.T) {
 		expectedOriginalProposal *BaseFeeProposal
 		expectedErr              error
 	}{
-		"Fail: option 2 out of bonds": {
+		"Fail: option 2 out of bounds": {
 			proposal: &BaseFeeProposal{
 				Start:   100,
 				End:     101,

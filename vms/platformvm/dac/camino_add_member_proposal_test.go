@@ -317,7 +317,7 @@ func TestAddMemberProposalCreateFinishedProposalState(t *testing.T) {
 		expectedOriginalProposal *AddMemberProposal
 		expectedErr              error
 	}{
-		"Fail: option 2 out of bonds": {
+		"Fail: option 2 out of bounds": {
 			proposal: &AddMemberProposal{
 				Start:            100,
 				End:              101,

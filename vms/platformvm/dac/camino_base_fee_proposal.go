@@ -86,8 +86,8 @@ func (p *BaseFeeProposal) CreateFinishedProposalState(optionIndex uint32) (Propo
 	return proposalState, nil
 }
 
-func (p *BaseFeeProposal) Visit(visitor VerifierVisitor) error {
-	return visitor.BaseFeeProposal(p)
+func (p *BaseFeeProposal) VerifyWith(verifier Verifier) error {
+	return verifier.BaseFeeProposal(p)
 }
 
 type BaseFeeProposalState struct {
@@ -201,10 +201,10 @@ func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error
 	return updatedProposal, nil
 }
 
-func (p *BaseFeeProposalState) Visit(visitor ExecutorVisitor) error {
-	return visitor.BaseFeeProposal(p)
+func (p *BaseFeeProposalState) ExecuteWith(executor Executor) error {
+	return executor.BaseFeeProposal(p)
 }
 
-func (p *BaseFeeProposalState) GetBondTxIDs(visitor BondTxIDsGetter) ([]ids.ID, error) {
-	return visitor.BaseFeeProposal(p)
+func (p *BaseFeeProposalState) GetBondTxIDsWith(bondTxIDsGetter BondTxIDsGetter) ([]ids.ID, error) {
+	return bondTxIDsGetter.BaseFeeProposal(p)
 }

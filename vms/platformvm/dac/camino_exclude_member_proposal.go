@@ -87,8 +87,8 @@ func (p *ExcludeMemberProposal) CreateFinishedProposalState(optionIndex uint32) 
 	return proposalState, nil
 }
 
-func (p *ExcludeMemberProposal) Visit(visitor VerifierVisitor) error {
-	return visitor.ExcludeMemberProposal(p)
+func (p *ExcludeMemberProposal) VerifyWith(verifier Verifier) error {
+	return verifier.ExcludeMemberProposal(p)
 }
 
 type ExcludeMemberProposalState struct {
@@ -201,10 +201,10 @@ func (p *ExcludeMemberProposalState) ForceAddVote(voteIntf Vote) (ProposalState,
 	return updatedProposal, nil
 }
 
-func (p *ExcludeMemberProposalState) Visit(visitor ExecutorVisitor) error {
-	return visitor.ExcludeMemberProposal(p)
+func (p *ExcludeMemberProposalState) ExecuteWith(executor Executor) error {
+	return executor.ExcludeMemberProposal(p)
 }
 
-func (p *ExcludeMemberProposalState) GetBondTxIDs(visitor BondTxIDsGetter) ([]ids.ID, error) {
-	return visitor.ExcludeMemberProposal(p)
+func (p *ExcludeMemberProposalState) GetBondTxIDsWith(bondTxIDsGetter BondTxIDsGetter) ([]ids.ID, error) {
+	return bondTxIDsGetter.ExcludeMemberProposal(p)
 }

@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	_ dac.VerifierVisitor = (*proposalVerifier)(nil)
-	_ dac.ExecutorVisitor = (*proposalExecutor)(nil)
+	_ dac.Verifier        = (*proposalVerifier)(nil)
+	_ dac.Executor        = (*proposalExecutor)(nil)
 	_ dac.BondTxIDsGetter = (*proposalBondTxIDsGetter)(nil)
 
 	errNotConsortiumMember          = errors.New("address isn't consortium member")
@@ -52,7 +52,7 @@ type proposalBondTxIDsGetter struct {
 	state state.Chain
 }
 
-func ProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.AddProposalTx) *proposalVerifier {
+func NewProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.AddProposalTx) dac.Verifier {
 	return &proposalVerifier{
 		state:               state,
 		fx:                  fx,
@@ -61,7 +61,7 @@ func ProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.Add
 	}
 }
 
-func ProposalExecutor(state state.Chain, fx fx.Fx) *proposalExecutor {
+func NewProposalExecutor(state state.Chain, fx fx.Fx) dac.Executor {
 	return &proposalExecutor{state: state, fx: fx}
 }
 
@@ -78,7 +78,7 @@ func getBondTxIDs(bondTxIDsGetter dac.BondTxIDsGetter, state state.Chain, tx *tx
 		if err != nil {
 			return nil, err
 		}
-		lockTxIDs, err := proposal.GetBondTxIDs(bondTxIDsGetter)
+		lockTxIDs, err := proposal.GetBondTxIDsWith(bondTxIDsGetter)
 		if err != nil {
 			return nil, err
 		}

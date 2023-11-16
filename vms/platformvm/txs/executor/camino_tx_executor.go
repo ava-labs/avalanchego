@@ -1765,7 +1765,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return fmt.Errorf("%w: %s", errProposerCredentialMismatch, err)
 	}
 
-	if err := txProposal.Visit(dac.ProposalVerifier(e.State, e.Fx, e.Tx, tx)); err != nil {
+	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.State, e.Fx, e.Tx, tx)); err != nil {
 		return fmt.Errorf("%w: %s", errInvalidProposal, err)
 	}
 
@@ -2054,7 +2054,7 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 		}
 
 		// try to execute proposal
-		if err := proposal.Visit(dac.ProposalExecutor(e.State, e.Fx)); err != nil {
+		if err := proposal.ExecuteWith(dac.NewProposalExecutor(e.State, e.Fx)); err != nil {
 			return err
 		}
 
@@ -2105,7 +2105,7 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 		}
 
 		// try to execute proposal
-		if err := proposal.Visit(dac.ProposalExecutor(e.State, e.Fx)); err != nil {
+		if err := proposal.ExecuteWith(dac.NewProposalExecutor(e.State, e.Fx)); err != nil {
 			return err
 		}
 

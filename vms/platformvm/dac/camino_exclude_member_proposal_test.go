@@ -317,7 +317,7 @@ func TestExcludeMemberProposalCreateFinishedProposalState(t *testing.T) {
 		expectedOriginalProposal *ExcludeMemberProposal
 		expectedErr              error
 	}{
-		"Fail: option 2 out of bonds": {
+		"Fail: option 2 out of bounds": {
 			proposal: &ExcludeMemberProposal{
 				Start:         100,
 				End:           101,
