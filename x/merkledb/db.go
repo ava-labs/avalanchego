@@ -115,14 +115,14 @@ type RangeProofer interface {
 type Prefetcher interface {
 	// PrefetchPath attempts to load all trie nodes on the path of [key]
 	// into the cache.
-	PrefetchPath(key []byte) error
+	PrefetchPath(ctx context.Context, key []byte) error
 
 	// PrefetchPaths attempts to load all trie nodes on the paths of [keys]
 	// into the cache.
 	//
 	// Using PrefetchPaths can be more efficient than PrefetchPath because
 	// the underlying view used to compute each path can be reused.
-	PrefetchPaths(keys [][]byte) error
+	PrefetchPaths(ctx context.Context, keys [][]byte) error
 
 	PrefetchValue(key []byte) error
 	PrefetchValues(keys [][]byte) error
@@ -469,7 +469,11 @@ func (db *merkleDB) prefetchValue(keyBytes []byte) error {
 	return nil
 }
 
-func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
+func (db *merkleDB) PrefetchPaths(ctx context.Context, keys [][]byte) error {
+	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.PrefetchPaths", oteltrace.WithAttributes(
+		attribute.Int("keyCount", len(keys)),
+	))
+	defer span.End()
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -478,7 +482,7 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 	}
 
 	for _, key := range keys {
-		if err := db.prefetchPath(key); err != nil {
+		if err := db.prefetchPath(ctx, key); err != nil {
 			return err
 		}
 	}
@@ -486,20 +490,35 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 	return nil
 }
 
-func (db *merkleDB) PrefetchPath(key []byte) error {
+func (db *merkleDB) PrefetchPath(ctx context.Context, key []byte) error {
+	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.PrefetchPath")
+	defer span.End()
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
 	}
-	return db.prefetchPath(key)
+	return db.prefetchPath(ctx, key)
 }
 
-func (db *merkleDB) prefetchPath(keyBytes []byte) error {
-	return visitPathToKey(ToKey(keyBytes), db.root, db.tokenSize, db.getNodeInternal, func(key Key, n *node) error {
-		return db.nodeDB.Put(key, n)
-	})
+func (db *merkleDB) prefetchPath(ctx context.Context, keyBytes []byte) error {
+	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.prefetchPath")
+	defer span.End()
+	return visitPathToKey(
+		ToKey(keyBytes),
+		db.root,
+		db.tokenSize,
+		func(key Key) (*node, error) {
+			_, innerSpan := db.debugTracer.Start(ctx, "MerkleDB.getNodeInternal")
+			defer innerSpan.End()
+			return db.getNodeInternal(key)
+		},
+		func(key Key, n *node) error {
+			_, innerSpan := db.debugTracer.Start(ctx, "MerkleDB.nodeDB.Put")
+			defer innerSpan.End()
+			return db.nodeDB.Put(key, n)
+		})
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
