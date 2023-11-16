@@ -89,6 +89,11 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 	return parseNode(key, nodeBytes)
 }
 
+func (db *valueNodeDB) Clear() error {
+	db.nodeCache.Flush()
+	return database.AtomicClearPrefix(db.baseDB, db.baseDB, valueNodePrefix)
+}
+
 // Batch of database operations
 type valueNodeBatch struct {
 	db  *valueNodeDB

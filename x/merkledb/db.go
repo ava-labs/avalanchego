@@ -36,6 +36,7 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
+	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 )
@@ -113,6 +114,12 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
+type Clearer interface {
+	// Deletes all key/value pairs from the database
+	// and clears the change history.
+	Clear() error
+}
+
 type Prefetcher interface {
 	// PrefetchPath attempts to load all trie nodes on the path of [key]
 	// into the cache.
@@ -128,6 +135,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
+	Clearer
 	Trie
 	MerkleRootGetter
 	ProofGetter
@@ -1262,6 +1270,35 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)
+}
+
+func (db *merkleDB) Clear() error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	// Clear nodes from disk and caches
+	if err := db.valueNodeDB.Clear(); err != nil {
+		return err
+	}
+	if err := db.intermediateNodeDB.Clear(); err != nil {
+		return err
+	}
+
+	// Clear root
+	db.sentinelNode = newNode(Key{})
+	db.sentinelNode.calculateID(db.metrics)
+
+	// Clear history
+	db.history = newTrieHistory(db.history.maxHistoryLen)
+	db.history.record(&changeSummary{
+		rootID: db.getMerkleRoot(),
+		values: map[Key]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Key]*change[*node]{},
+	})
+	return nil
 }
 
 // Returns [key] prefixed by [prefix].

@@ -218,3 +218,34 @@ func TestValueNodeDBIterator(t *testing.T) {
 	err := it.Error()
 	require.ErrorIs(err, database.ErrClosed)
 }
+
+func TestValueNodeDBClear(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	baseDB := memdb.New()
+	db := newValueNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+	)
+
+	batch := db.NewBatch()
+	for _, b := range [][]byte{{1}, {2}, {3}} {
+		batch.Put(ToKey(b), newNode(ToKey(b)))
+	}
+	require.NoError(batch.Write())
+
+	// Assert the db is not empty
+	iter := baseDB.NewIteratorWithPrefix(valueNodePrefix)
+	require.True(iter.Next())
+	iter.Release()
+
+	require.NoError(db.Clear())
+
+	iter = baseDB.NewIteratorWithPrefix(valueNodePrefix)
+	defer iter.Release()
+	require.False(iter.Next())
+}

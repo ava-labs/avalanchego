@@ -7,7 +7,7 @@ package builder
 
 import (
 	"context"
-	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -28,8 +28,11 @@ var _ Network = (*network)(nil)
 type Network interface {
 	common.AppHandler
 
-	// GossipTx gossips the transaction to some of the connected peers
-	GossipTx(tx *txs.Tx) error
+	// IssueTx verifies the transaction at the currently preferred state, adds
+	// it to the mempool, and gossips it to the network.
+	//
+	// Invariant: Assumes the context lock is held.
+	IssueTx(ctx context.Context, tx *txs.Tx) error
 }
 
 type network struct {
@@ -38,10 +41,11 @@ type network struct {
 
 	ctx        *snow.Context
 	blkBuilder *builder
+	appSender  common.AppSender
 
 	// gossip related attributes
-	appSender common.AppSender
-	recentTxs *cache.LRU[ids.ID, struct{}]
+	recentTxsLock sync.Mutex
+	recentTxs     *cache.LRU[ids.ID, struct{}]
 }
 
 func NewNetwork(
@@ -59,7 +63,7 @@ func NewNetwork(
 	}
 }
 
-func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
@@ -111,7 +115,7 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	}
 
 	// add to mempool
-	if err := n.blkBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := n.IssueTx(ctx, tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
@@ -120,22 +124,59 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	return nil
 }
 
-func (n *network) GossipTx(tx *txs.Tx) error {
+func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	txID := tx.ID()
-	// Don't gossip a transaction if it has been recently gossiped.
-	if _, has := n.recentTxs.Get(txID); has {
+	if n.blkBuilder.Mempool.Has(txID) {
+		// If the transaction is already in the mempool - then it looks the same
+		// as if it was successfully added
 		return nil
 	}
+
+	if err := n.blkBuilder.blkManager.VerifyTx(tx); err != nil {
+		n.blkBuilder.Mempool.MarkDropped(txID, err)
+		return err
+	}
+
+	// If we are partially syncing the Primary Network, we should not be
+	// maintaining the transaction mempool locally.
+	if !n.blkBuilder.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		if err := n.blkBuilder.Mempool.Add(tx); err != nil {
+			return err
+		}
+	}
+
+	txBytes := tx.Bytes()
+	msg := &message.Tx{
+		Tx: txBytes,
+	}
+	msgBytes, err := message.Build(msg)
+	if err != nil {
+		return err
+	}
+
+	n.gossipTx(ctx, txID, msgBytes)
+	return nil
+}
+
+func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
+	n.recentTxsLock.Lock()
+	_, has := n.recentTxs.Get(txID)
 	n.recentTxs.Put(txID, struct{}{})
+	n.recentTxsLock.Unlock()
+
+	// Don't gossip a transaction if it has been recently gossiped.
+	if has {
+		return
+	}
 
 	n.ctx.Log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
 	)
 
-	msg := &message.Tx{Tx: tx.Bytes()}
-	msgBytes, err := message.Build(msg)
-	if err != nil {
-		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
+	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
+		n.ctx.Log.Error("failed to gossip tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
 	}
-	return n.appSender.SendAppGossip(context.TODO(), msgBytes)
 }
