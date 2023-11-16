@@ -1039,11 +1039,8 @@ func (ms *merkleState) ApplyValidatorWeightDiffs(
 			return err
 		}
 	}
-	if err := diffIter.Error(); err != nil {
-		return err
-	}
 
-	return nil
+	return diffIter.Error()
 }
 
 func (ms *merkleState) ApplyValidatorPublicKeyDiffs(
