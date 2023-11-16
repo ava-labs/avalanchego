@@ -1467,7 +1467,7 @@ func (s *state) loadCurrentValidators() error {
 		staker, err := NewCurrentStaker(
 			txID,
 			stakerTx,
-			stakerTx.(txs.PreDurangoStaker).StartTime(),
+			stakerTx.(txs.ScheduledStaker).StartTime(),
 			metadata.PotentialReward)
 		if err != nil {
 			return err
@@ -1494,13 +1494,13 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		startTime := stakerTx.(txs.PreDurangoStaker).StartTime()
+		startTime := stakerTx.StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
@@ -1562,7 +1562,7 @@ func (s *state) loadCurrentValidators() error {
 			staker, err := NewCurrentStaker(
 				txID,
 				stakerTx,
-				stakerTx.(txs.PreDurangoStaker).StartTime(),
+				stakerTx.(txs.ScheduledStaker).StartTime(),
 				metadata.PotentialReward,
 			)
 			if err != nil {
@@ -1608,7 +1608,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1643,7 +1643,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.PreDurangoStaker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
