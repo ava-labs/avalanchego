@@ -1,13 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use std::borrow::Cow;
+
 use clap::Args;
 use firewood::{
     db::{Db, DbConfig, WalConfig},
-    v2::api::{self},
+    v2::api::{self, Db as _},
 };
+use futures_util::StreamExt;
 use log;
-use tokio::task::block_in_place;
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -28,7 +30,20 @@ pub async fn run(opts: &Options) -> Result<(), api::Error> {
         .wal(WalConfig::builder().max_revisions(10).build());
 
     let db = Db::new(opts.db.clone(), &cfg.build()).await?;
-    Ok(block_in_place(|| {
-        db.kv_dump(&mut std::io::stdout().lock())
-    })?)
+    let latest_hash = db.root_hash().await?;
+    let latest_rev = db.revision(latest_hash).await?;
+    let mut stream = latest_rev.stream::<Vec<_>>(None)?;
+    loop {
+        match stream.next().await {
+            None => break,
+            Some(Ok((key, value))) => {
+                println!("'{}': '{}'", u8_to_string(&key), u8_to_string(&value))
+            }
+            Some(Err(e)) => return Err(e),
+        }
+    }
+    Ok(())
+}
+fn u8_to_string(data: &[u8]) -> Cow<'_, str> {
+    String::from_utf8_lossy(data)
 }

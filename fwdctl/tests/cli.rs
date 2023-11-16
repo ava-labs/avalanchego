@@ -202,7 +202,7 @@ fn fwdctl_dump() -> Result<()> {
         .args([tmpdb::path()])
         .assert()
         .success()
-        .stdout(predicate::str::is_empty().not());
+        .stdout(predicate::str::contains("2023"));
 
     fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
