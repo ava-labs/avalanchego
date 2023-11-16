@@ -486,10 +486,11 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
 
-				// Staker2 end time matches staker5 start time, so in prod
-				// this staker would be removed via a ProposalBlock. This does
-				// not happen in this test, as we are only interested in asserting
-				// the effect of advancing time.
+				// Staker2's end time matches staker5's start time, so typically
+				// the block builder would produce a ProposalBlock to remove
+				// staker2 when advancing the time. However, it is valid to only
+				// advance the time with a StandardBlock and not remove staker2,
+				// which is what this test does.
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,

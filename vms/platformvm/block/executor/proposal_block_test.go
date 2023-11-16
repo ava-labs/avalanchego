@@ -542,10 +542,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
 
-				// Staker2 end time matches staker5 start time, so in prod
-				// this staker would be removed via a ProposalBlock. This does
-				// not happen in this test, as we are only interested in asserting
-				// the effect of advancing time.
+				// Staker2's end time matches staker5's start time, so typically
+				// the block builder would produce a ProposalBlock to remove
+				// staker2 when advancing the time. However, this test injects
+				// staker0 into the staker set artificially to advance the time.
+				// This means that staker2 is not removed by the ProposalBlock
+				// when advancing the time.
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
