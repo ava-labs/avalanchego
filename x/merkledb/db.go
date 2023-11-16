@@ -261,14 +261,13 @@ func newDatabase(
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
 
-	root, err := trieDB.initializeRootIfNeeded()
-	if err != nil {
+	if err := trieDB.initializeRoot(); err != nil {
 		return nil, err
 	}
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootID: root,
+		rootID: trieDB.rootID,
 		values: map[Key]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Key]*change[*node]{},
 	})
@@ -1157,40 +1156,38 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// not sure if the  sentinel node exists or if it had a value
-	// check under both prefixes
+func (db *merkleDB) initializeRoot() error {
+	// Not sure if the  sentinel node exists or if it had a value,
+	// so check under both prefixes
 	var err error
 	db.sentinelNode, err = db.intermediateNodeDB.Get(Key{})
+
 	if errors.Is(err, database.ErrNotFound) {
+		// Didn't find the sentinel in the intermediateNodeDB, check the valueNodeDB
 		db.sentinelNode, err = db.valueNodeDB.Get(Key{})
 	}
-	if err == nil {
-		// sentinel node already exists, so calculate the root ID of the trie
-		db.rootID = db.sentinelNode.calculateID(db.metrics)
-		if !isSentinelNodeTheRoot(db.sentinelNode) {
-			// if the sentinel node should be skipped, the trie's root is the nil key node's only child
-			for _, childEntry := range db.sentinelNode.children {
-				db.rootID = childEntry.id
-			}
+
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			return err
 		}
-		return db.rootID, nil
-	}
-	if !errors.Is(err, database.ErrNotFound) {
-		return ids.Empty, err
+
+		// Sentinel node doesn't exist in either database prefix.
+		// Make a new one and store it in the intermediateNodeDB
+		db.sentinelNode = newNode(Key{})
+		if err := db.intermediateNodeDB.Put(Key{}, db.sentinelNode); err != nil {
+			return err
+		}
 	}
 
-	// sentinel node doesn't exist; make a new one.
-	db.sentinelNode = newNode(Key{})
-
-	// update its ID
 	db.rootID = db.sentinelNode.calculateID(db.metrics)
-
-	if err := db.intermediateNodeDB.Put(Key{}, db.sentinelNode); err != nil {
-		return ids.Empty, err
+	if !isSentinelNodeTheRoot(db.sentinelNode) {
+		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
+		for _, childEntry := range db.sentinelNode.children {
+			db.rootID = childEntry.id
+		}
 	}
-
-	return db.rootID, nil
+	return nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
