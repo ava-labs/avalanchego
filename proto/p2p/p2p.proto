@@ -415,8 +415,8 @@ message AppError {
   bytes chain_id = 1;
   // Request id of the original AppRequest
   uint32 request_id = 2;
-  // VM defined error code
-  uint32 error_code = 3;
+  // VM defined error code. VMs may define error codes > 0.
+  sint32 error_code = 3;
   // VM defined error message
   string error_message = 4;
 }
