@@ -1016,14 +1016,14 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
-	extraNode := ids.GenerateTestNodeID()
+	extraNodeID := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
-		extraNode,
+		extraNodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1104,7 +1104,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		genesisNodeIDs[2]: defaultWeight,
 		genesisNodeIDs[3]: defaultWeight,
 		genesisNodeIDs[4]: defaultWeight,
-		extraNode:         vm.MaxValidatorStake,
+		extraNodeID:       vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
