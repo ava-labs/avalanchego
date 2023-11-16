@@ -403,6 +403,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NotEqual(oldReqID, requestID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes1}))
+
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
@@ -548,6 +549,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1})) // respond with blk1
 	require.Equal(blkID1, requested)
+
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
@@ -852,6 +854,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))                                    // should request blk2
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2, blkBytes1})) // respond with blk2 and blk1
 	require.Equal(blkID2, requested)
+
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
