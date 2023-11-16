@@ -204,7 +204,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.GetAncestorsFailedF = failed
 	bootstrapper.GetFailedF = failed
 	bootstrapper.QueryFailedF = failed
-	bootstrapper.AppRequestFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, _ error) error {
+	bootstrapper.AppRequestFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, _ *common.AppError) error {
 		require.NoError(ctx.Err())
 
 		failedLock.Lock()
@@ -214,7 +214,7 @@ func TestTimeout(t *testing.T) {
 		wg.Done()
 		return nil
 	}
-	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, _ uint32, _ error) error {
+	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, _ uint32, _ *common.AppError) error {
 		require.NoError(ctx.Err())
 
 		failedLock.Lock()

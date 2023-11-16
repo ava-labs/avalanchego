@@ -125,7 +125,7 @@ type EngineTest struct {
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, err *AppError) error
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys set.Set[uint64]) error
 	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error
@@ -138,7 +138,7 @@ type EngineTest struct {
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, err error) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, err *AppError) error
 }
 
 func (e *EngineTest) Default(cant bool) {
