@@ -977,6 +977,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.True(ok)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
+
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
