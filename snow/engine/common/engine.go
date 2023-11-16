@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Engine describes the standard interface of a consensus engine.
@@ -108,7 +109,7 @@ type GetAcceptedStateSummaryHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		heights []uint64,
+		heights set.Set[uint64],
 	) error
 }
 
@@ -122,7 +123,7 @@ type AcceptedStateSummaryHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		summaryIDs []ids.ID,
+		summaryIDs set.Set[ids.ID],
 	) error
 
 	// Notify this engine that a GetAcceptedStateSummary request it issued has
@@ -182,7 +183,7 @@ type GetAcceptedHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerIDs set.Set[ids.ID],
 	) error
 }
 
@@ -196,7 +197,7 @@ type AcceptedHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerIDs set.Set[ids.ID],
 	) error
 
 	// Notify this engine that a GetAccepted request it issued has failed.
