@@ -1943,11 +1943,8 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 		return nil
 	}
 
-	preferredBlk, err := s.vm.Preferred()
-	if err != nil {
-		return fmt.Errorf("could not retrieve preferred block, err %w", err)
-	}
-	preferred, err := s.chainExists(ctx, preferredBlk.ID(), blockchainID)
+	preferredBlkID := s.vm.manager.Preferred()
+	preferred, err := s.chainExists(ctx, preferredBlkID, blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
@@ -2246,12 +2243,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	prefBlk, err := s.vm.Preferred()
-	if err != nil {
-		return err
-	}
-
-	preferredID := prefBlk.ID()
+	preferredID := s.vm.manager.Preferred()
 	onAccept, ok := s.vm.manager.GetState(preferredID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)

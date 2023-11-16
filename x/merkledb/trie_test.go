@@ -43,7 +43,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if result.key != path || result == nil {
+	if result == nil || result.key != path {
 		return nil, database.ErrNotFound
 	}
 
@@ -126,7 +126,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 
 	// Just the root
 	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 
 	// Insert a key
 	key1 := []byte{0}
@@ -151,7 +151,8 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 
 	// Root and 1 value
 	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
+
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(ToKey(key1), nodePath[1].key)
 
 	// Insert another key which is a child of the first
@@ -175,7 +176,8 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 		return nil
 	}))
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(ToKey(key1), nodePath[1].key)
 	require.Equal(ToKey(key2), nodePath[2].key)
 
@@ -201,7 +203,8 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	}))
 
 	require.Len(nodePath, 2)
-	require.Equal(trie.root, nodePath[0])
+
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(ToKey(key3), nodePath[1].key)
 
 	// Other key path not affected
@@ -211,7 +214,8 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 		return nil
 	}))
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(ToKey(key1), nodePath[1].key)
 	require.Equal(ToKey(key2), nodePath[2].key)
 
@@ -224,7 +228,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	}))
 
 	require.Len(nodePath, 3)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 	require.Equal(ToKey(key1), nodePath[1].key)
 	require.Equal(ToKey(key2), nodePath[2].key)
 
@@ -236,7 +240,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 		return nil
 	}))
 	require.Len(nodePath, 1)
-	require.Equal(trie.root, nodePath[0])
+	require.Equal(trie.sentinelNode, nodePath[0])
 }
 
 func Test_Trie_ViewOnCommitedView(t *testing.T) {

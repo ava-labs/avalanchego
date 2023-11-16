@@ -68,7 +68,7 @@ func ToToken(val byte, tokenSize int) Key {
 }
 
 // Token returns the token at the specified index,
-// Assumes that bitindex + tokenSize doesn't cross a byte boundary
+// Assumes that bitIndex + tokenSize doesn't cross a byte boundary
 func (k Key) Token(bitIndex int, tokenSize int) byte {
 	storageByte := k.value[bitIndex/8]
 	// Shift the byte right to get the last bit to the rightmost position.
@@ -145,7 +145,7 @@ func (k Key) HasPrefix(prefix Key) bool {
 	}
 
 	// Note that this will never be an index OOB because len(prefix.value) > 0.
-	// If len(prefix.value) == 0 were true, [remainderTokens] would be 0 so we
+	// If len(prefix.value) == 0 were true, [remainderTokens] would be 0, so we
 	// would have returned above.
 	prefixWithoutPartialByte := prefix.value[:len(prefix.value)-1]
 	return strings.HasPrefix(k.value, prefixWithoutPartialByte)
@@ -167,7 +167,7 @@ func (k Key) Greater(other Key) bool {
 	return k.value > other.value || (k.value == other.value && k.length > other.length)
 }
 
-// Less returns true if current Key is less than other Key
+// Less will return true if current Key is less than other Key
 func (k Key) Less(other Key) bool {
 	return k.value < other.value || (k.value == other.value && k.length < other.length)
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
@@ -29,6 +30,8 @@ import (
 )
 
 const defaultHistoryLength = 300
+
+var emptyKey Key
 
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
@@ -771,6 +774,49 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 			require.Equal(view1Root, view2Root)
 		}
 	}
+}
+
+func TestMerkleDBClear(t *testing.T) {
+	require := require.New(t)
+
+	// Make a database and insert some key-value pairs.
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	emptyRootID := db.getMerkleRoot()
+
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+
+	insertRandomKeyValues(
+		require,
+		r,
+		[]database.Database{db},
+		1_000,
+		0.25,
+	)
+
+	// Clear the database.
+	require.NoError(db.Clear())
+
+	// Assert that the database is empty.
+	iter := db.NewIterator()
+	defer iter.Release()
+	require.False(iter.Next())
+	require.Equal(emptyRootID, db.getMerkleRoot())
+	require.Equal(emptyKey, db.sentinelNode.key)
+
+	// Assert caches are empty.
+	require.Zero(db.valueNodeDB.nodeCache.Len())
+	require.Zero(db.intermediateNodeDB.nodeCache.currentSize)
+
+	// Assert history has only the clearing change.
+	require.Len(db.history.lastChanges, 1)
+	change, ok := db.history.lastChanges[emptyRootID]
+	require.True(ok)
+	require.Empty(change.nodes)
+	require.Empty(change.values)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {

@@ -21,6 +21,8 @@ message Request {
 service DB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
+  rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
+
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);

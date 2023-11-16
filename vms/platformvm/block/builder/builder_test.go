@@ -110,7 +110,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
 
-	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic
+	require.False(t, env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {

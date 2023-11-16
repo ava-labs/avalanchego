@@ -784,7 +784,8 @@ func TestGetBlock(t *testing.T) {
 			)
 			require.NoError(err)
 
-			preferred, err := service.vm.Builder.Preferred()
+			preferredID := service.vm.manager.Preferred()
+			preferred, err := service.vm.manager.GetBlock(preferredID)
 			require.NoError(err)
 
 			statelessBlock, err := block.NewBanffStandardBlock(

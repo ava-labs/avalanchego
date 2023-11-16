@@ -849,8 +849,8 @@ func buildCustomGenesis() ([]byte, error) {
 
 	starTime := mockable.MaxTime.Add(-1 * defaultMinStakingDuration)
 	endTime := mockable.MaxTime
-	genesisValidator := api.PermissionlessValidator{
-		Staker: api.Staker{
+	genesisValidator := api.GenesisPermissionlessValidator{
+		GenesisValidator: api.GenesisValidator{
 			StartTime: json.Uint64(starTime.Unix()),
 			EndTime:   json.Uint64(endTime.Unix()),
 			NodeID:    nodeID,
@@ -871,7 +871,7 @@ func buildCustomGenesis() ([]byte, error) {
 		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
-		Validators:    []api.PermissionlessValidator{genesisValidator},
+		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),

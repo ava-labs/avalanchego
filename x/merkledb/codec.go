@@ -83,7 +83,7 @@ func newCodec() encoderDecoder {
 	}
 }
 
-// Note that bytes.Buffer.Write always returns nil so we
+// Note that bytes.Buffer.Write always returns nil, so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
 	// Invariant: Every byte slice returned by [varIntPool] has
@@ -277,12 +277,12 @@ func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte]
 		return maybe.Nothing[[]byte](), err
 	}
 
-	bytes, err := c.decodeByteSlice(src)
+	rawBytes, err := c.decodeByteSlice(src)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 
-	return maybe.Some(bytes), nil
+	return maybe.Some(rawBytes), nil
 }
 
 func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {

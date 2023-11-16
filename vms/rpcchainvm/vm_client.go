@@ -396,7 +396,7 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]http.H
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
-		NodeId:  nodeID[:],
+		NodeId:  nodeID.Bytes(),
 		Version: nodeVersion.String(),
 	})
 	return err
@@ -404,7 +404,7 @@ func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersio
 
 func (vm *VMClient) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	_, err := vm.client.Disconnected(ctx, &vmpb.DisconnectedRequest{
-		NodeId: nodeID[:],
+		NodeId: nodeID.Bytes(),
 	})
 	return err
 }
@@ -568,7 +568,7 @@ func (vm *VMClient) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 	_, err := vm.client.AppRequest(
 		ctx,
 		&vmpb.AppRequestMsg{
-			NodeId:    nodeID[:],
+			NodeId:    nodeID.Bytes(),
 			RequestId: requestID,
 			Request:   request,
 			Deadline:  grpcutils.TimestampFromTime(deadline),
@@ -581,7 +581,7 @@ func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.NodeID, requestI
 	_, err := vm.client.AppResponse(
 		ctx,
 		&vmpb.AppResponseMsg{
-			NodeId:    nodeID[:],
+			NodeId:    nodeID.Bytes(),
 			RequestId: requestID,
 			Response:  response,
 		},
@@ -593,7 +593,7 @@ func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, req
 	_, err := vm.client.AppRequestFailed(
 		ctx,
 		&vmpb.AppRequestFailedMsg{
-			NodeId:    nodeID[:],
+			NodeId:    nodeID.Bytes(),
 			RequestId: requestID,
 		},
 	)
@@ -604,7 +604,7 @@ func (vm *VMClient) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 	_, err := vm.client.AppGossip(
 		ctx,
 		&vmpb.AppGossipMsg{
-			NodeId: nodeID[:],
+			NodeId: nodeID.Bytes(),
 			Msg:    msg,
 		},
 	)

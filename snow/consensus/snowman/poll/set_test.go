@@ -21,11 +21,11 @@ var (
 	blkID3 = ids.ID{3}
 	blkID4 = ids.ID{4}
 
-	vdr1 = ids.NodeID{1}
-	vdr2 = ids.NodeID{2}
-	vdr3 = ids.NodeID{3}
-	vdr4 = ids.NodeID{4}
-	vdr5 = ids.NodeID{5}
+	vdr1 = ids.BuildTestNodeID([]byte{0x01})
+	vdr2 = ids.BuildTestNodeID([]byte{0x02})
+	vdr3 = ids.BuildTestNodeID([]byte{0x03})
+	vdr4 = ids.BuildTestNodeID([]byte{0x04})
+	vdr5 = ids.BuildTestNodeID([]byte{0x05}) // k = 5
 )
 
 func TestNewSetErrorOnPollsMetrics(t *testing.T) {

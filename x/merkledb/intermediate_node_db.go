@@ -146,3 +146,14 @@ func (db *intermediateNodeDB) Flush() error {
 func (db *intermediateNodeDB) Delete(key Key) error {
 	return db.nodeCache.Put(key, nil)
 }
+
+func (db *intermediateNodeDB) Clear() error {
+	// Reset the cache. Note we don't flush because that would cause us to
+	// persist intermediate nodes we're about to delete.
+	db.nodeCache = newOnEvictCache(
+		db.nodeCache.maxSize,
+		db.nodeCache.size,
+		db.nodeCache.onEviction,
+	)
+	return database.AtomicClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix)
+}

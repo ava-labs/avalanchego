@@ -9,6 +9,9 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -45,7 +49,14 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	nonStateSyncableVM := &block.TestVM{
 		TestVM: common.TestVM{T: t},
 	}
-	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
+	dummyGetter, err := getter.New(
+		nonStateSyncableVM,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
@@ -59,8 +70,6 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	require.False(enabled)
 
 	// State syncableVM case
-	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
-
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{T: t},
@@ -69,7 +78,13 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 			T: t,
 		},
 	}
-	dummyGetter, err = getter.New(fullVM, *commonCfg)
+	dummyGetter, err = getter.New(
+		fullVM,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry())
 	require.NoError(err)
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
@@ -790,7 +805,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		math.MaxInt32,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 
 	// responsiveVoter still pending
@@ -803,7 +818,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		unsolicitedVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
@@ -812,7 +827,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 
 	// responsiveBeacon not pending anymore
@@ -913,7 +928,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{unknownSummaryID},
+		set.Of(unknownSummaryID),
 	))
 	_, found = syncer.weightedSummaries[unknownSummaryID]
 	require.False(found)
@@ -924,7 +939,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
@@ -1058,7 +1073,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID, minoritySummaryID},
+				set.Of(summaryID, minoritySummaryID),
 			))
 			cumulatedWeight += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1067,7 +1082,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID},
+				set.Of(summaryID),
 			))
 			cumulatedWeight += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1185,7 +1200,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID},
+				set.Of(summaryID),
 			))
 		}
 	}
@@ -1328,7 +1343,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
+				set.Of(minoritySummary1.ID(), minoritySummary2.ID()),
 			))
 			votingWeightStake += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1337,7 +1352,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
+				set.Of(ids.ID{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}),
 			))
 			votingWeightStake += vdrs.GetWeight(ctx.SubnetID, voterID)
 		}

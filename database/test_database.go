@@ -1266,7 +1266,74 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 			require.Equal(expected[string(iter.Key())], val)
 			numIterElts++
 		}
-		require.Equal(len(expectedList), numIterElts)
+		require.Len(expectedList, numIterElts)
+
+		// Clear the database for the next fuzz iteration.
+		require.NoError(AtomicClear(db, db))
+	})
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
+	const (
+		maxKeyLen   = 32
+		maxValueLen = 32
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		randSeed int64,
+		start []byte,
+		prefix []byte,
+		numKeyValues uint,
+	) {
+		require := require.New(t)
+		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+
+		expected := map[string][]byte{}
+
+		// Put a bunch of key-values
+		for i := 0; i < int(numKeyValues); i++ {
+			key := make([]byte, r.Intn(maxKeyLen))
+			_, _ = r.Read(key) // #nosec G404
+
+			value := make([]byte, r.Intn(maxValueLen))
+			_, _ = r.Read(value) // #nosec G404
+
+			if len(value) == 0 {
+				// Consistently treat zero length values as nil
+				// so that we can compare [expected] and [got] with
+				// require.Equal, which treats nil and empty byte
+				// as being unequal, whereas the database treats
+				// them as being equal.
+				value = nil
+			}
+
+			if bytes.HasPrefix(key, prefix) && bytes.Compare(key, start) >= 0 {
+				expected[string(key)] = value
+			}
+
+			require.NoError(db.Put(key, value))
+		}
+
+		expectedList := maps.Keys(expected)
+		slices.Sort(expectedList)
+
+		iter := db.NewIteratorWithStartAndPrefix(start, prefix)
+		defer iter.Release()
+
+		// Assert the iterator returns the expected key-values.
+		numIterElts := 0
+		for iter.Next() {
+			val := iter.Value()
+			if len(val) == 0 {
+				val = nil
+			}
+			keyStr := string(iter.Key())
+			require.Equal(expectedList[numIterElts], keyStr)
+			require.Equal(expected[keyStr], val)
+			numIterElts++
+		}
+		require.Len(expectedList, numIterElts)
 
 		// Clear the database for the next fuzz iteration.
 		require.NoError(AtomicClear(db, db))

@@ -812,7 +812,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(ids.NodeID{}, nil, errAppSendFailed).Times(2)
+	).Return(ids.EmptyNodeID, nil, errAppSendFailed).Times(2)
 
 	_, err = client.GetChangeProof(
 		context.Background(),

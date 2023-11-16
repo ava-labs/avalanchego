@@ -26,34 +26,39 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzKeyValue(f *testing.F) {
-	folder := f.TempDir()
+func newDB(t testing.TB) database.Database {
+	folder := t.TempDir()
 	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	require.NoError(f, err)
+	require.NoError(t, err)
+	return db
+}
 
+func FuzzKeyValue(f *testing.F) {
+	db := newDB(f)
 	defer db.Close()
 
 	database.FuzzKeyValue(f, db)
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	folder := f.TempDir()
-	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	require.NoError(f, err)
-
+	db := newDB(f)
 	defer db.Close()
 
 	database.FuzzNewIteratorWithPrefix(f, db)
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	db := newDB(f)
+	defer db.Close()
+
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
-			folder := b.TempDir()
-
-			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-			require.NoError(b, err)
+			db := newDB(b)
 
 			bench(b, db, "leveldb", keys, values)
 

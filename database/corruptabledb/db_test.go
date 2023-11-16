@@ -26,16 +26,21 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzKeyValue(f *testing.F) {
+func newDB() *Database {
 	baseDB := memdb.New()
-	db := New(baseDB)
-	database.FuzzKeyValue(f, db)
+	return New(baseDB)
+}
+
+func FuzzKeyValue(f *testing.F) {
+	database.FuzzKeyValue(f, newDB())
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	baseDB := memdb.New()
-	db := New(baseDB)
-	database.FuzzNewIteratorWithPrefix(f, db)
+	database.FuzzNewIteratorWithPrefix(f, newDB())
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithStartAndPrefix(f, newDB())
 }
 
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.
@@ -70,9 +75,7 @@ func TestCorruption(t *testing.T) {
 			return err
 		},
 	}
-	baseDB := memdb.New()
-	// wrap this db
-	corruptableDB := New(baseDB)
+	corruptableDB := newDB()
 	_ = corruptableDB.handleError(errTest)
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
@@ -176,9 +179,7 @@ func TestIterator(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			// Make a database
-			baseDB := memdb.New()
-			corruptableDB := New(baseDB)
-
+			corruptableDB := newDB()
 			// Put a key-value pair in the database.
 			require.NoError(corruptableDB.Put([]byte{0}, []byte{1}))
 

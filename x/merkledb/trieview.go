@@ -96,8 +96,9 @@ type trieView struct {
 
 	db *merkleDB
 
-	// The root of the trie represented by this view.
-	root *node
+	// The nil key node
+	// It is either the root of the trie or the root of the trie is its single child node
+	sentinelNode *node
 
 	tokenSize int
 }
@@ -147,20 +148,20 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	root, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
+	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
 	if err != nil {
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNoValidRoot
 		}
 		return nil, err
 	}
 
 	newView := &trieView{
-		root:       root,
-		db:         db,
-		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
-		tokenSize:  db.tokenSize,
+		sentinelNode: sentinelNode,
+		db:           db,
+		parentTrie:   parentTrie,
+		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		tokenSize:    db.tokenSize,
 	}
 
 	for _, op := range changes.BatchOps {
@@ -200,17 +201,17 @@ func newHistoricalTrieView(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRootChange, ok := changes.nodes[Key{}]
+	passedSentinelChange, ok := changes.nodes[Key{}]
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
 
 	newView := &trieView{
-		root:       passedRootChange.after,
-		db:         db,
-		parentTrie: db,
-		changes:    changes,
-		tokenSize:  db.tokenSize,
+		sentinelNode: passedSentinelChange.after,
+		db:           db,
+		parentTrie:   db,
+		changes:      changes,
+		tokenSize:    db.tokenSize,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
@@ -250,9 +251,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.root)
+		t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.root.id
+		t.changes.rootID = t.getMerkleRoot()
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -273,8 +274,8 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 	)
 
 	for childIndex, child := range n.children {
-		childPath := n.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
-		childNodeChange, ok := t.changes.nodes[childPath]
+		childKey := n.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
+		childNodeChange, ok := t.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
 			continue
@@ -347,6 +348,22 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil
 	}); err != nil {
 		return nil, err
+	}
+	root, err := t.getRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	// The sentinel node is always the first node in the path.
+	// If the sentinel node is not the root, remove it from the proofPath.
+	if root != t.sentinelNode {
+		proof.Path = proof.Path[1:]
+
+		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
+		if len(proof.Path) == 0 {
+			proof.Path = []ProofNode{root.asProofNode()}
+			return proof, nil
+		}
 	}
 
 	if closestNode.key == proof.Key {
@@ -460,7 +477,11 @@ func (t *trieView) GetRangeProof(
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.
-		rootProof, err := t.getProof(ctx, rootKey)
+		root, err := t.getRoot()
+		if err != nil {
+			return nil, err
+		}
+		rootProof, err := t.getProof(ctx, root.key.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -547,7 +568,17 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.root.id, nil
+	return t.getMerkleRoot(), nil
+}
+
+func (t *trieView) getMerkleRoot() ids.ID {
+	if !isSentinelNodeTheRoot(t.sentinelNode) {
+		for _, childEntry := range t.sentinelNode.children {
+			return childEntry.id
+		}
+	}
+
+	return t.sentinelNode.id
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -717,8 +748,8 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 // Always returns at least the root node.
 func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
 	var (
-		// all node paths start at the root
-		currentNode = t.root
+		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
+		currentNode = t.sentinelNode
 		err         error
 	)
 	if err := visitNode(currentNode); err != nil {
@@ -811,7 +842,7 @@ func (t *trieView) insert(
 	// have the existing path node and the value being inserted as children.
 
 	// generate the new branch node
-	// find how many tokens are common between the existing child's compressed path and
+	// find how many tokens are common between the existing child's compressed key and
 	// the current key(offset by the closest node's key),
 	// then move all the common tokens into the branch node
 	commonPrefixLength := getLengthOfCommonPrefix(
@@ -889,6 +920,20 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
+func (t *trieView) getRoot() (*node, error) {
+	if !isSentinelNodeTheRoot(t.sentinelNode) {
+		// sentinelNode has one child, which is the root
+		for index, childEntry := range t.sentinelNode.children {
+			return t.getNodeWithID(
+				childEntry.id,
+				t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey),
+				childEntry.hasValue)
+		}
+	}
+
+	return t.sentinelNode, nil
+}
+
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
@@ -910,7 +955,7 @@ func (t *trieView) recordKeyChange(key Key, after *node, hadValue bool, newNode 
 	}
 
 	before, err := t.getParentTrie().getEditableNode(key, hadValue)
-	if err != nil && err != database.ErrNotFound {
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return err
 	}
 	t.changes.nodes[key] = &change[*node]{

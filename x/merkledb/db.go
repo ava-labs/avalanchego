@@ -36,13 +36,13 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
+	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 )
 
 var (
-	rootKey []byte
-	_       MerkleDB = (*merkleDB)(nil)
+	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
@@ -54,8 +54,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot  = errors.New("start and end root are the same")
-	errNoNewRoot = errors.New("there was no updated root in change list")
+	errSameRoot      = errors.New("start and end root are the same")
+	errNoNewSentinel = errors.New("there was no updated sentinel node in change list")
 )
 
 type ChangeProofer interface {
@@ -73,7 +73,7 @@ type ChangeProofer interface {
 		maxLength int,
 	) (*ChangeProof, error)
 
-	// Returns nil iff all of the following hold:
+	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
@@ -114,6 +114,12 @@ type RangeProofer interface {
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
+type Clearer interface {
+	// Deletes all key/value pairs from the database
+	// and clears the change history.
+	Clear() error
+}
+
 type Prefetcher interface {
 	// PrefetchPath attempts to load all trie nodes on the path of [key]
 	// into the cache.
@@ -129,6 +135,7 @@ type Prefetcher interface {
 
 type MerkleDB interface {
 	database.Database
+	Clearer
 	Trie
 	MerkleRootGetter
 	ProofGetter
@@ -175,7 +182,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	// Contains all of the key-value pairs stored by this database,
+	// Contains all the key-value pairs stored by this database,
 	// including metadata, intermediate nodes and value nodes.
 	baseDB database.Database
 
@@ -194,8 +201,10 @@ type merkleDB struct {
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
 
-	// The root of this trie.
-	root *node
+	// The sentinel node of this trie.
+	// It is the node with a nil key and is the ancestor of all nodes in the trie.
+	// If it has a value or has multiple children, it is also the root of the trie.
+	sentinelNode *node
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -286,7 +295,7 @@ func newDatabase(
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
-	db.root = newNode(Key{})
+	db.sentinelNode = newNode(Key{})
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -495,11 +504,11 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	defer db.lock.RUnlock()
 
 	values := make([][]byte, len(keys))
-	errors := make([]error, len(keys))
+	getErrors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(ToKey(key))
+		values[i], getErrors[i] = db.getValueCopy(ToKey(key))
 	}
-	return values, errors
+	return values, getErrors
 }
 
 // GetValue returns the value associated with [key].
@@ -569,7 +578,20 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	return db.root.id
+	if !isSentinelNodeTheRoot(db.sentinelNode) {
+		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
+		for _, childEntry := range db.sentinelNode.children {
+			return childEntry.id
+		}
+	}
+	return db.sentinelNode.id
+}
+
+// isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
+// When this is true, the root of the trie is the sentinel node
+// When this is false, the root of the trie is the sentinel node's single child
+func isSentinelNodeTheRoot(sentinel *node) bool {
+	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -778,7 +800,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 	}
 
 	_, err := db.getValueWithoutLock(ToKey(k))
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	return err == nil, err
@@ -862,7 +884,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	return view.commitToDB(ctx)
 }
 
-// Assumes values inside of [ops] are safe to reference after the function
+// Assumes values inside [ops] are safe to reference after the function
 // returns. Assumes [db.lock] isn't held.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
@@ -915,9 +937,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	}
 
-	rootChange, ok := changes.nodes[Key{}]
+	sentinelChange, ok := changes.nodes[Key{}]
 	if !ok {
-		return errNoNewRoot
+		return errNoNewSentinel
 	}
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
@@ -959,7 +981,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
-	db.root = rootChange.after
+	db.sentinelNode = sentinelChange.after
 	db.history.record(changes)
 	return nil
 }
@@ -1140,33 +1162,33 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 }
 
 func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
-	// not sure if the root exists or had a value or not
+	// not sure if the  sentinel node exists or if it had a value
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodeDB.Get(Key{})
-	if err == database.ErrNotFound {
-		db.root, err = db.valueNodeDB.Get(Key{})
+	db.sentinelNode, err = db.intermediateNodeDB.Get(Key{})
+	if errors.Is(err, database.ErrNotFound) {
+		db.sentinelNode, err = db.valueNodeDB.Get(Key{})
 	}
 	if err == nil {
-		// Root already exists, so calculate its id
-		db.root.calculateID(db.metrics)
-		return db.root.id, nil
+		// sentinel node already exists, so calculate the root ID of the trie
+		db.sentinelNode.calculateID(db.metrics)
+		return db.getMerkleRoot(), nil
 	}
-	if err != database.ErrNotFound {
+	if !errors.Is(err, database.ErrNotFound) {
 		return ids.Empty, err
 	}
 
-	// Root doesn't exist; make a new one.
-	db.root = newNode(Key{})
+	// sentinel node doesn't exist; make a new one.
+	db.sentinelNode = newNode(Key{})
 
 	// update its ID
-	db.root.calculateID(db.metrics)
+	db.sentinelNode.calculateID(db.metrics)
 
-	if err := db.intermediateNodeDB.Put(Key{}, db.root); err != nil {
+	if err := db.intermediateNodeDB.Put(Key{}, db.sentinelNode); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, nil
+	return db.sentinelNode.id, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
@@ -1243,11 +1265,40 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	case db.closed:
 		return nil, database.ErrClosed
 	case key == Key{}:
-		return db.root, nil
+		return db.sentinelNode, nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)
+}
+
+func (db *merkleDB) Clear() error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	// Clear nodes from disk and caches
+	if err := db.valueNodeDB.Clear(); err != nil {
+		return err
+	}
+	if err := db.intermediateNodeDB.Clear(); err != nil {
+		return err
+	}
+
+	// Clear root
+	db.sentinelNode = newNode(Key{})
+	db.sentinelNode.calculateID(db.metrics)
+
+	// Clear history
+	db.history = newTrieHistory(db.history.maxHistoryLen)
+	db.history.record(&changeSummary{
+		rootID: db.getMerkleRoot(),
+		values: map[Key]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[Key]*change[*node]{},
+	})
+	return nil
 }
 
 // Returns [key] prefixed by [prefix].
