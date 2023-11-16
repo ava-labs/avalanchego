@@ -91,17 +91,8 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
-	proposalTx := buildAddMemberProposalTx(
-		t,
-		vm,
-		caminoPreFundedKeys[0],
-		vm.Config.CaminoConfig.DACProposalBondAmount,
-		defaultTxFee,
-		adminProposerKey, // AdminProposer
-		consortiumMemberKey.Address(),
-		vm.clock.Time(),
-		true,
-	)
+	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
@@ -277,17 +268,8 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
-	proposalTx := buildAddMemberProposalTx(
-		t,
-		vm,
-		caminoPreFundedKeys[0],
-		vm.Config.CaminoConfig.DACProposalBondAmount,
-		defaultTxFee,
-		adminProposerKey, // AdminProposer
-		consortiumMemberKey.Address(),
-		vm.clock.Time(),
-		true,
-	)
+	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
@@ -792,6 +774,359 @@ func TestAdminProposals(t *testing.T) {
 	require.True(applicantAddrState.Is(as.AddressStateConsortiumMember))
 }
 
+func TestExcludeMemberProposals(t *testing.T) {
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	require.NoError(t, err)
+	memberKey, memberAddr, _ := generateKeyAndOwner(t)
+	memberAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], memberAddr.Bytes())
+	require.NoError(t, err)
+	memberNodeKey, memberNodeShortID, _ := generateKeyAndOwner(t)
+	memberNodeID := ids.NodeID(memberNodeShortID)
+	rootAdminKey := caminoPreFundedKeys[0]
+	adminProposerKey := caminoPreFundedKeys[0]
+
+	defaultConfig := defaultCaminoConfig(true)
+	fee := defaultConfig.TxFee
+	addValidatorFee := defaultConfig.AddPrimaryNetworkValidatorFee
+	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
+	validatorBondAmount := defaultConfig.MaxValidatorStake // is equal to min
+
+	tests := map[string]struct {
+		moreExlcude      bool // try to exclude member with additional proposal
+		registerNode     bool // member has registered node
+		currentValidator bool // member has current validator
+		pendingValidator bool // member has pending validator
+		expire           bool // means that proposal should expire, not early finish
+		success          bool // doesn't mean that most voted option is "yes", just means that proposal was successfully voted with some option
+		excluded         bool // means that most voted option is "yes", proposal is successful and member was excluded
+	}{
+		"Failed: tried to exclude with another proposal": {
+			moreExlcude: true,
+		},
+		"Excluded: no registered node": {
+			success:  true,
+			excluded: true,
+		},
+		"Excluded: no validators": {
+			registerNode: true,
+			success:      true,
+			excluded:     true,
+		},
+		"Excluded: has pending validator": {
+			registerNode:     true,
+			pendingValidator: true,
+			success:          true,
+			excluded:         true,
+		},
+		"Excluded: has active validator": {
+			registerNode:     true,
+			currentValidator: true,
+			success:          true,
+			excluded:         true,
+		},
+		"Not excluded: no registered node": {
+			success:  true,
+			excluded: false,
+		},
+		"Not excluded: no validators": {
+			registerNode: true,
+			success:      true,
+			excluded:     false,
+		},
+		"Not excluded: has pending validator": {
+			registerNode:     true,
+			pendingValidator: true,
+			success:          true,
+			excluded:         false,
+		},
+		"Not excluded: has active validator": {
+			registerNode:     true,
+			currentValidator: true,
+			success:          true,
+			excluded:         false,
+		},
+		"Not excluded: expire": {
+			registerNode: true,
+			expire:       true,
+			excluded:     false,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			numberOfValidatorsInNetwork := 5
+			if tt.currentValidator {
+				numberOfValidatorsInNetwork++
+			}
+			burnedAmt := uint64(0)
+			bondedAmt := uint64(0)
+			balance := proposalBondAmount + defaultTxFee*8 + validatorBondAmount*2 + addValidatorFee*2
+			// Prepare vm
+			vm := newCaminoVM(api.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				InitialAdmin:        caminoPreFundedKeys[0].Address(),
+			}, []api.UTXO{
+				{
+					Amount:  json.Uint64(balance),
+					Address: memberAddrStr,
+				},
+				{
+					Amount:  json.Uint64(defaultTxFee*3 + proposalBondAmount*2),
+					Address: caminoPreFundedKey0AddrStr,
+				},
+			}, &defaultConfig.BanffTime)
+			vm.ctx.Lock.Lock()
+			defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+			initialMemberBalance, _, _, _, _ := getBalance(t, vm.state, memberAddr)
+			checkBalance(t, vm.state, memberAddr,
+				initialMemberBalance,          // total
+				0, 0, 0, initialMemberBalance, // unlocked
+			)
+			memberAddrState, err := vm.state.GetAddressStates(memberAddr)
+			require.NoError(err)
+			require.Equal(as.AddressStateEmpty, memberAddrState)
+			_, err = vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
+			require.ErrorIs(err, database.ErrNotFound)
+
+			// Make member actual consortium member
+			tx, err := vm.txBuilder.NewAddressStateTx(
+				adminProposerKey.Address(),
+				false,
+				as.AddressStateBitRoleConsortiumAdminProposer,
+				[]*secp256k1.PrivateKey{rootAdminKey},
+				nil,
+			)
+			require.NoError(err)
+			_ = buildAndAcceptBlock(t, vm, tx)
+			addMemberProposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], proposalBondAmount, defaultTxFee,
+				adminProposerKey, memberAddr, vm.clock.Time(), true)
+			_, _, _, _ = makeProposalWithTx(t, vm, addMemberProposalTx) // add admin proposal
+			_ = buildAndAcceptBlock(t, vm, nil)                         // execute admin proposal
+			memberAddrState, err = vm.state.GetAddressStates(memberAddr)
+			require.NoError(err)
+			require.Equal(as.AddressStateConsortiumMember, memberAddrState)
+
+			// Register member's node
+			if tt.registerNode {
+				registerNodeTx, err := vm.txBuilder.NewRegisterNodeTx(
+					ids.EmptyNodeID,
+					memberNodeID,
+					memberAddr,
+					[]*secp256k1.PrivateKey{memberKey, memberNodeKey},
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{memberAddr},
+					},
+				)
+				require.NoError(err)
+				blk := buildAndAcceptBlock(t, vm, registerNodeTx)
+				require.Len(blk.Txs(), 1)
+				checkTx(t, vm, blk.ID(), registerNodeTx.ID())
+				registeredMemberNodeID, err := vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
+				require.NoError(err)
+				require.Equal(memberNodeShortID, registeredMemberNodeID)
+				burnedAmt += fee
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,          // total
+					0, 0, 0, balance-burnedAmt, // unlocked
+				)
+			}
+
+			chainTime := vm.state.GetTimestamp()
+			pendingValidatorStartTime := chainTime.Add(120 * time.Second)
+			currentValidatorStartTime := chainTime.Add(240 * time.Second)
+			validatorsEndTime := currentValidatorStartTime.Add(defaultConfig.MinStakeDuration)
+
+			// Add pending validator
+			if tt.pendingValidator {
+				addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
+					validatorBondAmount,
+					uint64(pendingValidatorStartTime.Unix()),
+					uint64(validatorsEndTime.Unix()),
+					memberNodeID,
+					memberAddr,
+					memberAddr,
+					0,
+					[]*secp256k1.PrivateKey{memberKey},
+					memberAddr,
+				)
+				require.NoError(err)
+				blk := buildAndAcceptBlock(t, vm, addValidatorTx)
+				require.Len(blk.Txs(), 1)
+				checkTx(t, vm, blk.ID(), addValidatorTx.ID())
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.NoError(err)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.ErrorIs(err, database.ErrNotFound)
+				burnedAmt += addValidatorFee
+				bondedAmt += validatorBondAmount
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+				)
+			}
+
+			// Add current validator
+			if tt.currentValidator {
+				// Add current validator as pending
+				addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
+					validatorBondAmount,
+					uint64(currentValidatorStartTime.Unix()),
+					uint64(validatorsEndTime.Unix()),
+					memberNodeID,
+					memberAddr,
+					memberAddr,
+					0,
+					[]*secp256k1.PrivateKey{memberKey},
+					memberAddr,
+				)
+				require.NoError(err)
+				blk := buildAndAcceptBlock(t, vm, addValidatorTx)
+				require.Len(blk.Txs(), 1)
+				checkTx(t, vm, blk.ID(), addValidatorTx.ID())
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.NoError(err)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.ErrorIs(err, database.ErrNotFound)
+
+				// Advance time, so pending validator will become current
+				vm.clock.Set(currentValidatorStartTime)
+				blk = buildAndAcceptBlock(t, vm, nil)
+				require.Empty(blk.Txs())
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.ErrorIs(err, database.ErrNotFound)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				require.NoError(err)
+				burnedAmt += addValidatorFee
+				bondedAmt += validatorBondAmount
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+				)
+			}
+
+			chainTime = vm.state.GetTimestamp()
+
+			// Add proposal (member proposes to exclude himself using his own funds)
+			proposalStartTime := chainTime.Add(100 * time.Second)
+			proposalEndTime := proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration) * time.Second)
+			excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, memberKey, proposalBondAmount, fee,
+				memberKey, memberAddr, proposalStartTime, proposalEndTime, false)
+			proposalState, _, _, _ := makeProposalWithTx(t, vm, excludeMemberProposalTx)
+			excludeMemberProposalState, ok := proposalState.(*dac.ExcludeMemberProposalState)
+			require.True(ok)
+			burnedAmt += fee
+			bondedAmt += proposalBondAmount
+			checkBalance(t, vm.state, memberAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-burnedAmt-bondedAmt, // unlocked
+			)
+
+			vm.clock.Set(excludeMemberProposalState.StartTime())
+
+			if tt.moreExlcude {
+				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, caminoPreFundedKeys[0], proposalBondAmount, fee,
+					adminProposerKey, memberAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
+				require.Error(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx))
+				return
+			}
+
+			// If we want proposal to succeed, pick option 0, to fail - option 1
+			optionIndex := uint32(1)
+			if tt.excluded {
+				optionIndex = 0
+			}
+			optionWeights := make([]uint32, len(excludeMemberProposalState.Options))
+
+			// If proposal should be finished early, than we're voting for it with enough votes
+			numberOfVotesToSuccess := numberOfValidatorsInNetwork/2 + 1
+			if tt.expire {
+				numberOfVotesToSuccess = 0
+			}
+
+			for i := 0; i < numberOfVotesToSuccess; i++ {
+				optionWeights[optionIndex]++
+				voteTx := buildSimpleVoteTx(t, vm, memberKey, fee, excludeMemberProposalTx.ID(), caminoPreFundedKeys[i], optionIndex)
+				proposalState = voteWithTx(t, vm, voteTx, excludeMemberProposalTx.ID(), optionWeights)
+				burnedAmt += fee
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+				)
+			}
+			require.Equal(tt.success, proposalState.IsSuccessful())
+
+			// If we need proposal to expire, advance time forward
+			if tt.expire {
+				vm.clock.Set(proposalState.EndTime())
+			}
+
+			// Build block with FinishProposalsTx
+			blk := buildAndAcceptBlock(t, vm, nil)
+			require.Len(blk.Txs(), 1)
+			checkTx(t, vm, blk.ID(), blk.Txs()[0].ID())
+			_, err = vm.state.GetProposal(excludeMemberProposalTx.ID())
+			require.ErrorIs(err, database.ErrNotFound)
+
+			bondedAmt -= proposalBondAmount
+			memberAddrState, err = vm.state.GetAddressStates(memberAddr)
+			require.NoError(err)
+			_, pendingValidatorErr := vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+			_, currentValidatorErr := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+			_, suspendedValidatorErr := vm.state.GetDeferredValidator(constants.PrimaryNetworkID, memberNodeID)
+			registeredMemberNodeID, registeredNodeErr := vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
+			if tt.excluded {
+				require.Equal(as.AddressStateEmpty, memberAddrState)
+				require.ErrorIs(pendingValidatorErr, database.ErrNotFound)
+				require.ErrorIs(currentValidatorErr, database.ErrNotFound)
+				require.ErrorIs(registeredNodeErr, database.ErrNotFound)
+				if tt.currentValidator {
+					require.NoError(suspendedValidatorErr)
+				} else {
+					require.ErrorIs(suspendedValidatorErr, database.ErrNotFound)
+				}
+				if tt.pendingValidator {
+					bondedAmt -= validatorBondAmount
+				}
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+				)
+			} else {
+				require.Equal(as.AddressStateConsortiumMember, memberAddrState)
+				if tt.pendingValidator {
+					require.NoError(pendingValidatorErr)
+				} else {
+					require.ErrorIs(pendingValidatorErr, database.ErrNotFound)
+				}
+				if tt.currentValidator {
+					require.NoError(currentValidatorErr)
+				} else {
+					require.ErrorIs(currentValidatorErr, database.ErrNotFound)
+				}
+				if tt.registerNode {
+					require.NoError(registeredNodeErr)
+					require.Equal(memberNodeShortID, registeredMemberNodeID)
+				} else {
+					require.ErrorIs(registeredNodeErr, database.ErrNotFound)
+				}
+				require.ErrorIs(suspendedValidatorErr, database.ErrNotFound)
+				checkBalance(t, vm.state, memberAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+				)
+			}
+		})
+	}
+}
+
 func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
 	t.Helper()
 	if tx != nil {
@@ -852,11 +1187,11 @@ func checkBalance(
 ) {
 	t.Helper()
 	total, bonded, deposited, depositBonded, unlocked := getBalance(t, db, addr)
-	require.Equal(t, expectedTotal, total)
-	require.Equal(t, expectedBonded, bonded)
-	require.Equal(t, expectedDeposited, deposited)
-	require.Equal(t, expectedDepositBonded, depositBonded)
-	require.Equal(t, expectedUnlocked, unlocked)
+	require.Equal(t, expectedTotal, total, "total balance")
+	require.Equal(t, expectedBonded, bonded, "bonded balance")
+	require.Equal(t, expectedDeposited, deposited, "deposited balance")
+	require.Equal(t, expectedDepositBonded, depositBonded, "depositBonded balance")
+	require.Equal(t, expectedUnlocked, unlocked, "unlocked balance")
 }
 
 func checkTx(t *testing.T, vm *VM, blkID, txID ids.ID) {
@@ -923,7 +1258,7 @@ func buildAddMemberProposalTx(
 	proposerKey *secp256k1.PrivateKey,
 	applicantAddress ids.ShortID,
 	startTime time.Time,
-	adminProposal bool,
+	adminProposal bool, //nolint:unparam
 ) *txs.Tx {
 	t.Helper()
 	ins, outs, signers, _, err := vm.txBuilder.Lock(
@@ -939,6 +1274,54 @@ func buildAddMemberProposalTx(
 		Start:            uint64(startTime.Unix()),
 		End:              uint64(startTime.Unix()) + dac.AddMemberProposalDuration,
 		ApplicantAddress: applicantAddress,
+	}
+	if adminProposal {
+		proposal = &dac.AdminProposal{Proposal: proposal}
+	}
+	wrapper := &txs.ProposalWrapper{Proposal: proposal}
+	proposalBytes, err := txs.Codec.Marshal(txs.Version, wrapper)
+	require.NoError(t, err)
+	proposalTx, err := txs.NewSigned(&txs.AddProposalTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		ProposalPayload: proposalBytes,
+		ProposerAddress: proposerKey.Address(),
+		ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+	}, txs.Codec, append(signers, []*secp256k1.PrivateKey{proposerKey}))
+	require.NoError(t, err)
+	return proposalTx
+}
+
+func buildExcludeMemberProposalTx(
+	t *testing.T,
+	vm *VM,
+	fundsKey *secp256k1.PrivateKey,
+	amountToBond uint64,
+	amountToBurn uint64,
+	proposerKey *secp256k1.PrivateKey,
+	memberAddress ids.ShortID,
+	startTime time.Time,
+	endTime time.Time,
+	adminProposal bool,
+) *txs.Tx {
+	t.Helper()
+	ins, outs, signers, _, err := vm.txBuilder.Lock(
+		vm.state,
+		[]*secp256k1.PrivateKey{fundsKey},
+		amountToBond,
+		amountToBurn,
+		locked.StateBonded,
+		nil, nil, 0,
+	)
+	require.NoError(t, err)
+	var proposal dac.Proposal = &dac.ExcludeMemberProposal{
+		Start:         uint64(startTime.Unix()),
+		End:           uint64(endTime.Unix()),
+		MemberAddress: memberAddress,
 	}
 	if adminProposal {
 		proposal = &dac.AdminProposal{Proposal: proposal}
@@ -1036,6 +1419,11 @@ func voteWithTx(
 	require.NoError(t, err)
 	switch proposalState := proposalState.(type) {
 	case *dac.BaseFeeProposalState:
+		require.Len(t, proposalState.Options, len(expectedVoteWeights))
+		for i := range proposalState.Options {
+			require.Equal(t, expectedVoteWeights[i], proposalState.Options[i].Weight)
+		}
+	case *dac.ExcludeMemberProposalState:
 		require.Len(t, proposalState.Options, len(expectedVoteWeights))
 		for i := range proposalState.Options {
 			require.Equal(t, expectedVoteWeights[i], proposalState.Options[i].Weight)

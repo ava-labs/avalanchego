@@ -25,11 +25,19 @@ var (
 type VerifierVisitor interface {
 	BaseFeeProposal(*BaseFeeProposal) error
 	AddMemberProposal(*AddMemberProposal) error
+	ExcludeMemberProposal(*ExcludeMemberProposal) error
 }
 
 type ExecutorVisitor interface {
 	BaseFeeProposal(*BaseFeeProposalState) error
 	AddMemberProposal(*AddMemberProposalState) error
+	ExcludeMemberProposal(*ExcludeMemberProposalState) error
+}
+
+type BondTxIDsGetter interface {
+	BaseFeeProposal(*BaseFeeProposalState) ([]ids.ID, error)
+	AddMemberProposal(*AddMemberProposalState) ([]ids.ID, error)
+	ExcludeMemberProposal(*ExcludeMemberProposalState) ([]ids.ID, error)
 }
 
 type Proposal interface {
@@ -62,6 +70,8 @@ type ProposalState interface {
 	IsSuccessful() bool // should be called only for finished proposals
 	Outcome() any       // should be called only for finished successful proposals
 	Visit(ExecutorVisitor) error
+	// Visits getter and returns additional lock tx ids, that should be unbonded when this proposal is successfully finished.
+	GetBondTxIDs(BondTxIDsGetter) ([]ids.ID, error)
 	// Will return modified ProposalState with added vote, original ProposalState will not be modified!
 	AddVote(voterAddress ids.ShortID, vote Vote) (ProposalState, error)
 

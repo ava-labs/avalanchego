@@ -136,7 +136,6 @@ func (p *BaseFeeProposalState) Outcome() any {
 	return mostVotedOptionIndex
 }
 
-// Votes must be valid for this proposal, could panic otherwise.
 func (p *BaseFeeProposalState) Result() (uint64, uint32, bool) {
 	mostVotedWeight, mostVotedOptionIndex, unambiguous := p.GetMostVoted()
 	return p.Options[mostVotedOptionIndex].Value, mostVotedWeight, unambiguous
@@ -203,5 +202,9 @@ func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error
 }
 
 func (p *BaseFeeProposalState) Visit(visitor ExecutorVisitor) error {
+	return visitor.BaseFeeProposal(p)
+}
+
+func (p *BaseFeeProposalState) GetBondTxIDs(visitor BondTxIDsGetter) ([]ids.ID, error) {
 	return visitor.BaseFeeProposal(p)
 }

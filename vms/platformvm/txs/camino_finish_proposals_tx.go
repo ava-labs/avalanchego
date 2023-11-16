@@ -103,3 +103,7 @@ func (tx *FinishProposalsTx) ProposalIDs() []ids.ID {
 	lockTxIDs = append(lockTxIDs, tx.ExpiredSuccessfulProposalIDs...)
 	return append(lockTxIDs, tx.ExpiredFailedProposalIDs...)
 }
+
+func (tx *FinishProposalsTx) SuccessfulProposalIDs() []ids.ID {
+	return append(tx.EarlyFinishedSuccessfulProposalIDs, tx.ExpiredSuccessfulProposalIDs...)
+}

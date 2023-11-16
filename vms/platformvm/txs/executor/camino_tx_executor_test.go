@@ -4937,7 +4937,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 	}
 }
 
-func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
+func TestCaminoStandardTxExecutorAddressStateTxSuspendValidator(t *testing.T) {
 	// finding first staker to remove
 	env := newCaminoEnvironment( /*postBanff*/ true, false, api.Camino{LockModeBondDeposit: true})
 	stakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -6111,7 +6111,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errNotPermittedToCreateProposal,
+			expectedErr: errInvalidProposal,
 		},
 		"OK": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddProposalTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
@@ -6685,52 +6685,75 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		LockModeBondDeposit: caminoGenesisConf.LockModeBondDeposit,
 	}
 
+	proposalBondAmt := uint64(100)
+
 	bondOwnerAddr1 := ids.ShortID{1}
 	bondOwnerAddr2 := ids.ShortID{2}
 	bondOwnerAddr3 := ids.ShortID{3}
 	bondOwnerAddr4 := ids.ShortID{4}
 	bondOwnerAddr5 := ids.ShortID{5}
 	bondOwnerAddr6 := ids.ShortID{6}
-	voterAddr1 := ids.ShortID{7}
-	voterAddr2 := ids.ShortID{8}
-	bond1Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr1}, Threshold: 1}
-	bond2Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr2}, Threshold: 1}
-	bond3Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr3}, Threshold: 1}
-	bond4Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr4}, Threshold: 1}
-	bond5Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr5}, Threshold: 1}
-	bond6Owner := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr6}, Threshold: 1}
+	bondOwnerAddr7 := ids.ShortID{7}
+	bondOwnerAddr8 := ids.ShortID{8}
+	bondOwnerAddr9 := ids.ShortID{9}
+	bondOwnerAddr10 := ids.ShortID{10}
+	voterAddr1 := ids.ShortID{11}
+	voterAddr2 := ids.ShortID{12}
+	memberNodeShortID1 := ids.ShortID{13}
+	memberNodeShortID2 := ids.ShortID{14}
+	bondOwner1 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr1}, Threshold: 1}
+	bondOwner2 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr2}, Threshold: 1}
+	bondOwner3 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr3}, Threshold: 1}
+	bondOwner4 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr4}, Threshold: 1}
+	bondOwner5 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr5}, Threshold: 1}
+	bondOwner6 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr6}, Threshold: 1}
+	bondOwner7 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr7}, Threshold: 1}
+	bondOwner8 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr8}, Threshold: 1}
+	bondOwner9 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr9}, Threshold: 1}
+	bondOwner10 := secp256k1fx.OutputOwners{Addrs: []ids.ShortID{bondOwnerAddr10}, Threshold: 1}
 
-	successfulEarlyFinishedProposalID := ids.ID{1, 1}
-	failedEarlyFinishedProposalID := ids.ID{2, 2}
-	successfulExpiredProposalID := ids.ID{3, 3}
-	failedExpiredProposalID := ids.ID{4, 4}
-	successfulActiveProposalID := ids.ID{5, 5}
-	failedActiveProposalID := ids.ID{6, 6}
-	proposalBondAmt := uint64(100)
-	successfulEarlyFinishedProposalUTXO := generateTestUTXOWithIndex(ids.ID{1, 1, 1}, 0, ctx.AVAXAssetID, proposalBondAmt, bond1Owner, ids.Empty, locked.ThisTxID, true)
-	failedEarlyFinishedProposalUTXO := generateTestUTXOWithIndex(ids.ID{2, 2, 2}, 0, ctx.AVAXAssetID, proposalBondAmt, bond2Owner, ids.Empty, locked.ThisTxID, true)
-	successfulExpiredProposalUTXO := generateTestUTXOWithIndex(ids.ID{3, 3, 3}, 0, ctx.AVAXAssetID, proposalBondAmt, bond3Owner, ids.Empty, locked.ThisTxID, true)
-	failedExpiredProposalUTXO := generateTestUTXOWithIndex(ids.ID{4, 4, 4}, 0, ctx.AVAXAssetID, proposalBondAmt, bond4Owner, ids.Empty, locked.ThisTxID, true)
-	successfulActiveProposalUTXO := generateTestUTXOWithIndex(ids.ID{5, 5, 5}, 0, ctx.AVAXAssetID, proposalBondAmt, bond5Owner, ids.Empty, locked.ThisTxID, true)
-	failedActiveProposalUTXO := generateTestUTXOWithIndex(ids.ID{6, 6, 6}, 0, ctx.AVAXAssetID, proposalBondAmt, bond6Owner, ids.Empty, locked.ThisTxID, true)
+	earlySuccessfulProposalID := ids.ID{1, 1}
+	earlyFailedProposalID := ids.ID{2, 2}
+	expiredSuccessfulProposalID := ids.ID{3, 3}
+	expiredFailedProposalID := ids.ID{4, 4}
+	activeSuccessfulProposalID := ids.ID{5, 5}
+	activeFailedProposalID := ids.ID{6, 6}
+	earlySuccessfulProposalWithBondID := ids.ID{7, 7}
+	expiredSuccessfulProposalWithBondID := ids.ID{8, 8}
+	validatorTxID1 := ids.ID{9, 9}
+	validatorTxID2 := ids.ID{10, 10}
+
+	earlySuccessfulProposalUTXO := generateTestUTXOWithIndex(earlySuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, earlySuccessfulProposalID, true)
+	earlyFailedProposalUTXO := generateTestUTXOWithIndex(earlyFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner2, ids.Empty, earlyFailedProposalID, true)
+	expiredSuccessfulProposalUTXO := generateTestUTXOWithIndex(expiredSuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner3, ids.Empty, expiredSuccessfulProposalID, true)
+	expiredFailedProposalUTXO := generateTestUTXOWithIndex(expiredFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner4, ids.Empty, expiredFailedProposalID, true)
+	activeSuccessfulProposalUTXO := generateTestUTXOWithIndex(activeSuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner5, ids.Empty, activeSuccessfulProposalID, true)
+	activeFailedProposalUTXO := generateTestUTXOWithIndex(activeFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner6, ids.Empty, activeFailedProposalID, true)
+	earlySuccessfulProposalWithBondUTXO := generateTestUTXOWithIndex(earlySuccessfulProposalWithBondID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner7, ids.Empty, earlySuccessfulProposalWithBondID, true)
+	expiredSuccessfulProposalWithBondUTXO := generateTestUTXOWithIndex(expiredSuccessfulProposalWithBondID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner8, ids.Empty, expiredSuccessfulProposalWithBondID, true)
+	additionalBondUTXO1 := generateTestUTXOWithIndex(validatorTxID1, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner9, ids.Empty, validatorTxID1, true)
+	additionalBondUTXO2 := generateTestUTXOWithIndex(validatorTxID2, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner10, ids.Empty, validatorTxID2, true)
+
+	pendingValidator1 := &state.Staker{TxID: validatorTxID1}
+	pendingValidator2 := &state.Staker{TxID: validatorTxID2}
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
 		Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-			successfulEarlyFinishedProposalUTXO, failedEarlyFinishedProposalUTXO,
-			successfulExpiredProposalUTXO, failedExpiredProposalUTXO,
+			earlySuccessfulProposalUTXO, earlyFailedProposalUTXO,
+			expiredSuccessfulProposalUTXO, expiredFailedProposalUTXO,
 		}, []uint32{}),
 		Outs: []*avax.TransferableOutput{
-			generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-			generateTestOutFromUTXO(failedEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-			generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
-			generateTestOutFromUTXO(failedExpiredProposalUTXO, ids.Empty, ids.Empty),
+			generateTestOutFromUTXO(earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
+			generateTestOutFromUTXO(earlyFailedProposalUTXO, ids.Empty, ids.Empty),
+			generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
+			generateTestOutFromUTXO(expiredFailedProposalUTXO, ids.Empty, ids.Empty),
 		},
 	}}
 
 	mostVotedIndex := uint32(1)
-	successfulEarlyFinishedProposal := &dac.BaseFeeProposalState{
+	earlySuccessfulProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{voterAddr1},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6741,7 +6764,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		TotalAllowedVoters: 3,
 	}
 
-	failedEarlyFinishedProposal := &dac.BaseFeeProposalState{
+	earlyFailedProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6752,7 +6775,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		TotalAllowedVoters: 3,
 	}
 
-	successfulExpiredProposal := &dac.BaseFeeProposalState{
+	expiredSuccessfulProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{voterAddr1},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6763,7 +6786,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		TotalAllowedVoters: 4,
 	}
 
-	failedExpiredProposal := &dac.BaseFeeProposalState{
+	expiredFailedProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{voterAddr1, voterAddr2},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6774,7 +6797,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		TotalAllowedVoters: 4,
 	}
 
-	successfulActiveProposal := &dac.BaseFeeProposalState{
+	activeSuccessfulProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{voterAddr1},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6785,7 +6808,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 		TotalAllowedVoters: 4,
 	}
 
-	failedActiveProposal := &dac.BaseFeeProposalState{
+	activeFailedProposal := &dac.BaseFeeProposalState{
 		AllowedVoters: []ids.ShortID{voterAddr1, voterAddr2},
 		Start:         100, End: 102,
 		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
@@ -6794,6 +6817,28 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			{Value: 7},
 		}},
 		TotalAllowedVoters: 4,
+	}
+
+	earlySuccessfulProposalWithBond := &dac.ExcludeMemberProposalState{
+		AllowedVoters: []ids.ShortID{voterAddr1},
+		Start:         100, End: 102,
+		SimpleVoteOptions: dac.SimpleVoteOptions[bool]{Options: []dac.SimpleVoteOption[bool]{
+			{Value: true, Weight: 2},
+			{Value: false},
+		}},
+		TotalAllowedVoters: 3,
+		MemberAddress:      bondOwnerAddr6,
+	}
+
+	expiredSuccessfulProposalWithBond := &dac.ExcludeMemberProposalState{
+		AllowedVoters: []ids.ShortID{voterAddr1},
+		Start:         100, End: 102,
+		SimpleVoteOptions: dac.SimpleVoteOptions[bool]{Options: []dac.SimpleVoteOption[bool]{
+			{Value: true, Weight: 2},
+			{Value: false, Weight: 1},
+		}},
+		TotalAllowedVoters: 4,
+		MemberAddress:      bondOwnerAddr5,
 	}
 
 	tests := map[string]struct {
@@ -6814,10 +6859,10 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx:                             baseTx,
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
-					EarlyFinishedFailedProposalIDs:     []ids.ID{failedEarlyFinishedProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulExpiredProposalID},
-					ExpiredFailedProposalIDs:           []ids.ID{failedExpiredProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalID},
+					EarlyFinishedFailedProposalIDs:     []ids.ID{earlyFailedProposalID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{expiredSuccessfulProposalID},
+					ExpiredFailedProposalIDs:           []ids.ID{expiredFailedProposalID},
 				}
 			},
 			expectedErr: errNotBerlinPhase,
@@ -6834,10 +6879,10 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx:                             baseTx,
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
-					EarlyFinishedFailedProposalIDs:     []ids.ID{failedEarlyFinishedProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulExpiredProposalID},
-					ExpiredFailedProposalIDs:           []ids.ID{failedExpiredProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalID},
+					EarlyFinishedFailedProposalIDs:     []ids.ID{earlyFailedProposalID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{expiredSuccessfulProposalID},
+					ExpiredFailedProposalIDs:           []ids.ID{expiredFailedProposalID},
 				}
 			},
 			signers:     [][]*secp256k1.PrivateKey{{}},
@@ -6849,7 +6894,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulActiveProposalID}, cfg.BerlinPhaseTime.Add(time.Second), nil)
+					Return([]ids.ID{activeSuccessfulProposalID}, cfg.BerlinPhaseTime.Add(time.Second), nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				return s
 			},
@@ -6859,13 +6904,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulActiveProposalUTXO,
+							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulActiveProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(activeSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredSuccessfulProposalIDs: []ids.ID{successfulActiveProposalID},
+					ExpiredSuccessfulProposalIDs: []ids.ID{activeSuccessfulProposalID},
 				}
 			},
 			expectedErr: errProposalsAreNotExpiredYet,
@@ -6876,7 +6921,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID, failedExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredSuccessfulProposalID, expiredFailedProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				return s
 			},
@@ -6886,13 +6931,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulExpiredProposalUTXO,
+							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredSuccessfulProposalIDs: []ids.ID{successfulExpiredProposalID},
+					ExpiredSuccessfulProposalIDs: []ids.ID{expiredSuccessfulProposalID},
 				}
 			},
 			expectedErr: errExpiredProposalsMismatch,
@@ -6904,7 +6949,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().
-					Return([]ids.ID{successfulEarlyFinishedProposalID, failedEarlyFinishedProposalID}, nil)
+					Return([]ids.ID{earlySuccessfulProposalID, earlyFailedProposalID}, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -6913,13 +6958,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulExpiredProposalUTXO,
+							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalID},
 				}
 			},
 			expectedErr: errEarlyFinishedProposalsMismatch,
@@ -6930,13 +6975,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
-				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
-				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, utx.ExpiredSuccessfulProposalIDs...) //nolint:gocritic
+					Return([]ids.ID{expiredFailedProposalID}, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{earlyFailedProposalID}, nil)
+				lockTxIDs := append(utx.EarlyFinishedFailedProposalIDs, utx.ExpiredFailedProposalIDs...) //nolint:gocritic
 				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
-					bondOwnerAddr1, bondOwnerAddr3,
+					bondOwnerAddr2, bondOwnerAddr4,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO, successfulExpiredProposalUTXO,
+					earlyFailedProposalUTXO, expiredFailedProposalUTXO,
 				}, locked.StateBonded)
 				return s
 			},
@@ -6946,32 +6991,76 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: []*avax.TransferableInput{ // missing 2nd input
-							generateTestInFromUTXO(successfulEarlyFinishedProposalUTXO, []uint32{}),
+							generateTestInFromUTXO(earlyFailedProposalUTXO, []uint32{}),
 						},
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlyFailedProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulExpiredProposalID},
+					EarlyFinishedFailedProposalIDs: []ids.ID{earlyFailedProposalID},
+					ExpiredFailedProposalIDs:       []ids.ID{expiredFailedProposalID},
 				}
 			},
 			expectedErr: errInvalidSystemTxBody,
 		},
-		"Invalid outs": {
+		"Invalid inputs: additional bond from proposal (e.g. excluded member pending validator)": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.FinishProposalsTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return(utx.EarlyFinishedSuccessfulProposalIDs, nil)
+				s.EXPECT().GetProposal(earlySuccessfulProposalWithBondID).Return(earlySuccessfulProposalWithBond, nil)
+
+				// * proposalBondTxIDsGetter
+				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID1, nil)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(pendingValidator1, nil)
+				// *
+
+				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, validatorTxID1) //nolint:gocritic
+				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
+					bondOwnerAddr7, bondOwnerAddr9,
+				}, []*avax.UTXO{
+					earlySuccessfulProposalWithBondUTXO, additionalBondUTXO1,
+				}, locked.StateBonded)
+
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
+				return &txs.FinishProposalsTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins: []*avax.TransferableInput{
+							generateTestInFromUTXO(earlySuccessfulProposalWithBondUTXO, []uint32{}),
+							// generateTestInFromUTXO(additionalBondUTXO1, []uint32{}), // missing pending validator bond
+						},
+						Outs: []*avax.TransferableOutput{
+							generateTestOutFromUTXO(earlySuccessfulProposalWithBondUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(additionalBondUTXO1, ids.Empty, ids.Empty),
+						},
+					}},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalWithBondID},
+				}
+			},
+			expectedErr: errInvalidSystemTxBody,
+		},
+		"Invalid outputs": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.FinishProposalsTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
-				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
-				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, utx.ExpiredSuccessfulProposalIDs...) //nolint:gocritic
+					Return([]ids.ID{expiredFailedProposalID}, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{earlyFailedProposalID}, nil)
+				lockTxIDs := append(utx.EarlyFinishedFailedProposalIDs, utx.ExpiredFailedProposalIDs...) //nolint:gocritic
 				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
-					bondOwnerAddr1, bondOwnerAddr3,
+					bondOwnerAddr2, bondOwnerAddr4,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO, successfulExpiredProposalUTXO,
+					earlyFailedProposalUTXO, expiredFailedProposalUTXO,
 				}, locked.StateBonded)
 				return s
 			},
@@ -6981,15 +7070,103 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulEarlyFinishedProposalUTXO, successfulExpiredProposalUTXO,
+							earlyFailedProposalUTXO, expiredFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-							generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bond1Owner, ids.Empty, ids.Empty), // successfulExpiredProposalUTXO with different owner
+							generateTestOutFromUTXO(earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, ids.Empty), // expiredFailedProposalUTXO with different owner
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulExpiredProposalID},
+					EarlyFinishedFailedProposalIDs: []ids.ID{earlyFailedProposalID},
+					ExpiredFailedProposalIDs:       []ids.ID{expiredFailedProposalID},
+				}
+			},
+			expectedErr: errInvalidSystemTxBody,
+		},
+		"Invalid outputs: additional bond from proposal (e.g. excluded member pending validator)": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.FinishProposalsTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return(utx.EarlyFinishedSuccessfulProposalIDs, nil)
+				s.EXPECT().GetProposal(earlySuccessfulProposalWithBondID).Return(earlySuccessfulProposalWithBond, nil)
+
+				// * proposalBondTxIDsGetter
+				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID1, nil)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(pendingValidator1, nil)
+				// *
+
+				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, validatorTxID1) //nolint:gocritic
+				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
+					bondOwnerAddr7, bondOwnerAddr9,
+				}, []*avax.UTXO{
+					earlySuccessfulProposalWithBondUTXO, additionalBondUTXO1,
+				}, locked.StateBonded)
+
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
+				return &txs.FinishProposalsTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins: []*avax.TransferableInput{
+							generateTestInFromUTXO(earlySuccessfulProposalWithBondUTXO, []uint32{}),
+							generateTestInFromUTXO(additionalBondUTXO1, []uint32{}),
+						},
+						Outs: []*avax.TransferableOutput{
+							generateTestOutFromUTXO(earlySuccessfulProposalWithBondUTXO, ids.Empty, ids.Empty),
+							// generateTestOutFromUTXO(additionalBondUTXO1, ids.Empty, ids.Empty), // missing pending validator bond
+						},
+					}},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalWithBondID},
+				}
+			},
+			expectedErr: errInvalidSystemTxBody,
+		},
+		"Invalid inputs/outputs: additional bond from proposal (e.g. excluded member pending validator)": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.FinishProposalsTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return(utx.EarlyFinishedSuccessfulProposalIDs, nil)
+				s.EXPECT().GetProposal(earlySuccessfulProposalWithBondID).Return(earlySuccessfulProposalWithBond, nil)
+
+				// * proposalBondTxIDsGetter
+				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID1, nil)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(pendingValidator1, nil)
+				// *
+
+				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, validatorTxID1) //nolint:gocritic
+				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
+					bondOwnerAddr7, bondOwnerAddr9,
+				}, []*avax.UTXO{
+					earlySuccessfulProposalWithBondUTXO, additionalBondUTXO1,
+				}, locked.StateBonded)
+
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
+				return &txs.FinishProposalsTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins: []*avax.TransferableInput{
+							generateTestInFromUTXO(earlySuccessfulProposalWithBondUTXO, []uint32{}),
+							// generateTestInFromUTXO(additionalBondUTXO1, []uint32{}), // missing pending validator bond
+						},
+						Outs: []*avax.TransferableOutput{
+							generateTestOutFromUTXO(earlySuccessfulProposalWithBondUTXO, ids.Empty, ids.Empty),
+							// generateTestOutFromUTXO(additionalBondUTXO1, ids.Empty, ids.Empty), // missing pending validator bond
+						},
+					}},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalWithBondID},
 				}
 			},
 			expectedErr: errInvalidSystemTxBody,
@@ -7000,13 +7177,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
-				s.EXPECT().GetProposalIDsToFinish().Return(utx.EarlyFinishedSuccessfulProposalIDs, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return(utx.EarlyFinishedFailedProposalIDs, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
-					bondOwnerAddr1,
+					bondOwnerAddr2,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO,
+					earlyFailedProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(successfulEarlyFinishedProposalID).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetProposal(earlyFailedProposalID).Return(nil, database.ErrNotFound)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7015,13 +7192,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulEarlyFinishedProposalUTXO,
+							earlyFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlyFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
+					EarlyFinishedFailedProposalIDs: []ids.ID{earlyFailedProposalID},
 				}
 			},
 			expectedErr: database.ErrNotFound,
@@ -7032,15 +7209,16 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredSuccessfulProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().
-					Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
+					Return([]ids.ID{earlySuccessfulProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr1, bondOwnerAddr3,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO, successfulExpiredProposalUTXO,
+					earlySuccessfulProposalUTXO, expiredSuccessfulProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(successfulExpiredProposalID).Return(successfulExpiredProposal, nil)
+				s.EXPECT().GetProposal(expiredSuccessfulProposalID).Return(expiredSuccessfulProposal, nil).Times(2)
+				s.EXPECT().GetProposal(earlySuccessfulProposalID).Return(earlySuccessfulProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7049,16 +7227,16 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulEarlyFinishedProposalUTXO,
-							successfulExpiredProposalUTXO,
+							earlySuccessfulProposalUTXO,
+							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulExpiredProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulEarlyFinishedProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{expiredSuccessfulProposalID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{earlySuccessfulProposalID},
 				}
 			},
 			expectedErr: errNotEarlyFinishedProposal,
@@ -7069,15 +7247,16 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredSuccessfulProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().
-					Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
+					Return([]ids.ID{earlySuccessfulProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr1, bondOwnerAddr3,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO, successfulExpiredProposalUTXO,
+					earlySuccessfulProposalUTXO, expiredSuccessfulProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(successfulExpiredProposalID).Return(successfulExpiredProposal, nil)
+				s.EXPECT().GetProposal(expiredSuccessfulProposalID).Return(expiredSuccessfulProposal, nil).Times(2)
+				s.EXPECT().GetProposal(earlySuccessfulProposalID).Return(earlySuccessfulProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7086,16 +7265,16 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulEarlyFinishedProposalUTXO,
-							successfulExpiredProposalUTXO,
+							earlySuccessfulProposalUTXO,
+							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulExpiredProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulEarlyFinishedProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{expiredSuccessfulProposalID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{earlySuccessfulProposalID},
 				}
 			},
 			expectedErr: errNotEarlyFinishedProposal,
@@ -7107,13 +7286,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().
-					Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
+					Return([]ids.ID{earlySuccessfulProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr5,
 				}, []*avax.UTXO{
-					successfulActiveProposalUTXO,
+					activeSuccessfulProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(successfulActiveProposalID).Return(successfulActiveProposal, nil)
+				s.EXPECT().GetProposal(activeSuccessfulProposalID).Return(activeSuccessfulProposal, nil).Times(2)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7122,13 +7301,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulActiveProposalUTXO,
+							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulActiveProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(activeSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulActiveProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{activeSuccessfulProposalID},
 				}
 			},
 			expectedErr: errNotEarlyFinishedProposal,
@@ -7140,13 +7319,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().
-					Return([]ids.ID{failedEarlyFinishedProposalID}, nil)
+					Return([]ids.ID{earlyFailedProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr6,
 				}, []*avax.UTXO{
-					failedActiveProposalUTXO,
+					activeFailedProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(failedActiveProposalID).Return(failedActiveProposal, nil)
+				s.EXPECT().GetProposal(activeFailedProposalID).Return(activeFailedProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7155,13 +7334,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							failedActiveProposalUTXO,
+							activeFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(failedActiveProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(activeFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedFailedProposalIDs: []ids.ID{failedActiveProposalID},
+					EarlyFinishedFailedProposalIDs: []ids.ID{activeFailedProposalID},
 				}
 			},
 			expectedErr: errNotEarlyFinishedProposal,
@@ -7172,14 +7351,14 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredSuccessfulProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr5,
 				}, []*avax.UTXO{
-					successfulActiveProposalUTXO,
+					activeSuccessfulProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(successfulActiveProposalID).Return(successfulActiveProposal, nil)
+				s.EXPECT().GetProposal(activeSuccessfulProposalID).Return(activeSuccessfulProposal, nil).Times(2)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7188,13 +7367,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulActiveProposalUTXO,
+							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulActiveProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(activeSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredSuccessfulProposalIDs: []ids.ID{successfulActiveProposalID},
+					ExpiredSuccessfulProposalIDs: []ids.ID{activeSuccessfulProposalID},
 				}
 			},
 			expectedErr: errNotExpiredProposal,
@@ -7205,14 +7384,14 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{failedExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredFailedProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr6,
 				}, []*avax.UTXO{
-					failedActiveProposalUTXO,
+					activeFailedProposalUTXO,
 				}, locked.StateBonded)
-				s.EXPECT().GetProposal(failedActiveProposalID).Return(failedActiveProposal, nil)
+				s.EXPECT().GetProposal(activeFailedProposalID).Return(activeFailedProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7221,13 +7400,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							failedActiveProposalUTXO,
+							activeFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(failedActiveProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(activeFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredFailedProposalIDs: []ids.ID{failedActiveProposalID},
+					ExpiredFailedProposalIDs: []ids.ID{activeFailedProposalID},
 				}
 			},
 			expectedErr: errNotExpiredProposal,
@@ -7238,15 +7417,15 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{failedExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredFailedProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr4,
 				}, []*avax.UTXO{
-					failedExpiredProposalUTXO,
+					expiredFailedProposalUTXO,
 				}, locked.StateBonded)
 
-				s.EXPECT().GetProposal(failedExpiredProposalID).Return(failedExpiredProposal, nil)
+				s.EXPECT().GetProposal(expiredFailedProposalID).Return(expiredFailedProposal, nil).Times(2)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7255,13 +7434,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							failedExpiredProposalUTXO,
+							expiredFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(failedExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredSuccessfulProposalIDs: []ids.ID{failedExpiredProposalID},
+					ExpiredSuccessfulProposalIDs: []ids.ID{expiredFailedProposalID},
 				}
 			},
 			expectedErr: errNotSuccessfulProposal,
@@ -7272,14 +7451,14 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
-				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{failedEarlyFinishedProposalID}, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{earlyFailedProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr2,
 				}, []*avax.UTXO{
-					failedEarlyFinishedProposalUTXO,
+					earlyFailedProposalUTXO,
 				}, locked.StateBonded)
 
-				s.EXPECT().GetProposal(failedEarlyFinishedProposalID).Return(failedEarlyFinishedProposal, nil)
+				s.EXPECT().GetProposal(earlyFailedProposalID).Return(earlyFailedProposal, nil).Times(2)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7288,13 +7467,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							failedEarlyFinishedProposalUTXO,
+							earlyFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(failedEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlyFailedProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{failedEarlyFinishedProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlyFailedProposalID},
 				}
 			},
 			expectedErr: errNotSuccessfulProposal,
@@ -7305,15 +7484,15 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
-					Return([]ids.ID{successfulExpiredProposalID}, cfg.BerlinPhaseTime, nil)
+					Return([]ids.ID{expiredSuccessfulProposalID}, cfg.BerlinPhaseTime, nil)
 				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr3,
 				}, []*avax.UTXO{
-					successfulExpiredProposalUTXO,
+					expiredSuccessfulProposalUTXO,
 				}, locked.StateBonded)
 
-				s.EXPECT().GetProposal(successfulExpiredProposalID).Return(successfulExpiredProposal, nil)
+				s.EXPECT().GetProposal(expiredSuccessfulProposalID).Return(expiredSuccessfulProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7322,13 +7501,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulExpiredProposalUTXO,
+							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulExpiredProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					ExpiredFailedProposalIDs: []ids.ID{successfulExpiredProposalID},
+					ExpiredFailedProposalIDs: []ids.ID{expiredSuccessfulProposalID},
 				}
 			},
 			expectedErr: errSuccessfulProposal,
@@ -7339,14 +7518,14 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).Return([]ids.ID{}, cfg.BerlinPhaseTime, nil)
-				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{successfulEarlyFinishedProposalID}, nil)
+				s.EXPECT().GetProposalIDsToFinish().Return([]ids.ID{earlySuccessfulProposalID}, nil)
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr1,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO,
+					earlySuccessfulProposalUTXO,
 				}, locked.StateBonded)
 
-				s.EXPECT().GetProposal(successfulEarlyFinishedProposalID).Return(successfulEarlyFinishedProposal, nil)
+				s.EXPECT().GetProposal(earlySuccessfulProposalID).Return(earlySuccessfulProposal, nil)
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
@@ -7355,13 +7534,13 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: generateInsFromUTXOsWithSigIndices([]*avax.UTXO{
-							successfulEarlyFinishedProposalUTXO,
+							earlySuccessfulProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
-							generateTestOutFromUTXO(successfulEarlyFinishedProposalUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
 						},
 					}},
-					EarlyFinishedFailedProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
+					EarlyFinishedFailedProposalIDs: []ids.ID{earlySuccessfulProposalID},
 				}
 			},
 			expectedErr: errSuccessfulProposal,
@@ -7377,25 +7556,25 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				expectUnlock(t, s, utx.ProposalIDs(), []ids.ShortID{
 					bondOwnerAddr1, bondOwnerAddr2, bondOwnerAddr3, bondOwnerAddr4,
 				}, []*avax.UTXO{
-					successfulEarlyFinishedProposalUTXO, failedEarlyFinishedProposalUTXO,
-					successfulExpiredProposalUTXO, failedExpiredProposalUTXO,
+					earlySuccessfulProposalUTXO, earlyFailedProposalUTXO,
+					expiredSuccessfulProposalUTXO, expiredFailedProposalUTXO,
 				}, locked.StateBonded)
 
-				s.EXPECT().GetProposal(successfulEarlyFinishedProposalID).Return(successfulEarlyFinishedProposal, nil)
-				s.EXPECT().SetBaseFee(successfulEarlyFinishedProposal.Options[mostVotedIndex].Value) // proposal executor
-				s.EXPECT().RemoveProposal(successfulEarlyFinishedProposalID, successfulEarlyFinishedProposal)
-				s.EXPECT().RemoveProposalIDToFinish(successfulEarlyFinishedProposalID)
+				s.EXPECT().GetProposal(earlySuccessfulProposalID).Return(earlySuccessfulProposal, nil).Times(2)
+				s.EXPECT().SetBaseFee(earlySuccessfulProposal.Options[mostVotedIndex].Value) // proposal executor
+				s.EXPECT().RemoveProposal(earlySuccessfulProposalID, earlySuccessfulProposal)
+				s.EXPECT().RemoveProposalIDToFinish(earlySuccessfulProposalID)
 
-				s.EXPECT().GetProposal(failedEarlyFinishedProposalID).Return(failedEarlyFinishedProposal, nil)
-				s.EXPECT().RemoveProposal(failedEarlyFinishedProposalID, failedEarlyFinishedProposal)
-				s.EXPECT().RemoveProposalIDToFinish(failedEarlyFinishedProposalID)
+				s.EXPECT().GetProposal(earlyFailedProposalID).Return(earlyFailedProposal, nil)
+				s.EXPECT().RemoveProposal(earlyFailedProposalID, earlyFailedProposal)
+				s.EXPECT().RemoveProposalIDToFinish(earlyFailedProposalID)
 
-				s.EXPECT().GetProposal(successfulExpiredProposalID).Return(successfulExpiredProposal, nil)
-				s.EXPECT().SetBaseFee(successfulExpiredProposal.Options[mostVotedIndex].Value) // proposal executor
-				s.EXPECT().RemoveProposal(successfulExpiredProposalID, successfulExpiredProposal)
+				s.EXPECT().GetProposal(expiredSuccessfulProposalID).Return(expiredSuccessfulProposal, nil).Times(2)
+				s.EXPECT().SetBaseFee(expiredSuccessfulProposal.Options[mostVotedIndex].Value) // proposal executor
+				s.EXPECT().RemoveProposal(expiredSuccessfulProposalID, expiredSuccessfulProposal)
 
-				s.EXPECT().GetProposal(failedExpiredProposalID).Return(failedExpiredProposal, nil)
-				s.EXPECT().RemoveProposal(failedExpiredProposalID, failedExpiredProposal)
+				s.EXPECT().GetProposal(expiredFailedProposalID).Return(expiredFailedProposal, nil)
+				s.EXPECT().RemoveProposal(expiredFailedProposalID, expiredFailedProposal)
 
 				expectConsumeUTXOs(t, s, utx.Ins)
 				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
@@ -7404,10 +7583,106 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx:                             baseTx,
-					EarlyFinishedSuccessfulProposalIDs: []ids.ID{successfulEarlyFinishedProposalID},
-					EarlyFinishedFailedProposalIDs:     []ids.ID{failedEarlyFinishedProposalID},
-					ExpiredSuccessfulProposalIDs:       []ids.ID{successfulExpiredProposalID},
-					ExpiredFailedProposalIDs:           []ids.ID{failedExpiredProposalID},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalID},
+					EarlyFinishedFailedProposalIDs:     []ids.ID{earlyFailedProposalID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{expiredSuccessfulProposalID},
+					ExpiredFailedProposalIDs:           []ids.ID{expiredFailedProposalID},
+				}
+			},
+		},
+		"OK: additional bond from proposals (e.g. excluded member pending validator)": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.FinishProposalsTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				s.EXPECT().GetNextToExpireProposalIDsAndTime(nil).
+					Return(utx.ExpiredSuccessfulProposalIDs, cfg.BerlinPhaseTime, nil)
+				s.EXPECT().GetProposalIDsToFinish().
+					Return(utx.EarlyFinishedSuccessfulProposalIDs, nil)
+				s.EXPECT().GetProposal(earlySuccessfulProposalWithBondID).Return(earlySuccessfulProposalWithBond, nil)
+				s.EXPECT().GetProposal(expiredSuccessfulProposalWithBondID).Return(expiredSuccessfulProposalWithBond, nil)
+
+				// * proposalBondTxIDsGetter
+				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID1, nil)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(pendingValidator1, nil)
+
+				s.EXPECT().GetShortIDLink(expiredSuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID2, nil)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID2)).
+					Return(pendingValidator2, nil)
+				// *
+
+				lockTxIDs := append(utx.EarlyFinishedSuccessfulProposalIDs, utx.ExpiredSuccessfulProposalIDs...) //nolint:gocritic
+				lockTxIDs = append(lockTxIDs, validatorTxID1, validatorTxID2)
+				expectUnlock(t, s, lockTxIDs, []ids.ShortID{
+					bondOwnerAddr7, bondOwnerAddr8, bondOwnerAddr9, bondOwnerAddr10,
+				}, []*avax.UTXO{
+					earlySuccessfulProposalWithBondUTXO, expiredSuccessfulProposalWithBondUTXO,
+					additionalBondUTXO1, additionalBondUTXO2,
+				}, locked.StateBonded)
+
+				s.EXPECT().GetProposal(earlySuccessfulProposalWithBondID).Return(earlySuccessfulProposalWithBond, nil)
+				s.EXPECT().RemoveProposal(earlySuccessfulProposalWithBondID, earlySuccessfulProposalWithBond)
+				s.EXPECT().RemoveProposalIDToFinish(earlySuccessfulProposalWithBondID)
+
+				s.EXPECT().GetProposal(expiredSuccessfulProposalWithBondID).Return(expiredSuccessfulProposalWithBond, nil)
+				s.EXPECT().RemoveProposal(expiredSuccessfulProposalWithBondID, expiredSuccessfulProposalWithBond)
+
+				// * proposalExecutor
+				s.EXPECT().GetAddressStates(earlySuccessfulProposalWithBond.MemberAddress).
+					Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().SetAddressStates(earlySuccessfulProposalWithBond.MemberAddress, as.AddressStateEmpty)
+				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID1, nil)
+				s.EXPECT().SetShortIDLink(memberNodeShortID1, state.ShortLinkKeyRegisterNode, nil)
+				s.EXPECT().SetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(nil, database.ErrNotFound)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID1)).
+					Return(pendingValidator1, nil)
+				s.EXPECT().DeletePendingValidator(pendingValidator1)
+
+				s.EXPECT().GetAddressStates(expiredSuccessfulProposalWithBond.MemberAddress).
+					Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().SetAddressStates(expiredSuccessfulProposalWithBond.MemberAddress, as.AddressStateEmpty)
+				s.EXPECT().GetShortIDLink(expiredSuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
+					Return(memberNodeShortID2, nil)
+				s.EXPECT().SetShortIDLink(memberNodeShortID2, state.ShortLinkKeyRegisterNode, nil)
+				s.EXPECT().SetShortIDLink(expiredSuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID2)).
+					Return(nil, database.ErrNotFound)
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(memberNodeShortID2)).
+					Return(pendingValidator2, nil)
+				s.EXPECT().DeletePendingValidator(pendingValidator2)
+				// *
+
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
+
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
+				return &txs.FinishProposalsTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins: []*avax.TransferableInput{
+							generateTestInFromUTXO(earlySuccessfulProposalWithBondUTXO, []uint32{}),
+							generateTestInFromUTXO(expiredSuccessfulProposalWithBondUTXO, []uint32{}),
+							generateTestInFromUTXO(additionalBondUTXO1, []uint32{}),
+							generateTestInFromUTXO(additionalBondUTXO2, []uint32{}),
+						},
+						Outs: []*avax.TransferableOutput{
+							generateTestOutFromUTXO(earlySuccessfulProposalWithBondUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(expiredSuccessfulProposalWithBondUTXO, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(additionalBondUTXO1, ids.Empty, ids.Empty),
+							generateTestOutFromUTXO(additionalBondUTXO2, ids.Empty, ids.Empty),
+						},
+					}},
+					EarlyFinishedSuccessfulProposalIDs: []ids.ID{earlySuccessfulProposalWithBondID},
+					ExpiredSuccessfulProposalIDs:       []ids.ID{expiredSuccessfulProposalWithBondID},
 				}
 			},
 		},
@@ -7419,10 +7694,10 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			env := newCaminoEnvironmentWithMocks(caminoGenesisConf, nil)
 			defer func() { require.NoError(t, shutdownCaminoEnvironment(env)) }()
 
-			env.config.BerlinPhaseTime = successfulEarlyFinishedProposal.StartTime().Add(-1 * time.Second)
+			env.config.BerlinPhaseTime = earlySuccessfulProposal.StartTime().Add(-1 * time.Second)
 
 			utx := tt.utx(env.config)
-			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
+			avax.SortTransferableInputs(utx.Ins)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
 			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
 			require.NoError(t, err)

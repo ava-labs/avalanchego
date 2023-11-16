@@ -115,7 +115,7 @@ func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO, startTime *t
 	return vm
 }
 
-func defaultCaminoConfig(postBanff bool) config.Config {
+func defaultCaminoConfig(postBanff bool) config.Config { //nolint:unparam
 	banffTime := mockable.MaxTime
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)

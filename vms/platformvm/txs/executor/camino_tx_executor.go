@@ -19,11 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
-	dac "github.com/ava-labs/avalanchego/vms/platformvm/dac"
+	dacProposals "github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"golang.org/x/exp/slices"
@@ -100,6 +101,8 @@ var (
 	errEarlyFinishedProposalsMismatch    = errors.New("early proposals mismatch")
 	errExpiredProposalsMismatch          = errors.New("expired proposals mismatch")
 	errWrongAdminProposal                = errors.New("this type of proposal can't be admin-proposal")
+	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
+	errInvalidProposal                   = errors.New("proposal is semantically invalid")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -1721,7 +1724,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return err
 	}
 
-	adminProposal, isAdminProposal := txProposal.(*dac.AdminProposal)
+	adminProposal, isAdminProposal := txProposal.(*dacProposals.AdminProposal)
 	adminProposerAddressState := txProposal.AdminProposer()
 
 	// verify proposal and proposer credential
@@ -1762,8 +1765,8 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return fmt.Errorf("%w: %s", errProposerCredentialMismatch, err)
 	}
 
-	if err := txProposal.Visit(e.proposalVerifier(tx)); err != nil {
-		return err
+	if err := txProposal.Visit(dac.ProposalVerifier(e.State, e.Fx, e.Tx, tx)); err != nil {
+		return fmt.Errorf("%w: %s", errInvalidProposal, err)
 	}
 
 	// verify the flowcheck
@@ -1792,7 +1795,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 
 	txID := e.Tx.ID()
 	allowedVoters := []ids.ShortID{}
-	var proposalState dac.ProposalState
+	var proposalState dacProposals.ProposalState
 
 	if isAdminProposal {
 		// currently we only have addMember and excludeMember proposals, and their option 0 is "success" option
@@ -1992,7 +1995,16 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 
 	// verify ins and outs
 
-	expectedIns, expectedOuts, err := e.FlowChecker.Unlock(e.State, tx.ProposalIDs(), locked.StateBonded)
+	lockTxIDs, err := dac.GetBondTxIDs(e.State, tx)
+	if err != nil {
+		return err
+	}
+
+	expectedIns, expectedOuts, err := e.FlowChecker.Unlock(
+		e.State,
+		lockTxIDs,
+		locked.StateBonded,
+	)
 	if err != nil {
 		return err
 	}
@@ -2042,7 +2054,7 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 		}
 
 		// try to execute proposal
-		if err := proposal.Visit(e.proposalExecutor()); err != nil {
+		if err := proposal.Visit(dac.ProposalExecutor(e.State, e.Fx)); err != nil {
 			return err
 		}
 
@@ -2093,7 +2105,7 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 		}
 
 		// try to execute proposal
-		if err := proposal.Visit(e.proposalExecutor()); err != nil {
+		if err := proposal.Visit(dac.ProposalExecutor(e.State, e.Fx)); err != nil {
 			return err
 		}
 

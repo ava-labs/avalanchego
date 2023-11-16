@@ -736,6 +736,7 @@ func expectVerifyUnlockDeposit(
 	expectGetMultisigAliases(t, s, addrs, aliases)
 }
 
+// TODO @evlekht seems, that [addrs] actually not affecting anything and could be omitted
 func expectUnlock(
 	t *testing.T,
 	s *state.MockDiff,
