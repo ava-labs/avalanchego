@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -52,6 +54,44 @@ func newDefaultConfig() Config {
 		Tracer:                    trace.Noop,
 		BranchFactor:              BranchFactor16,
 	}
+}
+
+func initiateValues(batch []database.BatchOp, seed int64) []database.BatchOp {
+	r := rand.New(rand.NewSource(seed))
+	maxKeyLen := 25
+	maxValLen := 32
+	for i := 0; i < len(batch); i++ {
+		keyLen := r.Intn(maxKeyLen)
+		key := make([]byte, keyLen+7)
+		_, _ = r.Read(key)
+
+		valueLen := r.Intn(maxValLen)
+		value := make([]byte, valueLen)
+		_, _ = r.Read(value)
+		batch[i] = database.BatchOp{Key: key, Value: value}
+	}
+	return batch
+}
+
+func Test_Insert(t *testing.T) {
+	require := require.New(t)
+
+	lvldb, err := leveldb.New(t.TempDir(), nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	db, err := newDatabase(
+		context.Background(),
+		lvldb,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	for i := 0; i < 10; i++ {
+		require.NoError(err)
+		view, err := db.NewView(context.Background(), ViewChanges{BatchOps: initiateValues(make([]database.BatchOp, 150000), int64(i)), ConsumeBytes: true})
+		require.NoError(err)
+		_, err = view.GetMerkleRoot(context.Background())
+		require.NoError(err)
+		//require.NoError(view.CommitToDB(context.Background()))
+	}
+	require.NoError(db.Close())
 }
 
 func Test_MerkleDB_Get_Safety(t *testing.T) {

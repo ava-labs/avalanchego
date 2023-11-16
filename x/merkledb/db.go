@@ -205,6 +205,7 @@ type merkleDB struct {
 	// It is the node with a nil key and is the ancestor of all nodes in the trie.
 	// If it has a value or has multiple children, it is also the root of the trie.
 	sentinelNode *node
+	rootID       ids.ID
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -578,13 +579,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	if !isSentinelNodeTheRoot(db.sentinelNode) {
-		// if the sentinel node should be skipped, the trie's root is the nil key node's only child
-		for _, childEntry := range db.sentinelNode.children {
-			return childEntry.id
-		}
-	}
-	return db.sentinelNode.id
+	return db.rootID
 }
 
 // isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
@@ -982,6 +977,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
 	db.sentinelNode = sentinelChange.after
+	db.rootID = changes.rootID
 	db.history.record(changes)
 	return nil
 }
@@ -1171,8 +1167,14 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 	if err == nil {
 		// sentinel node already exists, so calculate the root ID of the trie
-		db.sentinelNode.calculateID(db.metrics)
-		return db.getMerkleRoot(), nil
+		db.rootID = db.sentinelNode.calculateID(db.metrics)
+		if !isSentinelNodeTheRoot(db.sentinelNode) {
+			// if the sentinel node should be skipped, the trie's root is the nil key node's only child
+			for _, childEntry := range db.sentinelNode.children {
+				db.rootID = childEntry.id
+			}
+		}
+		return db.rootID, nil
 	}
 	if !errors.Is(err, database.ErrNotFound) {
 		return ids.Empty, err
@@ -1182,13 +1184,13 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	db.sentinelNode = newNode(Key{})
 
 	// update its ID
-	db.sentinelNode.calculateID(db.metrics)
+	db.rootID = db.sentinelNode.calculateID(db.metrics)
 
 	if err := db.intermediateNodeDB.Put(Key{}, db.sentinelNode); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.sentinelNode.id, nil
+	return db.rootID, nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
@@ -1289,7 +1291,7 @@ func (db *merkleDB) Clear() error {
 
 	// Clear root
 	db.sentinelNode = newNode(Key{})
-	db.sentinelNode.calculateID(db.metrics)
+	db.rootID = db.sentinelNode.calculateID(db.metrics)
 
 	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
