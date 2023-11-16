@@ -18,7 +18,7 @@ func (noop) GetPeers(context.Context) set.Set[ids.NodeID] {
 	return nil
 }
 
-func (noop) RecordOpinion(context.Context, ids.NodeID, ...ids.ID) error {
+func (noop) RecordOpinion(context.Context, ids.NodeID, set.Set[ids.ID]) error {
 	return nil
 }
 

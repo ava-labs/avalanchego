@@ -56,19 +56,19 @@ func NewMajority(
 	}
 }
 
-func (m *Majority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) error {
+func (m *Majority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs set.Set[ids.ID]) error {
 	if !m.recordResponse(nodeID) {
 		// The chain router should have already dropped unexpected messages.
 		m.log.Error("received unexpected opinion",
 			zap.String("pollType", "majority"),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringers("blkIDs", blkIDs),
+			zap.Reflect("blkIDs", blkIDs),
 		)
 		return nil
 	}
 
 	weight := m.nodeWeights[nodeID]
-	for _, blkID := range blkIDs {
+	for blkID := range blkIDs {
 		newWeight, err := math.Add64(m.received[blkID], weight)
 		if err != nil {
 			return err

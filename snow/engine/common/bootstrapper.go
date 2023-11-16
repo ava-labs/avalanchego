@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	smbootstrapper "github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper"
 )
@@ -67,7 +68,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 
-	if err := b.minority.RecordOpinion(ctx, nodeID, containerID); err != nil {
+	if err := b.minority.RecordOpinion(ctx, nodeID, set.Of(containerID)); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)
@@ -83,13 +84,13 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 		return nil
 	}
 
-	if err := b.minority.RecordOpinion(ctx, nodeID); err != nil {
+	if err := b.minority.RecordOpinion(ctx, nodeID, nil); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)
 }
 
-func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync Accepted message",
 			zap.Stringer("nodeID", nodeID),
@@ -99,7 +100,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		return nil
 	}
 
-	if err := b.majority.RecordOpinion(ctx, nodeID, containerIDs...); err != nil {
+	if err := b.majority.RecordOpinion(ctx, nodeID, containerIDs); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)
@@ -115,7 +116,7 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 		return nil
 	}
 
-	if err := b.majority.RecordOpinion(ctx, nodeID); err != nil {
+	if err := b.majority.RecordOpinion(ctx, nodeID, nil); err != nil {
 		return err
 	}
 	return b.sendMessagesOrFinish(ctx)

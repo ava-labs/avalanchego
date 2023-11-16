@@ -16,7 +16,7 @@ type Poll interface {
 	// until [Result] returns finalized.
 	GetPeers(ctx context.Context) (peers set.Set[ids.NodeID])
 	// RecordOpinion of a node whose opinion was requested.
-	RecordOpinion(ctx context.Context, nodeID ids.NodeID, blkIDs ...ids.ID) error
+	RecordOpinion(ctx context.Context, nodeID ids.NodeID, blkIDs set.Set[ids.ID]) error
 	// Result returns the evaluation of all the peer's opinions along with a
 	// flag to identify that the result has finished being calculated.
 	Result(ctx context.Context) (blkIDs []ids.ID, finalized bool)

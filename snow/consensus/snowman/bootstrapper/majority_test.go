@@ -152,7 +152,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 		name          string
 		majority      Poll
 		nodeID        ids.NodeID
-		blkIDs        []ids.ID
+		blkIDs        set.Set[ids.ID]
 		expectedState Poll
 		expectedErr   error
 	}{
@@ -204,7 +204,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 				received: make(map[ids.ID]uint64),
 			},
 			nodeID: nodeID1,
-			blkIDs: []ids.ID{blkID0},
+			blkIDs: set.Of(blkID0),
 			expectedState: &Majority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -239,7 +239,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 				},
 			},
 			nodeID: nodeID1,
-			blkIDs: []ids.ID{blkID0},
+			blkIDs: set.Of(blkID0),
 			expectedState: &Majority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -271,7 +271,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 				received: make(map[ids.ID]uint64),
 			},
 			nodeID: nodeID1,
-			blkIDs: []ids.ID{blkID0},
+			blkIDs: set.Of(blkID0),
 			expectedState: &Majority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -307,7 +307,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 				},
 			},
 			nodeID: nodeID2,
-			blkIDs: []ids.ID{blkID1},
+			blkIDs: set.Of(blkID1),
 			expectedState: &Majority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -332,7 +332,7 @@ func TestMajorityRecordOpinion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := test.majority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs...)
+			err := test.majority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs)
 			require.Equal(test.expectedState, test.majority)
 			require.ErrorIs(err, test.expectedErr)
 		})

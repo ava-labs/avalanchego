@@ -15,7 +15,7 @@ func TestNoop(t *testing.T) {
 
 	require.Empty(Noop.GetPeers(context.Background()))
 
-	require.NoError(Noop.RecordOpinion(context.Background(), nodeID0))
+	require.NoError(Noop.RecordOpinion(context.Background(), nodeID0, nil))
 
 	blkIDs, finalized := Noop.Result(context.Background())
 	require.Empty(blkIDs)

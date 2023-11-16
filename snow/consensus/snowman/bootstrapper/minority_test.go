@@ -113,7 +113,7 @@ func TestMinorityRecordOpinion(t *testing.T) {
 		name          string
 		minority      Poll
 		nodeID        ids.NodeID
-		blkIDs        []ids.ID
+		blkIDs        set.Set[ids.ID]
 		expectedState Poll
 		expectedErr   error
 	}{
@@ -150,7 +150,7 @@ func TestMinorityRecordOpinion(t *testing.T) {
 				log: logging.NoLog{},
 			},
 			nodeID: nodeID1,
-			blkIDs: []ids.ID{blkID0},
+			blkIDs: set.Of(blkID0),
 			expectedState: &Minority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -172,7 +172,7 @@ func TestMinorityRecordOpinion(t *testing.T) {
 				log: logging.NoLog{},
 			},
 			nodeID: nodeID2,
-			blkIDs: []ids.ID{blkID1},
+			blkIDs: set.Of(blkID1),
 			expectedState: &Minority{
 				requests: requests{
 					maxOutstanding: 1,
@@ -189,7 +189,7 @@ func TestMinorityRecordOpinion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := test.minority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs...)
+			err := test.minority.RecordOpinion(context.Background(), test.nodeID, test.blkIDs)
 			require.Equal(test.expectedState, test.minority)
 			require.ErrorIs(err, test.expectedErr)
 		})
