@@ -1136,23 +1136,35 @@ func TestRestartBootstrapping(t *testing.T) {
 	reqID, ok := requestIDs[blkID3]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2, blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2}))
+
+	require.Contains(requestIDs, blkID1)
+
+	// Remove request, so we can restart bootstrapping via ForceAccepted
+	require.True(bs.OutstandingRequests.RemoveAny(blkID1))
+	requestIDs = map[ids.ID]uint32{}
 
 	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{blkID4}))
 
+	blk1RequestID, ok := requestIDs[blkID1]
+	require.True(ok)
 	blk4RequestID, ok := requestIDs[blkID4]
 	require.True(ok)
 
 	require.NotEqual(snow.NormalOp, config.Ctx.State.Get().State)
 
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
 	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
 
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk0.Status())
 	require.Equal(choices.Accepted, blk1.Status())
 	require.Equal(choices.Accepted, blk2.Status())
 	require.Equal(choices.Accepted, blk3.Status())
 	require.Equal(choices.Accepted, blk4.Status())
+
+	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{blkID4}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
