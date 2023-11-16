@@ -11,12 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// test constants
-const (
-	GenesisTestAddr = "0x751a0b96e1042bee789452ecb20253fba40dbe85"
-	GenesisTestKey  = "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
-)
-
 // SnowmanAPI introduces snowman specific functionality to the evm
 type SnowmanAPI struct{ vm *VM }
 
@@ -30,10 +24,6 @@ type GetAcceptedFrontReply struct {
 // GetAcceptedFront returns the last accepted block's hash and height
 func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontReply, error) {
 	blk := api.vm.blockChain.LastConsensusAcceptedBlock()
-
-	api.vm.ctx.Lock.Lock()
-	defer api.vm.ctx.Lock.Unlock()
-
 	return &GetAcceptedFrontReply{
 		Hash:   blk.Hash(),
 		Number: blk.Number(),
@@ -43,10 +33,6 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 // IssueBlock to the chain
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
-
-	api.vm.ctx.Lock.Lock()
-	defer api.vm.ctx.Lock.Unlock()
-
 	api.vm.builder.signalTxsReady()
 	return nil
 }
