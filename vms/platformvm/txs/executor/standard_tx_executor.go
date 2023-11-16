@@ -290,13 +290,11 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -321,16 +319,12 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -344,16 +338,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -444,13 +434,11 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -478,16 +466,12 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 	return nil
 }
 
@@ -511,7 +495,6 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -543,5 +526,31 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	return nil
+}
+
+// addStakerFromStakerTx creates the staker and adds it to state.
+func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.ScheduledStaker) error {
+	var (
+		txID   = e.Tx.ID()
+		staker *state.Staker
+		err    error
+	)
+
+	staker, err = state.NewPendingStaker(txID, stakerTx)
+	if err != nil {
+		return err
+	}
+
+	switch priority := staker.Priority; {
+	case priority.IsCurrentValidator():
+		e.State.PutCurrentValidator(staker)
+	case priority.IsCurrentDelegator():
+		e.State.PutCurrentDelegator(staker)
+	case priority.IsPendingValidator():
+		e.State.PutPendingValidator(staker)
+	case priority.IsPendingDelegator():
+		e.State.PutPendingDelegator(staker)
+	}
 	return nil
 }
