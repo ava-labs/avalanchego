@@ -76,8 +76,18 @@ var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -87,6 +97,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
+	network    Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -168,13 +179,20 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
+	res.network = NewNetwork(
+		res.backend.Ctx,
+		res.blkManager,
+		res.mempool,
+		res.backend.Config.PartialSyncPrimaryNetwork,
+		res.sender,
+	)
+
 	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
 	)
 
 	res.blkManager.SetPreference(genesisID)
@@ -357,9 +375,8 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
