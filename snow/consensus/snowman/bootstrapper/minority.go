@@ -65,7 +65,8 @@ func (m *Minority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs se
 
 	m.received = m.receivedSet.List()
 
-	m.log.Debug("finalized bootstrapping frontier",
+	m.log.Debug("finalized bootstrapping poll",
+		zap.String("pollType", "minority"),
 		zap.Stringers("frontier", m.received),
 	)
 	return nil

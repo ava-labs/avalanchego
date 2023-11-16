@@ -98,7 +98,8 @@ func (m *Majority) RecordOpinion(_ context.Context, nodeID ids.NodeID, blkIDs se
 		}
 	}
 
-	m.log.Debug("finalized bootstrapping instance",
+	m.log.Debug("finalized bootstrapping poll",
+		zap.String("pollType", "majority"),
 		zap.Stringers("accepted", m.accepted),
 	)
 	return nil
