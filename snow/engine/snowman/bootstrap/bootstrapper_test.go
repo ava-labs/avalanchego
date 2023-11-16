@@ -1151,9 +1151,10 @@ func TestRestartBootstrapping(t *testing.T) {
 	blk4RequestID, ok := requestIDs[blkID4]
 	require.True(ok)
 
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
+
 	require.NotEqual(snow.NormalOp, config.Ctx.State.Get().State)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
 	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
 
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
