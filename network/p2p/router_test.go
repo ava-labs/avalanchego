@@ -22,6 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+var errFoo = &common.AppError{
+	Code:    123,
+	Message: "foobar",
+}
+
 func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
 	request := []byte("request")
@@ -33,11 +38,6 @@ func TestAppRequestResponse(t *testing.T) {
 	ctxVal := new(string)
 	*ctxKey = "foo"
 	*ctxVal = "bar"
-
-	errFoo := &common.AppError{
-		Code:    0,
-		Message: "foobar",
-	}
 
 	tests := []struct {
 		name        string
@@ -275,7 +275,7 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested app request failed",
 			requestFunc: func(router *Router) error {
-				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0, nil)
+				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0, errFoo)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -289,7 +289,7 @@ func TestRouterDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested cross-chain request failed",
 			requestFunc: func(router *Router) error {
-				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0, nil)
+				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0, errFoo)
 			},
 			err: ErrUnrequestedResponse,
 		},
