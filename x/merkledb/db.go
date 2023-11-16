@@ -517,6 +517,9 @@ func (db *merkleDB) prefetchPath(ctx context.Context, keyBytes []byte) error {
 		func(key Key, n *node) error {
 			_, innerSpan := db.infoTracer.Start(ctx, "MerkleDB.nodeDB.Put")
 			defer innerSpan.End()
+			if _, ok := db.nodeDB.nodeCache.Get(key); ok {
+				return nil
+			}
 			return db.nodeDB.Put(key, n)
 		})
 }
