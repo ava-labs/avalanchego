@@ -1699,12 +1699,16 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		return err
 	}
 
+	if updateValidators {
+		err = s.updateValidatorSet(diffs.valSetDiff, diffs.weightDiffs)
+	}
+
 	return utils.Err(
+		err,
 		s.writeBlocks(),
 		s.writeCurrentStakers(),
 		s.writeWeightDiffs(height, diffs.weightDiffs),
 		s.writeBlsKeyDiffs(height, diffs.blsKeyDiffs),
-		s.updateValidatorSet(updateValidators, diffs.valSetDiff, diffs.weightDiffs),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1787,14 +1791,9 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 }
 
 func (s *state) updateValidatorSet(
-	updateValidators bool,
 	valSetDiff map[subnetNodeKey]validatorStatusPair,
 	weightDiffs map[subnetNodeKey]*ValidatorWeightDiff,
 ) error {
-	if !updateValidators {
-		return nil
-	}
-
 	for key, weightDiff := range weightDiffs {
 		var (
 			subnetID = key.subnetID
@@ -1853,11 +1852,11 @@ type diffs struct {
 }
 
 func (s *state) calculateDiffs() (diffs, error) {
-	var (
-		outputWeights = make(map[subnetNodeKey]*ValidatorWeightDiff)
-		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
-		outputValSet  = make(map[subnetNodeKey]validatorStatusPair)
-	)
+	res := diffs{
+		weightDiffs: make(map[subnetNodeKey]*ValidatorWeightDiff),
+		blsKeyDiffs: make(map[ids.NodeID]*bls.PublicKey),
+		valSetDiff:  make(map[subnetNodeKey]validatorStatusPair),
+	}
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		// for now, let writeCurrentStakers consume s.currentStakers.validatorDiffs
@@ -1872,7 +1871,7 @@ func (s *state) calculateDiffs() (diffs, error) {
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
-			outputWeights[key] = &ValidatorWeightDiff{
+			res.weightDiffs[key] = &ValidatorWeightDiff{
 				Decrease: validatorDiff.validatorStatus == deleted,
 			}
 
@@ -1882,15 +1881,15 @@ func (s *state) calculateDiffs() (diffs, error) {
 					weight = validatorDiff.validator.Weight
 					blsKey = validatorDiff.validator.PublicKey
 				)
-				outputWeights[key].Amount = weight
+				res.weightDiffs[key].Amount = weight
 				if blsKey != nil {
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
-					outputBlsKey[nodeID] = nil
+					res.blsKeyDiffs[nodeID] = nil
 				}
 
-				outputValSet[key] = validatorStatusPair{
+				res.valSetDiff[key] = validatorStatusPair{
 					validator: validatorDiff.validator,
 					status:    validatorDiff.validatorStatus,
 				}
@@ -1900,15 +1899,15 @@ func (s *state) calculateDiffs() (diffs, error) {
 					weight = validatorDiff.validator.Weight
 					blkKey = validatorDiff.validator.PublicKey
 				)
-				outputWeights[key].Amount = weight
+				res.weightDiffs[key].Amount = weight
 				if blkKey != nil {
 					// Record that the public key for the validator is being
 					// removed. This means we must record the prior value of the
 					// public key.
-					outputBlsKey[nodeID] = blkKey
+					res.blsKeyDiffs[nodeID] = blkKey
 				}
 
-				outputValSet[key] = validatorStatusPair{
+				res.valSetDiff[key] = validatorStatusPair{
 					validator: validatorDiff.validator,
 					status:    validatorDiff.validatorStatus,
 				}
@@ -1923,7 +1922,7 @@ func (s *state) calculateDiffs() (diffs, error) {
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
 
-				if err := outputWeights[key].Add(false /*negative*/, staker.Weight); err != nil {
+				if err := res.weightDiffs[key].Add(false /*negative*/, staker.Weight); err != nil {
 					addedDelegatorIterator.Release()
 					return diffs{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
@@ -1931,18 +1930,14 @@ func (s *state) calculateDiffs() (diffs, error) {
 			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				if err := outputWeights[key].Add(true /*negative*/, staker.Weight); err != nil {
+				if err := res.weightDiffs[key].Add(true /*negative*/, staker.Weight); err != nil {
 					return diffs{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
 
-	return diffs{
-		weightDiffs: outputWeights,
-		blsKeyDiffs: outputBlsKey,
-		valSetDiff:  outputValSet,
-	}, nil
+	return res, nil
 }
 
 func (s *state) Close() error {
