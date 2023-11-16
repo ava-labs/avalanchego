@@ -82,6 +82,7 @@ type SyncServer interface {
 type VM struct {
 	config.Config
 	blockbuilder.Builder
+	blockbuilder.Network
 	validators.State
 
 	syncClient SyncClient
@@ -213,13 +214,19 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
+	vm.Network = blockbuilder.NewNetwork(
+		txExecutorBackend.Ctx,
+		vm.manager,
+		mempool,
+		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+		appSender,
+	)
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 		toEngine,
-		appSender,
 	)
 
 	// Create all of the chains that the database says exist
