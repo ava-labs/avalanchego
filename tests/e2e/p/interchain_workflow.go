@@ -95,13 +95,15 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
-		ginkgo.By("adding the new node as a validator", func() {
-			startTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-			// Validation duration doesn't actually matter to this
-			// test - it is only ensuring that adding a validator
-			// doesn't break interchain transfer.
-			endTime := startTime.Add(30 * time.Second)
+		// Validation and delegation durations don't actually matter to this
+		// test - it is only ensuring that adding a validator and delegator
+		// doesn't break interchain transfer.
+		var (
+			validatorEndTime = time.Now().Add(30 * time.Second)
+			delegatorEndTime = validatorEndTime.Add(-1 * time.Second)
+		)
 
+		ginkgo.By("adding the new node as a validator", func() {
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -114,8 +116,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
-						End:    uint64(endTime.Unix()),
+						End:    uint64(validatorEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -137,12 +138,6 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		ginkgo.By("adding a delegator to the new node", func() {
-			startTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-			// Delegation duration doesn't actually matter to this
-			// test - it is only ensuring that adding a delegator
-			// doesn't break interchain transfer.
-			endTime := startTime.Add(15 * time.Second)
-
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -150,8 +145,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
-						End:    uint64(endTime.Unix()),
+						End:    uint64(delegatorEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,

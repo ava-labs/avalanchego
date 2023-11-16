@@ -140,7 +140,6 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							Start:  uint64(validatorStartTime.Unix()),
 							End:    uint64(validatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
@@ -162,7 +161,6 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							Start:  uint64(delegatorStartTime.Unix()),
 							End:    uint64(delegatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},

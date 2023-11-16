@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -362,6 +363,11 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool:   mempool,
 					txBuilder: txBuilder,
+					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
+					},
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -401,11 +407,15 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 				return &builder{
 					Mempool: mempool,
+					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
+					},
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -448,7 +458,6 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
 				mempool.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
@@ -460,6 +469,9 @@ func TestBuildBlock(t *testing.T) {
 							Log: logging.NoLog{},
 						},
 						Clk: clk,
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
 					},
 				}
 			},
@@ -496,7 +508,6 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
 				mempool.EXPECT().HasTxs().Return(false)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return(nil)
 
@@ -506,6 +517,9 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
 					},
 				}
 			},
@@ -551,7 +565,6 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There is a tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
 
@@ -561,6 +574,9 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
 					},
 				}
 			},
@@ -605,7 +621,6 @@ func TestBuildBlock(t *testing.T) {
 
 				// There are no decision txs
 				// There is a staker tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
 
@@ -615,6 +630,9 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
+						Config: &config.Config{
+							DTime: time.Time{}, // Durango fork activate
+						},
 					},
 				}
 			},

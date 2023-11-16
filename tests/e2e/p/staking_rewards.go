@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -109,17 +108,17 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			weight            = 2_000 * units.Avax
 		)
 
-		alphaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-		alphaValidatorEndTime := alphaValidatorStartTime.Add(validationPeriod)
-		tests.Outf("alpha node validation period starting at: %v\n", alphaValidatorStartTime)
+		var (
+			validatorsEndTime = time.Now().Add(validationPeriod)
+			delegatorsEndTime = time.Now().Add(delegationPeriod)
+		)
 
 		ginkgo.By("adding alpha node as a validator", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						Start:  uint64(alphaValidatorStartTime.Unix()),
-						End:    uint64(alphaValidatorEndTime.Unix()),
+						End:    uint64(validatorsEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -140,17 +139,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		betaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-		betaValidatorEndTime := betaValidatorStartTime.Add(validationPeriod)
-		tests.Outf("beta node validation period starting at: %v\n", betaValidatorStartTime)
-
 		ginkgo.By("adding beta node as a validator", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						Start:  uint64(betaValidatorStartTime.Unix()),
-						End:    uint64(betaValidatorEndTime.Unix()),
+						End:    uint64(validatorsEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -171,16 +165,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		gammaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-		tests.Outf("gamma delegation period starting at: %v\n", gammaDelegatorStartTime)
-
 		ginkgo.By("adding gamma as delegator to the alpha node", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						Start:  uint64(gammaDelegatorStartTime.Unix()),
-						End:    uint64(gammaDelegatorStartTime.Add(delegationPeriod).Unix()),
+						End:    uint64(delegatorsEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -195,16 +185,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		deltaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-		tests.Outf("delta delegation period starting at: %v\n", deltaDelegatorStartTime)
-
 		ginkgo.By("adding delta as delegator to the beta node", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						Start:  uint64(deltaDelegatorStartTime.Unix()),
-						End:    uint64(deltaDelegatorStartTime.Add(delegationPeriod).Unix()),
+						End:    uint64(delegatorsEndTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -225,7 +211,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		ginkgo.By("waiting until all validation periods are over")
 		// The beta validator was the last added and so has the latest end time. The
 		// delegation periods are shorter than the validation periods.
-		time.Sleep(time.Until(betaValidatorEndTime))
+		time.Sleep(time.Until(validatorsEndTime))
 
 		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
 
