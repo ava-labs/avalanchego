@@ -35,12 +35,10 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errDuplicateTx                = errors.New("duplicate tx")
-	errTxTooLarge                 = errors.New("tx too large")
-	errMempoolFull                = errors.New("mempool is full")
-	errConflictsWithOtherTx       = errors.New("tx conflicts with other tx")
-	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
-	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
+	errDuplicateTx          = errors.New("duplicate tx")
+	errTxTooLarge           = errors.New("tx too large")
+	errMempoolFull          = errors.New("mempool is full")
+	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
 type BlockTimer interface {
@@ -61,19 +59,25 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
-	Peek(maxTxSize int) *txs.Tx
-
-	// Note: Dropped txs are added to droppedTxIDs but not evicted from
-	// unissued. This allows previously dropped txs to be possibly reissued.
-	MarkDropped(txID ids.ID, reason error)
-	GetDropReason(txID ids.ID) error
+	// Following Banff activation, all mempool transactions,
+	// (both decision and staker) are included into Standard blocks.
+	// HasTxs allow to check for availability of any mempool transaction.
+	HasTxs() bool
+	// PeekTxs returns the next txs for Banff blocks
+	// up to maxTxsBytes without removing them from the mempool.
+	PeekTxs(maxTxsBytes int) []*txs.Tx
 
 	// Drops all [txs.Staker] transactions whose [StartTime] is before
 	// [minStartTime] from [mempool]. The dropped tx ids are returned.
 	//
 	// TODO: Remove once [StartTime] field is ignored in staker txs
 	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
+
+	// Note: dropped txs are added to droppedTxIDs but are not evicted from
+	// unissued decision/staker txs. This allows previously dropped txs to be
+	// possibly reissued.
+	MarkDropped(txID ids.ID, reason error)
+	GetDropReason(txID ids.ID) error
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -148,14 +152,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
 	}
 
-	switch tx.Unsigned.(type) {
-	case *txs.AdvanceTimeTx:
-		return errCantIssueAdvanceTimeTx
-	case *txs.RewardValidatorTx:
-		return errCantIssueRewardValidatorTx
-	default:
-	}
-
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
@@ -185,9 +181,12 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
 	}
 
-	m.unissuedTxs.Put(tx.ID(), tx)
-	m.bytesAvailable -= txSize
-	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+	if err := tx.Unsigned.Visit(&issuer{
+		m:  m,
+		tx: tx,
+	}); err != nil {
+		return err
+	}
 
 	// Mark these UTXOs as consumed in the mempool
 	m.consumedUTXOs.Union(inputs)
@@ -209,32 +208,59 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
+	remover := &remover{
+		m: m,
+	}
+
 	for _, tx := range txsToRemove {
-		txID := tx.ID()
-		if !m.unissuedTxs.Delete(txID) {
-			continue
-		}
-
-		m.bytesAvailable += len(tx.Bytes())
-		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-		m.numTxs.Dec()
-
-		inputs := tx.Unsigned.InputIDs()
-		m.consumedUTXOs.Difference(inputs)
+		remover.tx = tx
+		_ = tx.Unsigned.Visit(remover)
 	}
 }
 
-func (m *mempool) Peek(maxTxSize int) *txs.Tx {
+func (m *mempool) HasTxs() bool {
+	return m.unissuedTxs.Len() > 0
+}
+
+func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
+	var txs []*txs.Tx
 	txIter := m.unissuedTxs.NewIterator()
+	size := 0
 	for txIter.Next() {
 		tx := txIter.Value()
-		txSize := len(tx.Bytes())
-		if txSize <= maxTxSize {
-			return tx
+		size += len(tx.Bytes())
+		if size > maxTxsBytes {
+			return txs
+		}
+		txs = append(txs, tx)
+	}
+	return txs
+}
+
+func (m *mempool) addDecisionTx(tx *txs.Tx) {
+	m.unissuedTxs.Put(tx.ID(), tx)
+	m.register(tx)
+}
+
+func (m *mempool) addStakerTx(tx *txs.Tx) {
+	m.unissuedTxs.Put(tx.ID(), tx)
+	m.register(tx)
+}
+
+func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
+	for _, tx := range txs {
+		txID := tx.ID()
+		if m.unissuedTxs.Delete(txID) {
+			m.deregister(tx)
 		}
 	}
-	return nil
+}
+
+func (m *mempool) removeStakerTx(tx *txs.Tx) {
+	txID := tx.ID()
+	if m.unissuedTxs.Delete(txID) {
+		m.deregister(tx)
+	}
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
@@ -246,6 +272,25 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 	return err
 }
 
+func (m *mempool) register(tx *txs.Tx) {
+	txBytes := tx.Bytes()
+	m.bytesAvailable -= len(txBytes)
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+}
+
+func (m *mempool) deregister(tx *txs.Tx) {
+	txBytes := tx.Bytes()
+	m.bytesAvailable += len(txBytes)
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+
+	inputs := tx.Unsigned.InputIDs()
+	m.consumedUTXOs.Difference(inputs)
+}
+
+// Drops all [txs.Staker] transactions whose [StartTime] is before
+// [minStartTime] from [mempool]. The dropped tx ids are returned.
+//
+// TODO: Remove once [StartTime] field is ignored in staker txs
 func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 	var droppedTxIDs []ids.ID
 
@@ -256,6 +301,7 @@ func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 		if !ok {
 			continue
 		}
+
 		startTime := stakerTx.StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
