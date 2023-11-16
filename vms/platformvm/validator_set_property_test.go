@@ -374,7 +374,7 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	if err := vm.Builder.AddUnverifiedTx(signedTx); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -802,7 +802,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), testSubnet1); err != nil {
 		return nil, ids.Empty, err
 	}
 
@@ -841,7 +841,7 @@ func buildCustomGenesis() ([]byte, error) {
 	// won't find next staker to promote/evict from stakers set. Contrary to
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
-	nodeID := ids.NodeID(keys[len(keys)-1].PublicKey().Address())
+	nodeID := genesisNodeIDs[len(genesisNodeIDs)-1]
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
