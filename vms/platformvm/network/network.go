@@ -115,12 +115,13 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	// Invariant: tx should not be referenced again without the context lock
 	// held to avoid any data races.
 	n.ctx.Lock.Lock()
+	defer n.ctx.Lock.Unlock()
+
 	if reason := n.mempool.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
 	err = n.issueTx(tx)
-	n.ctx.Lock.Unlock()
 	if err == nil {
 		n.gossipTx(ctx, txID, msgBytes)
 	}

@@ -36,7 +36,6 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 		},
 	}
-
 	require.NoError(t, testTx.Initialize(txs.Codec))
 
 	type test struct {
