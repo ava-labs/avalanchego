@@ -788,6 +788,9 @@ func (db *merkleDB) NewView(
 	if db.closed {
 		return nil, database.ErrClosed
 	}
+	if db.invalid {
+		return nil, ErrInvalid
+	}
 
 	newView, err := newTrieView(db, db, changes)
 	if err != nil {
@@ -923,7 +926,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return database.ErrClosed
 	case trieToCommit == nil:
 		return nil
-	case trieToCommit.isInvalid():
+	case db.invalid || trieToCommit.isInvalid():
 		return ErrInvalid
 	case trieToCommit.committed:
 		return ErrCommitted
