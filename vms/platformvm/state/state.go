@@ -1494,13 +1494,13 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		startTime := stakerTx.StartTime()
+		startTime := stakerTx.(txs.ScheduledStaker).StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
