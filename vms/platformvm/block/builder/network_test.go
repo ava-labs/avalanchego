@@ -125,7 +125,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	require.NoError(env.Builder.AddUnverifiedTx(tx))
+	require.NoError(env.Builder.IssueTx(context.Background(), tx))
 	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
