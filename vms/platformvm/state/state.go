@@ -2164,21 +2164,23 @@ func (s *state) writeCurrentStakers(updateValidators bool) error {
 				continue
 			}
 
-			if weightDiff.Decrease {
+			switch {
+			case weightDiff.Amount == 0:
+				// No weight change to record; go to next validator.
+				continue
+			case weightDiff.Decrease:
 				err = s.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
-			} else {
-				if validatorDiff.validatorStatus == added {
-					staker := validatorDiff.validator
-					err = s.cfg.Validators.AddStaker(
-						subnetID,
-						nodeID,
-						staker.PublicKey,
-						staker.TxID,
-						weightDiff.Amount,
-					)
-				} else {
-					err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
-				}
+			case validatorDiff.validatorStatus == added:
+				staker := validatorDiff.validator
+				err = s.cfg.Validators.AddStaker(
+					subnetID,
+					nodeID,
+					staker.PublicKey,
+					staker.TxID,
+					weightDiff.Amount,
+				)
+			default:
+				err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 			}
 			if err != nil {
 				return fmt.Errorf("failed to update validator weight: %w", err)
