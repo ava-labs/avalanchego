@@ -259,7 +259,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 		ts.Keys[0].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
-	require.NoError(vm.Builder.AddUnverifiedTx(testSubnet1))
+	require.NoError(vm.Builder.IssueTx(context.Background(), testSubnet1))
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
@@ -355,7 +355,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -455,7 +455,7 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -500,7 +500,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	err = vm.Builder.AddUnverifiedTx(tx)
+	err = vm.Builder.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
 }
 
@@ -533,7 +533,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -579,7 +579,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -775,7 +775,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err) // should contain proposal to create chain
@@ -828,7 +828,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), createSubnetTx))
 
 	// should contain proposal to create subnet
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -869,7 +869,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
 
 	blk, err = vm.Builder.BuildBlock(context.Background()) // should add validator to the new subnet
 	require.NoError(err)
@@ -985,7 +985,7 @@ func TestAtomicImport(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -1477,7 +1477,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	frontier := []ids.ID{advanceTimeBlkID}
+	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
 	externalSender.SendF = nil
@@ -1896,7 +1896,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1913,7 +1913,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1982,7 +1982,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
 
-	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), createSubnetTx))
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -2014,7 +2014,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(transferSubnetOwnershipTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), transferSubnetOwnershipTx))
 	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -2100,7 +2100,7 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(baseTx))
+	require.NoError(vm.Builder.IssueTx(context.Background(), baseTx))
 	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
