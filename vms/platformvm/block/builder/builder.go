@@ -43,9 +43,6 @@ type Builder interface {
 	mempool.BlockTimer
 	Network
 
-	// AddUnverifiedTx verifier the tx before adding it to mempool
-	AddUnverifiedTx(tx *txs.Tx) error
-
 	// BuildBlock is called on timer clock to attempt to create
 	// next block
 	BuildBlock(context.Context) (snowman.Block, error)
@@ -98,30 +95,6 @@ func New(
 
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
-}
-
-// AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	txID := tx.ID()
-	if b.Mempool.Has(txID) {
-		// If the transaction is already in the mempool - then it looks the same
-		// as if it was successfully added
-		return nil
-	}
-
-	if err := b.blkManager.VerifyTx(tx); err != nil {
-		b.MarkDropped(txID, err)
-		return err
-	}
-
-	// If we are partially syncing the Primary Network, we should not be
-	// maintaining the transaction mempool locally.
-	if !b.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
-		if err := b.Mempool.Add(tx); err != nil {
-			return err
-		}
-	}
-	return b.GossipTx(context.TODO(), tx)
 }
 
 // BuildBlock builds a block to be added to consensus.

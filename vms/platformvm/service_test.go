@@ -238,12 +238,12 @@ func TestGetTxStatus(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// put the chain in existing chain list
-	err = service.vm.Builder.AddUnverifiedTx(tx)
+	err = service.vm.Builder.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
 
 	mutableSharedMemory.SharedMemory = sm
 
-	require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(service.vm.Builder.IssueTx(context.Background(), tx))
 
 	block, err := service.vm.BuildBlock(context.Background())
 	require.NoError(err)
@@ -339,7 +339,7 @@ func TestGetTx(t *testing.T) {
 
 				service.vm.ctx.Lock.Lock()
 
-				require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
+				require.NoError(service.vm.Builder.IssueTx(context.Background(), tx))
 
 				blk, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
