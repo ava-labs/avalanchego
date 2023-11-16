@@ -67,10 +67,10 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err *common.AppError) {
 					defer wg.Done()
 
-					require.NoError(t, err)
+					require.Nil(t, err)
 					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
@@ -91,7 +91,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err *common.AppError) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, errFoo)
@@ -125,9 +125,9 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err *common.AppError) {
 					defer wg.Done()
-					require.NoError(t, err)
+					require.Nil(t, err)
 					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
@@ -147,7 +147,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}()
 					})
 
-				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err *common.AppError) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, errFoo)
