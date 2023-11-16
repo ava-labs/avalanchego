@@ -243,7 +243,7 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
-		nodeDB:               newNodeDB(db, bufferPool, metrics, int(config.NodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
+		nodeDB:               newNodeDB(db, bufferPool, metrics, int(config.NodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor], getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer)),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
@@ -470,7 +470,7 @@ func (db *merkleDB) prefetchValue(keyBytes []byte) error {
 }
 
 func (db *merkleDB) PrefetchPaths(ctx context.Context, keys [][]byte) error {
-	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.PrefetchPaths", oteltrace.WithAttributes(
+	ctx, span := db.infoTracer.Start(ctx, "MerkleDB.PrefetchPaths", oteltrace.WithAttributes(
 		attribute.Int("keyCount", len(keys)),
 	))
 	defer span.End()
@@ -491,7 +491,7 @@ func (db *merkleDB) PrefetchPaths(ctx context.Context, keys [][]byte) error {
 }
 
 func (db *merkleDB) PrefetchPath(ctx context.Context, key []byte) error {
-	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.PrefetchPath")
+	ctx, span := db.infoTracer.Start(ctx, "MerkleDB.PrefetchPath")
 	defer span.End()
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -503,19 +503,19 @@ func (db *merkleDB) PrefetchPath(ctx context.Context, key []byte) error {
 }
 
 func (db *merkleDB) prefetchPath(ctx context.Context, keyBytes []byte) error {
-	ctx, span := db.debugTracer.Start(ctx, "MerkleDB.prefetchPath")
+	ctx, span := db.infoTracer.Start(ctx, "MerkleDB.prefetchPath")
 	defer span.End()
 	return visitPathToKey(
 		ToKey(keyBytes),
 		db.root,
 		db.tokenSize,
 		func(key Key) (*node, error) {
-			_, innerSpan := db.debugTracer.Start(ctx, "MerkleDB.getNodeInternal")
+			innerCtx, innerSpan := db.infoTracer.Start(ctx, "MerkleDB.getNodeInternal")
 			defer innerSpan.End()
-			return db.getNodeInternal(key)
+			return db.getNodeInternal(innerCtx, key)
 		},
 		func(key Key, n *node) error {
-			_, innerSpan := db.debugTracer.Start(ctx, "MerkleDB.nodeDB.Put")
+			_, innerSpan := db.infoTracer.Start(ctx, "MerkleDB.nodeDB.Put")
 			defer innerSpan.End()
 			return db.nodeDB.Put(key, n)
 		})
@@ -1193,7 +1193,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, nil
 	}
-	db.root, err = db.nodeDB.Get(Key{})
+	db.root, err = db.nodeDB.Get(context.Background(), Key{})
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return ids.Empty, err
@@ -1266,7 +1266,7 @@ func (db *merkleDB) getNode(key Key) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	n, err := db.getNodeInternal(key)
+	n, err := db.getNodeInternal(context.Background(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -1278,14 +1278,14 @@ func (db *merkleDB) getNode(key Key) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNodeInternal(key Key) (*node, error) {
+func (db *merkleDB) getNodeInternal(ctx context.Context, key Key) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
 	case key == Key{}:
 		return db.root, nil
 	}
-	return db.nodeDB.Get(key)
+	return db.nodeDB.Get(ctx, key)
 }
 
 // Returns [key] prefixed by [prefix].

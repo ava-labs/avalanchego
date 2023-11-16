@@ -4,6 +4,8 @@
 package merkledb
 
 import (
+	"context"
+	"github.com/ava-labs/avalanchego/trace"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -32,6 +34,8 @@ type nodeDB struct {
 	evictionBatchSize int
 	metrics           merkleMetrics
 	tokenSize         int
+
+	tracer trace.Tracer
 }
 
 func newNodeDB(
@@ -41,6 +45,7 @@ func newNodeDB(
 	size int,
 	evictionBatchSize int,
 	tokenSize int,
+	tracer trace.Tracer,
 ) *nodeDB {
 	result := &nodeDB{
 		metrics:           metrics,
@@ -48,6 +53,7 @@ func newNodeDB(
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
 		tokenSize:         tokenSize,
+		tracer:            tracer,
 	}
 	result.nodeCache = newOnEvictCache(
 		size,
@@ -103,16 +109,23 @@ func (db *nodeDB) addToBatch(b database.Batch, key Key, n *node) error {
 	return b.Put(dbKey, codec.encodeNode(n))
 }
 
-func (db *nodeDB) Get(key Key) (*node, error) {
+func (db *nodeDB) Get(ctx context.Context, key Key) (*node, error) {
+	ctx, span := db.tracer.Start(ctx, "nodeDB.Get")
+	defer span.End()
+
+	_, cacheSpan := db.tracer.Start(ctx, "nodeDB.Get.cache")
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.NodeCacheHit()
 		if cachedValue == nil {
 			return nil, database.ErrNotFound
 		}
+		cacheSpan.End()
 		return cachedValue, nil
 	}
+	cacheSpan.End()
 	db.metrics.NodeCacheMiss()
-
+	_, dbSpan := db.tracer.Start(ctx, "nodeDB.Get.db")
+	defer dbSpan.End()
 	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(dbKey)
