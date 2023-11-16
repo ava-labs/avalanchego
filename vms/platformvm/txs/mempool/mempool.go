@@ -208,13 +208,19 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
-	remover := &remover{
-		m: m,
-	}
-
 	for _, tx := range txsToRemove {
-		remover.tx = tx
-		_ = tx.Unsigned.Visit(remover)
+		txID := tx.ID()
+		if !m.unissuedTxs.Delete(txID) {
+			continue
+		}
+
+		m.bytesAvailable += len(tx.Bytes())
+		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+
+		m.numTxs.Dec()
+
+		inputs := tx.Unsigned.InputIDs()
+		m.consumedUTXOs.Difference(inputs)
 	}
 }
 
@@ -247,22 +253,6 @@ func (m *mempool) addStakerTx(tx *txs.Tx) {
 	m.register(tx)
 }
 
-func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
-	for _, tx := range txs {
-		txID := tx.ID()
-		if m.unissuedTxs.Delete(txID) {
-			m.deregister(tx)
-		}
-	}
-}
-
-func (m *mempool) removeStakerTx(tx *txs.Tx) {
-	txID := tx.ID()
-	if m.unissuedTxs.Delete(txID) {
-		m.deregister(tx)
-	}
-}
-
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 	m.droppedTxIDs.Put(txID, reason)
 }
@@ -276,15 +266,6 @@ func (m *mempool) register(tx *txs.Tx) {
 	txBytes := tx.Bytes()
 	m.bytesAvailable -= len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-}
-
-func (m *mempool) deregister(tx *txs.Tx) {
-	txBytes := tx.Bytes()
-	m.bytesAvailable += len(txBytes)
-	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-	inputs := tx.Unsigned.InputIDs()
-	m.consumedUTXOs.Difference(inputs)
 }
 
 // Drops all [txs.Staker] transactions whose [StartTime] is before
