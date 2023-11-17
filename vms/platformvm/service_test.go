@@ -238,12 +238,12 @@ func TestGetTxStatus(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// put the chain in existing chain list
-	err = service.vm.Builder.IssueTx(context.Background(), tx)
+	err = service.vm.Network.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
 
 	mutableSharedMemory.SharedMemory = sm
 
-	require.NoError(service.vm.Builder.IssueTx(context.Background(), tx))
+	require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
 
 	block, err := service.vm.BuildBlock(context.Background())
 	require.NoError(err)
@@ -339,7 +339,7 @@ func TestGetTx(t *testing.T) {
 
 				service.vm.ctx.Lock.Lock()
 
-				require.NoError(service.vm.Builder.IssueTx(context.Background(), tx))
+				require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
 
 				blk, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
@@ -501,8 +501,8 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
-	delegatorStartTime := defaultGenesisTime
+	delegatorNodeID := genesisNodeIDs[0]
+	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -636,9 +636,9 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
-	delegatorStartTime := defaultGenesisStartTime
-	delegatorEndTime := defaultGenesisStartTime.Add(defaultMinStakingDuration)
+	validatorNodeID := genesisNodeIDs[1]
+	delegatorStartTime := defaultValidateStartTime
+	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 

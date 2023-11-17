@@ -282,9 +282,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
+
 				// Note the duration is 1 less than the minimum
-				tx.Validator.Start = 1
-				tx.Validator.End = uint64(unsignedTransformTx.MinStakeDuration)
+				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration) - 1
 				return &tx
 			},
 			expectedErr: ErrStakeTooShort,
@@ -315,8 +315,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
+
 				// Note the duration is more than the maximum
-				tx.Validator.End = 2 + uint64(unsignedTransformTx.MaxStakeDuration)
+				endTime := now.Add(time.Duration(unsignedTransformTx.MaxStakeDuration) * time.Second).Add(time.Second)
+				tx.Validator.End = uint64(endTime.Unix())
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
