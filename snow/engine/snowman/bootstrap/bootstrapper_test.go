@@ -75,28 +75,22 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	commonConfig := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        vdrs,
-		SampleK:                        vdrs.Count(ctx.SubnetID),
-		Alpha:                          totalWeight/2 + 1,
-		StartupTracker:                 startupTracker,
-		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	return Config{
-		Config:        commonConfig,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocker,
-		VM:            vm,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        vdrs,
+		SampleK:                        vdrs.Count(ctx.SubnetID),
+		StartupTracker:                 startupTracker,
+		Sender:                         sender,
+		BootstrapTracker:               bootstrapTracker,
+		Timer:                          &common.TimerTest{},
+		AncestorsMaxContainersReceived: 2000,
+		Blocked:                        blocker,
+		VM:                             vm,
 	}, peer, sender, vm
 }
 
@@ -121,27 +115,21 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startupTracker := tracker.NewStartup(peerTracker, startupAlpha)
 	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
-	commonCfg := common.Config{
+	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	require.NoError(err)
+	cfg := Config{
+		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        peers,
 		SampleK:                        sampleK,
-		Alpha:                          alpha,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		BootstrapTracker:               &common.BootstrapTrackerTest{},
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
-	require.NoError(err)
-	cfg := Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocker,
-		VM:            vm,
+		Blocked:                        blocker,
+		VM:                             vm,
 	}
 
 	blkID0 := ids.Empty.Prefix(0)
@@ -192,7 +180,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	require.NoError(peers.AddStaker(commonCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, startupAlpha/2))
+	require.NoError(peers.AddStaker(ctx.SubnetID, vdr0, nil, ids.Empty, startupAlpha/2))
 	require.NoError(bs.Connected(context.Background(), vdr0, version.CurrentApp))
 
 	require.NoError(bs.Start(context.Background(), 0))
@@ -200,7 +188,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(peers.AddStaker(commonCfg.Ctx.SubnetID, vdr, nil, ids.Empty, startupAlpha))
+	require.NoError(peers.AddStaker(ctx.SubnetID, vdr, nil, ids.Empty, startupAlpha))
 	require.NoError(bs.Connected(context.Background(), vdr, version.CurrentApp))
 	require.True(frontierRequested)
 }
@@ -696,10 +684,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 
 	// add another two validators to the fetch set to test behavior on empty response
 	newPeerID := ids.GenerateTestNodeID()
-	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+	bs.fetchFrom.Add(newPeerID)
 
 	newPeerID = ids.GenerateTestNodeID()
-	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+	bs.fetchFrom.Add(newPeerID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes2}))
 	require.Equal(blkID1, requestedBlock)
@@ -719,7 +707,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.Equal(choices.Accepted, blk2.Status())
 
 	// check peerToBlacklist was removed from the fetch set
-	require.NotContains(bs.(*bootstrapper).fetchFrom, peerToBlacklist)
+	require.NotContains(bs.fetchFrom, peerToBlacklist)
 }
 
 // There are multiple needed blocks and Ancestors returns all at once
@@ -1111,7 +1099,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1122,8 +1110,6 @@ func TestRestartBootstrapping(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1220,7 +1206,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1231,8 +1217,6 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1291,7 +1275,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		return blk0.ID(), nil
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1302,8 +1286,6 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1366,19 +1348,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	commonConfig := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        peers,
-		SampleK:                        peers.Count(ctx.SubnetID),
-		Alpha:                          totalWeight/2 + 1,
-		StartupTracker:                 startupTracker,
-		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
@@ -1428,10 +1397,17 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	require.NoError(err)
 
 	config := Config{
-		Config:        commonConfig,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocker,
-		VM:            vm,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        peers,
+		SampleK:                        peers.Count(ctx.SubnetID),
+		StartupTracker:                 startupTracker,
+		Sender:                         sender,
+		BootstrapTracker:               bootstrapTracker,
+		Timer:                          &common.TimerTest{},
+		AncestorsMaxContainersReceived: 2000,
+		Blocked:                        blocker,
+		VM:                             vm,
 	}
 
 	_, err = New(

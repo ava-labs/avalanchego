@@ -15,26 +15,8 @@ type Config struct {
 	Ctx     *snow.ConsensusContext
 	Beacons validators.Manager
 
-	SampleK          int
-	Alpha            uint64
-	StartupTracker   tracker.Startup
-	Sender           Sender
-	Bootstrapable    Bootstrapable
-	BootstrapTracker BootstrapTracker
-	Timer            Timer
-
-	// This node will only consider the first [AncestorsMaxContainersReceived]
-	// containers in an ancestors message it receives.
-	AncestorsMaxContainersReceived int
-
-	SharedCfg *SharedConfig
-}
-
-// Shared among common.bootstrapper and snowman/avalanche bootstrapper
-type SharedConfig struct {
-	// Tracks the last requestID that was used in a request
-	RequestID uint32
-
-	// True if RestartBootstrap has been called at least once
-	Restarted bool
+	SampleK        int
+	Alpha          uint64
+	StartupTracker tracker.Startup
+	Sender         Sender
 }

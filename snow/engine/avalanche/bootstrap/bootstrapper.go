@@ -29,6 +29,14 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
+
+	// StatusUpdateFrequency is how many containers should be processed between
+	// logs
+	statusUpdateFrequency = 5000
+
+	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
+	// sent but not responded to/failed
+	maxOutstandingGetAncestorsRequests = 10
 )
 
 var _ common.BootstrapableEngine = (*bootstrapper)(nil)
@@ -384,7 +392,7 @@ func (b *bootstrapper) GetVM() common.VM {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
@@ -490,7 +498,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 			b.numFetchedVts.Inc()
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
-			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			if verticesFetchedSoFar%statusUpdateFrequency == 0 { // Periodically print progress
 				b.Ctx.Log.Info("fetched vertices",
 					zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
 				)

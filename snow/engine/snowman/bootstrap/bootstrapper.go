@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+
+	smbootstrapper "github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper"
 )
 
 const (
@@ -33,26 +35,23 @@ const (
 	// logs
 	statusUpdateFrequency = 5000
 
-	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
-	// sent but not responded to/failed
-	maxOutstandingGetAncestorsRequests = 10
-
 	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
 )
 
 var (
-	_ common.BootstrapableEngine = (*bootstrapper)(nil)
+	_ common.BootstrapableEngine = (*Bootstrapper)(nil)
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
 // Invariant: The VM is not guaranteed to be initialized until Start has been
 // called, so it must be guaranteed the VM is not used until after Start.
-type bootstrapper struct {
+type Bootstrapper struct {
 	Config
 	common.Halter
+	*metrics
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
 	common.StateSummaryFrontierHandler
@@ -62,11 +61,13 @@ type bootstrapper struct {
 	common.ChitsHandler
 	common.AppHandler
 
-	common.Bootstrapper
-	common.Fetcher
-	*metrics
+	requestID uint32 // Tracks the last requestID that was used in a request
 
-	started bool
+	started   bool
+	restarted bool
+
+	minority smbootstrapper.Poll
+	majority smbootstrapper.Poll
 
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
@@ -76,6 +77,8 @@ type bootstrapper struct {
 	initiallyFetched uint64
 	// Time that ForceAccepted was last called
 	startTime time.Time
+
+	common.Fetcher
 
 	// number of state transitions executed
 	executedStateTransitions int
@@ -98,13 +101,9 @@ type bootstrapper struct {
 	bootstrappedOnce sync.Once
 }
 
-func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics("bs", config.Ctx.Registerer)
-	if err != nil {
-		return nil, err
-	}
-
-	b := &bootstrapper{
+	return &Bootstrapper{
 		Config:                      config,
 		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -114,19 +113,21 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
+		minority: smbootstrapper.Noop,
+		majority: smbootstrapper.Noop,
+
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
 		},
-		executedStateTransitions: math.MaxInt32,
-	}
-
-	config.Bootstrapable = b
-	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
-
-	return b, nil
+		executedStateTransitions: math.MaxInt,
+	}, err
 }
 
-func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
+func (b *Bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
+func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
 	b.Ctx.State.Set(snow.EngineState{
@@ -158,23 +159,247 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
 	b.startingHeight = lastAccepted.Height()
-	b.Config.SharedCfg.RequestID = startReqID
+	b.requestID = startReqID
 
-	if !b.StartupTracker.ShouldStart() {
+	return b.startBootstrappingIfSufficientlyConnected(ctx)
+}
+
+func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+	// Ensure fetchFrom reflects proper validator list
+	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
+		b.fetchFrom.Add(nodeID)
+	}
+
+	return b.startBootstrappingIfSufficientlyConnected(ctx)
+}
+
+func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	b.markUnavailable(nodeID)
+	return nil
+}
+
+func (b *Bootstrapper) startBootstrappingIfSufficientlyConnected(ctx context.Context) error {
+	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
 	b.started = true
-	return b.Startup(ctx)
+	return b.startBootstrapping(ctx)
 }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext {
-	return b.Ctx
+func (b *Bootstrapper) startBootstrapping(ctx context.Context) error {
+	currentBeacons := b.Beacons.GetMap(b.Ctx.SubnetID)
+	nodeWeights := make(map[ids.NodeID]uint64, len(currentBeacons))
+	for nodeID, beacon := range currentBeacons {
+		nodeWeights[nodeID] = beacon.Weight
+	}
+
+	frontierNodes, err := smbootstrapper.Sample(nodeWeights, b.SampleK)
+	if err != nil {
+		return err
+	}
+
+	b.Ctx.Log.Debug("sampled nodes to seed bootstrapping frontier",
+		zap.Reflect("sampledNodes", frontierNodes),
+		zap.Int("numNodes", len(nodeWeights)),
+	)
+
+	b.minority = smbootstrapper.NewMinority(
+		b.Ctx.Log,
+		frontierNodes,
+		maxOutstandingBroadcastRequests,
+	)
+	b.majority = smbootstrapper.NewMajority(
+		b.Ctx.Log,
+		nodeWeights,
+		maxOutstandingBroadcastRequests,
+	)
+
+	if accepted, finalized := b.majority.Result(ctx); finalized {
+		b.Ctx.Log.Info("bootstrapping skipped",
+			zap.String("reason", "no provided bootstraps"),
+		)
+		return b.ForceAccepted(ctx, accepted)
+	}
+
+	b.requestID++
+	return b.sendMessagesOrFinish(ctx)
+}
+
+func (b *Bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
+	if peers := b.minority.GetPeers(ctx); peers.Len() > 0 {
+		b.Sender.SendGetAcceptedFrontier(ctx, peers, b.requestID)
+		return nil
+	}
+
+	potentialAccepted, finalized := b.minority.Result(ctx)
+	if !finalized {
+		// We haven't finalized the accepted frontier, so we should wait for the
+		// outstanding requests.
+		return nil
+	}
+
+	if peers := b.majority.GetPeers(ctx); peers.Len() > 0 {
+		b.Sender.SendGetAccepted(ctx, peers, b.requestID, potentialAccepted)
+		return nil
+	}
+
+	accepted, finalized := b.majority.Result(ctx)
+	if !finalized {
+		// We haven't finalized the accepted set, so we should wait for the
+		// outstanding requests.
+		return nil
+	}
+
+	numAccepted := len(accepted)
+	if numAccepted == 0 {
+		b.Ctx.Log.Debug("restarting bootstrap",
+			zap.String("reason", "no blocks accepted"),
+			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
+		)
+		// Invariant: These functions are mutualy recursive. However, when
+		// [startBootstrapping] calls [sendMessagesOrFinish], it is guaranteed
+		// to exit when sending GetAcceptedFrontier requests.
+		return b.startBootstrapping(ctx)
+	}
+
+	if !b.restarted {
+		b.Ctx.Log.Info("bootstrapping started syncing",
+			zap.Int("numAccepted", numAccepted),
+		)
+	} else {
+		b.Ctx.Log.Debug("bootstrapping started syncing",
+			zap.Int("numAccepted", numAccepted),
+		)
+	}
+
+	return b.ForceAccepted(ctx, accepted)
+}
+
+func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+	if requestID != b.requestID {
+		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.requestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	if err := b.minority.RecordOpinion(ctx, nodeID, set.Of(containerID)); err != nil {
+		return err
+	}
+	return b.sendMessagesOrFinish(ctx)
+}
+
+func (b *Bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	if requestID != b.requestID {
+		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.requestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	if err := b.minority.RecordOpinion(ctx, nodeID, nil); err != nil {
+		return err
+	}
+	return b.sendMessagesOrFinish(ctx)
+}
+
+func (b *Bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	if requestID != b.requestID {
+		b.Ctx.Log.Debug("received out-of-sync Accepted message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.requestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	if err := b.majority.RecordOpinion(ctx, nodeID, containerIDs); err != nil {
+		return err
+	}
+	return b.sendMessagesOrFinish(ctx)
+}
+
+func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	if requestID != b.requestID {
+		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.requestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	if err := b.majority.RecordOpinion(ctx, nodeID, nil); err != nil {
+		return err
+	}
+	return b.sendMessagesOrFinish(ctx)
+}
+
+func (b *Bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+	pendingContainerIDs := b.Blocked.MissingIDs()
+
+	// Initialize the fetch from set to the currently preferred peers
+	b.fetchFrom = b.StartupTracker.PreferredPeers()
+
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
+	b.Ctx.Log.Debug("starting bootstrapping",
+		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
+		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+	)
+	for _, blkID := range pendingContainerIDs {
+		b.Blocked.AddMissingID(blkID)
+
+		// TODO: if `GetBlock` returns an error other than
+		// `database.ErrNotFound`, then the error should be propagated.
+		blk, err := b.VM.GetBlock(ctx, blkID)
+		if err != nil {
+			if err := b.fetch(ctx, blkID); err != nil {
+				return err
+			}
+			continue
+		}
+		toProcess = append(toProcess, blk)
+	}
+
+	b.initiallyFetched = b.Blocked.PendingJobs()
+	b.startTime = time.Now()
+
+	// Process received blocks
+	for _, blk := range toProcess {
+		if err := b.process(ctx, blk, nil); err != nil {
+			return err
+		}
+	}
+
+	return b.checkFinish(ctx)
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
@@ -244,7 +469,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	return b.process(ctx, requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
@@ -261,58 +486,24 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, blkID)
 }
 
-func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
-		b.fetchFrom.Add(nodeID)
-	}
-
-	if b.started || !b.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup(ctx)
-}
-
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	b.markUnavailable(nodeID)
-	return nil
-}
-
-func (b *bootstrapper) Timeout(ctx context.Context) error {
+func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
 	b.awaitingTimeout = false
 
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.Restart(ctx)
+		return b.restartBootstrapping(ctx)
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.requestID)
 }
 
-func (*bootstrapper) Gossip(context.Context) error {
+func (*Bootstrapper) Gossip(context.Context) error {
 	return nil
 }
 
-func (b *bootstrapper) Shutdown(ctx context.Context) error {
+func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 
 	b.Ctx.Lock.Lock()
@@ -321,7 +512,7 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
+func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
 		b.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
@@ -333,7 +524,7 @@ func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	return nil
 }
 
-func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
@@ -345,54 +536,12 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *bootstrapper) GetVM() common.VM {
+func (b *Bootstrapper) GetVM() common.VM {
 	return b.VM
 }
 
-func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
-	pendingContainerIDs := b.Blocked.MissingIDs()
-
-	// Initialize the fetch from set to the currently preferred peers
-	b.fetchFrom = b.StartupTracker.PreferredPeers()
-
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
-	// we iterate over every container that must be traversed.
-	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
-	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
-	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
-		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
-	)
-	for _, blkID := range pendingContainerIDs {
-		b.Blocked.AddMissingID(blkID)
-
-		// TODO: if `GetBlock` returns an error other than
-		// `database.ErrNotFound`, then the error should be propagated.
-		blk, err := b.VM.GetBlock(ctx, blkID)
-		if err != nil {
-			if err := b.fetch(ctx, blkID); err != nil {
-				return err
-			}
-			continue
-		}
-		toProcess = append(toProcess, blk)
-	}
-
-	b.initiallyFetched = b.Blocked.PendingJobs()
-	b.startTime = time.Now()
-
-	// Process received blocks
-	for _, blk := range toProcess {
-		if err := b.process(ctx, blk, nil); err != nil {
-			return err
-		}
-	}
-
-	return b.checkFinish(ctx)
-}
-
 // Get block [blkID] and its ancestors from a validator
-func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
+func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	// Make sure we haven't already requested this block
 	if b.OutstandingRequests.Contains(blkID) {
 		return nil
@@ -411,17 +560,17 @@ func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	// We only allow one outbound request at a time from a node
 	b.markUnavailable(validatorID)
 
-	b.Config.SharedCfg.RequestID++
+	b.requestID++
 
-	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
-	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
+	b.OutstandingRequests.Add(validatorID, b.requestID, blkID)
+	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, blkID) // request block and ancestors
 	return nil
 }
 
 // markUnavailable removes [nodeID] from the set of peers used to fetch
 // ancestors. If the set becomes empty, it is reset to the currently preferred
 // peers so bootstrapping can continue.
-func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
+func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	b.fetchFrom.Remove(nodeID)
 
 	// if [fetchFrom] has become empty, reset it to the currently preferred
@@ -431,7 +580,7 @@ func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	}
 }
 
-func (b *bootstrapper) Clear(context.Context) error {
+func (b *Bootstrapper) Clear(context.Context) error {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
@@ -451,7 +600,7 @@ func (b *bootstrapper) Clear(context.Context) error {
 //
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
-func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
 	for {
 		blkID := blk.ID()
 		if b.Halted() {
@@ -520,7 +669,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			)
 			b.fetchETA.Set(float64(eta))
 
-			if !b.Config.SharedCfg.Restarted {
+			if !b.restarted {
 				b.Ctx.Log.Info("fetching blocks",
 					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
@@ -570,7 +719,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
-func (b *bootstrapper) checkFinish(ctx context.Context) error {
+func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	if numPending := b.Blocked.NumMissingIDs(); numPending != 0 {
 		return nil
 	}
@@ -579,7 +728,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if !b.Config.SharedCfg.Restarted {
+	if !b.restarted {
 		b.Ctx.Log.Info("executing blocks",
 			zap.Uint64("numPendingJobs", b.Blocked.PendingJobs()),
 		)
@@ -593,7 +742,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		ctx,
 		b.Config.Ctx,
 		b,
-		b.Config.SharedCfg.Restarted,
+		b.restarted,
 		b.Ctx.BlockAcceptor,
 	)
 	if err != nil || b.Halted() {
@@ -607,7 +756,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.Restart(ctx)
+		return b.restartBootstrapping(ctx)
 	}
 
 	// If there is an additional callback, notify them that this chain has been
@@ -622,7 +771,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		if !b.Config.SharedCfg.Restarted {
+		if !b.restarted {
 			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
@@ -634,5 +783,11 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.requestID)
+}
+
+func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
+	b.Ctx.Log.Debug("Checking for new frontiers")
+	b.restarted = true
+	return b.startBootstrapping(ctx)
 }
