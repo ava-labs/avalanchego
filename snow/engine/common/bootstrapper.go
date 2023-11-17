@@ -19,10 +19,6 @@ const (
 	// logs
 	StatusUpdateFrequency = 5000
 
-	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
-	// sent but not responded to/failed
-	MaxOutstandingGetAncestorsRequests = 10
-
 	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	MaxOutstandingBroadcastRequests = 50
