@@ -276,9 +276,7 @@ func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 
 		startTime := stakerTx.StartTime()
 		if !startTime.Before(minStartTime) {
-			// The next proposal tx in the mempool starts sufficiently far in
-			// the future.
-			break
+			continue
 		}
 
 		txID := tx.ID()

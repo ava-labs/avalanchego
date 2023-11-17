@@ -229,3 +229,44 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	}
 	return proposalTxs, nil
 }
+
+type testBlockTimer struct{}
+
+func (*testBlockTimer) ResetBlockTimer() {}
+
+func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  startTime,
+			End:    endTime,
+		},
+		StakeOuts:        nil,
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: 100,
+	}
+
+	return txs.NewSigned(utx, txs.Codec, nil)
+}
+
+func TestDropExpiredStakerTxs(t *testing.T) {
+	require := require.New(t)
+
+	mempool, err := New("test", prometheus.NewRegistry(), &testBlockTimer{})
+	require.NoError(err)
+
+	tx1, err := generateAddValidatorTx(10, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx1))
+
+	tx2, err := generateAddValidatorTx(8, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx2))
+
+	tx3, err := generateAddValidatorTx(15, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx3))
+
+	require.Len(mempool.DropExpiredStakerTxs(time.Unix(int64(9), 0)), 1)
+}
