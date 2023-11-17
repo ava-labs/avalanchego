@@ -1260,9 +1260,9 @@ func (m *manager) createSnowmanChain(
 	stateSyncCfg, err := syncer.NewConfig(
 		snowGetHandler,
 		ctx,
-		beacons,
 		startupTracker,
 		messageSender,
+		beacons,
 		sampleK,
 		alpha,
 		m.StateSyncBeacons,
