@@ -894,7 +894,8 @@ func (m *manager) createAvalancheChain(
 		Blocked:       blockBlocker,
 		VM:            vmWrappingProposerVM,
 	}
-	snowmanBootstrapper, err := smbootstrap.New(
+	var snowmanBootstrapper common.BootstrapableEngine
+	snowmanBootstrapper, err = smbootstrap.New(
 		bootstrapCfg,
 		snowmanEngine.Start,
 	)
@@ -1243,7 +1244,8 @@ func (m *manager) createSnowmanChain(
 		VM:            vm,
 		Bootstrapped:  bootstrapFunc,
 	}
-	bootstrapper, err := smbootstrap.New(
+	var bootstrapper common.BootstrapableEngine
+	bootstrapper, err = smbootstrap.New(
 		bootstrapCfg,
 		engine.Start,
 	)
