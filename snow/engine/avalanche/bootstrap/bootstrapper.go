@@ -29,6 +29,10 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
+
+	// maxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
+	// sent but not yet responded to/failed
+	maxOutstandingGetAncestorsRequests = 10
 )
 
 var _ common.BootstrapableEngine = (*bootstrapper)(nil)
@@ -384,7 +388,7 @@ func (b *bootstrapper) GetVM() common.VM {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 

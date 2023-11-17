@@ -108,6 +108,10 @@ func New(
 	}
 }
 
+func (ss *stateSyncer) Context() *snow.ConsensusContext {
+	return ss.Ctx
+}
+
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
