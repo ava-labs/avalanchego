@@ -34,6 +34,20 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
+// bootstrapper repeatedly performs the bootstrapping protocol.
+//
+//  1. Wait until a sufficient amount of stake is connected.
+//  2. Sample a small number of nodes to get the last accepted block ID
+//  3. Verify against the full network that the last accepted block ID received
+//     in step 2 is an accepted block.
+//  4. Sync the full ancestry of the last accepted block.
+//  5. Execute all the fetched blocks that haven't already been executed.
+//  6. Restart the bootstrapping protocol until the number of blocks being
+//     accepted during a bootstrapping round stops decreasing.
+//
+// Note: Because of step 6, the bootstrapping protocol will generally be
+// performed multiple times.
+//
 // Invariant: The VM is not guaranteed to be initialized until Start has been
 // called, so it must be guaranteed the VM is not used until after Start.
 type bootstrapper struct {
