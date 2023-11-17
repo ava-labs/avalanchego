@@ -1222,23 +1222,21 @@ func (m *manager) createSnowmanChain(
 		engine = smeng.TraceEngine(engine, m.Tracer)
 	}
 
-	alpha := bootstrapWeight/2 + 1 // must be > 50%
-	commonCfg := common.Config{
-		Ctx:                            ctx,
-		Beacons:                        beacons,
-		SampleK:                        sampleK,
-		StartupTracker:                 startupTracker,
-		Alpha:                          alpha,
-		Sender:                         messageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
-		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
 	// create bootstrap gear
+	alpha := bootstrapWeight/2 + 1 // must be > 50%
 	bootstrapCfg := smbootstrap.Config{
-		Config:        commonCfg,
+		Config: common.Config{
+			Ctx:                            ctx,
+			Beacons:                        beacons,
+			SampleK:                        sampleK,
+			StartupTracker:                 startupTracker,
+			Alpha:                          alpha,
+			Sender:                         messageSender,
+			BootstrapTracker:               sb,
+			Timer:                          h,
+			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+			SharedCfg:                      &common.SharedConfig{},
+		},
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
