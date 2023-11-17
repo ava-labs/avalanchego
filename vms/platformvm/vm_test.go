@@ -432,7 +432,6 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-	// defaultBalance -= vm.Config.GetCreateBlockchainTxFee(vm.clock.Time())
 
 	return vm, db, msm
 }
@@ -487,6 +486,10 @@ func TestGenesis(t *testing.T) {
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 		require.True(ok)
 	}
+
+	// Ensure the new subnet we created exists
+	_, _, err = vm.state.GetTx(testSubnet1.ID())
+	require.NoError(err)
 }
 
 // accept proposal to add validator to primary network
