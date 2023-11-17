@@ -140,6 +140,20 @@ func (b *Bootstrapper) Context() *snow.ConsensusContext {
 	return b.Ctx
 }
 
+func (b *Bootstrapper) GetVM() common.VM {
+	return b.VM
+}
+
+func (b *Bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
+	if err := b.Config.Blocked.Clear(); err != nil {
+		return err
+	}
+	return b.Config.Blocked.Commit()
+}
+
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
@@ -412,6 +426,33 @@ func (b *Bootstrapper) startSyncingAncestry(ctx context.Context, acceptedContain
 	return b.checkFinish(ctx)
 }
 
+// Get block [blkID] and its ancestors from a validator
+func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
+	// Make sure we haven't already requested this block
+	if b.OutstandingRequests.Contains(blkID) {
+		return nil
+	}
+
+	// Make sure we don't already have this block
+	if _, err := b.VM.GetBlock(ctx, blkID); err == nil {
+		return b.checkFinish(ctx)
+	}
+
+	validatorID, ok := b.fetchFrom.Peek()
+	if !ok {
+		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
+	}
+
+	// We only allow one outbound request at a time from a node
+	b.markUnavailable(validatorID)
+
+	b.requestID++
+
+	b.OutstandingRequests.Add(validatorID, b.requestID, blkID)
+	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, blkID) // request block and ancestors
+	return nil
+}
+
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
@@ -501,87 +542,6 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, blkID)
 }
 
-func (b *Bootstrapper) Timeout(ctx context.Context) error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.restartBootstrapping(ctx)
-	}
-	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.requestID)
-}
-
-func (*Bootstrapper) Gossip(context.Context) error {
-	return nil
-}
-
-func (b *Bootstrapper) Shutdown(ctx context.Context) error {
-	b.Ctx.Log.Info("shutting down bootstrapper")
-
-	b.Ctx.Lock.Lock()
-	defer b.Ctx.Lock.Unlock()
-
-	return b.VM.Shutdown(ctx)
-}
-
-func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
-	if msg != common.StateSyncDone {
-		b.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("msg", msg),
-		)
-		return nil
-	}
-
-	b.Ctx.StateSyncing.Set(false)
-	return nil
-}
-
-func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
-	b.Ctx.Lock.Lock()
-	defer b.Ctx.Lock.Unlock()
-
-	vmIntf, vmErr := b.VM.HealthCheck(ctx)
-	intf := map[string]interface{}{
-		"consensus": struct{}{},
-		"vm":        vmIntf,
-	}
-	return intf, vmErr
-}
-
-func (b *Bootstrapper) GetVM() common.VM {
-	return b.VM
-}
-
-// Get block [blkID] and its ancestors from a validator
-func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
-	// Make sure we haven't already requested this block
-	if b.OutstandingRequests.Contains(blkID) {
-		return nil
-	}
-
-	// Make sure we don't already have this block
-	if _, err := b.VM.GetBlock(ctx, blkID); err == nil {
-		return b.checkFinish(ctx)
-	}
-
-	validatorID, ok := b.fetchFrom.Peek()
-	if !ok {
-		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
-	}
-
-	// We only allow one outbound request at a time from a node
-	b.markUnavailable(validatorID)
-
-	b.requestID++
-
-	b.OutstandingRequests.Add(validatorID, b.requestID, blkID)
-	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, blkID) // request block and ancestors
-	return nil
-}
-
 // markUnavailable removes [nodeID] from the set of peers used to fetch
 // ancestors. If the set becomes empty, it is reset to the currently preferred
 // peers so bootstrapping can continue.
@@ -593,16 +553,6 @@ func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	if b.fetchFrom.Len() == 0 {
 		b.fetchFrom = b.StartupTracker.PreferredPeers()
 	}
-}
-
-func (b *Bootstrapper) Clear(context.Context) error {
-	b.Ctx.Lock.Lock()
-	defer b.Ctx.Lock.Unlock()
-
-	if err := b.Config.Blocked.Clear(); err != nil {
-		return err
-	}
-	return b.Config.Blocked.Commit()
 }
 
 // process a series of consecutive blocks starting at [blk].
@@ -801,8 +751,58 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	return b.OnFinished(ctx, b.requestID)
 }
 
+func (b *Bootstrapper) Timeout(ctx context.Context) error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
+		return b.restartBootstrapping(ctx)
+	}
+	b.fetchETA.Set(0)
+	return b.OnFinished(ctx, b.requestID)
+}
+
 func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	b.Ctx.Log.Debug("Checking for new frontiers")
 	b.restarted = true
 	return b.startBootstrapping(ctx)
+}
+
+func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
+	if msg != common.StateSyncDone {
+		b.Ctx.Log.Warn("received an unexpected message from the VM",
+			zap.Stringer("msg", msg),
+		)
+		return nil
+	}
+
+	b.Ctx.StateSyncing.Set(false)
+	return nil
+}
+
+func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
+	vmIntf, vmErr := b.VM.HealthCheck(ctx)
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+	return intf, vmErr
+}
+
+func (b *Bootstrapper) Shutdown(ctx context.Context) error {
+	b.Ctx.Log.Info("shutting down bootstrapper")
+
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
+	return b.VM.Shutdown(ctx)
+}
+
+func (*Bootstrapper) Gossip(context.Context) error {
+	return nil
 }
