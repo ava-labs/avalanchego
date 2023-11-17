@@ -50,8 +50,6 @@ func NewConfig(
 	stateSyncerIDs []ids.NodeID,
 	vm block.ChainVM,
 ) (Config, error) {
-	// Initialize the default values that will be used if stateSyncerIDs is
-	// empty.
 	// Initialize the beacons that will be used if stateSyncerIDs is empty.
 	stateSyncBeacons := beacons
 
