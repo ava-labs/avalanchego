@@ -307,7 +307,7 @@ func (m *mempool) deregister(tx *txs.Tx) {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !m.HasTxs() && !emptyBlockPermitted {
+	if !emptyBlockPermitted && !m.HasTxs() {
 		return
 	}
 
