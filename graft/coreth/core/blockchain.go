@@ -583,6 +583,12 @@ func (bc *BlockChain) startAcceptor() {
 		logs := bc.collectUnflattenedLogs(next, false)
 		bc.acceptedLogsCache.Put(next.Hash(), logs)
 
+		// Update the acceptor tip before sending events to ensure that any client acting based off of
+		// the events observes the updated acceptorTip on subsequent requests
+		bc.acceptorTipLock.Lock()
+		bc.acceptorTip = next
+		bc.acceptorTipLock.Unlock()
+
 		// Update accepted feeds
 		flattenedLogs := types.FlattenLogs(logs)
 		bc.chainAcceptedFeed.Send(ChainEvent{Block: next, Hash: next.Hash(), Logs: flattenedLogs})
@@ -593,9 +599,6 @@ func (bc *BlockChain) startAcceptor() {
 			bc.txAcceptedFeed.Send(NewTxsEvent{next.Transactions()})
 		}
 
-		bc.acceptorTipLock.Lock()
-		bc.acceptorTip = next
-		bc.acceptorTipLock.Unlock()
 		bc.acceptorWg.Done()
 
 		acceptorWorkTimer.Inc(time.Since(start).Milliseconds())
