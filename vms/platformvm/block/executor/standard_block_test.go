@@ -365,39 +365,45 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	// Staker3sub:             |----------------|
 	// Staker4:            |------------------------|
 	// Staker5:                                 |--------------------|
+
+	// In this test multiple stakers may join and leave the staker set at the same time.
+	// The order in which they do it is asserted; the order may depend on the staker.TxID,
+	// which in turns depend on every feature of the transaction creating the staker.
+	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
+	// so that TxID does not depend on the order we run tests.
 	staker1 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
+		rewardAddress: ids.ShortID{0xf1},
 		startTime:     ts.GenesisTime.Add(1 * time.Minute),
 		endTime:       ts.GenesisTime.Add(10 * ts.MinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
+		rewardAddress: ids.ShortID{0xf2},
 		startTime:     staker1.startTime.Add(1 * time.Minute),
 		endTime:       staker1.startTime.Add(1 * time.Minute).Add(ts.MinStakingDuration),
 	}
 	staker3 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
+		rewardAddress: ids.ShortID{0xf3},
 		startTime:     staker2.startTime.Add(1 * time.Minute),
 		endTime:       staker2.endTime.Add(1 * time.Minute),
 	}
 	staker3Sub := staker{
-		nodeID:        staker3.nodeID,
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
+		rewardAddress: ids.ShortID{0xff},
 		startTime:     staker3.startTime.Add(1 * time.Minute),
 		endTime:       staker3.endTime.Add(-1 * time.Minute),
 	}
 	staker4 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf4}),
+		rewardAddress: ids.ShortID{0xf4},
 		startTime:     staker3.startTime,
 		endTime:       staker3.endTime,
 	}
 	staker5 := staker{
-		nodeID:        ids.GenerateTestNodeID(),
-		rewardAddress: ids.GenerateTestShortID(),
+		nodeID:        ids.BuildTestNodeID([]byte{0xf5}),
+		rewardAddress: ids.ShortID{0xf5},
 		startTime:     staker2.endTime,
 		endTime:       staker2.endTime.Add(ts.MinStakingDuration),
 	}
@@ -476,11 +482,17 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			},
 		},
 		{
-			description:   "advance time to staker5 end",
+			description:   "advance time to staker5 start",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
+
+				// Staker2's end time matches staker5's start time, so typically
+				// the block builder would produce a ProposalBlock to remove
+				// staker2 when advancing the time. However, it is valid to only
+				// advance the time with a StandardBlock and not remove staker2,
+				// which is what this test does.
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
@@ -604,8 +616,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.TrackedSubnets.Add(subnetID)
 
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
-	// Starts after the corre
+	subnetValidatorNodeID := ts.GenesisNodeIDs[0]
 	subnetVdr1StartTime := ts.ValidateStartTime
 	subnetVdr1EndTime := ts.ValidateStartTime.Add(ts.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
@@ -633,7 +644,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(ts.Keys[1].PublicKey().Address())
+	subnetVdr2NodeID := ts.GenesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                            // Start time
@@ -704,8 +715,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
-
+			subnetValidatorNodeID := ts.GenesisNodeIDs[0]
 			subnetVdr1StartTime := ts.GenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := ts.GenesisTime.Add(10 * ts.MinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(

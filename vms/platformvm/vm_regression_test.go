@@ -71,7 +71,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
 
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -103,7 +103,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.IssueTx(context.Background(), addFirstDelegatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addFirstDelegatorTx))
 
 	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -137,7 +137,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Builder.IssueTx(context.Background(), addSecondDelegatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addSecondDelegatorTx))
 
 	addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -161,7 +161,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	err = vm.Builder.IssueTx(context.Background(), addThirdDelegatorTx)
+	err = vm.Network.IssueTx(context.Background(), addThirdDelegatorTx)
 	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
@@ -218,6 +218,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			id := key.PublicKey().Address()
+			nodeID := ids.GenerateTestNodeID()
 			changeAddr := ts.Keys[0].PublicKey().Address()
 
 			// create valid tx
@@ -225,7 +226,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				validatorStake,
 				uint64(validatorStartTime.Unix()),
 				uint64(validatorEndTime.Unix()),
-				ids.NodeID(id),
+				nodeID,
 				id,
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
@@ -234,7 +235,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the add validator tx
-			require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
+			require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
 
 			// trigger block creation for the validator tx
 			addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -248,7 +249,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator1Stake,
 				uint64(delegator1StartTime.Unix()),
 				uint64(delegator1EndTime.Unix()),
-				ids.NodeID(id),
+				nodeID,
 				ts.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				changeAddr,
@@ -256,7 +257,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the first add delegator tx
-			require.NoError(vm.Builder.IssueTx(context.Background(), addFirstDelegatorTx))
+			require.NoError(vm.Network.IssueTx(context.Background(), addFirstDelegatorTx))
 
 			// trigger block creation for the first add delegator tx
 			addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -270,7 +271,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator2Stake,
 				uint64(delegator2StartTime.Unix()),
 				uint64(delegator2EndTime.Unix()),
-				ids.NodeID(id),
+				nodeID,
 				ts.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				changeAddr,
@@ -278,7 +279,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the second add delegator tx
-			require.NoError(vm.Builder.IssueTx(context.Background(), addSecondDelegatorTx))
+			require.NoError(vm.Network.IssueTx(context.Background(), addSecondDelegatorTx))
 
 			// trigger block creation for the second add delegator tx
 			addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -292,7 +293,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator3Stake,
 				uint64(delegator3StartTime.Unix()),
 				uint64(delegator3EndTime.Unix()),
-				ids.NodeID(id),
+				nodeID,
 				ts.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				changeAddr,
@@ -300,7 +301,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the third add delegator tx
-			require.NoError(vm.Builder.IssueTx(context.Background(), addThirdDelegatorTx))
+			require.NoError(vm.Network.IssueTx(context.Background(), addThirdDelegatorTx))
 
 			// trigger block creation for the third add delegator tx
 			addThirdDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -314,7 +315,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator4Stake,
 				uint64(delegator4StartTime.Unix()),
 				uint64(delegator4EndTime.Unix()),
-				ids.NodeID(id),
+				nodeID,
 				ts.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				changeAddr,
@@ -322,7 +323,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the fourth add delegator tx
-			require.NoError(vm.Builder.IssueTx(context.Background(), addFourthDelegatorTx))
+			require.NoError(vm.Network.IssueTx(context.Background(), addFourthDelegatorTx))
 
 			// trigger block creation for the fourth add delegator tx
 			addFourthDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -459,13 +460,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(ts.MinStakingDuration)
-
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
-
-	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -473,7 +470,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		uint64(newValidatorStartTime.Unix()),
 		uint64(newValidatorEndTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty,
@@ -677,7 +674,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(ts.MaxStakingDuration)
 
-	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
+	nodeID0 := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
@@ -685,7 +682,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
 		nodeID0,
-		ids.ShortID(nodeID0),
+		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty,
@@ -849,7 +846,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(ts.MaxStakingDuration)
 
-	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
+	nodeID1 := ids.GenerateTestNodeID()
 
 	// Create the tx to add the second new validator
 	addValidatorTx1, err := vm.txBuilder.NewAddValidatorTx(
@@ -857,7 +854,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		uint64(newValidatorStartTime1.Unix()),
 		uint64(newValidatorEndTime1.Unix()),
 		nodeID1,
-		ids.ShortID(nodeID1),
+		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[1]},
 		ids.ShortEmpty,
@@ -988,22 +985,16 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID0 := ids.NodeID(ts.Keys[0].PublicKey().Address())
-	nodeID1 := ids.NodeID(ts.Keys[1].PublicKey().Address())
-	nodeID2 := ids.NodeID(ts.Keys[2].PublicKey().Address())
-	nodeID3 := ids.NodeID(ts.Keys[3].PublicKey().Address())
-	nodeID4 := ids.NodeID(ts.Keys[4].PublicKey().Address())
-
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		nodeID0: ts.Weight,
-		nodeID1: ts.Weight,
-		nodeID2: ts.Weight,
-		nodeID3: ts.Weight,
-		nodeID4: ts.Weight,
+		ts.GenesisNodeIDs[0]: ts.Weight,
+		ts.GenesisNodeIDs[1]: ts.Weight,
+		ts.GenesisNodeIDs[2]: ts.Weight,
+		ts.GenesisNodeIDs[3]: ts.Weight,
+		ts.GenesisNodeIDs[4]: ts.Weight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1014,14 +1005,14 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(ts.MaxStakingDuration)
 
-	nodeID5 := ids.GenerateTestNodeID()
+	extraNodeID := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
-		nodeID5,
+		extraNodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
@@ -1097,12 +1088,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		nodeID0: ts.Weight,
-		nodeID1: ts.Weight,
-		nodeID2: ts.Weight,
-		nodeID3: ts.Weight,
-		nodeID4: ts.Weight,
-		nodeID5: vm.MaxValidatorStake,
+		ts.GenesisNodeIDs[0]: ts.Weight,
+		ts.GenesisNodeIDs[1]: ts.Weight,
+		ts.GenesisNodeIDs[2]: ts.Weight,
+		ts.GenesisNodeIDs[3]: ts.Weight,
+		ts.GenesisNodeIDs[4]: ts.Weight,
+		extraNodeID:          vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1138,7 +1129,8 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	id := key.PublicKey().Address()
+	id := key.Address()
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := ts.Keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -1146,7 +1138,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		validatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
@@ -1155,7 +1147,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// issue the add validator tx
-	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1169,7 +1161,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		delegator1Stake,
 		uint64(delegator1StartTime.Unix()),
 		uint64(delegator1EndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		ts.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
@@ -1177,7 +1169,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// issue the first add delegator tx
-	require.NoError(vm.Builder.IssueTx(context.Background(), addFirstDelegatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addFirstDelegatorTx))
 
 	// trigger block creation for the first add delegator tx
 	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1191,7 +1183,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		delegator2Stake,
 		uint64(delegator2StartTime.Unix()),
 		uint64(delegator2EndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		ts.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
@@ -1200,7 +1192,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// attempting to issue the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	err = vm.Builder.IssueTx(context.Background(), addSecondDelegatorTx)
+	err = vm.Network.IssueTx(context.Background(), addSecondDelegatorTx)
 	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
@@ -1222,14 +1214,15 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	id := key.PublicKey().Address()
+	id := key.Address()
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := ts.Keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		ts.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
@@ -1237,7 +1230,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1254,7 +1247,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1267,14 +1260,14 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		ts.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), addSubnetValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	addSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1292,7 +1285,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.Empty(emptyValidatorSet)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
-		ids.NodeID(id),
+		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
@@ -1303,7 +1296,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), removeSubnetValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), removeSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	removeSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1340,13 +1333,14 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
+	nodeID := ids.GenerateTestNodeID()
 	changeAddr := ts.Keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		ts.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
@@ -1354,7 +1348,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1371,7 +1365,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1384,14 +1378,14 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		ts.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), addSubnetValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), addSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	addSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1401,7 +1395,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
-		ids.NodeID(id),
+		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 		changeAddr,
@@ -1412,7 +1406,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), removeSubnetValidatorTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), removeSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	removeSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1506,7 +1500,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 	require.NoError(primaryTx.SyntacticVerify(vm.ctx))
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
@@ -1533,7 +1527,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), subnetTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), subnetTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
@@ -1637,7 +1631,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryRestartTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryRestartTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
@@ -1745,7 +1739,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryTx1))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryTx1))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
@@ -1837,7 +1831,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryRestartTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryRestartTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
@@ -1908,7 +1902,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryTx1))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryTx1))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
@@ -1935,7 +1929,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), subnetTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), subnetTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
@@ -2039,7 +2033,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryRestartTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryRestartTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
@@ -2117,7 +2111,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), primaryTx1))
+	require.NoError(vm.Network.IssueTx(context.Background(), primaryTx1))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
@@ -2141,7 +2135,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.IssueTx(context.Background(), subnetTx))
+	require.NoError(vm.Network.IssueTx(context.Background(), subnetTx))
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current

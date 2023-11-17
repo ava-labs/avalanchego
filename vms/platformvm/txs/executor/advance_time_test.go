@@ -464,8 +464,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(ts.Keys[0].PublicKey().Address())
-	// Starts after the corre
+	subnetValidatorNodeID := ts.GenesisNodeIDs[0]
 	subnetVdr1StartTime := ts.ValidateStartTime
 	subnetVdr1EndTime := ts.ValidateStartTime.Add(ts.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
@@ -494,7 +493,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(ts.Keys[1].PublicKey().Address())
+	subnetVdr2NodeID := ts.GenesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                            // Start time
@@ -569,7 +568,7 @@ func TestTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := ts.Keys[0].PublicKey().Address()
+			subnetValidatorNodeID := ts.GenesisNodeIDs[0]
 
 			subnetVdr1StartTime := ts.GenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := ts.GenesisTime.Add(10 * ts.MinStakingDuration).Add(1 * time.Minute)
@@ -577,7 +576,7 @@ func TestTrackedSubnet(t *testing.T) {
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
-				ids.NodeID(subnetValidatorNodeID),  // Node ID
+				subnetValidatorNodeID,              // Node ID
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
 				ids.ShortEmpty,
@@ -618,7 +617,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
-			_, ok := env.config.Validators.GetValidator(subnetID, ids.NodeID(subnetValidatorNodeID))
+			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
 			require.True(ok)
 		})
 	}
@@ -925,7 +924,7 @@ func addPendingValidator(
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		keys,
 		ids.ShortEmpty,

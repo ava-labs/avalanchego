@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
-					NodeID:    ids.NodeID(id),
+					NodeID:    ids.BuildTestNodeID(id[:]),
 				},
 				RewardOwner: &api.Owner{
 					Threshold: 1,
