@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfigs() Config {
+func DefaultConfig() Config {
 	return Config{
 		Ctx:        snow.DefaultConsensusContextTest(),
 		VM:         &block.TestVM{},
