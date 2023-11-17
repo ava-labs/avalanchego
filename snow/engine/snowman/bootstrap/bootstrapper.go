@@ -249,7 +249,7 @@ func (b *Bootstrapper) startBootstrapping(ctx context.Context) error {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
-		return b.ForceAccepted(ctx, accepted)
+		return b.startSyncingAncestry(ctx, accepted)
 	}
 
 	b.requestID++
@@ -303,7 +303,7 @@ func (b *Bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
 		)
 	}
 
-	return b.ForceAccepted(ctx, accepted)
+	return b.startSyncingAncestry(ctx, accepted)
 }
 
 func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
@@ -370,7 +370,7 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return b.sendMessagesOrFinish(ctx)
 }
 
-func (b *Bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+func (b *Bootstrapper) startSyncingAncestry(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Initialize the fetch from set to the currently preferred peers

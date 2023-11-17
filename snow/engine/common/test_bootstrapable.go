@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
@@ -24,15 +22,14 @@ var (
 type BootstrapableTest struct {
 	T *testing.T
 
-	CantForceAccepted, CantClear bool
+	CantClear bool
 
-	ClearF         func(ctx context.Context) error
-	ForceAcceptedF func(ctx context.Context, acceptedContainerIDs []ids.ID) error
+	ClearF func(ctx context.Context) error
 }
 
 // Default sets the default on call handling
 func (b *BootstrapableTest) Default(cant bool) {
-	b.CantForceAccepted = cant
+	b.CantClear = cant
 }
 
 func (b *BootstrapableTest) Clear(ctx context.Context) error {
@@ -43,14 +40,4 @@ func (b *BootstrapableTest) Clear(ctx context.Context) error {
 		require.FailNow(b.T, errClear.Error())
 	}
 	return errClear
-}
-
-func (b *BootstrapableTest) ForceAccepted(ctx context.Context, containerIDs []ids.ID) error {
-	if b.ForceAcceptedF != nil {
-		return b.ForceAcceptedF(ctx, containerIDs)
-	}
-	if b.CantForceAccepted && b.T != nil {
-		require.FailNow(b.T, errForceAccepted.Error())
-	}
-	return errForceAccepted
 }

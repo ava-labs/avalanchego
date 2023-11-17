@@ -337,7 +337,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to get linearization status: %w", err)
 	}
 	if linearized {
-		return b.ForceAccepted(ctx, nil)
+		return b.startSyncingAncestry(ctx, nil)
 	}
 
 	// If a stop vertex is well known, accept that.
@@ -346,7 +346,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 			zap.Stringer("vtxID", b.Config.StopVertexID),
 		)
 
-		return b.ForceAccepted(ctx, []ids.ID{b.Config.StopVertexID})
+		return b.startSyncingAncestry(ctx, []ids.ID{b.Config.StopVertexID})
 	}
 
 	// If a stop vertex isn't well known, treat the current state as the final
@@ -368,7 +368,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		zap.Stringer("vtxID", stopVertexID),
 	)
 
-	return b.ForceAccepted(ctx, nil)
+	return b.startSyncingAncestry(ctx, nil)
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -544,8 +544,8 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	return b.fetch(ctx)
 }
 
-// ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+// startSyncingAncestry starts bootstrapping. Process the vertices in [accepterContainerIDs].
+func (b *bootstrapper) startSyncingAncestry(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
