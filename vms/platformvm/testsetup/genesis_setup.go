@@ -25,6 +25,9 @@ var (
 	// each key controls an address that has [Balance] AVAX at genesis
 	Keys = secp256k1.TestKeys()
 
+	// Node IDs of genesis validators. Initialized in init function
+	GenesisNodeIDs []ids.NodeID
+
 	// chain timestamp at genesis
 	GenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -49,6 +52,17 @@ var (
 	GenesisUTXOBalance     = 100 * MinValidatorStake // amount in each genesis utxos
 	GenesisValidatorWeight = MinValidatorStake       // weight of each genesis validator
 )
+
+func init() {
+	for _, key := range Keys {
+		// TODO: use ids.GenerateTestNodeID() instead of ids.BuildTestNodeID
+		// Can be done when TestGetState is refactored
+		nodeBytes := key.PublicKey().Address()
+		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+
+		GenesisNodeIDs = append(GenesisNodeIDs, nodeID)
+	}
+}
 
 // [BuildGenesis] is a good default to build genesis for platformVM unit tests
 func BuildGenesis() (*genesis.Genesis, error) {
