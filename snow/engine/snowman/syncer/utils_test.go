@@ -71,9 +71,8 @@ func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
 func buildTestsObjects(
 	t *testing.T,
 	ctx *snow.ConsensusContext,
-	beacons validators.Manager,
 	startupTracker tracker.Startup,
-	sampleK int,
+	beacons validators.Manager,
 	alpha uint64,
 ) (
 	*stateSyncer,
@@ -104,10 +103,10 @@ func buildTestsObjects(
 	cfg, err := NewConfig(
 		dummyGetter,
 		ctx,
-		beacons,
 		startupTracker,
 		sender,
-		sampleK,
+		beacons,
+		beacons.Count(ctx.SubnetID),
 		alpha,
 		nil,
 		fullVM,

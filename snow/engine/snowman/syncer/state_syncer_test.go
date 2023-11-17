@@ -56,7 +56,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cfg, err := NewConfig(dummyGetter, ctx, nil, nil, sender, 0, 0, nil, nonStateSyncableVM)
+	cfg, err := NewConfig(dummyGetter, ctx, nil, sender, nil, 0, 0, nil, nonStateSyncableVM)
 	require.NoError(err)
 	syncer := New(cfg, func(context.Context, uint32) error {
 		return nil
@@ -84,7 +84,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		prometheus.NewRegistry())
 	require.NoError(err)
 
-	cfg, err = NewConfig(dummyGetter, ctx, nil, nil, sender, 0, 0, nil, fullVM)
+	cfg, err = NewConfig(dummyGetter, ctx, nil, sender, nil, 0, 0, nil, fullVM)
 	require.NoError(err)
 	syncer = New(cfg, func(context.Context, uint32) error {
 		return nil
@@ -119,7 +119,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, _, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), alpha)
+	syncer, _, sender := buildTestsObjects(t, ctx, startup, beacons, alpha)
 
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {}
@@ -161,7 +161,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, _ := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, _ := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// mock VM to simulate a valid summary is returned
 	localSummary := &block.TestStateSummary{
@@ -198,7 +198,7 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, _ := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, _ := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// mock VM to simulate a no summary returned
 	fullVM.CantStateSyncGetOngoingSummary = true
@@ -228,7 +228,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, _, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, _, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := set.NewSet[ids.NodeID](3)
@@ -266,7 +266,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -355,7 +355,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -423,7 +423,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -505,7 +505,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -593,7 +593,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -663,7 +663,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -779,7 +779,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -882,7 +882,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), alpha)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, alpha)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -1026,7 +1026,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), alpha)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, alpha)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -1131,7 +1131,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, fullVM, sender := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), alpha)
+	syncer, fullVM, sender := buildTestsObjects(t, ctx, startup, beacons, alpha)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -1275,7 +1275,7 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	startup := tracker.NewStartup(peers, startupAlpha)
 	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
-	syncer, _, _ := buildTestsObjects(t, ctx, beacons, startup, beacons.Count(ctx.SubnetID), (totalWeight+1)/2)
+	syncer, _, _ := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	stateSyncFullyDone := false
 	syncer.onDoneStateSyncing = func(context.Context, uint32) error {

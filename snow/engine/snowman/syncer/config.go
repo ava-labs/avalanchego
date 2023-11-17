@@ -42,9 +42,9 @@ type Config struct {
 func NewConfig(
 	snowGetHandler common.AllGetsServer,
 	ctx *snow.ConsensusContext,
-	beacons validators.Manager,
 	startupTracker tracker.Startup,
 	sender common.Sender,
+	beacons validators.Manager,
 	sampleK int,
 	alpha uint64,
 	stateSyncerIDs []ids.NodeID,
