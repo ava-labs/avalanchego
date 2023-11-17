@@ -42,13 +42,6 @@ var (
 	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
-type BlockTimer interface {
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
-	ResetBlockTimer()
-}
-
 type Mempool interface {
 	// we may want to be able to stop valid transactions
 	// from entering the mempool, e.g. during blocks creation
