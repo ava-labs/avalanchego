@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -73,6 +74,12 @@ type Mempool interface {
 	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
 	PeekStakerTx() *txs.Tx
 
+	// RequestBuildBlock notifies the consensus engine that a block should be
+	// built. If [emptyBlockPermitted] is true, the notification will be sent
+	// if there are no transactions in the mempool. Otherwise, a notification
+	// will only be sent if there is at least one transaction in the mempool.
+	RequestBuildBlock(emptyBlockPermitted bool)
+
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
 	// unissued decision/staker txs. This allows previously dropped txs to be
 	// possibly reissued.
@@ -98,13 +105,13 @@ type mempool struct {
 
 	consumedUTXOs set.Set[ids.ID]
 
-	blkTimer BlockTimer
+	toEngine chan<- common.Message
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
+	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -142,7 +149,7 @@ func New(
 		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default
-		blkTimer:             blkTimer,
+		toEngine:             toEngine,
 	}, nil
 }
 
@@ -201,7 +208,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
 
-	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 
@@ -305,6 +311,17 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
+}
+
+func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	if !m.HasTxs() && !emptyBlockPermitted {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
 }
 
 // Drops all [txs.Staker] transactions whose [StartTime] is before

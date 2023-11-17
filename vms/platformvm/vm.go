@@ -177,9 +177,7 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	// Note: There is a circular dependency between the mempool and block
-	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.New("mempool", registerer, vm)
+	mempool, err := mempool.New("mempool", registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -203,7 +201,6 @@ func (vm *VM) Initialize(
 		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
-		toEngine,
 	)
 
 	// Create all of the chains that the database says exist

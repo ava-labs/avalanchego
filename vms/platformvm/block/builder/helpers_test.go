@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -193,7 +193,6 @@ func newEnvironment(t *testing.T) *environment {
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
-		nil, // toEngine,
 	)
 
 	res.blkManager.SetPreference(genesisID)

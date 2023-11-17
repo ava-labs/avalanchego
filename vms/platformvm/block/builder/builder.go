@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -58,9 +57,6 @@ type builder struct {
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
-	// channel to send messages to the consensus engine
-	toEngine chan<- common.Message
-
 	// This timer goes off when it is time for the next validator to add/leave
 	// the validator set. When it goes off ResetTimer() is called, potentially
 	// triggering creation of a new block.
@@ -72,14 +68,12 @@ func New(
 	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
-	toEngine chan<- common.Message,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
-		toEngine:          toEngine,
 	}
 
 	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
@@ -192,7 +186,7 @@ func (b *builder) setNextBuildBlockTime() {
 
 	if _, err := b.buildBlock(); err == nil {
 		// We can build a block now
-		b.notifyBlockReady()
+		b.Mempool.RequestBuildBlock(true)
 		return
 	}
 
@@ -227,16 +221,6 @@ func (b *builder) setNextBuildBlockTime() {
 
 	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
-}
-
-// notifyBlockReady tells the consensus engine that a new block is ready to be
-// created
-func (b *builder) notifyBlockReady() {
-	select {
-	case b.toEngine <- common.PendingTxs:
-	default:
-		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
-	}
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
