@@ -145,7 +145,40 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAccepted.Height()
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.StartupTracker.ShouldStart() {
+	return b.startBootstrappingOnceIfSufficientlyConnected(ctx)
+}
+
+func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+	// Ensure fetchFrom reflects proper validator list
+	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
+		b.fetchFrom.Add(nodeID)
+	}
+
+	return b.startBootstrappingOnceIfSufficientlyConnected(ctx)
+}
+
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	b.markUnavailable(nodeID)
+	return nil
+}
+
+func (b *bootstrapper) startBootstrappingOnceIfSufficientlyConnected(ctx context.Context) error {
+	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -240,40 +273,6 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 
 	// Send another request for this
 	return b.fetch(ctx, blkID)
-}
-
-func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
-		b.fetchFrom.Add(nodeID)
-	}
-
-	if b.started || !b.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup(ctx)
-}
-
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	b.markUnavailable(nodeID)
-	return nil
 }
 
 func (b *bootstrapper) Timeout(ctx context.Context) error {
