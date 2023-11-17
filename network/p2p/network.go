@@ -186,8 +186,8 @@ func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options
 
 	n.router.handlers[handlerID] = &meteredHandler{
 		responder: &responder{
+			Handler:   handler,
 			handlerID: handlerID,
-			handler:   handler,
 			log:       n.log,
 			sender:    n.sender,
 		},
