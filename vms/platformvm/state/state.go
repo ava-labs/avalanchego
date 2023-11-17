@@ -1700,12 +1700,17 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	}
 
 	modifiedPendingStakers := s.processPendingStakers()
+
+	if updateValidators {
+		err = s.updateValidatorSet(diffs.valSetDiff, diffs.weightDiffs)
+	}
+
 	return utils.Err(
+		err,
 		s.writeBlocks(),
 		s.writeCurrentStakers(modifiedCurrentStakers),
 		s.writeWeightDiffs(height, diffs.weightDiffs),
 		s.writeBlsKeyDiffs(height, diffs.blsKeyDiffs),
-		s.updateValidatorSet(updateValidators, diffs.valSetDiff, diffs.weightDiffs),
 		s.writePendingStakers(modifiedPendingStakers),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
@@ -1758,9 +1763,13 @@ func (s *state) writeWeightDiffs(height uint64, weightDiffs map[subnetNodeKey]*V
 }
 
 func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.PublicKey) error {
+	heightBytes := database.PackUInt64(height)
+	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
+	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
+
 	for nodeID, blsKey := range blsKeyDiffs {
 		key := marshalDiffKey(constants.PrimaryNetworkID, height, nodeID)
-		blsKeyBytes := []byte{}
+		var blsKeyBytes []byte
 		if blsKey != nil {
 			// Note: in flatValidatorPublicKeyDiffsDB we store the
 			// uncompressed public key here as it is
@@ -1773,10 +1782,6 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 
 		// TODO: Remove this once we no longer support version rollbacks.
 		if blsKey != nil {
-			heightBytes := database.PackUInt64(height)
-			rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
-			nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
-
 			// Note: We store the compressed public key here.
 			pkBytes := bls.PublicKeyToBytes(blsKey)
 			if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
@@ -1788,14 +1793,9 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 }
 
 func (s *state) updateValidatorSet(
-	updateValidators bool,
 	valSetDiff map[subnetNodeKey]stakerStatusPair,
 	weightDiffs map[subnetNodeKey]*ValidatorWeightDiff,
 ) error {
-	if !updateValidators {
-		return nil
-	}
-
 	for key, weightDiff := range weightDiffs {
 		var (
 			subnetID = key.subnetID
@@ -1804,26 +1804,23 @@ func (s *state) updateValidatorSet(
 			err      error
 		)
 
-		if weightDiff.Amount == 0 {
+		switch {
+		case weightDiff.Amount == 0:
 			// No weight change to record; go to next validator.
 			continue
-		}
-
-		if weightDiff.Decrease {
+		case weightDiff.Decrease:
 			err = s.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
-		} else {
-			if val.status == added {
-				staker := val.staker
-				err = s.cfg.Validators.AddStaker(
-					subnetID,
-					nodeID,
-					staker.PublicKey,
-					staker.TxID,
-					weightDiff.Amount,
-				)
-			} else {
-				err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
-			}
+		case val.status == added:
+			staker := val.staker
+			err = s.cfg.Validators.AddStaker(
+				subnetID,
+				nodeID,
+				staker.PublicKey,
+				staker.TxID,
+				weightDiff.Amount,
+			)
+		default:
+			err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to update validator weight: %w", err)
@@ -1859,9 +1856,12 @@ type diffs struct {
 func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 	var (
 		outputStakers = make([]stakerStatusPair, 0)
-		outputWeights = make(map[subnetNodeKey]*ValidatorWeightDiff)
-		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
-		outputValSet  = make(map[subnetNodeKey]stakerStatusPair)
+
+		d = diffs{
+			weightDiffs: make(map[subnetNodeKey]*ValidatorWeightDiff),
+			blsKeyDiffs: make(map[ids.NodeID]*bls.PublicKey),
+			valSetDiff:  make(map[subnetNodeKey]stakerStatusPair),
+		}
 	)
 
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
@@ -1878,7 +1878,7 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 
 			// make sure there is an entry for delegators even in case
 			// there are no validators modified.
-			outputWeights[key] = &ValidatorWeightDiff{
+			d.weightDiffs[key] = &ValidatorWeightDiff{
 				Decrease: validatorDiff.validatorStatus == deleted,
 			}
 
@@ -1886,7 +1886,7 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 			case added:
 				var (
 					weight = validatorDiff.validator.Weight
-					blkKey = validatorDiff.validator.PublicKey
+					blsKey = validatorDiff.validator.PublicKey
 				)
 
 				outputStakers = append(outputStakers, stakerStatusPair{
@@ -1894,15 +1894,15 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 					staker: validatorDiff.validator,
 				})
 
-				outputWeights[key].Amount = weight
-				if blkKey != nil {
+				d.weightDiffs[key].Amount = weight
+				if blsKey != nil {
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
-					outputBlsKey[nodeID] = nil
+					d.blsKeyDiffs[nodeID] = nil
 				}
 
-				outputValSet[key] = stakerStatusPair{
+				d.valSetDiff[key] = stakerStatusPair{
 					staker: validatorDiff.validator,
 					status: validatorDiff.validatorStatus,
 				}
@@ -1910,7 +1910,7 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 			case deleted:
 				var (
 					weight = validatorDiff.validator.Weight
-					blkKey = validatorDiff.validator.PublicKey
+					blsKey = validatorDiff.validator.PublicKey
 				)
 
 				outputStakers = append(outputStakers, stakerStatusPair{
@@ -1918,15 +1918,15 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 					staker: validatorDiff.validator,
 				})
 
-				outputWeights[key].Amount = weight
-				if blkKey != nil {
+				d.weightDiffs[key].Amount = weight
+				if blsKey != nil {
 					// Record that the public key for the validator is being
 					// removed. This means we must record the prior value of the
 					// public key.
-					outputBlsKey[nodeID] = blkKey
+					d.blsKeyDiffs[nodeID] = blsKey
 				}
 
-				outputValSet[key] = stakerStatusPair{
+				d.valSetDiff[key] = stakerStatusPair{
 					staker: validatorDiff.validator,
 					status: validatorDiff.validatorStatus,
 				}
@@ -1946,7 +1946,7 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 					staker: delegator,
 				})
 
-				if err := outputWeights[key].Add(false, delegator.Weight); err != nil {
+				if err := d.weightDiffs[key].Add(false /*negative*/, delegator.Weight); err != nil {
 					addedDelegatorIterator.Release()
 					return nil, diffs{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
@@ -1959,18 +1959,14 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 					staker: delegator,
 				})
 
-				if err := outputWeights[key].Add(true, delegator.Weight); err != nil {
+				if err := d.weightDiffs[key].Add(true /*negative*/, delegator.Weight); err != nil {
 					return nil, diffs{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
 
-	return outputStakers, diffs{
-		weightDiffs: outputWeights,
-		blsKeyDiffs: outputBlsKey,
-		valSetDiff:  outputValSet,
-	}, nil
+	return outputStakers, d, nil
 }
 
 func (s *state) processPendingStakers() []stakerStatusPair {
