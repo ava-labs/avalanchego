@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// TODO: consider moving the network implementation to a separate package
-
-package builder
+package network
 
 import (
 	"context"
@@ -34,7 +32,7 @@ type Network interface {
 	// it to the mempool, and gossips it to the network.
 	//
 	// Invariant: Assumes the context lock is held.
-	IssueTx(ctx context.Context, tx *txs.Tx) error
+	IssueTx(context.Context, *txs.Tx) error
 }
 
 type network struct {
@@ -52,7 +50,7 @@ type network struct {
 	recentTxs     *cache.LRU[ids.ID, struct{}]
 }
 
-func NewNetwork(
+func New(
 	ctx *snow.Context,
 	manager executor.Manager,
 	mempool mempool.Mempool,
@@ -109,11 +107,13 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		)
 		return nil
 	}
-
 	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
+	//
+	// Invariant: tx should not be referenced again without the context lock
+	// held to avoid any data races.
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
@@ -121,36 +121,15 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
-
-	// add to mempool
-	if err := n.IssueTx(ctx, tx); err != nil {
-		n.ctx.Log.Debug("tx failed verification",
-			zap.Stringer("nodeID", nodeID),
-			zap.Error(err),
-		)
+	if err := n.issueTx(tx); err == nil {
+		n.gossipTx(ctx, txID, msgBytes)
 	}
 	return nil
 }
 
 func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
-	txID := tx.ID()
-	if n.mempool.Has(txID) {
-		// If the transaction is already in the mempool - then it looks the same
-		// as if it was successfully added
-		return nil
-	}
-
-	if err := n.manager.VerifyTx(tx); err != nil {
-		n.mempool.MarkDropped(txID, err)
+	if err := n.issueTx(tx); err != nil {
 		return err
-	}
-
-	// If we are partially syncing the Primary Network, we should not be
-	// maintaining the transaction mempool locally.
-	if !n.partialSyncPrimaryNetwork {
-		if err := n.mempool.Add(tx); err != nil {
-			return err
-		}
 	}
 
 	txBytes := tx.Bytes()
@@ -162,7 +141,46 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 		return err
 	}
 
+	txID := tx.ID()
 	n.gossipTx(ctx, txID, msgBytes)
+	return nil
+}
+
+// returns nil if the tx is in the mempool
+func (n *network) issueTx(tx *txs.Tx) error {
+	txID := tx.ID()
+	if n.mempool.Has(txID) {
+		// The tx is already in the mempool
+		return nil
+	}
+
+	// Verify the tx at the currently preferred state
+	if err := n.manager.VerifyTx(tx); err != nil {
+		n.ctx.Log.Debug("tx failed verification",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
+		n.mempool.MarkDropped(txID, err)
+		return err
+	}
+
+	// If we are partially syncing the Primary Network, we should not be
+	// maintaining the transaction mempool locally.
+	if n.partialSyncPrimaryNetwork {
+		return nil
+	}
+
+	if err := n.mempool.Add(tx); err != nil {
+		n.ctx.Log.Debug("tx failed to be added to the mempool",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
+		n.mempool.MarkDropped(txID, err)
+		return err
+	}
+
 	return nil
 }
 
