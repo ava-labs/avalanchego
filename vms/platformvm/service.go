@@ -1284,7 +1284,7 @@ func (s *Service) AddValidator(req *http.Request, args *AddValidatorArgs, reply 
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1394,7 +1394,7 @@ func (s *Service) AddDelegator(req *http.Request, args *AddDelegatorArgs, reply 
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1500,7 +1500,7 @@ func (s *Service) AddSubnetValidator(req *http.Request, args *AddSubnetValidator
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1576,7 +1576,7 @@ func (s *Service) CreateSubnet(req *http.Request, args *CreateSubnetArgs, respon
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1672,7 +1672,7 @@ func (s *Service) ExportAVAX(req *http.Request, args *ExportAVAXArgs, response *
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1757,7 +1757,7 @@ func (s *Service) ImportAVAX(req *http.Request, args *ImportAVAXArgs, response *
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1881,7 +1881,7 @@ func (s *Service) CreateBlockchain(req *http.Request, args *CreateBlockchainArgs
 
 	return utils.Err(
 		err,
-		s.vm.Builder.IssueTx(req.Context(), tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -2173,7 +2173,7 @@ func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *ap
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	if err := s.vm.Builder.IssueTx(req.Context(), tx); err != nil {
+	if err := s.vm.Network.IssueTx(req.Context(), tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 

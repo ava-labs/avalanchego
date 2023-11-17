@@ -9,22 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 const defaultWeight = 10000
 
-// each key controls an address that has [defaultBalance] AVAX at genesis
-var keys = secp256k1.TestKeys()
-
 func TestBoundedBy(t *testing.T) {
 	require := require.New(t)
+
+	nodeID := ids.GenerateTestNodeID()
 
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
 	a := &Validator{
-		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
+		NodeID: nodeID,
 		Start:  aStartTime,
 		End:    aEndTIme,
 		Wght:   defaultWeight,
@@ -33,7 +31,7 @@ func TestBoundedBy(t *testing.T) {
 	bStartTime := uint64(2)
 	bEndTime := uint64(3)
 	b := &Validator{
-		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
+		NodeID: nodeID,
 		Start:  bStartTime,
 		End:    bEndTime,
 		Wght:   defaultWeight,
