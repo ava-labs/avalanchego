@@ -34,6 +34,20 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
+// bootstrapper repeatedly performs the bootstrapping protocol.
+//
+//  1. Wait until a sufficient amount of stake is connected.
+//  2. Sample a small number of nodes to get the last accepted block ID
+//  3. Verify against the full network that the last accepted block ID received
+//     in step 2 is an accepted block.
+//  4. Sync the full ancestry of the last accepted block.
+//  5. Execute all the fetched blocks that haven't already been executed.
+//  6. Restart the bootstrapping protocol until the number of blocks being
+//     accepted during a bootstrapping round stops decreasing.
+//
+// Note: Because of step 6, the bootstrapping protocol will generally be
+// performed multiple times.
+//
 // Invariant: The VM is not guaranteed to be initialized until Start has been
 // called, so it must be guaranteed the VM is not used until after Start.
 type Bootstrapper struct {
@@ -149,7 +163,42 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAccepted.Height()
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.StartupTracker.ShouldStart() {
+	return b.tryStartBootstrapping(ctx)
+}
+
+func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+	// Ensure fetchFrom reflects proper validator list
+	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
+		b.fetchFrom.Add(nodeID)
+	}
+
+	return b.tryStartBootstrapping(ctx)
+}
+
+func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	b.markUnavailable(nodeID)
+	return nil
+}
+
+// tryStartBootstrapping will start bootstrapping the first time it is called
+// while the startupTracker is reporting that the protocol should start.
+func (b *Bootstrapper) tryStartBootstrapping(ctx context.Context) error {
+	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -246,40 +295,6 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, blkID)
 }
 
-func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
-		b.fetchFrom.Add(nodeID)
-	}
-
-	if b.started || !b.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup(ctx)
-}
-
-func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	b.markUnavailable(nodeID)
-	return nil
-}
-
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
@@ -287,7 +302,7 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	b.awaitingTimeout = false
 
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.Restart(ctx, true)
+		return b.Restart(ctx)
 	}
 	b.fetchETA.Set(0)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
@@ -591,8 +606,8 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
-	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.Restart(ctx, true)
+	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
+		return b.Restart(ctx)
 	}
 
 	// If there is an additional callback, notify them that this chain has been
