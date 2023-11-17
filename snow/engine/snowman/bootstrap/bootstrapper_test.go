@@ -697,10 +697,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 
 	// add another two validators to the fetch set to test behavior on empty response
 	newPeerID := ids.GenerateTestNodeID()
-	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+	bs.fetchFrom.Add(newPeerID)
 
 	newPeerID = ids.GenerateTestNodeID()
-	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+	bs.fetchFrom.Add(newPeerID)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes2}))
 	require.Equal(blkID1, requestedBlock)
@@ -720,7 +720,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.Equal(choices.Accepted, blk2.Status())
 
 	// check peerToBlacklist was removed from the fetch set
-	require.NotContains(bs.(*bootstrapper).fetchFrom, peerToBlacklist)
+	require.NotContains(bs.fetchFrom, peerToBlacklist)
 }
 
 // There are multiple needed blocks and Ancestors returns all at once
@@ -1106,7 +1106,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1117,8 +1117,6 @@ func TestRestartBootstrapping(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1212,7 +1210,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1223,8 +1221,6 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1283,7 +1279,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		return blk0.ID(), nil
 	}
 
-	bsIntf, err := New(
+	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1294,8 +1290,6 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.IsType(&bootstrapper{}, bsIntf)
-	bs := bsIntf.(*bootstrapper)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
