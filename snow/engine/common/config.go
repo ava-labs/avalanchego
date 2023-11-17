@@ -23,12 +23,6 @@ type Config struct {
 	BootstrapTracker BootstrapTracker
 	Timer            Timer
 
-	// Should Bootstrap be retried
-	RetryBootstrap bool
-
-	// Max number of times to retry bootstrap before warning the node operator
-	RetryBootstrapWarnFrequency int
-
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
 	AncestorsMaxContainersReceived int

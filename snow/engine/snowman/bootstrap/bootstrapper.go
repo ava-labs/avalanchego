@@ -530,7 +530,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	b.awaitingTimeout = false
 
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.Restart(ctx, true)
+		return b.Restart(ctx)
 	}
 	b.fetchETA.Set(0)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
@@ -834,16 +834,14 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
-	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.Restart(ctx, true)
+	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
+		return b.Restart(ctx)
 	}
 
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
-		b.bootstrappedOnce.Do(func() {
-			b.Bootstrapped()
-		})
+		b.bootstrappedOnce.Do(b.Bootstrapped)
 	}
 
 	// Notify the subnet that this chain is synced

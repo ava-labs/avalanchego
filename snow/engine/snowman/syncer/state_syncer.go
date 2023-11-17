@@ -84,9 +84,6 @@ type stateSyncer struct {
 	// we keep a list of deduplicated height ready for voting
 	summariesHeights       set.Set[uint64]
 	uniqueSummariesHeights []uint64
-
-	// number of times the state sync has been attempted
-	attempts int
 }
 
 func New(
@@ -211,15 +208,11 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 
 	frontierStake := frontiersTotalWeight - failedBeaconWeight
 	if float64(frontierStake) < frontierAlpha {
-		ss.Ctx.Log.Debug("didn't receive enough frontiers",
+		ss.Ctx.Log.Debug("restarting state sync",
+			zap.String("reason", "didn't receive enough frontiers"),
 			zap.Int("numFailedValidators", ss.failedSeeders.Len()),
-			zap.Int("numStateSyncAttempts", ss.attempts),
 		)
-
-		if ss.Config.RetryBootstrap {
-			ss.Ctx.Log.Debug("restarting state sync")
-			return ss.restart(ctx)
-		}
+		return ss.startup(ctx)
 	}
 
 	ss.requestID++
@@ -227,7 +220,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -252,10 +245,10 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("subnetID", ss.Ctx.SubnetID),
-		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Reflect("summaryIDs", summaryIDs),
 		zap.Uint64("nodeWeight", nodeWeight),
 	)
-	for _, summaryID := range summaryIDs {
+	for summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			ss.Ctx.Log.Debug("skipping summary",
@@ -330,14 +323,13 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 			return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconsTotalWeight - failedVotersWeight
-		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
+		if votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("restarting state sync",
 				zap.String("reason", "not enough votes received"),
 				zap.Int("numBeacons", ss.StateSyncBeacons.Count(ss.Ctx.SubnetID)),
 				zap.Int("numFailedSyncers", ss.failedVoters.Len()),
-				zap.Int("numAttempts", ss.attempts),
 			)
-			return ss.restart(ctx)
+			return ss.startup(ctx)
 		}
 
 		ss.Ctx.Log.Info("skipping state sync",
@@ -488,9 +480,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for _, nodeID := range ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID) {
-		ss.targetVoters.Add(nodeID)
-	}
+	ss.targetVoters.Add(ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID)...)
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
@@ -513,7 +503,6 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// initiate messages exchange
-	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
@@ -522,16 +511,6 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.requestID++
 	ss.sendGetStateSummaryFrontiers(ctx)
 	return nil
-}
-
-func (ss *stateSyncer) restart(ctx context.Context) error {
-	if ss.attempts > 0 && ss.attempts%ss.RetryBootstrapWarnFrequency == 0 {
-		ss.Ctx.Log.Debug("check internet connection",
-			zap.Int("numSyncAttempts", ss.attempts),
-		)
-	}
-
-	return ss.startup(ctx)
 }
 
 // Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time

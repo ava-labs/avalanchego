@@ -558,13 +558,11 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true,
-		RetryBootstrapWarnFrequency: 1,
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -805,7 +803,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		math.MaxInt32,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 
 	// responsiveVoter still pending
@@ -818,7 +816,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		unsolicitedVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
@@ -827,7 +825,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 
 	// responsiveBeacon not pending anymore
@@ -928,7 +926,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{unknownSummaryID},
+		set.Of(unknownSummaryID),
 	))
 	_, found = syncer.weightedSummaries[unknownSummaryID]
 	require.False(found)
@@ -939,7 +937,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
-		[]ids.ID{summaryID},
+		set.Of(summaryID),
 	))
 	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
@@ -1073,7 +1071,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID, minoritySummaryID},
+				set.Of(summaryID, minoritySummaryID),
 			))
 			cumulatedWeight += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1082,7 +1080,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID},
+				set.Of(summaryID),
 			))
 			cumulatedWeight += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1114,13 +1112,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true, // this sets RetryStateSyncing too
-		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -1200,7 +1196,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{summaryID},
+				set.Of(summaryID),
 			))
 		}
 	}
@@ -1343,7 +1339,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
+				set.Of(minoritySummary1.ID(), minoritySummary2.ID()),
 			))
 			votingWeightStake += vdrs.GetWeight(ctx.SubnetID, voterID)
 
@@ -1352,7 +1348,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				context.Background(),
 				voterID,
 				reqID,
-				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
+				set.Of(ids.ID{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}),
 			))
 			votingWeightStake += vdrs.GetWeight(ctx.SubnetID, voterID)
 		}
@@ -1378,13 +1374,11 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     vdrs,
-		SampleK:                     vdrs.Count(ctx.SubnetID),
-		Alpha:                       (totalWeight + 1) / 2,
-		StartupTracker:              startup,
-		RetryBootstrap:              true, // this sets RetryStateSyncing too
-		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Count(ctx.SubnetID),
+		Alpha:          (totalWeight + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 	_ = fullVM
