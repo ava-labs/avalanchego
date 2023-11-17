@@ -111,6 +111,10 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 	return b, nil
 }
 
+func (b *bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
@@ -556,7 +560,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.Ctx.State.Get().State == snow.NormalOp || b.awaitingTimeout {
 		return nil
 	}
 
@@ -594,9 +598,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
-		b.bootstrappedOnce.Do(func() {
-			b.Bootstrapped()
-		})
+		b.bootstrappedOnce.Do(b.Bootstrapped)
 	}
 
 	// Notify the subnet that this chain is synced
