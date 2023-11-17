@@ -111,6 +111,10 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 	return b, nil
 }
 
+func (b *Bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
@@ -556,7 +560,7 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.Ctx.State.Get().State == snow.NormalOp || b.awaitingTimeout {
 		return nil
 	}
 
