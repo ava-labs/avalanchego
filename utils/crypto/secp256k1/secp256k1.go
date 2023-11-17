@@ -54,16 +54,12 @@ var (
 	errMutatedSig              = errors.New("signature was mutated from its original format")
 )
 
-type Factory struct {
-	Cache cache.LRU[ids.ID, *PublicKey]
-}
-
-func (*Factory) NewPrivateKey() (*PrivateKey, error) {
+func NewPrivateKey() (*PrivateKey, error) {
 	k, err := secp256k1.GeneratePrivateKey()
 	return &PrivateKey{sk: k}, err
 }
 
-func (*Factory) ToPublicKey(b []byte) (*PublicKey, error) {
+func ToPublicKey(b []byte) (*PublicKey, error) {
 	if len(b) != PublicKeyLen {
 		return nil, errInvalidPublicKeyLength
 	}
@@ -75,7 +71,7 @@ func (*Factory) ToPublicKey(b []byte) (*PublicKey, error) {
 	}, err
 }
 
-func (*Factory) ToPrivateKey(b []byte) (*PrivateKey, error) {
+func ToPrivateKey(b []byte) (*PrivateKey, error) {
 	if len(b) != PrivateKeyLen {
 		return nil, errInvalidPrivateKeyLength
 	}
@@ -85,19 +81,11 @@ func (*Factory) ToPrivateKey(b []byte) (*PrivateKey, error) {
 	}, nil
 }
 
-func (f *Factory) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
-	return f.RecoverHashPublicKey(hashing.ComputeHash256(msg), sig)
+func RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
+	return RecoverPublicKeyFromHash(hashing.ComputeHash256(msg), sig)
 }
 
-func (f *Factory) RecoverHashPublicKey(hash, sig []byte) (*PublicKey, error) {
-	cacheBytes := make([]byte, len(hash)+len(sig))
-	copy(cacheBytes, hash)
-	copy(cacheBytes[len(hash):], sig)
-	id := hashing.ComputeHash256Array(cacheBytes)
-	if cachedPublicKey, ok := f.Cache.Get(id); ok {
-		return cachedPublicKey, nil
-	}
-
+func RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
 	if err := verifySECP256K1RSignatureFormat(sig); err != nil {
 		return nil, err
 	}
@@ -116,9 +104,33 @@ func (f *Factory) RecoverHashPublicKey(hash, sig []byte) (*PublicKey, error) {
 		return nil, errCompressed
 	}
 
-	pubkey := &PublicKey{pk: rawPubkey}
-	f.Cache.Put(id, pubkey)
-	return pubkey, nil
+	return &PublicKey{pk: rawPubkey}, nil
+}
+
+type RecoverCache struct {
+	cache.LRU[ids.ID, *PublicKey]
+}
+
+func (r *RecoverCache) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
+	return r.RecoverPublicKeyFromHash(hashing.ComputeHash256(msg), sig)
+}
+
+func (r *RecoverCache) RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
+	cacheBytes := make([]byte, len(hash)+len(sig))
+	copy(cacheBytes, hash)
+	copy(cacheBytes[len(hash):], sig)
+	id := hashing.ComputeHash256Array(cacheBytes)
+	if cachedPublicKey, ok := r.Get(id); ok {
+		return cachedPublicKey, nil
+	}
+
+	pubKey, err := RecoverPublicKeyFromHash(hash, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Put(id, pubKey)
+	return pubKey, nil
 }
 
 type PublicKey struct {
@@ -132,8 +144,7 @@ func (k *PublicKey) Verify(msg, sig []byte) bool {
 }
 
 func (k *PublicKey) VerifyHash(hash, sig []byte) bool {
-	factory := Factory{}
-	pk, err := factory.RecoverHashPublicKey(hash, sig)
+	pk, err := RecoverPublicKeyFromHash(hash, sig)
 	if err != nil {
 		return false
 	}

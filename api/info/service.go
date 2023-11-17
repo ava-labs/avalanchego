@@ -208,7 +208,7 @@ type PeersArgs struct {
 type Peer struct {
 	peer.Info
 
-	Benched []ids.ID `json:"benched"`
+	Benched []string `json:"benched"`
 }
 
 // PeersReply are the results from calling Peers
@@ -229,9 +229,18 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 	peers := i.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for index, peer := range peers {
+		benchedIDs := i.benchlist.GetBenched(peer.ID)
+		benchedAliases := make([]string, len(benchedIDs))
+		for idx, id := range benchedIDs {
+			alias, err := i.chainManager.PrimaryAlias(id)
+			if err != nil {
+				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
+			}
+			benchedAliases[idx] = alias
+		}
 		peerInfo[index] = Peer{
 			Info:    peer,
-			Benched: i.benchlist.GetBenched(peer.ID),
+			Benched: benchedAliases,
 		}
 	}
 

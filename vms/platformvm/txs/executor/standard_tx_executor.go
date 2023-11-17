@@ -514,3 +514,34 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 
 	return nil
 }
+
+func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
+	if !e.Backend.Config.IsDActivated(e.State.GetTimestamp()) {
+		return ErrDUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	if err := e.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
+		},
+	); err != nil {
+		return err
+	}
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	return nil
+}

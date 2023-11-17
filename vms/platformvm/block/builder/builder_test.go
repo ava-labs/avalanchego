@@ -51,7 +51,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	require.NoError(env.Builder.AddUnverifiedTx(tx))
+	require.NoError(env.network.IssueTx(context.Background(), tx))
 	require.True(env.mempool.Has(txID))
 
 	// show that build block include that tx and removes it from mempool
@@ -110,7 +110,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
 
-	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic
+	require.False(t, env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {

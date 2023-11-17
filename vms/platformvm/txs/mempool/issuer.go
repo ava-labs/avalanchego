@@ -79,6 +79,11 @@ func (i *issuer) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error
 	return nil
 }
 
+func (i *issuer) BaseTx(*txs.BaseTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	i.m.addStakerTx(i.tx)
 	return nil

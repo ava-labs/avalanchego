@@ -62,7 +62,7 @@ func TestLinkedHashmap(t *testing.T) {
 	require.Equal(key1, rkey1, "wrong key")
 	require.Equal(1, val1, "wrong value")
 
-	lh.Delete(key0)
+	require.True(lh.Delete(key0))
 	require.Equal(1, lh.Len(), "wrong hashmap length")
 
 	_, exists = lh.Get(key0)
@@ -132,7 +132,7 @@ func TestIterator(t *testing.T) {
 		// Should be empty
 		require.False(iter.Next())
 		// Delete id1
-		lh.Delete(id1)
+		require.True(lh.Delete(id1))
 		iter = lh.NewIterator()
 		require.NotNil(iter)
 		// Should immediately be exhausted
@@ -169,8 +169,8 @@ func TestIterator(t *testing.T) {
 		iter := lh.NewIterator()
 		require.True(iter.Next())
 		require.True(iter.Next())
-		lh.Delete(id1)
-		lh.Delete(id2)
+		require.True(lh.Delete(id1))
+		require.True(lh.Delete(id2))
 		require.True(iter.Next())
 		require.Equal(id3, iter.Key())
 		require.Equal(3, iter.Value())

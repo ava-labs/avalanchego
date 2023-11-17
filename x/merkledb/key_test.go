@@ -5,48 +5,52 @@ package merkledb
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-var branchFactors = []BranchFactor{
-	BranchFactor2,
-	BranchFactor4,
-	BranchFactor16,
-	BranchFactor256,
+func TestBranchFactor_Valid(t *testing.T) {
+	require := require.New(t)
+	for _, bf := range validBranchFactors {
+		require.NoError(bf.Valid())
+	}
+	var empty BranchFactor
+	err := empty.Valid()
+	require.ErrorIs(err, ErrInvalidBranchFactor)
 }
 
 func TestHasPartialByte(t *testing.T) {
-	for _, branchFactor := range branchFactors {
-		t.Run(fmt.Sprint(branchFactor), func(t *testing.T) {
+	for _, ts := range validTokenSizes {
+		t.Run(strconv.Itoa(ts), func(t *testing.T) {
 			require := require.New(t)
 
-			key := emptyKey(branchFactor)
+			key := Key{}
 			require.False(key.hasPartialByte())
 
-			if branchFactor == BranchFactor256 {
+			if ts == 8 {
 				// Tokens are an entire byte so
 				// there is never a partial byte.
-				key = key.Append(0)
+				key = key.Extend(ToToken(1, ts))
 				require.False(key.hasPartialByte())
-				key = key.Append(0)
+				key = key.Extend(ToToken(0, ts))
 				require.False(key.hasPartialByte())
 				return
 			}
 
 			// Fill all but the last token of the first byte.
-			for i := 0; i < key.tokensPerByte-1; i++ {
-				key = key.Append(0)
+			for i := 0; i < 8-ts; i += ts {
+				key = key.Extend(ToToken(1, ts))
 				require.True(key.hasPartialByte())
 			}
 
 			// Fill the last token of the first byte.
-			key = key.Append(0)
+			key = key.Extend(ToToken(0, ts))
 			require.False(key.hasPartialByte())
 
 			// Fill the first token of the second byte.
-			key = key.Append(0)
+			key = key.Extend(ToToken(0, ts))
 			require.True(key.hasPartialByte())
 		})
 	}
@@ -55,66 +59,71 @@ func TestHasPartialByte(t *testing.T) {
 func Test_Key_Has_Prefix(t *testing.T) {
 	type test struct {
 		name           string
-		keyA           func(bf BranchFactor) Key
-		keyB           func(bf BranchFactor) Key
+		keyA           func(ts int) Key
+		keyB           func(ts int) Key
 		isStrictPrefix bool
 		isPrefix       bool
 	}
 
 	key := "Key"
-	keyLength := map[BranchFactor]int{}
-	for _, branchFactor := range branchFactors {
-		config := branchFactorToTokenConfig[branchFactor]
-		keyLength[branchFactor] = len(key) * config.tokensPerByte
-	}
 
 	tests := []test{
 		{
 			name:           "equal keys",
-			keyA:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf) },
-			keyB:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf) },
+			keyA:           func(ts int) Key { return ToKey([]byte(key)) },
+			keyB:           func(ts int) Key { return ToKey([]byte(key)) },
 			isPrefix:       true,
 			isStrictPrefix: false,
 		},
 		{
-			name:           "one key has one fewer token",
-			keyA:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf) },
-			keyB:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf).Take(keyLength[bf] - 1) },
+			name: "one key has one fewer token",
+			keyA: func(ts int) Key { return ToKey([]byte(key)) },
+			keyB: func(ts int) Key {
+				return ToKey([]byte(key)).Take(len(key)*8 - ts)
+			},
 			isPrefix:       true,
 			isStrictPrefix: true,
 		},
 		{
-			name:           "equal keys, both have one fewer token",
-			keyA:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf).Take(keyLength[bf] - 1) },
-			keyB:           func(bf BranchFactor) Key { return ToKey([]byte(key), bf).Take(keyLength[bf] - 1) },
+			name: "equal keys, both have one fewer token",
+			keyA: func(ts int) Key {
+				return ToKey([]byte(key)).Take(len(key)*8 - ts)
+			},
+			keyB: func(ts int) Key {
+				return ToKey([]byte(key)).Take(len(key)*8 - ts)
+			},
 			isPrefix:       true,
 			isStrictPrefix: false,
 		},
 		{
 			name:           "different keys",
-			keyA:           func(bf BranchFactor) Key { return ToKey([]byte{0xF7}, bf) },
-			keyB:           func(bf BranchFactor) Key { return ToKey([]byte{0xF0}, bf) },
+			keyA:           func(ts int) Key { return ToKey([]byte{0xF7}) },
+			keyB:           func(ts int) Key { return ToKey([]byte{0xF0}) },
 			isPrefix:       false,
 			isStrictPrefix: false,
 		},
 		{
-			name:           "same bytes, different lengths",
-			keyA:           func(bf BranchFactor) Key { return ToKey([]byte{0x10, 0x00}, bf).Take(1) },
-			keyB:           func(bf BranchFactor) Key { return ToKey([]byte{0x10, 0x00}, bf).Take(2) },
+			name: "same bytes, different lengths",
+			keyA: func(ts int) Key {
+				return ToKey([]byte{0x10, 0x00}).Take(ts)
+			},
+			keyB: func(ts int) Key {
+				return ToKey([]byte{0x10, 0x00}).Take(ts * 2)
+			},
 			isPrefix:       false,
 			isStrictPrefix: false,
 		},
 	}
 
 	for _, tt := range tests {
-		for _, bf := range branchFactors {
-			t.Run(tt.name+" bf "+fmt.Sprint(bf), func(t *testing.T) {
+		for _, ts := range validTokenSizes {
+			t.Run(tt.name+" ts "+strconv.Itoa(ts), func(t *testing.T) {
 				require := require.New(t)
-				keyA := tt.keyA(bf)
-				keyB := tt.keyB(bf)
+				keyA := tt.keyA(ts)
+				keyB := tt.keyB(ts)
 
 				require.Equal(tt.isPrefix, keyA.HasPrefix(keyB))
-				require.Equal(tt.isPrefix, keyA.iteratedHasPrefix(0, keyB))
+				require.Equal(tt.isPrefix, keyA.iteratedHasPrefix(keyB, 0, ts))
 				require.Equal(tt.isStrictPrefix, keyA.HasStrictPrefix(keyB))
 			})
 		}
@@ -124,30 +133,29 @@ func Test_Key_Has_Prefix(t *testing.T) {
 func Test_Key_Skip(t *testing.T) {
 	require := require.New(t)
 
-	for _, bf := range branchFactors {
-		empty := emptyKey(bf)
-		require.Equal(ToKey([]byte{0}, bf).Skip(empty.tokensPerByte), empty)
-		if bf == BranchFactor256 {
+	empty := Key{}
+	require.Equal(ToKey([]byte{0}).Skip(8), empty)
+	for _, ts := range validTokenSizes {
+		if ts == 8 {
 			continue
 		}
-		shortKey := ToKey([]byte{0b0101_0101}, bf)
-		longKey := ToKey([]byte{0b0101_0101, 0b0101_0101}, bf)
-		for i := 0; i < shortKey.tokensPerByte; i++ {
-			shift := byte(i) * shortKey.tokenBitSize
-			skipKey := shortKey.Skip(i)
+		shortKey := ToKey([]byte{0b0101_0101})
+		longKey := ToKey([]byte{0b0101_0101, 0b0101_0101})
+		for shift := 0; shift < 8; shift += ts {
+			skipKey := shortKey.Skip(shift)
 			require.Equal(byte(0b0101_0101<<shift), skipKey.value[0])
 
-			skipKey = longKey.Skip(i)
+			skipKey = longKey.Skip(shift)
 			require.Equal(byte(0b0101_0101<<shift+0b0101_0101>>(8-shift)), skipKey.value[0])
 			require.Equal(byte(0b0101_0101<<shift), skipKey.value[1])
 		}
 	}
 
-	skip := ToKey([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Skip(1)
+	skip := ToKey([]byte{0b0101_0101, 0b1010_1010}).Skip(8)
 	require.Len(skip.value, 1)
 	require.Equal(byte(0b1010_1010), skip.value[0])
 
-	skip = ToKey([]byte{0b0101_0101, 0b1010_1010, 0b0101_0101}, BranchFactor256).Skip(1)
+	skip = ToKey([]byte{0b0101_0101, 0b1010_1010, 0b0101_0101}).Skip(8)
 	require.Len(skip.value, 2)
 	require.Equal(byte(0b1010_1010), skip.value[0])
 	require.Equal(byte(0b0101_0101), skip.value[1])
@@ -156,24 +164,22 @@ func Test_Key_Skip(t *testing.T) {
 func Test_Key_Take(t *testing.T) {
 	require := require.New(t)
 
-	for _, bf := range branchFactors {
-		// take more tokens than the key has
-		require.Equal(ToKey([]byte{0}, bf).Take(1000), ToKey([]byte{0}, bf))
+	require.Equal(ToKey([]byte{0}).Take(0), Key{})
 
-		// take no tokens
-		require.Equal(ToKey([]byte{0}, bf).Take(0), emptyKey(bf))
-		if bf == BranchFactor256 {
+	for _, ts := range validTokenSizes {
+		if ts == 8 {
 			continue
 		}
-		key := ToKey([]byte{0b0101_0101}, bf)
-		for i := 1; i <= key.tokensPerByte; i++ {
-			shift := 8 - (byte(i) * key.tokenBitSize)
-			take := key.Take(i)
+		key := ToKey([]byte{0b0101_0101})
+		for length := ts; length <= 8; length += ts {
+			take := key.Take(length)
+			require.Equal(length, take.length)
+			shift := 8 - length
 			require.Equal(byte((0b0101_0101>>shift)<<shift), take.value[0])
 		}
 	}
 
-	take := ToKey([]byte{0b0101_0101, 0b1010_1010}, BranchFactor256).Take(1)
+	take := ToKey([]byte{0b0101_0101, 0b1010_1010}).Take(8)
 	require.Len(take.value, 1)
 	require.Equal(byte(0b0101_0101), take.value[0])
 }
@@ -182,47 +188,47 @@ func Test_Key_Token(t *testing.T) {
 	type test struct {
 		name         string
 		inputBytes   []byte
-		branchFactor BranchFactor
+		ts           int
 		assertTokens func(*require.Assertions, Key)
 	}
 
 	tests := []test{
 		{
-			name:         "branch factor 2",
-			inputBytes:   []byte{0b0_1_01_0_1_01, 0b1_0_1_0_1_0_1_0},
-			branchFactor: BranchFactor2,
+			name:       "branch factor 2",
+			inputBytes: []byte{0b0_1_0_1_0_1_0_1, 0b1_0_1_0_1_0_1_0},
+			ts:         1,
 			assertTokens: func(require *require.Assertions, key Key) {
-				require.Equal(byte(0), key.Token(0))
-				require.Equal(byte(1), key.Token(1))
-				require.Equal(byte(0), key.Token(2))
-				require.Equal(byte(1), key.Token(3))
-				require.Equal(byte(0), key.Token(4))
-				require.Equal(byte(1), key.Token(5))
-				require.Equal(byte(0), key.Token(6))
-				require.Equal(byte(1), key.Token(7)) // end first byte
-				require.Equal(byte(1), key.Token(8))
-				require.Equal(byte(0), key.Token(9))
-				require.Equal(byte(1), key.Token(10))
-				require.Equal(byte(0), key.Token(11))
-				require.Equal(byte(1), key.Token(12))
-				require.Equal(byte(0), key.Token(13))
-				require.Equal(byte(1), key.Token(14))
-				require.Equal(byte(0), key.Token(15)) // end second byte
+				require.Equal(byte(0), key.Token(0, 1))
+				require.Equal(byte(1), key.Token(1, 1))
+				require.Equal(byte(0), key.Token(2, 1))
+				require.Equal(byte(1), key.Token(3, 1))
+				require.Equal(byte(0), key.Token(4, 1))
+				require.Equal(byte(1), key.Token(5, 1))
+				require.Equal(byte(0), key.Token(6, 1))
+				require.Equal(byte(1), key.Token(7, 1)) // end first byte
+				require.Equal(byte(1), key.Token(8, 1))
+				require.Equal(byte(0), key.Token(9, 1))
+				require.Equal(byte(1), key.Token(10, 1))
+				require.Equal(byte(0), key.Token(11, 1))
+				require.Equal(byte(1), key.Token(12, 1))
+				require.Equal(byte(0), key.Token(13, 1))
+				require.Equal(byte(1), key.Token(14, 1))
+				require.Equal(byte(0), key.Token(15, 1)) // end second byte
 			},
 		},
 		{
-			name:         "branch factor 4",
-			inputBytes:   []byte{0b00_01_10_11, 0b11_10_01_00},
-			branchFactor: BranchFactor4,
+			name:       "branch factor 4",
+			inputBytes: []byte{0b00_01_10_11, 0b11_10_01_00},
+			ts:         2,
 			assertTokens: func(require *require.Assertions, key Key) {
-				require.Equal(byte(0), key.Token(0)) // 00
-				require.Equal(byte(1), key.Token(1)) // 01
-				require.Equal(byte(2), key.Token(2)) // 10
-				require.Equal(byte(3), key.Token(3)) // 11 end first byte
-				require.Equal(byte(3), key.Token(4)) // 11
-				require.Equal(byte(2), key.Token(5)) // 10
-				require.Equal(byte(1), key.Token(6)) // 01
-				require.Equal(byte(0), key.Token(7)) // 00 end second byte
+				require.Equal(byte(0), key.Token(0, 2))  // 00
+				require.Equal(byte(1), key.Token(2, 2))  // 01
+				require.Equal(byte(2), key.Token(4, 2))  // 10
+				require.Equal(byte(3), key.Token(6, 2))  // 11 end first byte
+				require.Equal(byte(3), key.Token(8, 2))  // 11
+				require.Equal(byte(2), key.Token(10, 2)) // 10
+				require.Equal(byte(1), key.Token(12, 2)) // 01
+				require.Equal(byte(0), key.Token(14, 2)) // 00 end second byte
 			},
 		},
 		{
@@ -237,10 +243,10 @@ func Test_Key_Token(t *testing.T) {
 				0b1100_1101,
 				0b1110_1111,
 			},
-			branchFactor: BranchFactor16,
+			ts: 4,
 			assertTokens: func(require *require.Assertions, key Key) {
 				for i := 0; i < 16; i++ {
-					require.Equal(byte(i), key.Token(i))
+					require.Equal(byte(i), key.Token(i*4, 4))
 				}
 			},
 		},
@@ -249,11 +255,11 @@ func Test_Key_Token(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		i := i
 		tests = append(tests, test{
-			name:         fmt.Sprintf("branch factor 256, byte %d", i),
-			inputBytes:   []byte{byte(i)},
-			branchFactor: BranchFactor256,
+			name:       fmt.Sprintf("branch factor 256, byte %d", i),
+			inputBytes: []byte{byte(i)},
+			ts:         8,
 			assertTokens: func(require *require.Assertions, key Key) {
-				require.Equal(byte(i), key.Token(0))
+				require.Equal(byte(i), key.Token(0, 8))
 			},
 		})
 	}
@@ -261,7 +267,7 @@ func Test_Key_Token(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			key := ToKey(tt.inputBytes, tt.branchFactor)
+			key := ToKey(tt.inputBytes)
 			tt.assertTokens(require, key)
 		})
 	}
@@ -270,12 +276,13 @@ func Test_Key_Token(t *testing.T) {
 func Test_Key_Append(t *testing.T) {
 	require := require.New(t)
 
-	for _, bf := range branchFactors {
-		key := ToKey([]byte{}, bf)
-		for i := 0; i < int(key.branchFactor); i++ {
-			appendedKey := key.Append(byte(i)).Append(byte(i / 2))
-			require.Equal(byte(i), appendedKey.Token(0))
-			require.Equal(byte(i/2), appendedKey.Token(1))
+	key := ToKey([]byte{})
+	for _, bf := range validBranchFactors {
+		size := BranchFactorToTokenSize[bf]
+		for i := 0; i < int(bf); i++ {
+			appendedKey := key.Extend(ToToken(byte(i), size), ToToken(byte(i/2), size))
+			require.Equal(byte(i), appendedKey.Token(0, size))
+			require.Equal(byte(i/2), appendedKey.Token(size, size))
 		}
 	}
 }
@@ -283,220 +290,182 @@ func Test_Key_Append(t *testing.T) {
 func Test_Key_AppendExtend(t *testing.T) {
 	require := require.New(t)
 
-	key2 := ToKey([]byte{0b1000_0000}, BranchFactor2).Take(1)
-	p := ToKey([]byte{0b01010101}, BranchFactor2)
-	extendedP := key2.AppendExtend(0, p)
+	key2 := ToKey([]byte{0b1000_0000}).Take(1)
+	p := ToKey([]byte{0b01010101})
+	extendedP := key2.Extend(ToToken(0, 1), p)
 	require.Equal([]byte{0b10010101, 0b01000_000}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(0), extendedP.Token(2))
-	require.Equal(byte(1), extendedP.Token(3))
-	require.Equal(byte(0), extendedP.Token(4))
-	require.Equal(byte(1), extendedP.Token(5))
-	require.Equal(byte(0), extendedP.Token(6))
-	require.Equal(byte(1), extendedP.Token(7))
-	require.Equal(byte(0), extendedP.Token(8))
-	require.Equal(byte(1), extendedP.Token(9))
+	require.Equal(byte(1), extendedP.Token(0, 1))
+	require.Equal(byte(0), extendedP.Token(1, 1))
+	require.Equal(byte(0), extendedP.Token(2, 1))
+	require.Equal(byte(1), extendedP.Token(3, 1))
+	require.Equal(byte(0), extendedP.Token(4, 1))
+	require.Equal(byte(1), extendedP.Token(5, 1))
+	require.Equal(byte(0), extendedP.Token(6, 1))
+	require.Equal(byte(1), extendedP.Token(7, 1))
+	require.Equal(byte(0), extendedP.Token(8, 1))
+	require.Equal(byte(1), extendedP.Token(9, 1))
 
-	p = ToKey([]byte{0b0101_0101, 0b1000_0000}, BranchFactor2).Take(9)
-	extendedP = key2.AppendExtend(0, p)
+	p = ToKey([]byte{0b0101_0101, 0b1000_0000}).Take(9)
+	extendedP = key2.Extend(ToToken(0, 1), p)
 	require.Equal([]byte{0b1001_0101, 0b0110_0000}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(0), extendedP.Token(2))
-	require.Equal(byte(1), extendedP.Token(3))
-	require.Equal(byte(0), extendedP.Token(4))
-	require.Equal(byte(1), extendedP.Token(5))
-	require.Equal(byte(0), extendedP.Token(6))
-	require.Equal(byte(1), extendedP.Token(7))
-	require.Equal(byte(0), extendedP.Token(8))
-	require.Equal(byte(1), extendedP.Token(9))
-	require.Equal(byte(1), extendedP.Token(10))
+	require.Equal(byte(1), extendedP.Token(0, 1))
+	require.Equal(byte(0), extendedP.Token(1, 1))
+	require.Equal(byte(0), extendedP.Token(2, 1))
+	require.Equal(byte(1), extendedP.Token(3, 1))
+	require.Equal(byte(0), extendedP.Token(4, 1))
+	require.Equal(byte(1), extendedP.Token(5, 1))
+	require.Equal(byte(0), extendedP.Token(6, 1))
+	require.Equal(byte(1), extendedP.Token(7, 1))
+	require.Equal(byte(0), extendedP.Token(8, 1))
+	require.Equal(byte(1), extendedP.Token(9, 1))
+	require.Equal(byte(1), extendedP.Token(10, 1))
 
-	key4 := ToKey([]byte{0b0100_0000}, BranchFactor4).Take(1)
-	p = ToKey([]byte{0b0101_0101}, BranchFactor4)
-	extendedP = key4.AppendExtend(0, p)
+	key4 := ToKey([]byte{0b0100_0000}).Take(2)
+	p = ToKey([]byte{0b0101_0101})
+	extendedP = key4.Extend(ToToken(0, 2), p)
 	require.Equal([]byte{0b0100_0101, 0b0101_0000}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
-	require.Equal(byte(1), extendedP.Token(3))
-	require.Equal(byte(1), extendedP.Token(4))
-	require.Equal(byte(1), extendedP.Token(5))
+	require.Equal(byte(1), extendedP.Token(0, 2))
+	require.Equal(byte(0), extendedP.Token(2, 2))
+	require.Equal(byte(1), extendedP.Token(4, 2))
+	require.Equal(byte(1), extendedP.Token(6, 2))
+	require.Equal(byte(1), extendedP.Token(8, 2))
+	require.Equal(byte(1), extendedP.Token(10, 2))
 
-	key16 := ToKey([]byte{0b0001_0000}, BranchFactor16).Take(1)
-	p = ToKey([]byte{0b0001_0001}, BranchFactor16)
-	extendedP = key16.AppendExtend(0, p)
+	key16 := ToKey([]byte{0b0001_0000}).Take(4)
+	p = ToKey([]byte{0b0001_0001})
+	extendedP = key16.Extend(ToToken(0, 4), p)
 	require.Equal([]byte{0b0001_0000, 0b0001_0001}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
-	require.Equal(byte(1), extendedP.Token(3))
+	require.Equal(byte(1), extendedP.Token(0, 4))
+	require.Equal(byte(0), extendedP.Token(4, 4))
+	require.Equal(byte(1), extendedP.Token(8, 4))
+	require.Equal(byte(1), extendedP.Token(12, 4))
 
-	p = ToKey([]byte{0b0001_0001, 0b0001_0001}, BranchFactor16)
-	extendedP = key16.AppendExtend(0, p)
+	p = ToKey([]byte{0b0001_0001, 0b0001_0001})
+	extendedP = key16.Extend(ToToken(0, 4), p)
 	require.Equal([]byte{0b0001_0000, 0b0001_0001, 0b0001_0001}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
-	require.Equal(byte(1), extendedP.Token(3))
-	require.Equal(byte(1), extendedP.Token(4))
-	require.Equal(byte(1), extendedP.Token(5))
+	require.Equal(byte(1), extendedP.Token(0, 4))
+	require.Equal(byte(0), extendedP.Token(4, 4))
+	require.Equal(byte(1), extendedP.Token(8, 4))
+	require.Equal(byte(1), extendedP.Token(12, 4))
+	require.Equal(byte(1), extendedP.Token(16, 4))
+	require.Equal(byte(1), extendedP.Token(20, 4))
 
-	key256 := ToKey([]byte{0b0000_0001}, BranchFactor256)
-	p = ToKey([]byte{0b0000_0001}, BranchFactor256)
-	extendedP = key256.AppendExtend(0, p)
+	key256 := ToKey([]byte{0b0000_0001})
+	p = ToKey([]byte{0b0000_0001})
+	extendedP = key256.Extend(ToToken(0, 8), p)
 	require.Equal([]byte{0b0000_0001, 0b0000_0000, 0b0000_0001}, extendedP.Bytes())
-	require.Equal(byte(1), extendedP.Token(0))
-	require.Equal(byte(0), extendedP.Token(1))
-	require.Equal(byte(1), extendedP.Token(2))
+	require.Equal(byte(1), extendedP.Token(0, 8))
+	require.Equal(byte(0), extendedP.Token(8, 8))
+	require.Equal(byte(1), extendedP.Token(16, 8))
 }
 
 func TestKeyBytesNeeded(t *testing.T) {
 	type test struct {
-		BranchFactor
-		tokenLength int
+		bitLength   int
 		bytesNeeded int
 	}
 
 	tests := []test{
 		{
-			BranchFactor: BranchFactor2,
-			tokenLength:  7,
-			bytesNeeded:  1,
+			bitLength:   7,
+			bytesNeeded: 1,
 		},
 		{
-			BranchFactor: BranchFactor2,
-			tokenLength:  8,
-			bytesNeeded:  1,
+			bitLength:   8,
+			bytesNeeded: 1,
 		},
 		{
-			BranchFactor: BranchFactor2,
-			tokenLength:  9,
-			bytesNeeded:  2,
+			bitLength:   9,
+			bytesNeeded: 2,
 		},
 		{
-			BranchFactor: BranchFactor2,
-			tokenLength:  16,
-			bytesNeeded:  2,
+			bitLength:   0,
+			bytesNeeded: 0,
 		},
-		{
-			BranchFactor: BranchFactor2,
-			tokenLength:  17,
-			bytesNeeded:  3,
-		},
-		{
-			BranchFactor: BranchFactor4,
-			tokenLength:  3,
-			bytesNeeded:  1,
-		},
-		{
-			BranchFactor: BranchFactor4,
-			tokenLength:  4,
-			bytesNeeded:  1,
-		},
-		{
-			BranchFactor: BranchFactor4,
-			tokenLength:  5,
-			bytesNeeded:  2,
-		},
-		{
-			BranchFactor: BranchFactor4,
-			tokenLength:  8,
-			bytesNeeded:  2,
-		},
-		{
-			BranchFactor: BranchFactor4,
-			tokenLength:  9,
-			bytesNeeded:  3,
-		},
-		{
-			BranchFactor: BranchFactor16,
-			tokenLength:  2,
-			bytesNeeded:  1,
-		},
-		{
-			BranchFactor: BranchFactor16,
-			tokenLength:  3,
-			bytesNeeded:  2,
-		},
-		{
-			BranchFactor: BranchFactor16,
-			tokenLength:  4,
-			bytesNeeded:  2,
-		},
-		{
-			BranchFactor: BranchFactor16,
-			tokenLength:  5,
-			bytesNeeded:  3,
-		},
-		{
-			BranchFactor: BranchFactor256,
-			tokenLength:  2,
-			bytesNeeded:  2,
-		},
-		{
-			BranchFactor: BranchFactor256,
-			tokenLength:  3,
-			bytesNeeded:  3,
-		},
-		{
-			BranchFactor: BranchFactor256,
-			tokenLength:  4,
-			bytesNeeded:  4,
-		},
-	}
-
-	for _, branchFactor := range branchFactors {
-		tests = append(tests, test{
-			BranchFactor: branchFactor,
-			tokenLength:  0,
-			bytesNeeded:  0,
-		})
-		tests = append(tests, test{
-			BranchFactor: branchFactor,
-			tokenLength:  1,
-			bytesNeeded:  1,
-		})
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("branch factor %d, tokens length %d", tt.BranchFactor, tt.tokenLength), func(t *testing.T) {
+		t.Run(fmt.Sprintf("bit length %d", tt.bitLength), func(t *testing.T) {
 			require := require.New(t)
-			key := emptyKey(tt.BranchFactor)
-			require.Equal(tt.bytesNeeded, key.bytesNeeded(tt.tokenLength))
+			require.Equal(tt.bytesNeeded, bytesNeeded(tt.bitLength))
 		})
 	}
 }
 
-func FuzzKeyAppendExtend(f *testing.F) {
+func FuzzKeyDoubleExtend_Tokens(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
 		second []byte,
-		token byte,
+		tokenByte byte,
 		forceFirstOdd bool,
 		forceSecondOdd bool,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range branchFactors {
-			key1 := ToKey(first, branchFactor)
-			if forceFirstOdd && key1.tokenLength > 0 {
-				key1 = key1.Take(key1.tokenLength - 1)
+		for _, ts := range validTokenSizes {
+			key1 := ToKey(first)
+			if forceFirstOdd && key1.length > ts {
+				key1 = key1.Take(key1.length - ts)
 			}
-			key2 := ToKey(second, branchFactor)
-			if forceSecondOdd && key2.tokenLength > 0 {
-				key2 = key2.Take(key2.tokenLength - 1)
+			key2 := ToKey(second)
+			if forceSecondOdd && key2.length > ts {
+				key2 = key2.Take(key2.length - ts)
 			}
-			token = byte(int(token) % int(branchFactor))
-			extendedP := key1.AppendExtend(token, key2)
-			require.Equal(key1.tokenLength+key2.tokenLength+1, extendedP.tokenLength)
-			for i := 0; i < key1.tokenLength; i++ {
-				require.Equal(key1.Token(i), extendedP.Token(i))
+			token := byte(int(tokenByte) % int(tokenSizeToBranchFactor[ts]))
+			extendedP := key1.Extend(ToToken(token, ts), key2)
+			require.Equal(key1.length+key2.length+ts, extendedP.length)
+			firstIndex := 0
+			for ; firstIndex < key1.length; firstIndex += ts {
+				require.Equal(key1.Token(firstIndex, ts), extendedP.Token(firstIndex, ts))
 			}
-			require.Equal(token, extendedP.Token(key1.tokenLength))
-			for i := 0; i < key2.tokenLength; i++ {
-				require.Equal(key2.Token(i), extendedP.Token(i+1+key1.tokenLength))
+			require.Equal(token, extendedP.Token(firstIndex, ts))
+			firstIndex += ts
+			for secondIndex := 0; secondIndex < key2.length; secondIndex += ts {
+				require.Equal(key2.Token(secondIndex, ts), extendedP.Token(firstIndex+secondIndex, ts))
+			}
+		}
+	})
+}
+
+func FuzzKeyDoubleExtend_Any(f *testing.F) {
+	f.Fuzz(func(
+		t *testing.T,
+		baseKeyBytes []byte,
+		firstKeyBytes []byte,
+		secondKeyBytes []byte,
+		forceBaseOdd bool,
+		forceFirstOdd bool,
+		forceSecondOdd bool,
+	) {
+		require := require.New(t)
+		for _, ts := range validTokenSizes {
+			baseKey := ToKey(baseKeyBytes)
+			if forceBaseOdd && baseKey.length > ts {
+				baseKey = baseKey.Take(baseKey.length - ts)
+			}
+			firstKey := ToKey(firstKeyBytes)
+			if forceFirstOdd && firstKey.length > ts {
+				firstKey = firstKey.Take(firstKey.length - ts)
+			}
+
+			secondKey := ToKey(secondKeyBytes)
+			if forceSecondOdd && secondKey.length > ts {
+				secondKey = secondKey.Take(secondKey.length - ts)
+			}
+
+			extendedP := baseKey.Extend(firstKey, secondKey)
+			require.Equal(baseKey.length+firstKey.length+secondKey.length, extendedP.length)
+			totalIndex := 0
+			for baseIndex := 0; baseIndex < baseKey.length; baseIndex += ts {
+				require.Equal(baseKey.Token(baseIndex, ts), extendedP.Token(baseIndex, ts))
+			}
+			totalIndex += baseKey.length
+			for firstIndex := 0; firstIndex < firstKey.length; firstIndex += ts {
+				require.Equal(firstKey.Token(firstIndex, ts), extendedP.Token(totalIndex+firstIndex, ts))
+			}
+			totalIndex += firstKey.length
+			for secondIndex := 0; secondIndex < secondKey.length; secondIndex += ts {
+				require.Equal(secondKey.Token(secondIndex, ts), extendedP.Token(totalIndex+secondIndex, ts))
 			}
 		}
 	})
@@ -509,15 +478,18 @@ func FuzzKeySkip(f *testing.F) {
 		tokensToSkip uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range branchFactors {
-			key1 := ToKey(first, branchFactor)
-			if int(tokensToSkip) >= key1.tokenLength {
+		key1 := ToKey(first)
+		for _, ts := range validTokenSizes {
+			// need bits to be a multiple of token size
+			ubitsToSkip := tokensToSkip * uint(ts)
+			if ubitsToSkip >= uint(key1.length) {
 				t.SkipNow()
 			}
-			key2 := key1.Skip(int(tokensToSkip))
-			require.Equal(key1.tokenLength-int(tokensToSkip), key2.tokenLength)
-			for i := 0; i < key2.tokenLength; i++ {
-				require.Equal(key1.Token(int(tokensToSkip)+i), key2.Token(i))
+			bitsToSkip := int(ubitsToSkip)
+			key2 := key1.Skip(bitsToSkip)
+			require.Equal(key1.length-bitsToSkip, key2.length)
+			for i := 0; i < key2.length; i += ts {
+				require.Equal(key1.Token(bitsToSkip+i, ts), key2.Token(i, ts))
 			}
 		}
 	})
@@ -527,19 +499,24 @@ func FuzzKeyTake(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		first []byte,
-		tokensToTake uint,
+		uTokensToTake uint,
 	) {
 		require := require.New(t)
-		for _, branchFactor := range branchFactors {
-			key1 := ToKey(first, branchFactor)
-			if int(tokensToTake) >= key1.tokenLength {
+		for _, ts := range validTokenSizes {
+			key1 := ToKey(first)
+			uBitsToTake := uTokensToTake * uint(ts)
+			if uBitsToTake >= uint(key1.length) {
 				t.SkipNow()
 			}
-			key2 := key1.Take(int(tokensToTake))
-			require.Equal(int(tokensToTake), key2.tokenLength)
-
-			for i := 0; i < key2.tokenLength; i++ {
-				require.Equal(key1.Token(i), key2.Token(i))
+			bitsToTake := int(uBitsToTake)
+			key2 := key1.Take(bitsToTake)
+			require.Equal(bitsToTake, key2.length)
+			if key2.hasPartialByte() {
+				paddingMask := byte(0xFF >> (key2.length % 8))
+				require.Zero(key2.value[len(key2.value)-1] & paddingMask)
+			}
+			for i := 0; i < bitsToTake; i += ts {
+				require.Equal(key1.Token(i, ts), key2.Token(i, ts))
 			}
 		}
 	})
@@ -550,7 +527,7 @@ func TestShiftCopy(t *testing.T) {
 		dst      []byte
 		src      []byte
 		expected []byte
-		shift    byte
+		shift    int
 	}
 
 	tests := []test{

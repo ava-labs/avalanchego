@@ -1776,8 +1776,7 @@ func TestImportExportKey(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	importArgs := &ImportKeyArgs{
@@ -1821,8 +1820,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{

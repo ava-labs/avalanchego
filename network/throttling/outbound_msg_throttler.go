@@ -11,10 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -204,15 +204,13 @@ func (m *outboundMsgThrottlerMetrics) initialize(namespace string, registerer pr
 		Name:      "throttler_outbound_awaiting_release",
 		Help:      "Number of messages waiting to be sent",
 	})
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		registerer.Register(m.acquireSuccesses),
 		registerer.Register(m.acquireFailures),
 		registerer.Register(m.remainingAtLargeBytes),
 		registerer.Register(m.remainingVdrBytes),
 		registerer.Register(m.awaitingRelease),
 	)
-	return errs.Err
 }
 
 func NewNoOutboundThrottler() OutboundMsgThrottler {

@@ -24,28 +24,30 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func FuzzKeyValue(f *testing.F) {
+func newDB(t testing.TB) database.Database {
 	unencryptedDB := memdb.New()
 	db, err := New([]byte(testPassword), unencryptedDB)
-	require.NoError(f, err)
-	database.FuzzKeyValue(f, db)
+	require.NoError(t, err)
+	return db
+}
+
+func FuzzKeyValue(f *testing.F) {
+	database.FuzzKeyValue(f, newDB(f))
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	unencryptedDB := memdb.New()
-	db, err := New([]byte(testPassword), unencryptedDB)
-	require.NoError(f, err)
-	database.FuzzNewIteratorWithPrefix(f, db)
+	database.FuzzNewIteratorWithPrefix(f, newDB(f))
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithStartAndPrefix(f, newDB(f))
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
-			unencryptedDB := memdb.New()
-			db, err := New([]byte(testPassword), unencryptedDB)
-			require.NoError(b, err)
-			bench(b, db, "encdb", keys, values)
+			bench(b, newDB(b), "encdb", keys, values)
 		}
 	}
 }

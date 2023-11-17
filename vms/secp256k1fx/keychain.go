@@ -27,7 +27,6 @@ var (
 
 // Keychain is a collection of keys that can be used to spend outputs
 type Keychain struct {
-	factory            *secp256k1.Factory
 	avaxAddrToKeyIndex map[ids.ShortID]int
 	ethAddrToKeyIndex  map[common.Address]int
 
@@ -41,7 +40,6 @@ type Keychain struct {
 // NewKeychain returns a new keychain containing [keys]
 func NewKeychain(keys ...*secp256k1.PrivateKey) *Keychain {
 	kc := &Keychain{
-		factory:            &secp256k1.Factory{},
 		avaxAddrToKeyIndex: make(map[ids.ShortID]int),
 		ethAddrToKeyIndex:  make(map[common.Address]int),
 	}
@@ -90,7 +88,7 @@ func (kc Keychain) EthAddresses() set.Set[common.Address] {
 
 // New returns a newly generated private key
 func (kc *Keychain) New() (*secp256k1.PrivateKey, error) {
-	sk, err := kc.factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}

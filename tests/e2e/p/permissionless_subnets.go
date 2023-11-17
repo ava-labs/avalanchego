@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -32,7 +32,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 
 			keychain := e2e.Env.NewKeychain(1)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			xWallet := baseWallet.X()

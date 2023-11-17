@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,13 +35,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -78,8 +77,18 @@ var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -89,6 +98,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
+	network    network.Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -116,8 +126,7 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.baseDB = versiondb.New(memdb.New())
 	res.ctx, res.msm = defaultCtx(res.baseDB)
 
 	res.ctx.Lock.Lock()
@@ -160,7 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, res)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -171,16 +180,23 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
+	res.network = network.New(
+		res.backend.Ctx,
+		res.blkManager,
+		res.mempool,
+		res.backend.Config.PartialSyncPrimaryNetwork,
+		res.sender,
+	)
+
 	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
 	)
 
-	res.Builder.SetPreference(genesisID)
+	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
 	return res
@@ -239,7 +255,6 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
-		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
 
@@ -361,13 +376,12 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
+		genesisValidators[i] = api.GenesisPermissionlessValidator{
+			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
@@ -419,10 +433,22 @@ func shutdownEnvironment(env *environment) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-	return errs.Err
+}
+
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(t, err)
+	return tx
 }

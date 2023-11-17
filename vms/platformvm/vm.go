@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -37,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -62,6 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
+	network.Network
 	validators.State
 
 	metrics            metrics.Metrics
@@ -73,8 +74,8 @@ type VM struct {
 	uptimeManager uptime.Manager
 
 	// The context of this vm
-	ctx       *snow.Context
-	dbManager manager.Manager
+	ctx *snow.Context
+	db  database.Database
 
 	state state.State
 
@@ -96,7 +97,7 @@ type VM struct {
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
@@ -124,7 +125,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.ctx = chainCtx
-	vm.dbManager = dbManager
+	vm.db = db
 
 	vm.codecRegistry = linearcodec.NewDefault()
 	vm.fx = &secp256k1fx.Fx{}
@@ -135,7 +136,7 @@ func (vm *VM) Initialize(
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
 	vm.state, err = state.New(
-		vm.dbManager.Current().Database,
+		vm.db,
 		genesisBytes,
 		registerer,
 		&vm.Config,
@@ -143,7 +144,6 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
-		&vm.bootstrapped,
 	)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (vm *VM) Initialize(
 
 	// Note: There is a circular dependency between the mempool and block
 	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	mempool, err := mempool.New("mempool", registerer, vm)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -191,13 +191,19 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
+	vm.Network = network.New(
+		txExecutorBackend.Ctx,
+		vm.manager,
+		mempool,
+		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+		appSender,
+	)
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 		toEngine,
-		appSender,
 	)
 
 	// Create all of the chains that the database says exist
@@ -305,17 +311,21 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
 	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
+	vl := validators.NewLogger(vm.ctx.Log, constants.PrimaryNetworkID, vm.ctx.NodeID)
+	vm.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
+
 	for subnetID := range vm.TrackedSubnets {
 		vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
-
 		if err := vm.uptimeManager.StartTracking(vdrIDs, subnetID); err != nil {
 			return err
 		}
+
+		vl := validators.NewLogger(vm.ctx.Log, subnetID, vm.ctx.NodeID)
+		vm.Validators.RegisterCallbackListener(subnetID, vl)
 	}
 
 	if err := vm.state.Commit(); err != nil {
@@ -340,7 +350,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown(context.Context) error {
-	if vm.dbManager == nil {
+	if vm.db == nil {
 		return nil
 	}
 
@@ -364,12 +374,10 @@ func (vm *VM) Shutdown(context.Context) error {
 		}
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		vm.state.Close(),
-		vm.dbManager.Close(),
+		vm.db.Close(),
 	)
-	return errs.Err
 }
 
 func (vm *VM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
@@ -393,7 +401,9 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	vm.Builder.SetPreference(blkID)
+	if vm.manager.SetPreference(blkID) {
+		vm.Builder.ResetBlockTimer()
+	}
 	return nil
 }
 

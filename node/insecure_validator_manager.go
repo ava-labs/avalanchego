@@ -27,7 +27,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 		// peer as a validator. Because each validator needs a txID associated
 		// with it, we hack one together by padding the nodeID with zeroes.
 		dummyTxID := ids.Empty
-		copy(dummyTxID[:], vdrID[:])
+		copy(dummyTxID[:], vdrID.Bytes())
 
 		err := i.vdrs.AddStaker(constants.PrimaryNetworkID, vdrID, nil, dummyTxID, i.weight)
 		if err != nil {

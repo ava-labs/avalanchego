@@ -76,6 +76,10 @@ func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDele
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) BaseTx(*txs.BaseTx) error {
+	return ErrWrongTxType
+}
+
 func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return e.atomicTx(tx)
 }

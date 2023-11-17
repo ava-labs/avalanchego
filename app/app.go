@@ -54,11 +54,45 @@ type App interface {
 	ExitCode() (int, error)
 }
 
-func New(config node.Config) App {
-	return &app{
-		config: config,
-		node:   &node.Node{},
+func New(config node.Config) (App, error) {
+	// Set the data directory permissions to be read write.
+	if err := perms.ChmodR(config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
 	}
+	if err := perms.ChmodR(config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("failed to restrict the permissions of the log directory with: %w", err)
+	}
+
+	logFactory := logging.NewFactory(config.LoggingConfig)
+	log, err := logFactory.Make("main")
+	if err != nil {
+		logFactory.Close()
+		return nil, fmt.Errorf("failed to initialize log: %w", err)
+	}
+
+	// update fd limit
+	fdLimit := config.FdLimit
+	if err := ulimit.Set(fdLimit, log); err != nil {
+		log.Fatal("failed to set fd-limit",
+			zap.Error(err),
+		)
+		logFactory.Close()
+		return nil, err
+	}
+
+	n, err := node.New(&config, logFactory, log)
+	if err != nil {
+		log.Stop()
+		logFactory.Close()
+		return nil, fmt.Errorf("failed to initialize node: %w", err)
+	}
+
+	return &app{
+		config:     config,
+		node:       n,
+		log:        log,
+		logFactory: logFactory,
+	}, nil
 }
 
 func Run(app App) int {
@@ -99,56 +133,33 @@ func Run(app App) int {
 
 // app is a wrapper around a node that runs in this process
 type app struct {
-	config node.Config
-	node   *node.Node
-	exitWG sync.WaitGroup
+	config     node.Config
+	node       *node.Node
+	log        logging.Logger
+	logFactory logging.Factory
+	exitWG     sync.WaitGroup
 }
 
 // Start the business logic of the node (as opposed to config reading, etc).
 // Does not block until the node is done. Errors returned from this method
 // are not logged.
 func (a *app) Start() error {
-	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(a.config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
-	}
-	if err := perms.ChmodR(a.config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to restrict the permissions of the log directory with: %w", err)
-	}
-
-	// we want to create the logger after the plugin has started the app
-	logFactory := logging.NewFactory(a.config.LoggingConfig)
-	log, err := logFactory.Make("main")
-	if err != nil {
-		logFactory.Close()
-		return err
-	}
-
-	// update fd limit
-	fdLimit := a.config.FdLimit
-	if err := ulimit.Set(fdLimit, log); err != nil {
-		log.Fatal("failed to set fd-limit",
-			zap.Error(err),
-		)
-		logFactory.Close()
-		return err
-	}
-
 	// Track if sybil control is enforced
 	if !a.config.SybilProtectionEnabled {
-		log.Warn("sybil control is not enforced")
+		a.log.Warn("sybil control is not enforced")
 	}
 
 	// TODO move this to config
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
-		log.Warn("UPnP and NAT-PMP router attach failed, you may not be listening publicly. " +
+		a.log.Warn("UPnP and NAT-PMP router attach failed, " +
+			"you may not be listening publicly. " +
 			"Please confirm the settings in your router")
 	}
 
 	if ip := a.config.IPPort.IPPort().IP; ip.IsLoopback() || ip.IsPrivate() {
-		log.Warn("P2P IP is private, you will not be publicly discoverable",
+		a.log.Warn("P2P IP is private, you will not be publicly discoverable",
 			zap.Stringer("ip", ip),
 		)
 	}
@@ -159,23 +170,23 @@ func (a *app) Start() error {
 	if !hostIsPublic {
 		ip, err := ips.Lookup(a.config.HTTPHost)
 		if err != nil {
-			log.Fatal("failed to lookup HTTP host",
+			a.log.Fatal("failed to lookup HTTP host",
 				zap.String("host", a.config.HTTPHost),
 				zap.Error(err),
 			)
-			logFactory.Close()
+			a.logFactory.Close()
 			return err
 		}
 		hostIsPublic = !ip.IsLoopback() && !ip.IsPrivate()
 
-		log.Debug("finished HTTP host lookup",
+		a.log.Debug("finished HTTP host lookup",
 			zap.String("host", a.config.HTTPHost),
 			zap.Stringer("ip", ip),
 			zap.Bool("isPublic", hostIsPublic),
 		)
 	}
 
-	mapper := nat.NewPortMapper(log, a.config.Nat)
+	mapper := nat.NewPortMapper(a.log, a.config.Nat)
 
 	// Open staking port we want for NAT traversal to have the external port
 	// (config.IP.Port) to connect to our internal listening port
@@ -192,7 +203,7 @@ func (a *app) Start() error {
 
 	// Don't open the HTTP port if the HTTP server is private
 	if hostIsPublic {
-		log.Warn("HTTP server is binding to a potentially public host. "+
+		a.log.Warn("HTTP server is binding to a potentially public host. "+
 			"You may be vulnerable to a DoS attack if your HTTP port is publicly accessible",
 			zap.String("host", a.config.HTTPHost),
 		)
@@ -213,18 +224,7 @@ func (a *app) Start() error {
 	// Regularly update our public IP.
 	// Note that if the node config said to not dynamically resolve and
 	// update our public IP, [p.config.IPUdater] is a no-op implementation.
-	go a.config.IPUpdater.Dispatch(log)
-
-	if err := a.node.Initialize(&a.config, log, logFactory); err != nil {
-		log.Fatal("error initializing node",
-			zap.Error(err),
-		)
-		mapper.UnmapAllPorts()
-		a.config.IPUpdater.Stop()
-		log.Stop()
-		logFactory.Close()
-		return err
-	}
+	go a.config.IPUpdater.Dispatch(a.log)
 
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
@@ -233,8 +233,8 @@ func (a *app) Start() error {
 			if r := recover(); r != nil {
 				fmt.Println("caught panic", r)
 			}
-			log.Stop()
-			logFactory.Close()
+			a.log.Stop()
+			a.logFactory.Close()
 			a.exitWG.Done()
 		}()
 		defer func() {
@@ -244,11 +244,11 @@ func (a *app) Start() error {
 			// If [p.node.Dispatch()] panics, then we should log the panic and
 			// then re-raise the panic. This is why the above defer is broken
 			// into two parts.
-			log.StopOnPanic()
+			a.log.StopOnPanic()
 		}()
 
 		err := a.node.Dispatch()
-		log.Debug("dispatch returned",
+		a.log.Debug("dispatch returned",
 			zap.Error(err),
 		)
 	}()

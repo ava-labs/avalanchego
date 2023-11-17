@@ -232,7 +232,7 @@ func (x StateSummaryAcceptResponse_Mode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StateSummaryAcceptResponse_Mode.Descriptor instead.
 func (StateSummaryAcceptResponse_Mode) EnumDescriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{46, 0}
+	return file_vm_vm_proto_rawDescGZIP(), []int{45, 0}
 }
 
 type InitializeRequest struct {
@@ -246,15 +246,15 @@ type InitializeRequest struct {
 	NodeId    []byte `protobuf:"bytes,4,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	// public_key is the BLS public key that would correspond with any signatures
 	// produced by the warp messaging signer
-	PublicKey    []byte               `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
-	XChainId     []byte               `protobuf:"bytes,6,opt,name=x_chain_id,json=xChainId,proto3" json:"x_chain_id,omitempty"`
-	CChainId     []byte               `protobuf:"bytes,7,opt,name=c_chain_id,json=cChainId,proto3" json:"c_chain_id,omitempty"`
-	AvaxAssetId  []byte               `protobuf:"bytes,8,opt,name=avax_asset_id,json=avaxAssetId,proto3" json:"avax_asset_id,omitempty"`
-	ChainDataDir string               `protobuf:"bytes,9,opt,name=chain_data_dir,json=chainDataDir,proto3" json:"chain_data_dir,omitempty"`
-	GenesisBytes []byte               `protobuf:"bytes,10,opt,name=genesis_bytes,json=genesisBytes,proto3" json:"genesis_bytes,omitempty"`
-	UpgradeBytes []byte               `protobuf:"bytes,11,opt,name=upgrade_bytes,json=upgradeBytes,proto3" json:"upgrade_bytes,omitempty"`
-	ConfigBytes  []byte               `protobuf:"bytes,12,opt,name=config_bytes,json=configBytes,proto3" json:"config_bytes,omitempty"`
-	DbServers    []*VersionedDBServer `protobuf:"bytes,13,rep,name=db_servers,json=dbServers,proto3" json:"db_servers,omitempty"`
+	PublicKey    []byte `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	XChainId     []byte `protobuf:"bytes,6,opt,name=x_chain_id,json=xChainId,proto3" json:"x_chain_id,omitempty"`
+	CChainId     []byte `protobuf:"bytes,7,opt,name=c_chain_id,json=cChainId,proto3" json:"c_chain_id,omitempty"`
+	AvaxAssetId  []byte `protobuf:"bytes,8,opt,name=avax_asset_id,json=avaxAssetId,proto3" json:"avax_asset_id,omitempty"`
+	ChainDataDir string `protobuf:"bytes,9,opt,name=chain_data_dir,json=chainDataDir,proto3" json:"chain_data_dir,omitempty"`
+	GenesisBytes []byte `protobuf:"bytes,10,opt,name=genesis_bytes,json=genesisBytes,proto3" json:"genesis_bytes,omitempty"`
+	UpgradeBytes []byte `protobuf:"bytes,11,opt,name=upgrade_bytes,json=upgradeBytes,proto3" json:"upgrade_bytes,omitempty"`
+	ConfigBytes  []byte `protobuf:"bytes,12,opt,name=config_bytes,json=configBytes,proto3" json:"config_bytes,omitempty"`
+	DbServerAddr string `protobuf:"bytes,13,opt,name=db_server_addr,json=dbServerAddr,proto3" json:"db_server_addr,omitempty"`
 	// server_addr is the address of the gRPC server which serves
 	// the messenger, keystore, shared memory, blockchain alias,
 	// subnet alias, and appSender services
@@ -377,11 +377,11 @@ func (x *InitializeRequest) GetConfigBytes() []byte {
 	return nil
 }
 
-func (x *InitializeRequest) GetDbServers() []*VersionedDBServer {
+func (x *InitializeRequest) GetDbServerAddr() string {
 	if x != nil {
-		return x.DbServers
+		return x.DbServerAddr
 	}
-	return nil
+	return ""
 }
 
 func (x *InitializeRequest) GetServerAddr() string {
@@ -470,63 +470,6 @@ func (x *InitializeResponse) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-type VersionedDBServer struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
-	// server_addr is the address of the gRPC server which serves the
-	// Database service
-	ServerAddr string `protobuf:"bytes,2,opt,name=server_addr,json=serverAddr,proto3" json:"server_addr,omitempty"`
-}
-
-func (x *VersionedDBServer) Reset() {
-	*x = VersionedDBServer{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *VersionedDBServer) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*VersionedDBServer) ProtoMessage() {}
-
-func (x *VersionedDBServer) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use VersionedDBServer.ProtoReflect.Descriptor instead.
-func (*VersionedDBServer) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *VersionedDBServer) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
-}
-
-func (x *VersionedDBServer) GetServerAddr() string {
-	if x != nil {
-		return x.ServerAddr
-	}
-	return ""
-}
-
 type SetStateRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -538,7 +481,7 @@ type SetStateRequest struct {
 func (x *SetStateRequest) Reset() {
 	*x = SetStateRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[3]
+		mi := &file_vm_vm_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -551,7 +494,7 @@ func (x *SetStateRequest) String() string {
 func (*SetStateRequest) ProtoMessage() {}
 
 func (x *SetStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[3]
+	mi := &file_vm_vm_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +507,7 @@ func (x *SetStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetStateRequest.ProtoReflect.Descriptor instead.
 func (*SetStateRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{3}
+	return file_vm_vm_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SetStateRequest) GetState() State {
@@ -589,7 +532,7 @@ type SetStateResponse struct {
 func (x *SetStateResponse) Reset() {
 	*x = SetStateResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[4]
+		mi := &file_vm_vm_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -602,7 +545,7 @@ func (x *SetStateResponse) String() string {
 func (*SetStateResponse) ProtoMessage() {}
 
 func (x *SetStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[4]
+	mi := &file_vm_vm_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +558,7 @@ func (x *SetStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetStateResponse.ProtoReflect.Descriptor instead.
 func (*SetStateResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{4}
+	return file_vm_vm_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SetStateResponse) GetLastAcceptedId() []byte {
@@ -664,7 +607,7 @@ type CreateHandlersResponse struct {
 func (x *CreateHandlersResponse) Reset() {
 	*x = CreateHandlersResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[5]
+		mi := &file_vm_vm_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -677,7 +620,7 @@ func (x *CreateHandlersResponse) String() string {
 func (*CreateHandlersResponse) ProtoMessage() {}
 
 func (x *CreateHandlersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[5]
+	mi := &file_vm_vm_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -690,7 +633,7 @@ func (x *CreateHandlersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHandlersResponse.ProtoReflect.Descriptor instead.
 func (*CreateHandlersResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{5}
+	return file_vm_vm_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateHandlersResponse) GetHandlers() []*Handler {
@@ -711,7 +654,7 @@ type CreateStaticHandlersResponse struct {
 func (x *CreateStaticHandlersResponse) Reset() {
 	*x = CreateStaticHandlersResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[6]
+		mi := &file_vm_vm_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -724,7 +667,7 @@ func (x *CreateStaticHandlersResponse) String() string {
 func (*CreateStaticHandlersResponse) ProtoMessage() {}
 
 func (x *CreateStaticHandlersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[6]
+	mi := &file_vm_vm_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -737,7 +680,7 @@ func (x *CreateStaticHandlersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStaticHandlersResponse.ProtoReflect.Descriptor instead.
 func (*CreateStaticHandlersResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{6}
+	return file_vm_vm_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateStaticHandlersResponse) GetHandlers() []*Handler {
@@ -761,7 +704,7 @@ type Handler struct {
 func (x *Handler) Reset() {
 	*x = Handler{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[7]
+		mi := &file_vm_vm_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -774,7 +717,7 @@ func (x *Handler) String() string {
 func (*Handler) ProtoMessage() {}
 
 func (x *Handler) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[7]
+	mi := &file_vm_vm_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -787,7 +730,7 @@ func (x *Handler) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Handler.ProtoReflect.Descriptor instead.
 func (*Handler) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{7}
+	return file_vm_vm_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Handler) GetPrefix() string {
@@ -815,7 +758,7 @@ type BuildBlockRequest struct {
 func (x *BuildBlockRequest) Reset() {
 	*x = BuildBlockRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[8]
+		mi := &file_vm_vm_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -828,7 +771,7 @@ func (x *BuildBlockRequest) String() string {
 func (*BuildBlockRequest) ProtoMessage() {}
 
 func (x *BuildBlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[8]
+	mi := &file_vm_vm_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +784,7 @@ func (x *BuildBlockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildBlockRequest.ProtoReflect.Descriptor instead.
 func (*BuildBlockRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{8}
+	return file_vm_vm_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BuildBlockRequest) GetPChainHeight() uint64 {
@@ -868,7 +811,7 @@ type BuildBlockResponse struct {
 func (x *BuildBlockResponse) Reset() {
 	*x = BuildBlockResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[9]
+		mi := &file_vm_vm_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -881,7 +824,7 @@ func (x *BuildBlockResponse) String() string {
 func (*BuildBlockResponse) ProtoMessage() {}
 
 func (x *BuildBlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[9]
+	mi := &file_vm_vm_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -894,7 +837,7 @@ func (x *BuildBlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildBlockResponse.ProtoReflect.Descriptor instead.
 func (*BuildBlockResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{9}
+	return file_vm_vm_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BuildBlockResponse) GetId() []byte {
@@ -950,7 +893,7 @@ type ParseBlockRequest struct {
 func (x *ParseBlockRequest) Reset() {
 	*x = ParseBlockRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[10]
+		mi := &file_vm_vm_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -963,7 +906,7 @@ func (x *ParseBlockRequest) String() string {
 func (*ParseBlockRequest) ProtoMessage() {}
 
 func (x *ParseBlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[10]
+	mi := &file_vm_vm_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -976,7 +919,7 @@ func (x *ParseBlockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseBlockRequest.ProtoReflect.Descriptor instead.
 func (*ParseBlockRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{10}
+	return file_vm_vm_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ParseBlockRequest) GetBytes() []byte {
@@ -1002,7 +945,7 @@ type ParseBlockResponse struct {
 func (x *ParseBlockResponse) Reset() {
 	*x = ParseBlockResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[11]
+		mi := &file_vm_vm_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1015,7 +958,7 @@ func (x *ParseBlockResponse) String() string {
 func (*ParseBlockResponse) ProtoMessage() {}
 
 func (x *ParseBlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[11]
+	mi := &file_vm_vm_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +971,7 @@ func (x *ParseBlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseBlockResponse.ProtoReflect.Descriptor instead.
 func (*ParseBlockResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{11}
+	return file_vm_vm_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ParseBlockResponse) GetId() []byte {
@@ -1084,7 +1027,7 @@ type GetBlockRequest struct {
 func (x *GetBlockRequest) Reset() {
 	*x = GetBlockRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[12]
+		mi := &file_vm_vm_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1097,7 +1040,7 @@ func (x *GetBlockRequest) String() string {
 func (*GetBlockRequest) ProtoMessage() {}
 
 func (x *GetBlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[12]
+	mi := &file_vm_vm_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1053,7 @@ func (x *GetBlockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockRequest.ProtoReflect.Descriptor instead.
 func (*GetBlockRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{12}
+	return file_vm_vm_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetBlockRequest) GetId() []byte {
@@ -1138,7 +1081,7 @@ type GetBlockResponse struct {
 func (x *GetBlockResponse) Reset() {
 	*x = GetBlockResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[13]
+		mi := &file_vm_vm_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1151,7 +1094,7 @@ func (x *GetBlockResponse) String() string {
 func (*GetBlockResponse) ProtoMessage() {}
 
 func (x *GetBlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[13]
+	mi := &file_vm_vm_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1164,7 +1107,7 @@ func (x *GetBlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockResponse.ProtoReflect.Descriptor instead.
 func (*GetBlockResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{13}
+	return file_vm_vm_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetBlockResponse) GetParentId() []byte {
@@ -1227,7 +1170,7 @@ type SetPreferenceRequest struct {
 func (x *SetPreferenceRequest) Reset() {
 	*x = SetPreferenceRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[14]
+		mi := &file_vm_vm_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1240,7 +1183,7 @@ func (x *SetPreferenceRequest) String() string {
 func (*SetPreferenceRequest) ProtoMessage() {}
 
 func (x *SetPreferenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[14]
+	mi := &file_vm_vm_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1253,7 +1196,7 @@ func (x *SetPreferenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPreferenceRequest.ProtoReflect.Descriptor instead.
 func (*SetPreferenceRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{14}
+	return file_vm_vm_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SetPreferenceRequest) GetId() []byte {
@@ -1277,7 +1220,7 @@ type BlockVerifyRequest struct {
 func (x *BlockVerifyRequest) Reset() {
 	*x = BlockVerifyRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[15]
+		mi := &file_vm_vm_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1290,7 +1233,7 @@ func (x *BlockVerifyRequest) String() string {
 func (*BlockVerifyRequest) ProtoMessage() {}
 
 func (x *BlockVerifyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[15]
+	mi := &file_vm_vm_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1303,7 +1246,7 @@ func (x *BlockVerifyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockVerifyRequest.ProtoReflect.Descriptor instead.
 func (*BlockVerifyRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{15}
+	return file_vm_vm_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *BlockVerifyRequest) GetBytes() []byte {
@@ -1331,7 +1274,7 @@ type BlockVerifyResponse struct {
 func (x *BlockVerifyResponse) Reset() {
 	*x = BlockVerifyResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[16]
+		mi := &file_vm_vm_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1344,7 +1287,7 @@ func (x *BlockVerifyResponse) String() string {
 func (*BlockVerifyResponse) ProtoMessage() {}
 
 func (x *BlockVerifyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[16]
+	mi := &file_vm_vm_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1357,7 +1300,7 @@ func (x *BlockVerifyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockVerifyResponse.ProtoReflect.Descriptor instead.
 func (*BlockVerifyResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{16}
+	return file_vm_vm_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *BlockVerifyResponse) GetTimestamp() *timestamppb.Timestamp {
@@ -1378,7 +1321,7 @@ type BlockAcceptRequest struct {
 func (x *BlockAcceptRequest) Reset() {
 	*x = BlockAcceptRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[17]
+		mi := &file_vm_vm_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1391,7 +1334,7 @@ func (x *BlockAcceptRequest) String() string {
 func (*BlockAcceptRequest) ProtoMessage() {}
 
 func (x *BlockAcceptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[17]
+	mi := &file_vm_vm_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1347,7 @@ func (x *BlockAcceptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockAcceptRequest.ProtoReflect.Descriptor instead.
 func (*BlockAcceptRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{17}
+	return file_vm_vm_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *BlockAcceptRequest) GetId() []byte {
@@ -1425,7 +1368,7 @@ type BlockRejectRequest struct {
 func (x *BlockRejectRequest) Reset() {
 	*x = BlockRejectRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[18]
+		mi := &file_vm_vm_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1438,7 +1381,7 @@ func (x *BlockRejectRequest) String() string {
 func (*BlockRejectRequest) ProtoMessage() {}
 
 func (x *BlockRejectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[18]
+	mi := &file_vm_vm_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1394,7 @@ func (x *BlockRejectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRejectRequest.ProtoReflect.Descriptor instead.
 func (*BlockRejectRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{18}
+	return file_vm_vm_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BlockRejectRequest) GetId() []byte {
@@ -1472,7 +1415,7 @@ type HealthResponse struct {
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[19]
+		mi := &file_vm_vm_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1485,7 +1428,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[19]
+	mi := &file_vm_vm_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1498,7 +1441,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{19}
+	return file_vm_vm_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *HealthResponse) GetDetails() []byte {
@@ -1519,7 +1462,7 @@ type VersionResponse struct {
 func (x *VersionResponse) Reset() {
 	*x = VersionResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[20]
+		mi := &file_vm_vm_proto_msgTypes[19]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1532,7 +1475,7 @@ func (x *VersionResponse) String() string {
 func (*VersionResponse) ProtoMessage() {}
 
 func (x *VersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[20]
+	mi := &file_vm_vm_proto_msgTypes[19]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1545,7 +1488,7 @@ func (x *VersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionResponse.ProtoReflect.Descriptor instead.
 func (*VersionResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{20}
+	return file_vm_vm_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *VersionResponse) GetVersion() string {
@@ -1573,7 +1516,7 @@ type AppRequestMsg struct {
 func (x *AppRequestMsg) Reset() {
 	*x = AppRequestMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[21]
+		mi := &file_vm_vm_proto_msgTypes[20]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1586,7 +1529,7 @@ func (x *AppRequestMsg) String() string {
 func (*AppRequestMsg) ProtoMessage() {}
 
 func (x *AppRequestMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[21]
+	mi := &file_vm_vm_proto_msgTypes[20]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1599,7 +1542,7 @@ func (x *AppRequestMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppRequestMsg.ProtoReflect.Descriptor instead.
 func (*AppRequestMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{21}
+	return file_vm_vm_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AppRequestMsg) GetNodeId() []byte {
@@ -1644,7 +1587,7 @@ type AppRequestFailedMsg struct {
 func (x *AppRequestFailedMsg) Reset() {
 	*x = AppRequestFailedMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[22]
+		mi := &file_vm_vm_proto_msgTypes[21]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1657,7 +1600,7 @@ func (x *AppRequestFailedMsg) String() string {
 func (*AppRequestFailedMsg) ProtoMessage() {}
 
 func (x *AppRequestFailedMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[22]
+	mi := &file_vm_vm_proto_msgTypes[21]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1670,7 +1613,7 @@ func (x *AppRequestFailedMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppRequestFailedMsg.ProtoReflect.Descriptor instead.
 func (*AppRequestFailedMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{22}
+	return file_vm_vm_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AppRequestFailedMsg) GetNodeId() []byte {
@@ -1703,7 +1646,7 @@ type AppResponseMsg struct {
 func (x *AppResponseMsg) Reset() {
 	*x = AppResponseMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[23]
+		mi := &file_vm_vm_proto_msgTypes[22]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1716,7 +1659,7 @@ func (x *AppResponseMsg) String() string {
 func (*AppResponseMsg) ProtoMessage() {}
 
 func (x *AppResponseMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[23]
+	mi := &file_vm_vm_proto_msgTypes[22]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1729,7 +1672,7 @@ func (x *AppResponseMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppResponseMsg.ProtoReflect.Descriptor instead.
 func (*AppResponseMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{23}
+	return file_vm_vm_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AppResponseMsg) GetNodeId() []byte {
@@ -1767,7 +1710,7 @@ type AppGossipMsg struct {
 func (x *AppGossipMsg) Reset() {
 	*x = AppGossipMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[24]
+		mi := &file_vm_vm_proto_msgTypes[23]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1780,7 +1723,7 @@ func (x *AppGossipMsg) String() string {
 func (*AppGossipMsg) ProtoMessage() {}
 
 func (x *AppGossipMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[24]
+	mi := &file_vm_vm_proto_msgTypes[23]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1793,7 +1736,7 @@ func (x *AppGossipMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppGossipMsg.ProtoReflect.Descriptor instead.
 func (*AppGossipMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{24}
+	return file_vm_vm_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AppGossipMsg) GetNodeId() []byte {
@@ -1828,7 +1771,7 @@ type CrossChainAppRequestMsg struct {
 func (x *CrossChainAppRequestMsg) Reset() {
 	*x = CrossChainAppRequestMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[25]
+		mi := &file_vm_vm_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1841,7 +1784,7 @@ func (x *CrossChainAppRequestMsg) String() string {
 func (*CrossChainAppRequestMsg) ProtoMessage() {}
 
 func (x *CrossChainAppRequestMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[25]
+	mi := &file_vm_vm_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1854,7 +1797,7 @@ func (x *CrossChainAppRequestMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossChainAppRequestMsg.ProtoReflect.Descriptor instead.
 func (*CrossChainAppRequestMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{25}
+	return file_vm_vm_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CrossChainAppRequestMsg) GetChainId() []byte {
@@ -1899,7 +1842,7 @@ type CrossChainAppRequestFailedMsg struct {
 func (x *CrossChainAppRequestFailedMsg) Reset() {
 	*x = CrossChainAppRequestFailedMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[26]
+		mi := &file_vm_vm_proto_msgTypes[25]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1912,7 +1855,7 @@ func (x *CrossChainAppRequestFailedMsg) String() string {
 func (*CrossChainAppRequestFailedMsg) ProtoMessage() {}
 
 func (x *CrossChainAppRequestFailedMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[26]
+	mi := &file_vm_vm_proto_msgTypes[25]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1925,7 +1868,7 @@ func (x *CrossChainAppRequestFailedMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossChainAppRequestFailedMsg.ProtoReflect.Descriptor instead.
 func (*CrossChainAppRequestFailedMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{26}
+	return file_vm_vm_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CrossChainAppRequestFailedMsg) GetChainId() []byte {
@@ -1958,7 +1901,7 @@ type CrossChainAppResponseMsg struct {
 func (x *CrossChainAppResponseMsg) Reset() {
 	*x = CrossChainAppResponseMsg{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[27]
+		mi := &file_vm_vm_proto_msgTypes[26]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1971,7 +1914,7 @@ func (x *CrossChainAppResponseMsg) String() string {
 func (*CrossChainAppResponseMsg) ProtoMessage() {}
 
 func (x *CrossChainAppResponseMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[27]
+	mi := &file_vm_vm_proto_msgTypes[26]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1984,7 +1927,7 @@ func (x *CrossChainAppResponseMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossChainAppResponseMsg.ProtoReflect.Descriptor instead.
 func (*CrossChainAppResponseMsg) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{27}
+	return file_vm_vm_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *CrossChainAppResponseMsg) GetChainId() []byte {
@@ -2020,7 +1963,7 @@ type ConnectedRequest struct {
 func (x *ConnectedRequest) Reset() {
 	*x = ConnectedRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[28]
+		mi := &file_vm_vm_proto_msgTypes[27]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2033,7 +1976,7 @@ func (x *ConnectedRequest) String() string {
 func (*ConnectedRequest) ProtoMessage() {}
 
 func (x *ConnectedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[28]
+	mi := &file_vm_vm_proto_msgTypes[27]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2046,7 +1989,7 @@ func (x *ConnectedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectedRequest.ProtoReflect.Descriptor instead.
 func (*ConnectedRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{28}
+	return file_vm_vm_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ConnectedRequest) GetNodeId() []byte {
@@ -2074,7 +2017,7 @@ type DisconnectedRequest struct {
 func (x *DisconnectedRequest) Reset() {
 	*x = DisconnectedRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[29]
+		mi := &file_vm_vm_proto_msgTypes[28]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2087,7 +2030,7 @@ func (x *DisconnectedRequest) String() string {
 func (*DisconnectedRequest) ProtoMessage() {}
 
 func (x *DisconnectedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[29]
+	mi := &file_vm_vm_proto_msgTypes[28]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2100,7 +2043,7 @@ func (x *DisconnectedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectedRequest.ProtoReflect.Descriptor instead.
 func (*DisconnectedRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{29}
+	return file_vm_vm_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *DisconnectedRequest) GetNodeId() []byte {
@@ -2124,7 +2067,7 @@ type GetAncestorsRequest struct {
 func (x *GetAncestorsRequest) Reset() {
 	*x = GetAncestorsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[30]
+		mi := &file_vm_vm_proto_msgTypes[29]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2137,7 +2080,7 @@ func (x *GetAncestorsRequest) String() string {
 func (*GetAncestorsRequest) ProtoMessage() {}
 
 func (x *GetAncestorsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[30]
+	mi := &file_vm_vm_proto_msgTypes[29]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2150,7 +2093,7 @@ func (x *GetAncestorsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAncestorsRequest.ProtoReflect.Descriptor instead.
 func (*GetAncestorsRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{30}
+	return file_vm_vm_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetAncestorsRequest) GetBlkId() []byte {
@@ -2192,7 +2135,7 @@ type GetAncestorsResponse struct {
 func (x *GetAncestorsResponse) Reset() {
 	*x = GetAncestorsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[31]
+		mi := &file_vm_vm_proto_msgTypes[30]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2205,7 +2148,7 @@ func (x *GetAncestorsResponse) String() string {
 func (*GetAncestorsResponse) ProtoMessage() {}
 
 func (x *GetAncestorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[31]
+	mi := &file_vm_vm_proto_msgTypes[30]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2218,7 +2161,7 @@ func (x *GetAncestorsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAncestorsResponse.ProtoReflect.Descriptor instead.
 func (*GetAncestorsResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{31}
+	return file_vm_vm_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetAncestorsResponse) GetBlksBytes() [][]byte {
@@ -2239,7 +2182,7 @@ type BatchedParseBlockRequest struct {
 func (x *BatchedParseBlockRequest) Reset() {
 	*x = BatchedParseBlockRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[32]
+		mi := &file_vm_vm_proto_msgTypes[31]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2252,7 +2195,7 @@ func (x *BatchedParseBlockRequest) String() string {
 func (*BatchedParseBlockRequest) ProtoMessage() {}
 
 func (x *BatchedParseBlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[32]
+	mi := &file_vm_vm_proto_msgTypes[31]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2265,7 +2208,7 @@ func (x *BatchedParseBlockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchedParseBlockRequest.ProtoReflect.Descriptor instead.
 func (*BatchedParseBlockRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{32}
+	return file_vm_vm_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *BatchedParseBlockRequest) GetRequest() [][]byte {
@@ -2286,7 +2229,7 @@ type BatchedParseBlockResponse struct {
 func (x *BatchedParseBlockResponse) Reset() {
 	*x = BatchedParseBlockResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[33]
+		mi := &file_vm_vm_proto_msgTypes[32]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2299,7 +2242,7 @@ func (x *BatchedParseBlockResponse) String() string {
 func (*BatchedParseBlockResponse) ProtoMessage() {}
 
 func (x *BatchedParseBlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[33]
+	mi := &file_vm_vm_proto_msgTypes[32]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2312,7 +2255,7 @@ func (x *BatchedParseBlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchedParseBlockResponse.ProtoReflect.Descriptor instead.
 func (*BatchedParseBlockResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{33}
+	return file_vm_vm_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *BatchedParseBlockResponse) GetResponse() []*ParseBlockResponse {
@@ -2333,7 +2276,7 @@ type VerifyHeightIndexResponse struct {
 func (x *VerifyHeightIndexResponse) Reset() {
 	*x = VerifyHeightIndexResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[34]
+		mi := &file_vm_vm_proto_msgTypes[33]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2346,7 +2289,7 @@ func (x *VerifyHeightIndexResponse) String() string {
 func (*VerifyHeightIndexResponse) ProtoMessage() {}
 
 func (x *VerifyHeightIndexResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[34]
+	mi := &file_vm_vm_proto_msgTypes[33]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2359,7 +2302,7 @@ func (x *VerifyHeightIndexResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyHeightIndexResponse.ProtoReflect.Descriptor instead.
 func (*VerifyHeightIndexResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{34}
+	return file_vm_vm_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *VerifyHeightIndexResponse) GetErr() Error {
@@ -2380,7 +2323,7 @@ type GetBlockIDAtHeightRequest struct {
 func (x *GetBlockIDAtHeightRequest) Reset() {
 	*x = GetBlockIDAtHeightRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[35]
+		mi := &file_vm_vm_proto_msgTypes[34]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2393,7 +2336,7 @@ func (x *GetBlockIDAtHeightRequest) String() string {
 func (*GetBlockIDAtHeightRequest) ProtoMessage() {}
 
 func (x *GetBlockIDAtHeightRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[35]
+	mi := &file_vm_vm_proto_msgTypes[34]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2406,7 +2349,7 @@ func (x *GetBlockIDAtHeightRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockIDAtHeightRequest.ProtoReflect.Descriptor instead.
 func (*GetBlockIDAtHeightRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{35}
+	return file_vm_vm_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetBlockIDAtHeightRequest) GetHeight() uint64 {
@@ -2428,7 +2371,7 @@ type GetBlockIDAtHeightResponse struct {
 func (x *GetBlockIDAtHeightResponse) Reset() {
 	*x = GetBlockIDAtHeightResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[36]
+		mi := &file_vm_vm_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2441,7 +2384,7 @@ func (x *GetBlockIDAtHeightResponse) String() string {
 func (*GetBlockIDAtHeightResponse) ProtoMessage() {}
 
 func (x *GetBlockIDAtHeightResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[36]
+	mi := &file_vm_vm_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2454,7 +2397,7 @@ func (x *GetBlockIDAtHeightResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockIDAtHeightResponse.ProtoReflect.Descriptor instead.
 func (*GetBlockIDAtHeightResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{36}
+	return file_vm_vm_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetBlockIDAtHeightResponse) GetBlkId() []byte {
@@ -2482,7 +2425,7 @@ type GatherResponse struct {
 func (x *GatherResponse) Reset() {
 	*x = GatherResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[37]
+		mi := &file_vm_vm_proto_msgTypes[36]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2495,7 +2438,7 @@ func (x *GatherResponse) String() string {
 func (*GatherResponse) ProtoMessage() {}
 
 func (x *GatherResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[37]
+	mi := &file_vm_vm_proto_msgTypes[36]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2508,7 +2451,7 @@ func (x *GatherResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GatherResponse.ProtoReflect.Descriptor instead.
 func (*GatherResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{37}
+	return file_vm_vm_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GatherResponse) GetMetricFamilies() []*_go.MetricFamily {
@@ -2530,7 +2473,7 @@ type StateSyncEnabledResponse struct {
 func (x *StateSyncEnabledResponse) Reset() {
 	*x = StateSyncEnabledResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[38]
+		mi := &file_vm_vm_proto_msgTypes[37]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2543,7 +2486,7 @@ func (x *StateSyncEnabledResponse) String() string {
 func (*StateSyncEnabledResponse) ProtoMessage() {}
 
 func (x *StateSyncEnabledResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[38]
+	mi := &file_vm_vm_proto_msgTypes[37]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2556,7 +2499,7 @@ func (x *StateSyncEnabledResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncEnabledResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncEnabledResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{38}
+	return file_vm_vm_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *StateSyncEnabledResponse) GetEnabled() bool {
@@ -2587,7 +2530,7 @@ type GetOngoingSyncStateSummaryResponse struct {
 func (x *GetOngoingSyncStateSummaryResponse) Reset() {
 	*x = GetOngoingSyncStateSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[39]
+		mi := &file_vm_vm_proto_msgTypes[38]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2600,7 +2543,7 @@ func (x *GetOngoingSyncStateSummaryResponse) String() string {
 func (*GetOngoingSyncStateSummaryResponse) ProtoMessage() {}
 
 func (x *GetOngoingSyncStateSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[39]
+	mi := &file_vm_vm_proto_msgTypes[38]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2613,7 +2556,7 @@ func (x *GetOngoingSyncStateSummaryResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetOngoingSyncStateSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetOngoingSyncStateSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{39}
+	return file_vm_vm_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetOngoingSyncStateSummaryResponse) GetId() []byte {
@@ -2658,7 +2601,7 @@ type GetLastStateSummaryResponse struct {
 func (x *GetLastStateSummaryResponse) Reset() {
 	*x = GetLastStateSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[40]
+		mi := &file_vm_vm_proto_msgTypes[39]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2671,7 +2614,7 @@ func (x *GetLastStateSummaryResponse) String() string {
 func (*GetLastStateSummaryResponse) ProtoMessage() {}
 
 func (x *GetLastStateSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[40]
+	mi := &file_vm_vm_proto_msgTypes[39]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2684,7 +2627,7 @@ func (x *GetLastStateSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLastStateSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetLastStateSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{40}
+	return file_vm_vm_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetLastStateSummaryResponse) GetId() []byte {
@@ -2726,7 +2669,7 @@ type ParseStateSummaryRequest struct {
 func (x *ParseStateSummaryRequest) Reset() {
 	*x = ParseStateSummaryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[41]
+		mi := &file_vm_vm_proto_msgTypes[40]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2739,7 +2682,7 @@ func (x *ParseStateSummaryRequest) String() string {
 func (*ParseStateSummaryRequest) ProtoMessage() {}
 
 func (x *ParseStateSummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[41]
+	mi := &file_vm_vm_proto_msgTypes[40]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2752,7 +2695,7 @@ func (x *ParseStateSummaryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseStateSummaryRequest.ProtoReflect.Descriptor instead.
 func (*ParseStateSummaryRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{41}
+	return file_vm_vm_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ParseStateSummaryRequest) GetBytes() []byte {
@@ -2775,7 +2718,7 @@ type ParseStateSummaryResponse struct {
 func (x *ParseStateSummaryResponse) Reset() {
 	*x = ParseStateSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[42]
+		mi := &file_vm_vm_proto_msgTypes[41]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2788,7 +2731,7 @@ func (x *ParseStateSummaryResponse) String() string {
 func (*ParseStateSummaryResponse) ProtoMessage() {}
 
 func (x *ParseStateSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[42]
+	mi := &file_vm_vm_proto_msgTypes[41]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2801,7 +2744,7 @@ func (x *ParseStateSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseStateSummaryResponse.ProtoReflect.Descriptor instead.
 func (*ParseStateSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{42}
+	return file_vm_vm_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ParseStateSummaryResponse) GetId() []byte {
@@ -2836,7 +2779,7 @@ type GetStateSummaryRequest struct {
 func (x *GetStateSummaryRequest) Reset() {
 	*x = GetStateSummaryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[43]
+		mi := &file_vm_vm_proto_msgTypes[42]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2849,7 +2792,7 @@ func (x *GetStateSummaryRequest) String() string {
 func (*GetStateSummaryRequest) ProtoMessage() {}
 
 func (x *GetStateSummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[43]
+	mi := &file_vm_vm_proto_msgTypes[42]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2862,7 +2805,7 @@ func (x *GetStateSummaryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateSummaryRequest.ProtoReflect.Descriptor instead.
 func (*GetStateSummaryRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{43}
+	return file_vm_vm_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetStateSummaryRequest) GetHeight() uint64 {
@@ -2885,7 +2828,7 @@ type GetStateSummaryResponse struct {
 func (x *GetStateSummaryResponse) Reset() {
 	*x = GetStateSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[44]
+		mi := &file_vm_vm_proto_msgTypes[43]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2898,7 +2841,7 @@ func (x *GetStateSummaryResponse) String() string {
 func (*GetStateSummaryResponse) ProtoMessage() {}
 
 func (x *GetStateSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[44]
+	mi := &file_vm_vm_proto_msgTypes[43]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2911,7 +2854,7 @@ func (x *GetStateSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetStateSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{44}
+	return file_vm_vm_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetStateSummaryResponse) GetId() []byte {
@@ -2946,7 +2889,7 @@ type StateSummaryAcceptRequest struct {
 func (x *StateSummaryAcceptRequest) Reset() {
 	*x = StateSummaryAcceptRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[45]
+		mi := &file_vm_vm_proto_msgTypes[44]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2959,7 +2902,7 @@ func (x *StateSummaryAcceptRequest) String() string {
 func (*StateSummaryAcceptRequest) ProtoMessage() {}
 
 func (x *StateSummaryAcceptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[45]
+	mi := &file_vm_vm_proto_msgTypes[44]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2972,7 +2915,7 @@ func (x *StateSummaryAcceptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSummaryAcceptRequest.ProtoReflect.Descriptor instead.
 func (*StateSummaryAcceptRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{45}
+	return file_vm_vm_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *StateSummaryAcceptRequest) GetBytes() []byte {
@@ -2994,7 +2937,7 @@ type StateSummaryAcceptResponse struct {
 func (x *StateSummaryAcceptResponse) Reset() {
 	*x = StateSummaryAcceptResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[46]
+		mi := &file_vm_vm_proto_msgTypes[45]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3007,7 +2950,7 @@ func (x *StateSummaryAcceptResponse) String() string {
 func (*StateSummaryAcceptResponse) ProtoMessage() {}
 
 func (x *StateSummaryAcceptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[46]
+	mi := &file_vm_vm_proto_msgTypes[45]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3020,7 +2963,7 @@ func (x *StateSummaryAcceptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSummaryAcceptResponse.ProtoReflect.Descriptor instead.
 func (*StateSummaryAcceptResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{46}
+	return file_vm_vm_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *StateSummaryAcceptResponse) GetMode() StateSummaryAcceptResponse_Mode {
@@ -3047,7 +2990,7 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a,
 	0x22, 0x69, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x6d, 0x65, 0x74, 0x68, 0x65, 0x75, 0x73, 0x2f, 0x63,
 	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x2f, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x22, 0xec, 0x03, 0x0a, 0x11, 0x49, 0x6e, 0x69, 0x74, 0x69, 0x61, 0x6c, 0x69,
+	0x6f, 0x74, 0x6f, 0x22, 0xdc, 0x03, 0x0a, 0x11, 0x49, 0x6e, 0x69, 0x74, 0x69, 0x61, 0x6c, 0x69,
 	0x7a, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x6e, 0x65, 0x74,
 	0x77, 0x6f, 0x72, 0x6b, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x09, 0x6e,
 	0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x49, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x75, 0x62, 0x6e,
@@ -3072,11 +3015,10 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x79, 0x74, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x75, 0x70, 0x67, 0x72,
 	0x61, 0x64, 0x65, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6e, 0x66,
 	0x69, 0x67, 0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b,
-	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x34, 0x0a, 0x0a, 0x64,
-	0x62, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x73, 0x18, 0x0d, 0x20, 0x03, 0x28, 0x0b, 0x32,
-	0x15, 0x2e, 0x76, 0x6d, 0x2e, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x65, 0x64, 0x44, 0x42,
-	0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x52, 0x09, 0x64, 0x62, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72,
-	0x73, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x61, 0x64, 0x64, 0x72,
+	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x24, 0x0a, 0x0e, 0x64,
+	0x62, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x18, 0x0d, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0c, 0x64, 0x62, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x41, 0x64, 0x64,
+	0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x61, 0x64, 0x64, 0x72,
 	0x18, 0x0e, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x41, 0x64,
 	0x64, 0x72, 0x22, 0xdd, 0x01, 0x0a, 0x12, 0x49, 0x6e, 0x69, 0x74, 0x69, 0x61, 0x6c, 0x69, 0x7a,
 	0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x28, 0x0a, 0x10, 0x6c, 0x61, 0x73,
@@ -3092,12 +3034,7 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x73, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f,
 	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69,
 	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61,
-	0x6d, 0x70, 0x22, 0x4e, 0x0a, 0x11, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x65, 0x64, 0x44,
-	0x42, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69,
-	0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f,
-	0x6e, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x61, 0x64, 0x64, 0x72,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x41, 0x64,
-	0x64, 0x72, 0x22, 0x32, 0x0a, 0x0f, 0x53, 0x65, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x65,
+	0x6d, 0x70, 0x22, 0x32, 0x0a, 0x0f, 0x53, 0x65, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1f, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x0e, 0x32, 0x09, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52,
 	0x05, 0x73, 0x74, 0x61, 0x74, 0x65, 0x22, 0xdb, 0x01, 0x0a, 0x10, 0x53, 0x65, 0x74, 0x53, 0x74,
@@ -3545,7 +3482,7 @@ func file_vm_vm_proto_rawDescGZIP() []byte {
 }
 
 var file_vm_vm_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_vm_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
+var file_vm_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_vm_vm_proto_goTypes = []interface{}{
 	(State)(0),                                 // 0: vm.State
 	(Status)(0),                                // 1: vm.Status
@@ -3553,155 +3490,153 @@ var file_vm_vm_proto_goTypes = []interface{}{
 	(StateSummaryAcceptResponse_Mode)(0),       // 3: vm.StateSummaryAcceptResponse.Mode
 	(*InitializeRequest)(nil),                  // 4: vm.InitializeRequest
 	(*InitializeResponse)(nil),                 // 5: vm.InitializeResponse
-	(*VersionedDBServer)(nil),                  // 6: vm.VersionedDBServer
-	(*SetStateRequest)(nil),                    // 7: vm.SetStateRequest
-	(*SetStateResponse)(nil),                   // 8: vm.SetStateResponse
-	(*CreateHandlersResponse)(nil),             // 9: vm.CreateHandlersResponse
-	(*CreateStaticHandlersResponse)(nil),       // 10: vm.CreateStaticHandlersResponse
-	(*Handler)(nil),                            // 11: vm.Handler
-	(*BuildBlockRequest)(nil),                  // 12: vm.BuildBlockRequest
-	(*BuildBlockResponse)(nil),                 // 13: vm.BuildBlockResponse
-	(*ParseBlockRequest)(nil),                  // 14: vm.ParseBlockRequest
-	(*ParseBlockResponse)(nil),                 // 15: vm.ParseBlockResponse
-	(*GetBlockRequest)(nil),                    // 16: vm.GetBlockRequest
-	(*GetBlockResponse)(nil),                   // 17: vm.GetBlockResponse
-	(*SetPreferenceRequest)(nil),               // 18: vm.SetPreferenceRequest
-	(*BlockVerifyRequest)(nil),                 // 19: vm.BlockVerifyRequest
-	(*BlockVerifyResponse)(nil),                // 20: vm.BlockVerifyResponse
-	(*BlockAcceptRequest)(nil),                 // 21: vm.BlockAcceptRequest
-	(*BlockRejectRequest)(nil),                 // 22: vm.BlockRejectRequest
-	(*HealthResponse)(nil),                     // 23: vm.HealthResponse
-	(*VersionResponse)(nil),                    // 24: vm.VersionResponse
-	(*AppRequestMsg)(nil),                      // 25: vm.AppRequestMsg
-	(*AppRequestFailedMsg)(nil),                // 26: vm.AppRequestFailedMsg
-	(*AppResponseMsg)(nil),                     // 27: vm.AppResponseMsg
-	(*AppGossipMsg)(nil),                       // 28: vm.AppGossipMsg
-	(*CrossChainAppRequestMsg)(nil),            // 29: vm.CrossChainAppRequestMsg
-	(*CrossChainAppRequestFailedMsg)(nil),      // 30: vm.CrossChainAppRequestFailedMsg
-	(*CrossChainAppResponseMsg)(nil),           // 31: vm.CrossChainAppResponseMsg
-	(*ConnectedRequest)(nil),                   // 32: vm.ConnectedRequest
-	(*DisconnectedRequest)(nil),                // 33: vm.DisconnectedRequest
-	(*GetAncestorsRequest)(nil),                // 34: vm.GetAncestorsRequest
-	(*GetAncestorsResponse)(nil),               // 35: vm.GetAncestorsResponse
-	(*BatchedParseBlockRequest)(nil),           // 36: vm.BatchedParseBlockRequest
-	(*BatchedParseBlockResponse)(nil),          // 37: vm.BatchedParseBlockResponse
-	(*VerifyHeightIndexResponse)(nil),          // 38: vm.VerifyHeightIndexResponse
-	(*GetBlockIDAtHeightRequest)(nil),          // 39: vm.GetBlockIDAtHeightRequest
-	(*GetBlockIDAtHeightResponse)(nil),         // 40: vm.GetBlockIDAtHeightResponse
-	(*GatherResponse)(nil),                     // 41: vm.GatherResponse
-	(*StateSyncEnabledResponse)(nil),           // 42: vm.StateSyncEnabledResponse
-	(*GetOngoingSyncStateSummaryResponse)(nil), // 43: vm.GetOngoingSyncStateSummaryResponse
-	(*GetLastStateSummaryResponse)(nil),        // 44: vm.GetLastStateSummaryResponse
-	(*ParseStateSummaryRequest)(nil),           // 45: vm.ParseStateSummaryRequest
-	(*ParseStateSummaryResponse)(nil),          // 46: vm.ParseStateSummaryResponse
-	(*GetStateSummaryRequest)(nil),             // 47: vm.GetStateSummaryRequest
-	(*GetStateSummaryResponse)(nil),            // 48: vm.GetStateSummaryResponse
-	(*StateSummaryAcceptRequest)(nil),          // 49: vm.StateSummaryAcceptRequest
-	(*StateSummaryAcceptResponse)(nil),         // 50: vm.StateSummaryAcceptResponse
-	(*timestamppb.Timestamp)(nil),              // 51: google.protobuf.Timestamp
-	(*_go.MetricFamily)(nil),                   // 52: io.prometheus.client.MetricFamily
-	(*emptypb.Empty)(nil),                      // 53: google.protobuf.Empty
+	(*SetStateRequest)(nil),                    // 6: vm.SetStateRequest
+	(*SetStateResponse)(nil),                   // 7: vm.SetStateResponse
+	(*CreateHandlersResponse)(nil),             // 8: vm.CreateHandlersResponse
+	(*CreateStaticHandlersResponse)(nil),       // 9: vm.CreateStaticHandlersResponse
+	(*Handler)(nil),                            // 10: vm.Handler
+	(*BuildBlockRequest)(nil),                  // 11: vm.BuildBlockRequest
+	(*BuildBlockResponse)(nil),                 // 12: vm.BuildBlockResponse
+	(*ParseBlockRequest)(nil),                  // 13: vm.ParseBlockRequest
+	(*ParseBlockResponse)(nil),                 // 14: vm.ParseBlockResponse
+	(*GetBlockRequest)(nil),                    // 15: vm.GetBlockRequest
+	(*GetBlockResponse)(nil),                   // 16: vm.GetBlockResponse
+	(*SetPreferenceRequest)(nil),               // 17: vm.SetPreferenceRequest
+	(*BlockVerifyRequest)(nil),                 // 18: vm.BlockVerifyRequest
+	(*BlockVerifyResponse)(nil),                // 19: vm.BlockVerifyResponse
+	(*BlockAcceptRequest)(nil),                 // 20: vm.BlockAcceptRequest
+	(*BlockRejectRequest)(nil),                 // 21: vm.BlockRejectRequest
+	(*HealthResponse)(nil),                     // 22: vm.HealthResponse
+	(*VersionResponse)(nil),                    // 23: vm.VersionResponse
+	(*AppRequestMsg)(nil),                      // 24: vm.AppRequestMsg
+	(*AppRequestFailedMsg)(nil),                // 25: vm.AppRequestFailedMsg
+	(*AppResponseMsg)(nil),                     // 26: vm.AppResponseMsg
+	(*AppGossipMsg)(nil),                       // 27: vm.AppGossipMsg
+	(*CrossChainAppRequestMsg)(nil),            // 28: vm.CrossChainAppRequestMsg
+	(*CrossChainAppRequestFailedMsg)(nil),      // 29: vm.CrossChainAppRequestFailedMsg
+	(*CrossChainAppResponseMsg)(nil),           // 30: vm.CrossChainAppResponseMsg
+	(*ConnectedRequest)(nil),                   // 31: vm.ConnectedRequest
+	(*DisconnectedRequest)(nil),                // 32: vm.DisconnectedRequest
+	(*GetAncestorsRequest)(nil),                // 33: vm.GetAncestorsRequest
+	(*GetAncestorsResponse)(nil),               // 34: vm.GetAncestorsResponse
+	(*BatchedParseBlockRequest)(nil),           // 35: vm.BatchedParseBlockRequest
+	(*BatchedParseBlockResponse)(nil),          // 36: vm.BatchedParseBlockResponse
+	(*VerifyHeightIndexResponse)(nil),          // 37: vm.VerifyHeightIndexResponse
+	(*GetBlockIDAtHeightRequest)(nil),          // 38: vm.GetBlockIDAtHeightRequest
+	(*GetBlockIDAtHeightResponse)(nil),         // 39: vm.GetBlockIDAtHeightResponse
+	(*GatherResponse)(nil),                     // 40: vm.GatherResponse
+	(*StateSyncEnabledResponse)(nil),           // 41: vm.StateSyncEnabledResponse
+	(*GetOngoingSyncStateSummaryResponse)(nil), // 42: vm.GetOngoingSyncStateSummaryResponse
+	(*GetLastStateSummaryResponse)(nil),        // 43: vm.GetLastStateSummaryResponse
+	(*ParseStateSummaryRequest)(nil),           // 44: vm.ParseStateSummaryRequest
+	(*ParseStateSummaryResponse)(nil),          // 45: vm.ParseStateSummaryResponse
+	(*GetStateSummaryRequest)(nil),             // 46: vm.GetStateSummaryRequest
+	(*GetStateSummaryResponse)(nil),            // 47: vm.GetStateSummaryResponse
+	(*StateSummaryAcceptRequest)(nil),          // 48: vm.StateSummaryAcceptRequest
+	(*StateSummaryAcceptResponse)(nil),         // 49: vm.StateSummaryAcceptResponse
+	(*timestamppb.Timestamp)(nil),              // 50: google.protobuf.Timestamp
+	(*_go.MetricFamily)(nil),                   // 51: io.prometheus.client.MetricFamily
+	(*emptypb.Empty)(nil),                      // 52: google.protobuf.Empty
 }
 var file_vm_vm_proto_depIdxs = []int32{
-	6,  // 0: vm.InitializeRequest.db_servers:type_name -> vm.VersionedDBServer
-	51, // 1: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 2: vm.SetStateRequest.state:type_name -> vm.State
-	51, // 3: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 4: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
-	11, // 5: vm.CreateStaticHandlersResponse.handlers:type_name -> vm.Handler
-	51, // 6: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 7: vm.ParseBlockResponse.status:type_name -> vm.Status
-	51, // 8: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 9: vm.GetBlockResponse.status:type_name -> vm.Status
-	51, // 10: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 11: vm.GetBlockResponse.err:type_name -> vm.Error
-	51, // 12: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
-	51, // 13: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
-	51, // 14: vm.CrossChainAppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
-	15, // 15: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
-	2,  // 16: vm.VerifyHeightIndexResponse.err:type_name -> vm.Error
-	2,  // 17: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
-	52, // 18: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
-	2,  // 19: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
-	2,  // 20: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
-	2,  // 21: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
-	2,  // 22: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
-	2,  // 23: vm.GetStateSummaryResponse.err:type_name -> vm.Error
-	3,  // 24: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
-	2,  // 25: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
-	4,  // 26: vm.VM.Initialize:input_type -> vm.InitializeRequest
-	7,  // 27: vm.VM.SetState:input_type -> vm.SetStateRequest
-	53, // 28: vm.VM.Shutdown:input_type -> google.protobuf.Empty
-	53, // 29: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
-	53, // 30: vm.VM.CreateStaticHandlers:input_type -> google.protobuf.Empty
-	32, // 31: vm.VM.Connected:input_type -> vm.ConnectedRequest
-	33, // 32: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
-	12, // 33: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
-	14, // 34: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
-	16, // 35: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
-	18, // 36: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
-	53, // 37: vm.VM.Health:input_type -> google.protobuf.Empty
-	53, // 38: vm.VM.Version:input_type -> google.protobuf.Empty
-	25, // 39: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
-	26, // 40: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
-	27, // 41: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
-	28, // 42: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
-	53, // 43: vm.VM.Gather:input_type -> google.protobuf.Empty
-	29, // 44: vm.VM.CrossChainAppRequest:input_type -> vm.CrossChainAppRequestMsg
-	30, // 45: vm.VM.CrossChainAppRequestFailed:input_type -> vm.CrossChainAppRequestFailedMsg
-	31, // 46: vm.VM.CrossChainAppResponse:input_type -> vm.CrossChainAppResponseMsg
-	34, // 47: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
-	36, // 48: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
-	53, // 49: vm.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
-	39, // 50: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
-	53, // 51: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
-	53, // 52: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
-	53, // 53: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
-	45, // 54: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
-	47, // 55: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
-	19, // 56: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
-	21, // 57: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
-	22, // 58: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
-	49, // 59: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
-	5,  // 60: vm.VM.Initialize:output_type -> vm.InitializeResponse
-	8,  // 61: vm.VM.SetState:output_type -> vm.SetStateResponse
-	53, // 62: vm.VM.Shutdown:output_type -> google.protobuf.Empty
-	9,  // 63: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
-	10, // 64: vm.VM.CreateStaticHandlers:output_type -> vm.CreateStaticHandlersResponse
-	53, // 65: vm.VM.Connected:output_type -> google.protobuf.Empty
-	53, // 66: vm.VM.Disconnected:output_type -> google.protobuf.Empty
-	13, // 67: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
-	15, // 68: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
-	17, // 69: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
-	53, // 70: vm.VM.SetPreference:output_type -> google.protobuf.Empty
-	23, // 71: vm.VM.Health:output_type -> vm.HealthResponse
-	24, // 72: vm.VM.Version:output_type -> vm.VersionResponse
-	53, // 73: vm.VM.AppRequest:output_type -> google.protobuf.Empty
-	53, // 74: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
-	53, // 75: vm.VM.AppResponse:output_type -> google.protobuf.Empty
-	53, // 76: vm.VM.AppGossip:output_type -> google.protobuf.Empty
-	41, // 77: vm.VM.Gather:output_type -> vm.GatherResponse
-	53, // 78: vm.VM.CrossChainAppRequest:output_type -> google.protobuf.Empty
-	53, // 79: vm.VM.CrossChainAppRequestFailed:output_type -> google.protobuf.Empty
-	53, // 80: vm.VM.CrossChainAppResponse:output_type -> google.protobuf.Empty
-	35, // 81: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
-	37, // 82: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
-	38, // 83: vm.VM.VerifyHeightIndex:output_type -> vm.VerifyHeightIndexResponse
-	40, // 84: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
-	42, // 85: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
-	43, // 86: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
-	44, // 87: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
-	46, // 88: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
-	48, // 89: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
-	20, // 90: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
-	53, // 91: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
-	53, // 92: vm.VM.BlockReject:output_type -> google.protobuf.Empty
-	50, // 93: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
-	60, // [60:94] is the sub-list for method output_type
-	26, // [26:60] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	50, // 0: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 1: vm.SetStateRequest.state:type_name -> vm.State
+	50, // 2: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
+	10, // 3: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
+	10, // 4: vm.CreateStaticHandlersResponse.handlers:type_name -> vm.Handler
+	50, // 5: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 6: vm.ParseBlockResponse.status:type_name -> vm.Status
+	50, // 7: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 8: vm.GetBlockResponse.status:type_name -> vm.Status
+	50, // 9: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 10: vm.GetBlockResponse.err:type_name -> vm.Error
+	50, // 11: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
+	50, // 12: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
+	50, // 13: vm.CrossChainAppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
+	14, // 14: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
+	2,  // 15: vm.VerifyHeightIndexResponse.err:type_name -> vm.Error
+	2,  // 16: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
+	51, // 17: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
+	2,  // 18: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
+	2,  // 19: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
+	2,  // 20: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
+	2,  // 21: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
+	2,  // 22: vm.GetStateSummaryResponse.err:type_name -> vm.Error
+	3,  // 23: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
+	2,  // 24: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
+	4,  // 25: vm.VM.Initialize:input_type -> vm.InitializeRequest
+	6,  // 26: vm.VM.SetState:input_type -> vm.SetStateRequest
+	52, // 27: vm.VM.Shutdown:input_type -> google.protobuf.Empty
+	52, // 28: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
+	52, // 29: vm.VM.CreateStaticHandlers:input_type -> google.protobuf.Empty
+	31, // 30: vm.VM.Connected:input_type -> vm.ConnectedRequest
+	32, // 31: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
+	11, // 32: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
+	13, // 33: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
+	15, // 34: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
+	17, // 35: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
+	52, // 36: vm.VM.Health:input_type -> google.protobuf.Empty
+	52, // 37: vm.VM.Version:input_type -> google.protobuf.Empty
+	24, // 38: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
+	25, // 39: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
+	26, // 40: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
+	27, // 41: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
+	52, // 42: vm.VM.Gather:input_type -> google.protobuf.Empty
+	28, // 43: vm.VM.CrossChainAppRequest:input_type -> vm.CrossChainAppRequestMsg
+	29, // 44: vm.VM.CrossChainAppRequestFailed:input_type -> vm.CrossChainAppRequestFailedMsg
+	30, // 45: vm.VM.CrossChainAppResponse:input_type -> vm.CrossChainAppResponseMsg
+	33, // 46: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
+	35, // 47: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
+	52, // 48: vm.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
+	38, // 49: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
+	52, // 50: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
+	52, // 51: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
+	52, // 52: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
+	44, // 53: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
+	46, // 54: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
+	18, // 55: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
+	20, // 56: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
+	21, // 57: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
+	48, // 58: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
+	5,  // 59: vm.VM.Initialize:output_type -> vm.InitializeResponse
+	7,  // 60: vm.VM.SetState:output_type -> vm.SetStateResponse
+	52, // 61: vm.VM.Shutdown:output_type -> google.protobuf.Empty
+	8,  // 62: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
+	9,  // 63: vm.VM.CreateStaticHandlers:output_type -> vm.CreateStaticHandlersResponse
+	52, // 64: vm.VM.Connected:output_type -> google.protobuf.Empty
+	52, // 65: vm.VM.Disconnected:output_type -> google.protobuf.Empty
+	12, // 66: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
+	14, // 67: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
+	16, // 68: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
+	52, // 69: vm.VM.SetPreference:output_type -> google.protobuf.Empty
+	22, // 70: vm.VM.Health:output_type -> vm.HealthResponse
+	23, // 71: vm.VM.Version:output_type -> vm.VersionResponse
+	52, // 72: vm.VM.AppRequest:output_type -> google.protobuf.Empty
+	52, // 73: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
+	52, // 74: vm.VM.AppResponse:output_type -> google.protobuf.Empty
+	52, // 75: vm.VM.AppGossip:output_type -> google.protobuf.Empty
+	40, // 76: vm.VM.Gather:output_type -> vm.GatherResponse
+	52, // 77: vm.VM.CrossChainAppRequest:output_type -> google.protobuf.Empty
+	52, // 78: vm.VM.CrossChainAppRequestFailed:output_type -> google.protobuf.Empty
+	52, // 79: vm.VM.CrossChainAppResponse:output_type -> google.protobuf.Empty
+	34, // 80: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
+	36, // 81: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
+	37, // 82: vm.VM.VerifyHeightIndex:output_type -> vm.VerifyHeightIndexResponse
+	39, // 83: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
+	41, // 84: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
+	42, // 85: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
+	43, // 86: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
+	45, // 87: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
+	47, // 88: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
+	19, // 89: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
+	52, // 90: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
+	52, // 91: vm.VM.BlockReject:output_type -> google.protobuf.Empty
+	49, // 92: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
+	59, // [59:93] is the sub-list for method output_type
+	25, // [25:59] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_vm_vm_proto_init() }
@@ -3735,18 +3670,6 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*VersionedDBServer); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_vm_vm_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SetStateRequest); i {
 			case 0:
 				return &v.state
@@ -3758,7 +3681,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SetStateResponse); i {
 			case 0:
 				return &v.state
@@ -3770,7 +3693,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CreateHandlersResponse); i {
 			case 0:
 				return &v.state
@@ -3782,7 +3705,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CreateStaticHandlersResponse); i {
 			case 0:
 				return &v.state
@@ -3794,7 +3717,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Handler); i {
 			case 0:
 				return &v.state
@@ -3806,7 +3729,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BuildBlockRequest); i {
 			case 0:
 				return &v.state
@@ -3818,7 +3741,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BuildBlockResponse); i {
 			case 0:
 				return &v.state
@@ -3830,7 +3753,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ParseBlockRequest); i {
 			case 0:
 				return &v.state
@@ -3842,7 +3765,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ParseBlockResponse); i {
 			case 0:
 				return &v.state
@@ -3854,7 +3777,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetBlockRequest); i {
 			case 0:
 				return &v.state
@@ -3866,7 +3789,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetBlockResponse); i {
 			case 0:
 				return &v.state
@@ -3878,7 +3801,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SetPreferenceRequest); i {
 			case 0:
 				return &v.state
@@ -3890,7 +3813,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BlockVerifyRequest); i {
 			case 0:
 				return &v.state
@@ -3902,7 +3825,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BlockVerifyResponse); i {
 			case 0:
 				return &v.state
@@ -3914,7 +3837,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BlockAcceptRequest); i {
 			case 0:
 				return &v.state
@@ -3926,7 +3849,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BlockRejectRequest); i {
 			case 0:
 				return &v.state
@@ -3938,7 +3861,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*HealthResponse); i {
 			case 0:
 				return &v.state
@@ -3950,7 +3873,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*VersionResponse); i {
 			case 0:
 				return &v.state
@@ -3962,7 +3885,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AppRequestMsg); i {
 			case 0:
 				return &v.state
@@ -3974,7 +3897,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AppRequestFailedMsg); i {
 			case 0:
 				return &v.state
@@ -3986,7 +3909,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AppResponseMsg); i {
 			case 0:
 				return &v.state
@@ -3998,7 +3921,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AppGossipMsg); i {
 			case 0:
 				return &v.state
@@ -4010,7 +3933,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CrossChainAppRequestMsg); i {
 			case 0:
 				return &v.state
@@ -4022,7 +3945,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[26].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CrossChainAppRequestFailedMsg); i {
 			case 0:
 				return &v.state
@@ -4034,7 +3957,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[27].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[26].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CrossChainAppResponseMsg); i {
 			case 0:
 				return &v.state
@@ -4046,7 +3969,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[28].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[27].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ConnectedRequest); i {
 			case 0:
 				return &v.state
@@ -4058,7 +3981,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[29].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[28].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*DisconnectedRequest); i {
 			case 0:
 				return &v.state
@@ -4070,7 +3993,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[30].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[29].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetAncestorsRequest); i {
 			case 0:
 				return &v.state
@@ -4082,7 +4005,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[31].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[30].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetAncestorsResponse); i {
 			case 0:
 				return &v.state
@@ -4094,7 +4017,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[32].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[31].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BatchedParseBlockRequest); i {
 			case 0:
 				return &v.state
@@ -4106,7 +4029,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[33].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[32].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BatchedParseBlockResponse); i {
 			case 0:
 				return &v.state
@@ -4118,7 +4041,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[33].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*VerifyHeightIndexResponse); i {
 			case 0:
 				return &v.state
@@ -4130,7 +4053,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetBlockIDAtHeightRequest); i {
 			case 0:
 				return &v.state
@@ -4142,7 +4065,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[36].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetBlockIDAtHeightResponse); i {
 			case 0:
 				return &v.state
@@ -4154,7 +4077,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[37].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[36].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GatherResponse); i {
 			case 0:
 				return &v.state
@@ -4166,7 +4089,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[38].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[37].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StateSyncEnabledResponse); i {
 			case 0:
 				return &v.state
@@ -4178,7 +4101,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[39].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[38].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetOngoingSyncStateSummaryResponse); i {
 			case 0:
 				return &v.state
@@ -4190,7 +4113,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[40].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[39].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetLastStateSummaryResponse); i {
 			case 0:
 				return &v.state
@@ -4202,7 +4125,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[41].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[40].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ParseStateSummaryRequest); i {
 			case 0:
 				return &v.state
@@ -4214,7 +4137,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[42].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[41].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ParseStateSummaryResponse); i {
 			case 0:
 				return &v.state
@@ -4226,7 +4149,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[43].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[42].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetStateSummaryRequest); i {
 			case 0:
 				return &v.state
@@ -4238,7 +4161,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[44].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[43].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetStateSummaryResponse); i {
 			case 0:
 				return &v.state
@@ -4250,7 +4173,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[45].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[44].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StateSummaryAcceptRequest); i {
 			case 0:
 				return &v.state
@@ -4262,7 +4185,7 @@ func file_vm_vm_proto_init() {
 				return nil
 			}
 		}
-		file_vm_vm_proto_msgTypes[46].Exporter = func(v interface{}, i int) interface{} {
+		file_vm_vm_proto_msgTypes[45].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StateSummaryAcceptResponse); i {
 			case 0:
 				return &v.state
@@ -4275,15 +4198,15 @@ func file_vm_vm_proto_init() {
 			}
 		}
 	}
-	file_vm_vm_proto_msgTypes[8].OneofWrappers = []interface{}{}
-	file_vm_vm_proto_msgTypes[15].OneofWrappers = []interface{}{}
+	file_vm_vm_proto_msgTypes[7].OneofWrappers = []interface{}{}
+	file_vm_vm_proto_msgTypes[14].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_vm_vm_proto_rawDesc,
 			NumEnums:      4,
-			NumMessages:   47,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

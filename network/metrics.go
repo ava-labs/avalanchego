@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
@@ -147,8 +147,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		peerConnectedStartTimes: make(map[ids.NodeID]float64),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(m.numTracked),
 		registerer.Register(m.numPeers),
 		registerer.Register(m.numSubnetPeers),
@@ -182,7 +181,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		m.nodeSubnetUptimeRewardingStake.WithLabelValues(subnetIDStr).Set(0)
 	}
 
-	return m, errs.Err
+	return m, err
 }
 
 func (m *metrics) markConnected(peer peer.Peer) {

@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -167,7 +166,7 @@ func New(
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	dbManager manager.Manager,
+	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
@@ -193,9 +192,7 @@ func (vm *VM) Initialize(
 	chainCtx.Metrics = optionalGatherer
 
 	vm.ctx = chainCtx
-	rawDB := dbManager.Current().Database
-	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	vm.db = versiondb.New(prefixDB)
+	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", registerer)
 	if err != nil {
 		return err
@@ -237,7 +234,7 @@ func (vm *VM) Initialize(
 	err = vm.ChainVM.Initialize(
 		ctx,
 		chainCtx,
-		dbManager,
+		db,
 		genesisBytes,
 		upgradeBytes,
 		configBytes,

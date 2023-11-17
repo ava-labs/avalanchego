@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestSocketSendAndReceive(t *testing.T) {
@@ -21,7 +23,7 @@ func TestSocketSendAndReceive(t *testing.T) {
 	)
 
 	// Create socket and client; wait for client to connect
-	socket := NewSocket(socketName, nil)
+	socket := NewSocket(socketName, logging.NoLog{})
 	socket.accept, connCh = newTestAcceptFn(t)
 	require.NoError(socket.Listen())
 

@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -83,13 +83,11 @@ func NewPullGossiper[T any, U GossipableAny[T]](
 		}),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		metrics.Register(p.receivedN),
 		metrics.Register(p.receivedBytes),
 	)
-
-	return p, errs.Err
+	return p, err
 }
 
 type PullGossiper[T any, U GossipableAny[T]] struct {

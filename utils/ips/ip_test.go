@@ -5,7 +5,6 @@ package ips
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -61,7 +60,7 @@ func TestIPPortEqual(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			require := require.New(t)
 
 			ipPort := IPDesc{}

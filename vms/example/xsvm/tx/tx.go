@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var secp256k1r = secp256k1.Factory{
-	Cache: cache.LRU[ids.ID, *secp256k1.PublicKey]{
+var secpCache = secp256k1.RecoverCache{
+	LRU: cache.LRU[ids.ID, *secp256k1.PublicKey]{
 		Size: 2048,
 	},
 }
@@ -56,7 +56,7 @@ func (tx *Tx) SenderID() (ids.ShortID, error) {
 		return ids.ShortEmpty, err
 	}
 
-	pk, err := secp256k1r.RecoverPublicKey(unsignedBytes, tx.Signature[:])
+	pk, err := secpCache.RecoverPublicKey(unsignedBytes, tx.Signature[:])
 	if err != nil {
 		return ids.ShortEmpty, err
 	}

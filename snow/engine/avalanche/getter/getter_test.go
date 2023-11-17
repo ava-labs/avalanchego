@@ -7,75 +7,50 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
 
-func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
-	vdrs := validators.NewManager()
-	peer := ids.GenerateTestNodeID()
-	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
-
-	sender := &common.SenderTest{T: t}
-	sender.Default(true)
-	sender.CantSendGetAcceptedFrontier = false
-
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
-	totalWeight, err := vdrs.TotalWeight(constants.PrimaryNetworkID)
-	require.NoError(t, err)
-
-	commonConfig := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
-		Beacons:                        vdrs,
-		SampleK:                        vdrs.Count(constants.PrimaryNetworkID),
-		Alpha:                          totalWeight/2 + 1,
-		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
-		AncestorsMaxContainersSent:     2000,
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
+func newTest(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.SenderTest) {
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 
-	return manager, sender, commonConfig
+	sender := &common.SenderTest{
+		T: t,
+	}
+	sender.Default(true)
+
+	bs, err := New(
+		manager,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	return bs, manager, sender
 }
 
 func TestAcceptedFrontier(t *testing.T) {
 	require := require.New(t)
-
-	manager, sender, config := testSetup(t)
+	bs, manager, sender := newTest(t)
 
 	vtxID := ids.GenerateTestID()
-
-	bsIntf, err := New(manager, config)
-	require.NoError(err)
-	require.IsType(&getter{}, bsIntf)
-	bs := bsIntf.(*getter)
-
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
 			vtxID,
@@ -92,8 +67,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
-
-	manager, sender, config := testSetup(t)
+	bs, manager, sender := newTest(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -107,13 +81,6 @@ func TestFilterAccepted(t *testing.T) {
 		IDV:     vtxID1,
 		StatusV: choices.Accepted,
 	}}
-
-	bsIntf, err := New(manager, config)
-	require.NoError(err)
-	require.IsType(&getter{}, bsIntf)
-	bs := bsIntf.(*getter)
-
-	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
@@ -133,6 +100,7 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
+	vtxIDs := set.Of(vtxID0, vtxID1, vtxID2)
 	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs))
 
 	require.Contains(accepted, vtxID0)

@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/corruptabledb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
@@ -75,7 +75,7 @@ type VMServer struct {
 	allowShutdown *utils.Atomic[bool]
 
 	processMetrics prometheus.Gatherer
-	dbManager      manager.Manager
+	db             database.Database
 	log            logging.Logger
 
 	serverCloser grpcutils.ServerCloser
@@ -150,40 +150,19 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	// Register metrics for each Go plugin processes
 	vm.processMetrics = registerer
 
-	// Dial each database in the request and construct the database manager
-	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
-	for i, vDBReq := range req.DbServers {
-		version, err := version.Parse(vDBReq.Version)
-		if err != nil {
-			// Ignore closing errors to return the original error
-			_ = vm.connCloser.Close()
-			return nil, err
-		}
-
-		clientConn, err := grpcutils.Dial(
-			vDBReq.ServerAddr,
-			grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
-			grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
-		)
-		if err != nil {
-			// Ignore closing errors to return the original error
-			_ = vm.connCloser.Close()
-			return nil, err
-		}
-		vm.connCloser.Add(clientConn)
-		db := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(clientConn))
-		versionedDBs[i] = &manager.VersionedDatabase{
-			Database: corruptabledb.New(db),
-			Version:  version,
-		}
-	}
-	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
+	// Dial the database
+	dbClientConn, err := grpcutils.Dial(
+		req.DbServerAddr,
+		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
+		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
+	)
 	if err != nil {
-		// Ignore closing errors to return the original error
-		_ = vm.connCloser.Close()
 		return nil, err
 	}
-	vm.dbManager = dbManager
+	vm.connCloser.Add(dbClientConn)
+	vm.db = corruptabledb.New(
+		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
+	)
 
 	// TODO: Allow the logger to be configured by the client
 	vm.log = logging.NewLogger(
@@ -259,7 +238,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		ChainDataDir: req.ChainDataDir,
 	}
 
-	if err := vm.vm.Initialize(ctx, vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
+	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(vm.closed)
@@ -518,7 +497,7 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-	dbHealth, err := vm.dbHealthChecks(ctx)
+	dbHealth, err := vm.db.HealthCheck(ctx)
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
@@ -531,22 +510,6 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	return &vmpb.HealthResponse{
 		Details: details,
 	}, err
-}
-
-func (vm *VMServer) dbHealthChecks(ctx context.Context) (interface{}, error) {
-	details := make(map[string]interface{}, len(vm.dbManager.GetDatabases()))
-
-	// Check Database health
-	for _, client := range vm.dbManager.GetDatabases() {
-		// Shared gRPC client don't close
-		health, err := client.Database.HealthCheck(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check db health %q: %w", client.Version.String(), err)
-		}
-		details[client.Version.String()] = health
-	}
-
-	return details, nil
 }
 
 func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.VersionResponse, error) {

@@ -18,7 +18,7 @@ func newDB(t testing.TB) *Database {
 	folder := t.TempDir()
 	db, err := New(folder, DefaultConfigBytes, logging.NoLog{}, "pebble", prometheus.NewRegistry())
 	require.NoError(t, err)
-	return db
+	return db.(*Database)
 }
 
 func TestInterface(t *testing.T) {
@@ -38,6 +38,12 @@ func FuzzKeyValue(f *testing.F) {
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	db := newDB(f)
 	database.FuzzNewIteratorWithPrefix(f, db)
+	_ = db.Close()
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	db := newDB(f)
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
 	_ = db.Close()
 }
 

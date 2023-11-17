@@ -521,8 +521,6 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
-		RetryBootstrap:                          v.GetBool(RetryBootstrapKey),
-		RetryBootstrapWarnFrequency:             v.GetInt(RetryBootstrapWarnFrequencyKey),
 		BootstrapBeaconConnectionTimeout:        v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
 		BootstrapMaxTimeGetAncestors:            v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
 		BootstrapAncestorsMaxContainersSent:     int(v.GetUint(BootstrapAncestorsMaxContainersSentKey)),
@@ -928,7 +926,8 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 	}
 
 	return node.DatabaseConfig{
-		Name: v.GetString(DBTypeKey),
+		Name:     v.GetString(DBTypeKey),
+		ReadOnly: v.GetBool(DBReadOnlyKey),
 		Path: filepath.Join(
 			GetExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),

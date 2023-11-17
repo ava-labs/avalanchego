@@ -144,20 +144,6 @@ func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
 }
 
-// ApplyCurrentValidators mocks base method.
-func (m *MockState) ApplyCurrentValidators(arg0 ids.ID, arg1 validators.Manager) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyCurrentValidators", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ApplyCurrentValidators indicates an expected call of ApplyCurrentValidators.
-func (mr *MockStateMockRecorder) ApplyCurrentValidators(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyCurrentValidators", reflect.TypeOf((*MockState)(nil).ApplyCurrentValidators), arg0, arg1)
-}
-
 // ApplyValidatorPublicKeyDiffs mocks base method.
 func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64) error {
 	m.ctrl.T.Helper()

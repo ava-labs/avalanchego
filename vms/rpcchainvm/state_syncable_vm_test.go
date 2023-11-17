@@ -13,7 +13,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
@@ -471,10 +471,8 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snow.DefaultContextTest()
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	require.NoError(vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(context.Background(), ctx, prefixdb.New([]byte{}, memdb.New()), nil, nil, nil, nil, nil, nil))
 
 	blkID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -36,7 +36,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 			keychain := e2e.Env.NewKeychain(2)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			avaxAssetID := baseWallet.P().AVAXAssetID()

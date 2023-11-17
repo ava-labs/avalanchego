@@ -65,6 +65,7 @@ linters:
     - nakedret
     - noctx
     - nolintlint
+    - perfsprint
     - prealloc
     - revive
     - staticcheck

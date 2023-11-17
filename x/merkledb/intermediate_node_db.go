@@ -13,7 +13,7 @@ const defaultBufferLength = 256
 
 // Holds intermediate nodes. That is, those without values.
 // Changes to this database aren't written to [baseDB] until
-// they're evicted from the [nodeCache] or Flush is called..
+// they're evicted from the [nodeCache] or Flush is called.
 type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
@@ -31,6 +31,7 @@ type intermediateNodeDB struct {
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
+	tokenSize         int
 }
 
 func newIntermediateNodeDB(
@@ -39,12 +40,14 @@ func newIntermediateNodeDB(
 	metrics merkleMetrics,
 	size int,
 	evictionBatchSize int,
+	tokenSize int,
 ) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
+		tokenSize:         tokenSize,
 	}
 	result.nodeCache = newOnEvictCache(
 		size,
@@ -121,15 +124,15 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 
 // constructDBKey returns a key that can be used in [db.baseDB].
 // We need to be able to differentiate between two keys of equal
-// byte length but different token length, so we add padding to differentiate.
+// byte length but different bit length, so we add padding to differentiate.
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
-	if key.branchFactor == BranchFactor256 {
-		// For BranchFactor256, no padding is needed since byte length == token length
+	if db.tokenSize == 8 {
+		// For tokens of size byte, no padding is needed since byte length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Append(1).Bytes())
+	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {
@@ -142,4 +145,15 @@ func (db *intermediateNodeDB) Flush() error {
 
 func (db *intermediateNodeDB) Delete(key Key) error {
 	return db.nodeCache.Put(key, nil)
+}
+
+func (db *intermediateNodeDB) Clear() error {
+	// Reset the cache. Note we don't flush because that would cause us to
+	// persist intermediate nodes we're about to delete.
+	db.nodeCache = newOnEvictCache(
+		db.nodeCache.maxSize,
+		db.nodeCache.size,
+		db.nodeCache.onEviction,
+	)
+	return database.AtomicClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix)
 }

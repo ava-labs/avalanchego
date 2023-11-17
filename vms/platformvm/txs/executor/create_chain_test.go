@@ -78,8 +78,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	// Generate new, random key to sign tx with
-	factory := secp256k1.Factory{}
-	key, err := factory.NewPrivateKey()
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	// Replace a valid signature with one from another key

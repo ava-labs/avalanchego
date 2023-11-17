@@ -76,8 +76,8 @@ The node serialization format is as follows:
 
 Where:
 * `Value existence flag` is `1` if this node has a value, otherwise `0`.
-* `Value length` is the length of the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
-* `Value` is the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Value length` is the length of the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
+* `Value` is the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
 * `Number of children` is the number of children this node has.
 * `Child index` is the index of a child node within the list of the node's children.
 * `Child compressed key length` is the length of the child node's compressed key.
@@ -197,8 +197,8 @@ Where:
 * `Child index` is the index of a child node within the list of the node's children.
 * `Child ID` is the child node's ID.
 * `Value existence flag` is `1` if this node has a value, otherwise `0`.
-* `Value length` is the length of the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
-* `Value` is the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Value length` is the length of the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
+* `Value` is the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
 * `Key length` is the number of nibbles in this node's key.
 * `Key` is the node's key.
 

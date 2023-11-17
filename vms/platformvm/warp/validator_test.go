@@ -5,8 +5,8 @@ package warp
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -336,7 +336,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			},
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
 				require.NoError(b, err)

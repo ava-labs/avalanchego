@@ -107,12 +107,6 @@ type StateSyncConfig struct {
 }
 
 type BootstrapConfig struct {
-	// Should Bootstrap be retried
-	RetryBootstrap bool `json:"retryBootstrap"`
-
-	// Max number of times to retry bootstrap before warning the node operator
-	RetryBootstrapWarnFrequency int `json:"retryBootstrapWarnFrequency"`
-
 	// Timeout before emitting a warn log when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`
 
@@ -131,6 +125,9 @@ type BootstrapConfig struct {
 }
 
 type DatabaseConfig struct {
+	// If true, all writes are to memory and are discarded at node shutdown.
+	ReadOnly bool `json:"readOnly"`
+
 	// Path to database
 	Path string `json:"path"`
 

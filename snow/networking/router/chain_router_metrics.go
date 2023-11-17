@@ -6,7 +6,7 @@ package router
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // routerMetrics about router messages
@@ -40,11 +40,10 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 		},
 	)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(rMetrics.outstandingRequests),
 		registerer.Register(rMetrics.longestRunningRequest),
 		registerer.Register(rMetrics.droppedRequests),
 	)
-	return rMetrics, errs.Err
+	return rMetrics, err
 }

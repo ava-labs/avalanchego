@@ -15,9 +15,7 @@ import (
 func BenchmarkVerify(b *testing.B) {
 	require := require.New(b)
 
-	f := &Factory{}
-
-	privateKey, err := f.NewPrivateKey()
+	privateKey, err := NewPrivateKey()
 	require.NoError(err)
 
 	message := utils.RandomBytes(512)

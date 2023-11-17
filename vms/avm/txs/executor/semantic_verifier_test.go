@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -882,8 +881,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
 	ctx.ValidatorState = validatorState
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, memdb.New()))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	typeToFxIndex := make(map[reflect.Type]int)

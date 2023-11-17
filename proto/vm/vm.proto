@@ -127,7 +127,7 @@ message InitializeRequest {
   bytes genesis_bytes = 10;
   bytes upgrade_bytes = 11;
   bytes config_bytes = 12;
-  repeated VersionedDBServer db_servers = 13;
+  string db_server_addr = 13;
   // server_addr is the address of the gRPC server which serves
   // the messenger, keystore, shared memory, blockchain alias,
   // subnet alias, and appSender services
@@ -140,13 +140,6 @@ message InitializeResponse {
   uint64 height = 3;
   bytes bytes = 4;
   google.protobuf.Timestamp timestamp = 5;
-}
-
-message VersionedDBServer {
-  string version = 1;
-  // server_addr is the address of the gRPC server which serves the
-  // Database service
-  string server_addr = 2;
 }
 
 message SetStateRequest {

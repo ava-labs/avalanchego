@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -52,13 +52,11 @@ func NewHandler[T Gossipable](
 		}),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		metrics.Register(h.sentN),
 		metrics.Register(h.sentBytes),
 	)
-
-	return h, errs.Err
+	return h, err
 }
 
 type Handler[T Gossipable] struct {

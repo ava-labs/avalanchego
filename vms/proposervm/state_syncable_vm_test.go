@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -51,7 +51,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		HeightV: 0,
 		BytesV:  []byte("genesis state"),
 	}
-	innerVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -67,10 +67,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		return innerGenesisBlk, nil
 	}
 
-	// createVM
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-
+	// create the VM
 	vm := New(
 		innerVM,
 		time.Time{},
@@ -87,7 +84,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		prefixdb.New([]byte{}, memdb.New()),
 		innerGenesisBlk.Bytes(),
 		nil,
 		nil,

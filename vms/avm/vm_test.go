@@ -13,12 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -42,14 +41,14 @@ func TestInvalidGenesis(t *testing.T) {
 
 	err := vm.Initialize(
 		context.Background(),
-		ctx,                                     // context
-		manager.NewMemDB(version.Semantic1_0_0), // dbManager
-		nil,                                     // genesisState
-		nil,                                     // upgradeBytes
-		nil,                                     // configBytes
-		make(chan common.Message, 1),            // engineMessenger
-		nil,                                     // fxs
-		nil,                                     // AppSender
+		ctx,                          // context
+		memdb.New(),                  // database
+		nil,                          // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
+		nil,                          // fxs
+		nil,                          // AppSender
 	)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 }
@@ -68,12 +67,12 @@ func TestInvalidFx(t *testing.T) {
 	genesisBytes := buildGenesisTest(t)
 	err := vm.Initialize(
 		context.Background(),
-		ctx,                                     // context
-		manager.NewMemDB(version.Semantic1_0_0), // dbManager
-		genesisBytes,                            // genesisState
-		nil,                                     // upgradeBytes
-		nil,                                     // configBytes
-		make(chan common.Message, 1),            // engineMessenger
+		ctx,                          // context
+		memdb.New(),                  // database
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
 		[]*common.Fx{ // fxs
 			nil,
 		},
@@ -96,12 +95,12 @@ func TestFxInitializationFailure(t *testing.T) {
 	genesisBytes := buildGenesisTest(t)
 	err := vm.Initialize(
 		context.Background(),
-		ctx,                                     // context
-		manager.NewMemDB(version.Semantic1_0_0), // dbManager
-		genesisBytes,                            // genesisState
-		nil,                                     // upgradeBytes
-		nil,                                     // configBytes
-		make(chan common.Message, 1),            // engineMessenger
+		ctx,                          // context
+		memdb.New(),                  // database
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
 		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{

@@ -14,10 +14,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -101,13 +101,12 @@ func newPeerTracker(
 		),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(t.numTrackedPeers),
 		registerer.Register(t.numResponsivePeers),
 		registerer.Register(t.averageBandwidthMetric),
 	)
-	return t, errs.Err
+	return t, err
 }
 
 // Returns true if we're not connected to enough peers.

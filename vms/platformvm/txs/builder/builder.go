@@ -92,6 +92,17 @@ type DecisionTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
+
+	// amount: amount the sender is sending
+	// owner: recipient of the funds
+	// keys: keys to sign the tx and pay the amount
+	// changeAddr: address to send change to, if there is any
+	NewBaseTx(
+		amount uint64,
+		owner secp256k1fx.OutputOwners,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
 }
 
 type ProposalTxBuilder interface {
@@ -653,6 +664,46 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		Owner: &secp256k1fx.OutputOwners{
 			Threshold: threshold,
 			Addrs:     ownerAddrs,
+		},
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewBaseTx(
+	amount uint64,
+	owner secp256k1fx.OutputOwners,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	if err != nil {
+		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+	}
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	outs = append(outs, &avax.TransferableOutput{
+		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:          amount,
+			OutputOwners: owner,
+		},
+	})
+
+	avax.SortTransferableOutputs(outs, txs.Codec)
+
+	utx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		},
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

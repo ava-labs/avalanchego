@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -375,7 +374,7 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	if err := vm.Builder.AddUnverifiedTx(signedTx); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -748,9 +747,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext(t)
@@ -774,7 +773,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	err = vm.Initialize(
 		context.Background(),
 		ctx,
-		chainDBManager,
+		chainDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -803,7 +802,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
+	if err := vm.Network.IssueTx(context.Background(), testSubnet1); err != nil {
 		return nil, ids.Empty, err
 	}
 
@@ -842,7 +841,7 @@ func buildCustomGenesis() ([]byte, error) {
 	// won't find next staker to promote/evict from stakers set. Contrary to
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
-	nodeID := ids.NodeID(keys[len(keys)-1].PublicKey().Address())
+	nodeID := genesisNodeIDs[len(genesisNodeIDs)-1]
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
@@ -850,8 +849,8 @@ func buildCustomGenesis() ([]byte, error) {
 
 	starTime := mockable.MaxTime.Add(-1 * defaultMinStakingDuration)
 	endTime := mockable.MaxTime
-	genesisValidator := api.PermissionlessValidator{
-		Staker: api.Staker{
+	genesisValidator := api.GenesisPermissionlessValidator{
+		GenesisValidator: api.GenesisValidator{
 			StartTime: json.Uint64(starTime.Unix()),
 			EndTime:   json.Uint64(endTime.Unix()),
 			NodeID:    nodeID,
@@ -872,7 +871,7 @@ func buildCustomGenesis() ([]byte, error) {
 		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
-		Validators:    []api.PermissionlessValidator{genesisValidator},
+		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),

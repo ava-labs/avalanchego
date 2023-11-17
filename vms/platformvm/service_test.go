@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -77,7 +76,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
+	ks := keystore.New(logging.NoLog{}, memdb.New())
 	require.NoError(t, ks.CreateUser(testUsername, testPassword))
 
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
@@ -99,7 +98,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
 	require.NoError(err)
 
-	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
+	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
 	require.NoError(user.PutKeys(pk, keys[0]))
@@ -176,11 +175,10 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := secp256k1.Factory{}
-	recipientKey, err := factory.NewPrivateKey()
+	recipientKey, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
+	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.db))
 
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(xChainID)
@@ -240,12 +238,12 @@ func TestGetTxStatus(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// put the chain in existing chain list
-	err = service.vm.Builder.AddUnverifiedTx(tx)
+	err = service.vm.Network.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
 
 	mutableSharedMemory.SharedMemory = sm
 
-	require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
+	require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
 
 	block, err := service.vm.BuildBlock(context.Background())
 	require.NoError(err)
@@ -341,7 +339,7 @@ func TestGetTx(t *testing.T) {
 
 				service.vm.ctx.Lock.Lock()
 
-				require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
+				require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
 
 				blk, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
@@ -496,7 +494,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	delegatorNodeID := genesisNodeIDs[0]
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
@@ -628,7 +626,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
+	validatorNodeID := genesisNodeIDs[1]
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
@@ -786,7 +784,8 @@ func TestGetBlock(t *testing.T) {
 			)
 			require.NoError(err)
 
-			preferred, err := service.vm.Builder.Preferred()
+			preferredID := service.vm.manager.Preferred()
+			preferred, err := service.vm.manager.GetBlock(preferredID)
 			require.NoError(err)
 
 			statelessBlock, err := block.NewBanffStandardBlock(

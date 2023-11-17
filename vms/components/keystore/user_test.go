@@ -37,8 +37,7 @@ func TestUserClosedDB(t *testing.T) {
 	_, err = GetKeychain(u, nil)
 	require.ErrorIs(err, database.ErrClosed)
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	err = u.PutKeys(sk)
@@ -57,8 +56,7 @@ func TestUser(t *testing.T) {
 	require.NoError(err)
 	require.Empty(addresses, "new user shouldn't have address")
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	require.NoError(u.PutKeys(sk))

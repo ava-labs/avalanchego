@@ -41,9 +41,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodeApp := app.New(nodeConfig) // Create node wrapper
 	if term.IsTerminal(int(os.Stdout.Fd())) {
 		fmt.Println(app.Header)
+	}
+
+	nodeApp, err := app.New(nodeConfig)
+	if err != nil {
+		fmt.Printf("couldn't start node: %s\n", err)
+		os.Exit(1)
 	}
 
 	exitCode := app.Run(nodeApp)

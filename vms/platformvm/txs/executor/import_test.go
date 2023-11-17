@@ -36,8 +36,7 @@ func TestNewImportTx(t *testing.T) {
 		expectedErr   error
 	}
 
-	factory := secp256k1.Factory{}
-	sourceKey, err := factory.NewPrivateKey()
+	sourceKey, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
 	cnt := new(byte)

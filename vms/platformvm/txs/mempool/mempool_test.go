@@ -34,7 +34,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -58,7 +58,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
@@ -110,7 +110,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after

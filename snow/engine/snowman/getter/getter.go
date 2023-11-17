@@ -5,6 +5,9 @@ package getter
 
 import (
 	"context"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
@@ -22,15 +26,20 @@ var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
 	vm block.ChainVM,
-	commonCfg common.Config,
+	sender common.Sender,
+	log logging.Logger,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
-		vm:     vm,
-		ssVM:   ssVM,
-		sender: commonCfg.Sender,
-		cfg:    commonCfg,
-		log:    commonCfg.Ctx.Log,
+		vm:                        vm,
+		ssVM:                      ssVM,
+		sender:                    sender,
+		log:                       log,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
@@ -38,18 +47,23 @@ func New(
 		"bs",
 		"get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
-		commonCfg.Ctx.Registerer,
+		reg,
 	)
 	return gh, err
 }
 
 type getter struct {
-	vm     block.ChainVM
-	ssVM   block.StateSyncableVM // can be nil
-	sender common.Sender
-	cfg    common.Config
+	vm   block.ChainVM
+	ssVM block.StateSyncableVM // can be nil
 
-	log              logging.Logger
+	sender common.Sender
+	log    logging.Logger
+	// Max time to spend fetching a container and its ancestors when responding
+	// to a GetAncestors
+	maxTimeGetAncestors time.Duration
+	// Max number of containers in an ancestors message sent by this node.
+	maxContainersGetAncestors int
+
 	getAncestorsBlks metric.Averager
 }
 
@@ -81,10 +95,10 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights set.Set[uint64]) error {
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
-	if len(heights) == 0 {
+	if heights.Len() == 0 {
 		gh.sender.SendAcceptedStateSummary(ctx, nodeID, requestID, nil)
 		return nil
 	}
@@ -101,8 +115,8 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		return nil
 	}
 
-	summaryIDs := make([]ids.ID, 0, len(heights))
-	for _, height := range heights {
+	summaryIDs := make([]ids.ID, 0, heights.Len())
+	for height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(ctx, height)
 		if err == block.ErrStateSyncableVMNotImplemented {
 			gh.log.Debug("dropping GetAcceptedStateSummary message",
@@ -135,9 +149,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, blkID := range containerIDs {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	acceptedIDs := make([]ids.ID, 0, containerIDs.Len())
+	for blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
 		if err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
@@ -153,9 +167,9 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.log,
 		gh.vm,
 		blkID,
-		gh.cfg.AncestorsMaxContainersSent,
+		gh.maxContainersGetAncestors,
 		constants.MaxContainersLen,
-		gh.cfg.MaxTimeGetAncestors,
+		gh.maxTimeGetAncestors,
 	)
 	if err != nil {
 		gh.log.Verbo("dropping GetAncestors message",

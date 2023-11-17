@@ -9,6 +9,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -16,7 +17,7 @@ const (
 	Client = "avalanchego"
 	// RPCChainVMProtocol should be bumped anytime changes are made which require
 	// the plugin vm to upgrade to latest avalanchego release to be compatible.
-	RPCChainVMProtocol uint = 29
+	RPCChainVMProtocol uint = 30
 )
 
 // These are globals that describe network upgrades and node versions
@@ -24,7 +25,7 @@ var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 10,
-		Patch: 14,
+		Patch: 15,
 	}
 	CurrentApp = &Application{
 		Name:  Client,
@@ -81,7 +82,6 @@ var (
 		constants.MainnetID: 793005,
 		constants.FujiID:    47437,
 	}
-	ApricotPhase4DefaultMinPChainHeight uint64
 
 	ApricotPhase5Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
@@ -102,6 +102,7 @@ var (
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
+	CortinaXChainStopVertexID map[uint32]ids.ID
 
 	// TODO: update this before release
 	DTimes = map[uint32]time.Time{
@@ -129,6 +130,29 @@ func init() {
 		}
 		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
+
+	// The mainnet stop vertex is well known. It can be verified on any fully
+	// synced node by looking at the parentID of the genesis block.
+	//
+	// Ref: https://subnets.avax.network/x-chain/block/0
+	mainnetXChainStopVertexID, err := ids.FromString("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga")
+	if err != nil {
+		panic(err)
+	}
+
+	// The fuji stop vertex is well known. It can be verified on any fully
+	// synced node by looking at the parentID of the genesis block.
+	//
+	// Ref: https://subnets-test.avax.network/x-chain/block/0
+	fujiXChainStopVertexID, err := ids.FromString("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ")
+	if err != nil {
+		panic(err)
+	}
+
+	CortinaXChainStopVertexID = map[uint32]ids.ID{
+		constants.MainnetID: mainnetXChainStopVertexID,
+		constants.FujiID:    fujiXChainStopVertexID,
+	}
 }
 
 func GetApricotPhase3Time(networkID uint32) time.Time {
@@ -143,13 +167,6 @@ func GetApricotPhase4Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime
-}
-
-func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
-	if minHeight, exists := ApricotPhase4MinPChainHeight[networkID]; exists {
-		return minHeight
-	}
-	return ApricotPhase4DefaultMinPChainHeight
 }
 
 func GetApricotPhase5Time(networkID uint32) time.Time {

@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Maximum number of containers IDs that can be fetched at a time in a call to
@@ -114,14 +114,12 @@ func newIndex(
 
 // Close this index
 func (i *index) Close() error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		i.indexToContainer.Close(),
 		i.containerToIndex.Close(),
 		i.vDB.Close(),
 		i.baseDB.Close(),
 	)
-	return errs.Err
 }
 
 // Index that the given transaction is accepted

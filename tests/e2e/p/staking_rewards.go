@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -59,22 +59,21 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(betaNode)
 
 		ginkgo.By("generating reward keys")
-		factory := secp256k1.Factory{}
 
-		alphaValidationRewardKey, err := factory.NewPrivateKey()
+		alphaValidationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
-		alphaDelegationRewardKey, err := factory.NewPrivateKey()
-		require.NoError(err)
-
-		betaValidationRewardKey, err := factory.NewPrivateKey()
-		require.NoError(err)
-		betaDelegationRewardKey, err := factory.NewPrivateKey()
+		alphaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		gammaDelegationRewardKey, err := factory.NewPrivateKey()
+		betaValidationRewardKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+		betaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		deltaDelegationRewardKey, err := factory.NewPrivateKey()
+		gammaDelegationRewardKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+
+		deltaDelegationRewardKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
 		rewardKeys := []*secp256k1.PrivateKey{
@@ -91,7 +90,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		fundedKey := e2e.Env.AllocateFundedKey()
 		keychain.Add(fundedKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
 		ginkgo.By("retrieving alpha node id and pop")
@@ -262,7 +261,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
 		for _, rewardKey := range rewardKeys {
 			keychain := secp256k1fx.NewKeychain(rewardKey)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 			pWallet := baseWallet.P()
 			balances, err := pWallet.Builder().GetBalance()
 			require.NoError(err)
