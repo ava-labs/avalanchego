@@ -163,7 +163,5 @@ func (m *manager) RegisterRequestToUnreachableValidator() {
 }
 
 func (m *manager) Stop() {
-	m.stopOnce.Do(func() {
-		m.tm.Stop()
-	})
+	m.stopOnce.Do(m.tm.Stop)
 }
