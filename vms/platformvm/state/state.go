@@ -1457,14 +1457,14 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime()
+		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
 			// in case they are not stored in the database
 			// Note: we don't provide [LastUpdated] here because we expect it to
 			// always be present on disk.
-			StakerStartTime: defaultStartTime.Unix(),
+			StakerStartTime: defaultStartTime,
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1559,11 +1559,11 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime()
+			defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
-				StakerStartTime: defaultStartTime.Unix(),
+				StakerStartTime: defaultStartTime,
 				txID:            txID,
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
