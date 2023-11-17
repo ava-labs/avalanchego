@@ -385,19 +385,19 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
-	pendingContainerIDs := b.Blocked.MissingIDs()
-
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
+	pendingContainerIDs := b.Blocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
-	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
 	b.Ctx.Log.Debug("starting bootstrapping",
 		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
 	)
+
+	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.Blocked.AddMissingID(blkID)
 
