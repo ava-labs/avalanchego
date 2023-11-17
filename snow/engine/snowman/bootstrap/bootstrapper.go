@@ -149,7 +149,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAccepted.Height()
 	b.Config.SharedCfg.RequestID = startReqID
 
-	return b.startBootstrappingOnceIfSufficientlyConnected(ctx)
+	return b.tryStartBootstrapping(ctx)
 }
 
 func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -165,7 +165,7 @@ func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 		b.fetchFrom.Add(nodeID)
 	}
 
-	return b.startBootstrappingOnceIfSufficientlyConnected(ctx)
+	return b.tryStartBootstrapping(ctx)
 }
 
 func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
@@ -181,7 +181,9 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return nil
 }
 
-func (b *bootstrapper) startBootstrappingOnceIfSufficientlyConnected(ctx context.Context) error {
+// tryStartBootstrapping will start bootstrapping the first time it is called
+// while the startupTracker is reporting that the protocol should start.
+func (b *bootstrapper) tryStartBootstrapping(ctx context.Context) error {
 	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil
 	}

@@ -125,7 +125,7 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 
 	ss.requestID = startReqID
 
-	return ss.startSyncingOnceIfSufficientlyConnected(ctx)
+	return ss.tryStartSyncing(ctx)
 }
 
 func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -137,7 +137,7 @@ func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 		return err
 	}
 
-	return ss.startSyncingOnceIfSufficientlyConnected(ctx)
+	return ss.tryStartSyncing(ctx)
 }
 
 func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
@@ -148,7 +148,9 @@ func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return ss.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (ss *stateSyncer) startSyncingOnceIfSufficientlyConnected(ctx context.Context) error {
+// tryStartSyncing will start syncing the first time it is called while the
+// startupTracker is reporting that the protocol should start.
+func (ss *stateSyncer) tryStartSyncing(ctx context.Context) error {
 	if ss.started || !ss.StartupTracker.ShouldStart() {
 		return nil
 	}
