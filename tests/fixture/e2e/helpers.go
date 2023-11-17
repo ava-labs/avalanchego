@@ -146,7 +146,10 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 
 // Wait for the given node to report healthy.
 func WaitForHealthy(node testnet.Node) {
-	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(DefaultContext(), node))
+	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -195,12 +198,26 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 
 // Verify that a new node can bootstrap into the network.
 func CheckBootstrapIsPossible(network testnet.Network) {
+	require := require.New(ginkgo.GinkgoT())
+
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
 		return
 	}
 	ginkgo.By("checking if bootstrap is possible with the current network state")
-	node := AddEphemeralNode(network, testnet.FlagsMap{})
+
+	// Call network.AddEphemeralNode instead of AddEphemeralNode to support
+	// checking for bootstrap implicitly on teardown via a function registered
+	// with ginkgo.DeferCleanup. It's not possible to call DeferCleanup from
+	// within a function called by DeferCleanup.
+	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, testnet.FlagsMap{})
+	require.NoError(err)
+
+	defer func() {
+		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
+		require.NoError(node.Stop())
+	}()
+
 	WaitForHealthy(node)
 }
 

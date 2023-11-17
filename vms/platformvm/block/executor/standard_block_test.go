@@ -371,37 +371,37 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	// so that TxID does not depend on the order we run tests.
 	staker1 := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf1}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xf1}),
+		rewardAddress: ids.ShortID{0xf1},
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
 		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf2}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xf2}),
+		rewardAddress: ids.ShortID{0xf2},
 		startTime:     staker1.startTime.Add(1 * time.Minute),
 		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf3}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xf3}),
+		rewardAddress: ids.ShortID{0xf3},
 		startTime:     staker2.startTime.Add(1 * time.Minute),
 		endTime:       staker2.endTime.Add(1 * time.Minute),
 	}
 	staker3Sub := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf3}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xff}),
+		rewardAddress: ids.ShortID{0xff},
 		startTime:     staker3.startTime.Add(1 * time.Minute),
 		endTime:       staker3.endTime.Add(-1 * time.Minute),
 	}
 	staker4 := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf4}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xf4}),
+		rewardAddress: ids.ShortID{0xf4},
 		startTime:     staker3.startTime,
 		endTime:       staker3.endTime,
 	}
 	staker5 := staker{
 		nodeID:        ids.BuildTestShortNodeID([]byte{0xf5}),
-		rewardAddress: ids.BuildTestShortID([]byte{0xf5}),
+		rewardAddress: ids.ShortID{0xf5},
 		startTime:     staker2.endTime,
 		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
 	}
@@ -485,6 +485,13 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
 			expectedStakers: map[ids.ShortNodeID]stakerStatus{
 				staker1.nodeID: current,
+
+				// Staker2's end time matches staker5's start time, so typically
+				// the block builder would produce a ProposalBlock to remove
+				// staker2 when advancing the time. However, it is valid to only
+				// advance the time with a StandardBlock and not remove staker2,
+				// which is what this test does.
+				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
 				staker5.nodeID: current,

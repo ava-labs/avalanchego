@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -110,7 +111,7 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
+	blkIDs := set.Of(blkID0, blkID1, blkID2)
 	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
 
 	require.Len(accepted, 2)

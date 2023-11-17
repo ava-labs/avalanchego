@@ -1185,7 +1185,7 @@ type AddValidatorArgs struct {
 
 // AddValidator creates and signs and issues a transaction to add a validator to
 // the primary network
-func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
+func (s *Service) AddValidator(req *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "addValidator"),
@@ -1282,7 +1282,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1297,7 +1297,7 @@ type AddDelegatorArgs struct {
 
 // AddDelegator creates and signs and issues a transaction to add a delegator to
 // the primary network
-func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
+func (s *Service) AddDelegator(req *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "addDelegator"),
@@ -1390,7 +1390,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1406,7 +1406,7 @@ type AddSubnetValidatorArgs struct {
 
 // AddSubnetValidator creates and signs and issues a transaction to add a
 // validator to a subnet other than the primary network
-func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
+func (s *Service) AddSubnetValidator(req *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "addSubnetValidator"),
@@ -1496,7 +1496,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1511,7 +1511,7 @@ type CreateSubnetArgs struct {
 
 // CreateSubnet creates and signs and issues a transaction to create a new
 // subnet
-func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
+func (s *Service) CreateSubnet(req *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "createSubnet"),
@@ -1572,7 +1572,7 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1595,7 +1595,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
+func (s *Service) ExportAVAX(req *http.Request, args *ExportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "exportAVAX"),
@@ -1668,7 +1668,7 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1687,7 +1687,7 @@ type ImportAVAXArgs struct {
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
+func (s *Service) ImportAVAX(req *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "importAVAX"),
@@ -1753,7 +1753,7 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1783,7 +1783,7 @@ type CreateBlockchainArgs struct {
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
-func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
+func (s *Service) CreateBlockchain(req *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
 		zap.String("service", "platform"),
 		zap.String("method", "createBlockchain"),
@@ -1877,7 +1877,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 
 	return utils.Err(
 		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
+		s.vm.Network.IssueTx(req.Context(), tx),
 		user.Close(),
 	)
 }
@@ -1939,11 +1939,8 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 		return nil
 	}
 
-	preferredBlk, err := s.vm.Preferred()
-	if err != nil {
-		return fmt.Errorf("could not retrieve preferred block, err %w", err)
-	}
-	preferred, err := s.chainExists(ctx, preferredBlk.ID(), blockchainID)
+	preferredBlkID := s.vm.manager.Preferred()
+	preferred, err := s.chainExists(ctx, preferredBlkID, blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
@@ -2154,7 +2151,7 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	return nil
 }
 
-func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
+func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "issueTx"),
@@ -2172,7 +2169,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	if err := s.vm.Builder.AddUnverifiedTx(tx); err != nil {
+	if err := s.vm.Network.IssueTx(req.Context(), tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -2242,12 +2239,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	prefBlk, err := s.vm.Preferred()
-	if err != nil {
-		return err
-	}
-
-	preferredID := prefBlk.ID()
+	preferredID := s.vm.manager.Preferred()
 	onAccept, ok := s.vm.manager.GetState(preferredID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)

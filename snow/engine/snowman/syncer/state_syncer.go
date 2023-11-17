@@ -108,6 +108,10 @@ func New(
 	}
 }
 
+func (ss *stateSyncer) Context() *snow.ConsensusContext {
+	return ss.Ctx
+}
+
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -223,7 +227,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -248,10 +252,10 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("subnetID", ss.Ctx.SubnetID),
-		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Reflect("summaryIDs", summaryIDs),
 		zap.Uint64("nodeWeight", nodeWeight),
 	)
-	for _, summaryID := range summaryIDs {
+	for summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			ss.Ctx.Log.Debug("skipping summary",
@@ -484,9 +488,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for _, nodeID := range ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID) {
-		ss.targetVoters.Add(nodeID)
-	}
+	ss.targetVoters.Add(ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID)...)
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
