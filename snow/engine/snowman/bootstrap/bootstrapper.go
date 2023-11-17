@@ -111,6 +111,10 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 	return b, nil
 }
 
+func (b *bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
@@ -145,7 +149,42 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAccepted.Height()
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.StartupTracker.ShouldStart() {
+	return b.tryStartBootstrapping(ctx)
+}
+
+func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+	// Ensure fetchFrom reflects proper validator list
+	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
+		b.fetchFrom.Add(nodeID)
+	}
+
+	return b.tryStartBootstrapping(ctx)
+}
+
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	b.markUnavailable(nodeID)
+	return nil
+}
+
+// tryStartBootstrapping will start bootstrapping the first time it is called
+// while the startupTracker is reporting that the protocol should start.
+func (b *bootstrapper) tryStartBootstrapping(ctx context.Context) error {
+	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -240,40 +279,6 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 
 	// Send another request for this
 	return b.fetch(ctx, blkID)
-}
-
-func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
-		b.fetchFrom.Add(nodeID)
-	}
-
-	if b.started || !b.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup(ctx)
-}
-
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	b.markUnavailable(nodeID)
-	return nil
 }
 
 func (b *bootstrapper) Timeout(ctx context.Context) error {
@@ -556,7 +561,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.Ctx.State.Get().State == snow.NormalOp || b.awaitingTimeout {
 		return nil
 	}
 
@@ -594,9 +599,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
-		b.bootstrappedOnce.Do(func() {
-			b.Bootstrapped()
-		})
+		b.bootstrappedOnce.Do(b.Bootstrapped)
 	}
 
 	// Notify the subnet that this chain is synced

@@ -108,6 +108,57 @@ func New(
 	}
 }
 
+func (ss *stateSyncer) Context() *snow.ConsensusContext {
+	return ss.Ctx
+}
+
+func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
+	ss.Ctx.Log.Info("starting state sync")
+
+	ss.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.StateSyncing,
+	})
+	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
+		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
+	}
+
+	ss.requestID = startReqID
+
+	return ss.tryStartSyncing(ctx)
+}
+
+func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := ss.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	return ss.tryStartSyncing(ctx)
+}
+
+func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	return ss.StartupTracker.Disconnected(ctx, nodeID)
+}
+
+// tryStartSyncing will start syncing the first time it is called while the
+// startupTracker is reporting that the protocol should start.
+func (ss *stateSyncer) tryStartSyncing(ctx context.Context) error {
+	if ss.started || !ss.StartupTracker.ShouldStart() {
+		return nil
+	}
+
+	ss.started = true
+	return ss.startup(ctx)
+}
+
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
@@ -223,7 +274,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -248,10 +299,10 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("subnetID", ss.Ctx.SubnetID),
-		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Reflect("summaryIDs", summaryIDs),
 		zap.Uint64("nodeWeight", nodeWeight),
 	)
-	for _, summaryID := range summaryIDs {
+	for summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			ss.Ctx.Log.Debug("skipping summary",
@@ -422,27 +473,6 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
 
-func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
-	ss.Ctx.Log.Info("starting state sync")
-
-	ss.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.StateSyncing,
-	})
-	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
-		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
-	}
-
-	ss.requestID = startReqID
-
-	if !ss.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	ss.started = true
-	return ss.startup(ctx)
-}
-
 // startup do start the whole state sync process by
 // sampling frontier seeders, listing state syncers to request votes to
 // and reaching out frontier seeders if any. Otherwise, it moves immediately
@@ -484,9 +514,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for _, nodeID := range ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID) {
-		ss.targetVoters.Add(nodeID)
-	}
+	ss.targetVoters.Add(ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID)...)
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
@@ -576,31 +604,6 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 
 	ss.Ctx.StateSyncing.Set(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
-}
-
-func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := ss.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if ss.started || !ss.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	ss.started = true
-	return ss.startup(ctx)
-}
-
-func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	return ss.StartupTracker.Disconnected(ctx, nodeID)
 }
 
 func (*stateSyncer) Gossip(context.Context) error {
