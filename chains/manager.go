@@ -1251,9 +1251,9 @@ func (m *manager) createSnowmanChain(
 	stateSyncCfg, err := syncer.NewConfig(
 		snowGetHandler,
 		ctx,
-		beacons,
 		startupTracker,
 		messageSender,
+		beacons,
 		sampleK,
 		bootstrapWeight/2+1, // must be > 50%
 		m.StateSyncBeacons,

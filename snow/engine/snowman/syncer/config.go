@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 type Config struct {
@@ -41,9 +42,9 @@ type Config struct {
 func NewConfig(
 	snowGetHandler common.AllGetsServer,
 	ctx *snow.ConsensusContext,
-	beacons validators.Manager,
 	startupTracker tracker.Startup,
 	sender common.Sender,
+	beacons validators.Manager,
 	sampleK int,
 	alpha uint64,
 	stateSyncerIDs []ids.NodeID,
@@ -51,6 +52,7 @@ func NewConfig(
 ) (Config, error) {
 	// Initialize the default values that will be used if stateSyncerIDs is
 	// empty.
+	// Initialize the beacons that will be used if stateSyncerIDs is empty.
 	stateSyncBeacons := beacons
 
 	// If the user has manually provided state syncer IDs, then override the
@@ -67,9 +69,7 @@ func NewConfig(
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons for subnet %s: %w", ctx.SubnetID, err)
 		}
-		if uint64(sampleK) > stateSyncingWeight {
-			sampleK = int(stateSyncingWeight)
-		}
+		sampleK = int(math.Min(uint64(sampleK), stateSyncingWeight))
 		alpha = stateSyncingWeight/2 + 1 // must be > 50%
 	}
 	return Config{

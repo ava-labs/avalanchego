@@ -12,7 +12,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -66,15 +68,18 @@ func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
 	return vdrs
 }
 
-func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
+func buildTestsObjects(
+	t *testing.T,
+	ctx *snow.ConsensusContext,
+	startupTracker tracker.Startup,
+	beacons validators.Manager,
+	alpha uint64,
+) (
 	*stateSyncer,
 	*fullVM,
 	*common.SenderTest,
 ) {
 	require := require.New(t)
-
-	sender := &common.SenderTest{T: t}
-	commonCfg.Sender = sender
 
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -84,17 +89,28 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			T: t,
 		},
 	}
+	sender := &common.SenderTest{T: t}
 	dummyGetter, err := getter.New(
 		fullVM,
-		commonCfg.Sender,
-		commonCfg.Ctx.Log,
+		sender,
+		ctx.Log,
 		time.Second,
 		2000,
-		commonCfg.Ctx.Registerer,
+		ctx.Registerer,
 	)
 	require.NoError(err)
 
-	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
+	cfg, err := NewConfig(
+		dummyGetter,
+		ctx,
+		startupTracker,
+		sender,
+		beacons,
+		beacons.Count(ctx.SubnetID),
+		alpha,
+		nil,
+		fullVM,
+	)
 	require.NoError(err)
 	commonSyncer := New(cfg, func(context.Context, uint32) error {
 		return nil

@@ -30,11 +30,11 @@ const (
 	stripeWidth    = 5
 	cacheSize      = 100000
 
-	// StatusUpdateFrequency is how many containers should be processed between
+	// statusUpdateFrequency is how many containers should be processed between
 	// logs
 	statusUpdateFrequency = 5000
 
-	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
+	// maxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
 	// sent but not responded to/failed
 	maxOutstandingGetAncestorsRequests = 10
 )
