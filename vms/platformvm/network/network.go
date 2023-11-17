@@ -121,7 +121,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
-	if err = n.issueTx(tx); err == nil {
+	if err := n.issueTx(tx); err == nil {
 		n.gossipTx(ctx, txID, msgBytes)
 	}
 	return nil
