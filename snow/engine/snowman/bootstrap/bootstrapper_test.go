@@ -271,7 +271,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk1.Status())
 }
@@ -384,7 +384,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID2})) // should request blk1
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID2})) // should request blk1
 
 	oldReqID := requestID
 	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes0})) // respond with wrong block
@@ -397,7 +397,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.Equal(choices.Accepted, blk1.Status())
 	require.Equal(choices.Accepted, blk2.Status())
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID2}))
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID2}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -530,7 +530,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = blkID
 	}
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs)) // should request blk2
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs)) // should request blk2
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2})) // respond with blk2
 	require.Equal(blkID1, requested)
@@ -543,7 +543,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	require.Equal(choices.Accepted, blk1.Status())
 	require.Equal(choices.Accepted, blk2.Status())
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -678,7 +678,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	// should request blk2
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
 	require.Equal(peerID, requestedVdr)
 	require.Equal(blkID2, requestedBlock)
 
@@ -839,7 +839,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		requested = blkID
 	}
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs))                             // should request blk2
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))                                     // should request blk2
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2, blkBytes1})) // respond with blk2 and blk1
 	require.Equal(blkID2, requested)
 
@@ -848,7 +848,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	require.Equal(choices.Accepted, blk1.Status())
 	require.Equal(choices.Accepted, blk2.Status())
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -959,7 +959,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[blkID] = reqID
 	}
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk2 and blk1
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk2 and blk1
 
 	reqIDBlk2, ok := requestIDs[blkID2]
 	require.True(ok)
@@ -971,7 +971,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.Equal(choices.Accepted, blk1.Status())
 	require.Equal(choices.Accepted, blk2.Status())
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID2}))
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID2}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -1121,7 +1121,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	// Force Accept blk3
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID3})) // should request blk3
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID3})) // should request blk3
 
 	reqID, ok := requestIDs[blkID3]
 	require.True(ok)
@@ -1134,7 +1134,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.True(bs.OutstandingRequests.RemoveAny(blkID1))
 	requestIDs = map[ids.ID]uint32{}
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID4}))
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID4}))
 
 	blk1RequestID, ok := requestIDs[blkID1]
 	require.True(ok)
@@ -1154,7 +1154,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.Equal(choices.Accepted, blk3.Status())
 	require.Equal(choices.Accepted, blk4.Status())
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blkID4}))
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID4}))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -1228,7 +1228,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	// Force Accept, the already transitively accepted, blk0
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blk0.ID()})) // should request blk0
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blk0.ID()})) // should request blk0
 
 	reqID, ok := requestIDs[blk0.ID()]
 	require.True(ok)
@@ -1305,7 +1305,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
 
-	require.NoError(bs.startSyncingAncestry(context.Background(), []ids.ID{blk2.ID()}))
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blk2.ID()}))
 
 	require.Equal(1, bs.Blocked.NumMissingIDs())
 }

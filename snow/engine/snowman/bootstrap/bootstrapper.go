@@ -263,14 +263,14 @@ func (b *Bootstrapper) startBootstrapping(ctx context.Context) error {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
-		return b.startSyncingAncestry(ctx, accepted)
+		return b.startSyncing(ctx, accepted)
 	}
 
 	b.requestID++
-	return b.sendMessagesOrFinish(ctx)
+	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
-func (b *Bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
+func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) error {
 	if peers := b.minority.GetPeers(ctx); peers.Len() > 0 {
 		b.Sender.SendGetAcceptedFrontier(ctx, peers, b.requestID)
 		return nil
@@ -317,7 +317,7 @@ func (b *Bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
 		)
 	}
 
-	return b.startSyncingAncestry(ctx, accepted)
+	return b.startSyncing(ctx, accepted)
 }
 
 func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
@@ -333,7 +333,7 @@ func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	if err := b.minority.RecordOpinion(ctx, nodeID, set.Of(containerID)); err != nil {
 		return err
 	}
-	return b.sendMessagesOrFinish(ctx)
+	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
 func (b *Bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -349,7 +349,7 @@ func (b *Bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 	if err := b.minority.RecordOpinion(ctx, nodeID, nil); err != nil {
 		return err
 	}
-	return b.sendMessagesOrFinish(ctx)
+	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
 func (b *Bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
@@ -365,7 +365,7 @@ func (b *Bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	if err := b.majority.RecordOpinion(ctx, nodeID, containerIDs); err != nil {
 		return err
 	}
-	return b.sendMessagesOrFinish(ctx)
+	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
 func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -381,10 +381,10 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	if err := b.majority.RecordOpinion(ctx, nodeID, nil); err != nil {
 		return err
 	}
-	return b.sendMessagesOrFinish(ctx)
+	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
-func (b *Bootstrapper) startSyncingAncestry(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Initialize the fetch from set to the currently preferred peers
@@ -423,7 +423,7 @@ func (b *Bootstrapper) startSyncingAncestry(ctx context.Context, acceptedContain
 		}
 	}
 
-	return b.checkFinish(ctx)
+	return b.tryStartExecuting(ctx)
 }
 
 // Get block [blkID] and its ancestors from a validator
@@ -435,7 +435,7 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(ctx, blkID); err == nil {
-		return b.checkFinish(ctx)
+		return b.tryStartExecuting(ctx)
 	}
 
 	validatorID, ok := b.fetchFrom.Peek()
@@ -591,7 +591,7 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			if err := b.Blocked.Commit(); err != nil {
 				return err
 			}
-			return b.checkFinish(ctx)
+			return b.tryStartExecuting(ctx)
 		}
 
 		// If this block is going to be accepted, make sure to update the
@@ -617,7 +617,7 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			if err := b.Blocked.Commit(); err != nil {
 				return err
 			}
-			return b.checkFinish(ctx)
+			return b.tryStartExecuting(ctx)
 		}
 
 		// We added a new block to the queue, so track that it was fetched
@@ -678,13 +678,14 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		if err := b.Blocked.Commit(); err != nil {
 			return err
 		}
-		return b.checkFinish(ctx)
+		return b.tryStartExecuting(ctx)
 	}
 }
 
-// checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
-// after which it finishes the bootstrap process
-func (b *Bootstrapper) checkFinish(ctx context.Context) error {
+// tryStartExecuting executes all pending blocks if there are no more blocks
+// being fetched. After executing all pending blocks it will either restart
+// bootstrapping, or transition into normal operations.
+func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	if numPending := b.Blocked.NumMissingIDs(); numPending != 0 {
 		return nil
 	}
