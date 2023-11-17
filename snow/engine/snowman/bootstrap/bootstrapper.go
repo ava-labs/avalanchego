@@ -594,9 +594,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
-		b.bootstrappedOnce.Do(func() {
-			b.Bootstrapped()
-		})
+		b.bootstrappedOnce.Do(b.Bootstrapped)
 	}
 
 	// Notify the subnet that this chain is synced
