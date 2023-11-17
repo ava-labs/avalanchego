@@ -18,13 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
-
-	smbootstrapper "github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper"
 )
 
 const (
@@ -80,8 +79,8 @@ type Bootstrapper struct {
 	started   bool
 	restarted bool
 
-	minority smbootstrapper.Poll
-	majority smbootstrapper.Poll
+	minority bootstrapper.Poll
+	majority bootstrapper.Poll
 
 	// Greatest height of the blocks passed in ForceAccepted
 	tipHeight uint64
@@ -127,8 +126,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
-		minority: smbootstrapper.Noop,
-		majority: smbootstrapper.Noop,
+		minority: bootstrapper.Noop,
+		majority: bootstrapper.Noop,
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -225,7 +224,7 @@ func (b *Bootstrapper) startBootstrapping(ctx context.Context) error {
 		nodeWeights[nodeID] = beacon.Weight
 	}
 
-	frontierNodes, err := smbootstrapper.Sample(nodeWeights, b.SampleK)
+	frontierNodes, err := bootstrapper.Sample(nodeWeights, b.SampleK)
 	if err != nil {
 		return err
 	}
@@ -235,12 +234,12 @@ func (b *Bootstrapper) startBootstrapping(ctx context.Context) error {
 		zap.Int("numNodes", len(nodeWeights)),
 	)
 
-	b.minority = smbootstrapper.NewMinority(
+	b.minority = bootstrapper.NewMinority(
 		b.Ctx.Log,
 		frontierNodes,
 		maxOutstandingBroadcastRequests,
 	)
-	b.majority = smbootstrapper.NewMajority(
+	b.majority = bootstrapper.NewMajority(
 		b.Ctx.Log,
 		nodeWeights,
 		maxOutstandingBroadcastRequests,
