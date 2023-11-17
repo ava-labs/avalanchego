@@ -84,9 +84,6 @@ type stateSyncer struct {
 	// we keep a list of deduplicated height ready for voting
 	summariesHeights       set.Set[uint64]
 	uniqueSummariesHeights []uint64
-
-	// number of times the state sync has been attempted
-	attempts int
 }
 
 func New(
@@ -258,15 +255,11 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 
 	frontierStake := frontiersTotalWeight - failedBeaconWeight
 	if float64(frontierStake) < frontierAlpha {
-		ss.Ctx.Log.Debug("didn't receive enough frontiers",
+		ss.Ctx.Log.Debug("restarting state sync",
+			zap.String("reason", "didn't receive enough frontiers"),
 			zap.Int("numFailedValidators", ss.failedSeeders.Len()),
-			zap.Int("numStateSyncAttempts", ss.attempts),
 		)
-
-		if ss.Config.RetryBootstrap {
-			ss.Ctx.Log.Debug("restarting state sync")
-			return ss.restart(ctx)
-		}
+		return ss.startup(ctx)
 	}
 
 	ss.requestID++
@@ -377,14 +370,13 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 			return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconsTotalWeight - failedVotersWeight
-		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
+		if votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("restarting state sync",
 				zap.String("reason", "not enough votes received"),
 				zap.Int("numBeacons", ss.StateSyncBeacons.Count(ss.Ctx.SubnetID)),
 				zap.Int("numFailedSyncers", ss.failedVoters.Len()),
-				zap.Int("numAttempts", ss.attempts),
 			)
-			return ss.restart(ctx)
+			return ss.startup(ctx)
 		}
 
 		ss.Ctx.Log.Info("skipping state sync",
@@ -537,7 +529,6 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// initiate messages exchange
-	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
@@ -546,16 +537,6 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.requestID++
 	ss.sendGetStateSummaryFrontiers(ctx)
 	return nil
-}
-
-func (ss *stateSyncer) restart(ctx context.Context) error {
-	if ss.attempts > 0 && ss.attempts%ss.RetryBootstrapWarnFrequency == 0 {
-		ss.Ctx.Log.Debug("check internet connection",
-			zap.Int("numSyncAttempts", ss.attempts),
-		)
-	}
-
-	return ss.startup(ctx)
 }
 
 // Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time
