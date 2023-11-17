@@ -35,7 +35,7 @@ const (
 	statusUpdateFrequency = 5000
 
 	// maxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
-	// sent but not responded to/failed
+	// sent but not yet responded to/failed
 	maxOutstandingGetAncestorsRequests = 10
 )
 
