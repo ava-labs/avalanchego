@@ -33,18 +33,17 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.AddStaker(commonCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-	commonCfg.Sender = sender
 	sender.Default(true)
 
 	vm := &block.TestVM{}
@@ -54,10 +53,10 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	snowGetHandler, err := getter.New(
 		vm,
 		sender,
-		commonCfg.Ctx.Log,
+		engCfg.Ctx.Log,
 		time.Second,
 		2000,
-		commonCfg.Ctx.Registerer,
+		engCfg.Ctx.Registerer,
 	)
 	require.NoError(err)
 	engCfg.AllGetsServer = snowGetHandler
@@ -95,9 +94,8 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 }
 
 func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	commonCfg := common.DefaultConfigTest()
 	engCfg := DefaultConfigs()
-	return setup(t, commonCfg, engCfg)
+	return setup(t, engCfg)
 }
 
 func TestEngineShutdown(t *testing.T) {

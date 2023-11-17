@@ -1247,20 +1247,16 @@ func (m *manager) createSnowmanChain(
 		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
 	}
 
-	commonCfg := common.Config{
-		Ctx:            ctx,
-		Beacons:        beacons,
-		SampleK:        sampleK,
-		StartupTracker: startupTracker,
-		Alpha:          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:         messageSender,
-	}
-
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
-		commonCfg,
-		m.StateSyncBeacons,
 		snowGetHandler,
+		ctx,
+		beacons,
+		startupTracker,
+		messageSender,
+		sampleK,
+		bootstrapWeight/2+1, // must be > 50%
+		m.StateSyncBeacons,
 		vm,
 	)
 	if err != nil {
