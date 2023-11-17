@@ -58,7 +58,7 @@ message Message {
     AppGossip app_gossip = 32;
 
     PeerListAck peer_list_ack = 33;
-    AppRequestFailed app_request_failed = 34;
+    AppError app_error = 34;
   }
 }
 
@@ -387,7 +387,7 @@ message Chits {
 // AppRequest is a VM-defined request.
 //
 // Remote peers must respond to AppRequest with a corresponding AppResponse or
-// AppRequestFailed
+// AppError
 message AppRequest {
   // Chain being requested from
   bytes chain_id = 1;
@@ -409,14 +409,14 @@ message AppResponse {
   bytes app_bytes = 3;
 }
 
-// AppRequestFailed is a VM-defined error sent in response to AppRequest
-message AppRequestFailed {
+// AppError is a VM-defined error sent in response to AppRequest
+message AppError {
   // Chain the message is for
   bytes chain_id = 1;
   // Request id of the original AppRequest
   uint32 request_id = 2;
-  // VM defined error code
-  uint32 error_code = 3;
+  // VM defined error code. VMs may define error codes > 0.
+  sint32 error_code = 3;
   // VM defined error message
   string error_message = 4;
 }

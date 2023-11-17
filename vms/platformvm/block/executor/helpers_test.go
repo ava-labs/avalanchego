@@ -80,8 +80,18 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type stakerStatus uint
 
@@ -409,10 +419,8 @@ func buildGenesisTest(ctx *snow.Context) *genesis.Genesis {
 	}
 
 	vdrs := txheap.NewByEndTime()
-	for _, key := range preFundedKeys {
-		addr := key.PublicKey().Address()
-		nodeID := ids.NodeID(key.PublicKey().Address())
-
+	for idx, nodeID := range genesisNodeIDs {
+		addr := preFundedKeys[idx].PublicKey().Address()
 		utxo := &avax.TransferableOutput{
 			Asset: avax.Asset{ID: ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
