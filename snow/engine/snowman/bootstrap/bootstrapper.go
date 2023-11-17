@@ -30,11 +30,11 @@ const (
 	// Delay bootstrapping to avoid potential CPU burns
 	bootstrappingDelay = 10 * time.Second
 
-	// StatusUpdateFrequency is how many containers should be processed between
+	// statusUpdateFrequency is how many containers should be processed between
 	// logs
 	statusUpdateFrequency = 5000
 
-	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
+	// maxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
 )
