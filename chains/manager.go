@@ -1222,12 +1222,13 @@ func (m *manager) createSnowmanChain(
 		engine = smeng.TraceEngine(engine, m.Tracer)
 	}
 
+	alpha := bootstrapWeight/2 + 1 // must be > 50%
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
-		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		Alpha:                          alpha,
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
 		Timer:                          h,
@@ -1257,9 +1258,14 @@ func (m *manager) createSnowmanChain(
 
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
-		commonCfg,
-		m.StateSyncBeacons,
 		snowGetHandler,
+		ctx,
+		beacons,
+		startupTracker,
+		messageSender,
+		sampleK,
+		alpha,
+		m.StateSyncBeacons,
 		vm,
 	)
 	if err != nil {
