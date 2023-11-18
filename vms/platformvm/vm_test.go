@@ -1198,10 +1198,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(firstCtx.ChainID),
-	}
-	firstCtx.SharedMemory = msm
+	firstCtx.SharedMemory = m.NewSharedMemory(firstCtx.ChainID)
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -1280,7 +1277,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}}
 
 	secondCtx := defaultContext(t)
-	secondCtx.SharedMemory = msm
+	secondCtx.SharedMemory = firstCtx.SharedMemory
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -1335,10 +1332,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
@@ -1460,19 +1454,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
 	)
 	require.NoError(err)
-
-	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-		require.NoError(err)
-		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
-
-		requestID, ok := message.GetRequestID(inMsg.Message())
-		require.True(ok)
-
-		reqID = requestID
-		return nodeIDs
-	}
 
 	isBootstrapped := false
 	bootstrapTracker := &common.BootstrapTrackerTest{
@@ -1596,6 +1577,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
+	var reqID uint32
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
+
+		requestID, ok := message.GetRequestID(inMsg.Message())
+		require.True(ok)
+
+		reqID = requestID
+		return nodeIDs
+	}
+
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
@@ -1627,10 +1621,36 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
+
+		requestID, ok := message.GetRequestID(inMsg.Message())
+		require.True(ok)
+
+		reqID = requestID
+		return nodeIDs
+	}
+
+	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
+		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
+
+		reqID = inMsg.RequestId
+		return nodeIDs
+	}
+
+	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
+
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 	require.Equal(advanceTimeBlk.ID(), vm.manager.Preferred())
 
 	ctx.Lock.Unlock()
