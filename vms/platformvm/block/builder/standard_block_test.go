@@ -72,7 +72,7 @@ func TestAtomicTxImports(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.Builder.Add(tx))
+	require.NoError(env.Builder.Add(tx, env.state.GetTimestamp()))
 	b, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	// Test multiple verify calls work

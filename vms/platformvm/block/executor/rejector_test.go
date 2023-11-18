@@ -121,6 +121,7 @@ func TestRejectBlock(t *testing.T) {
 
 			mempool := mempool.NewMockMempool(ctrl)
 			state := state.NewMockState(ctrl)
+			state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,
@@ -139,7 +140,7 @@ func TestRejectBlock(t *testing.T) {
 
 			// Set expected calls on dependencies.
 			for _, tx := range blk.Txs() {
-				mempool.EXPECT().Add(tx).Return(nil).Times(1)
+				mempool.EXPECT().Add(tx, gomock.Any()).Return(nil).Times(1)
 			}
 
 			require.NoError(tt.rejectFunc(rejector, blk))

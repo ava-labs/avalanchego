@@ -4,6 +4,7 @@
 package p
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -131,6 +132,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			validatorStartTime = validatorChainTime
 			validatorsEndTime = validatorStartTime.Add(validationPeriod)
 
+			fmt.Fprintf(ginkgo.GinkgoWriter, "validator start time: %v\n", validatorStartTime)
+			fmt.Fprintf(ginkgo.GinkgoWriter, "validator end time: %v\n", validatorsEndTime)
+
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -154,6 +158,10 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
+
+			data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+			require.NoError(err)
+			fmt.Fprintf(ginkgo.GinkgoWriter, "alpha validator potential reward: %d\n", *(data[0].PotentialReward))
 		})
 
 		ginkgo.By("adding beta node as a validator", func() {
@@ -180,6 +188,10 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
+
+			data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{betaNodeID})
+			require.NoError(err)
+			fmt.Fprintf(ginkgo.GinkgoWriter, "beta validator potential reward: %d\n", *(data[0].PotentialReward))
 		})
 
 		ginkgo.By("retrieving supply before inserting delegators")
@@ -194,6 +206,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			// the timestamp of the block including its add delegator tx
 			delegatorStartTime = delegatorChainTime
 			delegatorsEndTime = delegatorStartTime.Add(delegationPeriod)
+
+			fmt.Fprintf(ginkgo.GinkgoWriter, "delegator start time: %v\n", delegatorStartTime)
+			fmt.Fprintf(ginkgo.GinkgoWriter, "delegator end time: %v\n", delegatorsEndTime)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
@@ -212,6 +227,10 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
+
+			data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+			require.NoError(err)
+			fmt.Fprintf(ginkgo.GinkgoWriter, "beta validator potential reward: %d\n", *(data[0].Delegators[0].PotentialReward))
 		})
 
 		ginkgo.By("adding delta as delegator to the beta node", func() {
@@ -285,7 +304,11 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		ginkgo.By("determining expected validation and delegation rewards")
 		calculator := reward.NewCalculator(rewardConfig)
 		expectedValidationReward := calculator.Calculate(validationPeriod, weight, supplyAtValidatorsStart)
+		fmt.Fprintf(ginkgo.GinkgoWriter, "expected validator reward: %d\n", expectedValidationReward)
+
 		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, supplyAtDelegatorsStart)
+		fmt.Fprintf(ginkgo.GinkgoWriter, "expected delegator reward: %d\n", potentialDelegationReward)
+
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")
