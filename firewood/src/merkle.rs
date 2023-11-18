@@ -1609,7 +1609,7 @@ mod tests {
 
     fn branch(value: Vec<u8>, encoded_child: Option<Vec<u8>>) -> Node {
         let children = Default::default();
-        let value = Some(value).map(Data);
+        let value = Some(Data(value));
         let mut children_encoded = <[Option<Vec<u8>>; NBRANCH]>::default();
 
         if let Some(child) = encoded_child {
