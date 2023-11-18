@@ -144,7 +144,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		g,
 		registerer,
-		&vm.Config,
+		vm.Config.Validators,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
