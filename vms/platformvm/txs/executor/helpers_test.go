@@ -132,7 +132,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(config.Validators, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -220,7 +220,7 @@ func addSubnet(
 }
 
 func defaultState(
-	cfg *config.Config,
+	validators validators.Manager,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -231,7 +231,7 @@ func defaultState(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		cfg,
+		validators,
 		execCfg,
 		ctx,
 		metrics.Noop,
