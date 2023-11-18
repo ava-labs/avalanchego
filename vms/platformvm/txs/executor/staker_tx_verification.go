@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -181,16 +182,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	if !isDurangoActive {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if tx.StartTime().After(maxStartTime) {
-			return nil, ErrFutureStakeTime
-		}
-	}
-
-	return outs, nil
+	return outs, stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -283,16 +275,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	if !isDurangoActive {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if tx.StartTime().After(maxStartTime) {
-			return ErrFutureStakeTime
-		}
-	}
-
-	return nil
+	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -484,16 +467,7 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	if !isDurangoActive {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if tx.StartTime().After(maxStartTime) {
-			return nil, ErrFutureStakeTime
-		}
-	}
-
-	return outs, nil
+	return outs, stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -617,16 +591,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	if !isDurangoActive {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if tx.StartTime().After(maxStartTime) {
-			return ErrFutureStakeTime
-		}
-	}
-
-	return nil
+	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -776,16 +741,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	if !isDurangoActive {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if tx.StartTime().After(maxStartTime) {
-			return ErrFutureStakeTime
-		}
-	}
-
-	return nil
+	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns an error if the given tx is invalid.
@@ -830,6 +786,19 @@ func verifyTransferSubnetOwnershipTx(
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+func stakerTimeTooMuchIntheFuture(backend *Backend, chainTime time.Time, stakerStartTime time.Time) error {
+	if !backend.Config.IsDActivated(chainTime) {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := chainTime.Add(MaxFutureStartTime)
+		if stakerStartTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil
