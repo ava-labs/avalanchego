@@ -138,18 +138,9 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	// Pre Durango activation, start time must be after current chain time.
-	// Post Durango activation, start time is not validated
-
-	if !isDurangoActive {
-		if !currentTimestamp.Before(tx.StartTime()) {
-			return nil, fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
-				tx.StartTime(),
-			)
-		}
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+		return nil, err
 	}
 
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -182,7 +173,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	return outs, stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -221,18 +212,9 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	// Pre Durango activation, start time must be after current chain time.
-	// Post Durango activation, only staking duration matters, hence start time
-	// is not validated
-	if !isDurangoActive {
-		if !currentTimestamp.Before(tx.StartTime()) {
-			return fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
-				tx.StartTime(),
-			)
-		}
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+		return err
 	}
 
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
@@ -275,7 +257,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -393,18 +375,9 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	// Pre Durango activation, start time must be after current chain time.
-	// Post Durango activation, only staking duration matters, hence start time
-	// is not validated
-	if !isDurangoActive {
-		if !currentTimestamp.Before(tx.StartTime()) {
-			return nil, fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
-				tx.StartTime(),
-			)
-		}
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+		return nil, err
 	}
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -467,7 +440,7 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	return outs, stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -487,9 +460,6 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	// Pre Durango activation, start time must be after current chain time.
-	// Post Durango activation, only staking duration matters, hence start time
-	// is not validated
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
@@ -497,14 +467,11 @@ func verifyAddPermissionlessValidatorTx(
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
-		if !currentTimestamp.Before(tx.StartTime()) {
-			return fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
-				tx.StartTime(),
-			)
-		}
+	}
+
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+		return err
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
@@ -591,7 +558,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -611,9 +578,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return nil
 	}
 
-	// Pre Durango activation, start time must be after current chain time.
-	// Post Durango activation, only staking duration matters, hence start time
-	// is not validated
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp) // post Durango duration
@@ -621,13 +585,11 @@ func verifyAddPermissionlessDelegatorTx(
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime()) // pre Durango duration
-		if !currentTimestamp.Before(tx.StartTime()) {
-			return fmt.Errorf(
-				"chain timestamp (%s) not before validator's start time (%s)",
-				currentTimestamp,
-				tx.StartTime(),
-			)
-		}
+	}
+
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+		return err
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, tx.Subnet)
@@ -741,7 +703,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTimeTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns an error if the given tx is invalid.
@@ -791,7 +753,25 @@ func verifyTransferSubnetOwnershipTx(
 	return nil
 }
 
-func stakerTimeTooMuchIntheFuture(backend *Backend, chainTime time.Time, stakerStartTime time.Time) error {
+// Ensure the proposed validator starts after the current time
+func checkStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time) error {
+	// Pre Durango activation, start time must be after current chain time.
+	// Post Durango activation, start time is not validated
+	if !isDurangoActive {
+		if !chainTime.Before(stakerTime) {
+			return fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				chainTime,
+				stakerTime,
+			)
+		}
+	}
+
+	return nil
+}
+
+func stakerTooMuchIntheFuture(backend *Backend, chainTime, stakerStartTime time.Time) error {
 	if !backend.Config.IsDActivated(chainTime) {
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
