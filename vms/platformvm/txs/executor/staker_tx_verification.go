@@ -92,7 +92,11 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
 
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -124,12 +128,6 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-	)
-
-	// Ensure the proposed validator starts after the current time
 	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
@@ -180,7 +178,12 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -195,12 +198,6 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-	)
-
-	// Ensure the proposed validator starts after the current time
 	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
 		return err
 	}
@@ -332,7 +329,12 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -355,12 +357,6 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-	)
-
-	// Ensure the proposed validator starts after the current time
 	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
@@ -442,6 +438,7 @@ func verifyAddPermissionlessValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
 	)
 
 	// Ensure the proposed validator starts after the current time
@@ -454,7 +451,6 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
@@ -557,6 +553,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
 	)
 
 	// Ensure the proposed validator starts after the current time
@@ -569,7 +566,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
