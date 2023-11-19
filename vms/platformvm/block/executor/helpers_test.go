@@ -81,8 +81,18 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
+
 	errMissing = errors.New("missing")
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type stakerStatus uint
 
@@ -141,7 +151,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
-		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.state = defaultState(res.config.Validators, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
@@ -259,7 +269,7 @@ func addSubnet(env *environment) {
 }
 
 func defaultState(
-	cfg *config.Config,
+	validators validators.Manager,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -270,7 +280,7 @@ func defaultState(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		cfg,
+		validators,
 		execCfg,
 		ctx,
 		metrics.Noop,
@@ -399,9 +409,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
