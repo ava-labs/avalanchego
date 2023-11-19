@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -111,7 +112,7 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 		return nil, err
 	}
 
-	nextBlkTime, err := v.nextBlockTime(state)
+	nextBlkTime, _, err := NextBlockTime(state, v.Clk)
 	if err != nil {
 		return nil, err
 	}
@@ -134,20 +135,27 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 	return state, nil
 }
 
-func (v *MempoolTxVerifier) nextBlockTime(state state.Diff) (time.Time, error) {
-	var (
-		parentTime  = state.GetTimestamp()
-		nextBlkTime = v.Clk.Time()
-	)
-	if parentTime.After(nextBlkTime) {
-		nextBlkTime = parentTime
+func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {
+	timestamp := clk.Time()
+	if parentTime := state.GetTimestamp(); parentTime.After(timestamp) {
+		timestamp = parentTime
 	}
+	// [timestamp] = max(now, parentTime)
+
 	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not calculate next staker change time: %w", err)
+		return time.Time{}, false, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
-	if !nextBlkTime.Before(nextStakerChangeTime) {
-		nextBlkTime = nextStakerChangeTime
+
+	// timeWasCapped means that [timestamp] was reduced to
+	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
+	// be willing to issue an advanceTimeTx. It is also used as a flag for
+	// [buildBanffBlock] to force the issuance of an empty block to advance
+	// the time forward; if there are no available transactions.
+	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
+	if timeWasCapped {
+		timestamp = nextStakerChangeTime
 	}
-	return nextBlkTime, nil
+	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
+	return timestamp, timeWasCapped, nil
 }
