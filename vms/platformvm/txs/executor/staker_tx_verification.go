@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -91,7 +92,11 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
 
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -123,16 +128,8 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
+	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+		return nil, err
 	}
 
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -165,14 +162,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
-	}
-
-	return outs, nil
+	return outs, stakerTooMuchIntheFuture(currentTimestamp, startTime)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -188,7 +178,12 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -203,16 +198,8 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
-		return fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			validatorStartTime,
-		)
+	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+		return err
 	}
 
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
@@ -255,14 +242,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if validatorStartTime.After(maxStartTime) {
-		return ErrFutureStakeTime
-	}
-
-	return nil
+	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -349,7 +329,12 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -372,16 +357,8 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			validatorStartTime,
-		)
+	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+		return nil, err
 	}
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -438,14 +415,7 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if validatorStartTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
-	}
-
-	return outs, nil
+	return outs, stakerTooMuchIntheFuture(currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -465,16 +435,15 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
 	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return fmt.Errorf(
-			"%w: %s >= %s",
-			ErrTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
+	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+		return err
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
@@ -482,7 +451,6 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
@@ -562,14 +530,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
-	}
-
-	return nil
+	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -589,15 +550,15 @@ func verifyAddPermissionlessDelegatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return fmt.Errorf(
-			"chain timestamp (%s) not before validator's start time (%s)",
-			currentTimestamp,
-			startTime,
-		)
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+		duration         = tx.Validator.Duration()
+	)
+
+	// Ensure the proposed validator starts after the current time
+	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+		return err
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, tx.Subnet)
@@ -605,7 +566,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
@@ -706,14 +666,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
-	}
-
-	return nil
+	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
 }
 
 // Returns an error if the given tx is invalid.
@@ -758,6 +711,30 @@ func verifyTransferSubnetOwnershipTx(
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+// Ensure the proposed validator starts after the current time
+func checkStakerStartTime(chainTime, stakerTime time.Time) error {
+	if !chainTime.Before(stakerTime) {
+		return fmt.Errorf(
+			"%w: %s >= %s",
+			ErrTimestampNotBeforeStartTime,
+			chainTime,
+			stakerTime,
+		)
+	}
+	return nil
+}
+
+func stakerTooMuchIntheFuture(chainTime, stakerStartTime time.Time) error {
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
+	maxStartTime := chainTime.Add(MaxFutureStartTime)
+	if stakerStartTime.After(maxStartTime) {
+		return ErrFutureStakeTime
 	}
 
 	return nil
