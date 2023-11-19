@@ -580,11 +580,11 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp) // post Durango duration
+		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime()) // pre Durango duration
+		duration = tx.EndTime().Sub(tx.StartTime())
 	}
 
 	// Ensure the proposed validator starts after the current time
