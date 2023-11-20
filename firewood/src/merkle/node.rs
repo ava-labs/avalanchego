@@ -376,6 +376,7 @@ impl NodeType {
         match items.len() {
             EXT_NODE_SIZE => {
                 let mut items = items.into_iter();
+
                 let decoded_key: Vec<u8> = items.next().unwrap().decode()?;
 
                 let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);

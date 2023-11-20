@@ -100,7 +100,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
     ) -> Result<Option<Vec<u8>>, DataStoreError> {
         let hash: [u8; 32] = *self.root_hash()?;
         proof
-            .verify_proof(key, hash)
+            .verify(key, hash)
             .map_err(|_err| DataStoreError::ProofVerificationError)
     }
 

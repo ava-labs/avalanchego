@@ -92,6 +92,8 @@ impl From<DbError> for ProofError {
 /// to a single proof step. If reaches an end step during proof verification,
 /// the hash value will be none, and the encoded value will be the value of the
 /// node.
+
+#[derive(Debug)]
 struct SubProof {
     encoded: Vec<u8>,
     hash: Option<[u8; 32]>,
@@ -103,7 +105,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     /// proof contains invalid trie nodes or the wrong value.
     ///
     /// The generic N represents the storage for the node data
-    pub fn verify_proof<K: AsRef<[u8]>>(
+    pub fn verify<K: AsRef<[u8]>>(
         &self,
         key: K,
         root_hash: [u8; 32],
@@ -113,24 +115,33 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
 
-        loop {
+        let value_node = loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
+
             let node = NodeType::decode(cur_proof.as_ref())?;
             let (sub_proof, traversed_nibbles) = locate_subproof(key_nibbles, node)?;
             key_nibbles = traversed_nibbles;
 
             cur_hash = match sub_proof {
                 // Return when reaching the end of the key.
-                Some(p) if key_nibbles.size_hint().0 == 0 => return Ok(Some(p.encoded)),
+                Some(p) if key_nibbles.size_hint().0 == 0 => break p.encoded,
                 // The trie doesn't contain the key.
                 Some(SubProof {
                     hash: Some(hash), ..
                 }) => hash,
                 _ => return Ok(None),
             };
-        }
+        };
+
+        let value = match NodeType::decode(&value_node) {
+            Ok(NodeType::Branch(branch)) => branch.value().as_ref().map(|v| v.to_vec()),
+            Ok(NodeType::Leaf(leaf)) => leaf.data().to_vec().into(),
+            _ => return Ok(value_node.into()),
+        };
+
+        Ok(value)
     }
 
     pub fn concat_proofs(&mut self, other: Proof<N>) {

@@ -1837,4 +1837,36 @@ mod tests {
         assert_eq!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
         assert_eq!(rangeproof.middle.len(), 0);
     }
+
+    #[test]
+    fn shared_path_proof() {
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let key1 = b"key1";
+        let value1 = b"1";
+        merkle.insert(key1, value1.to_vec(), root).unwrap();
+
+        let key2 = b"key2";
+        let value2 = b"2";
+        merkle.insert(key2, value2.to_vec(), root).unwrap();
+
+        let root_hash = merkle.root_hash(root).unwrap();
+
+        let verified = {
+            let key = key1;
+            let proof = merkle.prove(key, root).unwrap();
+            proof.verify(key, root_hash.0).unwrap()
+        };
+
+        assert_eq!(verified, Some(value1.to_vec()));
+
+        let verified = {
+            let key = key2;
+            let proof = merkle.prove(key, root).unwrap();
+            proof.verify(key, root_hash.0).unwrap()
+        };
+
+        assert_eq!(verified, Some(value2.to_vec()));
+    }
 }
