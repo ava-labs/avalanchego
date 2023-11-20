@@ -154,14 +154,14 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (ms *merkleState) load(hasSynced bool) error {
-	return utils.Err(
+	err := utils.Err(
 		ms.loadMerkleMetadata(),
 		ms.loadCurrentStakers(),
 		ms.loadPendingStakers(),
 		ms.initValidatorSets(),
-
-		ms.logMerkleRoot(!hasSynced), // we already logged if sync has happened
 	)
+	ms.logMerkleRoot() // we already logged if sync has happened
+	return err
 }
 
 // Loads the chain time and last accepted block ID from disk

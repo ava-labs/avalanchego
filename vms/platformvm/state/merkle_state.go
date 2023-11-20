@@ -1307,9 +1307,9 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 	return output, nil
 }
 
-func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
+func (ms *merkleState) newView(currentData, pendingData map[ids.ID]*stakersData) (merkledb.TrieView, error) {
 	batchOps := make([]database.BatchOp, 0)
-	err := utils.Err(
+	if err := utils.Err(
 		ms.writeMetadata(&batchOps),
 		ms.writePermissionedSubnets(&batchOps),
 		ms.writeSubnetOwners(&batchOps),
@@ -1319,24 +1319,23 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writePendingStakers(&batchOps, pendingData),
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
-	)
+	); err != nil {
+		return nil, err
+	}
+
+	return ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
+}
+
+func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
+	view, err := ms.newView(currentData, pendingData)
 	if err != nil {
 		return err
-	}
-
-	if len(batchOps) == 0 {
-		// nothing to commit
-		return nil
-	}
-
-	view, err := ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
-	if err != nil {
-		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
 	if err := view.CommitToDB(context.TODO()); err != nil {
 		return fmt.Errorf("failed committing merkleDB view: %w", err)
 	}
-	return ms.logMerkleRoot(len(batchOps) != 0)
+	ms.logMerkleRoot()
+	return nil
 }
 
 func (ms *merkleState) writeMetadata(batchOps *[]database.BatchOp) error {
@@ -1759,36 +1758,24 @@ func (ms *merkleState) updateValidatorSet(
 	return nil
 }
 
-func (ms *merkleState) logMerkleRoot(hasChanges bool) error {
+func (ms *merkleState) logMerkleRoot() {
 	// get current Height
 	blk, err := ms.GetStatelessBlock(ms.GetLastAccepted())
 	if err != nil {
 		// may happen in tests. Let's just skip
-		return nil
+		ms.ctx.Log.Error("failed to get last accepted block", zap.Error(err))
+		return
 	}
 
-	if !hasChanges {
-		ms.ctx.Log.Info("merkle root",
-			zap.Uint64("height", blk.Height()),
-			zap.Stringer("blkID", blk.ID()),
-			zap.String("merkle root", "no changes to merkle state"),
-		)
-		return nil
-	}
-
-	view, err := ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
+	rootID, err := ms.merkleDB.GetMerkleRoot(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed creating merkleDB view: %w", err)
-	}
-	root, err := view.GetMerkleRoot(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed pulling merkle root: %w", err)
+		ms.ctx.Log.Error("failed to get merkle root", zap.Error(err))
+		return
 	}
 
 	ms.ctx.Log.Info("merkle root",
 		zap.Uint64("height", blk.Height()),
 		zap.Stringer("blkID", blk.ID()),
-		zap.String("merkle root", root.String()),
+		zap.Stringer("merkle root", rootID),
 	)
-	return nil
 }
