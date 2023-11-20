@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Tracks the state of a snowman block
@@ -34,9 +35,8 @@ type snowmanBlock struct {
 	sb snowball.Consensus
 
 	// children is the set of blocks that have been issued that name this block
-	// as their parent. If this node has not had a child issued under it, this value
-	// will be nil
-	children map[ids.ID]Block
+	// as their parent.
+	children set.Set[ids.ID]
 }
 
 func (n *snowmanBlock) AddChild(child Block) {
@@ -46,12 +46,11 @@ func (n *snowmanBlock) AddChild(child Block) {
 	// should be initialized.
 	if n.sb == nil {
 		n.sb = snowball.NewTree(n.params, childID)
-		n.children = make(map[ids.ID]Block)
 	} else {
 		n.sb.Add(childID)
 	}
 
-	n.children[childID] = child
+	n.children.Add(childID)
 }
 
 func (n *snowmanBlock) Verify(ctx context.Context) error {
