@@ -284,7 +284,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Has(gomock.Any()).Return(false)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
-				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {

@@ -39,7 +39,7 @@ func (m *MockMempool) EXPECT() *MockMempoolMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockMempool) Add(arg0 *txs.Tx) error {
+func (m *MockMempool) Add(arg0 []*txs.Tx) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Add", arg0)
 	ret0, _ := ret[0].(error)
@@ -199,13 +199,13 @@ func (mr *MockMempoolMockRecorder) Remove(arg0 interface{}) *gomock.Call {
 }
 
 // RequestBuildBlock mocks base method.
-func (m *MockMempool) RequestBuildBlock(arg0 bool) {
+func (m *MockMempool) RequestBuildBlock() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RequestBuildBlock", arg0)
+	m.ctrl.Call(m, "RequestBuildBlock")
 }
 
 // RequestBuildBlock indicates an expected call of RequestBuildBlock.
-func (mr *MockMempoolMockRecorder) RequestBuildBlock(arg0 interface{}) *gomock.Call {
+func (mr *MockMempoolMockRecorder) RequestBuildBlock() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestBuildBlock", reflect.TypeOf((*MockMempool)(nil).RequestBuildBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestBuildBlock", reflect.TypeOf((*MockMempool)(nil).RequestBuildBlock))
 }

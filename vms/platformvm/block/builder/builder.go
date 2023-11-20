@@ -190,7 +190,7 @@ func (b *builder) setNextBuildBlockTime() {
 
 	if _, err := b.buildBlock(); err == nil {
 		// We can build a block now
-		b.Mempool.RequestBuildBlock(true)
+		b.Mempool.RequestBuildBlock()
 		return
 	}
 

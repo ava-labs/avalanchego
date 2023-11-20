@@ -38,13 +38,13 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
-	err = mpool.Add(tx)
+	err = mpool.Add([]*txs.Tx{tx})
 	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
-	err = mpool.Add(tx)
+	err = mpool.Add([]*txs.Tx{tx})
 	require.NoError(err, "should have added tx to mempool")
 }
 
@@ -66,7 +66,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add([]*txs.Tx{tx}))
 
 		// we can get it
 		require.True(mpool.Has(tx.ID()))
@@ -96,7 +96,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add([]*txs.Tx{tx}))
 	}
 }
 
@@ -120,7 +120,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add([]*txs.Tx{tx}))
 
 		// we can get it
 		require.True(mpool.HasStakerTx())
@@ -161,7 +161,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add([]*txs.Tx{tx}))
 	}
 }
 

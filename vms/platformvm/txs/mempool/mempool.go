@@ -36,6 +36,7 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
+	errClosedMempool        = errors.New("txs not added because mempool is closed")
 	errDuplicateTx          = errors.New("duplicate tx")
 	errTxTooLarge           = errors.New("tx too large")
 	errMempoolFull          = errors.New("mempool is full")
@@ -48,7 +49,7 @@ type Mempool interface {
 	EnableAdding()
 	DisableAdding()
 
-	Add(tx *txs.Tx) error
+	Add(txs []*txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
@@ -68,10 +69,8 @@ type Mempool interface {
 	PeekStakerTx() *txs.Tx
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
-	// built. If [emptyBlockPermitted] is true, the notification will be sent
-	// if there are no transactions in the mempool. Otherwise, a notification
-	// will only be sent if there is at least one transaction in the mempool.
-	RequestBuildBlock(emptyBlockPermitted bool)
+	// built.
+	RequestBuildBlock()
 
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
 	// unissued decision/staker txs. This allows previously dropped txs to be
@@ -154,52 +153,57 @@ func (m *mempool) DisableAdding() {
 	m.dropIncoming = true
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *mempool) Add(txs []*txs.Tx) error {
 	if m.dropIncoming {
-		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
+		return errClosedMempool
 	}
 
-	// Note: a previously dropped tx can be re-added
-	txID := tx.ID()
-	if m.Has(txID) {
-		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+	for _, tx := range txs {
+		// Note: a previously dropped tx can be re-added
+		txID := tx.ID()
+		if m.Has(txID) {
+			return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+		}
+
+		txSize := len(tx.Bytes())
+		if txSize > MaxTxSize {
+			return fmt.Errorf("%w: %s size (%d) > max size (%d)",
+				errTxTooLarge,
+				txID,
+				txSize,
+				MaxTxSize,
+			)
+		}
+		if txSize > m.bytesAvailable {
+			return fmt.Errorf("%w: %s size (%d) > available space (%d)",
+				errMempoolFull,
+				txID,
+				txSize,
+				m.bytesAvailable,
+			)
+		}
+
+		inputs := tx.Unsigned.InputIDs()
+		if m.consumedUTXOs.Overlaps(inputs) {
+			return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
+		}
+
+		if err := tx.Unsigned.Visit(&issuer{
+			m:  m,
+			tx: tx,
+		}); err != nil {
+			return err
+		}
+
+		// Mark these UTXOs as consumed in the mempool
+		m.consumedUTXOs.Union(inputs)
+
+		// An explicitly added tx must not be marked as dropped.
+		m.droppedTxIDs.Evict(txID)
 	}
 
-	txSize := len(tx.Bytes())
-	if txSize > MaxTxSize {
-		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
-			errTxTooLarge,
-			txID,
-			txSize,
-			MaxTxSize,
-		)
-	}
-	if txSize > m.bytesAvailable {
-		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
-			errMempoolFull,
-			txID,
-			txSize,
-			m.bytesAvailable,
-		)
-	}
-
-	inputs := tx.Unsigned.InputIDs()
-	if m.consumedUTXOs.Overlaps(inputs) {
-		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
-	}
-
-	if err := tx.Unsigned.Visit(&issuer{
-		m:  m,
-		tx: tx,
-	}); err != nil {
-		return err
-	}
-
-	// Mark these UTXOs as consumed in the mempool
-	m.consumedUTXOs.Union(inputs)
-
-	// An explicitly added tx must not be marked as dropped.
-	m.droppedTxIDs.Evict(txID)
+	// notify engine that we are ready to build a block
+	m.RequestBuildBlock()
 
 	return nil
 }
@@ -306,11 +310,7 @@ func (m *mempool) deregister(tx *txs.Tx) {
 	m.consumedUTXOs.Difference(inputs)
 }
 
-func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && !m.HasTxs() {
-		return
-	}
-
+func (m *mempool) RequestBuildBlock() {
 	select {
 	case m.toEngine <- common.PendingTxs:
 	default:

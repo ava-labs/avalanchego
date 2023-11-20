@@ -71,18 +71,13 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		return nil
 	}
 
-	for _, tx := range b.Txs() {
-		if err := r.Mempool.Add(tx); err != nil {
-			r.ctx.Log.Debug(
-				"failed to reissue tx",
-				zap.Stringer("txID", tx.ID()),
-				zap.Stringer("blkID", blkID),
-				zap.Error(err),
-			)
-		}
+	if err := r.Mempool.Add(b.Txs()); err != nil {
+		r.ctx.Log.Debug(
+			"failed to reissue txs from rejected block",
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
 	}
-
-	r.Mempool.RequestBuildBlock(false)
 
 	return nil
 }
