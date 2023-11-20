@@ -83,7 +83,7 @@ func TestErrorCode(t *testing.T) {
 		},
 		{
 			name:     "undefined",
-			code:     1,
+			code:     -1,
 			expected: ErrTimeout,
 		},
 	}
