@@ -53,6 +53,7 @@ var (
 
 	errSameRoot      = errors.New("start and end root are the same")
 	errNoNewSentinel = errors.New("there was no updated sentinel node in change list")
+	errDBInvalid     = errors.New("database had an error while committing and may now contain invalid data")
 )
 
 type ChangeProofer interface {
@@ -788,7 +789,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 	if db.invalid {
-		return nil, ErrInvalid
+		return nil, errDBInvalid
 	}
 
 	newView, err := newTrieView(db, db, changes)
@@ -923,9 +924,11 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	switch {
 	case db.closed:
 		return database.ErrClosed
+	case db.invalid:
+		return errDBInvalid
 	case trieToCommit == nil:
 		return nil
-	case db.invalid || trieToCommit.isInvalid():
+	case trieToCommit.isInvalid():
 		return ErrInvalid
 	case trieToCommit.committed:
 		return ErrCommitted
@@ -1087,6 +1090,9 @@ func (db *merkleDB) VerifyChangeProof(
 
 	if db.closed {
 		return database.ErrClosed
+	}
+	if db.invalid {
+		return errDBInvalid
 	}
 
 	if err := verifyAllChangeProofKeyValuesPresent(
@@ -1286,6 +1292,8 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
+	case db.invalid:
+		return nil, errDBInvalid
 	case key == Key{}:
 		return db.sentinelNode, nil
 	case hasValue:
