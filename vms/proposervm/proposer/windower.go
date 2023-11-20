@@ -17,9 +17,9 @@ import (
 
 // Proposer list constants
 const (
-	MaxWindows     = 6
-	WindowDuration = 5 * time.Second
-	MaxDelay       = MaxWindows * WindowDuration
+	WindowDuration   = 5 * time.Second
+	MaxVerifyWindows = 6
+	MaxBuildWindows  = 30
 )
 
 var _ Windower = (*windower)(nil)
@@ -33,6 +33,7 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
+		windows int,
 	) ([]ids.NodeID, error)
 	// Delay returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
@@ -42,6 +43,7 @@ type Windower interface {
 		chainHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
+		windows int,
 	) (time.Duration, error)
 }
 
@@ -64,7 +66,7 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.NodeID, error) {
+func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, windows int) ([]ids.NodeID, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
@@ -101,7 +103,7 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		return nil, err
 	}
 
-	numToSample := MaxWindows
+	numToSample := windows
 	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}
@@ -121,12 +123,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
+func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, windows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return MaxDelay, nil
+		return time.Duration(windows) * WindowDuration, nil
 	}
 
-	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight)
+	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, windows)
 	if err != nil {
 		return 0, err
 	}
