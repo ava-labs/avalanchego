@@ -6,9 +6,16 @@ package block
 import (
 	"context"
 	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+var (
+	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
+	ErrBlockBackfillingNotEnabled    = errors.New("vm does not require block backfilling")
+	ErrStopBlockBackfilling          = errors.New("vm required stopping block backfilling")
+	ErrInternalBlockBackfilling      = errors.New("block backfilling internal error")
+)
 
 // StateSyncableVM contains the functionality to allow VMs to sync to a given
 // state, rather then boostrapping from genesis.
@@ -42,4 +49,22 @@ type StateSyncableVM interface {
 	// Returns database.ErrNotFound if no summary is available at
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error)
+
+	// BackfillBlocksEnabled checks if VM wants to download all blocks from state summary one
+	// down to genesis.
+	//
+	// Returns the ID and height of the block it wants to start backfilling from.
+	// Returns ErrBlockBackfillingNotEnabled if block backfilling is not enabled.
+	// BackfillBlocksEnabled can be called multiple times by the engine
+	BackfillBlocksEnabled(ctx context.Context) (ids.ID, uint64, error)
+
+	// BackfillBlocks passes blocks bytes retrieved via GetAncestors calls to the VM
+	// It's left to the VM the to parse, validate and index the blocks.
+	// BackfillBlocks returns the next block ID to be requested and an error
+	// Returns the ID and height of the block it wants to start backfilling from.
+	// Returns [ErrStopBlockBackfilling] if VM has done backfilling; engine will stop requesting blocks.
+	// Returns [ErrInternalBlockBackfilling] if VM has erred in a way that should make block backfilling fail.
+	// If BackfillBlocks returns any other error, engine will issue a GetAncestor call to a different peer
+	// with the previously requested block ID
+	BackfillBlocks(ctx context.Context, blocks [][]byte) (ids.ID, uint64, error)
 }
