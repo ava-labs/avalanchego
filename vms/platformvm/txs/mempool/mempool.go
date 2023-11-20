@@ -158,6 +158,7 @@ func (m *mempool) Add(txs []*txs.Tx) error {
 		return errClosedMempool
 	}
 
+	addedTx := false
 	for _, tx := range txs {
 		// Note: a previously dropped tx can be re-added
 		txID := tx.ID()
@@ -200,10 +201,14 @@ func (m *mempool) Add(txs []*txs.Tx) error {
 
 		// An explicitly added tx must not be marked as dropped.
 		m.droppedTxIDs.Evict(txID)
+
+		addedTx = true
 	}
 
-	// notify engine that we are ready to build a block
-	m.RequestBuildBlock()
+	// notify engine only if we are ready to build a block
+	if addedTx {
+		m.RequestBuildBlock()
+	}
 
 	return nil
 }
