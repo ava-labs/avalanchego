@@ -153,6 +153,7 @@ func (ts *Topological) Initialize(
 	ts.preference = lastAcceptedID
 
 	// Initially set the metrics for the last accepted block.
+	ts.Height.Verified(ts.lastAcceptedHeight)
 	ts.Height.Accepted(ts.lastAcceptedHeight)
 	ts.Timestamp.Accepted(lastAcceptedTime)
 
@@ -165,8 +166,10 @@ func (ts *Topological) NumProcessing() int {
 
 func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	blkID := blk.ID()
+	height := blk.Height()
 	ts.ctx.Log.Verbo("adding block",
 		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", height),
 	)
 
 	// Make sure a block is not inserted twice. This enforces the invariant that
@@ -178,6 +181,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		return errDuplicateAdd
 	}
 
+	ts.Height.Verified(height)
 	ts.Latency.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
@@ -185,6 +189,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	if !ok {
 		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
 			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", height),
 			zap.Stringer("parentID", parentID),
 		)
 
@@ -208,21 +213,14 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 
 	// If we are extending the tail, this is the new tail
 	if ts.preference == parentID {
-		if err := smBlk.Verify(ctx); err != nil {
-			ts.ctx.Log.Warn("failed to verify preferred block",
-				zap.Stringer("blkID", blkID),
-				zap.Stringer("parentID", parentID),
-				zap.Error(err),
-			)
-		} else {
-			ts.preference = blkID
-			ts.preferredIDs.Add(blkID)
-			ts.preferredHeights[blk.Height()] = blkID
-		}
+		ts.preference = blkID
+		ts.preferredIDs.Add(blkID)
+		ts.preferredHeights[height] = blkID
 	}
 
 	ts.ctx.Log.Verbo("added block",
 		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", height),
 		zap.Stringer("parentID", parentID),
 	)
 	return nil
@@ -642,8 +640,10 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 		return err
 	}
 
+	height := child.Height()
 	ts.ctx.Log.Trace("accepting block",
 		zap.Stringer("blkID", pref),
+		zap.Uint64("height", height),
 	)
 	if err := child.Accept(ctx); err != nil {
 		return err
@@ -651,14 +651,14 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.lastAcceptedID = pref
-	ts.lastAcceptedHeight = child.Height()
+	ts.lastAcceptedHeight = height
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
-	delete(ts.preferredHeights, ts.lastAcceptedHeight)
+	delete(ts.preferredHeights, height)
 
 	ts.Latency.Accepted(pref, ts.pollNumber, len(bytes))
-	ts.Height.Accepted(ts.lastAcceptedHeight)
+	ts.Height.Accepted(height)
 	ts.Timestamp.Accepted(child.Timestamp())
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
@@ -673,8 +673,9 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 
 		ts.ctx.Log.Trace("rejecting block",
 			zap.String("reason", "conflict with accepted block"),
-			zap.Stringer("rejectedID", childID),
-			zap.Stringer("conflictedID", pref),
+			zap.Stringer("blkID", childID),
+			zap.Uint64("height", child.Height()),
+			zap.Stringer("conflictID", pref),
 		)
 		if err := child.Reject(ctx); err != nil {
 			return err
@@ -704,6 +705,12 @@ func (ts *Topological) rejectTransitively(ctx context.Context, rejected []ids.ID
 		delete(ts.blocks, rejectedID)
 
 		for childID, child := range rejectedNode.children {
+			ts.ctx.Log.Trace("rejecting block",
+				zap.String("reason", "rejected ancestor"),
+				zap.Stringer("blkID", childID),
+				zap.Uint64("height", child.Height()),
+				zap.Stringer("parentID", rejectedID),
+			)
 			if err := child.Reject(ctx); err != nil {
 				return err
 			}
