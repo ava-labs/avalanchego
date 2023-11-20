@@ -17,9 +17,13 @@ import (
 
 // Proposer list constants
 const (
-	WindowDuration   = 5 * time.Second
-	MaxVerifyWindows = 6
+	WindowDuration = 5 * time.Second
+
+	MaxVerifyWindows  = 6
+	MaxVerifyDuration = MaxVerifyWindows * WindowDuration
+
 	MaxBuildWindows  = 30
+	MaxBuildDuration = MaxBuildWindows * WindowDuration
 )
 
 var _ Windower = (*windower)(nil)
