@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -61,7 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	blockbuilder.Network
+	network.Network
 	validators.State
 
 	metrics            metrics.Metrics
@@ -138,7 +139,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		&vm.Config,
+		vm.Config.Validators,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
@@ -190,7 +191,7 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
-	vm.Network = blockbuilder.NewNetwork(
+	vm.Network = network.New(
 		txExecutorBackend.Ctx,
 		vm.manager,
 		mempool,

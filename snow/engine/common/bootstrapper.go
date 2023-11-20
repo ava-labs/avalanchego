@@ -19,10 +19,6 @@ const (
 	// logs
 	StatusUpdateFrequency = 5000
 
-	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
-	// sent but not responded to/failed
-	MaxOutstandingGetAncestorsRequests = 10
-
 	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	MaxOutstandingBroadcastRequests = 50
@@ -35,7 +31,7 @@ type Bootstrapper interface {
 	AcceptedHandler
 	Haltable
 	Startup(context.Context) error
-	Restart(ctx context.Context, reset bool) error
+	Restart(ctx context.Context) error
 }
 
 // It collects mechanisms common to both snowman and avalanche bootstrappers
@@ -45,9 +41,6 @@ type bootstrapper struct {
 
 	minority smbootstrapper.Poll
 	majority smbootstrapper.Poll
-
-	// number of times the bootstrap has been attempted
-	bootstrapAttempts int
 }
 
 func NewCommonBootstrapper(config Config) Bootstrapper {
@@ -150,7 +143,6 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 		MaxOutstandingBroadcastRequests,
 	)
 
-	b.bootstrapAttempts++
 	if accepted, finalized := b.majority.Result(ctx); finalized {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
@@ -162,22 +154,9 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	return b.sendMessagesOrFinish(ctx)
 }
 
-func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
-	// resets the attempts when we're pulling blocks/vertices we don't want to
-	// fail the bootstrap at that stage
-	if reset {
-		b.Ctx.Log.Debug("Checking for new frontiers")
-
-		b.Config.SharedCfg.Restarted = true
-		b.bootstrapAttempts = 0
-	}
-
-	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
-		b.Ctx.Log.Debug("check internet connection",
-			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
-		)
-	}
-
+func (b *bootstrapper) Restart(ctx context.Context) error {
+	b.Ctx.Log.Debug("Checking for new frontiers")
+	b.Config.SharedCfg.Restarted = true
 	return b.Startup(ctx)
 }
 
@@ -211,9 +190,8 @@ func (b *bootstrapper) sendMessagesOrFinish(ctx context.Context) error {
 		b.Ctx.Log.Debug("restarting bootstrap",
 			zap.String("reason", "no blocks accepted"),
 			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
-			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
 		)
-		return b.Restart(ctx, false /*=reset*/)
+		return b.Startup(ctx)
 	}
 
 	if !b.Config.SharedCfg.Restarted {
