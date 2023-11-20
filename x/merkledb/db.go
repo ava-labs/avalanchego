@@ -293,14 +293,6 @@ func newDatabase(
 	return trieDB, err
 }
 
-// Rebuild deletes every intermediate node and rebuilds them by re-adding every key/value.
-// TODO: make this more efficient by only clearing out the stale portions of the trie.
-func (db *merkleDB) Rebuild(ctx context.Context, batchSize int) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-	return db.rebuild(ctx, batchSize)
-}
-
 // rebuild deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, batchSize int) error {
