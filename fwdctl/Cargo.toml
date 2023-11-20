@@ -16,3 +16,12 @@ futures-util = "0.3.29"
 assert_cmd = "2.0.7"
 predicates = "3.0.1"
 serial_test = "2.0.0"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"

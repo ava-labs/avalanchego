@@ -23,7 +23,7 @@ pub struct Options {
     pub db: String,
 }
 
-pub async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("root hash {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
@@ -32,6 +32,6 @@ pub async fn run(opts: &Options) -> Result<(), api::Error> {
     let db = Db::new(opts.db.clone(), &cfg.build()).await?;
 
     let root = db.root_hash().await?;
-    println!("{:X?}", root);
+    println!("{root:X?}");
     Ok(())
 }

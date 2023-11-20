@@ -245,7 +245,7 @@ pub struct Options {
     max_revisions: u32,
 }
 
-pub fn initialize_db_config(opts: &Options) -> DbConfig {
+pub(super) const fn initialize_db_config(opts: &Options) -> DbConfig {
     DbConfig {
         meta_ncached_pages: opts.meta_ncached_pages,
         meta_ncached_files: opts.meta_ncached_files,
@@ -279,7 +279,7 @@ pub fn initialize_db_config(opts: &Options) -> DbConfig {
     }
 }
 
-pub async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     let db_config = initialize_db_config(opts);
     log::debug!("database configuration parameters: \n{:?}\n", db_config);
 

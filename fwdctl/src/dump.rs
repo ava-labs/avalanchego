@@ -23,7 +23,7 @@ pub struct Options {
     pub db: String,
 }
 
-pub async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("dump database {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
@@ -37,7 +37,7 @@ pub async fn run(opts: &Options) -> Result<(), api::Error> {
         match stream.next().await {
             None => break,
             Some(Ok((key, value))) => {
-                println!("'{}': '{}'", u8_to_string(&key), u8_to_string(&value))
+                println!("'{}': '{}'", u8_to_string(&key), u8_to_string(&value));
             }
             Some(Err(e)) => return Err(e),
         }

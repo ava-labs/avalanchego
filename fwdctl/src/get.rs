@@ -26,7 +26,7 @@ pub struct Options {
     pub db: String,
 }
 
-pub async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("get key value pair {:?}", opts);
     let cfg = DbConfig::builder()
         .truncate(false)
@@ -39,7 +39,7 @@ pub async fn run(opts: &Options) -> Result<(), api::Error> {
     match rev.val(opts.key.as_bytes()).await {
         Ok(Some(val)) => {
             let s = String::from_utf8_lossy(val.as_ref());
-            println!("{:?}", s);
+            println!("{s:?}");
             Ok(())
         }
         Ok(None) => {
