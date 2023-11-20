@@ -32,11 +32,13 @@ pub struct Db<T> {
 impl From<DbError> for api::Error {
     fn from(value: DbError) -> Self {
         match value {
-            DbError::InvalidParams => api::Error::InternalError(value.into()),
-            DbError::Merkle(e) => api::Error::InternalError(e.into()),
+            DbError::InvalidParams => api::Error::InternalError(Box::new(value)),
+            DbError::Merkle(e) => api::Error::InternalError(Box::new(e)),
             DbError::System(e) => api::Error::IO(e.into()),
-            DbError::KeyNotFound | DbError::CreateError => api::Error::InternalError(value.into()),
-            DbError::Shale(e) => api::Error::InternalError(e.into()),
+            DbError::KeyNotFound | DbError::CreateError => {
+                api::Error::InternalError(Box::new(value))
+            }
+            DbError::Shale(e) => api::Error::InternalError(Box::new(e)),
             DbError::IO(e) => api::Error::IO(e),
             DbError::InvalidProposal => api::Error::InvalidProposal,
         }

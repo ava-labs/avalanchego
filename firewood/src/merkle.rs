@@ -1,6 +1,5 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
-
 use crate::shale::{self, disk_address::DiskAddress, ObjWriteError, ShaleError, ShaleStore};
 use crate::v2::api;
 use crate::{nibbles::Nibbles, v2::api::Proof};
@@ -18,6 +17,7 @@ use thiserror::Error;
 
 mod node;
 mod partial_path;
+pub(super) mod range_proof;
 mod trie_hash;
 
 pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
@@ -1243,7 +1243,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
                 let root_node = self
                     .merkle
                     .get_node(self.merkle_root)
-                    .map_err(|e| api::Error::InternalError(e.into()))?;
+                    .map_err(|e| api::Error::InternalError(Box::new(e)))?;
                 let mut last_node = root_node;
                 let mut parents = vec![];
                 let leaf = loop {
@@ -1272,7 +1272,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
                             let next = self
                                 .merkle
                                 .get_node(leftmost_address)
-                                .map_err(|e| api::Error::InternalError(e.into()))?;
+                                .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
                             parents.push((last_node, leftmost_position as u8));
 
@@ -1295,12 +1295,12 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
                 let root_node = self
                     .merkle
                     .get_node(self.merkle_root)
-                    .map_err(|e| api::Error::InternalError(e.into()))?;
+                    .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
                 let (found_node, parents) = self
                     .merkle
                     .get_node_and_parents_by_key(root_node, &key)
-                    .map_err(|e| api::Error::InternalError(e.into()))?;
+                    .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
                 let Some(last_node) = found_node else {
                     return Poll::Ready(None);
@@ -1343,7 +1343,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
                         let current_node = self
                             .merkle
                             .get_node(child_address)
-                            .map_err(|e| api::Error::InternalError(e.into()))?;
+                            .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
                         let found_key = key_from_parents(&parents);
 
@@ -1389,7 +1389,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
                                         .merkle
                                         .get_node(found_address)
                                         .map(|node| (node, None))
-                                        .map_err(|e| api::Error::InternalError(e.into()))?;
+                                        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
                                     // stop_descending if:
                                     //  - on a branch and it has a value; OR
@@ -1569,9 +1569,9 @@ mod tests {
     use std::sync::Arc;
     use test_case::test_case;
 
-    #[test_case(vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
-    #[test_case(vec![0xc0, 0xff], vec![0xc, 0x0, 0xf, 0xf])]
-    fn to_nibbles(bytes: Vec<u8>, nibbles: Vec<u8>) {
+    #[test_case(vec![0x12, 0x34, 0x56], &[0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
+    #[test_case(vec![0xc0, 0xff], &[0xc, 0x0, 0xf, 0xf])]
+    fn to_nibbles(bytes: Vec<u8>, nibbles: &[u8]) {
         let n: Vec<_> = bytes.into_iter().flat_map(to_nibble_array).collect();
         assert_eq!(n, nibbles);
     }
@@ -1688,7 +1688,7 @@ mod tests {
         let root = merkle.init_root().unwrap();
         let mut it = merkle.get_iter(Some(b"x"), root).unwrap();
         let next = it.next().await;
-        assert!(next.is_none())
+        assert!(next.is_none());
     }
 
     #[test_case(Some(&[u8::MIN]); "Starting at first key")]
@@ -1747,7 +1747,7 @@ mod tests {
 
     #[test]
     fn remove_many() {
-        let mut merkle = create_test_merkle();
+        let mut merkle: Merkle<CompactSpace<Node, DynamicMem>> = create_test_merkle();
         let root = merkle.init_root().unwrap();
 
         // insert values
@@ -1774,5 +1774,67 @@ mod tests {
             let fetched_val = merkle.get(key, root).unwrap();
             assert!(fetched_val.is_none());
         }
+    }
+
+    #[tokio::test]
+    async fn empty_range_proof() {
+        let merkle: Merkle<CompactSpace<Node, DynamicMem>> = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        assert!(merkle
+            .range_proof::<&[u8]>(root, None, None, None)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn full_range_proof() {
+        let mut merkle: Merkle<CompactSpace<Node, DynamicMem>> = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        // insert values
+        for key_val in u8::MIN..=u8::MAX {
+            let key = &[key_val];
+            let val = &[key_val];
+
+            merkle.insert(key, val.to_vec(), root).unwrap();
+        }
+        merkle.flush_dirty();
+
+        let rangeproof = merkle
+            .range_proof::<&[u8]>(root, None, None, None)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(rangeproof.middle.len(), (u8::MAX - 1).into());
+        assert_ne!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
+        let left_proof = merkle.prove([u8::MIN], root).unwrap();
+        let right_proof = merkle.prove([u8::MAX], root).unwrap();
+        assert_eq!(rangeproof.first_key_proof.0, left_proof.0);
+        assert_eq!(rangeproof.last_key_proof.0, right_proof.0);
+    }
+
+    #[tokio::test]
+    async fn single_value_range_proof() {
+        const RANDOM_KEY: u8 = 42;
+
+        let mut merkle: Merkle<CompactSpace<Node, DynamicMem>> = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        // insert values
+        for key_val in u8::MIN..=u8::MAX {
+            let key = &[key_val];
+            let val = &[key_val];
+
+            merkle.insert(key, val.to_vec(), root).unwrap();
+        }
+        merkle.flush_dirty();
+
+        let rangeproof = merkle
+            .range_proof(root, Some([RANDOM_KEY]), None, Some(1))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
+        assert_eq!(rangeproof.middle.len(), 0);
     }
 }

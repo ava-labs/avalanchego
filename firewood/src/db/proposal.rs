@@ -295,12 +295,12 @@ impl api::DbView for Proposal {
             .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
     }
 
-    async fn range_proof<K, V, N>(
+    async fn range_proof<K, V>(
         &self,
         _first_key: Option<K>,
         _last_key: Option<K>,
-        _limit: usize,
-    ) -> Result<Option<api::RangeProof<K, V, N>>, api::Error>
+        _limit: Option<usize>,
+    ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error>
     where
         K: api::KeyType,
     {

@@ -71,22 +71,25 @@ pub enum Error {
     InvalidProposal,
 
     #[error("Internal error")]
-    InternalError(Box<dyn std::error::Error>),
+    InternalError(Box<dyn std::error::Error + Send>),
+
+    #[error("Range too small")]
+    RangeTooSmall,
 }
 
 /// A range proof, consisting of a proof of the first key and the last key,
 /// and a vector of all key/value pairs
 #[derive(Debug)]
-pub struct RangeProof<K, V, N> {
-    pub first_key: Proof<N>,
-    pub last_key: Proof<N>,
+pub struct RangeProof<K, V> {
+    pub first_key_proof: Proof<Vec<u8>>,
+    pub last_key_proof: Proof<Vec<u8>>,
     pub middle: Vec<(K, V)>,
 }
 
 /// A proof that a single key is present
 ///
 /// The generic N represents the storage for the node data
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Proof<N>(pub HashMap<HashKey, N>);
 
 /// The database interface, which includes a type for a static view of
@@ -152,12 +155,12 @@ pub trait DbView {
     /// * `last_key` - If None, continue to the end of the database
     /// * `limit` - The maximum number of keys in the range proof
     ///
-    async fn range_proof<K: KeyType, V, N>(
+    async fn range_proof<K: KeyType, V: Send + Sync>(
         &self,
         first_key: Option<K>,
         last_key: Option<K>,
-        limit: usize,
-    ) -> Result<Option<RangeProof<K, V, N>>, Error>;
+        limit: Option<usize>,
+    ) -> Result<Option<RangeProof<Vec<u8>, Vec<u8>>>, Error>;
 }
 
 /// A proposal for a new revision of the database.
