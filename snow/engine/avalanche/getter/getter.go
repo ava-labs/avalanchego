@@ -73,7 +73,7 @@ func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[uint64]) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -83,6 +83,8 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
+// TODO: Remove support for GetAcceptedFrontier messages after v1.11.x is
+// activated.
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge(ctx)
 	// Since all the DAGs are linearized, we only need to return the stop
@@ -93,9 +95,10 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
+// TODO: Remove support for GetAccepted messages after v1.11.x is activated.
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	acceptedVtxIDs := make([]ids.ID, 0, containerIDs.Len())
+	for vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
