@@ -117,18 +117,19 @@ The focus of this milestone will be to support synchronization to other
 instances to replicate the state. A synchronization library should also
 be developed for this milestone.
 
-- [ ] :runner: Add support for Ava Labs generic test tool via grpc client
+- [x] Migrate to a fully async interface
 - [ ] :runner: Pluggable encoding for nodes, for optional compatibility with MerkleDB
-- [ ] Support replicating the full state with corresponding range proofs that
+- [ ] :runner: MerkleDB root hash in parity for seamless transition between MerkleDB
+      and Firewood.
+- [ ] :runner: Support replicating the full state with corresponding range proofs that
       verify the correctness of the data.
-- [ ] Support replicating the delta state from the last sync point with
-      corresponding range proofs that verify the correctness of the data.
+- [ ] Pluggable IO subsystem (tokio\_uring, monoio, etc)
+- [ ] Add metric reporting
 - [ ] Enforce limits on the size of the range proof as well as keys to make
       synchronization easier for clients.
-- [ ] MerkleDB root hash in parity for seamless transition between MerkleDB
-      and Firewood.
-- [ ] Add metric reporting
-- [ ] Migrate to a fully async interface, consider tokio_uring, monoio, etc
+- [ ] Add support for Ava Labs generic test tool via grpc client
+- [ ] Support replicating the delta state from the last sync point with
+      corresponding change proofs that verify the correctness of the data.
 - [ ] Refactor `Shale` to be more idiomatic, consider rearchitecting it
 
 ## Build
