@@ -19,10 +19,10 @@ import (
 const (
 	WindowDuration = 5 * time.Second
 
-	MaxVerifyWindows  = 6
+	MaxVerifyWindows  = 6 // 30 seconds
 	MaxVerifyDuration = MaxVerifyWindows * WindowDuration
 
-	MaxBuildWindows  = 30
+	MaxBuildWindows  = 36 // 3 minutes
 	MaxBuildDuration = MaxBuildWindows * WindowDuration
 )
 
@@ -37,7 +37,7 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-		windows int,
+		maxWindows int,
 	) ([]ids.NodeID, error)
 	// Delay returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
@@ -47,7 +47,7 @@ type Windower interface {
 		chainHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
-		windows int,
+		maxWindows int,
 	) (time.Duration, error)
 }
 
@@ -70,7 +70,7 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, windows int) ([]ids.NodeID, error) {
+func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
@@ -107,7 +107,7 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		return nil, err
 	}
 
-	numToSample := windows
+	numToSample := maxWindows
 	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}
@@ -127,12 +127,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, windows int) (time.Duration, error) {
+func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return time.Duration(windows) * WindowDuration, nil
+		return time.Duration(maxWindows) * WindowDuration, nil
 	}
 
-	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, windows)
+	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, maxWindows)
 	if err != nil {
 		return 0, err
 	}
