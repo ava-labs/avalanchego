@@ -56,11 +56,8 @@ type Topological struct {
 	// instances
 	params snowball.Parameters
 
-	// head is the last accepted block
-	head ids.ID
-
-	// height is the height of the last accepted block
-	height uint64
+	lastAcceptedID     ids.ID
+	lastAcceptedHeight uint64
 
 	// blocks stores the last accepted block and all the pending blocks
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
@@ -72,19 +69,19 @@ type Topological struct {
 	// that height.
 	preferredHeights map[uint64]ids.ID // height -> blockID
 
-	// tail is the preferred block with no children
-	tail ids.ID
+	// preference is the highest preferred and verified block
+	preference ids.ID
 
 	// Used in [calculateInDegree] and.
 	// Should only be accessed in that method.
-	// We use this one instance of set.Set instead of creating a
-	// new set.Set during each call to [calculateInDegree].
+	// We use this one instance of set.Set instead of creating a new set.Set
+	// during each call to [calculateInDegree].
 	leaves set.Set[ids.ID]
 
 	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
-	// We use this one map instead of creating a new map
-	// during each call to [calculateInDegree].
+	// We use this one map instead of creating a new map during each call to
+	// [calculateInDegree].
 	kahnNodes map[ids.ID]kahnNode
 }
 
@@ -108,9 +105,9 @@ type votes struct {
 func (ts *Topological) Initialize(
 	ctx *snow.ConsensusContext,
 	params snowball.Parameters,
-	rootID ids.ID,
-	rootHeight uint64,
-	rootTime time.Time,
+	lastAcceptedID ids.ID,
+	lastAcceptedHeight uint64,
+	lastAcceptedTime time.Time,
 ) error {
 	if err := params.Verify(); err != nil {
 		return err
@@ -144,17 +141,20 @@ func (ts *Topological) Initialize(
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
 	ts.params = params
-	ts.head = rootID
-	ts.height = rootHeight
+	ts.lastAcceptedID = lastAcceptedID
+	ts.lastAcceptedHeight = lastAcceptedHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
-		rootID: {params: ts.params},
+		lastAcceptedID: {
+			params:   ts.params,
+			verified: true,
+		},
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
-	ts.tail = rootID
+	ts.preference = lastAcceptedID
 
 	// Initially set the metrics for the last accepted block.
-	ts.Height.Accepted(ts.height)
-	ts.Timestamp.Accepted(rootTime)
+	ts.Height.Accepted(ts.lastAcceptedHeight)
+	ts.Timestamp.Accepted(lastAcceptedTime)
 
 	return nil
 }
@@ -200,16 +200,25 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 
 	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
-	ts.blocks[blkID] = &snowmanBlock{
+	smBlk := &snowmanBlock{
 		params: ts.params,
 		blk:    blk,
 	}
+	ts.blocks[blkID] = smBlk
 
 	// If we are extending the tail, this is the new tail
-	if ts.tail == parentID {
-		ts.tail = blkID
-		ts.preferredIDs.Add(blkID)
-		ts.preferredHeights[blk.Height()] = blkID
+	if ts.preference == parentID {
+		if err := smBlk.Verify(ctx); err != nil {
+			ts.ctx.Log.Warn("failed to verify preferred block",
+				zap.Stringer("blkID", blkID),
+				zap.Stringer("parentID", parentID),
+				zap.Error(err),
+			)
+		} else {
+			ts.preference = blkID
+			ts.preferredIDs.Add(blkID)
+			ts.preferredHeights[blk.Height()] = blkID
+		}
 	}
 
 	ts.ctx.Log.Verbo("added block",
@@ -226,13 +235,13 @@ func (ts *Topological) Decided(blk Block) bool {
 	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	return blk.Status() == choices.Processing && blk.Height() <= ts.height
+	return blk.Status() == choices.Processing && blk.Height() <= ts.lastAcceptedHeight
 }
 
 func (ts *Topological) Processing(blkID ids.ID) bool {
 	// The last accepted block is in the blocks map, so we first must ensure the
 	// requested block isn't the last accepted block.
-	if blkID == ts.head {
+	if blkID == ts.lastAcceptedID {
 		return false
 	}
 	// If the block is in the map of current blocks and not the head, then the
@@ -250,16 +259,16 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 }
 
 func (ts *Topological) LastAccepted() (ids.ID, uint64) {
-	return ts.head, ts.height
+	return ts.lastAcceptedID, ts.lastAcceptedHeight
 }
 
 func (ts *Topological) Preference() ids.ID {
-	return ts.tail
+	return ts.preference
 }
 
 func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
-	if height == ts.height {
-		return ts.head, true
+	if height == ts.lastAcceptedHeight {
+		return ts.lastAcceptedID, true
 	}
 	blkID, ok := ts.preferredHeights[height]
 	return blkID, ok
@@ -325,8 +334,8 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	ts.preferredIDs.Clear()
 	maps.Clear(ts.preferredHeights)
 
-	ts.tail = preferred
-	startBlock := ts.blocks[ts.tail]
+	ts.preference = preferred
+	startBlock := ts.blocks[ts.preference]
 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
@@ -339,13 +348,13 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	// Traverse from the preferred ID to the preferred child until there are no
 	// children.
 	for block := startBlock; block.sb != nil; {
-		ts.tail = block.sb.Preference()
-		ts.preferredIDs.Add(ts.tail)
-		block = ts.blocks[ts.tail]
+		ts.preference = block.sb.Preference()
+		ts.preferredIDs.Add(ts.preference)
+		block = ts.blocks[ts.preference]
 		// Invariant: Because the prior block had an initialized snowball
 		// instance, it must have a processing child. This guarantees that
 		// block.blk is non-nil here.
-		ts.preferredHeights[block.blk.Height()] = ts.tail
+		ts.preferredHeights[block.blk.Height()] = ts.preference
 	}
 	return nil
 }
@@ -488,14 +497,12 @@ func (ts *Topological) pushVotes() []votes {
 	return voteStack
 }
 
-// apply votes to the branch that received an Alpha threshold and returns the
-// next preferred block after the last preferred block that received an Alpha
-// threshold.
+// apply votes to the branch that received an Alpha threshold.
 func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
-		headBlock := ts.blocks[ts.head]
+		headBlock := ts.blocks[ts.lastAcceptedID]
 		headBlock.shouldFalter = true
 
 		if numProcessing := len(ts.blocks) - 1; numProcessing > 0 {
@@ -504,11 +511,11 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 			)
 			ts.Polls.Failed()
 		}
-		return ts.tail, nil
+		return ts.preference, nil
 	}
 
 	// keep track of the new preferred block
-	newPreferred := ts.head
+	newPreferred := ts.lastAcceptedID
 	onPreferredBranch := true
 	pollSuccessful := false
 	for len(voteStack) > 0 {
@@ -545,7 +552,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		pollSuccessful = parentBlock.sb.RecordPoll(vote.votes) || pollSuccessful
 
 		// Only accept when you are finalized and the head.
-		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
+		if parentBlock.verified && parentBlock.sb.Finalized() && ts.lastAcceptedID == vote.parentID {
 			if err := ts.acceptPreferredChild(ctx, parentBlock); err != nil {
 				return ids.ID{}, err
 			}
@@ -556,13 +563,6 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 			delete(ts.blocks, vote.parentID)
 		}
 
-		// If we are on the preferred branch, then the parent's preference is
-		// the next block on the preferred branch.
-		parentPreference := parentBlock.sb.Preference()
-		if onPreferredBranch {
-			newPreferred = parentPreference
-		}
-
 		// Get the ID of the child that is having a RecordPoll called. All other
 		// children will need to have their confidence reset. If there isn't a
 		// child having RecordPoll called, then the nextID will default to the
@@ -571,10 +571,6 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		if len(voteStack) > 0 {
 			nextID = voteStack[newStackSize-1].parentID
 		}
-
-		// If we are on the preferred branch and the nextID is the preference of
-		// the snowball instance, then we are following the preferred branch.
-		onPreferredBranch = onPreferredBranch && nextID == parentPreference
 
 		// If there wasn't an alpha threshold on the branch (either on this vote
 		// or a past transitive vote), I should falter now.
@@ -603,6 +599,18 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 				// must be reset first.
 				childBlock.shouldFalter = true
 			}
+		}
+
+		// If we are on the preferred branch, then the parent's preference is
+		// the next block on the preferred branch.
+		parentPreference := parentBlock.sb.Preference()
+		if onPreferredBranch {
+			newPreferred = parentPreference
+
+			// If we are on the preferred branch and the nextID is the
+			// preference of the snowball instance, then we are following the
+			// preferred branch.
+			onPreferredBranch = nextID == parentPreference
 		}
 	}
 
@@ -642,15 +650,15 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	}
 
 	// Because this is the newest accepted block, this is the new head.
-	ts.head = pref
-	ts.height = child.Height()
+	ts.lastAcceptedID = pref
+	ts.lastAcceptedHeight = child.Height()
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
-	delete(ts.preferredHeights, ts.height)
+	delete(ts.preferredHeights, ts.lastAcceptedHeight)
 
 	ts.Latency.Accepted(pref, ts.pollNumber, len(bytes))
-	ts.Height.Accepted(ts.height)
+	ts.Height.Accepted(ts.lastAcceptedHeight)
 	ts.Timestamp.Accepted(child.Timestamp())
 
 	// Because ts.blocks contains the last accepted block, we don't delete the

@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -16,6 +18,11 @@ type snowmanBlock struct {
 
 	// block that this node contains. For the genesis, this value will be nil
 	blk Block
+
+	// verified is set to true when it is safe to mark this block as preferred.
+	// If consensus implies that this block should be preferred and it hasn't
+	// been verified, the block should be verified.
+	verified bool
 
 	// shouldFalter is set to true if this node, and all its descendants received
 	// less than Alpha votes
@@ -45,6 +52,16 @@ func (n *snowmanBlock) AddChild(child Block) {
 	}
 
 	n.children[childID] = child
+}
+
+func (n *snowmanBlock) Verify(ctx context.Context) error {
+	if n.verified {
+		return nil
+	}
+
+	err := n.blk.Verify(ctx)
+	n.verified = err == nil
+	return err
 }
 
 func (n *snowmanBlock) Accepted() bool {
