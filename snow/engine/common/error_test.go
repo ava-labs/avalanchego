@@ -92,7 +92,7 @@ func TestErrorCode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			require.Error(tt.expected, &AppError{Code: tt.code})
+			require.ErrorIs(tt.expected, &AppError{Code: tt.code})
 		})
 	}
 }
