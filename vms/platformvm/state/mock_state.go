@@ -22,6 +22,7 @@ import (
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -602,6 +603,21 @@ func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time
 func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
+}
+
+// NewView mocks base method.
+func (m *MockState) NewView() (merkledb.TrieView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewView")
+	ret0, _ := ret[0].(merkledb.TrieView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewView indicates an expected call of NewView.
+func (mr *MockStateMockRecorder) NewView() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockState)(nil).NewView))
 }
 
 // PruneAndIndex mocks base method.

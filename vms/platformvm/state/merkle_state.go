@@ -1307,6 +1307,19 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 	return output, nil
 }
 
+func (ms *merkleState) NewView() (merkledb.TrieView, error) {
+	// TODO reduce unneeded vars here.
+	currentData, _, _, _, err := ms.processCurrentStakers()
+	if err != nil {
+		return nil, err
+	}
+	pendingData, err := ms.processPendingStakers()
+	if err != nil {
+		return nil, err
+	}
+	return ms.newView(currentData, pendingData)
+}
+
 func (ms *merkleState) newView(currentData, pendingData map[ids.ID]*stakersData) (merkledb.TrieView, error) {
 	batchOps := make([]database.BatchOp, 0)
 	if err := utils.Err(

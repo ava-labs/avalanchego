@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -129,6 +130,8 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
+
+	NewView() (merkledb.TrieView, error)
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -702,6 +705,10 @@ func newState(
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}, nil
+}
+
+func (s *state) NewView() (merkledb.TrieView, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
