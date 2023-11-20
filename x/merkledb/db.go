@@ -964,13 +964,13 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		if shouldAddIntermediate {
 			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
 				nodesSpan.End()
-				db.invalidateDb()
+				db.invalidateDB()
 				return err
 			}
 		} else if shouldDeleteIntermediate {
 			if err := db.intermediateNodeDB.Delete(key); err != nil {
 				nodesSpan.End()
-				db.invalidateDb()
+				db.invalidateDB()
 				return err
 			}
 		}
@@ -987,7 +987,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
-		db.invalidateDb()
+		db.invalidateDB()
 		return err
 	}
 
@@ -1158,7 +1158,7 @@ func (db *merkleDB) VerifyChangeProof(
 	return nil
 }
 
-func (db *merkleDB) invalidateDb() {
+func (db *merkleDB) invalidateDB() {
 	db.invalid = true
 	db.invalidateChildrenExcept(nil)
 }
