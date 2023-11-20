@@ -168,9 +168,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	state, err := newMerkleState(
 		db,
 		metrics.Noop,
-		&config.Config{
-			Validators: validators.NewManager(),
-		},
+		validators.NewManager(),
 		execCfg,
 		&snow.Context{
 			Log: logging.NoLog{},
