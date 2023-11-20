@@ -4,17 +4,24 @@
 package executor
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-var _ Manager = (*manager)(nil)
+var (
+	_ Manager = (*manager)(nil)
+
+	ErrChainNotSynced = errors.New("chain not synced")
+)
 
 type Manager interface {
 	state.Versions
@@ -28,6 +35,10 @@ type Manager interface {
 	GetBlock(blkID ids.ID) (snowman.Block, error)
 	GetStatelessBlock(blkID ids.ID) (block.Block, error)
 	NewBlock(block.Block) snowman.Block
+
+	// VerifyTx verifies that the transaction can be issued based on the currently
+	// preferred state. This should *not* be used to verify transactions in a block.
+	VerifyTx(tx *txs.Tx) error
 }
 
 func NewManager(
@@ -62,7 +73,8 @@ func NewManager(
 			backend:         backend,
 			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
-		preferred: lastAccepted,
+		preferred:         lastAccepted,
+		txExecutorBackend: txExecutorBackend,
 	}
 }
 
@@ -72,7 +84,8 @@ type manager struct {
 	acceptor block.Visitor
 	rejector block.Visitor
 
-	preferred ids.ID
+	preferred         ids.ID
+	txExecutorBackend *executor.Backend
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -102,4 +115,17 @@ func (m *manager) SetPreference(blockID ids.ID) (updated bool) {
 
 func (m *manager) Preferred() ids.ID {
 	return m.preferred
+}
+
+func (m *manager) VerifyTx(tx *txs.Tx) error {
+	if !m.txExecutorBackend.Bootstrapped.Get() {
+		return ErrChainNotSynced
+	}
+
+	return tx.Unsigned.Visit(&executor.MempoolTxVerifier{
+		Backend:       m.txExecutorBackend,
+		ParentID:      m.preferred,
+		StateVersions: m,
+		Tx:            tx,
+	})
 }
