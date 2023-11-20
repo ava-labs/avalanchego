@@ -289,21 +289,21 @@ func (ms *merkleState) loadPendingStakers() error {
 // been called.
 func (ms *merkleState) initValidatorSets() error {
 	for subnetID, validators := range ms.currentStakers.validators {
-		if ms.cfg.Validators.Count(subnetID) != 0 {
+		if ms.validators.Count(subnetID) != 0 {
 			// Enforce the invariant that the validator set is empty here.
 			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
 		}
 
 		for nodeID, validator := range validators {
 			validatorStaker := validator.validator
-			if err := ms.cfg.Validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
+			if err := ms.validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
 				return err
 			}
 
 			delegatorIterator := NewTreeIterator(validator.delegators)
 			for delegatorIterator.Next() {
 				delegatorStaker := delegatorIterator.Value()
-				if err := ms.cfg.Validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
+				if err := ms.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
 					delegatorIterator.Release()
 					return err
 				}
@@ -312,8 +312,8 @@ func (ms *merkleState) initValidatorSets() error {
 		}
 	}
 
-	ms.metrics.SetLocalStake(ms.cfg.Validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
-	totalWeight, err := ms.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	ms.metrics.SetLocalStake(ms.validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
+	totalWeight, err := ms.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}

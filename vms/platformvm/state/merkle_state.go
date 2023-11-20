@@ -84,7 +84,7 @@ func NewMerkleState(
 	rawDB database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
-	cfg *config.Config,
+	validators validators.Manager,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
@@ -93,7 +93,7 @@ func NewMerkleState(
 	res, err := newMerkleState(
 		rawDB,
 		metrics,
-		cfg,
+		validators,
 		execCfg,
 		ctx,
 		metricsReg,
@@ -115,7 +115,7 @@ func NewMerkleState(
 func newMerkleState(
 	rawDB database.Database,
 	metrics metrics.Metrics,
-	cfg *config.Config,
+	validators validators.Manager,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
@@ -227,10 +227,10 @@ func newMerkleState(
 	}
 
 	return &merkleState{
-		cfg:     cfg,
-		ctx:     ctx,
-		metrics: metrics,
-		rewards: rewards,
+		validators: validators,
+		ctx:        ctx,
+		metrics:    metrics,
+		rewards:    rewards,
 
 		baseDB:       baseDB,
 		singletonDB:  singletonDB,
@@ -313,10 +313,10 @@ func newMerkleState(
 // - BLS Key Diffs
 // - Reward UTXOs
 type merkleState struct {
-	cfg     *config.Config
-	ctx     *snow.Context
-	metrics metrics.Metrics
-	rewards reward.Calculator
+	validators validators.Manager
+	ctx        *snow.Context
+	metrics    metrics.Metrics
+	rewards    reward.Calculator
 
 	baseDB       *versiondb.Database
 	singletonDB  database.Database
@@ -1730,11 +1730,11 @@ func (ms *merkleState) updateValidatorSet(
 		}
 
 		if weightDiff.Decrease {
-			err = ms.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
+			err = ms.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 		} else {
 			if validatorDiff.validatorStatus == added {
 				staker := validatorDiff.validator
-				err = ms.cfg.Validators.AddStaker(
+				err = ms.validators.AddStaker(
 					subnetID,
 					nodeID,
 					staker.PublicKey,
@@ -1742,7 +1742,7 @@ func (ms *merkleState) updateValidatorSet(
 					weightDiff.Amount,
 				)
 			} else {
-				err = ms.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
+				err = ms.validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 			}
 		}
 		if err != nil {
@@ -1750,8 +1750,8 @@ func (ms *merkleState) updateValidatorSet(
 		}
 	}
 
-	ms.metrics.SetLocalStake(ms.cfg.Validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
-	totalWeight, err := ms.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	ms.metrics.SetLocalStake(ms.validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
+	totalWeight, err := ms.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight: %w", err)
 	}
