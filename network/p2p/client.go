@@ -25,7 +25,7 @@ type AppResponseCallback func(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
-	err *common.AppError,
+	err error,
 )
 
 // CrossChainAppResponseCallback is called upon receiving an
@@ -35,7 +35,7 @@ type CrossChainAppResponseCallback func(
 	ctx context.Context,
 	chainID ids.ID,
 	responseBytes []byte,
-	err *common.AppError,
+	err error,
 )
 
 type Client struct {

@@ -5,7 +5,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -13,16 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
-)
-
-var (
-	_ error = (*AppError)(nil)
-
-	// ErrTimeout is used to signal a response timeout
-	ErrTimeout = &AppError{
-		Code:    -1,
-		Message: "timed out",
-	}
 )
 
 // Engine describes the standard interface of a consensus engine.
@@ -508,25 +497,4 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
-}
-
-// AppError is an application-defined error
-type AppError struct {
-	// Code is application-defined and should be used for error matching
-	Code int32
-	// Message is a human-readable error message
-	Message string
-}
-
-func (a *AppError) Error() string {
-	return fmt.Sprintf("%d: %s", a.Code, a.Message)
-}
-
-func (a *AppError) Is(target error) bool {
-	appErr, ok := target.(*AppError)
-	if !ok {
-		return false
-	}
-
-	return a.Code == appErr.Code
 }

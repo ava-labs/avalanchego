@@ -11,7 +11,7 @@ import (
 )
 
 // Tests the invariant that AppErrors are matched against their error codes
-func TestAppError(t *testing.T) {
+func TestAppErrorEqual(t *testing.T) {
 	tests := []struct {
 		name     string
 		err1     *AppError
@@ -65,6 +65,34 @@ func TestAppError(t *testing.T) {
 			require := require.New(t)
 
 			require.Equal(tt.expected, errors.Is(tt.err1, tt.err2))
+		})
+	}
+}
+
+// Tests reserved error types
+func TestErrorCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     int32
+		expected *AppError
+	}{
+		{
+			name:     "undefined",
+			code:     0,
+			expected: ErrUndefined,
+		},
+		{
+			name:     "undefined",
+			code:     1,
+			expected: ErrTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			require.Error(tt.expected, &AppError{Code: tt.code})
 		})
 	}
 }
