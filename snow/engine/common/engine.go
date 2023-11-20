@@ -390,8 +390,11 @@ type AppResponseHandler interface {
 		response []byte,
 	) error
 
-	// AppRequestFailed is called when a pending AppRequest failed due to either
-	// a timeout or an application-defined reason.
+	// Notify this engine that an AppRequest it issued has failed.
+	//
+	// This function will be called if an AppRequest message with nodeID and
+	// requestID was previously sent by this engine and will not receive a
+	// response.
 	AppRequestFailed(
 		ctx context.Context,
 		nodeID ids.NodeID,
@@ -457,8 +460,11 @@ type CrossChainAppResponseHandler interface {
 		response []byte,
 	) error
 
-	// CrossChainAppRequestFailed is called when a pending CrossChainAppRequest
-	// failed due to either a timeout or an application-defined reason.
+	// Notify this engine that a CrossChainAppRequest it issued has failed.
+	//
+	// This function will be called if a CrossChainAppRequest message with
+	// nodeID and requestID was previously sent by this engine and will not
+	// receive a response.
 	CrossChainAppRequestFailed(
 		ctx context.Context,
 		chainID ids.ID,
