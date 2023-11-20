@@ -42,6 +42,10 @@ type Block struct {
 	rejected bool
 }
 
+func (*Block) VerifyProposer(context.Context) error {
+	return nil
+}
+
 func (b *Block) Verify(context.Context) error {
 	blkID := b.ID()
 	if _, ok := b.manager.blkIDToState[blkID]; ok {

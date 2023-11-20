@@ -50,6 +50,7 @@ const (
 	VM_GetLastStateSummary_FullMethodName        = "/vm.VM/GetLastStateSummary"
 	VM_ParseStateSummary_FullMethodName          = "/vm.VM/ParseStateSummary"
 	VM_GetStateSummary_FullMethodName            = "/vm.VM/GetStateSummary"
+	VM_BlockVerifyProposer_FullMethodName        = "/vm.VM/BlockVerifyProposer"
 	VM_BlockVerify_FullMethodName                = "/vm.VM/BlockVerify"
 	VM_BlockAccept_FullMethodName                = "/vm.VM/BlockAccept"
 	VM_BlockReject_FullMethodName                = "/vm.VM/BlockReject"
@@ -126,6 +127,7 @@ type VMClient interface {
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
 	// Block
+	BlockVerifyProposer(ctx context.Context, in *BlockVerifyProposerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -411,6 +413,15 @@ func (c *vMClient) GetStateSummary(ctx context.Context, in *GetStateSummaryReque
 	return out, nil
 }
 
+func (c *vMClient) BlockVerifyProposer(ctx context.Context, in *BlockVerifyProposerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, VM_BlockVerifyProposer_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
 	out := new(BlockVerifyResponse)
 	err := c.cc.Invoke(ctx, VM_BlockVerify_FullMethodName, in, out, opts...)
@@ -517,6 +528,7 @@ type VMServer interface {
 	// [summaryHeight].
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
 	// Block
+	BlockVerifyProposer(context.Context, *BlockVerifyProposerRequest) (*emptypb.Empty, error)
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
@@ -618,6 +630,9 @@ func (UnimplementedVMServer) ParseStateSummary(context.Context, *ParseStateSumma
 }
 func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSummary not implemented")
+}
+func (UnimplementedVMServer) BlockVerifyProposer(context.Context, *BlockVerifyProposerRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockVerifyProposer not implemented")
 }
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
@@ -1184,6 +1199,24 @@ func _VM_GetStateSummary_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_BlockVerifyProposer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockVerifyProposerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BlockVerifyProposer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VM_BlockVerifyProposer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BlockVerifyProposer(ctx, req.(*BlockVerifyProposerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockVerifyRequest)
 	if err := dec(in); err != nil {
@@ -1382,6 +1415,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStateSummary",
 			Handler:    _VM_GetStateSummary_Handler,
+		},
+		{
+			MethodName: "BlockVerifyProposer",
+			Handler:    _VM_BlockVerifyProposer_Handler,
 		},
 		{
 			MethodName: "BlockVerify",

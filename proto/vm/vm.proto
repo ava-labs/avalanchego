@@ -81,6 +81,7 @@ service VM {
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
 
   // Block
+  rpc BlockVerifyProposer(BlockVerifyProposerRequest) returns (google.protobuf.Empty);
   rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
   rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
   rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
@@ -213,6 +214,10 @@ message GetBlockResponse {
 
 message SetPreferenceRequest {
   bytes id = 1;
+}
+
+message BlockVerifyProposerRequest {
+  bytes bytes = 1;
 }
 
 message BlockVerifyRequest {

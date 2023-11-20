@@ -973,7 +973,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 	blkID := blk.ID()
 
 	// make sure this block is valid
-	if err := blk.Verify(ctx); err != nil {
+	if err := blk.VerifyProposer(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
 			zap.Stringer("blkID", blkID),
 			zap.Error(err),

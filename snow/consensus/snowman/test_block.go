@@ -21,11 +21,12 @@ var (
 type TestBlock struct {
 	choices.TestDecidable
 
-	ParentV    ids.ID
-	HeightV    uint64
-	TimestampV time.Time
-	VerifyV    error
-	BytesV     []byte
+	ParentV         ids.ID
+	HeightV         uint64
+	TimestampV      time.Time
+	VerifyProposerV error
+	VerifyV         error
+	BytesV          []byte
 }
 
 func (b *TestBlock) Parent() ids.ID {
@@ -38,6 +39,10 @@ func (b *TestBlock) Height() uint64 {
 
 func (b *TestBlock) Timestamp() time.Time {
 	return b.TimestampV
+}
+
+func (b *TestBlock) VerifyProposer(context.Context) error {
+	return b.VerifyV
 }
 
 func (b *TestBlock) Verify(context.Context) error {

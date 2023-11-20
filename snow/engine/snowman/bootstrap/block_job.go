@@ -87,6 +87,14 @@ func (b *blockJob) Execute(ctx context.Context) error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		blkID := b.blk.ID()
+		if err := b.blk.VerifyProposer(ctx); err != nil {
+			b.log.Error("block failed proposer verification during bootstrapping",
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
+			return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
+		}
+
 		if err := b.blk.Verify(ctx); err != nil {
 			b.log.Error("block failed verification during bootstrapping",
 				zap.Stringer("blkID", blkID),

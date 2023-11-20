@@ -165,3 +165,17 @@ func (mr *MockBlockMockRecorder) Verify(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockBlock)(nil).Verify), arg0)
 }
+
+// VerifyProposer mocks base method.
+func (m *MockBlock) VerifyProposer(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyProposer", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyProposer indicates an expected call of VerifyProposer.
+func (mr *MockBlockMockRecorder) VerifyProposer(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyProposer", reflect.TypeOf((*MockBlock)(nil).VerifyProposer), arg0)
+}

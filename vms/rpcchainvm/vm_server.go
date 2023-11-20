@@ -784,6 +784,17 @@ func (vm *VMServer) GetStateSummary(
 	}, nil
 }
 
+func (vm *VMServer) BlockVerifyProposer(ctx context.Context, req *vmpb.BlockVerifyProposerRequest) (*emptypb.Empty, error) {
+	blk, err := vm.vm.ParseBlock(ctx, req.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	if err := blk.VerifyProposer(ctx); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func (vm *VMServer) BlockVerify(ctx context.Context, req *vmpb.BlockVerifyRequest) (*vmpb.BlockVerifyResponse, error) {
 	blk, err := vm.vm.ParseBlock(ctx, req.Bytes)
 	if err != nil {
