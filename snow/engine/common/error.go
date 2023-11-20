@@ -29,11 +29,11 @@ type AppError struct {
 	Message string
 }
 
-func (a AppError) Error() string {
+func (a *AppError) Error() string {
 	return fmt.Sprintf("%d: %s", a.Code, a.Message)
 }
 
-func (a AppError) Is(target error) bool {
+func (a *AppError) Is(target error) bool {
 	appErr, ok := target.(*AppError)
 	if !ok {
 		return false
