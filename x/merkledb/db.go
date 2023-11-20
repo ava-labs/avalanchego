@@ -212,7 +212,7 @@ type merkleDB struct {
 
 	tokenSize int
 
-	// true if the intermediate nodes have been invalidated due to an error while committing
+	// true if the database has been invalidated due to an error while committing
 	invalid bool
 }
 
@@ -346,7 +346,6 @@ func (db *merkleDB) rebuild(ctx context.Context, batchSize int) error {
 	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
-	db.invalid = false
 	return db.Compact(nil, nil)
 }
 
@@ -959,7 +958,6 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
 	// if we don't finish writing all data to the cache and the disk, we will need to rebuild the intermediate nodes
-	db.invalid = true
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
@@ -971,11 +969,13 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		if shouldAddIntermediate {
 			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
 				nodesSpan.End()
+				db.invalidateDb()
 				return err
 			}
 		} else if shouldDeleteIntermediate {
 			if err := db.intermediateNodeDB.Delete(key); err != nil {
 				nodesSpan.End()
+				db.invalidateDb()
 				return err
 			}
 		}
@@ -992,11 +992,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
+		db.invalidateDb()
 		return err
 	}
-
-	// we successfully wrote all node data, so we don't need to rebuild the intermediate nodes
-	db.invalid = false
 
 	// Only modify in-memory state after the commit succeeds
 	// so that we don't need to clean up on error.
@@ -1160,6 +1158,11 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	return nil
+}
+
+func (db *merkleDB) invalidateDb() {
+	db.invalid = true
+	db.invalidateChildrenExcept(nil)
 }
 
 // Invalidates and removes any child views that aren't [exception].
