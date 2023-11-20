@@ -22,7 +22,7 @@ const (
 	MaxVerifyWindows  = 6 // 30 seconds
 	MaxVerifyDuration = MaxVerifyWindows * WindowDuration
 
-	MaxBuildWindows  = 36 // 3 minutes
+	MaxBuildWindows  = 60 // 5 minutes
 	MaxBuildDuration = MaxBuildWindows * WindowDuration
 )
 
