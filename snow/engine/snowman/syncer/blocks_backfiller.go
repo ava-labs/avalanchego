@@ -54,10 +54,10 @@ func NewBlockBackfiller(cfg BlockBackfillerConfig, vals validators.Manager) (*Bl
 		return nil, err
 	}
 
-	// TODO: pt must be initialized with the peers already connected, as well as their version
+	// Initialize peer trackerwith the peers already connected. We don't care about version
 	valList := vals.GetValidatorIDs(cfg.Ctx.SubnetID)
 	for _, val := range valList {
-		pt.Connected(val, version.MinimumCompatibleVersion) // fake version, find a way to fix it
+		pt.Connected(val, version.MinimumCompatibleVersion)
 	}
 
 	return &BlockBackfiller{
