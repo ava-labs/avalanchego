@@ -18,17 +18,17 @@ type Height interface {
 }
 
 type height struct {
-	currentHighestVerifiedHeight uint64
-	highestVerifiedHeight        prometheus.Gauge
+	currentMaxVerifiedHeight uint64
+	maxVerifiedHeight        prometheus.Gauge
 
 	lastAcceptedHeight prometheus.Gauge
 }
 
 func NewHeight(namespace string, reg prometheus.Registerer) (Height, error) {
 	h := &height{
-		highestVerifiedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+		maxVerifiedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "highest_verified_height",
+			Name:      "max_verified_height",
 			Help:      "Highest verified height",
 		}),
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -39,14 +39,14 @@ func NewHeight(namespace string, reg prometheus.Registerer) (Height, error) {
 	}
 	err := utils.Err(
 		reg.Register(h.lastAcceptedHeight),
-		reg.Register(h.highestVerifiedHeight),
+		reg.Register(h.maxVerifiedHeight),
 	)
 	return h, err
 }
 
 func (h *height) Verified(height uint64) {
-	h.currentHighestVerifiedHeight = math.Max(h.currentHighestVerifiedHeight, height)
-	h.highestVerifiedHeight.Set(float64(h.currentHighestVerifiedHeight))
+	h.currentMaxVerifiedHeight = math.Max(h.currentMaxVerifiedHeight, height)
+	h.maxVerifiedHeight.Set(float64(h.currentMaxVerifiedHeight))
 }
 
 func (h *height) Accepted(height uint64) {
