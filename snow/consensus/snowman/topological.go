@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -23,7 +22,9 @@ import (
 )
 
 var (
-	errDuplicateAdd = errors.New("duplicate block add")
+	errDuplicateAdd            = errors.New("duplicate block add")
+	errTooManyProcessingBlocks = errors.New("too many processing blocks")
+	errBlockProcessingTooLong  = errors.New("block processing too long")
 
 	_ Factory   = (*TopologicalFactory)(nil)
 	_ Consensus = (*Topological)(nil)
@@ -333,30 +334,34 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
-	numOutstandingBlks := ts.NumProcessing()
-	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
-	healthy := isOutstandingBlks
-	details := map[string]interface{}{
-		"outstandingBlocks": numOutstandingBlks,
+	var errs []error
+
+	numProcessingBlks := ts.NumProcessing()
+	if numProcessingBlks > ts.params.MaxOutstandingItems {
+		err := fmt.Errorf("%w: %d > %d",
+			errTooManyProcessingBlocks,
+			numProcessingBlks,
+			ts.params.MaxOutstandingItems,
+		)
+		errs = append(errs, err)
 	}
 
-	// check for long running blocks
-	timeReqRunning := ts.metrics.MeasureAndGetOldestDuration()
-	isProcessingTime := timeReqRunning <= ts.params.MaxItemProcessingTime
-	healthy = healthy && isProcessingTime
-	details["longestRunningBlock"] = timeReqRunning.String()
-
-	if !healthy {
-		var errorReasons []string
-		if !isOutstandingBlks {
-			errorReasons = append(errorReasons, fmt.Sprintf("number of outstanding blocks %d > %d", numOutstandingBlks, ts.params.MaxOutstandingItems))
-		}
-		if !isProcessingTime {
-			errorReasons = append(errorReasons, fmt.Sprintf("block processing time %s > %s", timeReqRunning, ts.params.MaxItemProcessingTime))
-		}
-		return details, fmt.Errorf("snowman consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
+	maxTimeProcessing := ts.metrics.MeasureAndGetOldestDuration()
+	if maxTimeProcessing > ts.params.MaxItemProcessingTime {
+		err := fmt.Errorf("%w: %s > %s",
+			errBlockProcessingTooLong,
+			maxTimeProcessing,
+			ts.params.MaxItemProcessingTime,
+		)
+		errs = append(errs, err)
 	}
-	return details, nil
+
+	return map[string]interface{}{
+		"processingBlocks":       numProcessingBlks,
+		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
+		"lastAcceptedID":         ts.lastAcceptedID,
+		"lastAcceptedHeight":     ts.lastAcceptedHeight,
+	}, errors.Join(errs...)
 }
 
 // takes in a list of votes and sets up the topological ordering. Returns the
