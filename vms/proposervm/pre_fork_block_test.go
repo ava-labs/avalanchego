@@ -275,7 +275,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
