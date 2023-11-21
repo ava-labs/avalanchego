@@ -161,6 +161,7 @@ type CacheConfig struct {
 	Preimages                       bool          // Whether to store preimage of trie key to the disk
 	AcceptedCacheSize               int           // Depth of accepted headers cache and accepted logs cache at the accepted tip
 	TxLookupLimit                   uint64        // Number of recent blocks for which to maintain transaction lookup indices
+	SkipTxIndexing                  bool          // Whether to skip transaction indexing
 
 	SnapshotNoBuild bool // Whether the background generation is allowed
 	SnapshotWait    bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
@@ -485,7 +486,9 @@ func (bc *BlockChain) dispatchTxUnindexer() {
 // - updating the acceptor tip index
 func (bc *BlockChain) writeBlockAcceptedIndices(b *types.Block) error {
 	batch := bc.db.NewBatch()
-	rawdb.WriteTxLookupEntriesByBlock(batch, b)
+	if !bc.cacheConfig.SkipTxIndexing {
+		rawdb.WriteTxLookupEntriesByBlock(batch, b)
+	}
 	if err := rawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
 		return fmt.Errorf("%w: failed to write acceptor tip key", err)
 	}
@@ -864,7 +867,8 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		// Transactions are only indexed beneath the last accepted block, so we only check
 		// that the transactions have been indexed, if we are checking below the last accepted
 		// block.
-		shouldIndexTxs := bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TxLookupLimit
+		shouldIndexTxs := !bc.cacheConfig.SkipTxIndexing &&
+			(bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TxLookupLimit)
 		if current.Number.Uint64() <= bc.lastAccepted.NumberU64() && shouldIndexTxs {
 			// Ensure that all of the transactions have been stored correctly in the canonical
 			// chain

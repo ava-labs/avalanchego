@@ -205,6 +205,7 @@ func New(
 			Preimages:                       config.Preimages,
 			AcceptedCacheSize:               config.AcceptedCacheSize,
 			TxLookupLimit:                   config.TxLookupLimit,
+			SkipTxIndexing:                  config.SkipTxIndexing,
 		}
 	)
 
