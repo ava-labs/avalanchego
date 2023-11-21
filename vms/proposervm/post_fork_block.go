@@ -129,12 +129,10 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 }
 
 func (b *postForkBlock) verifyProposerPostForkChild(ctx context.Context, child *postForkBlock) error {
-	parentTimestamp := b.Timestamp()
-	parentPChainHeight := b.PChainHeight()
 	err := b.postForkCommonComponents.Verify(
 		ctx,
-		parentTimestamp,
-		parentPChainHeight,
+		b.Timestamp(),
+		b.PChainHeight(),
 		child,
 	)
 	if err != nil {
@@ -147,11 +145,10 @@ func (b *postForkBlock) verifyProposerPostForkChild(ctx context.Context, child *
 }
 
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
-	parentPChainHeight := b.PChainHeight()
 	return child.vm.verifyAndRecordInnerBlk(
 		ctx,
 		&smblock.Context{
-			PChainHeight: parentPChainHeight,
+			PChainHeight: b.PChainHeight(),
 		},
 		child,
 	)
