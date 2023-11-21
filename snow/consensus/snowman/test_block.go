@@ -42,7 +42,7 @@ func (b *TestBlock) Timestamp() time.Time {
 }
 
 func (b *TestBlock) VerifyProposer(context.Context) error {
-	return b.VerifyV
+	return b.VerifyProposerV
 }
 
 func (b *TestBlock) Verify(context.Context) error {
