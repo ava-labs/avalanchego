@@ -173,7 +173,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		if err := blk.Reject(ctx); err != nil {
 			return err
 		}
-		ts.metrics.Rejected(blkID, ts.pollNumber, len(blk.Bytes()))
+		ts.metrics.Rejected(blkID, false, ts.pollNumber, len(blk.Bytes()))
 		return nil
 	}
 
@@ -652,7 +652,7 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, blk *snowman
 		if err := sibling.blk.Reject(ctx); err != nil {
 			return false, err
 		}
-		ts.metrics.Rejected(siblingID, ts.pollNumber, len(sibling.blk.Bytes()))
+		ts.metrics.Rejected(siblingID, sibling.verified, ts.pollNumber, len(sibling.blk.Bytes()))
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, siblingID)
@@ -687,7 +687,7 @@ func (ts *Topological) rejectTransitively(ctx context.Context, rejected []ids.ID
 			if err := child.blk.Reject(ctx); err != nil {
 				return err
 			}
-			ts.metrics.Rejected(childID, ts.pollNumber, len(child.blk.Bytes()))
+			ts.metrics.Rejected(childID, child.verified, ts.pollNumber, len(child.blk.Bytes()))
 
 			// add the newly rejected block to the end of the stack
 			rejected = append(rejected, childID)

@@ -54,8 +54,9 @@ type metrics struct {
 	pollsRejected metric.Averager
 	// rejected tracks the number of nanoseconds that an item was processing
 	// before being rejected
-	latRejected          metric.Averager
-	blockSizeRejectedSum prometheus.Gauge
+	latRejected              metric.Averager
+	blockSizeRejectedSum     prometheus.Gauge
+	unverifiedBlocksRejected prometheus.Counter
 
 	// numFailedPolls keeps track of the number of polls that failed
 	numFailedPolls prometheus.Counter
@@ -152,6 +153,11 @@ func newMetrics(
 			Name:      "blks_rejected_container_size_sum",
 			Help:      "cumulative size of all rejected blocks",
 		}),
+		unverifiedBlocksRejected: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "unverified_blks_rejected",
+			Help:      "cumulative size of all rejected blocks",
+		}),
 
 		numSuccessfulPolls: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -177,6 +183,7 @@ func newMetrics(
 		reg.Register(m.numProcessing),
 		reg.Register(m.blockSizeAcceptedSum),
 		reg.Register(m.blockSizeRejectedSum),
+		reg.Register(m.unverifiedBlocksRejected),
 		reg.Register(m.numSuccessfulPolls),
 		reg.Register(m.numFailedPolls),
 	)
@@ -224,7 +231,7 @@ func (m *metrics) Accepted(
 	m.blockSizeAcceptedSum.Add(float64(blockSize))
 }
 
-func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
+func (m *metrics) Rejected(blkID ids.ID, verified bool, pollNumber uint64, blockSize int) {
 	start, ok := m.processingBlocks.Get(blkID)
 	if !ok {
 		m.log.Warn("unable to measure latency",
@@ -242,6 +249,10 @@ func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	m.latRejected.Observe(float64(duration))
 
 	m.blockSizeRejectedSum.Add(float64(blockSize))
+
+	if !verified {
+		m.unverifiedBlocksRejected.Inc()
+	}
 }
 
 func (m *metrics) MeasureAndGetOldestDuration() time.Duration {

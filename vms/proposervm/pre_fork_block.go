@@ -113,9 +113,6 @@ func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlo
 		zap.String("reason", "parent is an oracle block"),
 		zap.Stringer("blkID", b.ID()),
 	)
-	if err := child.Block.VerifyProposer(ctx); err != nil {
-		return err
-	}
 	return child.Block.Verify(ctx)
 }
 
