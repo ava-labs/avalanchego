@@ -159,7 +159,6 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		return errDuplicateAdd
 	}
 
-	ts.metrics.Verified(height)
 	ts.metrics.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
