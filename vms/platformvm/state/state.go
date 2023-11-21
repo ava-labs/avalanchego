@@ -286,10 +286,10 @@ type stateBlk struct {
 type state struct {
 	validatorState
 
-	cfg     *config.Config
-	ctx     *snow.Context
-	metrics metrics.Metrics
-	rewards reward.Calculator
+	validators validators.Manager
+	ctx        *snow.Context
+	metrics    metrics.Metrics
+	rewards    reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -451,7 +451,7 @@ func New(
 	db database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
-	cfg *config.Config,
+	validators validators.Manager,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
@@ -460,7 +460,7 @@ func New(
 	s, err := newState(
 		db,
 		metrics,
-		cfg,
+		validators,
 		execCfg,
 		ctx,
 		metricsReg,
@@ -504,7 +504,7 @@ func New(
 func newState(
 	db database.Database,
 	metrics metrics.Metrics,
-	cfg *config.Config,
+	validators validators.Manager,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
@@ -627,11 +627,11 @@ func newState(
 	return &state{
 		validatorState: newValidatorState(),
 
-		cfg:     cfg,
-		ctx:     ctx,
-		metrics: metrics,
-		rewards: rewards,
-		baseDB:  baseDB,
+		validators: validators,
+		ctx:        ctx,
+		metrics:    metrics,
+		rewards:    rewards,
+		baseDB:     baseDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
@@ -1661,21 +1661,21 @@ func (s *state) loadPendingValidators() error {
 // been called.
 func (s *state) initValidatorSets() error {
 	for subnetID, validators := range s.currentStakers.validators {
-		if s.cfg.Validators.Count(subnetID) != 0 {
+		if s.validators.Count(subnetID) != 0 {
 			// Enforce the invariant that the validator set is empty here.
 			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
 		}
 
 		for nodeID, validator := range validators {
 			validatorStaker := validator.validator
-			if err := s.cfg.Validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
+			if err := s.validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
 				return err
 			}
 
 			delegatorIterator := NewTreeIterator(validator.delegators)
 			for delegatorIterator.Next() {
 				delegatorStaker := delegatorIterator.Value()
-				if err := s.cfg.Validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
+				if err := s.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
 					delegatorIterator.Release()
 					return err
 				}
@@ -1684,8 +1684,8 @@ func (s *state) initValidatorSets() error {
 		}
 	}
 
-	s.metrics.SetLocalStake(s.cfg.Validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
-	totalWeight, err := s.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}
@@ -2079,11 +2079,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			if weightDiff.Decrease {
-				err = s.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
+				err = s.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 			} else {
 				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
-					err = s.cfg.Validators.AddStaker(
+					err = s.validators.AddStaker(
 						subnetID,
 						nodeID,
 						staker.PublicKey,
@@ -2091,7 +2091,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 						weightDiff.Amount,
 					)
 				} else {
-					err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
+					err = s.validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
 				}
 			}
 			if err != nil {
@@ -2107,12 +2107,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		return nil
 	}
 
-	totalWeight, err := s.cfg.Validators.TotalWeight(constants.PrimaryNetworkID)
+	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network: %w", err)
 	}
 
-	s.metrics.SetLocalStake(s.cfg.Validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }
