@@ -75,7 +75,6 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		r.ctx.Log.Debug(
 			"failed to reissue txs from rejected block",
 			zap.Stringer("blkID", blkID),
-			zap.Error(err),
 		)
 	}
 

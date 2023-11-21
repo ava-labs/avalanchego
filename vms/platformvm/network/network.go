@@ -172,11 +172,6 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	if err := n.mempool.Add([]*txs.Tx{tx}); err != nil {
-		n.ctx.Log.Debug("tx failed to be added to the mempool",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-
 		n.mempool.MarkDropped(txID, err)
 		return err
 	}

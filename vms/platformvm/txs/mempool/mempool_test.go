@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -28,7 +29,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, nil)
+	mpool, err := New(snow.DefaultContextTest(), "mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -52,7 +53,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, nil)
+	mpool, err := New(snow.DefaultContextTest(), "mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
@@ -104,7 +105,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, nil)
+	mpool, err := New(snow.DefaultContextTest(), "mempool", registerer, nil)
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after

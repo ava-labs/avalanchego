@@ -9,12 +9,15 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 )
@@ -82,6 +85,8 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	ctx *snow.Context
+
 	// If true, drop transactions added to the mempool via Add.
 	dropIncoming bool
 
@@ -101,6 +106,7 @@ type mempool struct {
 }
 
 func New(
+	ctx *snow.Context,
 	namespace string,
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
@@ -134,6 +140,7 @@ func New(
 
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
+		ctx:                  ctx,
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 		unissuedDecisionTxs:  unissuedDecisionTxs,
@@ -158,42 +165,70 @@ func (m *mempool) Add(txs []*txs.Tx) error {
 		return errClosedMempool
 	}
 
-	addedTx := false
+	var (
+		errs    = wrappers.Errs{}
+		addedTx = false
+	)
+
 	for _, tx := range txs {
 		// Note: a previously dropped tx can be re-added
 		txID := tx.ID()
 		if m.Has(txID) {
-			return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+			errs.Add(errDuplicateTx)
+			m.ctx.Log.Debug(
+				"failed to add tx to mempool",
+				zap.Stringer("txID", txID),
+				zap.Error(errDuplicateTx),
+			)
+			continue
 		}
 
 		txSize := len(tx.Bytes())
 		if txSize > MaxTxSize {
-			return fmt.Errorf("%w: %s size (%d) > max size (%d)",
-				errTxTooLarge,
-				txID,
-				txSize,
-				MaxTxSize,
+			errs.Add(errTxTooLarge)
+			m.ctx.Log.Debug(
+				"failed to add tx to mempool",
+				zap.Stringer("txID", txID),
+				zap.Int("txSize", txSize),
+				zap.Int("maxSize", MaxTxSize),
+				zap.Error(errTxTooLarge),
 			)
+			continue
 		}
 		if txSize > m.bytesAvailable {
-			return fmt.Errorf("%w: %s size (%d) > available space (%d)",
-				errMempoolFull,
-				txID,
-				txSize,
-				m.bytesAvailable,
+			errs.Add(errMempoolFull)
+			m.ctx.Log.Debug(
+				"failed to add tx to mempool",
+				zap.Stringer("txID", txID),
+				zap.Int("txSize", txSize),
+				zap.Int("availableSpace", m.bytesAvailable),
+				zap.Error(errMempoolFull),
 			)
+			continue
 		}
 
 		inputs := tx.Unsigned.InputIDs()
 		if m.consumedUTXOs.Overlaps(inputs) {
-			return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
+			errs.Add(errConflictsWithOtherTx)
+			m.ctx.Log.Debug(
+				"failed to add tx to mempool",
+				zap.Stringer("txID", txID),
+				zap.Error(errConflictsWithOtherTx),
+			)
+			continue
 		}
 
 		if err := tx.Unsigned.Visit(&issuer{
 			m:  m,
 			tx: tx,
 		}); err != nil {
-			return err
+			errs.Add(err)
+			m.ctx.Log.Debug(
+				"failed to add tx to mempool",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
+			continue
 		}
 
 		// Mark these UTXOs as consumed in the mempool
@@ -210,7 +245,7 @@ func (m *mempool) Add(txs []*txs.Tx) error {
 		m.RequestBuildBlock()
 	}
 
-	return nil
+	return errs.Err
 }
 
 func (m *mempool) Has(txID ids.ID) bool {
