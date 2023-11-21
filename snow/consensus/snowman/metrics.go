@@ -33,7 +33,7 @@ type metrics struct {
 	lastAcceptedHeight    prometheus.Gauge
 	lastAcceptedTimestamp prometheus.Gauge
 
-	// ProcessingEntries keeps track of the [processingStart] that each item was
+	// processingBlocks keeps track of the [processingStart] that each block was
 	// issued into the consensus instance. This is used to calculate the amount
 	// of time to accept or reject the block.
 	processingBlocks linkedhashmap.LinkedHashmap[ids.ID, processingStart]
@@ -41,18 +41,18 @@ type metrics struct {
 	// numProcessing keeps track of the number of processing blocks
 	numProcessing prometheus.Gauge
 
-	// pollsAccepted tracks the number of polls that an item was in processing
+	// pollsAccepted tracks the number of polls that a block was in processing
 	// for before being accepted
 	pollsAccepted metric.Averager
-	// latAccepted tracks the number of nanoseconds that an item was processing
+	// latAccepted tracks the number of nanoseconds that a block was processing
 	// before being accepted
 	latAccepted          metric.Averager
 	blockSizeAcceptedSum prometheus.Gauge
 
-	// pollsRejected tracks the number of polls that an item was in processing
+	// pollsRejected tracks the number of polls that a block was in processing
 	// for before being rejected
 	pollsRejected metric.Averager
-	// rejected tracks the number of nanoseconds that an item was processing
+	// latRejected tracks the number of nanoseconds that a block was processing
 	// before being rejected
 	latRejected          metric.Averager
 	blockSizeRejectedSum prometheus.Gauge

@@ -185,7 +185,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		blk:    blk,
 	}
 
-	// If we are extending the tail, this is the new tail
+	// If we are extending the preference, this is the new preference
 	if ts.preference == parentID {
 		ts.preference = blkID
 		ts.preferredIDs.Add(blkID)
@@ -216,8 +216,8 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 	if blkID == ts.lastAcceptedID {
 		return false
 	}
-	// If the block is in the map of current blocks and not the head, then the
-	// block is currently processing.
+	// If the block is in the map of current blocks and not the last accepted
+	// block, then it is currently processing.
 	_, ok := ts.blocks[blkID]
 	return ok
 }
@@ -254,8 +254,8 @@ func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
 // Every other block will have an unsuccessful poll registered.
 //
 // After collecting which blocks should be voted on, the polls are registered
-// and blocks are accepted/rejected as needed. The tail is then updated to equal
-// the leaf on the preferred branch.
+// and blocks are accepted/rejected as needed. The preference is then updated to
+// equal the leaf on the preferred branch.
 //
 // To optimize the theoretical complexity of the vote propagation, a topological
 // sort is done over the blocks that are reachable from the provided votes.
@@ -293,11 +293,11 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	}
 
 	// If the set of preferred IDs already contains the preference, then the
-	// tail is guaranteed to already be set correctly. This is because the value
-	// returned from vote reports the next preferred block after the last
+	// preference is guaranteed to already be set correctly. This is because the
+	// value returned from vote reports the next preferred block after the last
 	// preferred block that was voted for. If this block was previously
 	// preferred, then we know that following the preferences down the chain
-	// will return the current tail.
+	// will return the current preference.
 	if ts.preferredIDs.Contains(preferred) {
 		return nil
 	}
@@ -476,8 +476,8 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
-		headBlock := ts.blocks[ts.lastAcceptedID]
-		headBlock.shouldFalter = true
+		lastAcceptedBlock := ts.blocks[ts.lastAcceptedID]
+		lastAcceptedBlock.shouldFalter = true
 
 		if numProcessing := len(ts.blocks) - 1; numProcessing > 0 {
 			ts.ctx.Log.Verbo("no progress was made after processing pending blocks",
@@ -525,7 +525,8 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// apply the votes for this snowball instance
 		pollSuccessful = parentBlock.sb.RecordPoll(vote.votes) || pollSuccessful
 
-		// Only accept when you are finalized and the head.
+		// Only accept when you are finalized and a child of the last accepted
+		// block.
 		if parentBlock.sb.Finalized() && ts.lastAcceptedID == vote.parentID {
 			if err := ts.acceptPreferredChild(ctx, parentBlock); err != nil {
 				return ids.ID{}, err
@@ -624,7 +625,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 		return err
 	}
 
-	// Because this is the newest accepted block, this is the new head.
+	// Update the last accepted values to the newly accepted block.
 	ts.lastAcceptedID = pref
 	ts.lastAcceptedHeight = height
 	// Remove the decided block from the set of processing IDs, as its status
