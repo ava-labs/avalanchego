@@ -198,6 +198,11 @@ type Config struct {
 	//  * 0:   means no limit
 	//  * N:   means N block limit [HEAD-N+1, HEAD] and delete extra indexes
 	TxLookupLimit uint64 `json:"tx-lookup-limit"`
+
+	// SkipTxIndexing skips indexing transactions.
+	// This is useful for validators that don't need to index transactions.
+	// TxLookupLimit can be still used to control unindexing old transactions.
+	SkipTxIndexing bool `json:"skip-tx-indexing"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -290,7 +295,6 @@ func (c *Config) Validate() error {
 	if c.Pruning && c.CommitInterval == 0 {
 		return fmt.Errorf("cannot use commit interval of 0 with pruning enabled")
 	}
-
 	return nil
 }
 
