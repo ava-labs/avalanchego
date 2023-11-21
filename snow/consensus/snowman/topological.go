@@ -464,7 +464,7 @@ func (ts *Topological) vote(voteStack []votes) {
 		vote := voteStack[newStackSize]
 		voteStack = voteStack[:newStackSize]
 
-		ts.ctx.Log.Verbo("apllying votes",
+		ts.ctx.Log.Verbo("applying votes",
 			zap.Stringer("parentID", vote.parentID),
 			zap.Stringer("votes", &vote.votes),
 		)
