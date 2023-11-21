@@ -264,8 +264,8 @@ func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
 // Every other block will have an unsuccessful poll registered.
 //
 // After collecting which blocks should be voted on, the polls are registered
-// and blocks are accepted/rejected as needed. The tail is then updated to equal
-// the leaf on the preferred branch.
+// and blocks are accepted/rejected as needed. The preference is then updated to
+// equal the leaf on the preferred branch.
 //
 // To optimize the theoretical complexity of the vote propagation, a topological
 // sort is done over the blocks that are reachable from the provided votes.
@@ -445,8 +445,8 @@ func (ts *Topological) vote(voteStack []votes) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
-		headBlock := ts.blocks[ts.lastAcceptedID]
-		headBlock.shouldFalter = true
+		lastAcceptedBlock := ts.blocks[ts.lastAcceptedID]
+		lastAcceptedBlock.shouldFalter = true
 
 		if numProcessing := len(ts.blocks) - 1; numProcessing > 0 {
 			ts.ctx.Log.Verbo("no progress was made after processing pending blocks",
@@ -616,7 +616,7 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, blk *snowman
 		return false, err
 	}
 
-	// Because this is the newest accepted block, this is the new head.
+	// Update the last accepted values to the newly accepted block.
 	ts.lastAcceptedID = blkID
 	ts.lastAcceptedHeight = height
 	// Remove the decided block from the set of processing IDs, as its status
