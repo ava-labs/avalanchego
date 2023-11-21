@@ -553,8 +553,13 @@ func (ts *Topological) updateProcessing(ctx context.Context) error {
 			if !accepted {
 				break
 			}
+
 			delete(ts.blocks, ts.preference)
-		} else if err := blk.Verify(ctx); err != nil {
+			ts.preference = blkID
+			continue
+		}
+
+		if err := blk.Verify(ctx); err != nil {
 			ts.ctx.Log.Warn("preferred block failed verification",
 				zap.Stringer("blkID", blkID),
 				zap.Uint64("height", height),
