@@ -51,8 +51,13 @@ type Block interface {
 	acceptOuterBlk() error
 	acceptInnerBlk(context.Context) error
 
+	verifyProposerPreForkChild(ctx context.Context, child *preForkBlock) error
 	verifyPreForkChild(ctx context.Context, child *preForkBlock) error
+
+	verifyProposerPostForkChild(ctx context.Context, child *postForkBlock) error
 	verifyPostForkChild(ctx context.Context, child *postForkBlock) error
+
+	verifyProposerPostForkOption(ctx context.Context, child *postForkOption) error
 	verifyPostForkOption(ctx context.Context, child *postForkOption) error
 
 	buildChild(context.Context) (Block, error)

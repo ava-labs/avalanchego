@@ -95,19 +95,24 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 	return b.Block
 }
 
-func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
+func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, _ *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
-	if !parentTimestamp.Before(b.vm.activationTime) {
-		if err := verifyIsOracleBlock(ctx, b.Block); err != nil {
-			return err
-		}
-
-		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time",
-			zap.String("reason", "parent is an oracle block"),
-			zap.Stringer("blkID", b.ID()),
-		)
+	if parentTimestamp.Before(b.vm.activationTime) {
+		return nil
 	}
 
+	if err := verifyIsOracleBlock(ctx, b.Block); err != nil {
+		return err
+	}
+
+	b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time",
+		zap.String("reason", "parent is an oracle block"),
+		zap.Stringer("blkID", b.ID()),
+	)
+	return nil
+}
+
+func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
 	return child.Block.Verify(ctx)
 }
 

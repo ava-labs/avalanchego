@@ -82,6 +82,10 @@ func (b *postForkOption) Verify(ctx context.Context) error {
 	return parent.verifyPostForkOption(ctx, b)
 }
 
+func (*postForkOption) verifyProposerPreForkChild(context.Context, *preForkBlock) error {
+	return errUnsignedChild
+}
+
 func (*postForkOption) verifyPreForkChild(context.Context, *preForkBlock) error {
 	// A *preForkBlock's parent must be a *preForkBlock
 	return errUnsignedChild
