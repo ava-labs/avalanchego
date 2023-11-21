@@ -171,7 +171,7 @@ func (b *postForkBlock) verifyProposerPostForkOption(ctx context.Context, child 
 	return nil
 }
 
-func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
+func (*postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
 	return child.vm.verifyAndRecordInnerBlk(ctx, nil, child)
 }
 

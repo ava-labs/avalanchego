@@ -755,7 +755,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		require.Equal(status.Aborted, txStatus)
 	}
 
-	require.NoError(oracleBlk.Accept(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Accept(context.Background()))
 
 	// Verify that chain's timestamp has advanced

@@ -68,7 +68,7 @@ func (b *preForkBlock) VerifyProposer(ctx context.Context) error {
 	return parent.verifyPreForkChild(ctx, b)
 }
 
-func (b *preForkBlock) Verify(ctx context.Context) error {
+func (*preForkBlock) Verify(context.Context) error {
 	return nil // Block verification is fully handled by VerifyProposer
 }
 
