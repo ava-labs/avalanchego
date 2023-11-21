@@ -156,6 +156,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		return errDuplicateAdd
 	}
 
+	ts.metrics.Verified(height)
 	ts.metrics.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
@@ -631,7 +632,13 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	ts.preferredIDs.Remove(pref)
 	delete(ts.preferredHeights, height)
 
-	ts.metrics.Accepted(pref, height, child.Timestamp(), ts.pollNumber, len(bytes))
+	ts.metrics.Accepted(
+		pref,
+		height,
+		child.Timestamp(),
+		ts.pollNumber,
+		len(bytes),
+	)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
