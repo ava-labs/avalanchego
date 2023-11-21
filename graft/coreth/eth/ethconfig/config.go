@@ -53,18 +53,19 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		NetworkId:             1,
-		TrieCleanCache:        512,
-		TrieDirtyCache:        256,
-		TrieDirtyCommitTarget: 20,
-		SnapshotCache:         256,
-		AcceptedCacheSize:     32,
-		Miner:                 miner.Config{},
-		TxPool:                txpool.DefaultConfig,
-		RPCGasCap:             25000000,
-		RPCEVMTimeout:         5 * time.Second,
-		GPO:                   DefaultFullGPOConfig,
-		RPCTxFeeCap:           1, // 1 AVAX
+		NetworkId:                 1,
+		TrieCleanCache:            512,
+		TrieDirtyCache:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 16,
+		SnapshotCache:             256,
+		AcceptedCacheSize:         32,
+		Miner:                     miner.Config{},
+		TxPool:                    txpool.DefaultConfig,
+		RPCGasCap:                 25000000,
+		RPCEVMTimeout:             5 * time.Second,
+		GPO:                       DefaultFullGPOConfig,
+		RPCTxFeeCap:               1, // 1 AVAX
 	}
 }
 
@@ -94,13 +95,14 @@ type Config struct {
 	SkipBcVersionCheck bool `toml:"-"`
 
 	// TrieDB and snapshot options
-	TrieCleanCache        int
-	TrieCleanJournal      string
-	TrieCleanRejournal    time.Duration
-	TrieDirtyCache        int
-	TrieDirtyCommitTarget int
-	SnapshotCache         int
-	Preimages             bool
+	TrieCleanCache            int
+	TrieCleanJournal          string
+	TrieCleanRejournal        time.Duration
+	TrieDirtyCache            int
+	TrieDirtyCommitTarget     int
+	TriePrefetcherParallelism int
+	SnapshotCache             int
+	Preimages                 bool
 
 	// AcceptedCacheSize is the depth of accepted headers cache and accepted
 	// logs cache at the accepted tip.

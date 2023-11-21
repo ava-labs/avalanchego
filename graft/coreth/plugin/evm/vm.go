@@ -504,6 +504,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.TrieCleanRejournal = vm.config.TrieCleanRejournal.Duration
 	vm.ethConfig.TrieDirtyCache = vm.config.TrieDirtyCache
 	vm.ethConfig.TrieDirtyCommitTarget = vm.config.TrieDirtyCommitTarget
+	vm.ethConfig.TriePrefetcherParallelism = vm.config.TriePrefetcherParallelism
 	vm.ethConfig.SnapshotCache = vm.config.SnapshotCache
 	vm.ethConfig.Pruning = vm.config.Pruning
 	vm.ethConfig.AcceptorQueueLimit = vm.config.AcceptorQueueLimit

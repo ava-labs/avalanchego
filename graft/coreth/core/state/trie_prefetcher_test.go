@@ -36,6 +36,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const maxConcurrency = 4
+
 func filledStateDB() *StateDB {
 	state, _ := New(types.EmptyRootHash, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
@@ -56,7 +58,7 @@ func filledStateDB() *StateDB {
 
 func TestCopyAndClose(t *testing.T) {
 	db := filledStateDB()
-	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "")
+	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "", maxConcurrency)
 	skey := common.HexToHash("aaa")
 	prefetcher.prefetch(common.Hash{}, db.originalRoot, common.Address{}, [][]byte{skey.Bytes()})
 	prefetcher.prefetch(common.Hash{}, db.originalRoot, common.Address{}, [][]byte{skey.Bytes()})
@@ -81,7 +83,7 @@ func TestCopyAndClose(t *testing.T) {
 
 func TestUseAfterClose(t *testing.T) {
 	db := filledStateDB()
-	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "")
+	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "", maxConcurrency)
 	skey := common.HexToHash("aaa")
 	prefetcher.prefetch(common.Hash{}, db.originalRoot, common.Address{}, [][]byte{skey.Bytes()})
 	a := prefetcher.trie(common.Hash{}, db.originalRoot)
@@ -97,7 +99,7 @@ func TestUseAfterClose(t *testing.T) {
 
 func TestCopyClose(t *testing.T) {
 	db := filledStateDB()
-	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "")
+	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "", maxConcurrency)
 	skey := common.HexToHash("aaa")
 	prefetcher.prefetch(common.Hash{}, db.originalRoot, common.Address{}, [][]byte{skey.Bytes()})
 	cpy := prefetcher.copy()

@@ -524,9 +524,10 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 		}
 		engine = dummy.NewFullFaker()
 		config = &CacheConfig{
-			TrieCleanLimit: 256,
-			TrieDirtyLimit: 256,
-			SnapshotLimit:  0, // Disable snapshot by default
+			TrieCleanLimit:            256,
+			TrieDirtyLimit:            256,
+			TriePrefetcherParallelism: 4,
+			SnapshotLimit:             0, // Disable snapshot by default
 		}
 	)
 	defer engine.Close()

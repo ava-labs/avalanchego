@@ -21,6 +21,7 @@ const (
 	defaultTrieCleanCache                             = 512
 	defaultTrieDirtyCache                             = 512
 	defaultTrieDirtyCommitTarget                      = 20
+	defaultTriePrefetcherParallelism                  = 16
 	defaultSnapshotCache                              = 256
 	defaultSyncableCommitInterval                     = defaultCommitInterval * 4
 	defaultSnapshotWait                               = false
@@ -97,12 +98,13 @@ type Config struct {
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// Cache settings
-	TrieCleanCache        int      `json:"trie-clean-cache"`         // Size of the trie clean cache (MB)
-	TrieCleanJournal      string   `json:"trie-clean-journal"`       // Directory to use to save the trie clean cache (must be populated to enable journaling the trie clean cache)
-	TrieCleanRejournal    Duration `json:"trie-clean-rejournal"`     // Frequency to re-journal the trie clean cache to disk (minimum 1 minute, must be populated to enable journaling the trie clean cache)
-	TrieDirtyCache        int      `json:"trie-dirty-cache"`         // Size of the trie dirty cache (MB)
-	TrieDirtyCommitTarget int      `json:"trie-dirty-commit-target"` // Memory limit to target in the dirty cache before performing a commit (MB)
-	SnapshotCache         int      `json:"snapshot-cache"`           // Size of the snapshot disk layer clean cache (MB)
+	TrieCleanCache            int      `json:"trie-clean-cache"`            // Size of the trie clean cache (MB)
+	TrieCleanJournal          string   `json:"trie-clean-journal"`          // Directory to use to save the trie clean cache (must be populated to enable journaling the trie clean cache)
+	TrieCleanRejournal        Duration `json:"trie-clean-rejournal"`        // Frequency to re-journal the trie clean cache to disk (minimum 1 minute, must be populated to enable journaling the trie clean cache)
+	TrieDirtyCache            int      `json:"trie-dirty-cache"`            // Size of the trie dirty cache (MB)
+	TrieDirtyCommitTarget     int      `json:"trie-dirty-commit-target"`    // Memory limit to target in the dirty cache before performing a commit (MB)
+	TriePrefetcherParallelism int      `json:"trie-prefetcher-parallelism"` // Max concurrent disk reads trie prefetcher should perform at once
+	SnapshotCache             int      `json:"snapshot-cache"`              // Size of the snapshot disk layer clean cache (MB)
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
@@ -232,6 +234,7 @@ func (c *Config) SetDefaults() {
 	c.TrieCleanCache = defaultTrieCleanCache
 	c.TrieDirtyCache = defaultTrieDirtyCache
 	c.TrieDirtyCommitTarget = defaultTrieDirtyCommitTarget
+	c.TriePrefetcherParallelism = defaultTriePrefetcherParallelism
 	c.SnapshotCache = defaultSnapshotCache
 	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
 	c.SnapshotWait = defaultSnapshotWait
