@@ -361,8 +361,8 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 
 	return map[string]interface{}{
 		"processingBlocks":       numProcessingBlks,
-		"longestProcessingBlock": maxTimeProcessing.String(),
-		"lastAcceptedID":         ts.lastAcceptedID.String(),
+		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
+		"lastAcceptedID":         ts.lastAcceptedID,
 		"lastAcceptedHeight":     ts.lastAcceptedHeight,
 	}, errors.Join(errs...)
 }
