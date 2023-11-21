@@ -403,7 +403,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -498,7 +498,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
