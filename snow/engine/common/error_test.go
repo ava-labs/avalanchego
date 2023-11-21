@@ -62,9 +62,7 @@ func TestAppErrorEqual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			require.Equal(tt.expected, errors.Is(tt.err1, tt.err2))
+			require.Equal(t, tt.expected, errors.Is(tt.err1, tt.err2))
 		})
 	}
 }
@@ -90,9 +88,7 @@ func TestErrorCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			require.ErrorIs(tt.expected, &AppError{Code: tt.code})
+			require.ErrorIs(t, tt.expected, &AppError{Code: tt.code})
 		})
 	}
 }
