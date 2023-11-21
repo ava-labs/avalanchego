@@ -155,7 +155,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		// Verify the signature of the node
-		shouldHaveProposer := delay < proposer.MaxVerifyDuration
+		shouldHaveProposer := delay < proposer.MaxVerifyDelay
 		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
@@ -203,7 +203,7 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
-	if delay < proposer.MaxBuildDuration {
+	if delay < proposer.MaxBuildDelay {
 		parentHeight := p.innerBlk.Height()
 		proposerID := p.vm.ctx.NodeID
 		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
@@ -249,7 +249,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxVerifyDuration {
+	if delay >= proposer.MaxVerifyDelay {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
