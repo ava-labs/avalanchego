@@ -46,9 +46,10 @@ type metrics struct {
 	pollsAccepted metric.Averager
 	// latAccepted tracks the number of nanoseconds that a block was processing
 	// before being accepted
-	latAccepted              metric.Averager
-	blockSizeAcceptedSum     prometheus.Gauge
-	timesVerifiedAcceptedSum prometheus.Gauge
+	latAccepted                metric.Averager
+	blockSizeAcceptedSum       prometheus.Gauge
+	timesVerifiedAcceptedSum   prometheus.Gauge
+	verifiedOnceBlocksAccepted prometheus.Counter
 
 	// pollsRejected tracks the number of polls that a block was in processing
 	// for before being rejected
@@ -134,6 +135,11 @@ func newMetrics(
 			Name:      "blks_times_verified_accepted_sum",
 			Help:      "cumulative number of times all accepted blocks were verified",
 		}),
+		verifiedOnceBlocksAccepted: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "verified_once_blks_rejected",
+			Help:      "number of blocks accepted that were only verified once",
+		}),
 
 		pollsRejected: metric.NewAveragerWithErrs(
 			namespace,
@@ -195,6 +201,7 @@ func newMetrics(
 		reg.Register(m.numProcessing),
 		reg.Register(m.blockSizeAcceptedSum),
 		reg.Register(m.timesVerifiedAcceptedSum),
+		reg.Register(m.verifiedOnceBlocksAccepted),
 		reg.Register(m.blockSizeRejectedSum),
 		reg.Register(m.timesVerifiedRejectedSum),
 		reg.Register(m.unverifiedBlocksRejected),
@@ -245,6 +252,10 @@ func (m *metrics) Accepted(
 
 	m.blockSizeAcceptedSum.Add(float64(blockSize))
 	m.timesVerifiedAcceptedSum.Add(float64(timesVerified))
+
+	if timesVerified == 1 {
+		m.verifiedOnceBlocksAccepted.Inc()
+	}
 }
 
 func (m *metrics) Rejected(
