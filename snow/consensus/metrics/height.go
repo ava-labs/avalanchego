@@ -3,29 +3,50 @@
 
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/math"
+)
 
 var _ Height = (*height)(nil)
 
-// Height reports the last accepted height
 type Height interface {
+	Verified(height uint64)
 	Accepted(height uint64)
 }
 
 type height struct {
-	// lastAcceptedHeight keeps track of the last accepted height
+	currentMaxVerifiedHeight uint64
+	maxVerifiedHeight        prometheus.Gauge
+
 	lastAcceptedHeight prometheus.Gauge
 }
 
 func NewHeight(namespace string, reg prometheus.Registerer) (Height, error) {
 	h := &height{
+		maxVerifiedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "max_verified_height",
+			Help:      "Highest verified height",
+		}),
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "last_accepted_height",
 			Help:      "Last height accepted",
 		}),
 	}
-	return h, reg.Register(h.lastAcceptedHeight)
+	err := utils.Err(
+		reg.Register(h.lastAcceptedHeight),
+		reg.Register(h.maxVerifiedHeight),
+	)
+	return h, err
+}
+
+func (h *height) Verified(height uint64) {
+	h.currentMaxVerifiedHeight = math.Max(h.currentMaxVerifiedHeight, height)
+	h.maxVerifiedHeight.Set(float64(h.currentMaxVerifiedHeight))
 }
 
 func (h *height) Accepted(height uint64) {
