@@ -87,7 +87,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
 }
 
-func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
+func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
@@ -96,7 +96,7 @@ func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
 
-	// 0. Build a post fork block. It'll be the parent of our test subject.
+	// Build a post fork block. It'll be the parent block in our test cases
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
@@ -144,20 +144,19 @@ func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
 	_, err = proVM.getPostForkBlock(ctx, parentBlk.ID())
 	require.NoError(err)
 
-	// 2. Force this node to be the only validator, so to guarantee
+	// Force this node to be the only validator, so to guarantee
 	// it'd be picked if block build time was before MaxVerifyDelay
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		// a validator with a weight large enough to fully fill the proposers list
+		weight := uint64(proposer.MaxBuildWindows * 2)
+
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			proVM.ctx.NodeID: {
 				NodeID: proVM.ctx.NodeID,
-				Weight: 10,
+				Weight: weight,
 			},
 		}, nil
 	}
-
-	// 3. Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
-	localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
-	proVM.Set(localTime)
 
 	coreChildBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -172,14 +171,113 @@ func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
 		return coreChildBlk, nil
 	}
 
-	// check child block is unsigned if built after MaxVerifyDelay
-	// (even if it comes before MaxVerifyDelay)
-	childBlk, err := proVM.BuildBlock(ctx)
-	require.NoError(err)
-	require.IsType(&postForkBlock{}, childBlk)
-	require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+	{
+		// Set local clock before MaxVerifyDelay from parent timestamp.
+		// Check that child block is signed.
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		proVM.Set(localTime)
 
-	// 4. Mark node as non validator
+		childBlk, err := proVM.BuildBlock(ctx)
+		require.NoError(err)
+		require.IsType(&postForkBlock{}, childBlk)
+		require.Equal(proVM.ctx.NodeID, childBlk.(*postForkBlock).Proposer()) // signed block
+	}
+
+	{
+		// Set local clock exactly MaxVerifyDelay from parent timestamp.
+		// Check that child block is signed.
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		proVM.Set(localTime)
+
+		childBlk, err := proVM.BuildBlock(ctx)
+		require.NoError(err)
+		require.IsType(&postForkBlock{}, childBlk)
+		require.Equal(proVM.ctx.NodeID, childBlk.(*postForkBlock).Proposer()) // signed block
+	}
+
+	{
+		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
+		// Check that child block is unsigned
+		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		proVM.Set(localTime)
+
+		childBlk, err := proVM.BuildBlock(ctx)
+		require.NoError(err)
+		require.IsType(&postForkBlock{}, childBlk)
+		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+	}
+
+	{
+		// Set local clock after MaxBuildDelay from parent timestamp
+		// Check that child block is unsigned
+		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		proVM.Set(localTime)
+
+		childBlk, err := proVM.BuildBlock(ctx)
+		require.NoError(err)
+		require.IsType(&postForkBlock{}, childBlk)
+		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+	}
+}
+
+func TestNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(ctx))
+	}()
+
+	// Build a post fork block. It'll be the parent block in our test cases
+	parentTime := time.Now().Truncate(time.Second)
+	proVM.Set(parentTime)
+
+	coreParentBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreParentBlk, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreParentBlk.ID():
+			return coreParentBlk, nil
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) { // needed when setting preference
+		switch {
+		case bytes.Equal(b, coreParentBlk.Bytes()):
+			return coreParentBlk, nil
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock(ctx)
+	require.NoError(err)
+	require.NoError(parentBlk.Verify(ctx))
+	require.NoError(parentBlk.Accept(ctx))
+
+	// Make sure preference is duly set
+	require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
+	require.Equal(proVM.preferred, parentBlk.ID())
+	_, err = proVM.getPostForkBlock(ctx, parentBlk.ID())
+	require.NoError(err)
+
+	// Mark node as non validator
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			aValidator = ids.GenerateTestNodeID()
@@ -195,21 +293,58 @@ func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
 		}, nil
 	}
 
-	// 5. check that block is not built if local clock is
-	// among MaxVerifyDelay and MaxBuildDelay from parent timestamp
-	localTime = parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
-	proVM.Set(localTime)
+	coreChildBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreParentBlk.ID(),
+		HeightV: coreParentBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreChildBlk, nil
+	}
 
-	_, err = proVM.BuildBlock(ctx)
-	require.ErrorIs(errProposerWindowNotStarted, err)
+	{
+		// Set local clock before MaxVerifyDelay from parent timestamp.
+		// Check that child block is not built.
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		proVM.Set(localTime)
 
-	// 6. check that block is built if local clock is
-	// after MaxVerifyDelay from parent timestamp
-	localTime = parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
-	proVM.Set(localTime)
+		_, err := proVM.BuildBlock(ctx)
+		require.ErrorIs(errProposerWindowNotStarted, err)
+	}
 
-	childBlk, err = proVM.BuildBlock(ctx)
-	require.NoError(err)
-	require.IsType(&postForkBlock{}, childBlk)
-	require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+	{
+		// Set local clock exactly MaxVerifyDelay from parent timestamp.
+		// Check that child block is not built.
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		proVM.Set(localTime)
+
+		_, err := proVM.BuildBlock(ctx)
+		require.ErrorIs(errProposerWindowNotStarted, err)
+	}
+
+	{
+		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
+		// Check that child block is not built.
+		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		proVM.Set(localTime)
+
+		_, err := proVM.BuildBlock(ctx)
+		require.ErrorIs(errProposerWindowNotStarted, err)
+	}
+
+	{
+		// Set local clock after MaxBuildDelay from parent timestamp
+		// Check that child block is built and it is unsigned
+		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		proVM.Set(localTime)
+
+		childBlk, err := proVM.BuildBlock(ctx)
+		require.NoError(err)
+		require.IsType(&postForkBlock{}, childBlk)
+		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+	}
 }
