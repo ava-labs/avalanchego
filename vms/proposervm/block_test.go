@@ -319,7 +319,7 @@ func TestNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
