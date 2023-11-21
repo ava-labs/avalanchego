@@ -128,10 +128,7 @@ func (ts *Topological) Initialize(
 	ts.lastAcceptedID = lastAcceptedID
 	ts.lastAcceptedHeight = lastAcceptedHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
-		lastAcceptedID: {
-			params:   ts.params,
-			verified: true,
-		},
+		lastAcceptedID: {params: ts.params},
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
 	ts.preference = lastAcceptedID
