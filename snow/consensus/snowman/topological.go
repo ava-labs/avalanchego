@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -41,10 +40,7 @@ func (TopologicalFactory) New() Consensus {
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
-	metrics.Latency
-	metrics.Polls
-	metrics.Height
-	metrics.Timestamp
+	metrics *metrics
 
 	// pollNumber is the number of times RecordPolls has been called
 	pollNumber uint64
@@ -69,7 +65,7 @@ type Topological struct {
 	// that height.
 	preferredHeights map[uint64]ids.ID // height -> blockID
 
-	// preference is the highest preferred and verified block
+	// preference is the preferred block with highest height
 	preference ids.ID
 
 	// Used in [calculateInDegree] and.
@@ -109,33 +105,21 @@ func (ts *Topological) Initialize(
 	lastAcceptedHeight uint64,
 	lastAcceptedTime time.Time,
 ) error {
-	if err := params.Verify(); err != nil {
-		return err
-	}
-
-	latencyMetrics, err := metrics.NewLatency("blks", "block(s)", ctx.Log, "", ctx.Registerer)
+	err := params.Verify()
 	if err != nil {
 		return err
 	}
-	ts.Latency = latencyMetrics
 
-	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	ts.metrics, err = newMetrics(
+		ctx.Log,
+		"",
+		ctx.Registerer,
+		lastAcceptedHeight,
+		lastAcceptedTime,
+	)
 	if err != nil {
 		return err
 	}
-	ts.Polls = pollsMetrics
-
-	heightMetrics, err := metrics.NewHeight("", ctx.Registerer)
-	if err != nil {
-		return err
-	}
-	ts.Height = heightMetrics
-
-	timestampMetrics, err := metrics.NewTimestamp("", ctx.Registerer)
-	if err != nil {
-		return err
-	}
-	ts.Timestamp = timestampMetrics
 
 	ts.leaves = set.Set[ids.ID]{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
@@ -151,12 +135,6 @@ func (ts *Topological) Initialize(
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
 	ts.preference = lastAcceptedID
-
-	// Initially set the metrics for the last accepted block.
-	ts.Height.Verified(ts.lastAcceptedHeight)
-	ts.Height.Accepted(ts.lastAcceptedHeight)
-	ts.Timestamp.Accepted(lastAcceptedTime)
-
 	return nil
 }
 
@@ -181,7 +159,8 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		return errDuplicateAdd
 	}
 
-	ts.Latency.Issued(blkID, ts.pollNumber)
+	ts.metrics.Verified(height)
+	ts.metrics.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
@@ -198,7 +177,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		if err := blk.Reject(ctx); err != nil {
 			return err
 		}
-		ts.Latency.Rejected(blkID, ts.pollNumber, len(blk.Bytes()))
+		ts.metrics.Rejected(blkID, ts.pollNumber, len(blk.Bytes()))
 		return nil
 	}
 
@@ -220,7 +199,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 				zap.Error(err),
 			)
 		} else {
-			ts.Height.Verified(height)
+			ts.metrics.Verified(height)
 			// If the block was able to be verified, then we can vote for this
 			// block.
 			ts.preference = blkID
@@ -329,7 +308,7 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
-	numOutstandingBlks := ts.Latency.NumProcessing()
+	numOutstandingBlks := ts.NumProcessing()
 	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	healthy := isOutstandingBlks
 	details := map[string]interface{}{
@@ -337,7 +316,7 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	// check for long running blocks
-	timeReqRunning := ts.Latency.MeasureAndGetOldestDuration()
+	timeReqRunning := ts.metrics.MeasureAndGetOldestDuration()
 	isProcessingTime := timeReqRunning <= ts.params.MaxItemProcessingTime
 	healthy = healthy && isProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
@@ -477,7 +456,7 @@ func (ts *Topological) vote(voteStack []votes) {
 			ts.ctx.Log.Verbo("no progress was made after processing pending blocks",
 				zap.Int("numProcessing", numProcessing),
 			)
-			ts.Polls.Failed()
+			ts.metrics.FailedPoll()
 		}
 		return
 	}
@@ -549,9 +528,9 @@ func (ts *Topological) vote(voteStack []votes) {
 	}
 
 	if pollSuccessful {
-		ts.Polls.Successful()
+		ts.metrics.SuccessfulPoll()
 	} else {
-		ts.Polls.Failed()
+		ts.metrics.FailedPoll()
 	}
 }
 
@@ -588,7 +567,7 @@ func (ts *Topological) updateProcessing(ctx context.Context) error {
 			break
 		}
 
-		ts.Height.Verified(height)
+		ts.metrics.Verified(height)
 		ts.preference = blkID
 		ts.preferredIDs.Add(blkID)
 		// Invariant: Because the prior block had an initialized snowball
@@ -605,10 +584,10 @@ func (ts *Topological) updateProcessing(ctx context.Context) error {
 //
 // We accept a block once its parent's snowball instance has finalized
 // with it as the preference.
-func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, child *snowmanBlock, siblings set.Set[ids.ID]) (bool, error) {
-	blkID := child.blk.ID()
-	height := child.blk.Height()
-	if err := child.Verify(ctx); err != nil {
+func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, blk *snowmanBlock, siblings set.Set[ids.ID]) (bool, error) {
+	blkID := blk.blk.ID()
+	height := blk.blk.Height()
+	if err := blk.Verify(ctx); err != nil {
 		ts.ctx.Log.Warn("accepted block failed verification",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("height", height),
@@ -618,10 +597,10 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, child *snowm
 		return false, nil
 	}
 
-	ts.Height.Verified(height)
+	ts.metrics.Verified(height)
 
 	// Notify anyone listening that this block was accepted.
-	bytes := child.blk.Bytes()
+	bytes := blk.blk.Bytes()
 	// Note that BlockAcceptor.Accept must be called before child.Accept to
 	// honor Acceptor.Accept's invariant.
 	if err := ts.ctx.BlockAcceptor.Accept(ts.ctx, blkID, bytes); err != nil {
@@ -632,7 +611,7 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, child *snowm
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", height),
 	)
-	if err := child.blk.Accept(ctx); err != nil {
+	if err := blk.blk.Accept(ctx); err != nil {
 		return false, err
 	}
 
@@ -644,9 +623,13 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, child *snowm
 	ts.preferredIDs.Remove(blkID)
 	delete(ts.preferredHeights, height)
 
-	ts.Latency.Accepted(blkID, ts.pollNumber, len(bytes))
-	ts.Height.Accepted(height)
-	ts.Timestamp.Accepted(child.blk.Timestamp())
+	ts.metrics.Accepted(
+		blkID,
+		height,
+		blk.blk.Timestamp(),
+		ts.pollNumber,
+		len(bytes),
+	)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
@@ -668,7 +651,7 @@ func (ts *Topological) tryAcceptPreferredChild(ctx context.Context, child *snowm
 		if err := sibling.blk.Reject(ctx); err != nil {
 			return false, err
 		}
-		ts.Latency.Rejected(siblingID, ts.pollNumber, len(sibling.blk.Bytes()))
+		ts.metrics.Rejected(siblingID, ts.pollNumber, len(sibling.blk.Bytes()))
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, siblingID)
@@ -703,7 +686,7 @@ func (ts *Topological) rejectTransitively(ctx context.Context, rejected []ids.ID
 			if err := child.blk.Reject(ctx); err != nil {
 				return err
 			}
-			ts.Latency.Rejected(childID, ts.pollNumber, len(child.blk.Bytes()))
+			ts.metrics.Rejected(childID, ts.pollNumber, len(child.blk.Bytes()))
 
 			// add the newly rejected block to the end of the stack
 			rejected = append(rejected, childID)
