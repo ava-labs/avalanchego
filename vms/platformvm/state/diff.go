@@ -11,9 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 var (
@@ -74,6 +76,10 @@ func NewDiff(
 		timestamp:     parentState.GetTimestamp(),
 		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
+}
+
+func (*diff) NewView([]database.BatchOp) (merkledb.TrieView, error) {
+	return nil, errors.New("TODO")
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -476,6 +482,155 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	}
 }
 
+func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
+	batchOps := []database.BatchOp{}
+
+	// writeMetadata
+	encodedChainTime, err := d.timestamp.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encoding chainTime: %w", err)
+	}
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
+
+	// writePermissionedSubnets
+	for _, subnet := range d.addedSubnets {
+		key := merklePermissionedSubnetKey(subnet.ID())
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnet.Bytes(),
+		})
+	}
+
+	// writeSubnetOwners
+	for subnetID, owner := range d.subnetOwners {
+		owner := owner
+
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+
+		key := merkleSubnetOwnersKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: ownerBytes,
+		})
+	}
+
+	// writeElasticSubnets
+	for _, tx := range d.transformedSubnets {
+		transformSubnetTx := tx.Unsigned.(*txs.TransformSubnetTx)
+		key := merkleElasticSubnetKey(transformSubnetTx.Subnet)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: transformSubnetTx.Bytes(),
+		})
+	}
+
+	// writeChains
+	for _, chains := range d.addedChains {
+		for _, chain := range chains {
+			createChainTx := chain.Unsigned.(*txs.CreateChainTx)
+			subnetID := createChainTx.SubnetID
+			key := merkleChainKey(subnetID, chain.ID())
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: chain.Bytes(),
+			})
+		}
+	}
+
+	// writeCurrentStakers
+	// for stakerTxID, data := range currentData {
+	// 	key := merkleCurrentStakersKey(stakerTxID)
+
+	// 	if data.TxBytes == nil {
+	// 		batchOps = append(batchOps, database.BatchOp{
+	// 			Key:    key,
+	// 			Delete: true,
+	// 		})
+	// 		continue
+	// 	}
+
+	// 	dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
+	// 	}
+	// 	batchOps = append(batchOps, database.BatchOp{
+	// 		Key:   key,
+	// 		Value: dataBytes,
+	// 	})
+	// }
+
+	// writePendingStakers
+	// for stakerTxID, data := range pendingData {
+	// 	key := merklePendingStakersKey(stakerTxID)
+
+	// 	if data.TxBytes == nil {
+	// 		batchOps = append(batchOps, database.BatchOp{
+	// 			Key:    key,
+	// 			Delete: true,
+	// 		})
+	// 		continue
+	// 	}
+
+	// 	dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
+	// 	}
+	// 	batchOps = append(batchOps, database.BatchOp{
+	// 		Key:   key,
+	// 		Value: dataBytes,
+	// 	})
+	// }
+
+	// writeDelegateeRewards
+	for subnetID, nodes := range d.modifiedDelegateeRewards {
+		for nodeID, amount := range nodes {
+			key := merkleDelegateeRewardsKey(nodeID, subnetID)
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: database.PackUInt64(amount),
+			})
+		}
+	}
+
+	// writeUTXOs
+	for utxoID, utxo := range d.modifiedUTXOs {
+		key := merkleUtxoIDKey(utxoID)
+
+		if utxo != nil {
+			// Inserting a UTXO
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			if err != nil {
+				return nil, err
+			}
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: utxoBytes,
+			})
+			continue
+		}
+
+		// Deleting a UTXO
+		switch _, err := d.GetUTXO(utxoID); err {
+		case nil:
+			batchOps = append(batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+		case database.ErrNotFound:
+		default:
+			return nil, err
+		}
+	}
+
+	return batchOps, nil
+}
+
 func (d *diff) Apply(baseState State) error {
 	baseState.SetTimestamp(d.timestamp)
 	for subnetID, supply := range d.currentSupply {
@@ -557,5 +712,6 @@ func (d *diff) Apply(baseState State) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
+
 	return nil
 }

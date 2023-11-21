@@ -606,18 +606,18 @@ func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // NewView mocks base method.
-func (m *MockState) NewView() (merkledb.TrieView, error) {
+func (m *MockState) NewView(arg0 []database.BatchOp) (merkledb.TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView")
+	ret := m.ctrl.Call(m, "NewView", arg0)
 	ret0, _ := ret[0].(merkledb.TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockStateMockRecorder) NewView() *gomock.Call {
+func (mr *MockStateMockRecorder) NewView(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockState)(nil).NewView))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockState)(nil).NewView), arg0)
 }
 
 // PruneAndIndex mocks base method.

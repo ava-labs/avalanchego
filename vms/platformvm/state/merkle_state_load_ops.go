@@ -45,7 +45,7 @@ func (ms *merkleState) sync(genesis []byte) error {
 		}
 	}
 
-	return ms.load(shouldInit)
+	return ms.load()
 }
 
 func (ms *merkleState) shouldInit() (bool, error) {
@@ -153,7 +153,7 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
-func (ms *merkleState) load(hasSynced bool) error {
+func (ms *merkleState) load() error {
 	err := utils.Err(
 		ms.loadMerkleMetadata(),
 		ms.loadCurrentStakers(),

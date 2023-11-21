@@ -101,6 +101,8 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
+	NewView(ops []database.BatchOp) (merkledb.TrieView, error)
+
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
@@ -130,8 +132,6 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
-
-	NewView() (merkledb.TrieView, error)
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -707,7 +707,7 @@ func newState(
 	}, nil
 }
 
-func (s *state) NewView() (merkledb.TrieView, error) {
+func (*state) NewView([]database.BatchOp) (merkledb.TrieView, error) {
 	return nil, errors.New("unimplemented")
 }
 

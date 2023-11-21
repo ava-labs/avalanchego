@@ -1307,22 +1307,15 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 	return output, nil
 }
 
-func (ms *merkleState) NewView() (merkledb.TrieView, error) {
-	// TODO reduce unneeded vars here.
-	currentData, _, _, _, err := ms.processCurrentStakers()
-	if err != nil {
-		return nil, err
-	}
-	pendingData, err := ms.processPendingStakers()
-	if err != nil {
-		return nil, err
-	}
-	return ms.newView(currentData, pendingData)
+func (ms *merkleState) NewView(ops []database.BatchOp) (merkledb.TrieView, error) {
+	return ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{
+		BatchOps: ops,
+	})
 }
 
-func (ms *merkleState) newView(currentData, pendingData map[ids.ID]*stakersData) (merkledb.TrieView, error) {
+func (ms *merkleState) getMerkleChanges(currentData, pendingData map[ids.ID]*stakersData) ([]database.BatchOp, error) {
 	batchOps := make([]database.BatchOp, 0)
-	if err := utils.Err(
+	err := utils.Err(
 		ms.writeMetadata(&batchOps),
 		ms.writePermissionedSubnets(&batchOps),
 		ms.writeSubnetOwners(&batchOps),
@@ -1332,20 +1325,22 @@ func (ms *merkleState) newView(currentData, pendingData map[ids.ID]*stakersData)
 		ms.writePendingStakers(&batchOps, pendingData),
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
-	); err != nil {
-		return nil, err
-	}
+	)
 
-	return ms.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
+	return batchOps, err
 }
 
 func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
-	view, err := ms.newView(currentData, pendingData)
+	changes, err := ms.getMerkleChanges(currentData, pendingData)
 	if err != nil {
 		return err
 	}
-	if err := view.CommitToDB(context.TODO()); err != nil {
-		return fmt.Errorf("failed committing merkleDB view: %w", err)
+	view, err := ms.NewView(changes)
+	if err != nil {
+		return err
+	}
+	if err := view.CommitToDB(context.Background()); err != nil {
+		return err
 	}
 	ms.logMerkleRoot()
 	return nil
