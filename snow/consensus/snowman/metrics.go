@@ -272,7 +272,7 @@ func (m *metrics) Rejected(
 	m.blockSizeRejectedSum.Add(float64(blockSize))
 	m.timesVerifiedRejectedSum.Add(float64(timesVerified))
 
-	if timesVerified > 0 {
+	if timesVerified == 0 {
 		m.unverifiedBlocksRejected.Inc()
 	}
 }
