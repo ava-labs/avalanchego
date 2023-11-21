@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
@@ -83,4 +85,88 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
+}
+
+// Check that a proposer block is unsigned if built MaxVerifyDelay after
+// its parent, even if it's built before MaxBuiltDelay
+func TestBlockBuiltAfterMaxVerifyDelayIsUnsigned(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	coreVM /*valsState*/, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(ctx))
+	}()
+
+	// 1. Build a post fork block. It'll be the parent of our test subject.
+	parentTime := time.Now().Truncate(time.Second)
+	proVM.Set(parentTime)
+
+	coreParentBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreParentBlk, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreParentBlk.ID():
+			return coreParentBlk, nil
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) { // needed when setting preference
+		switch {
+		case bytes.Equal(b, coreParentBlk.Bytes()):
+			return coreParentBlk, nil
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock(ctx)
+	require.NoError(err)
+	require.NoError(parentBlk.Verify(ctx))
+	require.NoError(parentBlk.Accept(ctx))
+
+	// Make sure preference is duly set
+	require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
+	require.Equal(proVM.preferred, parentBlk.ID())
+	_, err = proVM.getPostForkBlock(ctx, parentBlk.ID())
+	require.NoError(err)
+
+	// 2. Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
+	localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxVerifyDelay) / 2)
+	proVM.Set(localTime)
+
+	coreChildBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreParentBlk.ID(),
+		HeightV: coreParentBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreChildBlk, nil
+	}
+
+	// check child block is unsigned if built after MaxVerifyDelay
+	// (even if it comes before MaxVerifyDelay)
+	childBlk, err := proVM.BuildBlock(ctx)
+	require.NoError(err)
+	require.IsType(&postForkBlock{}, childBlk)
+	require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
 }
