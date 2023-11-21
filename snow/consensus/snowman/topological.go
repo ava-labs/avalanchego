@@ -549,6 +549,9 @@ func (ts *Topological) updateProcessing(ctx context.Context) error {
 		parentSB := blk.sb
 		blkID := parentSB.Preference()
 		blk = ts.blocks[blkID]
+		// Invariant: Because the prior block had an initialized snowball
+		// instance, it must have a processing child. This guarantees that
+		// blk.blk is non-nil.
 		height := blk.blk.Height()
 		if ts.preference == ts.lastAcceptedID && parentSB.Finalized() {
 			accepted, err := ts.tryAcceptPreferredChild(ctx, blk, siblings)
@@ -576,9 +579,6 @@ func (ts *Topological) updateProcessing(ctx context.Context) error {
 		ts.metrics.Verified(height)
 		ts.preference = blkID
 		ts.preferredIDs.Add(blkID)
-		// Invariant: Because the prior block had an initialized snowball
-		// instance, it must have a processing child. This guarantees that
-		// block.blk is non-nil here.
 		ts.preferredHeights[height] = blkID
 	}
 	return nil
