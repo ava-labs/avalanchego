@@ -28,22 +28,24 @@ import (
 
 var (
 	archiveConfig = &CacheConfig{
-		TrieCleanLimit:        256,
-		TrieDirtyLimit:        256,
-		TrieDirtyCommitTarget: 20,
-		Pruning:               false, // Archive mode
-		SnapshotLimit:         256,
-		AcceptorQueueLimit:    64,
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 4,
+		Pruning:                   false, // Archive mode
+		SnapshotLimit:             256,
+		AcceptorQueueLimit:        64,
 	}
 
 	pruningConfig = &CacheConfig{
-		TrieCleanLimit:        256,
-		TrieDirtyLimit:        256,
-		TrieDirtyCommitTarget: 20,
-		Pruning:               true, // Enable pruning
-		CommitInterval:        4096,
-		SnapshotLimit:         256,
-		AcceptorQueueLimit:    64,
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 4,
+		Pruning:                   true, // Enable pruning
+		CommitInterval:            4096,
+		SnapshotLimit:             256,
+		AcceptorQueueLimit:        64,
 	}
 )
 
@@ -180,12 +182,13 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit:        256,
-				TrieDirtyLimit:        256,
-				TrieDirtyCommitTarget: 20,
-				Pruning:               false, // Archive mode
-				SnapshotLimit:         0,     // Disable snapshots
-				AcceptorQueueLimit:    64,
+				TrieCleanLimit:            256,
+				TrieDirtyLimit:            256,
+				TrieDirtyCommitTarget:     20,
+				TriePrefetcherParallelism: 4,
+				Pruning:                   false, // Archive mode
+				SnapshotLimit:             0,     // Disable snapshots
+				AcceptorQueueLimit:        64,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -214,13 +217,14 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit:        256,
-				TrieDirtyLimit:        256,
-				TrieDirtyCommitTarget: 20,
-				Pruning:               true, // Enable pruning
-				CommitInterval:        4096,
-				SnapshotLimit:         0, // Disable snapshots
-				AcceptorQueueLimit:    64,
+				TrieCleanLimit:            256,
+				TrieDirtyLimit:            256,
+				TrieDirtyCommitTarget:     20,
+				TriePrefetcherParallelism: 4,
+				Pruning:                   true, // Enable pruning
+				CommitInterval:            4096,
+				SnapshotLimit:             0, // Disable snapshots
+				AcceptorQueueLimit:        64,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -263,13 +267,14 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit:        256,
-				TrieDirtyLimit:        256,
-				TrieDirtyCommitTarget: 20,
-				Pruning:               true, // Enable pruning
-				CommitInterval:        4096,
-				SnapshotLimit:         0, // Disable snapshots
-				AcceptorQueueLimit:    64,
+				TrieCleanLimit:            256,
+				TrieDirtyLimit:            256,
+				TrieDirtyCommitTarget:     20,
+				TriePrefetcherParallelism: 4,
+				Pruning:                   true, // Enable pruning
+				CommitInterval:            4096,
+				SnapshotLimit:             0, // Disable snapshots
+				AcceptorQueueLimit:        64,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -298,13 +303,14 @@ func TestEnableSnapshots(t *testing.T) {
 		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit:        256,
-				TrieDirtyLimit:        256,
-				TrieDirtyCommitTarget: 20,
-				Pruning:               true, // Enable pruning
-				CommitInterval:        4096,
-				SnapshotLimit:         snapLimit,
-				AcceptorQueueLimit:    64,
+				TrieCleanLimit:            256,
+				TrieDirtyLimit:            256,
+				TrieDirtyCommitTarget:     20,
+				TriePrefetcherParallelism: 4,
+				Pruning:                   true, // Enable pruning
+				CommitInterval:            4096,
+				SnapshotLimit:             snapLimit,
+				AcceptorQueueLimit:        64,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -455,6 +461,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 			TrieCleanLimit:                  256,
 			TrieDirtyLimit:                  256,
 			TrieDirtyCommitTarget:           20,
+			TriePrefetcherParallelism:       4,
 			Pruning:                         false, // Archive mode
 			SnapshotLimit:                   256,
 			PopulateMissingTries:            &startHeight, // Starting point for re-populating.
@@ -487,14 +494,15 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	var (
 		create = func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
 			blockchain, err := createBlockChain(db, &CacheConfig{
-				TrieCleanLimit:        256,
-				TrieDirtyLimit:        256,
-				TrieDirtyCommitTarget: 20,
-				Pruning:               true,
-				CommitInterval:        4096,
-				SnapshotLimit:         256,
-				SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
-				AcceptorQueueLimit:    1000, // ensure channel doesn't block
+				TrieCleanLimit:            256,
+				TrieDirtyLimit:            256,
+				TrieDirtyCommitTarget:     20,
+				TriePrefetcherParallelism: 4,
+				Pruning:                   true,
+				CommitInterval:            4096,
+				SnapshotLimit:             256,
+				SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
+				AcceptorQueueLimit:        1000, // ensure channel doesn't block
 			}, gspec, lastAcceptedHash)
 			if err != nil {
 				return nil, err
@@ -681,14 +689,15 @@ func TestTransactionIndices(t *testing.T) {
 	}
 
 	conf := &CacheConfig{
-		TrieCleanLimit:        256,
-		TrieDirtyLimit:        256,
-		TrieDirtyCommitTarget: 20,
-		Pruning:               true,
-		CommitInterval:        4096,
-		SnapshotLimit:         256,
-		SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
-		AcceptorQueueLimit:    64,
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 4,
+		Pruning:                   true,
+		CommitInterval:            4096,
+		SnapshotLimit:             256,
+		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
+		AcceptorQueueLimit:        64,
 	}
 
 	// Init block chain and check all needed indices has been indexed.
@@ -851,15 +860,16 @@ func TestCanonicalHashMarker(t *testing.T) {
 
 func TestTxLookupBlockChain(t *testing.T) {
 	cacheConf := &CacheConfig{
-		TrieCleanLimit:        256,
-		TrieDirtyLimit:        256,
-		TrieDirtyCommitTarget: 20,
-		Pruning:               true,
-		CommitInterval:        4096,
-		SnapshotLimit:         256,
-		SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
-		AcceptorQueueLimit:    64,   // ensure channel doesn't block
-		TxLookupLimit:         5,
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 4,
+		Pruning:                   true,
+		CommitInterval:            4096,
+		SnapshotLimit:             256,
+		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
+		AcceptorQueueLimit:        64,   // ensure channel doesn't block
+		TxLookupLimit:             5,
 	}
 	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
 		return createBlockChain(db, cacheConf, gspec, lastAcceptedHash)

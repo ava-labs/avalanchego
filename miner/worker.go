@@ -162,10 +162,20 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
 
+	// Instantiate stateDB and kick off prefetcher.
 	env, err := w.createCurrentEnvironment(parent, header, tstart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
+
+	// Ensure we always stop prefetcher after block building is complete.
+	defer func() {
+		if env.state == nil {
+			return
+		}
+		env.state.StopPrefetcher()
+	}()
+
 	// Configure any stateful precompiles that should go into effect during this block.
 	w.chainConfig.CheckConfigurePrecompiles(&parent.Time, types.NewBlockWithHeader(header), env.state)
 
@@ -194,10 +204,13 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 }
 
 func (w *worker) createCurrentEnvironment(parent *types.Header, header *types.Header, tstart time.Time) (*environment, error) {
+	// Retrieve the parent state to apply transactions to and kickoff prefetcher,
+	// which will retrieve intermediate nodes for all modified state.
 	state, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		return nil, err
 	}
+	state.StartPrefetcher("miner", w.eth.BlockChain().CacheConfig().TriePrefetcherParallelism)
 	return &environment{
 		signer:  types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:   state,
