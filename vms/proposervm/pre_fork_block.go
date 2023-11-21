@@ -95,7 +95,7 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 	return b.Block
 }
 
-func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, _ *preForkBlock) error {
+func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		return nil
@@ -109,7 +109,7 @@ func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, _ *preFor
 		zap.String("reason", "parent is an oracle block"),
 		zap.Stringer("blkID", b.ID()),
 	)
-	return nil
+	return child.Block.VerifyProposer(ctx)
 }
 
 func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
@@ -178,6 +178,10 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 
 	// Verify the inner block and track it as verified
 	return b.vm.verifyAndRecordInnerBlk(ctx, nil, child)
+}
+
+func (*preForkBlock) verifyProposerPostForkOption(context.Context, *postForkOption) error {
+	return errUnexpectedBlockType
 }
 
 func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) error {
