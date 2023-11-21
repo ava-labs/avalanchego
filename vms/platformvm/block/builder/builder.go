@@ -123,7 +123,6 @@ func (b *builder) buildBlock() (block.Block, error) {
 		return nil, err
 	}
 	nextHeight := preferred.Height() + 1
-
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)

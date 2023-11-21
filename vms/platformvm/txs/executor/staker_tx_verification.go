@@ -92,12 +92,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-		duration         = tx.Validator.Duration()
-	)
-
+	duration := tx.Validator.Duration()
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -128,7 +123,11 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+	)
+	if err := verifyStakerStartTime(currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +161,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTooMuchIntheFuture(currentTimestamp, startTime)
+	return outs, verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -178,12 +177,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-		duration         = tx.Validator.Duration()
-	)
-
+	duration := tx.Validator.Duration()
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -198,7 +192,11 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+	)
+	if err := verifyStakerStartTime(currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -242,7 +240,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
+	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -329,12 +327,7 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		startTime        = tx.StartTime()
-		duration         = tx.Validator.Duration()
-	)
-
+	duration := tx.Validator.Duration()
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -357,7 +350,11 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		startTime        = tx.StartTime()
+	)
+	if err := verifyStakerStartTime(currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -415,7 +412,7 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTooMuchIntheFuture(currentTimestamp, startTime)
+	return outs, verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -438,11 +435,8 @@ func verifyAddPermissionlessValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		startTime        = tx.StartTime()
-		duration         = tx.Validator.Duration()
 	)
-
-	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -451,7 +445,10 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	stakedAssetID := tx.StakeOuts[0].AssetID()
+	var (
+		duration      = tx.Validator.Duration()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -530,7 +527,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
+	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -553,11 +550,8 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		startTime        = tx.StartTime()
-		duration         = tx.Validator.Duration()
 	)
-
-	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -566,7 +560,10 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	stakedAssetID := tx.StakeOuts[0].AssetID()
+	var (
+		duration      = tx.Validator.Duration()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
@@ -666,7 +663,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(currentTimestamp, startTime)
+	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
 // Returns an error if the given tx is invalid.
@@ -717,7 +714,7 @@ func verifyTransferSubnetOwnershipTx(
 }
 
 // Ensure the proposed validator starts after the current time
-func checkStakerStartTime(chainTime, stakerTime time.Time) error {
+func verifyStakerStartTime(chainTime, stakerTime time.Time) error {
 	if !chainTime.Before(stakerTime) {
 		return fmt.Errorf(
 			"%w: %s >= %s",
@@ -729,13 +726,12 @@ func checkStakerStartTime(chainTime, stakerTime time.Time) error {
 	return nil
 }
 
-func stakerTooMuchIntheFuture(chainTime, stakerStartTime time.Time) error {
+func verifyStakerStartsSoon(chainTime, stakerStartTime time.Time) error {
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
 	maxStartTime := chainTime.Add(MaxFutureStartTime)
 	if stakerStartTime.After(maxStartTime) {
 		return ErrFutureStakeTime
 	}
-
 	return nil
 }
