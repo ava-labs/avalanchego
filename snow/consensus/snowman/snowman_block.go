@@ -5,12 +5,19 @@ package snowman
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
+
+const minReverificationDelay = 250 * time.Millisecond
+
+var errRecentlyFailedVerification = errors.New("recently failed verification")
 
 // Tracks the state of a snowman block
 type snowmanBlock struct {
@@ -23,7 +30,9 @@ type snowmanBlock struct {
 	// verified is set to true when it is safe to mark this block as preferred.
 	// If consensus implies that this block should be preferred and it hasn't
 	// been verified, the block should be verified.
-	verified bool
+	verified         bool
+	lastTimeVerified time.Time
+	numTimesVerified int
 
 	// shouldFalter is set to true if this node, and all its descendants received
 	// less than Alpha votes
@@ -57,6 +66,14 @@ func (n *snowmanBlock) Verify(ctx context.Context) error {
 	if n.verified {
 		return nil
 	}
+
+	now := time.Now()
+	if timeSinceLastVerification := now.Sub(n.lastTimeVerified); timeSinceLastVerification < minReverificationDelay {
+		return fmt.Errorf("%w: %s", errRecentlyFailedVerification, timeSinceLastVerification)
+	}
+
+	n.lastTimeVerified = now
+	n.numTimesVerified++
 
 	err := n.blk.Verify(ctx)
 	n.verified = err == nil
