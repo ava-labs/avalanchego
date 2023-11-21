@@ -205,7 +205,7 @@ func (m *metrics) Accepted(
 ) {
 	start, ok := m.processingBlocks.Get(blkID)
 	if !ok {
-		m.log.Warn("unable to measure latency",
+		m.log.Error("unable to measure latency",
 			zap.Stringer("blkID", blkID),
 			zap.Stringer("status", choices.Accepted),
 		)
@@ -227,7 +227,7 @@ func (m *metrics) Accepted(
 func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	start, ok := m.processingBlocks.Get(blkID)
 	if !ok {
-		m.log.Warn("unable to measure latency",
+		m.log.Error("unable to measure latency",
 			zap.Stringer("blkID", blkID),
 			zap.Stringer("status", choices.Rejected),
 		)
