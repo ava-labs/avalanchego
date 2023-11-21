@@ -138,7 +138,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -185,7 +185,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	childProBlk.SignedBlock = childSlb
 	require.NoError(err)
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	require.NoError(childProBlk.Verify(context.Background()))
 }
 
@@ -332,7 +332,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block can arrive within submission window
-	atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
+	atSubWindowEnd := proVM.Time().Add(proposer.MaxBuildDelay)
 	proVM.Clock.Set(atSubWindowEnd)
 	childSlb, err = block.BuildUnsigned(
 		prntProBlk.ID(),
