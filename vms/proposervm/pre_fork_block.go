@@ -60,12 +60,16 @@ func (b *preForkBlock) Status() choices.Status {
 	return b.Block.Status()
 }
 
-func (b *preForkBlock) Verify(ctx context.Context) error {
+func (b *preForkBlock) VerifyProposer(ctx context.Context) error {
 	parent, err := b.vm.getPreForkBlock(ctx, b.Block.Parent())
 	if err != nil {
 		return err
 	}
 	return parent.verifyPreForkChild(ctx, b)
+}
+
+func (b *preForkBlock) Verify(ctx context.Context) error {
+	return nil // Block verification is fully handled by VerifyProposer
 }
 
 func (b *preForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
@@ -95,7 +99,7 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 	return b.Block
 }
 
-func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, child *preForkBlock) error {
+func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		return nil
@@ -109,15 +113,13 @@ func (b *preForkBlock) verifyProposerPreForkChild(ctx context.Context, child *pr
 		zap.String("reason", "parent is an oracle block"),
 		zap.Stringer("blkID", b.ID()),
 	)
-	return child.Block.VerifyProposer(ctx)
-}
-
-func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
+	if err := child.Block.VerifyProposer(ctx); err != nil {
+		return err
+	}
 	return child.Block.Verify(ctx)
 }
 
-// This method only returns nil once (during the transition)
-func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+func (b *preForkBlock) verifyProposerPostForkChild(ctx context.Context, child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(ctx, b.Block); err != nil {
 		return err
 	}
@@ -172,10 +174,11 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	}
 
 	// Verify the lack of signature on the node
-	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID); err != nil {
-		return err
-	}
+	return child.SignedBlock.Verify(false, b.vm.ctx.ChainID)
+}
 
+// This method only returns nil once (during the transition)
+func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	// Verify the inner block and track it as verified
 	return b.vm.verifyAndRecordInnerBlk(ctx, nil, child)
 }

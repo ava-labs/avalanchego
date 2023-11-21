@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -46,7 +47,9 @@ func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {
 
 func (b *postForkBlock) Reject(context.Context) error {
 	// We do not reject the inner block here because it may be accepted later
-	delete(b.vm.verifiedBlocks, b.ID())
+	blkID := b.ID()
+	delete(b.vm.verifiedProposerBlocks, blkID)
+	delete(b.vm.verifiedBlocks, blkID)
 	b.status = choices.Rejected
 	return nil
 }
@@ -62,6 +65,14 @@ func (b *postForkBlock) Status() choices.Status {
 // we don't have the parent.
 func (b *postForkBlock) Parent() ids.ID {
 	return b.ParentID()
+}
+
+func (b *postForkBlock) VerifyProposer(ctx context.Context) error {
+	parent, err := b.vm.getBlock(ctx, b.ParentID())
+	if err != nil {
+		return err
+	}
+	return parent.verifyProposerPostForkChild(ctx, b)
 }
 
 // If Verify() returns nil, Accept() or Reject() will eventually be called on
@@ -113,26 +124,40 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 }
 
 // A post-fork block can never have a pre-fork child
-func (*postForkBlock) verifyProposerPreForkChild(context.Context, *preForkBlock) error {
-	return errUnsignedChild
-}
-
 func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 	return errUnsignedChild
 }
 
-func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+func (b *postForkBlock) verifyProposerPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
-	return b.postForkCommonComponents.Verify(
+	err := b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
 		child,
 	)
+	if err != nil {
+		return err
+	}
+
+	childID := child.ID()
+	child.vm.verifiedProposerBlocks[childID] = child
+	return nil
 }
 
-func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
+func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+	parentPChainHeight := b.PChainHeight()
+	return child.vm.verifyAndRecordInnerBlk(
+		ctx,
+		&smblock.Context{
+			PChainHeight: parentPChainHeight,
+		},
+		child,
+	)
+}
+
+func (b *postForkBlock) verifyProposerPostForkOption(ctx context.Context, child *postForkOption) error {
 	if err := verifyIsOracleBlock(ctx, b.innerBlk); err != nil {
 		return err
 	}
@@ -144,6 +169,12 @@ func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postFor
 		return errInnerParentMismatch
 	}
 
+	childID := child.ID()
+	child.vm.verifiedProposerBlocks[childID] = child
+	return nil
+}
+
+func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
 	return child.vm.verifyAndRecordInnerBlk(ctx, nil, child)
 }
 

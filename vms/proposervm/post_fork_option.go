@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -54,8 +55,9 @@ func (b *postForkOption) acceptInnerBlk(ctx context.Context) error {
 func (b *postForkOption) Reject(context.Context) error {
 	// we do not reject the inner block here because that block may be contained
 	// in the proposer block that causing this block to be rejected.
-
-	delete(b.vm.verifiedBlocks, b.ID())
+	blkID := b.ID()
+	delete(b.vm.verifiedProposerBlocks, blkID)
+	delete(b.vm.verifiedBlocks, blkID)
 	b.status = choices.Rejected
 	return nil
 }
@@ -71,6 +73,14 @@ func (b *postForkOption) Parent() ids.ID {
 	return b.ParentID()
 }
 
+func (b *postForkOption) VerifyProposer(ctx context.Context) error {
+	parent, err := b.vm.getBlock(ctx, b.ParentID())
+	if err != nil {
+		return err
+	}
+	return parent.verifyProposerPostForkOption(ctx, b)
+}
+
 // If Verify returns nil, Accept or Reject is eventually called on [b] and
 // [b.innerBlk].
 func (b *postForkOption) Verify(ctx context.Context) error {
@@ -82,25 +92,41 @@ func (b *postForkOption) Verify(ctx context.Context) error {
 	return parent.verifyPostForkOption(ctx, b)
 }
 
-// A *preForkBlock's parent must be a *preForkBlock
-func (*postForkOption) verifyProposerPreForkChild(context.Context, *preForkBlock) error {
-	return errUnsignedChild
-}
-
 func (*postForkOption) verifyPreForkChild(context.Context, *preForkBlock) error {
 	return errUnsignedChild
 }
 
-func (b *postForkOption) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+func (b *postForkOption) verifyProposerPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight, err := b.pChainHeight(ctx)
 	if err != nil {
 		return err
 	}
-	return b.postForkCommonComponents.Verify(
+	err = b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
+		child,
+	)
+	if err != nil {
+		return err
+	}
+
+	childID := child.ID()
+	child.vm.verifiedProposerBlocks[childID] = child
+	return nil
+}
+
+func (b *postForkOption) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+	parentPChainHeight, err := b.pChainHeight(ctx)
+	if err != nil {
+		return err
+	}
+	return child.vm.verifyAndRecordInnerBlk(
+		ctx,
+		&smblock.Context{
+			PChainHeight: parentPChainHeight,
+		},
 		child,
 	)
 }
