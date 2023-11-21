@@ -87,18 +87,16 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
 }
 
-// Check that a proposer block is unsigned if built MaxVerifyDelay after
-// its parent, even if it's built before MaxBuiltDelay
-func TestBlockBuiltAfterMaxVerifyDelayIsUnsigned(t *testing.T) {
+func TestBlockBuiltAroundMaxVerifyDelay(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM /*valsState*/, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
 
-	// 1. Build a post fork block. It'll be the parent of our test subject.
+	// 0. Build a post fork block. It'll be the parent of our test subject.
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
@@ -146,8 +144,19 @@ func TestBlockBuiltAfterMaxVerifyDelayIsUnsigned(t *testing.T) {
 	_, err = proVM.getPostForkBlock(ctx, parentBlk.ID())
 	require.NoError(err)
 
-	// 2. Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
-	localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxVerifyDelay) / 2)
+	// 2. Force this node to be the only validator, so to guarantee
+	// it'd be picked if block build time was before MaxVerifyDelay
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+		}, nil
+	}
+
+	// 3. Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
+	localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
 	proVM.Set(localTime)
 
 	coreChildBlk := &snowman.TestBlock{
@@ -166,6 +175,40 @@ func TestBlockBuiltAfterMaxVerifyDelayIsUnsigned(t *testing.T) {
 	// check child block is unsigned if built after MaxVerifyDelay
 	// (even if it comes before MaxVerifyDelay)
 	childBlk, err := proVM.BuildBlock(ctx)
+	require.NoError(err)
+	require.IsType(&postForkBlock{}, childBlk)
+	require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+
+	// 4. Mark node as non validator
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		var (
+			aValidator = ids.GenerateTestNodeID()
+
+			// a validator with a weight large enough to fully fill the proposers list
+			weight = uint64(proposer.MaxBuildWindows * 2)
+		)
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			aValidator: {
+				NodeID: aValidator,
+				Weight: weight,
+			},
+		}, nil
+	}
+
+	// 5. check that block is not built if local clock is
+	// among MaxVerifyDelay and MaxBuildDelay from parent timestamp
+	localTime = parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+	proVM.Set(localTime)
+
+	_, err = proVM.BuildBlock(ctx)
+	require.ErrorIs(errProposerWindowNotStarted, err)
+
+	// 6. check that block is built if local clock is
+	// after MaxVerifyDelay from parent timestamp
+	localTime = parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+	proVM.Set(localTime)
+
+	childBlk, err = proVM.BuildBlock(ctx)
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, childBlk)
 	require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
