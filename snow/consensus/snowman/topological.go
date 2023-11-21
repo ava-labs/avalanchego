@@ -22,7 +22,9 @@ import (
 )
 
 var (
-	errDuplicateAdd = errors.New("duplicate block add")
+	errDuplicateAdd            = errors.New("duplicate block add")
+	errTooManyProcessingBlocks = errors.New("too many processing blocks")
+	errBlockProcessingTooLong  = errors.New("block processing too long")
 
 	_ Factory   = (*TopologicalFactory)(nil)
 	_ Consensus = (*Topological)(nil)
@@ -329,11 +331,6 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	}
 	return nil
 }
-
-var (
-	errTooManyProcessingBlocks = errors.New("too many processing blocks")
-	errBlockProcessingTooLong  = errors.New("block processing too long")
-)
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
