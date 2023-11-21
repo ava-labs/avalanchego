@@ -196,7 +196,13 @@ func (m *metrics) Verified(height uint64) {
 	m.maxVerifiedHeight.Set(float64(m.currentMaxVerifiedHeight))
 }
 
-func (m *metrics) Accepted(blkID ids.ID, height uint64, timestamp time.Time, pollNumber uint64, blockSize int) {
+func (m *metrics) Accepted(
+	blkID ids.ID,
+	height uint64,
+	timestamp time.Time,
+	pollNumber uint64,
+	blockSize int,
+) {
 	start, ok := m.processingBlocks.Get(blkID)
 	if !ok {
 		m.log.Warn("unable to measure latency",
