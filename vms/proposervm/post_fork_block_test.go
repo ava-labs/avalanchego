@@ -185,7 +185,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	childProBlk.SignedBlock = childSlb
 	require.NoError(err)
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
 	require.NoError(childProBlk.Verify(context.Background()))
 }
 
