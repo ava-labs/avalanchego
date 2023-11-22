@@ -233,7 +233,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -263,7 +263,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -298,7 +298,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -403,7 +403,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -498,7 +498,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -720,7 +720,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 		BytesV:     []byte{3},
 		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -1021,7 +1021,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	_, err = proVM.BuildBlock(context.Background())
 	require.ErrorIs(err, errProposerWindowNotStarted)
 
-	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
+	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxVerifyDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())
 
 	// The engine should have been notified to attempt to build a block now that
@@ -1604,7 +1604,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
-		aBlock.Timestamp().Add(proposer.MaxDelay),
+		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
