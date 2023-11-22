@@ -42,6 +42,7 @@ type peerInfo struct {
 	bandwidth safemath.Averager
 }
 
+// TODO add tests
 // Tracks the bandwidth of responses coming from peers,
 // preferring to contact peers with known good bandwidth, connecting
 // to new peers with an exponentially decaying probability.
@@ -137,6 +138,7 @@ func (p *peerTracker) shouldTrackNewPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
+// TODO get rid of minVersion
 // Returns a peer that we're connected to.
 // If we should track more peers, returns a random peer with version >= [minVersion], if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer from [p.responsivePeers].
