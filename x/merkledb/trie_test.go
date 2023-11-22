@@ -18,25 +18,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
-	var view *trieView
+func getNodeValue(t Trie, key string) ([]byte, error) {
+	path := ToKey([]byte(key))
 	if asTrieView, ok := t.(*trieView); ok {
 		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
 			return nil, err
 		}
-		view = asTrieView
-	}
-	if asDatabases, ok := t.(*merkleDB); ok {
-		dbView, err := asDatabases.NewView(context.Background(), ViewChanges{})
-		if err != nil {
-			return nil, err
-		}
-		view = dbView.(*trieView)
 	}
 
-	path := ToKey([]byte(key))
 	var result *node
-	err := view.visitPathToKey(path, func(n *node) error {
+
+	err := visitPathToKey(t, path, func(n *node) error {
 		result = n
 		return nil
 	})
@@ -119,7 +111,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	trie := trieIntf.(*trieView)
 
 	var nodePath []*node
-	require.NoError(trie.visitPathToKey(ToKey(nil), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(nil), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -144,7 +136,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key1), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key1), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -171,7 +163,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key2), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -197,7 +189,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
-	require.NoError(trie.visitPathToKey(ToKey(key3), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key3), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -209,7 +201,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 
 	// Other key path not affected
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key2), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key2), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -222,7 +214,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
 	nodePath = make([]*node, 0, 3)
-	require.NoError(trie.visitPathToKey(ToKey(key4), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key4), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
@@ -235,7 +227,7 @@ func TestTrieViewVisitPathToKey(t *testing.T) {
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
 	nodePath = make([]*node, 0, 1)
-	require.NoError(trie.visitPathToKey(ToKey(key5), func(n *node) error {
+	require.NoError(visitPathToKey(trie, ToKey(key5), func(n *node) error {
 		nodePath = append(nodePath, n)
 		return nil
 	}))
