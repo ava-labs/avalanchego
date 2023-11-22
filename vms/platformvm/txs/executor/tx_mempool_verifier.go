@@ -136,8 +136,11 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 }
 
 func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {
-	timestamp := clk.Time()
-	if parentTime := state.GetTimestamp(); parentTime.After(timestamp) {
+	var (
+		timestamp  = clk.Time()
+		parentTime = state.GetTimestamp()
+	)
+	if parentTime.After(timestamp) {
 		timestamp = parentTime
 	}
 	// [timestamp] = max(now, parentTime)

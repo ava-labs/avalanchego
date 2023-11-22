@@ -135,7 +135,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		},
 		ParentV:    oracleCoreBlk.opts[0].ID(),
 		BytesV:     []byte{4},
-		TimestampV: oracleCoreBlk.opts[0].Timestamp().Add(proposer.MaxDelay),
+		TimestampV: oracleCoreBlk.opts[0].Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childCoreBlk, nil
