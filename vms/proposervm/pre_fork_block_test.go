@@ -275,7 +275,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -286,7 +286,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		TimestampV: prntCoreBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: prntCoreBlk.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	childProBlk := preForkBlock{
 		Block: childCoreBlk,
