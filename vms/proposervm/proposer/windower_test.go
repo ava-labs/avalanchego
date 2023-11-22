@@ -30,7 +30,7 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	w := New(vdrState, subnetID, chainID)
 
-	delay, err := w.Delay(context.Background(), 1, 0, nodeID)
+	delay, err := w.Delay(context.Background(), 1, 0, nodeID, MaxVerifyWindows)
 	require.NoError(err)
 	require.Zero(delay)
 }
@@ -56,13 +56,13 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	w := New(vdrState, subnetID, chainID)
 
-	validatorDelay, err := w.Delay(context.Background(), 1, 0, validatorID)
+	validatorDelay, err := w.Delay(context.Background(), 1, 0, validatorID, MaxVerifyWindows)
 	require.NoError(err)
 	require.Zero(validatorDelay)
 
-	nonValidatorDelay, err := w.Delay(context.Background(), 1, 0, nonValidatorID)
+	nonValidatorDelay, err := w.Delay(context.Background(), 1, 0, nonValidatorID, MaxVerifyWindows)
 	require.NoError(err)
-	require.Equal(MaxDelay, nonValidatorDelay)
+	require.Equal(MaxVerifyDelay, nonValidatorDelay)
 }
 
 func TestWindowerChangeByHeight(t *testing.T) {
@@ -70,14 +70,14 @@ func TestWindowerChangeByHeight(t *testing.T) {
 
 	subnetID := ids.ID{0, 1}
 	chainID := ids.ID{0, 2}
-	validatorIDs := make([]ids.NodeID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
 	vdrState := &validators.TestState{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
 			for _, id := range validatorIDs {
 				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,
@@ -100,7 +100,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w.Delay(context.Background(), 1, 0, vdrID)
+		validatorDelay, err := w.Delay(context.Background(), 1, 0, vdrID, MaxVerifyWindows)
 		require.NoError(err)
 		require.Equal(expectedDelay, validatorDelay)
 	}
@@ -115,7 +115,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays2 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w.Delay(context.Background(), 2, 0, vdrID)
+		validatorDelay, err := w.Delay(context.Background(), 2, 0, vdrID, MaxVerifyWindows)
 		require.NoError(err)
 		require.Equal(expectedDelay, validatorDelay)
 	}
@@ -132,14 +132,14 @@ func TestWindowerChangeByChain(t *testing.T) {
 	chainID1 := ids.ID{}
 	_, _ = rand.Read(chainID1[:]) // #nosec G404
 
-	validatorIDs := make([]ids.NodeID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
 	vdrState := &validators.TestState{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
 			for _, id := range validatorIDs {
 				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,
@@ -163,7 +163,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays0 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w0.Delay(context.Background(), 1, 0, vdrID)
+		validatorDelay, err := w0.Delay(context.Background(), 1, 0, vdrID, MaxVerifyWindows)
 		require.NoError(err)
 		require.Equal(expectedDelay, validatorDelay)
 	}
@@ -178,7 +178,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w1.Delay(context.Background(), 1, 0, vdrID)
+		validatorDelay, err := w1.Delay(context.Background(), 1, 0, vdrID, MaxVerifyWindows)
 		require.NoError(err)
 		require.Equal(expectedDelay, validatorDelay)
 	}

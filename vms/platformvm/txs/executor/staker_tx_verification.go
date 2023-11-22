@@ -139,7 +139,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
 		return nil, err
 	}
 
@@ -173,7 +173,9 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
+	return outs, verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -213,7 +215,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
 		return err
 	}
 
@@ -257,7 +259,9 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
+	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -376,7 +380,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
 		return nil, err
 	}
 
@@ -440,7 +444,9 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return outs, stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
+	return outs, verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -470,7 +476,7 @@ func verifyAddPermissionlessValidatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
 		return err
 	}
 
@@ -558,7 +564,9 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
+	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -588,7 +596,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := checkStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
 		return err
 	}
 
@@ -703,7 +711,9 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return stakerTooMuchIntheFuture(backend, currentTimestamp, tx.StartTime())
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
+	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
 }
 
 // Returns an error if the given tx is invalid.
@@ -754,7 +764,7 @@ func verifyTransferSubnetOwnershipTx(
 }
 
 // Ensure the proposed validator starts after the current time
-func checkStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time) error {
+func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time) error {
 	// Pre Durango activation, start time must be after current chain time.
 	// Post Durango activation, start time is not validated
 	if !isDurangoActive {
@@ -771,7 +781,7 @@ func checkStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time)
 	return nil
 }
 
-func stakerTooMuchIntheFuture(backend *Backend, chainTime, stakerStartTime time.Time) error {
+func verifyStakerStartsSoon(backend *Backend, chainTime, stakerStartTime time.Time) error {
 	if !backend.Config.IsDActivated(chainTime) {
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
@@ -780,6 +790,5 @@ func stakerTooMuchIntheFuture(backend *Backend, chainTime, stakerStartTime time.
 			return ErrFutureStakeTime
 		}
 	}
-
 	return nil
 }
