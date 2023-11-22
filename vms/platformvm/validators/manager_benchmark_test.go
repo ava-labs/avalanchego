@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -180,7 +179,7 @@ func buildGenesisTest(avaxAssetID ids.ID, genesisTime, validatorEndTime time.Tim
 	}
 
 	return &genesis.Genesis{
-		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
+		GenesisBytes:  []byte{'g', 'e', 'n', 'e', 's', 'i', 's', 'B', 'y', 't', 'e', 's'},
 		UTXOs:         []*genesis.UTXO{},
 		Validators:    []*txs.Tx{tx},
 		Chains:        nil,

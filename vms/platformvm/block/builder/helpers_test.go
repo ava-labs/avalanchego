@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -426,7 +425,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) *genesis.Genesis {
 	}
 
 	return &genesis.Genesis{
-		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
+		GenesisBytes:  []byte{'g', 'e', 'n', 'e', 's', 'i', 's', 'B', 'y', 't', 'e', 's'},
 		UTXOs:         genesisUTXOs,
 		Validators:    vdrs.List(),
 		Chains:        nil,

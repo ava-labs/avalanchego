@@ -4,8 +4,6 @@
 package genesis
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -25,7 +23,7 @@ type Genesis struct {
 	InitialSupply uint64    `serialize:"true"`
 	Message       string    `serialize:"true"`
 
-	GenesisID ids.ID `serialize:"false"`
+	GenesisBytes []byte `serialize:"false"`
 }
 
 func Parse(genesisBytes []byte) (*Genesis, error) {
@@ -44,6 +42,6 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 		}
 	}
 
-	gen.GenesisID = hashing.ComputeHash256Array(genesisBytes)
+	gen.GenesisBytes = genesisBytes
 	return gen, nil
 }
