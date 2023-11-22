@@ -185,14 +185,14 @@ func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
-		// Check that child block is signed.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		// Check that child block is unsigned.
+		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 		proVM.Set(localTime)
 
 		childBlk, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
 		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(proVM.ctx.NodeID, childBlk.(*postForkBlock).Proposer()) // signed block
+		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // signed block
 	}
 
 	{
