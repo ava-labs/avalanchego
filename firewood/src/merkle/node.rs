@@ -245,12 +245,12 @@ impl Node {
         self.root_hash = OnceLock::new();
     }
 
-    pub fn branch<B: Into<Box<BranchNode>>>(node: B) -> Self {
+    pub fn from_branch<B: Into<Box<BranchNode>>>(node: B) -> Self {
         Self::from(NodeType::Branch(node.into()))
     }
 
-    pub fn leaf(path: PartialPath, data: Data) -> Self {
-        Self::from(NodeType::Leaf(LeafNode { path, data }))
+    pub fn from_leaf(leaf: LeafNode) -> Self {
+        Self::from(NodeType::Leaf(leaf))
     }
 
     pub fn inner(&self) -> &NodeType {
@@ -643,7 +643,7 @@ pub(super) mod tests {
     use test_case::test_case;
 
     pub fn leaf(path: Vec<u8>, data: Vec<u8>) -> Node {
-        Node::leaf(PartialPath(path), Data(data))
+        Node::from_leaf(LeafNode::new(PartialPath(path), Data(data)))
     }
 
     pub fn branch(
@@ -671,7 +671,7 @@ pub(super) mod tests {
             })
             .unwrap_or_default();
 
-        Node::branch(BranchNode {
+        Node::from_branch(BranchNode {
             // path: vec![].into(),
             children,
             value: value.map(Data),
