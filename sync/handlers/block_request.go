@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
@@ -17,9 +18,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// parentLimit specifies how many parents to retrieve and send given a starting hash
-// This value overrides any specified limit in blockRequest.Parents if it is greater than this value
-const parentLimit = uint16(64)
+const (
+	// parentLimit specifies how many parents to retrieve and send given a starting hash
+	// This value overrides any specified limit in blockRequest.Parents if it is greater than this value
+	parentLimit           = uint16(64)
+	targetMessageByteSize = units.MiB - units.KiB // Target total block bytes slightly under original network codec max size of 1MB
+)
 
 // BlockRequestHandler is a peer.RequestHandler for message.BlockRequest
 // serving requested blocks starting at specified hash
@@ -52,6 +56,7 @@ func (b *BlockRequestHandler) OnBlockRequest(ctx context.Context, nodeID ids.Nod
 		parents = parentLimit
 	}
 	blocks := make([][]byte, 0, parents)
+	totalBytes := 0
 
 	// ensure metrics are captured properly on all return paths
 	defer func() {
@@ -80,11 +85,17 @@ func (b *BlockRequestHandler) OnBlockRequest(ctx context.Context, nodeID ids.Nod
 
 		buf := new(bytes.Buffer)
 		if err := block.EncodeRLP(buf); err != nil {
-			log.Warn("failed to RLP encode block", "hash", block.Hash(), "height", block.NumberU64(), "err", err)
+			log.Error("failed to RLP encode block", "hash", block.Hash(), "height", block.NumberU64(), "err", err)
 			return nil, nil
 		}
 
+		if buf.Len()+totalBytes > targetMessageByteSize && len(blocks) > 0 {
+			log.Debug("Skipping block due to max total bytes size", "totalBlockDataSize", totalBytes, "blockSize", buf.Len(), "maxTotalBytesSize", targetMessageByteSize)
+			break
+		}
+
 		blocks = append(blocks, buf.Bytes())
+		totalBytes += buf.Len()
 		hash = block.ParentHash()
 		height--
 	}
@@ -100,7 +111,7 @@ func (b *BlockRequestHandler) OnBlockRequest(ctx context.Context, nodeID ids.Nod
 	}
 	responseBytes, err := b.codec.Marshal(message.Version, response)
 	if err != nil {
-		log.Warn("failed to marshal BlockResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "hash", blockRequest.Hash, "parents", blockRequest.Parents, "blocksLen", len(response.Blocks), "err", err)
+		log.Error("failed to marshal BlockResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "hash", blockRequest.Hash, "parents", blockRequest.Parents, "blocksLen", len(response.Blocks), "err", err)
 		return nil, nil
 	}
 
