@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -90,12 +91,119 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 
 	// TODO: Push local changes here
 	batchOps := make([]database.BatchOp, 0)
+	for _, subnetTx := range d.addedSubnets {
+		key := merklePermissionedSubnetKey(subnetTx.ID())
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnetTx.Bytes(),
+		})
+	}
+	for subnetID, owner := range d.subnetOwners {
+		owner := owner
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+		key := merkleSubnetOwnersKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: ownerBytes,
+		})
+	}
+	for subnetID, transforkSubnetTx := range d.transformedSubnets {
+		key := merkleElasticSubnetKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: transforkSubnetTx.Bytes(),
+		})
+	}
 	for subnetID, chains := range d.addedChains {
 		for _, chainTx := range chains {
 			key := merkleChainKey(subnetID, chainTx.ID())
 			batchOps = append(batchOps, database.BatchOp{
 				Key:   key,
 				Value: chainTx.Bytes(),
+			})
+		}
+	}
+
+	// CURRENT STAKERS
+	itAddedCurrentStakers := NewTreeIterator(d.currentStakerDiffs.addedStakers)
+	defer itAddedCurrentStakers.Release()
+	for itAddedCurrentStakers.Next() {
+		var (
+			staker     = itAddedCurrentStakers.Value()
+			stakerTxID = staker.TxID
+		)
+		tx, found := d.addedTxs[stakerTxID]
+		if !found {
+			return nil, fmt.Errorf("added staker %v, but can't find its tx among added ones", stakerTxID)
+		}
+
+		key := merkleCurrentStakersKey(stakerTxID)
+		stakerData := stakersData{
+			TxBytes:         tx.tx.Bytes(),
+			PotentialReward: staker.PotentialReward,
+		}
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
+		}
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
+	}
+	for txID := range d.currentStakerDiffs.deletedStakers {
+		key := merkleCurrentStakersKey(txID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:    key,
+			Delete: true,
+		})
+	}
+
+	// PENDING STAKERS
+	itAddedPendingStakers := NewTreeIterator(d.pendingStakerDiffs.addedStakers)
+	defer itAddedPendingStakers.Release()
+	for itAddedPendingStakers.Next() {
+		var (
+			staker     = itAddedPendingStakers.Value()
+			stakerTxID = staker.TxID
+		)
+		tx, found := d.addedTxs[stakerTxID]
+		if !found {
+			return nil, fmt.Errorf("added staker %v, but can't find its tx among added ones", stakerTxID)
+		}
+
+		key := merkleCurrentStakersKey(stakerTxID)
+		stakerData := stakersData{
+			TxBytes:         tx.tx.Bytes(),
+			PotentialReward: staker.PotentialReward,
+		}
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
+		}
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
+	}
+	for txID := range d.pendingStakerDiffs.deletedStakers {
+		key := merkleCurrentStakersKey(txID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:    key,
+			Delete: true,
+		})
+	}
+
+	// DELEGATEE REWARDS
+	for subnetID, nodeDelegateeRewards := range d.modifiedDelegateeRewards {
+		for nodeID, delegateeReward := range nodeDelegateeRewards {
+			key := merkleDelegateeRewardsKey(nodeID, subnetID)
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: database.PackUInt64(delegateeReward),
 			})
 		}
 	}
