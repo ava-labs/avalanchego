@@ -260,6 +260,6 @@ func TestDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(mempool.Add(tx3))
 
-	minStartTime := time.Unix(int64(9), 0)
+	minStartTime := time.Unix(9, 0)
 	require.Len(mempool.DropExpiredStakerTxs(minStartTime), 1)
 }
