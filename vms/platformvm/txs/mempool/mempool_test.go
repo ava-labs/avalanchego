@@ -20,13 +20,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ BlockTimer = (*noopBlkTimer)(nil)
+var (
+	_ BlockTimer = (*noopBlkTimer)(nil)
+
+	preFundedKeys = secp256k1.TestKeys()
+)
 
 type noopBlkTimer struct{}
 
 func (*noopBlkTimer) ResetBlockTimer() {}
-
-var preFundedKeys = secp256k1.TestKeys()
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
@@ -211,17 +213,10 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	now := time.Now()
 	proposalTxs := make([]*txs.Tx, 0, count)
 	for i := 0; i < count; i++ {
-		utx := &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{},
-			Validator: txs.Validator{
-				Start: uint64(now.Add(time.Duration(count-i) * time.Second).Unix()),
-			},
-			StakeOuts:        nil,
-			RewardsOwner:     &secp256k1fx.OutputOwners{},
-			DelegationShares: 100,
-		}
-
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := generateAddValidatorTx(
+			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
+			0, // endTime
+		)
 		if err != nil {
 			return nil, err
 		}
