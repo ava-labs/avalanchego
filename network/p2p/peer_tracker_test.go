@@ -1,27 +1,37 @@
 // (c) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package p2p
 
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func TestPeerTracker(t *testing.T) {
 	require := require.New(t)
-	p := NewPeerTracker()
+	p, err := newPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 
 	// Connect some peers
 	numExtraPeers := 10
 	numPeers := desiredMinResponsivePeers + numExtraPeers
 	peerIDs := make([]ids.NodeID, numPeers)
+	peerVersion := &version.Application{
+		Major: 1,
+		Minor: 2,
+		Patch: 3,
+	}
 
 	for i := range peerIDs {
 		peerIDs[i] = ids.GenerateTestNodeID()
-		p.Connected(peerIDs[i], defaultPeerVersion)
+		p.Connected(peerIDs[i], peerVersion)
 	}
 
 	responsivePeers := make(map[ids.NodeID]bool)
