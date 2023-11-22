@@ -3,11 +3,12 @@
 
 use crate::shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable};
 use bincode::{Error, Options};
+use bitflags::bitflags;
 use enum_as_inner::EnumAsInner;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::{
-    fmt::{self, Debug},
+    fmt::Debug,
     io::{Cursor, Read, Write},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -15,15 +16,28 @@ use std::{
     },
 };
 
+mod branch;
+mod extension;
+mod leaf;
+mod partial_path;
+
+pub use branch::{BranchNode, MAX_CHILDREN, SIZE as BRANCH_NODE_SIZE};
+pub use extension::{ExtNode, SIZE as EXTENSION_NODE_SIZE};
+pub use leaf::LeafNode;
+pub use partial_path::PartialPath;
+
 use crate::merkle::to_nibble_array;
 use crate::nibbles::Nibbles;
 
-use super::{from_nibbles, PartialPath, TrieHash, TRIE_HASH_LEN};
+use super::{from_nibbles, TrieHash, TRIE_HASH_LEN};
 
-pub const NBRANCH: usize = 16;
-
-const EXT_NODE_SIZE: usize = 2;
-const BRANCH_NODE_SIZE: usize = 17;
+bitflags! {
+    // should only ever be the size of a nibble
+    struct Flags: u8 {
+        const TERMINAL = 0b0010;
+        const ODD_LEN  = 0b0001;
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Data(pub(super) Vec<u8>);
@@ -35,8 +49,14 @@ impl std::ops::Deref for Data {
     }
 }
 
+impl From<Vec<u8>> for Data {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
-pub(crate) enum Encoded<T> {
+enum Encoded<T> {
     Raw(T),
     Data(T),
 }
@@ -57,269 +77,6 @@ impl<T: DeserializeOwned + AsRef<[u8]>> Encoded<T> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub struct BranchNode {
-    pub(super) children: [Option<DiskAddress>; NBRANCH],
-    pub(super) value: Option<Data>,
-    pub(super) children_encoded: [Option<Vec<u8>>; NBRANCH],
-}
-
-impl Debug for BranchNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "[Branch")?;
-        for (i, c) in self.children.iter().enumerate() {
-            if let Some(c) = c {
-                write!(f, " ({i:x} {c:?})")?;
-            }
-        }
-        for (i, c) in self.children_encoded.iter().enumerate() {
-            if let Some(c) = c {
-                write!(f, " ({i:x} {:?})", c)?;
-            }
-        }
-        write!(
-            f,
-            " v={}]",
-            match &self.value {
-                Some(v) => hex::encode(&**v),
-                None => "nil".to_string(),
-            }
-        )
-    }
-}
-
-impl BranchNode {
-    pub(super) fn single_child(&self) -> (Option<(DiskAddress, u8)>, bool) {
-        let mut has_chd = false;
-        let mut only_chd = None;
-        for (i, c) in self.children.iter().enumerate() {
-            if c.is_some() {
-                has_chd = true;
-                if only_chd.is_some() {
-                    only_chd = None;
-                    break;
-                }
-                only_chd = (*c).map(|e| (e, i as u8))
-            }
-        }
-        (only_chd, has_chd)
-    }
-
-    pub fn decode(buf: &[u8]) -> Result<Self, Error> {
-        let mut items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
-
-        // we've already validated the size, that's why we can safely unwrap
-        let data = items.pop().unwrap().decode()?;
-        // Extract the value of the branch node and set to None if it's an empty Vec
-        let value = Some(data).filter(|data| !data.is_empty());
-
-        // encode all children.
-        let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
-
-        // we popped the last element, so their should only be NBRANCH items left
-        for (i, chd) in items.into_iter().enumerate() {
-            let data = chd.decode()?;
-            chd_encoded[i] = Some(data).filter(|data| !data.is_empty());
-        }
-
-        Ok(BranchNode::new([None; NBRANCH], value, chd_encoded))
-    }
-
-    fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
-        let mut list = <[Encoded<Vec<u8>>; NBRANCH + 1]>::default();
-
-        for (i, c) in self.children.iter().enumerate() {
-            match c {
-                Some(c) => {
-                    let mut c_ref = store.get_item(*c).unwrap();
-
-                    if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
-                        list[i] = Encoded::Data(
-                            bincode::DefaultOptions::new()
-                                .serialize(&&(*c_ref.get_root_hash::<S>(store))[..])
-                                .unwrap(),
-                        );
-
-                        // See struct docs for ordering requirements
-                        if c_ref.lazy_dirty.load(Ordering::Relaxed) {
-                            c_ref.write(|_| {}).unwrap();
-                            c_ref.lazy_dirty.store(false, Ordering::Relaxed)
-                        }
-                    } else {
-                        let child_encoded = &c_ref.get_encoded::<S>(store);
-                        list[i] = Encoded::Raw(child_encoded.to_vec());
-                    }
-                }
-                None => {
-                    // Check if there is already a calculated encoded value for the child, which
-                    // can happen when manually constructing a trie from proof.
-                    if let Some(v) = &self.children_encoded[i] {
-                        if v.len() == TRIE_HASH_LEN {
-                            list[i] =
-                                Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
-                        } else {
-                            list[i] = Encoded::Raw(v.clone());
-                        }
-                    }
-                }
-            };
-        }
-
-        if let Some(Data(val)) = &self.value {
-            list[NBRANCH] = Encoded::Data(bincode::DefaultOptions::new().serialize(val).unwrap());
-        }
-
-        bincode::DefaultOptions::new()
-            .serialize(list.as_slice())
-            .unwrap()
-    }
-
-    pub fn new(
-        chd: [Option<DiskAddress>; NBRANCH],
-        value: Option<Vec<u8>>,
-        chd_encoded: [Option<Vec<u8>>; NBRANCH],
-    ) -> Self {
-        BranchNode {
-            children: chd,
-            value: value.map(Data),
-            children_encoded: chd_encoded,
-        }
-    }
-
-    pub fn value(&self) -> &Option<Data> {
-        &self.value
-    }
-
-    pub fn chd(&self) -> &[Option<DiskAddress>; NBRANCH] {
-        &self.children
-    }
-
-    pub fn chd_mut(&mut self) -> &mut [Option<DiskAddress>; NBRANCH] {
-        &mut self.children
-    }
-
-    pub fn chd_encode(&self) -> &[Option<Vec<u8>>; NBRANCH] {
-        &self.children_encoded
-    }
-
-    pub fn chd_encoded_mut(&mut self) -> &mut [Option<Vec<u8>>; NBRANCH] {
-        &mut self.children_encoded
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub struct LeafNode(pub(super) PartialPath, pub(super) Data);
-
-impl Debug for LeafNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "[Leaf {:?} {}]", self.0, hex::encode(&*self.1))
-    }
-}
-
-impl LeafNode {
-    fn encode(&self) -> Vec<u8> {
-        bincode::DefaultOptions::new()
-            .serialize(
-                [
-                    Encoded::Raw(from_nibbles(&self.0.encode(true)).collect()),
-                    Encoded::Raw(self.1.to_vec()),
-                ]
-                .as_slice(),
-            )
-            .unwrap()
-    }
-
-    pub fn new(path: Vec<u8>, data: Vec<u8>) -> Self {
-        LeafNode(PartialPath(path), Data(data))
-    }
-
-    pub fn path(&self) -> &PartialPath {
-        &self.0
-    }
-
-    pub fn data(&self) -> &Data {
-        &self.1
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub struct ExtNode {
-    pub(crate) path: PartialPath,
-    pub(crate) child: DiskAddress,
-    pub(crate) child_encoded: Option<Vec<u8>>,
-}
-
-impl Debug for ExtNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let Self {
-            path,
-            child,
-            child_encoded,
-        } = self;
-        write!(f, "[Extension {path:?} {child:?} {child_encoded:?}]",)
-    }
-}
-
-impl ExtNode {
-    fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
-        let mut list = <[Encoded<Vec<u8>>; 2]>::default();
-        list[0] = Encoded::Data(
-            bincode::DefaultOptions::new()
-                .serialize(&from_nibbles(&self.path.encode(false)).collect::<Vec<_>>())
-                .unwrap(),
-        );
-
-        if !self.child.is_null() {
-            let mut r = store.get_item(self.child).unwrap();
-
-            if r.is_encoded_longer_than_hash_len(store) {
-                list[1] = Encoded::Data(
-                    bincode::DefaultOptions::new()
-                        .serialize(&&(*r.get_root_hash(store))[..])
-                        .unwrap(),
-                );
-
-                if r.lazy_dirty.load(Ordering::Relaxed) {
-                    r.write(|_| {}).unwrap();
-                    r.lazy_dirty.store(false, Ordering::Relaxed);
-                }
-            } else {
-                list[1] = Encoded::Raw(r.get_encoded(store).to_vec());
-            }
-        } else {
-            // Check if there is already a caclucated encoded value for the child, which
-            // can happen when manually constructing a trie from proof.
-            if let Some(v) = &self.child_encoded {
-                if v.len() == TRIE_HASH_LEN {
-                    list[1] = Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
-                } else {
-                    list[1] = Encoded::Raw(v.clone());
-                }
-            }
-        }
-
-        bincode::DefaultOptions::new()
-            .serialize(list.as_slice())
-            .unwrap()
-    }
-
-    pub fn chd(&self) -> DiskAddress {
-        self.child
-    }
-
-    pub fn chd_encoded(&self) -> Option<&[u8]> {
-        self.child_encoded.as_deref()
-    }
-
-    pub fn chd_mut(&mut self) -> &mut DiskAddress {
-        &mut self.child
-    }
-
-    pub fn chd_encoded_mut(&mut self) -> &mut Option<Vec<u8>> {
-        &mut self.child_encoded
-    }
-}
-
 #[derive(Debug)]
 pub struct Node {
     pub(super) root_hash: OnceLock<TrieHash>,
@@ -333,6 +90,7 @@ pub struct Node {
 }
 
 impl Eq for Node {}
+
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
         let Node {
@@ -349,6 +107,7 @@ impl PartialEq for Node {
             && *inner == other.inner
     }
 }
+
 impl Clone for Node {
     fn clone(&self) -> Self {
         Self {
@@ -374,7 +133,7 @@ impl NodeType {
         let items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
         match items.len() {
-            EXT_NODE_SIZE => {
+            EXTENSION_NODE_SIZE => {
                 let mut items = items.into_iter();
 
                 let decoded_key: Vec<u8> = items.next().unwrap().decode()?;
@@ -383,6 +142,7 @@ impl NodeType {
 
                 let (cur_key_path, term) =
                     PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
+
                 let cur_key = cur_key_path.into_inner();
                 let data: Vec<u8> = items.next().unwrap().decode()?;
 
@@ -396,6 +156,7 @@ impl NodeType {
                     }))
                 }
             }
+            // TODO: add path
             BRANCH_NODE_SIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?)),
             size => Err(Box::new(bincode::ErrorKind::Custom(format!(
                 "invalid size: {size}"
@@ -411,14 +172,12 @@ impl NodeType {
         }
     }
 
-    pub fn path_mut(&mut self) -> Option<&mut PartialPath> {
-        let path = match self {
-            NodeType::Branch(_) => return None,
-            NodeType::Leaf(node) => &mut node.0,
+    pub fn path_mut(&mut self) -> &mut PartialPath {
+        match self {
+            NodeType::Branch(_u) => todo!(),
+            NodeType::Leaf(node) => &mut node.path,
             NodeType::Extension(node) => &mut node.path,
-        };
-
-        path.into()
+        }
     }
 }
 
@@ -449,7 +208,8 @@ impl Node {
                 is_encoded_longer_than_hash_len: OnceLock::new(),
                 encoded: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
-                    children: [Some(DiskAddress::null()); NBRANCH],
+                    // path: vec![].into(),
+                    children: [Some(DiskAddress::null()); MAX_CHILDREN],
                     value: Some(Data(Vec::new())),
                     children_encoded: Default::default(),
                 }),
@@ -488,7 +248,7 @@ impl Node {
     }
 
     pub fn leaf(path: PartialPath, data: Data) -> Self {
-        Self::from(NodeType::Leaf(LeafNode(path, data)))
+        Self::from(NodeType::Leaf(LeafNode { path, data }))
     }
 
     pub fn inner(&self) -> &NodeType {
@@ -527,31 +287,37 @@ impl Node {
 
 impl Storable for Node {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
-        const META_SIZE: usize = 32 + 1 + 1;
+        const META_SIZE: usize = TRIE_HASH_LEN + 1 + 1;
+
         let meta_raw =
             mem.get_view(addr, META_SIZE as u64)
                 .ok_or(ShaleError::InvalidCacheView {
                     offset: addr,
                     size: META_SIZE as u64,
                 })?;
-        let attrs = meta_raw.as_deref()[32];
+
+        let attrs = meta_raw.as_deref()[TRIE_HASH_LEN];
+
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
         } else {
             Some(TrieHash(
-                meta_raw.as_deref()[0..32]
+                meta_raw.as_deref()[..TRIE_HASH_LEN]
                     .try_into()
                     .expect("invalid slice"),
             ))
         };
+
         let is_encoded_longer_than_hash_len = if attrs & Node::IS_ENCODED_BIG_VALID == 0 {
             None
         } else {
             Some(attrs & Node::LONG_BIT != 0)
         };
+
         match meta_raw.as_deref()[33] {
             Self::BRANCH_NODE => {
-                let branch_header_size = NBRANCH as u64 * 8 + 4;
+                // TODO: add path
+                let branch_header_size = MAX_CHILDREN as u64 * 8 + 4;
                 let node_raw = mem.get_view(addr + META_SIZE, branch_header_size).ok_or(
                     ShaleError::InvalidCacheView {
                         offset: addr + META_SIZE,
@@ -559,7 +325,7 @@ impl Storable for Node {
                     },
                 )?;
                 let mut cur = Cursor::new(node_raw.as_deref());
-                let mut chd = [None; NBRANCH];
+                let mut chd = [None; MAX_CHILDREN];
                 let mut buff = [0; 8];
                 for chd in chd.iter_mut() {
                     cur.read_exact(&mut buff)?;
@@ -583,7 +349,7 @@ impl Storable for Node {
                             .as_deref(),
                     ))
                 };
-                let mut chd_encoded: [Option<Vec<u8>>; NBRANCH] = Default::default();
+                let mut chd_encoded: [Option<Vec<u8>>; MAX_CHILDREN] = Default::default();
                 let offset = if raw_len == u32::MAX as u64 {
                     addr + META_SIZE + branch_header_size as usize
                 } else {
@@ -619,12 +385,14 @@ impl Storable for Node {
                     root_hash,
                     is_encoded_longer_than_hash_len,
                     NodeType::Branch(BranchNode {
+                        // path: vec![].into(),
                         children: chd,
                         value,
                         children_encoded: chd_encoded,
                     }),
                 ))
             }
+
             Self::EXT_NODE => {
                 let ext_header_size = 1 + 8;
                 let node_raw = mem.get_view(addr + META_SIZE, ext_header_size).ok_or(
@@ -663,9 +431,12 @@ impl Storable for Node {
                         offset: addr + META_SIZE + ext_header_size as usize + path_len as usize,
                         size: 1,
                     })?;
+
                 cur = Cursor::new(encoded_len_raw.as_deref());
                 cur.read_exact(&mut buff)?;
+
                 let encoded_len = buff[0] as u64;
+
                 let encoded: Option<Vec<u8>> = if encoded_len != 0 {
                     let emcoded_raw = mem
                         .get_view(
@@ -686,7 +457,7 @@ impl Storable for Node {
                     None
                 };
 
-                Ok(Self::new_from_hash(
+                let node = Self::new_from_hash(
                     root_hash,
                     is_encoded_longer_than_hash_len,
                     NodeType::Extension(ExtNode {
@@ -694,8 +465,11 @@ impl Storable for Node {
                         child: DiskAddress::from(ptr as usize),
                         child_encoded: encoded,
                     }),
-                ))
+                );
+
+                Ok(node)
             }
+
             Self::LEAF_NODE => {
                 let leaf_header_size = 1 + 4;
                 let node_raw = mem.get_view(addr + META_SIZE, leaf_header_size).ok_or(
@@ -704,11 +478,15 @@ impl Storable for Node {
                         size: leaf_header_size,
                     },
                 )?;
+
                 let mut cur = Cursor::new(node_raw.as_deref());
                 let mut buff = [0; 4];
                 cur.read_exact(&mut buff[..1])?;
+
                 let path_len = buff[0] as u64;
+
                 cur.read_exact(&mut buff)?;
+
                 let data_len = u32::from_le_bytes(buff) as u64;
                 let remainder = mem
                     .get_view(
@@ -728,12 +506,15 @@ impl Storable for Node {
                     .collect();
 
                 let (path, _) = PartialPath::decode(&nibbles);
-                let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
-                Ok(Self::new_from_hash(
+                let data = Data(remainder.as_deref()[path_len as usize..].to_vec());
+
+                let node = Self::new_from_hash(
                     root_hash,
                     is_encoded_longer_than_hash_len,
-                    NodeType::Leaf(LeafNode(path, value)),
-                ))
+                    NodeType::Leaf(LeafNode { path, data }),
+                );
+
+                Ok(node)
             }
             _ => Err(ShaleError::InvalidNodeType),
         }
@@ -744,6 +525,7 @@ impl Storable for Node {
             + 1
             + match &self.inner {
                 NodeType::Branch(n) => {
+                    // TODO: add path
                     let mut encoded_len = 0;
                     for emcoded in n.children_encoded.iter() {
                         encoded_len += match emcoded {
@@ -751,7 +533,7 @@ impl Storable for Node {
                             None => 1,
                         }
                     }
-                    NBRANCH as u64 * 8
+                    MAX_CHILDREN as u64 * 8
                         + 4
                         + match &n.value {
                             Some(val) => val.len() as u64,
@@ -761,13 +543,13 @@ impl Storable for Node {
                 }
                 NodeType::Extension(n) => {
                     1 + 8
-                        + n.path.dehydrated_len()
+                        + n.path.serialized_len()
                         + match n.chd_encoded() {
                             Some(v) => 1 + v.len() as u64,
                             None => 1,
                         }
                 }
-                NodeType::Leaf(n) => 1 + 4 + n.0.dehydrated_len() + n.1.len() as u64,
+                NodeType::Leaf(n) => 1 + 4 + n.path.serialized_len() + n.data.len() as u64,
             }
     }
 
@@ -793,6 +575,7 @@ impl Storable for Node {
 
         match &self.inner {
             NodeType::Branch(n) => {
+                // TODO: add path
                 cur.write_all(&[Self::BRANCH_NODE]).unwrap();
                 for c in n.children.iter() {
                     cur.write_all(&match c {
@@ -836,11 +619,11 @@ impl Storable for Node {
             }
             NodeType::Leaf(n) => {
                 cur.write_all(&[Self::LEAF_NODE])?;
-                let path: Vec<u8> = from_nibbles(&n.0.encode(true)).collect();
+                let path: Vec<u8> = from_nibbles(&n.path.encode(true)).collect();
                 cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&(n.1.len() as u32).to_le_bytes())?;
+                cur.write_all(&(n.data.len() as u32).to_le_bytes())?;
                 cur.write_all(&path)?;
-                cur.write_all(&n.1).map_err(ShaleError::Io)
+                cur.write_all(&n.data).map_err(ShaleError::Io)
             }
         }
     }
@@ -863,8 +646,8 @@ pub(super) mod tests {
         value: Option<Vec<u8>>,
         repeated_encoded_child: Option<Vec<u8>>,
     ) -> Node {
-        let children: [Option<DiskAddress>; NBRANCH] = from_fn(|i| {
-            if i < NBRANCH / 2 {
+        let children: [Option<DiskAddress>; MAX_CHILDREN] = from_fn(|i| {
+            if i < MAX_CHILDREN / 2 {
                 DiskAddress::from(repeated_disk_address).into()
             } else {
                 None
@@ -874,7 +657,7 @@ pub(super) mod tests {
         let children_encoded = repeated_encoded_child
             .map(|child| {
                 from_fn(|i| {
-                    if i < NBRANCH / 2 {
+                    if i < MAX_CHILDREN / 2 {
                         child.clone().into()
                     } else {
                         None
@@ -884,6 +667,7 @@ pub(super) mod tests {
             .unwrap_or_default();
 
         Node::branch(BranchNode {
+            // path: vec![].into(),
             children,
             value: value.map(Data),
             children_encoded,

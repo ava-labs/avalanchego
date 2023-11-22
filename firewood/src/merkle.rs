@@ -17,11 +17,9 @@ use std::{
 use thiserror::Error;
 
 mod node;
-mod partial_path;
 mod trie_hash;
 
-pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
-pub use partial_path::PartialPath;
+pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, PartialPath, MAX_CHILDREN};
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
 type ObjRef<'a> = shale::ObjRef<'a, Node>;
@@ -87,7 +85,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         self.store
             .put_item(
                 Node::branch(BranchNode {
-                    children: [None; NBRANCH],
+                    // path: vec![].into(),
+                    children: [None; MAX_CHILDREN],
                     value: None,
                     children_encoded: Default::default(),
                 }),
@@ -192,7 +191,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
             node_to_split.write(|node| {
                 // TODO: handle unwrap better
-                let path = node.inner.path_mut().unwrap();
+                let path = node.inner.path_mut();
 
                 *path = PartialPath(new_split_node_path.to_vec());
 
@@ -202,7 +201,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             let new_node = Node::leaf(PartialPath(new_node_path.to_vec()), Data(val));
             let leaf_address = self.put_node(new_node)?.as_ptr();
 
-            let mut chd = [None; NBRANCH];
+            let mut chd = [None; MAX_CHILDREN];
 
             let last_matching_nibble = matching_path[idx];
             chd[last_matching_nibble as usize] = Some(leaf_address);
@@ -218,6 +217,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             chd[n_path[idx] as usize] = Some(address);
 
             let new_branch = Node::branch(BranchNode {
+                // path: PartialPath(matching_path[..idx].to_vec()),
                 children: chd,
                 value: None,
                 children_encoded: Default::default(),
@@ -251,7 +251,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             node_to_split,
                             |u| {
                                 match &mut u.inner {
-                                    NodeType::Leaf(u) => u.1 = Data(val),
+                                    NodeType::Leaf(u) => u.data = Data(val),
                                     NodeType::Extension(u) => {
                                         let write_result =
                                             self.get_node(u.chd()).and_then(|mut b_ref| {
@@ -298,7 +298,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         node_to_split
                             .write(|u| {
                                 // TODO: handle unwraps better
-                                let path = u.inner.path_mut().unwrap();
+                                let path = u.inner.path_mut();
                                 *path = PartialPath(n_path[insert_path.len() + 1..].to_vec());
 
                                 u.rehash();
@@ -306,6 +306,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             .unwrap();
 
                         let leaf_address = match &node_to_split.inner {
+                            // TODO: handle BranchNode case
                             NodeType::Extension(u) if u.path.len() == 0 => {
                                 deleted.push(node_to_split_address);
                                 u.chd()
@@ -341,7 +342,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 };
 
             // [parent] (-> [ExtNode]) -> [branch with v] -> [Leaf]
-            let mut children = [None; NBRANCH];
+            let mut children = [None; MAX_CHILDREN];
 
             children[idx] = leaf_address.into();
 
@@ -428,31 +429,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 // For a Branch node, we look at the child pointer. If it points
                 // to another node, we walk down that. Otherwise, we can store our
                 // value as a leaf and we're done
-                NodeType::Branch(n) => match n.children[current_nibble as usize] {
-                    Some(c) => (node, c),
-                    None => {
-                        // insert the leaf to the empty slot
-                        // create a new leaf
-                        let leaf_ptr = self
-                            .put_node(Node::leaf(PartialPath(key_nibbles.collect()), Data(val)))?
-                            .as_ptr();
-                        // set the current child to point to this leaf
-                        node.write(|u| {
-                            let uu = u.inner.as_branch_mut().unwrap();
-                            uu.children[current_nibble as usize] = Some(leaf_ptr);
-                            u.rehash();
-                        })
-                        .unwrap();
-
-                        break None;
-                    }
-                },
-
                 NodeType::Leaf(n) => {
                     // we collided with another key; make a copy
                     // of the stored key to pass into split
-                    let n_path = n.0.to_vec();
-                    let n_value = Some(n.1.clone());
+                    let n_path = n.path.to_vec();
+                    let n_value = Some(n.data.clone());
                     let rem_path = once(current_nibble).chain(key_nibbles).collect::<Vec<_>>();
 
                     self.split(
@@ -466,6 +447,31 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     )?;
 
                     break None;
+                }
+
+                NodeType::Branch(n) => {
+                    match n.children[current_nibble as usize] {
+                        Some(c) => (node, c),
+                        None => {
+                            // insert the leaf to the empty slot
+                            // create a new leaf
+                            let leaf_ptr = self
+                                .put_node(Node::leaf(
+                                    PartialPath(key_nibbles.collect()),
+                                    Data(val),
+                                ))?
+                                .as_ptr();
+                            // set the current child to point to this leaf
+                            node.write(|u| {
+                                let uu = u.inner.as_branch_mut().unwrap();
+                                uu.children[current_nibble as usize] = Some(leaf_ptr);
+                                u.rehash();
+                            })
+                            .unwrap();
+
+                            break None;
+                        }
+                    }
                 }
 
                 NodeType::Extension(n) => {
@@ -522,13 +528,13 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                 None
                             }
                             NodeType::Leaf(n) => {
-                                if n.0.len() == 0 {
-                                    n.1 = Data(val);
+                                if n.path.len() == 0 {
+                                    n.data = Data(val);
 
                                     None
                                 } else {
-                                    let idx = n.0[0];
-                                    n.0 = PartialPath(n.0[1..].to_vec());
+                                    let idx = n.path[0];
+                                    n.path = PartialPath(n.path[1..].to_vec());
                                     u.rehash();
 
                                     Some((idx, true, None, val))
@@ -557,7 +563,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             };
 
             if let Some((idx, more, ext, val)) = info {
-                let mut chd = [None; NBRANCH];
+                let mut chd = [None; MAX_CHILDREN];
 
                 let c_ptr = if more {
                     u_ptr
@@ -570,6 +576,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
                 let branch = self
                     .put_node(Node::branch(BranchNode {
+                        // path: vec![].into(),
                         children: chd,
                         value: Some(Data(val)),
                         children_encoded: Default::default(),
@@ -687,7 +694,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                             // to: [p: Branch] -> [Leaf/Ext]
                             let write_result = c_ref.write(|c| {
                                 let partial_path = match &mut c.inner {
-                                    NodeType::Leaf(n) => &mut n.0,
+                                    NodeType::Leaf(n) => &mut n.path,
                                     NodeType::Extension(n) => &mut n.path,
                                     _ => unreachable!(),
                                 };
@@ -728,7 +735,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                                     let mut path = n.path.clone().into_inner();
                                     path.push(idx);
                                     let path0 = match &mut c.inner {
-                                        NodeType::Leaf(n) => &mut n.0,
+                                        NodeType::Leaf(n) => &mut n.path,
                                         NodeType::Extension(n) => &mut n.path,
                                         _ => unreachable!(),
                                     };
@@ -811,7 +818,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // to: [Branch] -> [Leaf/Ext]
                     let write_result = c_ref.write(|c| {
                         match &mut c.inner {
-                            NodeType::Leaf(n) => &mut n.0,
+                            NodeType::Leaf(n) => &mut n.path,
                             NodeType::Extension(n) => &mut n.path,
                             _ => unreachable!(),
                         }
@@ -840,7 +847,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         let mut path = n.path.clone().into_inner();
                         path.push(idx);
                         let path0 = match &mut c.inner {
-                            NodeType::Leaf(n) => &mut n.0,
+                            NodeType::Leaf(n) => &mut n.path,
                             NodeType::Extension(n) => &mut n.path,
                             _ => unreachable!(),
                         };
@@ -903,7 +910,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 }
 
                 NodeType::Leaf(n) => {
-                    found = Some(n.1.clone());
+                    found = Some(n.data.clone());
                     deleted.push(node_ref.as_ptr());
                     self.after_remove_leaf(&mut parents, &mut deleted)?
                 }
@@ -1008,7 +1015,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    let node_ref = if once(nib).chain(key_nibbles).eq(n.0.iter().copied()) {
+                    let node_ref = if once(nib).chain(key_nibbles).eq(n.path.iter().copied()) {
                         Some(node_ref)
                     } else {
                         None
@@ -1043,7 +1050,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         // when we're done iterating over nibbles, check if the node we're at has a value
         let node_ref = match &node_ref.inner {
             NodeType::Branch(n) if n.value.as_ref().is_some() => Some(node_ref),
-            NodeType::Leaf(n) if n.0.len() == 0 => Some(node_ref),
+            NodeType::Leaf(n) if n.path.len() == 0 => Some(node_ref),
             _ => None,
         };
 
@@ -1142,7 +1149,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 }
             }
             NodeType::Leaf(n) => {
-                if n.0.len() == 0 {
+                if n.path.len() == 0 {
                     nodes.push(u_ref.as_ptr());
                 }
             }
@@ -1381,7 +1388,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
 
                 let returned_key_value = match last_node.inner() {
                     NodeType::Branch(branch) => (key, branch.value.to_owned().unwrap().to_vec()),
-                    NodeType::Leaf(leaf) => (key, leaf.1.to_vec()),
+                    NodeType::Leaf(leaf) => (key, leaf.data.to_vec()),
                     NodeType::Extension(_) => todo!(),
                 };
 
@@ -1511,7 +1518,7 @@ impl<'a, S: shale::ShaleStore<node::Node> + Send + Sync> Stream for MerkleKeyVal
             } => {
                 let value = match last_node.inner() {
                     NodeType::Branch(branch) => branch.value.to_owned().unwrap().to_vec(),
-                    NodeType::Leaf(leaf) => leaf.1.to_vec(),
+                    NodeType::Leaf(leaf) => leaf.data.to_vec(),
                     NodeType::Extension(_) => todo!(),
                 };
 
@@ -1535,7 +1542,7 @@ fn key_from_parents_and_leaf(parents: &[(ObjRef, u8)], leaf: &LeafNode) -> Vec<u
     let mut iter = parents[1..]
         .iter()
         .map(|parent| parent.1)
-        .chain(leaf.0.to_vec());
+        .chain(leaf.path.to_vec());
     let mut data = Vec::with_capacity(iter.size_hint().0);
     while let (Some(hi), Some(lo)) = (iter.next(), iter.next()) {
         data.push((hi << 4) + lo);
@@ -1570,7 +1577,7 @@ impl<'a> std::ops::Deref for Ref<'a> {
     fn deref(&self) -> &[u8] {
         match &self.0.inner {
             NodeType::Branch(n) => n.value.as_ref().unwrap(),
-            NodeType::Leaf(n) => &n.1,
+            NodeType::Leaf(n) => &n.data,
             _ => unreachable!(),
         }
     }
@@ -1604,7 +1611,7 @@ impl<'a, S: ShaleStore<Node> + Send + Sync> RefMut<'a, S> {
                 |u| {
                     modify(match &mut u.inner {
                         NodeType::Branch(n) => &mut n.value.as_mut().unwrap().0,
-                        NodeType::Leaf(n) => &mut n.1 .0,
+                        NodeType::Leaf(n) => &mut n.data.0,
                         _ => unreachable!(),
                     });
                     u.rehash()
@@ -1683,13 +1690,14 @@ mod tests {
     fn branch(value: Vec<u8>, encoded_child: Option<Vec<u8>>) -> Node {
         let children = Default::default();
         let value = Some(Data(value));
-        let mut children_encoded = <[Option<Vec<u8>>; NBRANCH]>::default();
+        let mut children_encoded = <[Option<Vec<u8>>; MAX_CHILDREN]>::default();
 
         if let Some(child) = encoded_child {
             children_encoded[0] = Some(child);
         }
 
         Node::branch(BranchNode {
+            // path: vec![].into(),
             children,
             value,
             children_encoded,
@@ -1712,7 +1720,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_and_retrieve() {
+    fn insert_and_retrieve_one() {
         let key = b"hello";
         let val = b"world";
 
