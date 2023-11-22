@@ -161,6 +161,8 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
 	return outs, verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
@@ -240,6 +242,8 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
 	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
@@ -412,6 +416,8 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
 	return outs, verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
@@ -527,6 +533,8 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
 	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
@@ -663,6 +671,8 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
+	// verifyStakerStartsSoon is checked last to allow
+	// the verifier visitor to explicitly check for this error.
 	return verifyStakerStartsSoon(currentTimestamp, startTime)
 }
 
@@ -727,8 +737,7 @@ func verifyStakerStartTime(chainTime, stakerTime time.Time) error {
 }
 
 func verifyStakerStartsSoon(chainTime, stakerStartTime time.Time) error {
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
+	// Make sure the tx doesn't start too far in the future.
 	maxStartTime := chainTime.Add(MaxFutureStartTime)
 	if stakerStartTime.After(maxStartTime) {
 		return ErrFutureStakeTime

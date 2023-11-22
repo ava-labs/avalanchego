@@ -128,7 +128,7 @@ func (b *builder) buildBlock() (block.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	nextTimeStamp, timeWasCapped, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -137,7 +137,7 @@ func (b *builder) buildBlock() (block.Block, error) {
 		b,
 		preferredID,
 		nextHeight,
-		nextTimeStamp,
+		timestamp,
 		timeWasCapped,
 		preferredState,
 	)

@@ -290,7 +290,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	if err := e.addStakerFromStakerTx(tx); err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
@@ -319,12 +319,13 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	if err := e.addStakerFromStakerTx(tx); err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 
@@ -338,12 +339,13 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	if err := e.addStakerFromStakerTx(tx); err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 
@@ -434,7 +436,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	if err := e.addStakerFromStakerTx(tx); err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
@@ -466,12 +468,13 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	if err := e.addStakerFromStakerTx(tx); err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 
@@ -522,22 +525,18 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 
-// addStakerFromStakerTx creates the staker and adds it to state.
-func (e *StandardTxExecutor) addStakerFromStakerTx(stakerTx txs.Staker) error {
-	var (
-		txID   = e.Tx.ID()
-		staker *state.Staker
-		err    error
-	)
-
-	staker, err = state.NewPendingStaker(txID, stakerTx)
+// putStaker creates the staker and adds it to state.
+func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
+	txID := e.Tx.ID()
+	staker, err := state.NewPendingStaker(txID, stakerTx)
 	if err != nil {
 		return err
 	}
