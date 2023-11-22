@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -144,18 +142,6 @@ type State interface {
 
 	// Discard uncommitted changes to the database.
 	Abort()
-
-	// Returns if the state should be pruned and indexed to remove rejected
-	// blocks and generate the block height index.
-	//
-	// TODO: Remove after v1.11.x is activated
-	ShouldPrune() (bool, error)
-
-	// Removes rejected blocks from disk and indexes accepted blocks by height. This
-	// function supports being (and is recommended to be) called asynchronously.
-	//
-	// TODO: Remove after v1.11.x is activated
-	PruneAndIndex(sync.Locker, logging.Logger) error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -1054,14 +1040,6 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 
 	s.blockIDCache.Put(height, blkID)
 	return blkID, nil
-}
-
-func (*state) ShouldPrune() (bool, error) {
-	return false, nil // Nothing to do
-}
-
-func (*state) PruneAndIndex(sync.Locker, logging.Logger) error {
-	return nil // Nothing to do
 }
 
 // UPTIMES SECTION
