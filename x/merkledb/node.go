@@ -141,7 +141,11 @@ func (n *node) clone() *node {
 		nodeBytes:   n.nodeBytes,
 	}
 	for key, existing := range n.children {
-		result.children[key] = &child{compressedKey: existing.compressedKey, id: existing.id, hasValue: existing.hasValue}
+		result.children[key] = &child{
+			compressedKey: existing.compressedKey,
+			id:            existing.id,
+			hasValue:      existing.hasValue,
+		}
 	}
 	return result
 }
