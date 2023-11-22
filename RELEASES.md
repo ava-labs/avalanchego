@@ -95,8 +95,6 @@ The plugin version is unchanged at `30` and compatible with version `v1.10.15`.
 - @DoTheBestToGetTheBest made their first contribution in https://github.com/ava-labs/avalanchego/pull/2251
 - @vuittont60 made their first contribution in https://github.com/ava-labs/avalanchego/pull/2261
 
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.15...v1.10.16-rc.8
-
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.15...v1.10.16
 
 ## [v1.10.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.15)
