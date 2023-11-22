@@ -121,9 +121,8 @@ impl Clone for Node {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
-#[allow(clippy::large_enum_variant)]
 pub enum NodeType {
-    Branch(BranchNode),
+    Branch(Box<BranchNode>),
     Leaf(LeafNode),
     Extension(ExtNode),
 }
@@ -157,7 +156,7 @@ impl NodeType {
                 }
             }
             // TODO: add path
-            BRANCH_NODE_SIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?)),
+            BRANCH_NODE_SIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?.into())),
             size => Err(Box::new(bincode::ErrorKind::Custom(format!(
                 "invalid size: {size}"
             )))),
@@ -207,12 +206,15 @@ impl Node {
                 root_hash: OnceLock::new(),
                 is_encoded_longer_than_hash_len: OnceLock::new(),
                 encoded: OnceLock::new(),
-                inner: NodeType::Branch(BranchNode {
-                    // path: vec![].into(),
-                    children: [Some(DiskAddress::null()); MAX_CHILDREN],
-                    value: Some(Data(Vec::new())),
-                    children_encoded: Default::default(),
-                }),
+                inner: NodeType::Branch(
+                    BranchNode {
+                        // path: vec![].into(),
+                        children: [Some(DiskAddress::null()); MAX_CHILDREN],
+                        value: Some(Data(Vec::new())),
+                        children_encoded: Default::default(),
+                    }
+                    .into(),
+                ),
                 lazy_dirty: AtomicBool::new(false),
             }
             .serialized_len()
@@ -243,8 +245,8 @@ impl Node {
         self.root_hash = OnceLock::new();
     }
 
-    pub fn branch(node: BranchNode) -> Self {
-        Self::from(NodeType::Branch(node))
+    pub fn branch<B: Into<Box<BranchNode>>>(node: B) -> Self {
+        Self::from(NodeType::Branch(node.into()))
     }
 
     pub fn leaf(path: PartialPath, data: Data) -> Self {
@@ -384,12 +386,15 @@ impl Storable for Node {
                 Ok(Self::new_from_hash(
                     root_hash,
                     is_encoded_longer_than_hash_len,
-                    NodeType::Branch(BranchNode {
-                        // path: vec![].into(),
-                        children: chd,
-                        value,
-                        children_encoded: chd_encoded,
-                    }),
+                    NodeType::Branch(
+                        BranchNode {
+                            // path: vec![].into(),
+                            children: chd,
+                            value,
+                            children_encoded: chd_encoded,
+                        }
+                        .into(),
+                    ),
                 ))
             }
 
