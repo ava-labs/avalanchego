@@ -28,10 +28,12 @@ var (
 type Diff interface {
 	Chain
 
+	SetBlockID(ids.ID)
 	Apply(State) error
 }
 
 type diff struct {
+	blockID       ids.ID // this block ID
 	parentID      ids.ID
 	stateVersions Versions
 
@@ -79,6 +81,10 @@ func NewDiff(
 	}, nil
 }
 
+func (d *diff) SetBlockID(blkID ids.ID) {
+	d.blockID = blkID
+}
+
 func (d *diff) MerkleView() (merkledb.TrieView, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -103,7 +109,7 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 
 	batchOps = append(batchOps, database.BatchOp{
 		Key:   merkleLastAcceptedBlkIDKey,
-		Value: d.lastAcceptedBlkID[:], // TODO WE NEED THIS DIFF BLOCK ID
+		Value: d.blockID[:],
 	})
 
 	for subnetID, supply := range d.currentSupply {

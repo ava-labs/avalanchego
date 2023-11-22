@@ -18,6 +18,7 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
+	BlockID       ids.ID
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
@@ -96,6 +97,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	if err != nil {
 		return err
 	}
+	onAccept.SetBlockID(e.BlockID)
 	e.OnAccept = onAccept
 
 	executor := StandardTxExecutor{

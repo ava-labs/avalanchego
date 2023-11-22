@@ -64,10 +64,13 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	if err != nil {
 		return err
 	}
+	onCommitState.SetBlockID(b.ID())
+
 	onAbortState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
+	onAbortState.SetBlockID(b.ID())
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
@@ -99,6 +102,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	if err != nil {
 		return err
 	}
+	onAcceptState.SetBlockID(b.ID())
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
@@ -147,10 +151,13 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	if err != nil {
 		return err
 	}
+	onCommitState.SetBlockID(b.ID())
+
 	onAbortState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
+	onAbortState.SetBlockID(b.ID())
 
 	return v.proposalBlock(b, onCommitState, onAbortState)
 }
@@ -165,6 +172,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	if err != nil {
 		return err
 	}
+	onAcceptState.SetBlockID(b.ID())
 
 	return v.standardBlock(b, onAcceptState)
 }
@@ -190,6 +198,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
+		BlockID:       b.ID(),
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,

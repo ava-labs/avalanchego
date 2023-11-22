@@ -16,6 +16,7 @@ import (
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -412,6 +413,21 @@ func (m *MockChain) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockChainMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), arg0)
+}
+
+// MerkleView mocks base method.
+func (m *MockChain) MerkleView() (merkledb.TrieView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MerkleView")
+	ret0, _ := ret[0].(merkledb.TrieView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MerkleView indicates an expected call of MerkleView.
+func (mr *MockChainMockRecorder) MerkleView() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MerkleView", reflect.TypeOf((*MockChain)(nil).MerkleView))
 }
 
 // PutCurrentDelegator mocks base method.

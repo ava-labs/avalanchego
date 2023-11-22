@@ -16,6 +16,7 @@ import (
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -428,6 +429,21 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
 }
 
+// MerkleView mocks base method.
+func (m *MockDiff) MerkleView() (merkledb.TrieView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MerkleView")
+	ret0, _ := ret[0].(merkledb.TrieView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MerkleView indicates an expected call of MerkleView.
+func (mr *MockDiffMockRecorder) MerkleView() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MerkleView", reflect.TypeOf((*MockDiff)(nil).MerkleView))
+}
+
 // PutCurrentDelegator mocks base method.
 func (m *MockDiff) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -474,6 +490,18 @@ func (m *MockDiff) PutPendingValidator(arg0 *Staker) {
 func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
+}
+
+// SetBlockID mocks base method.
+func (m *MockDiff) SetBlockID(arg0 ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetBlockID", arg0)
+}
+
+// SetBlockID indicates an expected call of SetBlockID.
+func (mr *MockDiffMockRecorder) SetBlockID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlockID", reflect.TypeOf((*MockDiff)(nil).SetBlockID), arg0)
 }
 
 // SetCurrentSupply mocks base method.

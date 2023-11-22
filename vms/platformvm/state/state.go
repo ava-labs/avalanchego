@@ -707,8 +707,8 @@ func newState(
 	}, nil
 }
 
-func (s *state) MerkleView() (merkledb.TrieView, error) {
-	return nil, errors.New("Hey Dan, should we drop this state.State and just have our merkleized version?")
+func (*state) MerkleView() (merkledb.TrieView, error) {
+	return nil, errors.New("hey Dan, should we drop this state.State and just have our merkleized version?")
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
