@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 var (
@@ -74,6 +76,38 @@ func NewDiff(
 		timestamp:     parentState.GetTimestamp(),
 		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
+}
+
+func (d *diff) MerkleView() (merkledb.TrieView, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	parentView, err := parentState.MerkleView()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving parent view, %w", err)
+	}
+
+	// TODO: Push local changes here
+	batchOps := make([]database.BatchOp, 0)
+	for subnetID, chains := range d.addedChains {
+		for _, chainTx := range chains {
+			key := merkleChainKey(subnetID, chainTx.ID())
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: chainTx.Bytes(),
+			})
+		}
+	}
+
+	thisDiffView, err := parentView.NewView(context.Background(), merkledb.ViewChanges{
+		BatchOps: batchOps,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed creating current view out of parent one parent view, %w", err)
+	}
+
+	return thisDiffView, nil
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -381,12 +415,9 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 func (d *diff) AddChain(createChainTx *txs.Tx) {
 	tx := createChainTx.Unsigned.(*txs.CreateChainTx)
 	if d.addedChains == nil {
-		d.addedChains = map[ids.ID][]*txs.Tx{
-			tx.SubnetID: {createChainTx},
-		}
-	} else {
-		d.addedChains[tx.SubnetID] = append(d.addedChains[tx.SubnetID], createChainTx)
+		d.addedChains = make(map[ids.ID][]*txs.Tx)
 	}
+	d.addedChains[tx.SubnetID] = append(d.addedChains[tx.SubnetID], createChainTx)
 
 	cachedChains, cached := d.cachedChains[tx.SubnetID]
 	if !cached {
