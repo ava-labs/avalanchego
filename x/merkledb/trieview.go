@@ -272,11 +272,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
-	var (
-		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg              sync.WaitGroup
-		updatedChildren = make(chan *node, len(n.children))
-	)
+	// We use [wg] to wait until all descendants of [n] have been updated.
+	var wg sync.WaitGroup
 
 	for childIndex := range n.children {
 		childEntry := n.children[childIndex]
@@ -305,7 +302,6 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 
 	// Wait until all descendants of [n] have been updated.
 	wg.Wait()
-	close(updatedChildren)
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(t.db.metrics)
