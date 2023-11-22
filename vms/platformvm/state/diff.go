@@ -89,8 +89,33 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		return nil, fmt.Errorf("failed retrieving parent view, %w", err)
 	}
 
-	// TODO: Push local changes here
 	batchOps := make([]database.BatchOp, 0)
+
+	// METADATA
+	encodedChainTime, err := d.timestamp.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encoding chainTime: %w", err)
+	}
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
+
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: d.lastAcceptedBlkID[:], // TODO WE NEED THIS DIFF BLOCK ID
+	})
+
+	for subnetID, supply := range d.currentSupply {
+		supply := supply
+		key := merkleSuppliesKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: database.PackUInt64(supply),
+		})
+	}
+
+	// PERMISSIONED SUBNETS
 	for _, subnetTx := range d.addedSubnets {
 		key := merklePermissionedSubnetKey(subnetTx.ID())
 		batchOps = append(batchOps, database.BatchOp{
@@ -98,6 +123,8 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			Value: subnetTx.Bytes(),
 		})
 	}
+
+	// SUBNET OWNERS
 	for subnetID, owner := range d.subnetOwners {
 		owner := owner
 		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
@@ -110,6 +137,8 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			Value: ownerBytes,
 		})
 	}
+
+	// ELASTIC SUBNETS
 	for subnetID, transforkSubnetTx := range d.transformedSubnets {
 		key := merkleElasticSubnetKey(subnetID)
 		batchOps = append(batchOps, database.BatchOp{
@@ -117,6 +146,8 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			Value: transforkSubnetTx.Bytes(),
 		})
 	}
+
+	// CHAINS
 	for subnetID, chains := range d.addedChains {
 		for _, chainTx := range chains {
 			key := merkleChainKey(subnetID, chainTx.ID())
@@ -206,6 +237,27 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 				Value: database.PackUInt64(delegateeReward),
 			})
 		}
+	}
+
+	// UTXOS
+	for utxoID, utxo := range d.modifiedUTXOs {
+		key := merkleUtxoIDKey(utxoID)
+		if utxo == nil { // delete the UTXO
+			batchOps = append(batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+			continue
+		}
+
+		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		if err != nil {
+			return nil, fmt.Errorf("failed marshalling utxo %v bytes: %w", utxoID, err)
+		}
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: utxoBytes,
+		})
 	}
 
 	thisDiffView, err := parentView.NewView(context.Background(), merkledb.ViewChanges{
