@@ -135,7 +135,7 @@ func (vm *VM) Initialize(
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
-	vm.state, err = state.NewMerkleState(
+	vm.state, err = state.New(
 		vm.db,
 		genesisBytes,
 		registerer,
