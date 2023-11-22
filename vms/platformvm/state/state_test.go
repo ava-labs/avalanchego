@@ -52,16 +52,16 @@ func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
 	s, db := newUninitializedState(require)
 
-	shouldInit, err := s.(*merkleState).shouldInit()
+	shouldInit, err := s.(*state).shouldInit()
 	require.NoError(err)
 	require.True(shouldInit)
 
-	require.NoError(s.(*merkleState).doneInit())
+	require.NoError(s.(*state).doneInit())
 	require.NoError(s.Commit())
 
 	s = newStateFromDB(require, db)
 
-	shouldInit, err = s.(*merkleState).shouldInit()
+	shouldInit, err = s.(*state).shouldInit()
 	require.NoError(err)
 	require.False(shouldInit)
 }
@@ -153,7 +153,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
-	require.NoError(s.(*merkleState).syncGenesis(genesisBlk, genesisState))
+	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
 
 	return s, db
 }
@@ -165,7 +165,7 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
 	execCfg, _ := config.GetExecutionConfig(nil)
-	state, err := newMerkleState(
+	state, err := newState(
 		db,
 		metrics.Noop,
 		validators.NewManager(),
@@ -671,12 +671,12 @@ func TestParsedStateBlock(t *testing.T) {
 		stBlkBytes, err := block.GenesisCodec.Marshal(block.Version, &stBlk)
 		require.NoError(err)
 
-		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
 		require.NoError(err)
 		require.True(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
 
-		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
 		require.NoError(err)
 		require.False(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
@@ -718,4 +718,35 @@ func TestStateSubnetOwner(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner2, owner)
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.11.x is activated
+type stateBlk struct {
+	Blk    block.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
+}
+
+func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, false, err
+	}
+
+	blkState.Blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return blkState.Blk, true, nil
 }

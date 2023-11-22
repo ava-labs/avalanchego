@@ -276,7 +276,7 @@ func defaultState(
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	state, err := state.NewMerkleState(
+	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
