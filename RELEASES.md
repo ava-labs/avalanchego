@@ -1,5 +1,34 @@
 # Release Notes
 
+## [v1.10.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.16)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `30` and compatible with version `v1.10.15`.
+
+### APIs
+
+- Added log level information to the result of `admin.setLoggerLevel`
+- Updated `info.peers` to return chain aliases for `benched` chains
+- Added support to sample validators of non-tracked subnets with `platform.sampleValidators`
+- Added `avalanche_{chainID}_max_verified_height` metric to track the highest verified block
+
+### Configs
+
+- Added `--db-read-only` to run the node without writing to disk.
+  - This flag is only expected to be used during testing as it will cause memory use to increase over time
+- Removed `--bootstrap-retry-enabled`
+- Removed `--bootstrap-retry-warn-frequency`
+
+### Fixes
+
+- Fixed packing of large block requests during C-chain state sync
+- Fixed order of updating acceptor tip and sending chain events to C-chain event subscribers
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.15...v1.10.16
+
 ## [v1.10.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.15)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
