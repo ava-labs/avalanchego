@@ -230,10 +230,6 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	return proposalTxs, nil
 }
 
-type testBlockTimer struct{}
-
-func (*testBlockTimer) ResetBlockTimer() {}
-
 func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
 	utx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{},
@@ -253,7 +249,8 @@ func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
 func TestDropExpiredStakerTxs(t *testing.T) {
 	require := require.New(t)
 
-	mempool, err := New("test", prometheus.NewRegistry(), &testBlockTimer{})
+	registerer := prometheus.NewRegistry()
+	mempool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	tx1, err := generateAddValidatorTx(10, 20)
