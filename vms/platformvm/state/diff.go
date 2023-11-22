@@ -544,26 +544,67 @@ func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
 	}
 
 	// writeCurrentStakers
-	// for stakerTxID, data := range currentData {
-	// 	key := merkleCurrentStakersKey(stakerTxID)
+	// TODO refactor
+	for _, nodeIDToValidatorDiff := range d.currentStakerDiffs.validatorDiffs {
+		for _, validatorDiff := range nodeIDToValidatorDiff {
+			switch validatorDiff.validatorStatus {
+			case deleted:
+				key := merkleCurrentStakersKey(validatorDiff.validator.TxID)
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    key,
+					Delete: true,
+				})
+			case added:
+				key := merkleCurrentStakersKey(validatorDiff.validator.TxID)
+				tx, _, err := d.GetTx(validatorDiff.validator.TxID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get tx %s: %w", validatorDiff.validator.TxID, err)
+				}
 
-	// 	if data.TxBytes == nil {
-	// 		batchOps = append(batchOps, database.BatchOp{
-	// 			Key:    key,
-	// 			Delete: true,
-	// 		})
-	// 		continue
-	// 	}
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: validatorDiff.validator.PotentialReward,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", validatorDiff.validator.TxID, err)
+				}
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   key,
+					Value: stakersDataBytes,
+				})
+			}
 
-	// 	dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
-	// 	}
-	// 	batchOps = append(batchOps, database.BatchOp{
-	// 		Key:   key,
-	// 		Value: dataBytes,
-	// 	})
-	// }
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				tx, _, err := d.GetTx(staker.TxID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading current delegator tx, %w", err)
+				}
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: staker.PotentialReward,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", staker.TxID, err)
+				}
+				key := merkleCurrentStakersKey(staker.TxID)
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   key,
+					Value: stakersDataBytes,
+				})
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				key := merkleCurrentStakersKey(staker.TxID)
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    key,
+					Delete: true,
+				})
+			}
+		}
+	}
 
 	// writePendingStakers
 	// for stakerTxID, data := range pendingData {
