@@ -7,14 +7,21 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 type Config struct {
-	common.Config
 	common.AllGetsServer
+
+	Ctx *snow.ConsensusContext
+
+	StartupTracker tracker.Startup
+	Sender         common.Sender
 
 	// SampleK determines the number of nodes to attempt to fetch the latest
 	// state sync summary from. In order for a round of voting to succeed, there
@@ -33,18 +40,18 @@ type Config struct {
 }
 
 func NewConfig(
-	commonCfg common.Config,
-	stateSyncerIDs []ids.NodeID,
 	snowGetHandler common.AllGetsServer,
+	ctx *snow.ConsensusContext,
+	startupTracker tracker.Startup,
+	sender common.Sender,
+	beacons validators.Manager,
+	sampleK int,
+	alpha uint64,
+	stateSyncerIDs []ids.NodeID,
 	vm block.ChainVM,
 ) (Config, error) {
-	// Initialize the default values that will be used if stateSyncerIDs is
-	// empty.
-	var (
-		stateSyncBeacons = commonCfg.Beacons
-		syncAlpha        = commonCfg.Alpha
-		syncSampleK      = commonCfg.SampleK
-	)
+	// Initialize the beacons that will be used if stateSyncerIDs is empty.
+	stateSyncBeacons := beacons
 
 	// If the user has manually provided state syncer IDs, then override the
 	// state sync beacons to them.
@@ -52,24 +59,24 @@ func NewConfig(
 		stateSyncBeacons = validators.NewManager()
 		for _, peerID := range stateSyncerIDs {
 			// Invariant: We never use the TxID or BLS keys populated here.
-			if err := stateSyncBeacons.AddStaker(commonCfg.Ctx.SubnetID, peerID, nil, ids.Empty, 1); err != nil {
+			if err := stateSyncBeacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1); err != nil {
 				return Config{}, err
 			}
 		}
-		stateSyncingWeight, err := stateSyncBeacons.TotalWeight(commonCfg.Ctx.SubnetID)
+		stateSyncingWeight, err := stateSyncBeacons.TotalWeight(ctx.SubnetID)
 		if err != nil {
-			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons for subnet %s: %w", commonCfg.Ctx.SubnetID, err)
+			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons for subnet %s: %w", ctx.SubnetID, err)
 		}
-		if uint64(syncSampleK) > stateSyncingWeight {
-			syncSampleK = int(stateSyncingWeight)
-		}
-		syncAlpha = stateSyncingWeight/2 + 1 // must be > 50%
+		sampleK = int(math.Min(uint64(sampleK), stateSyncingWeight))
+		alpha = stateSyncingWeight/2 + 1 // must be > 50%
 	}
 	return Config{
-		Config:           commonCfg,
 		AllGetsServer:    snowGetHandler,
-		SampleK:          syncSampleK,
-		Alpha:            syncAlpha,
+		Ctx:              ctx,
+		StartupTracker:   startupTracker,
+		Sender:           sender,
+		SampleK:          sampleK,
+		Alpha:            alpha,
 		StateSyncBeacons: stateSyncBeacons,
 		VM:               vm,
 	}, nil
