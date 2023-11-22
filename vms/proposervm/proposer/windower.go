@@ -19,11 +19,11 @@ import (
 const (
 	WindowDuration = 5 * time.Second
 
-	MaxVerifyWindows = 6 // 30 seconds
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration
+	MaxVerifyWindows = 6
+	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
 
-	MaxBuildWindows = 60 // 5 minutes
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration
+	MaxBuildWindows = 60
+	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 )
 
 var _ Windower = (*windower)(nil)
