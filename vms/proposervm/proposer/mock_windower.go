@@ -40,31 +40,31 @@ func (m *MockWindower) EXPECT() *MockWindowerMockRecorder {
 }
 
 // Delay mocks base method.
-func (m *MockWindower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID) (time.Duration, error) {
+func (m *MockWindower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID, arg4 int) (time.Duration, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delay", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Delay", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Delay indicates an expected call of Delay.
-func (mr *MockWindowerMockRecorder) Delay(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockWindowerMockRecorder) Delay(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*MockWindower)(nil).Delay), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*MockWindower)(nil).Delay), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Proposers mocks base method.
-func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64) ([]ids.NodeID, error) {
+func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64, arg3 int) ([]ids.NodeID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Proposers", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Proposers", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]ids.NodeID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Proposers indicates an expected call of Proposers.
-func (mr *MockWindowerMockRecorder) Proposers(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockWindowerMockRecorder) Proposers(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposers", reflect.TypeOf((*MockWindower)(nil).Proposers), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposers", reflect.TypeOf((*MockWindower)(nil).Proposers), arg0, arg1, arg2, arg3)
 }
