@@ -88,6 +88,7 @@ The plugin version is unchanged at `30` and compatible with version `v1.10.15`.
 - Expand consensus health check by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2354
 - Reduce the size of the OracleBlock interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2355
 - [vms/proposervm] Update Build Heuristic by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/2348
+- Use linkedhashmap for P-Chain mempool by @gyuho in https://github.com/ava-labs/avalanchego/pull/1536
 
 ### New Contributors
 
