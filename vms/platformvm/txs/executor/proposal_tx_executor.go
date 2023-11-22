@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -57,12 +56,6 @@ type ProposalTxExecutor struct {
 	// [OnAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
 	OnAbortState state.Diff
-
-	// outputs populated by this struct's methods:
-	//
-	// [PrefersCommit] is true iff this node initially prefers to
-	// commit this block transaction.
-	PrefersCommit bool
 }
 
 func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
@@ -149,8 +142,6 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
-
-	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -197,8 +188,6 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, tx.Outs)
-
-	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -246,8 +235,6 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
-
-	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -304,10 +291,6 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	// Update the state if this tx is committed
 	e.OnCommitState.SetTimestamp(newChainTime)
 	changes.Apply(e.OnCommitState)
-
-	e.PrefersCommit = !newChainTime.After(now.Add(SyncBound))
-
-	// Note that state doesn't change if this proposal is aborted
 	return nil
 }
 
@@ -352,17 +335,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		)
 	}
 
-	// retrieve primaryNetworkValidator before possibly removing it.
-	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
-		constants.PrimaryNetworkID,
-		stakerToReward.NodeID,
-	)
-	if err != nil {
-		// This should never error because the staker set is in memory and
-		// primary network validators are removed last.
-		return err
-	}
-
 	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
@@ -405,10 +377,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
-
-	// handle option preference
-	e.PrefersCommit, err = e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
-	return err
+	return nil
 }
 
 func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
@@ -644,27 +613,4 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		e.OnCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
-}
-
-func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
-	expectedUptimePercentage := e.Config.UptimePercentage
-	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
-		transformSubnet, err := GetTransformSubnetTx(e.OnCommitState, stakerToReward.SubnetID)
-		if err != nil {
-			return false, fmt.Errorf("failed to calculate uptime: %w", err)
-		}
-
-		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-	}
-
-	// TODO: calculate subnet uptimes
-	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
-		primaryNetworkValidator.NodeID,
-		constants.PrimaryNetworkID,
-		primaryNetworkValidator.StartTime,
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to calculate uptime: %w", err)
-	}
-	return uptime >= expectedUptimePercentage, nil
 }
