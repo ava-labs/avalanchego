@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -136,7 +135,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 	}
 
 	return &genesis.Genesis{
-		GenesisID:     hashing.ComputeHash256Array(ids.Empty[:]),
+		GenesisBytes:  []byte{'g', 'e', 'n', 'e', 's', 'i', 's', 'B', 'y', 't', 'e', 's'},
 		UTXOs:         genesisUTXOs,
 		Validators:    vdrs.List(),
 		Chains:        nil,
