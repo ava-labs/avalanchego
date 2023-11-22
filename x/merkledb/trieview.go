@@ -254,6 +254,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		t.changes.rootID = t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
 
+		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
 		if !isSentinelNodeTheRoot(t.sentinelNode) {
 			for _, childEntry := range t.sentinelNode.children {
 				t.changes.rootID = childEntry.id
