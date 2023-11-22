@@ -10,8 +10,6 @@ use crate::{
 };
 use std::fmt::{Debug, Error as FmtError, Formatter};
 
-pub const SIZE: usize = 2;
-
 #[derive(PartialEq, Eq, Clone)]
 pub struct ExtNode {
     pub(crate) path: PartialPath,

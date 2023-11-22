@@ -22,8 +22,8 @@ mod leaf;
 mod partial_path;
 
 pub use branch::{BranchNode, MAX_CHILDREN, SIZE as BRANCH_NODE_SIZE};
-pub use extension::{ExtNode, SIZE as EXTENSION_NODE_SIZE};
-pub use leaf::LeafNode;
+pub use extension::ExtNode;
+pub use leaf::{LeafNode, SIZE as LEAF_NODE_SIZE};
 pub use partial_path::PartialPath;
 
 use crate::merkle::to_nibble_array;
@@ -89,7 +89,7 @@ impl NodeType {
         let items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
         match items.len() {
-            EXTENSION_NODE_SIZE => {
+            LEAF_NODE_SIZE => {
                 let mut items = items.into_iter();
 
                 let decoded_key: Vec<u8> = items.next().unwrap().decode()?;
