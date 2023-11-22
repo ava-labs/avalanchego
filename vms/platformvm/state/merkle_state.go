@@ -388,6 +388,10 @@ type merkleState struct {
 	rewardUTXOsDB    database.Database
 }
 
+func (ms *merkleState) MerkleView() (merkledb.TrieView, error) {
+	return ms.merkleDB.NewView(context.Background(), merkledb.ViewChanges{})
+}
+
 // STAKERS section
 func (ms *merkleState) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return ms.currentStakers.GetValidator(subnetID, nodeID)

@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -123,6 +124,8 @@ type Chain interface {
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
+
+	MerkleView() (merkledb.TrieView, error)
 }
 
 type State interface {
@@ -702,6 +705,10 @@ func newState(
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}, nil
+}
+
+func (s *state) MerkleView() (merkledb.TrieView, error) {
+	return nil, errors.New("Hey Dan, should we drop this state.State and just have our merkleized version?")
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
