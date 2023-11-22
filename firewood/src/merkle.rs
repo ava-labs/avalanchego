@@ -5,13 +5,8 @@ use crate::v2::api;
 use crate::{nibbles::Nibbles, v2::api::Proof};
 use futures::{Stream, StreamExt, TryStreamExt};
 use sha3::Digest;
-use std::future::ready;
 use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    io::Write,
-    iter::once,
-    sync::{atomic::Ordering::Relaxed, OnceLock},
+    cmp::Ordering, collections::HashMap, future::ready, io::Write, iter::once, sync::OnceLock,
     task::Poll,
 };
 use thiserror::Error;
@@ -122,9 +117,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Ok(if let Some(root) = root {
             let mut node = self.get_node(root)?;
             let res = node.get_root_hash::<S>(self.store.as_ref()).clone();
-            if node.lazy_dirty.load(Relaxed) {
+            if node.is_dirty() {
                 node.write(|_| {}).unwrap();
-                node.lazy_dirty.store(false, Relaxed);
+                node.set_dirty(false);
             }
             res
         } else {

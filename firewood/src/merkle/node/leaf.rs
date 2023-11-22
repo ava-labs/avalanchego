@@ -8,6 +8,9 @@ use bincode::Options;
 use super::{Data, Encoded};
 use crate::merkle::{from_nibbles, PartialPath};
 
+// will be needed when extension node is removed
+// pub const SIZE: usize = 2;
+
 #[derive(PartialEq, Eq, Clone)]
 pub struct LeafNode {
     pub(crate) path: PartialPath,

@@ -8,10 +8,7 @@ use crate::{
     merkle::{from_nibbles, PartialPath, TRIE_HASH_LEN},
     shale::{DiskAddress, ShaleStore},
 };
-use std::{
-    fmt::{Debug, Error as FmtError, Formatter},
-    sync::atomic::Ordering,
-};
+use std::fmt::{Debug, Error as FmtError, Formatter};
 
 pub const SIZE: usize = 2;
 
@@ -52,9 +49,9 @@ impl ExtNode {
                         .unwrap(),
                 );
 
-                if r.lazy_dirty.load(Ordering::Relaxed) {
+                if r.is_dirty() {
                     r.write(|_| {}).unwrap();
-                    r.lazy_dirty.store(false, Ordering::Relaxed);
+                    r.set_dirty(false);
                 }
             } else {
                 list[1] = Encoded::Raw(r.get_encoded(store).to_vec());

@@ -8,10 +8,7 @@ use crate::{
     shale::ShaleStore,
 };
 use bincode::{Error, Options};
-use std::{
-    fmt::{Debug, Error as FmtError, Formatter},
-    sync::atomic::Ordering,
-};
+use std::fmt::{Debug, Error as FmtError, Formatter};
 
 pub const MAX_CHILDREN: usize = 16;
 pub const SIZE: usize = MAX_CHILDREN + 1;
@@ -148,9 +145,9 @@ impl BranchNode {
                         );
 
                         // See struct docs for ordering requirements
-                        if c_ref.lazy_dirty.load(Ordering::Relaxed) {
+                        if c_ref.is_dirty() {
                             c_ref.write(|_| {}).unwrap();
-                            c_ref.lazy_dirty.store(false, Ordering::Relaxed)
+                            c_ref.set_dirty(false);
                         }
                     } else {
                         let child_encoded = &c_ref.get_encoded::<S>(store);
