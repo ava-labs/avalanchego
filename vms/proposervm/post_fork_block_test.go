@@ -332,7 +332,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block can arrive within submission window
-	atSubWindowEnd := proVM.Time().Add(proposer.MaxBuildDelay)
+	atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
 	proVM.Clock.Set(atSubWindowEnd)
 	childSlb, err = block.BuildUnsigned(
 		prntProBlk.ID(),
