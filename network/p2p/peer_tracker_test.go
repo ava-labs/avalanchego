@@ -16,7 +16,7 @@ import (
 
 func TestPeerTracker(t *testing.T) {
 	require := require.New(t)
-	p, err := newPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry())
+	p, err := NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
 
 	// Connect some peers
