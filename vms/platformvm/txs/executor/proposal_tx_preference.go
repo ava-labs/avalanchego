@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,12 +15,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = (*ProposalTxPreference)(nil)
+var (
+	_ txs.Visitor = (*ProposalTxPreference)(nil)
+
+	ErrMissingStakerTx                      = errors.New("failed to get staker transaction")
+	ErrUnexpectedStakerTransactionType      = errors.New("unexpected staker transaction type")
+	ErrStakerWithoutPrimaryNetworkValidator = errors.New("failed to get primary network validator of staker")
+	ErrMissingSubnetTransformation          = errors.New("failed to get subnet transformation")
+	ErrCalculatingUptime                    = errors.New("failed calculating uptime")
+)
 
 type ProposalTxPreference struct {
 	// inputs, to be filled before visitor methods are called
 	PrimaryUptimePercentage float64
-	Uptimes                 uptime.Manager
+	Uptimes                 uptime.Calculator
 	State                   state.Chain
 	Tx                      *txs.Tx
 
@@ -98,7 +107,11 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 		// GetTx can only return [ErrNotFound], or an unexpected error like a
 		// parsing error or internal DB error. For anything other than
 		// [ErrNotFound] the block can just be dropped.
-		return fmt.Errorf("failed to get staker transaction to remove: %w", err)
+		return fmt.Errorf("%w %s: %w",
+			ErrMissingStakerTx,
+			tx.TxID,
+			err,
+		)
 	}
 
 	staker, ok := stakerTx.Unsigned.(txs.Staker)
@@ -106,13 +119,15 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 		// Because this transaction isn't guaranteed to have been verified yet,
 		// it's possible that a malicious node issued this transaction into a
 		// block that will fail verification in the future.
-		return fmt.Errorf("staker transaction has unexpected type: %T", stakerTx.Unsigned)
+		return fmt.Errorf("%w %s: %T",
+			ErrUnexpectedStakerTransactionType,
+			tx.TxID,
+			stakerTx.Unsigned,
+		)
 	}
 
-	subnetID := staker.SubnetID()
-	nodeID := staker.NodeID()
-
 	// retrieve primaryNetworkValidator before possibly removing it.
+	nodeID := staker.NodeID()
 	primaryNetworkValidator, err := e.State.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		nodeID,
@@ -120,31 +135,43 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 	if err != nil {
 		// If this transaction is included into an invalid block where the
 		// staker has already been removed, we can just drop it.
-		return fmt.Errorf("failed to get primary network validator for validator to remove: %w", err)
+		return fmt.Errorf("%w %s: %w",
+			ErrStakerWithoutPrimaryNetworkValidator,
+			nodeID,
+			err,
+		)
 	}
 
 	expectedUptimePercentage := e.PrimaryUptimePercentage
-	if subnetID != constants.PrimaryNetworkID {
+	if subnetID := staker.SubnetID(); subnetID != constants.PrimaryNetworkID {
 		transformSubnet, err := GetTransformSubnetTx(e.State, subnetID)
 		if err != nil {
 			// If the subnet hasn't been transformed yet, the tx we are removing
 			// isn't for a permissionless subnet. So, it's removal here is
 			// invalid.
-			return fmt.Errorf("failed to fetch transformation tx: %w", err)
+			return fmt.Errorf("%w %s: %w",
+				ErrMissingSubnetTransformation,
+				subnetID,
+				err,
+			)
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
 	}
 
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
-		primaryNetworkValidator.NodeID,
+		nodeID,
 		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {
 		// If this transaction is included into an invalid block where the
 		// staker has already been removed, we can just drop it.
-		return fmt.Errorf("failed to calculate uptime: %w", err)
+		return fmt.Errorf("%w: %w",
+			ErrCalculatingUptime,
+			nodeID,
+			err,
+		)
 	}
 
 	e.PrefersCommit = uptime >= expectedUptimePercentage

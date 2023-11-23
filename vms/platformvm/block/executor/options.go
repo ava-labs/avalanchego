@@ -19,7 +19,7 @@ var _ block.Visitor = (*verifier)(nil)
 type options struct {
 	// inputs populated before calling this struct's methods:
 	primaryUptimePercentage float64
-	uptimes                 uptime.Manager
+	uptimes                 uptime.Calculator
 	state                   state.Chain
 
 	// outputs populated by this struct's methods:

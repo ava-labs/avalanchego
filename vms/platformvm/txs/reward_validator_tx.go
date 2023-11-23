@@ -26,9 +26,6 @@ type RewardValidatorTx struct {
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
 
-	// Marks if this validator should be rewarded according to this node.
-	ShouldPreferCommit bool `json:"-"`
-
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
