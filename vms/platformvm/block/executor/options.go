@@ -8,15 +8,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var _ block.Visitor = (*verifier)(nil)
 
 // options supports build new option blocks
 type options struct {
+	// inputs populated before calling this struct's methods:
+	state state.Chain
+
 	// outputs populated by this struct's methods:
-	commitBlock block.Block
-	abortBlock  block.Block
+	preferredBlock block.Block
+	alternateBlock block.Block
 }
 
 func (*options) BanffAbortBlock(*block.BanffAbortBlock) error {
@@ -68,7 +72,7 @@ func (o *options) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	nextHeight := b.Height() + 1
 
 	var err error
-	o.commitBlock, err = block.NewApricotCommitBlock(blkID, nextHeight)
+	o.preferredBlock, err = block.NewApricotCommitBlock(blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -76,7 +80,7 @@ func (o *options) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		)
 	}
 
-	o.abortBlock, err = block.NewApricotAbortBlock(blkID, nextHeight)
+	o.alternateBlock, err = block.NewApricotAbortBlock(blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",

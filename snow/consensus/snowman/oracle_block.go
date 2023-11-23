@@ -18,7 +18,5 @@ var ErrNotOracle = errors.New("block isn't an oracle")
 type OracleBlock interface {
 	// Options returns the possible children of this block in the order this
 	// validator prefers the blocks.
-	//
-	// Any error other than [ErrNotOracle] will be considered a fatal error.
 	Options(context.Context) ([2]Block, error)
 }
