@@ -1539,8 +1539,8 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		s.writeSubnetOwners(&batchOps),
 		s.writeElasticSubnets(&batchOps),
 		s.writeChains(&batchOps),
-		s.writeCurrentStakers(&batchOps, currentData),
-		s.writePendingStakers(&batchOps, pendingData),
+		writeCurrentStakers(currentData, &batchOps),
+		writePendingStakers(pendingData, &batchOps),
 		s.writeDelegateeRewards(&batchOps),
 		s.writeUTXOs(&batchOps),
 	)
@@ -1603,50 +1603,33 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 }
 
 func (s *state) writePermissionedSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for _, subnetTx := range s.addedPermissionedSubnets {
-		key := merklePermissionedSubnetKey(subnetTx.ID())
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: subnetTx.Bytes(),
-		})
-	}
-	s.addedPermissionedSubnets = make([]*txs.Tx, 0)
+	writePermissionedSubnets(s.addedPermissionedSubnets, batchOps)
+	s.addedPermissionedSubnets = s.addedPermissionedSubnets[:0]
 	return nil
 }
 
 func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 	for subnetID, owner := range s.subnetOwners {
-		owner := owner
-
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		bytes, err := writeSubnetOwners(subnetID, owner, batchOps)
 		if err != nil {
-			return fmt.Errorf("failed to marshal subnet owner: %w", err)
+			return err
 		}
 
 		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
 			owner: owner,
-			size:  len(ownerBytes),
-		})
-
-		key := merkleSubnetOwnersKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: ownerBytes,
+			size:  len(bytes),
 		})
 	}
+
 	maps.Clear(s.subnetOwners)
 	return nil
 }
 
 func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for subnetID, transforkSubnetTx := range s.addedElasticSubnets {
-		key := merkleElasticSubnetKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: transforkSubnetTx.Bytes(),
-		})
-		delete(s.addedElasticSubnets, subnetID)
+	writeElasticSubnets(s.addedElasticSubnets, batchOps)
+	maps.Clear(s.addedElasticSubnets)
 
+	for subnetID := range s.addedElasticSubnets {
 		// Note: Evict is used rather than Put here because tx may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
@@ -1656,70 +1639,13 @@ func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //noli
 }
 
 func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for subnetID, chains := range s.addedChains {
-		for _, chainTx := range chains {
-			key := merkleChainKey(subnetID, chainTx.ID())
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:   key,
-				Value: chainTx.Bytes(),
-			})
-		}
-		delete(s.addedChains, subnetID)
-	}
-	return nil
-}
-
-func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
-	for stakerTxID, data := range currentData {
-		key := merkleCurrentStakersKey(stakerTxID)
-
-		if data.TxBytes == nil {
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:    key,
-				Delete: true,
-			})
-			continue
-		}
-
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
-		if err != nil {
-			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: dataBytes,
-		})
-	}
-	return nil
-}
-
-func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakersData) error {
-	for stakerTxID, data := range pendingData {
-		key := merklePendingStakersKey(stakerTxID)
-
-		if data.TxBytes == nil {
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:    key,
-				Delete: true,
-			})
-			continue
-		}
-
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
-		if err != nil {
-			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: dataBytes,
-		})
-	}
+	writeChains(s.addedChains, batchOps)
+	maps.Clear(s.addedChains)
 	return nil
 }
 
 func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 	for utxoID, utxo := range s.modifiedUTXOs {
-		delete(s.modifiedUTXOs, utxoID)
 		key := merkleUtxoIDKey(utxoID)
 		if utxo == nil { // delete the UTXO
 			switch utxo, err := s.GetUTXO(utxoID); err {
@@ -1760,6 +1686,8 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 			return err
 		}
 	}
+
+	maps.Clear(s.modifiedUTXOs)
 	return nil
 }
 

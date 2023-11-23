@@ -4,9 +4,14 @@
 package state
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // helpers types to store data on merkleDB
@@ -50,11 +55,31 @@ func merklePermissionedSubnetKey(subnetID ids.ID) []byte {
 	return key
 }
 
+func writePermissionedSubnets(permissionedSubnetsToAdd []*txs.Tx, batchOps *[]database.BatchOp) {
+	for _, subnetTx := range permissionedSubnetsToAdd {
+		key := merklePermissionedSubnetKey(subnetTx.ID())
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnetTx.Bytes(),
+		})
+	}
+}
+
 func merkleElasticSubnetKey(subnetID ids.ID) []byte {
 	key := make([]byte, len(elasticSubnetSectionPrefix), len(elasticSubnetSectionPrefix)+len(subnetID[:]))
 	copy(key, elasticSubnetSectionPrefix)
 	key = append(key, subnetID[:]...)
 	return key
+}
+
+func writeElasticSubnets(elasticSubnetsToAdd map[ids.ID]*txs.Tx, batchOps *[]database.BatchOp) {
+	for subnetID, transforkSubnetTx := range elasticSubnetsToAdd {
+		key := merkleElasticSubnetKey(subnetID)
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: transforkSubnetTx.Bytes(),
+		})
+	}
 }
 
 func merkleChainPrefix(subnetID ids.ID) []byte {
@@ -68,6 +93,18 @@ func merkleChainKey(subnetID ids.ID, chainID ids.ID) []byte {
 	key := merkleChainPrefix(subnetID)
 	key = append(key, chainID[:]...)
 	return key
+}
+
+func writeChains(chainsToAdd map[ids.ID][]*txs.Tx, batchOps *[]database.BatchOp) {
+	for subnetID, chains := range chainsToAdd {
+		for _, chainTx := range chains {
+			key := merkleChainKey(subnetID, chainTx.ID())
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: chainTx.Bytes(),
+			})
+		}
+	}
 }
 
 func merkleUtxoIDKey(utxoID ids.ID) []byte {
@@ -107,11 +144,59 @@ func merkleCurrentStakersKey(txID ids.ID) []byte {
 	return key
 }
 
+func writeCurrentStakers(currentData map[ids.ID]*stakersData, batchOps *[]database.BatchOp) error {
+	for stakerTxID, data := range currentData {
+		key := merkleCurrentStakersKey(stakerTxID)
+
+		if data.TxBytes == nil {
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+			continue
+		}
+
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		if err != nil {
+			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
+		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
+	}
+	return nil
+}
+
 func merklePendingStakersKey(txID ids.ID) []byte {
 	key := make([]byte, len(pendingStakersSectionPrefix)+len(txID))
 	copy(key, pendingStakersSectionPrefix)
 	copy(key[len(pendingStakersSectionPrefix):], txID[:])
 	return key
+}
+
+func writePendingStakers(pendingData map[ids.ID]*stakersData, batchOps *[]database.BatchOp) error {
+	for stakerTxID, data := range pendingData {
+		key := merklePendingStakersKey(stakerTxID)
+
+		if data.TxBytes == nil {
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+			continue
+		}
+
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		if err != nil {
+			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
+		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
+	}
+	return nil
 }
 
 func merkleDelegateeRewardsKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
@@ -127,4 +212,17 @@ func merkleSubnetOwnersKey(subnetID ids.ID) []byte {
 	copy(key, delegateeRewardsPrefix)
 	copy(key[len(delegateeRewardsPrefix):], subnetID[:])
 	return key
+}
+
+func writeSubnetOwners(subnetID ids.ID, owner fx.Owner, batchOps *[]database.BatchOp) ([]byte, error) {
+	ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+	}
+	key := merkleSubnetOwnersKey(subnetID)
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   key,
+		Value: ownerBytes,
+	})
+	return ownerBytes, nil
 }

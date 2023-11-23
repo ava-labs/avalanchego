@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -122,49 +121,24 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 	}
 
 	// PERMISSIONED SUBNETS
-	for _, subnetTx := range d.addedSubnets {
-		key := merklePermissionedSubnetKey(subnetTx.ID())
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: subnetTx.Bytes(),
-		})
-	}
+	writePermissionedSubnets(d.addedSubnets, &batchOps)
 
 	// SUBNET OWNERS
 	for subnetID, owner := range d.subnetOwners {
-		owner := owner
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		_, err := writeSubnetOwners(subnetID, owner, &batchOps)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+			return nil, fmt.Errorf("failed writing subnet owners: %w", err)
 		}
-		key := merkleSubnetOwnersKey(subnetID)
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: ownerBytes,
-		})
 	}
 
 	// ELASTIC SUBNETS
-	for subnetID, transforkSubnetTx := range d.transformedSubnets {
-		key := merkleElasticSubnetKey(subnetID)
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: transforkSubnetTx.Bytes(),
-		})
-	}
+	writeElasticSubnets(d.transformedSubnets, &batchOps)
 
 	// CHAINS
-	for subnetID, chains := range d.addedChains {
-		for _, chainTx := range chains {
-			key := merkleChainKey(subnetID, chainTx.ID())
-			batchOps = append(batchOps, database.BatchOp{
-				Key:   key,
-				Value: chainTx.Bytes(),
-			})
-		}
-	}
+	writeChains(d.addedChains, &batchOps)
 
 	// CURRENT STAKERS
+	currentStakersData := make(map[ids.ID]*stakersData)
 	itAddedCurrentStakers := NewTreeIterator(d.currentStakerDiffs.addedStakers)
 	defer itAddedCurrentStakers.Release()
 	for itAddedCurrentStakers.Next() {
@@ -176,30 +150,22 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		if !found {
 			return nil, fmt.Errorf("added staker %v, but can't find its tx among added ones", stakerTxID)
 		}
-
-		key := merkleCurrentStakersKey(stakerTxID)
-		stakerData := stakersData{
+		currentStakersData[stakerTxID] = &stakersData{
 			TxBytes:         tx.tx.Bytes(),
 			PotentialReward: staker.PotentialReward,
 		}
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: dataBytes,
-		})
 	}
 	for txID := range d.currentStakerDiffs.deletedStakers {
-		key := merkleCurrentStakersKey(txID)
-		batchOps = append(batchOps, database.BatchOp{
-			Key:    key,
-			Delete: true,
-		})
+		currentStakersData[txID] = &stakersData{
+			TxBytes: nil,
+		}
+	}
+	if err := writeCurrentStakers(currentStakersData, &batchOps); err != nil {
+		return nil, err
 	}
 
 	// PENDING STAKERS
+	pendingStakersData := make(map[ids.ID]*stakersData)
 	itAddedPendingStakers := NewTreeIterator(d.pendingStakerDiffs.addedStakers)
 	defer itAddedPendingStakers.Release()
 	for itAddedPendingStakers.Next() {
@@ -212,26 +178,18 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			return nil, fmt.Errorf("added staker %v, but can't find its tx among added ones", stakerTxID)
 		}
 
-		key := merkleCurrentStakersKey(stakerTxID)
-		stakerData := stakersData{
+		pendingStakersData[stakerTxID] = &stakersData{
 			TxBytes:         tx.tx.Bytes(),
 			PotentialReward: staker.PotentialReward,
 		}
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: dataBytes,
-		})
 	}
 	for txID := range d.pendingStakerDiffs.deletedStakers {
-		key := merkleCurrentStakersKey(txID)
-		batchOps = append(batchOps, database.BatchOp{
-			Key:    key,
-			Delete: true,
-		})
+		pendingStakersData[txID] = &stakersData{
+			TxBytes: nil,
+		}
+	}
+	if err := writePendingStakers(pendingStakersData, &batchOps); err != nil {
+		return nil, err
 	}
 
 	// DELEGATEE REWARDS
