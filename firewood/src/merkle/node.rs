@@ -196,15 +196,23 @@ impl From<NodeType> for Node {
     }
 }
 
-impl Node {
-    const BRANCH_NODE: u8 = 0x0;
-    const EXT_NODE: u8 = 0x1;
-    const LEAF_NODE: u8 = 0x2;
+bitflags! {
+    struct NodeAttributes: u8 {
+        const ROOT_HASH_VALID      = 0b001;
+        const IS_ENCODED_BIG_VALID = 0b010;
+        const LONG                 = 0b100;
+    }
+}
 
-    const ROOT_HASH_VALID_BIT: u8 = 1 << 0;
+impl Node {
+    const BRANCH_NODE: u8 = 0;
+    const LEAF_NODE: u8 = 1;
+    const EXT_NODE: u8 = 2;
+
+    const ROOT_HASH_VALID_BIT: u8 = 0b01;
     // TODO: why are these different?
-    const IS_ENCODED_BIG_VALID: u8 = 1 << 1;
-    const LONG_BIT: u8 = 1 << 2;
+    const IS_ENCODED_BIG_VALID: u8 = 0b10;
+    const LONG_BIT: u8 = 0b100;
 
     pub(super) fn max_branch_node_size() -> u64 {
         let max_size: OnceLock<u64> = OnceLock::new();
@@ -297,6 +305,36 @@ impl Node {
     }
 }
 
+mod type_id {
+    use crate::shale::ShaleError;
+
+    const BRANCH: u8 = 0;
+    const LEAF: u8 = 1;
+    const EXTENSION: u8 = 2;
+
+    #[repr(u8)]
+    pub enum NodeTypeId {
+        Branch = BRANCH,
+        Leaf = LEAF,
+        Extension = EXTENSION,
+    }
+
+    impl TryFrom<u8> for NodeTypeId {
+        type Error = ShaleError;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            match value {
+                BRANCH => Ok(Self::Branch),
+                LEAF => Ok(Self::Leaf),
+                EXTENSION => Ok(Self::Extension),
+                _ => Err(ShaleError::InvalidNodeType),
+            }
+        }
+    }
+}
+
+use type_id::NodeTypeId;
+
 impl Storable for Node {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         const META_SIZE: usize = TRIE_HASH_LEN + 1 + 1;
@@ -308,26 +346,27 @@ impl Storable for Node {
                     size: META_SIZE as u64,
                 })?;
 
-        let attrs = meta_raw.as_deref()[TRIE_HASH_LEN];
+        let attrs = NodeAttributes::from_bits_retain(meta_raw.as_deref()[TRIE_HASH_LEN]);
 
-        let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
-            None
-        } else {
+        let root_hash = if attrs.contains(NodeAttributes::ROOT_HASH_VALID) {
             Some(TrieHash(
                 meta_raw.as_deref()[..TRIE_HASH_LEN]
                     .try_into()
                     .expect("invalid slice"),
             ))
-        };
-
-        let is_encoded_longer_than_hash_len = if attrs & Node::IS_ENCODED_BIG_VALID == 0 {
-            None
         } else {
-            Some(attrs & Node::LONG_BIT != 0)
+            None
         };
 
-        match meta_raw.as_deref()[33] {
-            Self::BRANCH_NODE => {
+        let is_encoded_longer_than_hash_len =
+            if attrs.contains(NodeAttributes::IS_ENCODED_BIG_VALID) {
+                Some(attrs.contains(NodeAttributes::LONG))
+            } else {
+                None
+            };
+
+        match meta_raw.as_deref()[TRIE_HASH_LEN + 1].try_into()? {
+            NodeTypeId::Branch => {
                 // TODO: add path
                 let branch_header_size = MAX_CHILDREN as u64 * 8 + 4;
                 let node_raw = mem.get_view(addr + META_SIZE, branch_header_size).ok_or(
@@ -408,7 +447,7 @@ impl Storable for Node {
                 ))
             }
 
-            Self::EXT_NODE => {
+            NodeTypeId::Extension => {
                 let ext_header_size = 1 + 8;
                 let node_raw = mem.get_view(addr + META_SIZE, ext_header_size).ok_or(
                     ShaleError::InvalidCacheView {
@@ -485,7 +524,7 @@ impl Storable for Node {
                 Ok(node)
             }
 
-            Self::LEAF_NODE => {
+            NodeTypeId::Leaf => {
                 let leaf_header_size = 1 + 4;
                 let node_raw = mem.get_view(addr + META_SIZE, leaf_header_size).ok_or(
                     ShaleError::InvalidCacheView {
@@ -531,7 +570,6 @@ impl Storable for Node {
 
                 Ok(node)
             }
-            _ => Err(ShaleError::InvalidNodeType),
         }
     }
 
