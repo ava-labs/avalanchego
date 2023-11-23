@@ -13,6 +13,12 @@ import (
 
 var _ TimedHeap = (*byEndTime)(nil)
 
+type TimedHeap interface {
+	Heap
+
+	Timestamp() time.Time
+}
+
 type byEndTime struct {
 	txHeap
 }
