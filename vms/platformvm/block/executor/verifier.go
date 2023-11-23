@@ -376,9 +376,8 @@ func (v *verifier) proposalBlock(
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
+			onCommitState: onCommitState,
+			onAbortState:  onAbortState,
 		},
 		statelessBlock: b,
 		// It is safe to use [b.onAbortState] here because the timestamp will

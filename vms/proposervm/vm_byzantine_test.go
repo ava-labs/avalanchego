@@ -47,7 +47,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    gBlock.ID(),
 		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: gBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
@@ -70,7 +70,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		BytesV:     yBlockBytes,
 		ParentV:    xBlock.ID(),
 		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: xBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
@@ -225,7 +225,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    gBlock.ID(),
 		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: gBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
@@ -240,7 +240,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		BytesV:     yBlockBytes,
 		ParentV:    xBlock.ID(),
 		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: xBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 	}
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {

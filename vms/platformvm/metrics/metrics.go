@@ -19,10 +19,6 @@ var _ Metrics = (*metrics)(nil)
 type Metrics interface {
 	metric.APIInterceptor
 
-	// Mark that an option vote that we initially preferred was accepted.
-	MarkOptionVoteWon()
-	// Mark that an option vote that we initially preferred was rejected.
-	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
 	MarkAccepted(block.Block) error
 	// Mark that a validator set was created.
@@ -75,17 +71,6 @@ func New(
 			Help:      "Amount (in nAVAX) of AVAX staked on the Primary Network",
 		}),
 
-		numVotesWon: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "votes_won",
-			Help:      "Total number of votes this node has won",
-		}),
-		numVotesLost: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "votes_lost",
-			Help:      "Total number of votes this node has lost",
-		}),
-
 		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "validator_sets_cached",
@@ -118,9 +103,6 @@ func New(
 		registerer.Register(m.localStake),
 		registerer.Register(m.totalStake),
 
-		registerer.Register(m.numVotesWon),
-		registerer.Register(m.numVotesLost),
-
 		registerer.Register(m.validatorSetsCreated),
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
@@ -140,20 +122,10 @@ type metrics struct {
 	localStake             prometheus.Gauge
 	totalStake             prometheus.Gauge
 
-	numVotesWon, numVotesLost prometheus.Counter
-
 	validatorSetsCached     prometheus.Counter
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
-}
-
-func (m *metrics) MarkOptionVoteWon() {
-	m.numVotesWon.Inc()
-}
-
-func (m *metrics) MarkOptionVoteLost() {
-	m.numVotesLost.Inc()
 }
 
 func (m *metrics) MarkAccepted(b block.Block) error {
