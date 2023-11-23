@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -118,49 +117,23 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 		constants.PrimaryNetworkID,
 		nodeID,
 	)
-	if err == database.ErrNotFound {
-		// TODO: I don't think this should ever happen. This would imply that
-		// the Commit or Abort blocks have already been accepted.
-		e.PrefersCommit = true
-		return nil
-	}
 	if err != nil {
+		// If this transaction is included into an invalid block where the
+		// staker has already been removed, we can just drop it.
 		return fmt.Errorf("failed to get primary network validator for validator to remove: %w", err)
 	}
 
 	expectedUptimePercentage := e.PrimaryUptimePercentage
 	if subnetID != constants.PrimaryNetworkID {
 		transformSubnet, err := GetTransformSubnetTx(e.State, subnetID)
-		if err == nil {
-			expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-		} else if err != database.ErrNotFound {
-			return fmt.Errorf("failed to calculate uptime: %w", err)
+		if err != nil {
+			// If the subnet hasn't been transformed yet, the tx we are removing
+			// isn't for a permissionless subnet. So, it's removal here is
+			// invalid.
+			return fmt.Errorf("failed to fetch transformation tx: %w", err)
 		}
-		// If we couldn't find the transform subnet tx, so we default to the
-		// primary network requirements. This is unlikely to happen during
-		// normal execution because this would mean our node is trying to reward
-		// a validator that hasn't been confirmed yet.
-	}
 
-	// handle option preference
-	e.PrefersCommit, err = e.shouldBeRewarded(subnetID, primaryNetworkValidator)
-	return err
-}
-
-// TODO: calculate subnet uptimes
-func (e *ProposalTxPreference) shouldBeRewarded(subnetID ids.ID, primaryNetworkValidator *state.Staker) (bool, error) {
-	expectedUptimePercentage := e.PrimaryUptimePercentage
-	if subnetID != constants.PrimaryNetworkID {
-		transformSubnet, err := GetTransformSubnetTx(e.State, subnetID)
-		if err == nil {
-			expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-		} else if err != database.ErrNotFound {
-			return false, fmt.Errorf("failed to calculate uptime: %w", err)
-		}
-		// If we couldn't find the transform subnet tx, so we default to the
-		// primary network requirements. This is unlikely to happen during
-		// normal execution because this would mean our node is trying to reward
-		// a validator that hasn't been confirmed yet.
+		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
 	}
 
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
@@ -168,13 +141,12 @@ func (e *ProposalTxPreference) shouldBeRewarded(subnetID ids.ID, primaryNetworkV
 		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
-	if err == database.ErrNotFound {
-		// TODO: I don't think this should ever happen. This would imply that
-		// the Commit or Abort blocks have already been accepted.
-		return true, nil
-	}
 	if err != nil {
-		return false, fmt.Errorf("failed to calculate uptime: %w", err)
+		// If this transaction is included into an invalid block where the
+		// staker has already been removed, we can just drop it.
+		return fmt.Errorf("failed to calculate uptime: %w", err)
 	}
-	return uptime >= expectedUptimePercentage, nil
+
+	e.PrefersCommit = uptime >= expectedUptimePercentage
+	return nil
 }

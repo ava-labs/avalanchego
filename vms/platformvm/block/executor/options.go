@@ -7,8 +7,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ block.Visitor = (*verifier)(nil)
@@ -16,7 +18,9 @@ var _ block.Visitor = (*verifier)(nil)
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
-	state state.Chain
+	primaryUptimePercentage float64
+	uptimes                 uptime.Manager
+	state                   state.Chain
 
 	// outputs populated by this struct's methods:
 	preferredBlock block.Block
@@ -36,8 +40,17 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
-	var err error
-	o.commitBlock, err = block.NewBanffCommitBlock(timestamp, blkID, nextHeight)
+	preference := executor.ProposalTxPreference{
+		PrimaryUptimePercentage: o.primaryUptimePercentage,
+		Uptimes:                 o.uptimes,
+		State:                   o.state,
+		Tx:                      b.Tx,
+	}
+	if err := b.Tx.Unsigned.Visit(&preference); err != nil {
+		return err
+	}
+
+	commitBlock, err := block.NewBanffCommitBlock(timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -45,12 +58,20 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		)
 	}
 
-	o.abortBlock, err = block.NewBanffAbortBlock(timestamp, blkID, nextHeight)
+	abortBlock, err := block.NewBanffAbortBlock(timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",
 			err,
 		)
+	}
+
+	if preference.PrefersCommit {
+		o.preferredBlock = commitBlock
+		o.alternateBlock = abortBlock
+	} else {
+		o.preferredBlock = abortBlock
+		o.alternateBlock = commitBlock
 	}
 	return nil
 }
