@@ -407,7 +407,7 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 				return &builder{
@@ -459,7 +459,7 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 				mempool.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
@@ -510,7 +510,7 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 				mempool.EXPECT().HasTxs().Return(false)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return(nil)
 
@@ -568,7 +568,7 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				// There is a tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
 
@@ -625,7 +625,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// There are no decision txs
 				// There is a staker tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 				mempool.EXPECT().HasTxs().Return(true)
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
 
