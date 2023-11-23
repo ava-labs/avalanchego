@@ -167,7 +167,7 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 	if err != nil {
 		// If this transaction is included into an invalid block where the
 		// staker has already been removed, we can just drop it.
-		return fmt.Errorf("%w: %w",
+		return fmt.Errorf("%w %s: %w",
 			ErrCalculatingUptime,
 			nodeID,
 			err,
