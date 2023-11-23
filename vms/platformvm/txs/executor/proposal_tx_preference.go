@@ -34,8 +34,8 @@ type ProposalTxPreference struct {
 
 	// outputs populated by this struct's methods:
 	//
-	// [PrefersCommit] is true iff this node initially prefers to
-	// commit this block transaction.
+	// [PrefersCommit] is true iff this node initially prefers to commit the
+	// block containing this transaction.
 	PrefersCommit bool
 }
 
