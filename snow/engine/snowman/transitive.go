@@ -145,6 +145,35 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
+func (t *Transitive) Gossip(ctx context.Context) error {
+	t.Ctx.Log.Verbo("sampling from validators",
+		zap.Stringer("validators", t.Validators),
+	)
+
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.AcceptedFrontierValidatorSize)
+	if err != nil {
+		t.Ctx.Log.Error("dropped sample for block gossip",
+			zap.String("reason", "insufficient number of validators"),
+			zap.Int("size", t.AcceptedFrontierValidatorSize),
+		)
+		return nil
+	}
+
+	t.RequestID++
+	vdrSet := set.Of(vdrIDs...)
+	t.Sender.SendGetAcceptedFrontier(ctx, vdrSet, t.RequestID)
+	return nil
+}
+
+func (t *Transitive) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, _ uint32, blkID ids.ID) error {
+	_, err := t.issueFromByID(ctx, nodeID, blkID)
+	return err
+}
+
+func (*Transitive) GetAcceptedFrontierFailed(context.Context, ids.NodeID, uint32) error {
+	return nil
+}
+
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	if err != nil {
@@ -343,28 +372,6 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (*Transitive) Timeout(context.Context) error {
-	return nil
-}
-
-func (t *Transitive) Gossip(ctx context.Context) error {
-	blkID, err := t.VM.LastAccepted(ctx)
-	if err != nil {
-		return err
-	}
-
-	blk, err := t.GetBlock(ctx, blkID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request",
-			zap.String("reason", "block couldn't be loaded"),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-		return nil
-	}
-	t.Ctx.Log.Verbo("gossiping accepted block to the network",
-		zap.Stringer("blkID", blkID),
-	)
-	t.Sender.SendGossip(ctx, blk.Bytes())
 	return nil
 }
 
@@ -801,6 +808,7 @@ func (t *Transitive) sendQuery(
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
 			zap.Stringer("blkID", blkID),
+			zap.Int("size", t.Params.K),
 		)
 		return
 	}

@@ -1523,49 +1523,6 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	return nil
 }
 
-func (s *sender) SendGossip(_ context.Context, container []byte) {
-	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(
-		s.ctx.ChainID,
-		constants.GossipMsgRequestID,
-		container,
-		s.engineType,
-	)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", message.PutOp),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Binary("container", container),
-			zap.Error(err),
-		)
-		return
-	}
-
-	gossipConfig := s.subnet.Config().GossipConfig
-	sentTo := s.sender.Gossip(
-		outMsg,
-		s.ctx.SubnetID,
-		int(gossipConfig.AcceptedFrontierValidatorSize),
-		int(gossipConfig.AcceptedFrontierNonValidatorSize),
-		int(gossipConfig.AcceptedFrontierPeerSize),
-		s.subnet,
-	)
-	if sentTo.Len() == 0 {
-		if s.ctx.Log.Enabled(logging.Verbo) {
-			s.ctx.Log.Verbo("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-				zap.Binary("container", container),
-			)
-		} else {
-			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-			)
-		}
-	}
-}
-
 // Accept is called after every consensus decision
 func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) error {
 	if ctx.State.Get().State != snow.NormalOp {

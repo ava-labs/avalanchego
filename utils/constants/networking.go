@@ -71,18 +71,16 @@ const (
 	DefaultBenchlistMinFailingDuration = 2*time.Minute + 30*time.Second
 
 	// Router
-	DefaultAcceptedFrontierGossipFrequency                 = 10 * time.Second
-	DefaultConsensusAppConcurrency                         = 2
-	DefaultConsensusShutdownTimeout                        = time.Minute
-	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
-	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
-	DefaultConsensusGossipAcceptedFrontierPeerSize         = 15
-	DefaultConsensusGossipOnAcceptValidatorSize            = 0
-	DefaultConsensusGossipOnAcceptNonValidatorSize         = 0
-	DefaultConsensusGossipOnAcceptPeerSize                 = 10
-	DefaultAppGossipValidatorSize                          = 10
-	DefaultAppGossipNonValidatorSize                       = 0
-	DefaultAppGossipPeerSize                               = 0
+	DefaultAcceptedFrontierGossipFrequency              = 1 * time.Second
+	DefaultConsensusAppConcurrency                      = 2
+	DefaultConsensusShutdownTimeout                     = time.Minute
+	DefaultConsensusGossipAcceptedFrontierValidatorSize = 2
+	DefaultConsensusGossipOnAcceptValidatorSize         = 0
+	DefaultConsensusGossipOnAcceptNonValidatorSize      = 0
+	DefaultConsensusGossipOnAcceptPeerSize              = 10
+	DefaultAppGossipValidatorSize                       = 10
+	DefaultAppGossipNonValidatorSize                    = 0
+	DefaultAppGossipPeerSize                            = 0
 
 	// Inbound Throttling
 	DefaultInboundThrottlerAtLargeAllocSize         = 6 * units.MiB

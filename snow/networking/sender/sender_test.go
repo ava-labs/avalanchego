@@ -43,10 +43,10 @@ const testThreadPoolSize = 2
 
 var defaultSubnetConfig = subnets.Config{
 	GossipConfig: subnets.GossipConfig{
-		AcceptedFrontierPeerSize:  2,
-		OnAcceptPeerSize:          2,
-		AppGossipValidatorSize:    2,
-		AppGossipNonValidatorSize: 2,
+		AcceptedFrontierValidatorSize: 2,
+		OnAcceptPeerSize:              2,
+		AppGossipValidatorSize:        2,
+		AppGossipNonValidatorSize:     2,
 	},
 }
 
