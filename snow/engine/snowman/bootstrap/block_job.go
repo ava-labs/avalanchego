@@ -99,6 +99,7 @@ func (b *blockJob) Execute(ctx context.Context) error {
 		b.log.Trace("accepting block in bootstrapping",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("blkHeight", b.blk.Height()),
+			zap.Time("timestamp", b.blk.Timestamp()),
 		)
 		if err := b.blk.Accept(ctx); err != nil {
 			b.log.Debug("failed to accept block during bootstrapping",
