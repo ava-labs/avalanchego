@@ -5,9 +5,11 @@ package handlers
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -16,9 +18,87 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
+
+type blockRequestTest struct {
+	name string
+
+	// starting block, specify either Index or (hash+height)
+	startBlockIndex  int
+	startBlockHash   common.Hash
+	startBlockHeight uint64
+
+	requestedParents  uint16
+	expectedBlocks    int
+	expectNilResponse bool
+	assertResponse    func(t testing.TB, stats *stats.MockHandlerStats, b []byte)
+}
+
+func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*types.Block) {
+	mockHandlerStats := &stats.MockHandlerStats{}
+
+	// convert into map
+	blocksDB := make(map[common.Hash]*types.Block, len(blocks))
+	for _, blk := range blocks {
+		blocksDB[blk.Hash()] = blk
+	}
+	blockProvider := &TestBlockProvider{
+		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
+			blk, ok := blocksDB[hash]
+			if !ok || blk.NumberU64() != height {
+				return nil
+			}
+			return blk
+		},
+	}
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, mockHandlerStats)
+
+	var blockRequest message.BlockRequest
+	if test.startBlockHash != (common.Hash{}) {
+		blockRequest.Hash = test.startBlockHash
+		blockRequest.Height = test.startBlockHeight
+	} else {
+		startingBlock := blocks[test.startBlockIndex]
+		blockRequest.Hash = startingBlock.Hash()
+		blockRequest.Height = startingBlock.NumberU64()
+	}
+	blockRequest.Parents = test.requestedParents
+
+	responseBytes, err := blockRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, blockRequest)
+	if err != nil {
+		t.Fatal("unexpected error during block request", err)
+	}
+	if test.assertResponse != nil {
+		test.assertResponse(t, mockHandlerStats, responseBytes)
+	}
+
+	if test.expectNilResponse {
+		assert.Nil(t, responseBytes)
+		return
+	}
+
+	assert.NotEmpty(t, responseBytes)
+
+	var response message.BlockResponse
+	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
+		t.Fatal("error unmarshalling", err)
+	}
+	assert.Len(t, response.Blocks, test.expectedBlocks)
+
+	for _, blockBytes := range response.Blocks {
+		block := new(types.Block)
+		if err := rlp.DecodeBytes(blockBytes, block); err != nil {
+			t.Fatal("could not parse block", err)
+		}
+		assert.GreaterOrEqual(t, test.startBlockIndex, 0)
+		assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
+		test.startBlockIndex--
+	}
+	mockHandlerStats.Reset()
+}
 
 func TestBlockRequestHandler(t *testing.T) {
 	var gspec = &core.Genesis{
@@ -31,40 +111,9 @@ func TestBlockRequestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
-
 	assert.Len(t, blocks, 96)
 
-	// convert into map
-	blocksDB := make(map[common.Hash]*types.Block, len(blocks))
-	for _, blk := range blocks {
-		blocksDB[blk.Hash()] = blk
-	}
-
-	mockHandlerStats := &stats.MockHandlerStats{}
-	blockProvider := &TestBlockProvider{
-		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
-			blk, ok := blocksDB[hash]
-			if !ok || blk.NumberU64() != height {
-				return nil
-			}
-			return blk
-		},
-	}
-	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, mockHandlerStats)
-
-	tests := []struct {
-		name string
-
-		// starting block, specify either Index or (hash+height)
-		startBlockIndex  int
-		startBlockHash   common.Hash
-		startBlockHeight uint64
-
-		requestedParents  uint16
-		expectedBlocks    int
-		expectNilResponse bool
-		assertResponse    func(t *testing.T, response []byte)
-	}{
+	tests := []blockRequestTest{
 		{
 			name:             "handler_returns_blocks_as_requested",
 			startBlockIndex:  64,
@@ -89,55 +138,74 @@ func TestBlockRequestHandler(t *testing.T) {
 			startBlockHeight:  1_000_000,
 			requestedParents:  64,
 			expectNilResponse: true,
-			assertResponse: func(t *testing.T, _ []byte) {
+			assertResponse: func(t testing.TB, mockHandlerStats *stats.MockHandlerStats, _ []byte) {
 				assert.Equal(t, uint32(1), mockHandlerStats.MissingBlockHashCount)
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var blockRequest message.BlockRequest
-			if test.startBlockHash != (common.Hash{}) {
-				blockRequest.Hash = test.startBlockHash
-				blockRequest.Height = test.startBlockHeight
-			} else {
-				startingBlock := blocks[test.startBlockIndex]
-				blockRequest.Hash = startingBlock.Hash()
-				blockRequest.Height = startingBlock.NumberU64()
-			}
-			blockRequest.Parents = test.requestedParents
+			executeBlockRequestTest(t, test, blocks)
+		})
+	}
+}
 
-			responseBytes, err := blockRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, blockRequest)
-			if err != nil {
-				t.Fatal("unexpected error during block request", err)
-			}
-			if test.assertResponse != nil {
-				test.assertResponse(t, responseBytes)
-			}
+func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		funds   = big.NewInt(1000000000000000000)
+		gspec   = &core.Genesis{
+			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+			Alloc:  core.GenesisAlloc{addr1: {Balance: funds}},
+		}
+		signer = types.LatestSigner(gspec.Config)
+	)
+	memdb := memorydb.New()
+	genesis := gspec.MustCommit(memdb)
+	engine := dummy.NewETHFaker()
+	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, memdb, 96, 0, func(i int, b *core.BlockGen) {
+		var data []byte
+		switch {
+		case i < 32:
+			data = make([]byte, units.MiB)
+		default:
+			data = make([]byte, units.MiB/16)
+		}
+		tx, err := types.SignTx(types.NewTransaction(b.TxNonce(addr1), addr1, big.NewInt(10000), 4_215_304, nil, data), signer, key1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.AddTx(tx)
+	})
+	if err != nil {
+		t.Fatal("unexpected error when generating test blockchain", err)
+	}
+	assert.Len(t, blocks, 96)
 
-			if test.expectNilResponse {
-				assert.Nil(t, responseBytes)
-				return
-			}
-
-			assert.NotEmpty(t, responseBytes)
-
-			var response message.BlockResponse
-			if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
-				t.Fatal("error unmarshalling", err)
-			}
-			assert.Len(t, response.Blocks, test.expectedBlocks)
-
-			for _, blockBytes := range response.Blocks {
-				block := new(types.Block)
-				if err := rlp.DecodeBytes(blockBytes, block); err != nil {
-					t.Fatal("could not parse block", err)
-				}
-				assert.GreaterOrEqual(t, test.startBlockIndex, 0)
-				assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
-				test.startBlockIndex--
-			}
-			mockHandlerStats.Reset()
+	tests := []blockRequestTest{
+		{
+			name:             "handler_returns_blocks_as_requested",
+			startBlockIndex:  64,
+			requestedParents: 10,
+			expectedBlocks:   10,
+		},
+		{
+			name:             "handler_caps_blocks_size_limit",
+			startBlockIndex:  64,
+			requestedParents: 16,
+			expectedBlocks:   15,
+		},
+		{
+			name:             "handler_caps_blocks_size_limit_on_first_block",
+			startBlockIndex:  32,
+			requestedParents: 10,
+			expectedBlocks:   1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			executeBlockRequestTest(t, test, blocks)
 		})
 	}
 }
