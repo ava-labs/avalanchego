@@ -37,7 +37,7 @@ func (a *acceptor) BanffAbortBlock(b *block.BanffAbortBlock) error {
 }
 
 func (a *acceptor) BanffCommitBlock(b *block.BanffCommitBlock) error {
-	return a.optionBlock(b, "apricot commit")
+	return a.optionBlock(b, "banff commit")
 }
 
 func (a *acceptor) BanffProposalBlock(b *block.BanffProposalBlock) error {
