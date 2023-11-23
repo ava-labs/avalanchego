@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"go.uber.org/zap"
@@ -24,11 +23,7 @@ import (
 // in the cache, not entire transactions.
 const recentCacheSize = 512
 
-var (
-	_ Network = (*network)(nil)
-
-	errStateNotFound = errors.New("failed retrieving state for last accepted block")
-)
+var _ Network = (*network)(nil)
 
 type Network interface {
 	common.AppHandler
@@ -176,16 +171,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	state, found := n.manager.GetState(n.manager.LastAccepted())
-	if !found {
-		n.ctx.Log.Debug(errStateNotFound.Error(),
-			zap.Stringer("blkID", n.manager.LastAccepted()),
-		)
-
-		n.mempool.MarkDropped(txID, errStateNotFound)
-		return errStateNotFound
-	}
-	if err := n.mempool.Add(tx, state.GetTimestamp()); err != nil {
+	if err := n.mempool.Add(tx); err != nil {
 		n.ctx.Log.Debug("tx failed to be added to the mempool",
 			zap.Stringer("txID", txID),
 			zap.Error(err),

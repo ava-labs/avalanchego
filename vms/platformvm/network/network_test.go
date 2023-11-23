@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -244,17 +242,13 @@ func TestNetworkIssueTx(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Has(gomock.Any()).Return(false)
-				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(errTest)
+				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), errTest)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				mockState := state.NewMockChain(ctrl)
-				mockState.EXPECT().GetTimestamp().Return(time.Time{})
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				manager.EXPECT().LastAccepted().Return(ids.GenerateTestID())
-				manager.EXPECT().GetState(gomock.Any()).Return(mockState, true)
 				return manager
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
@@ -289,16 +283,12 @@ func TestNetworkIssueTx(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Has(gomock.Any()).Return(false)
-				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				mockState := state.NewMockChain(ctrl)
-				mockState.EXPECT().GetTimestamp().Return(time.Time{})
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				manager.EXPECT().LastAccepted().Return(ids.GenerateTestID())
-				manager.EXPECT().GetState(gomock.Any()).Return(mockState, true)
 				return manager
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {

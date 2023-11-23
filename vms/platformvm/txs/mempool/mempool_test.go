@@ -15,20 +15,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ BlockTimer = (*noopBlkTimer)(nil)
+var (
+	_ BlockTimer = (*noopBlkTimer)(nil)
+
+	preFundedKeys = secp256k1.TestKeys()
+)
 
 type noopBlkTimer struct{}
 
 func (*noopBlkTimer) ResetBlockTimer() {}
-
-var preFundedKeys = secp256k1.TestKeys()
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
@@ -36,7 +36,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New(&config.Config{}, "mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -46,13 +46,13 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
-	err = mpool.Add(tx, time.Time{})
+	err = mpool.Add(tx)
 	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
-	err = mpool.Add(tx, time.Time{})
+	err = mpool.Add(tx)
 	require.NoError(err, "should have added tx to mempool")
 }
 
@@ -60,7 +60,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New(&config.Config{}, "mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
@@ -74,7 +74,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx, time.Time{}))
+		require.NoError(mpool.Add(tx))
 
 		// we can get it
 		require.True(mpool.Has(tx.ID()))
@@ -104,7 +104,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx, time.Time{}))
+		require.NoError(mpool.Add(tx))
 	}
 }
 
@@ -112,9 +112,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New(&config.Config{
-		DTime: mockable.MaxTime,
-	}, "mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after
@@ -123,29 +121,18 @@ func TestProposalTxsInMempool(t *testing.T) {
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
-	// txs should not be already there
-	require.False(mpool.HasStakerTx())
-
 	for i, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx, time.Time{}))
+		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.HasStakerTx())
 		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		{
-			// we can peek it
-			peeked := mpool.PeekStakerTx()
-			require.NotNil(peeked)
-			require.Equal(tx, peeked)
-		}
 
 		{
 			// we can peek it
@@ -171,46 +158,8 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx, time.Time{}))
+		require.NoError(mpool.Add(tx))
 	}
-}
-
-func TestDurangoForkInMempool(t *testing.T) {
-	require := require.New(t)
-
-	forkTime := time.Now()
-	registerer := prometheus.NewRegistry()
-	mpool, err := New(&config.Config{
-		DTime: forkTime,
-	}, "mempool", registerer, &noopBlkTimer{})
-	require.NoError(err)
-
-	txs, err := createTestProposalTxs(1)
-	require.NoError(err)
-	tx := txs[0]
-
-	// insert pre fork
-	preForkTime := forkTime.Add(-1 * time.Second)
-	require.NoError(mpool.Add(tx, preForkTime))
-	require.True(mpool.HasStakerTx())
-	retrievedTx := mpool.PeekStakerTx()
-	require.Equal(tx, retrievedTx)
-
-	// insert post fork
-	postForkTime := forkTime.Add(time.Second)
-	err = mpool.Add(tx, postForkTime)
-	require.ErrorIs(err, errDuplicateTx)
-	mpool.Remove(txs)
-	require.NoError(mpool.Add(tx, postForkTime))
-	require.False(mpool.HasStakerTx(), "post fork there should not be staker txs anymore")
-	require.True(mpool.HasTxs())
-	retrievedTxs := mpool.PeekTxs(math.MaxInt)
-	require.True(len(retrievedTxs) == 1)
-	require.Equal(retrievedTxs[0], tx)
-
-	// remove post fork
-	mpool.Remove(retrievedTxs)
-	require.False(mpool.HasTxs())
 }
 
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
@@ -264,21 +213,53 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	now := time.Now()
 	proposalTxs := make([]*txs.Tx, 0, count)
 	for i := 0; i < count; i++ {
-		utx := &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{},
-			Validator: txs.Validator{
-				Start: uint64(now.Add(time.Duration(count-i) * time.Second).Unix()),
-			},
-			StakeOuts:        nil,
-			RewardsOwner:     &secp256k1fx.OutputOwners{},
-			DelegationShares: 100,
-		}
-
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := generateAddValidatorTx(
+			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
+			0, // endTime
+		)
 		if err != nil {
 			return nil, err
 		}
 		proposalTxs = append(proposalTxs, tx)
 	}
 	return proposalTxs, nil
+}
+
+func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  startTime,
+			End:    endTime,
+		},
+		StakeOuts:        nil,
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: 100,
+	}
+
+	return txs.NewSigned(utx, txs.Codec, nil)
+}
+
+func TestDropExpiredStakerTxs(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	mempool, err := New("mempool", registerer, &noopBlkTimer{})
+	require.NoError(err)
+
+	tx1, err := generateAddValidatorTx(10, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx1))
+
+	tx2, err := generateAddValidatorTx(8, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx2))
+
+	tx3, err := generateAddValidatorTx(15, 20)
+	require.NoError(err)
+	require.NoError(mempool.Add(tx3))
+
+	minStartTime := time.Unix(9, 0)
+	require.Len(mempool.DropExpiredStakerTxs(minStartTime), 1)
 }
