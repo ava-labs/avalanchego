@@ -1305,11 +1305,11 @@ func TestEngineGossip(t *testing.T) {
 	}
 
 	var (
-		calledSendGetAcceptedFrontier bool
-		calledSendGossip              bool
+		calledSendPullQuery bool
+		calledSendGossip    bool
 	)
-	sender.SendGetAcceptedFrontierF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32) {
-		calledSendGetAcceptedFrontier = true
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
+		calledSendPullQuery = true
 		require.Equal(set.Of(nodeID), nodeIDs)
 	}
 	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
@@ -1319,7 +1319,7 @@ func TestEngineGossip(t *testing.T) {
 
 	require.NoError(te.Gossip(context.Background()))
 
-	require.True(calledSendGetAcceptedFrontier)
+	require.True(calledSendPullQuery)
 	require.True(calledSendGossip)
 }
 

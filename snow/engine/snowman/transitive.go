@@ -52,6 +52,7 @@ type Transitive struct {
 	// list of NoOpsHandler for messages dropped by engine
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
+	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
 	common.AppHandler
@@ -129,6 +130,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		Config:                      config,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
@@ -144,6 +146,23 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Gossip(ctx context.Context) error {
+	// TODO: Remove periodic push gossip after v1.11.x is activated
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
+
+	lastAccepted, err := t.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request",
+			zap.String("reason", "block couldn't be loaded"),
+			zap.Stringer("blkID", lastAcceptedID),
+			zap.Error(err),
+		)
+		return nil
+	}
+	t.Ctx.Log.Verbo("gossiping accepted block to the network",
+		zap.Stringer("blkID", lastAcceptedID),
+	)
+	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
+
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -157,38 +176,21 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	t.RequestID++
-	vdrSet := set.Of(vdrIDs...)
-	t.Sender.SendGetAcceptedFrontier(ctx, vdrSet, t.RequestID)
-
-	// TODO: Remove periodic push gossip after v1.11.x is activated
-	blkID, err := t.VM.LastAccepted(ctx)
+	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
 	if err != nil {
-		return err
-	}
-
-	blk, err := t.GetBlock(ctx, blkID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request",
-			zap.String("reason", "block couldn't be loaded"),
-			zap.Stringer("blkID", blkID),
+		t.Ctx.Log.Error("dropped sample for block gossip",
+			zap.String("reason", "block height overflow"),
+			zap.Stringer("blkID", lastAcceptedID),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Error(err),
 		)
 		return nil
 	}
-	t.Ctx.Log.Verbo("gossiping accepted block to the network",
-		zap.Stringer("blkID", blkID),
-	)
-	t.Sender.SendGossip(ctx, blk.Bytes())
-	return nil
-}
 
-func (t *Transitive) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, _ uint32, blkID ids.ID) error {
-	_, err := t.issueFromByID(ctx, nodeID, blkID)
-	return err
-}
-
-func (*Transitive) GetAcceptedFrontierFailed(context.Context, ids.NodeID, uint32) error {
+	t.RequestID++
+	vdrSet := set.Of(vdrIDs...)
+	preferredID := t.Consensus.Preference()
+	t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, preferredID, nextHeightToAccept)
 	return nil
 }
 
