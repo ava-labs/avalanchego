@@ -126,15 +126,11 @@ func merkleChainKey(subnetID ids.ID, chainID ids.ID) []byte {
 	return key
 }
 
-func writeChains(chainsToAdd map[ids.ID][]*txs.Tx, batchOps map[string]database.BatchOp) {
-	for subnetID, chains := range chainsToAdd {
-		for _, chainTx := range chains {
-			key := merkleChainKey(subnetID, chainTx.ID())
-			batchOps[string(key)] = database.BatchOp{
-				Key:   key,
-				Value: chainTx.Bytes(),
-			}
-		}
+func writeChains(subnetID ids.ID, chainTx *txs.Tx, batchOps map[string]database.BatchOp) {
+	key := merkleChainKey(subnetID, chainTx.ID())
+	batchOps[string(key)] = database.BatchOp{
+		Key:   key,
+		Value: chainTx.Bytes(),
 	}
 }
 

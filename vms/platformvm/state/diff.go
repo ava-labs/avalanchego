@@ -118,7 +118,11 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 
 	writeElasticSubnets(d.transformedSubnets, d.changesSinceLastApply)
 
-	writeChains(d.addedChains, d.changesSinceLastApply)
+	for subnet, chains := range d.addedChains {
+		for _, chain := range chains {
+			writeChains(subnet, chain, d.changesSinceLastApply)
+		}
+	}
 
 	currentStakersData := make(map[ids.ID]*stakersData)
 	itAddedCurrentStakers := NewTreeIterator(d.currentStakerDiffs.addedStakers)
@@ -173,8 +177,11 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		return nil, err
 	}
 
-	// MOVED TO ITS OWN SET METHOD
-	// writeDelegateeRewards(d.modifiedDelegateeRewards, d.changesSinceLastApply)
+	for subnetID, nodes := range d.modifiedDelegateeRewards {
+		for nodeID, reward := range nodes {
+			writeDelegateeRewards(subnetID, nodeID, reward, d.changesSinceLastApply)
+		}
+	}
 
 	if err := writeUTXOs(d.modifiedUTXOs, d.changesSinceLastApply); err != nil {
 		return nil, err
@@ -254,8 +261,6 @@ func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uin
 		d.modifiedDelegateeRewards[subnetID] = nodes
 	}
 	nodes[nodeID] = amount
-
-	writeDelegateeRewards(subnetID, nodeID, amount, d.changesSinceLastApply)
 	return nil
 }
 

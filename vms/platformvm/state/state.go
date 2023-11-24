@@ -369,8 +369,7 @@ func newState(
 		addedElasticSubnets:      make(map[ids.ID]*txs.Tx),
 		elasticSubnetCache:       transformedSubnetCache,
 
-		addedChains: make(map[ids.ID][]*txs.Tx),
-		chainCache:  chainCache,
+		chainCache: chainCache,
 
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
@@ -466,8 +465,7 @@ type state struct {
 	elasticSubnetCache       cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
 
 	// Chains section
-	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
-	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	chainCache cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
 
 	// Blocks section
 	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
@@ -886,16 +884,17 @@ func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if err := chainDBIt.Error(); err != nil {
 		return nil, err
 	}
-	chains = append(chains, s.addedChains[subnetID]...)
-	s.chainCache.Put(subnetID, chains)
-	return chains, nil
+	return chains, chainDBIt.Error()
 }
 
 func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
 	subnetID := createChainTx.SubnetID
+	writeChains(subnetID, createChainTxIntf, s.changesSinceLastCommit)
 
-	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
+	chains, _ := s.chainCache.Get(subnetID)
+	chains = append(chains, createChainTxIntf)
+	s.chainCache.Put(subnetID, chains)
 }
 
 // TXs Section
@@ -1519,7 +1518,10 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		s.writePermissionedSubnets(),
 		s.writeSubnetOwners(),
 		s.writeElasticSubnets(),
-		s.writeChains(),
+
+		// MOVED TO ITS OWN SET METHOD
+		// s.writeChains(),
+
 		writeCurrentStakers(currentData, s.changesSinceLastCommit),
 		writePendingStakers(pendingData, s.changesSinceLastCommit),
 
@@ -1601,12 +1603,6 @@ func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
 	}
 
 	maps.Clear(s.addedElasticSubnets)
-	return nil
-}
-
-func (s *state) writeChains() error { //nolint:golint,unparam
-	writeChains(s.addedChains, s.changesSinceLastCommit)
-	maps.Clear(s.addedChains)
 	return nil
 }
 
