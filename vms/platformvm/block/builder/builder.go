@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
@@ -274,6 +275,18 @@ func buildBlock(
 		)
 	}
 
+	stateDiff, err := state.NewDiff(builder.blkManager.Preferred(), builder.blkManager)
+	if err != nil {
+		return nil, err
+	}
+
+	changes, err := txexecutor.AdvanceTimeTo(builder.txExecutorBackend, stateDiff, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	changes.Apply(stateDiff)
+	stateDiff.SetTimestamp(timestamp)
+
 	var (
 		blockTxs      []*txs.Tx
 		remainingSize = targetBlockSize
@@ -284,6 +297,25 @@ func buildBlock(
 			break
 		}
 		builder.Mempool.Remove([]*txs.Tx{tx})
+
+		txDiff, err := wrapState(stateDiff)
+		if err != nil {
+			return nil, err
+		}
+
+		err = tx.Unsigned.Visit(&txexecutor.StandardTxExecutor{
+			Backend: builder.txExecutorBackend,
+			State:   txDiff,
+			Tx:      tx,
+		})
+		if err != nil {
+			txID := tx.ID()
+			builder.Mempool.MarkDropped(txID, err)
+			continue
+		}
+
+		txDiff.AddTx(tx, status.Committed)
+		txDiff.Apply(stateDiff)
 
 		remainingSize -= len(tx.Bytes())
 		blockTxs = append(blockTxs, tx)
@@ -336,4 +368,18 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
+}
+
+type stateGetter struct {
+	state state.Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
+	return s.state, true
+}
+
+func wrapState(parentState state.Chain) (state.Diff, error) {
+	return state.NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
 }
