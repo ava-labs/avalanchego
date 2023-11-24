@@ -438,8 +438,8 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
-	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64
-	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]
+	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
+	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
 
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
