@@ -76,7 +76,7 @@ const (
 	DefaultConsensusShutdownTimeout                        = time.Minute
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 1
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
-	DefaultConsensusGossipAcceptedFrontierPeerSize         = 15
+	DefaultConsensusGossipAcceptedFrontierPeerSize         = 1
 	DefaultConsensusGossipOnAcceptValidatorSize            = 0
 	DefaultConsensusGossipOnAcceptNonValidatorSize         = 0
 	DefaultConsensusGossipOnAcceptPeerSize                 = 10
