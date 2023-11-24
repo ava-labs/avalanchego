@@ -1608,16 +1608,7 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for subnetID, nodeDelegateeRewards := range s.modifiedDelegateeRewards {
-		for nodeID, delegateeReward := range nodeDelegateeRewards {
-			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
-			})
-		}
-	}
-
+	writeDelegateeRewards(s.modifiedDelegateeRewards, batchOps)
 	maps.Clear(s.modifiedDelegateeRewards)
 	return nil
 }

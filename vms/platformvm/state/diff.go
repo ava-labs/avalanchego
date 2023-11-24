@@ -174,15 +174,7 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 	}
 
 	// DELEGATEE REWARDS
-	for subnetID, nodeDelegateeRewards := range d.modifiedDelegateeRewards {
-		for nodeID, delegateeReward := range nodeDelegateeRewards {
-			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			batchOps = append(batchOps, database.BatchOp{
-				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
-			})
-		}
-	}
+	writeDelegateeRewards(d.modifiedDelegateeRewards, &batchOps)
 
 	// UTXOS
 	if err := writeUTXOs(d.modifiedUTXOs, &batchOps); err != nil {
