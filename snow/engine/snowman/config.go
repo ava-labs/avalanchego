@@ -16,12 +16,12 @@ import (
 type Config struct {
 	common.AllGetsServer
 
-	Ctx                           *snow.ConsensusContext
-	VM                            block.ChainVM
-	Sender                        common.Sender
-	Validators                    validators.Manager
-	Params                        snowball.Parameters
-	AcceptedFrontierValidatorSize int
-	Consensus                     snowman.Consensus
-	PartialSync                   bool
+	Ctx                      *snow.ConsensusContext
+	VM                       block.ChainVM
+	Sender                   common.Sender
+	Validators               validators.Manager
+	Params                   snowball.Parameters
+	AcceptedFrontierPollSize int
+	Consensus                snowman.Consensus
+	PartialSync              bool
 }

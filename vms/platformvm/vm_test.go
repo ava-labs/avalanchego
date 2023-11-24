@@ -1438,10 +1438,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierValidatorSize: 1,
-		OnAcceptPeerSize:              1,
-		AppGossipValidatorSize:        1,
-		AppGossipNonValidatorSize:     1,
+		AcceptedFrontierPeerSize:  1,
+		OnAcceptPeerSize:          1,
+		AppGossipValidatorSize:    1,
+		AppGossipNonValidatorSize: 1,
 	}
 	sender, err := sender.New(
 		consensusCtx,
@@ -1540,8 +1540,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		AcceptedFrontierValidatorSize: 1,
-		Consensus:                     &smcon.Topological{},
+		AcceptedFrontierPollSize: 1,
+		Consensus:                &smcon.Topological{},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)

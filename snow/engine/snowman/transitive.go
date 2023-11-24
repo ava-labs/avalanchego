@@ -150,11 +150,11 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		zap.Stringer("validators", t.Validators),
 	)
 
-	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.AcceptedFrontierValidatorSize)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.AcceptedFrontierPollSize)
 	if err != nil {
 		t.Ctx.Log.Error("dropped sample for block gossip",
 			zap.String("reason", "insufficient number of validators"),
-			zap.Int("size", t.AcceptedFrontierValidatorSize),
+			zap.Int("size", t.AcceptedFrontierPollSize),
 		)
 		return nil
 	}
@@ -162,6 +162,26 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 	t.RequestID++
 	vdrSet := set.Of(vdrIDs...)
 	t.Sender.SendGetAcceptedFrontier(ctx, vdrSet, t.RequestID)
+
+	// TODO: Remove periodic push gossip after v1.11.x is activated
+	blkID, err := t.VM.LastAccepted(ctx)
+	if err != nil {
+		return err
+	}
+
+	blk, err := t.GetBlock(ctx, blkID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request",
+			zap.String("reason", "block couldn't be loaded"),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
+		return nil
+	}
+	t.Ctx.Log.Verbo("gossiping accepted block to the network",
+		zap.Stringer("blkID", blkID),
+	)
+	t.Sender.SendGossip(ctx, blk.Bytes())
 	return nil
 }
 

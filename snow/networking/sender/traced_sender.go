@@ -253,6 +253,15 @@ func (s *tracedSender) SendAppGossip(ctx context.Context, appGossipBytes []byte)
 	return s.sender.SendAppGossip(ctx, appGossipBytes)
 }
 
+func (s *tracedSender) SendGossip(ctx context.Context, container []byte) {
+	_, span := s.tracer.Start(ctx, "tracedSender.SendGossip", oteltrace.WithAttributes(
+		attribute.Int("containerLen", len(container)),
+	))
+	defer span.End()
+
+	s.sender.SendGossip(ctx, container)
+}
+
 func (s *tracedSender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	return s.sender.Accept(ctx, containerID, container)
 }

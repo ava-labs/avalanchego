@@ -304,13 +304,15 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 
 func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 	return subnets.GossipConfig{
-		AcceptedFrontierValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
-		OnAcceptValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
-		OnAcceptNonValidatorSize:      uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
-		OnAcceptPeerSize:              uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
-		AppGossipValidatorSize:        uint(v.GetUint32(AppGossipValidatorSizeKey)),
-		AppGossipNonValidatorSize:     uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipPeerSize:             uint(v.GetUint32(AppGossipPeerSizeKey)),
+		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
+		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
+		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
+		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
+		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
+		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
+		AppGossipValidatorSize:           uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		AppGossipNonValidatorSize:        uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipPeerSize:                uint(v.GetUint32(AppGossipPeerSizeKey)),
 	}
 }
 

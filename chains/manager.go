@@ -860,14 +860,14 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:                           ctx,
-		AllGetsServer:                 snowGetHandler,
-		VM:                            vmWrappingProposerVM,
-		Sender:                        snowmanMessageSender,
-		Validators:                    vdrs,
-		Params:                        consensusParams,
-		AcceptedFrontierValidatorSize: int(subnetConfig.AcceptedFrontierValidatorSize),
-		Consensus:                     snowmanConsensus,
+		Ctx:                      ctx,
+		AllGetsServer:            snowGetHandler,
+		VM:                       vmWrappingProposerVM,
+		Sender:                   snowmanMessageSender,
+		Validators:               vdrs,
+		Params:                   consensusParams,
+		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierValidatorSize),
+		Consensus:                snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
@@ -1208,15 +1208,15 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:                           ctx,
-		AllGetsServer:                 snowGetHandler,
-		VM:                            vm,
-		Sender:                        messageSender,
-		Validators:                    vdrs,
-		Params:                        consensusParams,
-		AcceptedFrontierValidatorSize: int(subnetConfig.AcceptedFrontierValidatorSize),
-		Consensus:                     consensus,
-		PartialSync:                   m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+		Ctx:                      ctx,
+		AllGetsServer:            snowGetHandler,
+		VM:                       vm,
+		Sender:                   messageSender,
+		Validators:               vdrs,
+		Params:                   consensusParams,
+		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierValidatorSize),
+		Consensus:                consensus,
+		PartialSync:              m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
