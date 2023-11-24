@@ -262,15 +262,11 @@ func merkleDelegateeRewardsKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
 	return key
 }
 
-func writeDelegateeRewards(modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64, batchOps map[string]database.BatchOp) {
-	for subnetID, nodeDelegateeRewards := range modifiedDelegateeRewards {
-		for nodeID, delegateeReward := range nodeDelegateeRewards {
-			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			batchOps[string(key)] = database.BatchOp{
-				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
-			}
-		}
+func writeDelegateeRewards(subnetID ids.ID, nodeID ids.NodeID, amount uint64, batchOps map[string]database.BatchOp) {
+	key := merkleDelegateeRewardsKey(nodeID, subnetID)
+	batchOps[string(key)] = database.BatchOp{
+		Key:   key,
+		Value: database.PackUInt64(amount),
 	}
 }
 

@@ -173,7 +173,8 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		return nil, err
 	}
 
-	writeDelegateeRewards(d.modifiedDelegateeRewards, d.changesSinceLastApply)
+	// MOVED TO ITS OWN SET METHOD
+	// writeDelegateeRewards(d.modifiedDelegateeRewards, d.changesSinceLastApply)
 
 	if err := writeUTXOs(d.modifiedUTXOs, d.changesSinceLastApply); err != nil {
 		return nil, err
@@ -253,6 +254,8 @@ func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uin
 		d.modifiedDelegateeRewards[subnetID] = nodes
 	}
 	nodes[nodeID] = amount
+
+	writeDelegateeRewards(subnetID, nodeID, amount, d.changesSinceLastApply)
 	return nil
 }
 

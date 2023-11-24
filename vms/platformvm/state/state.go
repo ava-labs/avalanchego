@@ -353,8 +353,7 @@ func newState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		delegateeRewardCache:     make(map[ids.ID]map[ids.NodeID]uint64),
-		modifiedDelegateeRewards: make(map[ids.ID]map[ids.NodeID]uint64),
+		delegateeRewardCache: make(map[ids.ID]map[ids.NodeID]uint64),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
@@ -443,8 +442,7 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
-	delegateeRewardCache     map[ids.ID]map[ids.NodeID]uint64 // all (subnetID, nodeID) --> delegatee amount
-	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64 // (subnetID, nodeID) --> delegatee amount modified from last commit
+	delegateeRewardCache map[ids.ID]map[ids.NodeID]uint64 // all (subnetID, nodeID) --> delegatee amount
 
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
@@ -612,12 +610,7 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 	nodeDelegateeRewards[vdrID] = amount
 
 	// track diff
-	updatedDelegateeRewards, exists := s.modifiedDelegateeRewards[subnetID]
-	if !exists {
-		updatedDelegateeRewards = make(map[ids.NodeID]uint64)
-		s.modifiedDelegateeRewards[subnetID] = updatedDelegateeRewards
-	}
-	updatedDelegateeRewards[vdrID] = amount
+	writeDelegateeRewards(subnetID, vdrID, amount, s.changesSinceLastCommit)
 	return nil
 }
 
@@ -1529,7 +1522,6 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		s.writeChains(),
 		writeCurrentStakers(currentData, s.changesSinceLastCommit),
 		writePendingStakers(pendingData, s.changesSinceLastCommit),
-		s.writeDelegateeRewards(),
 
 		// DO NOT wipe s.modifiedUTXOS here, it's used by writeUTXOsIndex later on
 		// writeUTXOsIndex will clear s.modifiedUTXOS up
@@ -1612,12 +1604,6 @@ func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
 func (s *state) writeChains() error { //nolint:golint,unparam
 	writeChains(s.addedChains, s.changesSinceLastCommit)
 	maps.Clear(s.addedChains)
-	return nil
-}
-
-func (s *state) writeDelegateeRewards() error { //nolint:golint,unparam
-	writeDelegateeRewards(s.modifiedDelegateeRewards, s.changesSinceLastCommit)
-	maps.Clear(s.modifiedDelegateeRewards)
 	return nil
 }
 
