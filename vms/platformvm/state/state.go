@@ -352,8 +352,8 @@ func newState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		delegateeRewardCache:    make(map[ids.NodeID]map[ids.ID]uint64),
-		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
+		delegateeRewardCache:     make(map[ids.ID]map[ids.NodeID]uint64),
+		modifiedDelegateeRewards: make(map[ids.ID]map[ids.NodeID]uint64),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
@@ -440,8 +440,8 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
-	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
-	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
+	delegateeRewardCache     map[ids.ID]map[ids.NodeID]uint64 // all (subnetID, nodeID) --> delegatee amount
+	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64 // (subnetID, nodeID) --> delegatee amount modified from last commit
 
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
@@ -574,9 +574,9 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 }
 
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
+	nodeDelegateeRewards, exists := s.delegateeRewardCache[subnetID]
 	if exists {
-		delegateeReward, exists := nodeDelegateeRewards[subnetID]
+		delegateeReward, exists := nodeDelegateeRewards[vdrID]
 		if exists {
 			return delegateeReward, nil
 		}
@@ -593,28 +593,28 @@ func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, e
 		return 0, err
 	}
 
-	if _, found := s.delegateeRewardCache[vdrID]; !found {
-		s.delegateeRewardCache[vdrID] = make(map[ids.ID]uint64)
+	if _, found := s.delegateeRewardCache[subnetID]; !found {
+		s.delegateeRewardCache[subnetID] = make(map[ids.NodeID]uint64)
 	}
-	s.delegateeRewardCache[vdrID][subnetID] = delegateeReward
+	s.delegateeRewardCache[subnetID][vdrID] = delegateeReward
 	return delegateeReward, nil
 }
 
 func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
+	nodeDelegateeRewards, exists := s.delegateeRewardCache[subnetID]
 	if !exists {
-		nodeDelegateeRewards = make(map[ids.ID]uint64)
-		s.delegateeRewardCache[vdrID] = nodeDelegateeRewards
+		nodeDelegateeRewards = make(map[ids.NodeID]uint64)
+		s.delegateeRewardCache[subnetID] = nodeDelegateeRewards
 	}
-	nodeDelegateeRewards[subnetID] = amount
+	nodeDelegateeRewards[vdrID] = amount
 
 	// track diff
-	updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]
-	if !ok {
-		updatedDelegateeRewards = set.Set[ids.ID]{}
-		s.modifiedDelegateeReward[vdrID] = updatedDelegateeRewards
+	updatedDelegateeRewards, exists := s.modifiedDelegateeRewards[subnetID]
+	if !exists {
+		updatedDelegateeRewards = make(map[ids.NodeID]uint64)
+		s.modifiedDelegateeRewards[subnetID] = updatedDelegateeRewards
 	}
-	updatedDelegateeRewards.Add(subnetID)
+	updatedDelegateeRewards[vdrID] = amount
 	return nil
 }
 
@@ -1608,19 +1608,17 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for nodeID, nodeDelegateeRewards := range s.modifiedDelegateeReward {
-		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
-		for _, subnetID := range nodeDelegateeRewardsList {
-			delegateeReward := s.delegateeRewardCache[nodeID][subnetID]
-
+	for subnetID, nodeDelegateeRewards := range s.modifiedDelegateeRewards {
+		for nodeID, delegateeReward := range nodeDelegateeRewards {
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
 			*batchOps = append(*batchOps, database.BatchOp{
 				Key:   key,
 				Value: database.PackUInt64(delegateeReward),
 			})
 		}
-		delete(s.modifiedDelegateeReward, nodeID)
 	}
+
+	maps.Clear(s.modifiedDelegateeRewards)
 	return nil
 }
 
