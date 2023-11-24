@@ -1294,7 +1294,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	require := require.New(t)
 
-	_, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	nodeID, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return gBlk.ID(), nil
@@ -1304,15 +1304,23 @@ func TestEngineGossip(t *testing.T) {
 		return gBlk, nil
 	}
 
-	called := new(bool)
+	var (
+		calledSendGetAcceptedFrontier bool
+		calledSendGossip              bool
+	)
+	sender.SendGetAcceptedFrontierF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32) {
+		calledSendGetAcceptedFrontier = true
+		require.Equal(set.Of(nodeID), nodeIDs)
+	}
 	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
-		*called = true
+		calledSendGossip = true
 		require.Equal(gBlk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.Gossip(context.Background()))
 
-	require.True(*called)
+	require.True(calledSendGetAcceptedFrontier)
+	require.True(calledSendGossip)
 }
 
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
