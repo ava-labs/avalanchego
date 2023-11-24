@@ -32,6 +32,8 @@ type Diff interface {
 }
 
 type diff struct {
+	changesSinceLastApply []database.BatchOp
+
 	blockID       ids.ID // this block ID
 	parentID      ids.ID
 	stateVersions Versions
@@ -73,10 +75,11 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:      parentID,
-		stateVersions: stateVersions,
-		timestamp:     parentState.GetTimestamp(),
-		subnetOwners:  make(map[ids.ID]fx.Owner),
+		changesSinceLastApply: make([]database.BatchOp, 0),
+		parentID:              parentID,
+		stateVersions:         stateVersions,
+		timestamp:             parentState.GetTimestamp(),
+		subnetOwners:          make(map[ids.ID]fx.Owner),
 	}, nil
 }
 
@@ -94,31 +97,23 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		return nil, fmt.Errorf("failed retrieving parent view, %w", err)
 	}
 
-	batchOps := make([]database.BatchOp, 0)
-
-	// METADATA
-	if err := writeMetadata(d.timestamp, d.blockID, d.currentSupply, &batchOps); err != nil {
+	if err := writeMetadata(d.timestamp, d.blockID, d.currentSupply, &d.changesSinceLastApply); err != nil {
 		return nil, err
 	}
 
-	// PERMISSIONED SUBNETS
-	writePermissionedSubnets(d.addedSubnets, &batchOps)
+	writePermissionedSubnets(d.addedSubnets, &d.changesSinceLastApply)
 
-	// SUBNET OWNERS
 	for subnetID, owner := range d.subnetOwners {
-		_, err := writeSubnetOwners(subnetID, owner, &batchOps)
+		_, err := writeSubnetOwners(subnetID, owner, &d.changesSinceLastApply)
 		if err != nil {
 			return nil, fmt.Errorf("failed writing subnet owners: %w", err)
 		}
 	}
 
-	// ELASTIC SUBNETS
-	writeElasticSubnets(d.transformedSubnets, &batchOps)
+	writeElasticSubnets(d.transformedSubnets, &d.changesSinceLastApply)
 
-	// CHAINS
-	writeChains(d.addedChains, &batchOps)
+	writeChains(d.addedChains, &d.changesSinceLastApply)
 
-	// CURRENT STAKERS
 	currentStakersData := make(map[ids.ID]*stakersData)
 	itAddedCurrentStakers := NewTreeIterator(d.currentStakerDiffs.addedStakers)
 	defer itAddedCurrentStakers.Release()
@@ -141,11 +136,10 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			TxBytes: nil,
 		}
 	}
-	if err := writeCurrentStakers(currentStakersData, &batchOps); err != nil {
+	if err := writeCurrentStakers(currentStakersData, &d.changesSinceLastApply); err != nil {
 		return nil, err
 	}
 
-	// PENDING STAKERS
 	pendingStakersData := make(map[ids.ID]*stakersData)
 	itAddedPendingStakers := NewTreeIterator(d.pendingStakerDiffs.addedStakers)
 	defer itAddedPendingStakers.Release()
@@ -169,22 +163,20 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 			TxBytes: nil,
 		}
 	}
-	if err := writePendingStakers(pendingStakersData, &batchOps); err != nil {
+	if err := writePendingStakers(pendingStakersData, &d.changesSinceLastApply); err != nil {
 		return nil, err
 	}
 
-	// DELEGATEE REWARDS
-	writeDelegateeRewards(d.modifiedDelegateeRewards, &batchOps)
+	writeDelegateeRewards(d.modifiedDelegateeRewards, &d.changesSinceLastApply)
 
-	// UTXOS
-	if err := writeUTXOs(d.modifiedUTXOs, &batchOps); err != nil {
+	if err := writeUTXOs(d.modifiedUTXOs, &d.changesSinceLastApply); err != nil {
 		return nil, err
 	}
 
 	thisDiffView, err := parentView.NewView(
 		context.Background(),
 		merkledb.ViewChanges{
-			BatchOps: batchOps,
+			BatchOps: d.changesSinceLastApply,
 		},
 	)
 	if err != nil {
@@ -592,6 +584,10 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 }
 
 func (d *diff) Apply(baseState State) error {
+	defer func() {
+		d.changesSinceLastApply = make([]database.BatchOp, 0)
+	}()
+
 	baseState.SetTimestamp(d.timestamp)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)

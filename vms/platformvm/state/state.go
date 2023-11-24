@@ -344,10 +344,11 @@ func newState(
 		metrics:    metrics,
 		rewards:    rewards,
 
-		baseDB:       baseDB,
-		singletonDB:  singletonDB,
-		baseMerkleDB: baseMerkleDB,
-		merkleDB:     merkleDB,
+		baseDB:                 baseDB,
+		singletonDB:            singletonDB,
+		baseMerkleDB:           baseMerkleDB,
+		merkleDB:               merkleDB,
+		changesSinceLastCommit: make([]database.BatchOp, 0),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -434,6 +435,8 @@ type state struct {
 	singletonDB  database.Database
 	baseMerkleDB database.Database
 	merkleDB     merkledb.MerkleDB // Stores merkleized state
+
+	changesSinceLastCommit []database.BatchOp
 
 	// stakers section (missing Delegatee piece)
 	// TODO: Consider moving delegatee to UTXOs section
@@ -1510,42 +1513,45 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 }
 
 func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
-	batchOps := make([]database.BatchOp, 0)
+	defer func() {
+		s.changesSinceLastCommit = make([]database.BatchOp, 0)
+	}()
+
 	err := utils.Err(
-		s.writeMetadata(&batchOps),
-		s.writePermissionedSubnets(&batchOps),
-		s.writeSubnetOwners(&batchOps),
-		s.writeElasticSubnets(&batchOps),
-		s.writeChains(&batchOps),
-		writeCurrentStakers(currentData, &batchOps),
-		writePendingStakers(pendingData, &batchOps),
-		s.writeDelegateeRewards(&batchOps),
-		s.writeUTXOs(&batchOps),
+		s.writeMetadata(),
+		s.writePermissionedSubnets(),
+		s.writeSubnetOwners(),
+		s.writeElasticSubnets(),
+		s.writeChains(),
+		writeCurrentStakers(currentData, &s.changesSinceLastCommit),
+		writePendingStakers(pendingData, &s.changesSinceLastCommit),
+		s.writeDelegateeRewards(),
+		s.writeUTXOs(),
 	)
 	if err != nil {
 		return err
 	}
 
-	if len(batchOps) == 0 {
+	if len(s.changesSinceLastCommit) == 0 {
 		// nothing to commit
 		return nil
 	}
 
-	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
+	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: s.changesSinceLastCommit})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
 	if err := view.CommitToDB(context.TODO()); err != nil {
 		return fmt.Errorf("failed committing merkleDB view: %w", err)
 	}
-	return s.logMerkleRoot(len(batchOps) != 0)
+	return s.logMerkleRoot(len(s.changesSinceLastCommit) != 0)
 }
 
-func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
+func (s *state) writeMetadata() error {
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
 
-	if err := writeMetadata(s.chainTime, s.lastAcceptedBlkID, s.modifiedSupplies, batchOps); err != nil {
+	if err := writeMetadata(s.chainTime, s.lastAcceptedBlkID, s.modifiedSupplies, &s.changesSinceLastCommit); err != nil {
 		return err
 	}
 
@@ -1557,15 +1563,15 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 	return nil
 }
 
-func (s *state) writePermissionedSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	writePermissionedSubnets(s.addedPermissionedSubnets, batchOps)
+func (s *state) writePermissionedSubnets() error { //nolint:golint,unparam
+	writePermissionedSubnets(s.addedPermissionedSubnets, &s.changesSinceLastCommit)
 	s.addedPermissionedSubnets = s.addedPermissionedSubnets[:0]
 	return nil
 }
 
-func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
+func (s *state) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
-		bytes, err := writeSubnetOwners(subnetID, owner, batchOps)
+		bytes, err := writeSubnetOwners(subnetID, owner, &s.changesSinceLastCommit)
 		if err != nil {
 			return err
 		}
@@ -1580,8 +1586,8 @@ func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 	return nil
 }
 
-func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	writeElasticSubnets(s.addedElasticSubnets, batchOps)
+func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
+	writeElasticSubnets(s.addedElasticSubnets, &s.changesSinceLastCommit)
 	maps.Clear(s.addedElasticSubnets)
 
 	for subnetID := range s.addedElasticSubnets {
@@ -1593,22 +1599,22 @@ func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //noli
 	return nil
 }
 
-func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	writeChains(s.addedChains, batchOps)
+func (s *state) writeChains() error { //nolint:golint,unparam
+	writeChains(s.addedChains, &s.changesSinceLastCommit)
 	maps.Clear(s.addedChains)
 	return nil
 }
 
-func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
-	if err := writeUTXOs(s.modifiedUTXOs, batchOps); err != nil {
+func (s *state) writeUTXOs() error {
+	if err := writeUTXOs(s.modifiedUTXOs, &s.changesSinceLastCommit); err != nil {
 		return err
 	}
 
 	return s.writeUTXOsIndex()
 }
 
-func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	writeDelegateeRewards(s.modifiedDelegateeRewards, batchOps)
+func (s *state) writeDelegateeRewards() error { //nolint:golint,unparam
+	writeDelegateeRewards(s.modifiedDelegateeRewards, &s.changesSinceLastCommit)
 	maps.Clear(s.modifiedDelegateeRewards)
 	return nil
 }
