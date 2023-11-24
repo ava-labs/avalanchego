@@ -144,7 +144,7 @@ func (p *postForkCommonComponents) Verify(
 
 		childHeight := child.Height()
 		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID)
+		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		// Verify the signature of the node
-		shouldHaveProposer := delay < proposer.MaxDelay
+		shouldHaveProposer := delay < proposer.MaxVerifyDelay
 		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
@@ -203,10 +203,10 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
-	if delay < proposer.MaxDelay {
+	if delay < proposer.MaxBuildDelay {
 		parentHeight := p.innerBlk.Height()
 		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID)
+		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",
 				zap.String("reason", "failed to calculate required timestamp delay"),
@@ -249,7 +249,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxDelay {
+	if delay >= proposer.MaxVerifyDelay {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
