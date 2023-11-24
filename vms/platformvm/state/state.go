@@ -1645,50 +1645,11 @@ func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golin
 }
 
 func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
-	for utxoID, utxo := range s.modifiedUTXOs {
-		key := merkleUtxoIDKey(utxoID)
-		if utxo == nil { // delete the UTXO
-			switch utxo, err := s.GetUTXO(utxoID); err {
-			case nil:
-				s.utxoCache.Put(utxoID, nil)
-				*batchOps = append(*batchOps, database.BatchOp{
-					Key:    key,
-					Delete: true,
-				})
-				// store the index
-				if err := s.writeUTXOsIndex(utxo, false /*insertUtxo*/); err != nil {
-					return err
-				}
-				// go process next utxo
-				continue
-
-			case database.ErrNotFound:
-				// trying to delete a non-existing utxo.
-				continue
-
-			default:
-				return err
-			}
-		}
-
-		// insert the UTXO
-		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
-		if err != nil {
-			return err
-		}
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: utxoBytes,
-		})
-
-		// store the index
-		if err := s.writeUTXOsIndex(utxo, true /*insertUtxo*/); err != nil {
-			return err
-		}
+	if err := writeUTXOs(s.modifiedUTXOs, batchOps); err != nil {
+		return err
 	}
 
-	maps.Clear(s.modifiedUTXOs)
-	return nil
+	return s.writeUTXOsIndex()
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
@@ -1762,23 +1723,48 @@ func (s *state) writeTxs() error {
 	return nil
 }
 
-func (s *state) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
-	addressable, ok := utxo.Out.(avax.Addressable)
-	if !ok {
-		return nil
-	}
-	addresses := addressable.Addresses()
+func (s *state) writeUTXOsIndex() error {
+	for utxoID, utxo := range s.modifiedUTXOs {
+		delete(s.modifiedUTXOs, utxoID) // we must this before s.GetUTXO
+		var (
+			utxoToIndex = utxo
+			insertUtxo  = true
+		)
 
-	for _, addr := range addresses {
-		key := merkleUtxoIndexKey(addr, utxo.InputID())
+		if utxo == nil { // delete the UTXO
+			switch utxo, err := s.GetUTXO(utxoID); err {
+			case nil:
+				utxoToIndex = utxo
+				insertUtxo = false
+				s.utxoCache.Put(utxoID, nil)
 
-		if insertUtxo {
-			if err := s.indexedUTXOsDB.Put(key, nil); err != nil {
+			case database.ErrNotFound:
+				// trying to delete a non-existing utxo.
+				continue
+
+			default:
 				return err
 			}
-		} else {
-			if err := s.indexedUTXOsDB.Delete(key); err != nil {
-				return err
+		}
+
+		// index the UTXO
+		addressable, ok := utxoToIndex.Out.(avax.Addressable)
+		if !ok {
+			return nil
+		}
+		addresses := addressable.Addresses()
+
+		for _, addr := range addresses {
+			key := merkleUtxoIndexKey(addr, utxoToIndex.InputID())
+
+			if insertUtxo {
+				if err := s.indexedUTXOsDB.Put(key, nil); err != nil {
+					return err
+				}
+			} else {
+				if err := s.indexedUTXOsDB.Delete(key); err != nil {
+					return err
+				}
 			}
 		}
 	}

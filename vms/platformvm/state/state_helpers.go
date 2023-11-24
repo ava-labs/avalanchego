@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -112,6 +113,30 @@ func merkleUtxoIDKey(utxoID ids.ID) []byte {
 	copy(key, utxosSectionPrefix)
 	key = append(key, utxoID[:]...)
 	return key
+}
+
+func writeUTXOs(modifiedUTXOs map[ids.ID]*avax.UTXO, batchOps *[]database.BatchOp) error {
+	for utxoID, utxo := range modifiedUTXOs {
+		key := merkleUtxoIDKey(utxoID)
+		if utxo == nil { // delete the UTXO
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+			continue
+		}
+
+		// insert the UTXO
+		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		if err != nil {
+			return fmt.Errorf("failed marshalling utxo %v bytes: %w", utxoID, err)
+		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: utxoBytes,
+		})
+	}
+	return nil
 }
 
 func merkleUtxoIndexKey(address []byte, utxoID ids.ID) []byte {

@@ -204,29 +204,16 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 	}
 
 	// UTXOS
-	for utxoID, utxo := range d.modifiedUTXOs {
-		key := merkleUtxoIDKey(utxoID)
-		if utxo == nil { // delete the UTXO
-			batchOps = append(batchOps, database.BatchOp{
-				Key:    key,
-				Delete: true,
-			})
-			continue
-		}
-
-		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
-		if err != nil {
-			return nil, fmt.Errorf("failed marshalling utxo %v bytes: %w", utxoID, err)
-		}
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: utxoBytes,
-		})
+	if err := writeUTXOs(d.modifiedUTXOs, &batchOps); err != nil {
+		return nil, err
 	}
 
-	thisDiffView, err := parentView.NewView(context.Background(), merkledb.ViewChanges{
-		BatchOps: batchOps,
-	})
+	thisDiffView, err := parentView.NewView(
+		context.Background(),
+		merkledb.ViewChanges{
+			BatchOps: batchOps,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating current view out of parent one parent view, %w", err)
 	}
