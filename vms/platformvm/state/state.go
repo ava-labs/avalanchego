@@ -1523,6 +1523,9 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		writeCurrentStakers(currentData, s.changesSinceLastCommit),
 		writePendingStakers(pendingData, s.changesSinceLastCommit),
 
+		// MOVED TO ITS OWN SET METHOD
+		// s.writeDelegateeRewards(),
+
 		// DO NOT wipe s.modifiedUTXOS here, it's used by writeUTXOsIndex later on
 		// writeUTXOsIndex will clear s.modifiedUTXOS up
 		writeUTXOs(s.modifiedUTXOs, s.changesSinceLastCommit),
