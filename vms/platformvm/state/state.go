@@ -1344,8 +1344,12 @@ func (s *state) write(updateValidators bool, height uint64) error {
 
 	return utils.Err(
 		s.writeMerkleState(currentData, pendingData),
+
+		// Below we persist all and only data local to this node, which
+		// does not belong to the merkleDB
 		s.writeBlocks(),
 		s.writeTxs(),
+		s.writeUTXOsIndex(),
 		s.writeLocalUptimes(),
 		s.writeWeightDiffs(height, weightDiffs),
 		s.writeBlsKeyDiffs(height, blsKeyDiffs),
@@ -1526,7 +1530,10 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		writeCurrentStakers(currentData, &s.changesSinceLastCommit),
 		writePendingStakers(pendingData, &s.changesSinceLastCommit),
 		s.writeDelegateeRewards(),
-		s.writeUTXOs(),
+
+		// DO NOT wipe s.modifiedUTXOS here, it's used by writeUTXOsIndex later on
+		// writeUTXOsIndex will clear s.modifiedUTXOS up
+		writeUTXOs(s.modifiedUTXOs, &s.changesSinceLastCommit),
 	)
 	if err != nil {
 		return err
@@ -1588,14 +1595,14 @@ func (s *state) writeSubnetOwners() error {
 
 func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
 	writeElasticSubnets(s.addedElasticSubnets, &s.changesSinceLastCommit)
-	maps.Clear(s.addedElasticSubnets)
-
 	for subnetID := range s.addedElasticSubnets {
 		// Note: Evict is used rather than Put here because tx may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.elasticSubnetCache.Evict(subnetID)
 	}
+
+	maps.Clear(s.addedElasticSubnets)
 	return nil
 }
 
@@ -1603,14 +1610,6 @@ func (s *state) writeChains() error { //nolint:golint,unparam
 	writeChains(s.addedChains, &s.changesSinceLastCommit)
 	maps.Clear(s.addedChains)
 	return nil
-}
-
-func (s *state) writeUTXOs() error {
-	if err := writeUTXOs(s.modifiedUTXOs, &s.changesSinceLastCommit); err != nil {
-		return err
-	}
-
-	return s.writeUTXOsIndex()
 }
 
 func (s *state) writeDelegateeRewards() error { //nolint:golint,unparam
@@ -1675,7 +1674,7 @@ func (s *state) writeTxs() error {
 
 func (s *state) writeUTXOsIndex() error {
 	for utxoID, utxo := range s.modifiedUTXOs {
-		delete(s.modifiedUTXOs, utxoID) // we must this before s.GetUTXO
+		delete(s.modifiedUTXOs, utxoID) // we must do this before s.GetUTXO
 		var (
 			utxoToIndex = utxo
 			insertUtxo  = true
