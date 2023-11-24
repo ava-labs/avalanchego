@@ -71,10 +71,10 @@ const (
 	DefaultBenchlistMinFailingDuration = 2*time.Minute + 30*time.Second
 
 	// Router
-	DefaultAcceptedFrontierGossipFrequency              = 1 * time.Second
+	DefaultAcceptedFrontierGossipFrequency              = 500 * time.Millisecond
 	DefaultConsensusAppConcurrency                      = 2
 	DefaultConsensusShutdownTimeout                     = time.Minute
-	DefaultConsensusGossipAcceptedFrontierValidatorSize = 2
+	DefaultConsensusGossipAcceptedFrontierValidatorSize = 1
 	DefaultConsensusGossipOnAcceptValidatorSize         = 0
 	DefaultConsensusGossipOnAcceptNonValidatorSize      = 0
 	DefaultConsensusGossipOnAcceptPeerSize              = 10
