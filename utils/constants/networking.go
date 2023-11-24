@@ -74,7 +74,7 @@ const (
 	DefaultConsensusAppConcurrency                         = 2
 	DefaultConsensusShutdownTimeout                        = time.Minute
 	DefaultFrontierGossipFrequency                         = 500 * time.Millisecond
-	DefaultConsensusGossipFrontierPollSize                 = 3
+	DefaultConsensusGossipFrontierPollSize                 = 5
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
 	DefaultConsensusGossipAcceptedFrontierPeerSize         = 1
