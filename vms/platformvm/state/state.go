@@ -348,7 +348,7 @@ func newState(
 		singletonDB:            singletonDB,
 		baseMerkleDB:           baseMerkleDB,
 		merkleDB:               merkleDB,
-		changesSinceLastCommit: make([]database.BatchOp, 0),
+		changesSinceLastCommit: make(map[string]database.BatchOp),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -436,7 +436,7 @@ type state struct {
 	baseMerkleDB database.Database
 	merkleDB     merkledb.MerkleDB // Stores merkleized state
 
-	changesSinceLastCommit []database.BatchOp
+	changesSinceLastCommit map[string]database.BatchOp // key bytes --> state change
 
 	// stakers section (missing Delegatee piece)
 	// TODO: Consider moving delegatee to UTXOs section
@@ -1518,7 +1518,7 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 
 func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
 	defer func() {
-		s.changesSinceLastCommit = make([]database.BatchOp, 0)
+		maps.Clear(s.changesSinceLastCommit)
 	}()
 
 	err := utils.Err(
@@ -1527,13 +1527,13 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		s.writeSubnetOwners(),
 		s.writeElasticSubnets(),
 		s.writeChains(),
-		writeCurrentStakers(currentData, &s.changesSinceLastCommit),
-		writePendingStakers(pendingData, &s.changesSinceLastCommit),
+		writeCurrentStakers(currentData, s.changesSinceLastCommit),
+		writePendingStakers(pendingData, s.changesSinceLastCommit),
 		s.writeDelegateeRewards(),
 
 		// DO NOT wipe s.modifiedUTXOS here, it's used by writeUTXOsIndex later on
 		// writeUTXOsIndex will clear s.modifiedUTXOS up
-		writeUTXOs(s.modifiedUTXOs, &s.changesSinceLastCommit),
+		writeUTXOs(s.modifiedUTXOs, s.changesSinceLastCommit),
 	)
 	if err != nil {
 		return err
@@ -1544,7 +1544,7 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		return nil
 	}
 
-	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: s.changesSinceLastCommit})
+	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: maps.Values(s.changesSinceLastCommit)})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
@@ -1557,13 +1557,13 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 func (s *state) writeMetadata() error {
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
-	if err := writeTimestamp(s.chainTime, &s.changesSinceLastCommit); err != nil {
+	if err := writeTimestamp(s.chainTime, s.changesSinceLastCommit); err != nil {
 		return err
 	}
 
-	writeBlockID(s.lastAcceptedBlkID, &s.changesSinceLastCommit)
+	writeBlockID(s.lastAcceptedBlkID, s.changesSinceLastCommit)
 
-	writeSupplies(s.modifiedSupplies, &s.changesSinceLastCommit)
+	writeSupplies(s.modifiedSupplies, s.changesSinceLastCommit)
 
 	for subnetID, supply := range s.modifiedSupplies {
 		supply := supply
@@ -1574,14 +1574,14 @@ func (s *state) writeMetadata() error {
 }
 
 func (s *state) writePermissionedSubnets() error { //nolint:golint,unparam
-	writePermissionedSubnets(s.addedPermissionedSubnets, &s.changesSinceLastCommit)
+	writePermissionedSubnets(s.addedPermissionedSubnets, s.changesSinceLastCommit)
 	s.addedPermissionedSubnets = s.addedPermissionedSubnets[:0]
 	return nil
 }
 
 func (s *state) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
-		bytes, err := writeSubnetOwners(subnetID, owner, &s.changesSinceLastCommit)
+		bytes, err := writeSubnetOwners(subnetID, owner, s.changesSinceLastCommit)
 		if err != nil {
 			return err
 		}
@@ -1597,7 +1597,7 @@ func (s *state) writeSubnetOwners() error {
 }
 
 func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
-	writeElasticSubnets(s.addedElasticSubnets, &s.changesSinceLastCommit)
+	writeElasticSubnets(s.addedElasticSubnets, s.changesSinceLastCommit)
 	for subnetID := range s.addedElasticSubnets {
 		// Note: Evict is used rather than Put here because tx may end up
 		// referencing additional data (because of shared byte slices) that
@@ -1610,13 +1610,13 @@ func (s *state) writeElasticSubnets() error { //nolint:golint,unparam
 }
 
 func (s *state) writeChains() error { //nolint:golint,unparam
-	writeChains(s.addedChains, &s.changesSinceLastCommit)
+	writeChains(s.addedChains, s.changesSinceLastCommit)
 	maps.Clear(s.addedChains)
 	return nil
 }
 
 func (s *state) writeDelegateeRewards() error { //nolint:golint,unparam
-	writeDelegateeRewards(s.modifiedDelegateeRewards, &s.changesSinceLastCommit)
+	writeDelegateeRewards(s.modifiedDelegateeRewards, s.changesSinceLastCommit)
 	maps.Clear(s.modifiedDelegateeRewards)
 	return nil
 }
