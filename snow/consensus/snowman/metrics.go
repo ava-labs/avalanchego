@@ -132,11 +132,6 @@ func newMetrics(
 			Name:      "blks_build_accept_latency",
 			Help:      "time (in ns) from the timestamp of a block to the time it was accepted",
 		}),
-		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_build_accept_latency",
-			Help:      "time (in ns) from the timestamp of a block to the time it was accepted",
-		}),
 
 		blockSizeRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
