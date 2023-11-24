@@ -1540,8 +1540,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		AcceptedFrontierPollSize: 1,
-		Consensus:                &smcon.Topological{},
+		FrontierPollSize: 1,
+		Consensus:        &smcon.Topological{},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)

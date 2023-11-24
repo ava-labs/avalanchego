@@ -179,8 +179,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
-	fs.Duration(ConsensusGossipAcceptedFrontierFrequencyKey, constants.DefaultAcceptedFrontierGossipFrequency, "Frequency of polling and gossiping accepted frontiers")
-	fs.Uint(ConsensusGossipAcceptedFrontierPollSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPollSize, "Number of validators to query when polling for accepted frontier changes")
+	fs.Duration(ConsensusGossipFrontierFrequencyKey, constants.DefaultFrontierGossipFrequency, "Frequency of polling and gossiping frontiers")
+	fs.Uint(ConsensusGossipFrontierPollSizeKey, constants.DefaultConsensusGossipFrontierPollSize, "Number of validators to query when polling for frontier changes")
 	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")

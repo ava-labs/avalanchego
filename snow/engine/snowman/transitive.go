@@ -167,11 +167,11 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		zap.Stringer("validators", t.Validators),
 	)
 
-	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.AcceptedFrontierPollSize)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.FrontierPollSize)
 	if err != nil {
 		t.Ctx.Log.Error("dropped sample for block gossip",
 			zap.String("reason", "insufficient number of validators"),
-			zap.Int("size", t.AcceptedFrontierPollSize),
+			zap.Int("size", t.FrontierPollSize),
 		)
 		return nil
 	}

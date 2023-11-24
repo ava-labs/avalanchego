@@ -205,8 +205,8 @@ type ManagerConfig struct {
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
-	AcceptedFrontierGossipFrequency time.Duration
-	ConsensusAppConcurrency         int
+	FrontierGossipFrequency time.Duration
+	ConsensusAppConcurrency int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -825,7 +825,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.AcceptedFrontierGossipFrequency,
+		m.FrontierGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
@@ -860,14 +860,14 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:                      ctx,
-		AllGetsServer:            snowGetHandler,
-		VM:                       vmWrappingProposerVM,
-		Sender:                   snowmanMessageSender,
-		Validators:               vdrs,
-		Params:                   consensusParams,
-		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierPollSize),
-		Consensus:                snowmanConsensus,
+		Ctx:              ctx,
+		AllGetsServer:    snowGetHandler,
+		VM:               vmWrappingProposerVM,
+		Sender:           snowmanMessageSender,
+		Validators:       vdrs,
+		Params:           consensusParams,
+		FrontierPollSize: int(subnetConfig.FrontierPollSize),
+		Consensus:        snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
@@ -1173,7 +1173,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.AcceptedFrontierGossipFrequency,
+		m.FrontierGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,
@@ -1208,15 +1208,15 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:                      ctx,
-		AllGetsServer:            snowGetHandler,
-		VM:                       vm,
-		Sender:                   messageSender,
-		Validators:               vdrs,
-		Params:                   consensusParams,
-		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierPollSize),
-		Consensus:                consensus,
-		PartialSync:              m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+		Ctx:              ctx,
+		AllGetsServer:    snowGetHandler,
+		VM:               vm,
+		Sender:           messageSender,
+		Validators:       vdrs,
+		Params:           consensusParams,
+		FrontierPollSize: int(subnetConfig.FrontierPollSize),
+		Consensus:        consensus,
+		PartialSync:      m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {

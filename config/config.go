@@ -308,7 +308,7 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 
 func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 	return subnets.GossipConfig{
-		AcceptedFrontierPollSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPollSizeKey)),
+		FrontierPollSize:                 uint(v.GetUint32(ConsensusGossipFrontierPollSizeKey)),
 		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
 		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
 		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
@@ -1325,9 +1325,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusGossipAcceptedFrontierFrequencyKey)
-	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipAcceptedFrontierFrequencyKey)
+	nodeConfig.FrontierGossipFrequency = v.GetDuration(ConsensusGossipFrontierFrequencyKey)
+	if nodeConfig.FrontierGossipFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrontierFrequencyKey)
 	}
 
 	// App handling
