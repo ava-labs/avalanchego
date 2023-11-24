@@ -97,9 +97,13 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 		return nil, fmt.Errorf("failed retrieving parent view, %w", err)
 	}
 
-	if err := writeMetadata(d.timestamp, d.blockID, d.currentSupply, &d.changesSinceLastApply); err != nil {
+	if err := writeTimestamp(d.timestamp, &d.changesSinceLastApply); err != nil {
 		return nil, err
 	}
+
+	writeBlockID(d.blockID, &d.changesSinceLastApply)
+
+	writeSupplies(d.currentSupply, &d.changesSinceLastApply)
 
 	writePermissionedSubnets(d.addedSubnets, &d.changesSinceLastApply)
 

@@ -1557,10 +1557,13 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 func (s *state) writeMetadata() error {
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
-
-	if err := writeMetadata(s.chainTime, s.lastAcceptedBlkID, s.modifiedSupplies, &s.changesSinceLastCommit); err != nil {
+	if err := writeTimestamp(s.chainTime, &s.changesSinceLastCommit); err != nil {
 		return err
 	}
+
+	writeBlockID(s.lastAcceptedBlkID, &s.changesSinceLastCommit)
+
+	writeSupplies(s.modifiedSupplies, &s.changesSinceLastCommit)
 
 	for subnetID, supply := range s.modifiedSupplies {
 		supply := supply

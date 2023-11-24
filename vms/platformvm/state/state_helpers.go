@@ -34,6 +34,25 @@ type weightDiffKey struct {
 	nodeID   ids.NodeID
 }
 
+func writeTimestamp(chainTime time.Time, batchOps *[]database.BatchOp) error {
+	encodedChainTime, err := chainTime.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to encoding chainTime: %w", err)
+	}
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
+	return nil
+}
+
+func writeBlockID(lastAcceptedBlkID ids.ID, batchOps *[]database.BatchOp) {
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: lastAcceptedBlkID[:],
+	})
+}
+
 func merkleSuppliesKey(subnetID ids.ID) []byte {
 	key := make([]byte, len(merkleSuppliesPrefix)+ids.IDLen)
 	copy(key, merkleSuppliesPrefix)
@@ -49,24 +68,7 @@ func splitMerkleSuppliesKey(b []byte) ([]byte, ids.ID) {
 	return prefix, subnetID
 }
 
-func writeMetadata(chainTime time.Time, lastAcceptedBlkID ids.ID, modifiedSupplies map[ids.ID]uint64, batchOps *[]database.BatchOp) error {
-	encodedChainTime, err := chainTime.MarshalBinary()
-	if err != nil {
-		return fmt.Errorf("failed to encoding chainTime: %w", err)
-	}
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleChainTimeKey,
-		Value: encodedChainTime,
-	})
-
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleLastAcceptedBlkIDKey,
-		Value: lastAcceptedBlkID[:],
-	})
-
-	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
-	// TODO: Consider if it should be
-
+func writeSupplies(modifiedSupplies map[ids.ID]uint64, batchOps *[]database.BatchOp) {
 	for subnetID, supply := range modifiedSupplies {
 		supply := supply
 		key := merkleSuppliesKey(subnetID)
@@ -75,7 +77,6 @@ func writeMetadata(chainTime time.Time, lastAcceptedBlkID ids.ID, modifiedSuppli
 			Value: database.PackUInt64(supply),
 		})
 	}
-	return nil
 }
 
 func merklePermissionedSubnetKey(subnetID ids.ID) []byte {
