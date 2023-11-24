@@ -1564,33 +1564,17 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 }
 
 func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
-	encodedChainTime, err := s.chainTime.MarshalBinary()
-	if err != nil {
-		return fmt.Errorf("failed to encoding chainTime: %w", err)
-	}
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleChainTimeKey,
-		Value: encodedChainTime,
-	})
-
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleLastAcceptedBlkIDKey,
-		Value: s.lastAcceptedBlkID[:],
-	})
-
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
+
+	if err := writeMetadata(s.chainTime, s.lastAcceptedBlkID, s.modifiedSupplies, batchOps); err != nil {
+		return err
+	}
 
 	for subnetID, supply := range s.modifiedSupplies {
 		supply := supply
 		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
 		s.suppliesCache.Put(subnetID, &supply)
-
-		key := merkleSuppliesKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: database.PackUInt64(supply),
-		})
 	}
 	return nil
 }

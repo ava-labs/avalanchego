@@ -97,27 +97,8 @@ func (d *diff) MerkleView() (merkledb.TrieView, error) {
 	batchOps := make([]database.BatchOp, 0)
 
 	// METADATA
-	encodedChainTime, err := d.timestamp.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encoding chainTime: %w", err)
-	}
-	batchOps = append(batchOps, database.BatchOp{
-		Key:   merkleChainTimeKey,
-		Value: encodedChainTime,
-	})
-
-	batchOps = append(batchOps, database.BatchOp{
-		Key:   merkleLastAcceptedBlkIDKey,
-		Value: d.blockID[:],
-	})
-
-	for subnetID, supply := range d.currentSupply {
-		supply := supply
-		key := merkleSuppliesKey(subnetID)
-		batchOps = append(batchOps, database.BatchOp{
-			Key:   key,
-			Value: database.PackUInt64(supply),
-		})
+	if err := writeMetadata(d.timestamp, d.blockID, d.currentSupply, &batchOps); err != nil {
+		return nil, err
 	}
 
 	// PERMISSIONED SUBNETS
