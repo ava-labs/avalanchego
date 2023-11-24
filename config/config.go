@@ -60,8 +60,9 @@ const (
 	subnetConfigFileExt  = ".json"
 	ipResolutionTimeout  = 30 * time.Second
 
-	ipcDeprecationMsg      = "IPC API is deprecated"
-	keystoreDeprecationMsg = "keystore API is deprecated"
+	ipcDeprecationMsg                    = "IPC API is deprecated"
+	keystoreDeprecationMsg               = "keystore API is deprecated"
+	acceptedFrontierGossipDeprecationMsg = "push based accepted frontier gossip is deprecated"
 )
 
 var (
@@ -72,6 +73,9 @@ var (
 		IpcsChainIDsKey:       ipcDeprecationMsg,
 		IpcsPathKey:           ipcDeprecationMsg,
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
 	}
 
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
@@ -304,6 +308,7 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 
 func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 	return subnets.GossipConfig{
+		AcceptedFrontierPollSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPollSizeKey)),
 		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
 		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
 		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
@@ -1320,9 +1325,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusAcceptedFrontierGossipFrequencyKey)
+	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusGossipAcceptedFrontierFrequencyKey)
 	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusAcceptedFrontierGossipFrequencyKey)
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipAcceptedFrontierFrequencyKey)
 	}
 
 	// App handling

@@ -16,6 +16,7 @@ import (
 var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 
 type GossipConfig struct {
+	AcceptedFrontierPollSize         uint `json:"gossipAcceptedFrontierPollSize"         yaml:"gossipAcceptedFrontierPollSize"`
 	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"    yaml:"gossipAcceptedFrontierValidatorSize"`
 	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
 	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize"         yaml:"gossipAcceptedFrontierPeerSize"`

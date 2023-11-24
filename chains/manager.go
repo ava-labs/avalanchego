@@ -866,7 +866,7 @@ func (m *manager) createAvalancheChain(
 		Sender:                   snowmanMessageSender,
 		Validators:               vdrs,
 		Params:                   consensusParams,
-		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierValidatorSize),
+		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierPollSize),
 		Consensus:                snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
@@ -1214,7 +1214,7 @@ func (m *manager) createSnowmanChain(
 		Sender:                   messageSender,
 		Validators:               vdrs,
 		Params:                   consensusParams,
-		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierValidatorSize),
+		AcceptedFrontierPollSize: int(subnetConfig.AcceptedFrontierPollSize),
 		Consensus:                consensus,
 		PartialSync:              m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
