@@ -163,13 +163,21 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 	)
 	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
 
+	if numProcessing := t.Consensus.NumProcessing(); numProcessing > 0 {
+		t.Ctx.Log.Debug("skipping block gossip",
+			zap.String("reason", "blocks currently processing"),
+			zap.Int("numProcessing", numProcessing),
+		)
+		return nil
+	}
+
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
 
 	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.FrontierPollSize)
 	if err != nil {
-		t.Ctx.Log.Error("dropped sample for block gossip",
+		t.Ctx.Log.Error("skipping block gossip",
 			zap.String("reason", "insufficient number of validators"),
 			zap.Int("size", t.FrontierPollSize),
 		)
@@ -178,7 +186,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 
 	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
 	if err != nil {
-		t.Ctx.Log.Error("dropped sample for block gossip",
+		t.Ctx.Log.Error("skipping block gossip",
 			zap.String("reason", "block height overflow"),
 			zap.Stringer("blkID", lastAcceptedID),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
