@@ -48,10 +48,6 @@ type metrics struct {
 	// latAccepted tracks the number of nanoseconds that a block was processing
 	// before being accepted
 	latAccepted          metric.Averager
-<<<<<<< HEAD
-	blockSizeAcceptedSum prometheus.Gauge
-=======
->>>>>>> dev
 	buildLatencyAccepted prometheus.Gauge
 
 	blockSizeRejectedSum prometheus.Gauge
