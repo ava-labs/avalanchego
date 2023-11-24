@@ -462,11 +462,11 @@ type state struct {
 	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
 
 	// Metadata section
-	chainTime, latestComittedChainTime                  time.Time
-	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
-	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
-	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
-	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	chainTime          time.Time
+	lastAcceptedBlkID  ids.ID
+	lastAcceptedHeight uint64                        // TODO: Should this be written to state??
+	modifiedSupplies   map[ids.ID]uint64             // map of subnetID -> current supply
+	suppliesCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
 
 	// Subnets section
 	// Subnet ID --> Owner of the subnet
@@ -1564,26 +1564,19 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 }
 
 func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
-	if !s.chainTime.Equal(s.latestComittedChainTime) {
-		encodedChainTime, err := s.chainTime.MarshalBinary()
-		if err != nil {
-			return fmt.Errorf("failed to encoding chainTime: %w", err)
-		}
-
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleChainTimeKey,
-			Value: encodedChainTime,
-		})
-		s.latestComittedChainTime = s.chainTime
+	encodedChainTime, err := s.chainTime.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to encoding chainTime: %w", err)
 	}
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
 
-	if s.lastAcceptedBlkID != s.latestCommittedLastAcceptedBlkID {
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleLastAcceptedBlkIDKey,
-			Value: s.lastAcceptedBlkID[:],
-		})
-		s.latestCommittedLastAcceptedBlkID = s.lastAcceptedBlkID
-	}
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: s.lastAcceptedBlkID[:],
+	})
 
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be

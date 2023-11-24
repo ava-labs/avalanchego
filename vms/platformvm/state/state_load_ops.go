@@ -176,7 +176,6 @@ func (s *state) loadMerkleMetadata() error {
 	if err := chainTime.UnmarshalBinary(chainTimeBytes); err != nil {
 		return err
 	}
-	s.latestComittedChainTime = chainTime
 	s.SetTimestamp(chainTime)
 
 	// load last accepted block
@@ -186,7 +185,6 @@ func (s *state) loadMerkleMetadata() error {
 	}
 	lastAcceptedBlkID := ids.Empty
 	copy(lastAcceptedBlkID[:], blkIDBytes)
-	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
 	s.SetLastAccepted(lastAcceptedBlkID)
 
 	// We don't need to load supplies. Unlike chain time and last block ID,
