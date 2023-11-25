@@ -1304,23 +1304,15 @@ func TestEngineGossip(t *testing.T) {
 		return gBlk, nil
 	}
 
-	var (
-		calledSendPullQuery bool
-		calledSendGossip    bool
-	)
+	var calledSendPullQuery bool
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
 		calledSendPullQuery = true
 		require.Equal(set.Of(nodeID), nodeIDs)
-	}
-	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
-		calledSendGossip = true
-		require.Equal(gBlk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.Gossip(context.Background()))
 
 	require.True(calledSendPullQuery)
-	require.True(calledSendGossip)
 }
 
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {

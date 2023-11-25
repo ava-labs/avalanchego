@@ -29,7 +29,6 @@ func DefaultConfigs() Config {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		FrontierPollSize: 1,
-		Consensus:        &snowman.Topological{},
+		Consensus: &snowman.Topological{},
 	}
 }

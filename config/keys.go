@@ -146,7 +146,6 @@ const (
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
 	ConsensusGossipFrontierFrequencyKey                = "consensus-frontier-gossip-frequency"
-	ConsensusGossipFrontierPollSizeKey                 = "consensus-frontier-gossip-poll-size"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
 	ConsensusGossipAcceptedFrontierPeerSizeKey         = "consensus-accepted-frontier-gossip-peer-size"

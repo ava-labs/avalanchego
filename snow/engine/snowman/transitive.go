@@ -31,7 +31,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 64 * units.MiB
+const (
+	nonVerifiedCacheSize = 64 * units.MiB
+	putGossipPeriod      = 10
+)
 
 var _ Engine = (*Transitive)(nil)
 
@@ -58,7 +61,9 @@ type Transitive struct {
 	common.AppHandler
 	validators.Connector
 
-	RequestID uint32
+	requestID uint32
+
+	gossipCounter int
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -146,23 +151,7 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Gossip(ctx context.Context) error {
-	// TODO: Remove periodic push gossip after v1.11.x is activated
 	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
-
-	lastAccepted, err := t.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request",
-			zap.String("reason", "block couldn't be loaded"),
-			zap.Stringer("blkID", lastAcceptedID),
-			zap.Error(err),
-		)
-		return nil
-	}
-	t.Ctx.Log.Verbo("gossiping accepted block to the network",
-		zap.Stringer("blkID", lastAcceptedID),
-	)
-	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
-
 	if numProcessing := t.Consensus.NumProcessing(); numProcessing > 0 {
 		t.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "blocks currently processing"),
@@ -175,11 +164,10 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		zap.Stringer("validators", t.Validators),
 	)
 
-	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.FrontierPollSize)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, 1)
 	if err != nil {
 		t.Ctx.Log.Error("skipping block gossip",
-			zap.String("reason", "insufficient number of validators"),
-			zap.Int("size", t.FrontierPollSize),
+			zap.String("reason", "no validators"),
 		)
 		return nil
 	}
@@ -195,10 +183,31 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	t.RequestID++
+	t.requestID++
 	vdrSet := set.Of(vdrIDs...)
 	preferredID := t.Consensus.Preference()
-	t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, preferredID, nextHeightToAccept)
+	t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, preferredID, nextHeightToAccept)
+
+	// TODO: Remove periodic push gossip after v1.11.x is activated
+	t.gossipCounter++
+	t.gossipCounter %= putGossipPeriod
+	if t.gossipCounter > 0 {
+		return nil
+	}
+
+	lastAccepted, err := t.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request",
+			zap.String("reason", "block couldn't be loaded"),
+			zap.Stringer("blkID", lastAcceptedID),
+			zap.Error(err),
+		)
+		return nil
+	}
+	t.Ctx.Log.Verbo("gossiping accepted block to the network",
+		zap.Stringer("blkID", lastAcceptedID),
+	)
+	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
 	return nil
 }
 
@@ -436,7 +445,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 }
 
 func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
-	t.RequestID = startReqID
+	t.requestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted(ctx)
 	if err != nil {
 		return err
@@ -805,14 +814,14 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 		return
 	}
 
-	t.RequestID++
-	t.blkReqs.Add(nodeID, t.RequestID, blkID)
+	t.requestID++
+	t.blkReqs.Add(nodeID, t.requestID, blkID)
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", t.RequestID),
+		zap.Uint32("requestID", t.requestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(ctx, nodeID, t.RequestID, blkID)
+	t.Sender.SendGet(ctx, nodeID, t.requestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -854,21 +863,21 @@ func (t *Transitive) sendQuery(
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
-	t.RequestID++
-	if !t.polls.Add(t.RequestID, vdrBag) {
+	t.requestID++
+	if !t.polls.Add(t.requestID, vdrBag) {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "failed to add poll"),
 			zap.Stringer("blkID", blkID),
-			zap.Uint32("requestID", t.RequestID),
+			zap.Uint32("requestID", t.requestID),
 		)
 		return
 	}
 
 	vdrSet := set.Of(vdrIDs...)
 	if push {
-		t.Sender.SendPushQuery(ctx, vdrSet, t.RequestID, blkBytes, nextHeightToAccept)
+		t.Sender.SendPushQuery(ctx, vdrSet, t.requestID, blkBytes, nextHeightToAccept)
 	} else {
-		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID, nextHeightToAccept)
+		t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, blkID, nextHeightToAccept)
 	}
 }
 
