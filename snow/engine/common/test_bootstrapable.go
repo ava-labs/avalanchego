@@ -14,8 +14,7 @@ import (
 var (
 	_ Bootstrapable = (*BootstrapableTest)(nil)
 
-	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
-	errClear         = errors.New("unexpectedly called Clear")
+	errClear = errors.New("unexpectedly called Clear")
 )
 
 // BootstrapableTest is a test engine that supports bootstrapping

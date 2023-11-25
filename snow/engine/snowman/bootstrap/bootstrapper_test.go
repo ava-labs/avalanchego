@@ -1130,7 +1130,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	require.Contains(requestIDs, blkID1)
 
-	// Remove request, so we can restart bootstrapping via ForceAccepted
+	// Remove request, so we can restart bootstrapping via startSyncing
 	require.True(bs.OutstandingRequests.RemoveAny(blkID1))
 	requestIDs = map[ids.ID]uint32{}
 

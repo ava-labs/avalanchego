@@ -82,13 +82,13 @@ type Bootstrapper struct {
 	minority bootstrapper.Poll
 	majority bootstrapper.Poll
 
-	// Greatest height of the blocks passed in ForceAccepted
+	// Greatest height of the blocks passed in startSyncing
 	tipHeight uint64
 	// Height of the last accepted block when bootstrapping starts
 	startingHeight uint64
-	// Number of blocks that were fetched on ForceAccepted
+	// Number of blocks that were fetched on startSyncing
 	initiallyFetched uint64
-	// Time that ForceAccepted was last called
+	// Time that startSyncing was last called
 	startTime time.Time
 
 	common.Fetcher
