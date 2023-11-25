@@ -1321,16 +1321,15 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 	for _, vdrTx := range genesis.Validators {
 		var txsStaker txs.Staker
 		var txsValidator txs.Validator
-		if tx, ok := vdrTx.Unsigned.(*txs.AddPermissionlessValidatorTx); ok {
+		switch tx := vdrTx.Unsigned.(type) {
+		case *txs.AddPermissionlessValidatorTx:
 			txsStaker = tx
 			txsValidator = tx.Validator
-		} else {
-			if tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx); ok {
-				txsStaker = tx
-				txsValidator = tx.Validator
-			} else {
-				return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
-			}
+		case *txs.AddValidatorTx:
+			txsStaker = tx
+			txsValidator = tx.Validator
+		default:
+			return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", tx)
 		}
 
 		stakeAmount := txsValidator.Wght
