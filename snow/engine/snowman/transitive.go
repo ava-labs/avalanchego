@@ -152,41 +152,40 @@ func newTransitive(config Config) (*Transitive, error) {
 
 func (t *Transitive) Gossip(ctx context.Context) error {
 	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
-	if numProcessing := t.Consensus.NumProcessing(); numProcessing > 0 {
+	if numProcessing := t.Consensus.NumProcessing(); numProcessing == 0 {
+		t.Ctx.Log.Verbo("sampling from validators",
+			zap.Stringer("validators", t.Validators),
+		)
+
+		vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, 1)
+		if err != nil {
+			t.Ctx.Log.Error("skipping block gossip",
+				zap.String("reason", "no validators"),
+			)
+			return nil
+		}
+
+		nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
+		if err != nil {
+			t.Ctx.Log.Error("skipping block gossip",
+				zap.String("reason", "block height overflow"),
+				zap.Stringer("blkID", lastAcceptedID),
+				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Error(err),
+			)
+			return nil
+		}
+
+		t.requestID++
+		vdrSet := set.Of(vdrIDs...)
+		preferredID := t.Consensus.Preference()
+		t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, preferredID, nextHeightToAccept)
+	} else {
 		t.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "blocks currently processing"),
 			zap.Int("numProcessing", numProcessing),
 		)
-		return nil
 	}
-
-	t.Ctx.Log.Verbo("sampling from validators",
-		zap.Stringer("validators", t.Validators),
-	)
-
-	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, 1)
-	if err != nil {
-		t.Ctx.Log.Error("skipping block gossip",
-			zap.String("reason", "no validators"),
-		)
-		return nil
-	}
-
-	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
-	if err != nil {
-		t.Ctx.Log.Error("skipping block gossip",
-			zap.String("reason", "block height overflow"),
-			zap.Stringer("blkID", lastAcceptedID),
-			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	t.requestID++
-	vdrSet := set.Of(vdrIDs...)
-	preferredID := t.Consensus.Preference()
-	t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, preferredID, nextHeightToAccept)
 
 	// TODO: Remove periodic push gossip after v1.11.x is activated
 	t.gossipCounter++
