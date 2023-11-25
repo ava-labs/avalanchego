@@ -1319,13 +1319,22 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
+		var txsStaker txs.Staker
+		var txsValidator txs.Validator
+		if tx, ok := vdrTx.Unsigned.(*txs.AddPermissionlessValidatorTx); ok {
+			txsStaker = tx
+			txsValidator = tx.Validator
+		} else {
+			if tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx); ok {
+				txsStaker = tx
+				txsValidator = tx.Validator
+			} else {
+				return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
+			}
 		}
 
-		stakeAmount := tx.Validator.Wght
-		stakeDuration := tx.Validator.Duration()
+		stakeAmount := txsValidator.Wght
+		stakeDuration := txsValidator.Duration()
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -1341,7 +1350,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), txsStaker, potentialReward)
 		if err != nil {
 			return err
 		}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var errInvalidETHAddress = errors.New("invalid eth address")
@@ -54,15 +55,17 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 }
 
 type UnparsedStaker struct {
-	NodeID        ids.NodeID `json:"nodeID"`
-	RewardAddress string     `json:"rewardAddress"`
-	DelegationFee uint32     `json:"delegationFee"`
+	NodeID        ids.NodeID                `json:"nodeID"`
+	RewardAddress string                    `json:"rewardAddress"`
+	DelegationFee uint32                    `json:"delegationFee"`
+	Signer        *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
 func (us UnparsedStaker) Parse() (Staker, error) {
 	s := Staker{
 		NodeID:        us.NodeID,
 		DelegationFee: us.DelegationFee,
+		Signer:        us.Signer,
 	}
 
 	_, _, avaxAddrBytes, err := address.Parse(us.RewardAddress)
