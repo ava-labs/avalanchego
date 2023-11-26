@@ -145,7 +145,7 @@ const (
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
-	ConsensusGossipFrontierFrequencyKey                = "consensus-frontier-gossip-frequency"
+	ConsensusFrontierPollFrequencyKey                  = "consensus-frontier-poll-frequency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
 	ConsensusGossipAcceptedFrontierPeerSizeKey         = "consensus-accepted-frontier-gossip-peer-size"

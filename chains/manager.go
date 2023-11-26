@@ -205,7 +205,7 @@ type ManagerConfig struct {
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
-	FrontierGossipFrequency time.Duration
+	FrontierPollFrequency   time.Duration
 	ConsensusAppConcurrency int
 
 	// Max Time to spend fetching a container and its
@@ -824,7 +824,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.FrontierGossipFrequency,
+		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
@@ -1170,7 +1170,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.FrontierGossipFrequency,
+		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,

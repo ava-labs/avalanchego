@@ -181,8 +181,8 @@ type Config struct {
 	ConsensusRouter          router.Router       `json:"-"`
 	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
-	// Gossip and query frontiers every [FrontierGossipFrequency]
-	FrontierGossipFrequency time.Duration `json:"consensusGossipFreq"`
+	// Poll for new frontiers every [FrontierPollFrequency]
+	FrontierPollFrequency time.Duration `json:"consensusGossipFreq"`
 	// ConsensusAppConcurrency defines the maximum number of goroutines to
 	// handle App messages per chain.
 	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`

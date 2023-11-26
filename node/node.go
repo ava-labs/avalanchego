@@ -1014,7 +1014,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Metrics:                                 n.MetricsGatherer,
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
-		FrontierGossipFrequency:                 n.Config.FrontierGossipFrequency,
+		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
 		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,

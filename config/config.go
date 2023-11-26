@@ -62,7 +62,7 @@ const (
 
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
-	acceptedFrontierGossipDeprecationMsg = "push based accepted frontier gossip is deprecated"
+	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
 )
 
 var (
@@ -76,6 +76,9 @@ var (
 		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
 	}
 
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
@@ -1324,9 +1327,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.FrontierGossipFrequency = v.GetDuration(ConsensusGossipFrontierFrequencyKey)
-	if nodeConfig.FrontierGossipFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrontierFrequencyKey)
+	nodeConfig.FrontierPollFrequency = v.GetDuration(ConsensusFrontierPollFrequencyKey)
+	if nodeConfig.FrontierPollFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusFrontierPollFrequencyKey)
 	}
 
 	// App handling
