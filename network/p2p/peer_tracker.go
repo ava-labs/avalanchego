@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package p2p
 
 import (
 	"math"
@@ -45,7 +45,7 @@ type peerInfo struct {
 // Tracks the bandwidth of responses coming from peers,
 // preferring to contact peers with known good bandwidth, connecting
 // to new peers with an exponentially decaying probability.
-type peerTracker struct {
+type PeerTracker struct {
 	// Lock to protect concurrent access to the peer tracker
 	lock sync.Mutex
 	// All peers we are connected to
@@ -64,12 +64,12 @@ type peerTracker struct {
 	averageBandwidthMetric prometheus.Gauge
 }
 
-func newPeerTracker(
+func NewPeerTracker(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
-) (*peerTracker, error) {
-	t := &peerTracker{
+) (*PeerTracker, error) {
+	t := &PeerTracker{
 		peers:           make(map[ids.NodeID]*peerInfo),
 		trackedPeers:    make(set.Set[ids.NodeID]),
 		responsivePeers: make(set.Set[ids.NodeID]),
@@ -112,7 +112,7 @@ func newPeerTracker(
 // Returns true if we're not connected to enough peers.
 // Otherwise returns true probabilistically based on the number of tracked peers.
 // Assumes p.lock is held.
-func (p *peerTracker) shouldTrackNewPeer() bool {
+func (p *PeerTracker) shouldTrackNewPeer() bool {
 	numResponsivePeers := p.responsivePeers.Len()
 	if numResponsivePeers < desiredMinResponsivePeers {
 		return true
@@ -137,11 +137,12 @@ func (p *peerTracker) shouldTrackNewPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
+// TODO get rid of minVersion
 // Returns a peer that we're connected to.
 // If we should track more peers, returns a random peer with version >= [minVersion], if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer from [p.responsivePeers].
 // With probability [1-randomPeerProbability] returns the peer in [p.bandwidthHeap] with the highest bandwidth.
-func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool) {
+func (p *PeerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -187,7 +188,7 @@ func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, b
 }
 
 // Record that we sent a request to [nodeID].
-func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
+func (p *PeerTracker) TrackPeer(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -197,7 +198,7 @@ func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
 
 // Record that we observed that [nodeID]'s bandwidth is [bandwidth].
 // Adds the peer's bandwidth averager to the bandwidth heap.
-func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
+func (p *PeerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -229,7 +230,7 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 }
 
 // Connected should be called when [nodeID] connects to this node
-func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
+func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -264,7 +265,7 @@ func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Applicat
 }
 
 // Disconnected should be called when [nodeID] disconnects from this node
-func (p *peerTracker) Disconnected(nodeID ids.NodeID) {
+func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -277,7 +278,7 @@ func (p *peerTracker) Disconnected(nodeID ids.NodeID) {
 }
 
 // Returns the number of peers the node is connected to.
-func (p *peerTracker) Size() int {
+func (p *PeerTracker) Size() int {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
