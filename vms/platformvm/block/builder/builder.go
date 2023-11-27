@@ -93,17 +93,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
-	statelessBlk, err := b.buildBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	return b.blkManager.NewBlock(statelessBlk), nil
-}
-
-// Returns the block we want to build and issue. This method removes the
-// transactions in the block from the mempool.
-func (b *builder) buildBlock() (block.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
 	preferred, err := b.blkManager.GetBlock(preferredID)
@@ -138,7 +127,7 @@ func (b *builder) buildBlock() (block.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	return buildBlock(
+	statelessBlk, err := buildBlock(
 		b,
 		preferredID,
 		nextHeight,
@@ -146,6 +135,11 @@ func (b *builder) buildBlock() (block.Block, error) {
 		timeWasCapped,
 		preferredState,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 func (b *builder) Shutdown() {
