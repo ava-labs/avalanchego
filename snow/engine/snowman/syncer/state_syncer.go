@@ -618,10 +618,6 @@ func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (ss *stateSyncer) GetVM() common.VM {
-	return ss.VM
-}
-
 func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
 	if ss.stateSyncVM == nil {
 		// state sync is not implemented

@@ -33,11 +33,8 @@ github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/component
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/block/executor=Manager=vms/platformvm/block/executor/mock_manager.go
 github.com/ava-labs/avalanchego/vms/platformvm/block=Block=vms/platformvm/block/mock_block.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/mock_chain.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/mock_diff.go
+github.com/ava-labs/avalanchego/vms/platformvm/state=Chain,Diff,State,Versions=vms/platformvm/state/mock_state.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=StakerIterator=vms/platformvm/state/mock_staker_iterator.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/mock_state.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=Versions=vms/platformvm/state/mock_versions.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/builder=Builder=vms/platformvm/txs/builder/mock_builder.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mock_mempool.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/mock_verifier.go
