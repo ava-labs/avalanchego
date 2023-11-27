@@ -54,9 +54,7 @@ func New(
 		AppHandler:                  config.VM,
 
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
+		onFinished:     onFinished,
 	}
 	return b, b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer)
 }
@@ -89,6 +87,9 @@ type bootstrapper struct {
 
 	// Tracks the last requestID that was used in a request
 	requestID uint32
+
+	// Called when bootstrapping is done on a specific chain
+	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
 func (b *bootstrapper) Context() *snow.ConsensusContext {
@@ -602,7 +603,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
-	return b.OnFinished(ctx, b.requestID)
+	return b.onFinished(ctx, b.requestID)
 }
 
 // A vertex is less than another vertex if it is unknown. Ties are broken by

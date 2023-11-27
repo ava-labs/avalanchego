@@ -3,33 +3,19 @@
 
 package common
 
-import (
-	"fmt"
-	"strings"
-
-	"github.com/ava-labs/avalanchego/ids"
-)
-
-const (
-	minRequestsSize = 32
-)
-
-type req struct {
-	vdr ids.NodeID
-	id  uint32
-}
+import "github.com/ava-labs/avalanchego/ids"
 
 // Requests tracks pending container messages from a peer.
 type Requests struct {
 	reqsToID map[ids.NodeID]map[uint32]ids.ID
-	idToReq  map[ids.ID]req
+	idToReq  map[ids.ID]Request
 }
 
 // Add a request. Assumes that requestIDs are unique. Assumes that containerIDs
 // are only in one request at a time.
 func (r *Requests) Add(vdr ids.NodeID, requestID uint32, containerID ids.ID) {
 	if r.reqsToID == nil {
-		r.reqsToID = make(map[ids.NodeID]map[uint32]ids.ID, minRequestsSize)
+		r.reqsToID = make(map[ids.NodeID]map[uint32]ids.ID)
 	}
 	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
@@ -39,11 +25,11 @@ func (r *Requests) Add(vdr ids.NodeID, requestID uint32, containerID ids.ID) {
 	vdrReqs[requestID] = containerID
 
 	if r.idToReq == nil {
-		r.idToReq = make(map[ids.ID]req, minRequestsSize)
+		r.idToReq = make(map[ids.ID]Request)
 	}
-	r.idToReq[containerID] = req{
-		vdr: vdr,
-		id:  requestID,
+	r.idToReq[containerID] = Request{
+		NodeID:    vdr,
+		RequestID: requestID,
 	}
 }
 
@@ -81,7 +67,7 @@ func (r *Requests) RemoveAny(containerID ids.ID) bool {
 		return false
 	}
 
-	r.Remove(req.vdr, req.id)
+	r.Remove(req.NodeID, req.RequestID)
 	return true
 }
 
@@ -95,16 +81,4 @@ func (r *Requests) Len() int {
 func (r *Requests) Contains(containerID ids.ID) bool {
 	_, ok := r.idToReq[containerID]
 	return ok
-}
-
-func (r Requests) String() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("Requests: (Num Validators = %d)", len(r.reqsToID)))
-	for vdr, reqs := range r.reqsToID {
-		sb.WriteString(fmt.Sprintf("\n  VDR[%s]: (Outstanding Requests %d)", vdr, len(reqs)))
-		for reqID, containerID := range reqs {
-			sb.WriteString(fmt.Sprintf("\n    Request[%d]: %s", reqID, containerID))
-		}
-	}
-	return sb.String()
 }

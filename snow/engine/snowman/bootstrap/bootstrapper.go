@@ -95,6 +95,9 @@ type Bootstrapper struct {
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.
 	bootstrappedOnce sync.Once
+
+	// Called when bootstrapping is done on a specific chain
+	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
@@ -113,10 +116,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
 		executedStateTransitions: math.MaxInt32,
+		onFinished:               onFinished,
 	}
 
 	config.Bootstrapable = b
@@ -305,7 +306,7 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 		return b.Restart(ctx)
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.onFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
 func (*Bootstrapper) Gossip(context.Context) error {
@@ -630,5 +631,5 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.onFinished(ctx, b.Config.SharedCfg.RequestID)
 }
