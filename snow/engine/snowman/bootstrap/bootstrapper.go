@@ -345,10 +345,6 @@ func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *Bootstrapper) GetVM() common.VM {
-	return b.VM
-}
-
 func (b *Bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
