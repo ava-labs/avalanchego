@@ -30,6 +30,10 @@ const (
 	stripeWidth    = 5
 	cacheSize      = 100000
 
+	// statusUpdateFrequency is how many containers should be processed between
+	// logs
+	statusUpdateFrequency = 5000
+
 	// maxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
 	// sent but not yet responded to/failed
 	maxOutstandingGetAncestorsRequests = 10
@@ -333,7 +337,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to get linearization status: %w", err)
 	}
 	if linearized {
-		return b.ForceAccepted(ctx, nil)
+		return b.startSyncing(ctx, nil)
 	}
 
 	// If a stop vertex is well known, accept that.
@@ -342,7 +346,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 			zap.Stringer("vtxID", b.Config.StopVertexID),
 		)
 
-		return b.ForceAccepted(ctx, []ids.ID{b.Config.StopVertexID})
+		return b.startSyncing(ctx, []ids.ID{b.Config.StopVertexID})
 	}
 
 	// If a stop vertex isn't well known, treat the current state as the final
@@ -364,7 +368,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		zap.Stringer("vtxID", stopVertexID),
 	)
 
-	return b.ForceAccepted(ctx, nil)
+	return b.startSyncing(ctx, nil)
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -490,7 +494,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 			b.numFetchedVts.Inc()
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
-			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			if verticesFetchedSoFar%statusUpdateFrequency == 0 { // Periodically print progress
 				b.Ctx.Log.Info("fetched vertices",
 					zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
 				)
@@ -536,8 +540,8 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	return b.fetch(ctx)
 }
 
-// ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+// startSyncing starts bootstrapping. Process the vertices in [accepterContainerIDs].
+func (b *bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
