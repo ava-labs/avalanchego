@@ -193,7 +193,7 @@ func (vm *VM) BackfillBlocks(ctx context.Context, blksBytes [][]byte) (ids.ID, u
 	// 2. Validate blocks, checking that they are continguous
 	blkHeights := maps.Keys(blks)
 	sort.Slice(blkHeights, func(i, j int) bool {
-		return blkHeights[i] < blkHeights[j] // sort in ascending order by heights
+		return blkHeights[i] < blkHeights[j]
 	})
 
 	var (
