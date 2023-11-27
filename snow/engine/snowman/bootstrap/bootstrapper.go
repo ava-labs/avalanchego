@@ -140,10 +140,6 @@ func (b *Bootstrapper) Context() *snow.ConsensusContext {
 	return b.Ctx
 }
 
-func (b *Bootstrapper) GetVM() common.VM {
-	return b.VM
-}
-
 func (b *Bootstrapper) Clear(context.Context) error {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
