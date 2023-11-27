@@ -1319,21 +1319,13 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		var txsStaker txs.Staker
-		var txsValidator txs.Validator
-		switch tx := vdrTx.Unsigned.(type) {
-		case *txs.AddPermissionlessValidatorTx:
-			txsStaker = tx
-			txsValidator = tx.Validator
-		case *txs.AddValidatorTx:
-			txsStaker = tx
-			txsValidator = tx.Validator
-		default:
-			return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", tx)
+		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
+		if !ok {
+			return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
-		stakeAmount := txsValidator.Wght
-		stakeDuration := txsValidator.Duration()
+		stakeAmount := validatorTx.Weight()
+		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime())
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
