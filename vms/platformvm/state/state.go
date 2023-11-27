@@ -1321,7 +1321,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 	for _, vdrTx := range genesis.Validators {
 		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddPermissionlessValidatorTx or *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := validatorTx.Weight()
@@ -1341,7 +1341,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), txsStaker, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, potentialReward)
 		if err != nil {
 			return err
 		}
