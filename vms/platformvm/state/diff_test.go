@@ -578,3 +578,111 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.NoError(err)
 	require.Equal(owner2, owner)
 }
+
+func TestDiffStacking(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
+		owner3 = fx.NewMockOwner(ctrl)
+
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
+
+		subnetID = createSubnetTx.ID()
+	)
+
+	// Create subnet on base state
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Create first diff and verify that subnet owner returns correctly
+	statesDiff, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Transferring subnet ownership on first diff should be reflected on first diff not state
+	statesDiff.SetSubnetOwner(subnetID, owner2)
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Create a second diff on first diff and verify that subnet owner returns correctly
+	stackedDiff, err := wrapState(statesDiff)
+	require.NoError(err)
+	owner, err = stackedDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	// Transfer ownership on stacked diff and verify it is only reflected on stacked diff
+	stackedDiff.SetSubnetOwner(subnetID, owner3)
+	owner, err = stackedDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Applying both diffs successively should work as expected.
+	require.NoError(stackedDiff.Apply(statesDiff))
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	require.NoError(statesDiff.Apply(state))
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+}
+
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func wrapState(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
+}

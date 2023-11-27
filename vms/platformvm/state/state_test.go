@@ -165,9 +165,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	state, err := newState(
 		db,
 		metrics.Noop,
-		&config.Config{
-			Validators: validators.NewManager(),
-		},
+		validators.NewManager(),
 		execCfg,
 		&snow.Context{},
 		prometheus.NewRegistry(),
