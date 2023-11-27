@@ -6,12 +6,8 @@ package common
 import "context"
 
 type BootstrapableEngine interface {
-	Bootstrapable
 	Engine
-}
 
-// Bootstrapable defines the functionality required to support bootstrapping
-type Bootstrapable interface {
 	// Clear removes all containers to be processed upon bootstrapping
 	Clear(ctx context.Context) error
 }

@@ -24,7 +24,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// MaxOutstandingBroadcastRequests is the maximum number of requests to have
+// maxOutstandingBroadcastRequests is the maximum number of requests to have
 // outstanding when broadcasting.
 const maxOutstandingBroadcastRequests = 50
 
