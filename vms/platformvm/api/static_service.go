@@ -316,35 +316,31 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			delegationFee = uint32(*vdr.ExactDelegationFee)
 		}
 
-		var tx *txs.Tx
+		var (
+			baseTx = txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}}
+			validator = txs.Validator{
+				NodeID: vdr.NodeID,
+				Start:  uint64(args.Time),
+				End:    uint64(vdr.EndTime),
+				Wght:   weight,
+			}
+			tx *txs.Tx
+		)
 		if vdr.Signer == nil {
 			tx = &txs.Tx{Unsigned: &txs.AddValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				Validator: txs.Validator{
-					NodeID: vdr.NodeID,
-					Start:  uint64(args.Time),
-					End:    uint64(vdr.EndTime),
-					Wght:   weight,
-				},
+				BaseTx:           baseTx,
+				Validator:        validator,
 				StakeOuts:        stake,
 				RewardsOwner:     owner,
 				DelegationShares: delegationFee,
 			}}
 		} else {
 			tx = &txs.Tx{Unsigned: &txs.AddPermissionlessValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				Validator: txs.Validator{
-					NodeID: vdr.NodeID,
-					Start:  uint64(args.Time),
-					End:    uint64(vdr.EndTime),
-					Wght:   weight,
-				},
+				BaseTx:                baseTx,
+				Validator:             validator,
 				Signer:                vdr.Signer,
 				StakeOuts:             stake,
 				ValidatorRewardsOwner: owner,
