@@ -80,8 +80,20 @@ func NewDiff(
 	}, nil
 }
 
-func (*diff) NewView([]database.BatchOp) (merkledb.TrieView, error) {
-	return nil, errors.New("TODO")
+func (d *diff) NewView(ops []database.BatchOp) (merkledb.TrieView, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	diffOps, err := d.GetMerkleChanges()
+	if err != nil {
+		return nil, err
+	}
+
+	ops = append(diffOps, ops...)
+
+	return parentState.NewView(ops)
 }
 
 func (d *diff) GetTimestamp() time.Time {
