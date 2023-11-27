@@ -100,8 +100,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		b.ResetBlockTimer()
 	}()
 
-	ctx := b.txExecutorBackend.Ctx
-	ctx.Log.Debug("starting to attempt to build a block")
+	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	statelessBlk, err := b.buildBlock()
 	if err != nil {
@@ -319,7 +318,12 @@ func buildBlock(
 		}
 
 		txDiff.AddTx(tx, status.Committed)
-		txDiff.Apply(stateDiff)
+		err = txDiff.Apply(stateDiff)
+		if err != nil {
+			txID := tx.ID()
+			builder.Mempool.MarkDropped(txID, err)
+			continue
+		}
 
 		remainingSize -= len(tx.Bytes())
 		blockTxs = append(blockTxs, tx)
