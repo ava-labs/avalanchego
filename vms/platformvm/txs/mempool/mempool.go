@@ -247,7 +247,7 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && !m.HasTxs() {
+	if !emptyBlockPermitted && m.unissuedTxs.Len() != 0 {
 		return
 	}
 
