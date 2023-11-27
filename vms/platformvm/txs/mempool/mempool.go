@@ -192,6 +192,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	m.unissuedTxs.Put(tx.ID(), tx)
+	m.numTxs.Inc()
 	m.bytesAvailable -= txSize
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
@@ -220,11 +221,10 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 		if !m.unissuedTxs.Delete(txID) {
 			continue
 		}
+		m.numTxs.Dec()
 
 		m.bytesAvailable += len(tx.Bytes())
 		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-		m.numTxs.Dec()
 
 		inputs := tx.Unsigned.InputIDs()
 		m.consumedUTXOs.Difference(inputs)
