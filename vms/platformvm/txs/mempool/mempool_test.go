@@ -5,7 +5,6 @@ package mempool
 
 import (
 	"errors"
-	"math"
 	"testing"
 	"time"
 
@@ -66,9 +65,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	decisionTxs, err := createTestDecisionTxs(2)
 	require.NoError(err)
 
-	// txs must not already there before we start
-	require.False(mpool.HasTxs())
-
 	for _, tx := range decisionTxs {
 		// tx not already there
 		require.False(mpool.Has(tx.ID()))
@@ -82,20 +78,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		// we can peek it
-		peeked := mpool.PeekTxs(math.MaxInt)
-
-		// tx will be among those peeked,
-		// in NO PARTICULAR ORDER
-		found := false
-		for _, pk := range peeked {
-			if pk.ID() == tx.ID() {
-				found = true
-				break
-			}
-		}
-		require.True(found)
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
@@ -121,7 +103,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
-	for i, tx := range proposalTxs {
+	for _, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
@@ -133,23 +115,6 @@ func TestProposalTxsInMempool(t *testing.T) {
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		{
-			// we can peek it
-			peeked := mpool.PeekTxs(math.MaxInt)
-			require.Len(peeked, i+1)
-
-			// tx will be among those peeked,
-			// in NO PARTICULAR ORDER
-			found := false
-			for _, pk := range peeked {
-				if pk.ID() == tx.ID() {
-					found = true
-					break
-				}
-			}
-			require.True(found)
-		}
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
