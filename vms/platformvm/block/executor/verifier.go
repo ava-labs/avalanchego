@@ -20,12 +20,13 @@ import (
 var (
 	_ block.Visitor = (*verifier)(nil)
 
+	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
+
 	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
 	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
-	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
@@ -418,7 +419,7 @@ func (v *verifier) standardBlock(
 		}
 		// ensure it doesn't overlap with current input batch
 		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
+			return ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		blkState.inputs.Union(txExecutor.Inputs)

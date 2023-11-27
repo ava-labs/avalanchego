@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -266,16 +267,8 @@ func buildBlock(
 		)
 	}
 
-	// Clean out the mempool's transactions with invalid timestamps.
-	droppedStakerTxIDs := builder.Mempool.DropExpiredStakerTxs(timestamp.Add(txexecutor.SyncBound))
-	for _, txID := range droppedStakerTxIDs {
-		builder.txExecutorBackend.Ctx.Log.Debug("dropping tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
-
-	stateDiff, err := state.NewDiff(builder.blkManager.Preferred(), builder.blkManager)
+	preferredID := builder.blkManager.Preferred()
+	stateDiff, err := state.NewDiff(preferredID, builder.blkManager)
 	if err != nil {
 		return nil, err
 	}
@@ -289,6 +282,7 @@ func buildBlock(
 
 	var (
 		blockTxs      []*txs.Tx
+		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 	)
 	for {
@@ -298,19 +292,29 @@ func buildBlock(
 		}
 		builder.Mempool.Remove([]*txs.Tx{tx})
 
+		// Invariant: [tx] has already been syntactically verified.
+
 		txDiff, err := wrapState(stateDiff)
 		if err != nil {
 			return nil, err
 		}
 
-		err = tx.Unsigned.Visit(&txexecutor.StandardTxExecutor{
+		executor := &txexecutor.StandardTxExecutor{
 			Backend: builder.txExecutorBackend,
 			State:   txDiff,
 			Tx:      tx,
-		})
+		}
+
+		err = tx.Unsigned.Visit(executor)
 		if err != nil {
 			txID := tx.ID()
 			builder.Mempool.MarkDropped(txID, err)
+			continue
+		}
+
+		if inputs.Overlaps(executor.Inputs) {
+			txID := tx.ID()
+			builder.Mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
 
@@ -322,7 +326,6 @@ func buildBlock(
 	}
 
 	if len(blockTxs) == 0 && !forceAdvanceTime {
-		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
 

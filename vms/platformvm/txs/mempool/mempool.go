@@ -6,7 +6,6 @@ package mempool
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -63,12 +62,6 @@ type Mempool interface {
 
 	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
 	Peek(maxTxSize int) *txs.Tx
-
-	// Drops all [txs.Staker] transactions whose [StartTime] is before
-	// [minStartTime] from [mempool]. The dropped tx ids are returned.
-	//
-	// TODO: Remove once [StartTime] field is ignored in staker txs
-	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
 
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
 	// unissued decision/staker txs. This allows previously dropped txs to be
@@ -245,39 +238,4 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
-}
-
-// Drops all [txs.Staker] transactions whose [StartTime] is before
-// [minStartTime] from [mempool]. The dropped tx ids are returned.
-//
-// TODO: Remove once [StartTime] field is ignored in staker txs
-func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
-	var droppedTxIDs []ids.ID
-
-	txIter := m.unissuedTxs.NewIterator()
-	for txIter.Next() {
-		tx := txIter.Value()
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
-		if !ok {
-			continue
-		}
-
-		startTime := stakerTx.StartTime()
-		if !startTime.Before(minStartTime) {
-			continue
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		m.Remove([]*txs.Tx{tx})
-		m.MarkDropped(txID, err) // cache tx as dropped
-		droppedTxIDs = append(droppedTxIDs, txID)
-	}
-
-	return droppedTxIDs
 }
