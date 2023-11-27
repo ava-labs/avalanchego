@@ -610,26 +610,64 @@ func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
 	}
 
 	// writePendingStakers
-	// for stakerTxID, data := range pendingData {
-	// 	key := merklePendingStakersKey(stakerTxID)
+	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
+		for _, validatorDiff := range subnetValidatorDiffs {
+			// validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+			switch validatorDiff.validatorStatus {
+			case added:
+				txID := validatorDiff.validator.TxID
+				tx, _, err := d.GetTx(txID)
+				if err != nil {
+					return nil, err
+				}
+				dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: 0,
+				})
+				if err != nil {
+					return nil, err
+				}
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   merklePendingStakersKey(txID),
+					Value: dataBytes,
+				})
+			case deleted:
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    merklePendingStakersKey(validatorDiff.validator.TxID),
+					Delete: true,
+				})
+			}
 
-	// 	if data.TxBytes == nil {
-	// 		batchOps = append(batchOps, database.BatchOp{
-	// 			Key:    key,
-	// 			Delete: true,
-	// 		})
-	// 		continue
-	// 	}
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				tx, _, err := d.GetTx(staker.TxID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading pending delegator tx, %w", err)
+				}
+				dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: 0,
+				})
+				if err != nil {
+					return nil, err
+				}
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   merklePendingStakersKey(staker.TxID),
+					Value: dataBytes,
+				})
+			}
 
-	// 	dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
-	// 	}
-	// 	batchOps = append(batchOps, database.BatchOp{
-	// 		Key:   key,
-	// 		Value: dataBytes,
-	// 	})
-	// }
+			for _, staker := range validatorDiff.deletedDelegators {
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    merklePendingStakersKey(staker.TxID),
+					Delete: true,
+				})
+			}
+		}
+	}
 
 	// writeDelegateeRewards
 	for subnetID, nodes := range d.modifiedDelegateeRewards {
