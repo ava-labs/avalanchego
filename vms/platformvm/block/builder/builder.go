@@ -40,13 +40,11 @@ var (
 type Builder interface {
 	mempool.Mempool
 
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
+	// ResetBlockTimer schedules a timer to notify the consensus engine once a
+	// block needs to be built to process a staker change.
 	ResetBlockTimer()
 
-	// BuildBlock is called on timer clock to attempt to create
-	// next block
+	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
 	// Shutdown cleanly shuts Builder down
@@ -65,6 +63,8 @@ type builder struct {
 	// the validator set. When it goes off ResetTimer() is called, potentially
 	// triggering creation of a new block.
 	timer *timer.Timer
+
+	nextStakerChangeTime time.Time
 }
 
 func New(
@@ -90,6 +90,8 @@ func New(
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
+	defer b.Mempool.RequestBuildBlock(false)
+
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
@@ -106,8 +108,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-// Returns the block we want to build and issue.
-// Only modifies state to remove expired proposal txs.
+// Returns the block we want to build and issue. This method removes the
+// transactions in the block from the mempool.
 func (b *builder) buildBlock() (block.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
@@ -183,10 +185,9 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	if _, err := b.buildBlock(); err == nil {
-		// We can build a block now
+	if !b.nextStakerChangeTime.After(b.txExecutorBackend.Clk.Time()) {
+		// Block needs to be issued to advance time.
 		b.Mempool.RequestBuildBlock(true)
-		return
 	}
 
 	// Wake up when it's time to add/remove the next validator/delegator
@@ -219,6 +220,7 @@ func (b *builder) setNextBuildBlockTime() {
 	)
 
 	// Wake up when it's time to add/remove the next validator
+	b.nextStakerChangeTime = nextStakerChangeTime
 	b.timer.SetTimeoutIn(waitTime)
 }
 
