@@ -31,3 +31,6 @@ tokio = { version = "1.28.1", features = ["tokio-macros", "rt", "macros"] }
 name = "growthring"
 path = "src/lib.rs"
 crate-type = ["dylib", "rlib", "staticlib"]
+
+[lints.clippy]
+missing_const_for_fn = "warn"

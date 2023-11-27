@@ -86,7 +86,7 @@ fn sort_fids(file_nbit: u64, mut fids: Vec<u64>) -> Vec<(u8, u64)> {
     }
 }
 
-fn counter_lt(a: u32, b: u32) -> bool {
+const fn counter_lt(a: u32, b: u32) -> bool {
     if u32::abs_diff(a, b) > u32::MAX / 2 {
         b < a
     } else {
@@ -125,10 +125,10 @@ impl WalRingId {
             counter: 0,
         }
     }
-    pub fn get_start(&self) -> WalPos {
+    pub const fn get_start(&self) -> WalPos {
         self.start
     }
-    pub fn get_end(&self) -> WalPos {
+    pub const fn get_end(&self) -> WalPos {
         self.end
     }
 }
