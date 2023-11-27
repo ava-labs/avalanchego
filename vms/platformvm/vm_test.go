@@ -1482,23 +1482,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	commonCfg := common.Config{
+	bootstrapConfig := bootstrap.Config{
+		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	bootstrapConfig := bootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
+		Blocked:                        blocked,
+		VM:                             vm,
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
