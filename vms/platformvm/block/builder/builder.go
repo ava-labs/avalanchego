@@ -92,12 +92,6 @@ func New(
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	defer b.Mempool.RequestBuildBlock(false)
 
-	b.Mempool.DisableAdding()
-	defer func() {
-		b.Mempool.EnableAdding()
-		b.ResetBlockTimer()
-	}()
-
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	statelessBlk, err := b.buildBlock()
