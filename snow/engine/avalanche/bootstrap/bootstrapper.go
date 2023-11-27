@@ -379,10 +379,6 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *bootstrapper) GetVM() common.VM {
-	return b.VM
-}
-
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more
 // to fetch or we are at the maximum number of outstanding requests.
