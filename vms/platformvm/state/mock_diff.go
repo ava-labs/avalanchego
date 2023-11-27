@@ -115,7 +115,7 @@ func (mr *MockDiffMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // Apply mocks base method.
-func (m *MockDiff) Apply(arg0 State) error {
+func (m *MockDiff) Apply(arg0 Chain) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Apply", arg0)
 	ret0, _ := ret[0].(error)
