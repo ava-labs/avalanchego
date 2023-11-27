@@ -179,7 +179,8 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	if !b.nextStakerChangeTime.After(b.txExecutorBackend.Clk.Time()) {
+	now := b.txExecutorBackend.Clk.Time()
+	if !b.nextStakerChangeTime.After(now) {
 		// Block needs to be issued to advance time.
 		b.Mempool.RequestBuildBlock(true)
 	}
@@ -206,7 +207,6 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	now := b.txExecutorBackend.Clk.Time()
 	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),
