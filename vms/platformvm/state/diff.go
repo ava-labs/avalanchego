@@ -611,59 +611,60 @@ func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
 
 	// writePendingStakers
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
+		toDeleteTxIDs := make([]ids.ID, 0, initialTxSliceSize)
+		toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
+
 		for _, validatorDiff := range subnetValidatorDiffs {
 			// validatorDiff.validator is not guaranteed to be non-nil here.
 			// Access it only if validatorDiff.validatorStatus is added or deleted
 			switch validatorDiff.validatorStatus {
 			case added:
-				txID := validatorDiff.validator.TxID
-				tx, _, err := d.GetTx(txID)
-				if err != nil {
-					return nil, err
-				}
-				dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
-					TxBytes:         tx.Bytes(),
-					PotentialReward: 0,
-				})
-				if err != nil {
-					return nil, err
-				}
-				batchOps = append(batchOps, database.BatchOp{
-					Key:   merklePendingStakersKey(txID),
-					Value: dataBytes,
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   validatorDiff.validator.TxID,
+					reward: 0,
 				})
 			case deleted:
-				batchOps = append(batchOps, database.BatchOp{
-					Key:    merklePendingStakersKey(validatorDiff.validator.TxID),
-					Delete: true,
-				})
+				toDeleteTxIDs = append(toDeleteTxIDs, validatorDiff.validator.TxID)
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
-				tx, _, err := d.GetTx(staker.TxID)
-				if err != nil {
-					return nil, fmt.Errorf("failed loading pending delegator tx, %w", err)
-				}
-				dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
-					TxBytes:         tx.Bytes(),
-					PotentialReward: 0,
-				})
-				if err != nil {
-					return nil, err
-				}
-				batchOps = append(batchOps, database.BatchOp{
-					Key:   merklePendingStakersKey(staker.TxID),
-					Value: dataBytes,
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   staker.TxID,
+					reward: 0,
 				})
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
+				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
+			}
+
+			for _, txID := range toDeleteTxIDs {
 				batchOps = append(batchOps, database.BatchOp{
-					Key:    merklePendingStakersKey(staker.TxID),
+					Key:    merklePendingStakersKey(txID),
 					Delete: true,
+				})
+			}
+
+			for _, txIDAndReward := range toAddTxIDAndRewards {
+				tx, _, err := d.GetTx(txIDAndReward.txID)
+				if err != nil {
+					return nil, err
+				}
+
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: txIDAndReward.reward,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   merklePendingStakersKey(txIDAndReward.txID),
+					Value: stakersDataBytes,
 				})
 			}
 		}
