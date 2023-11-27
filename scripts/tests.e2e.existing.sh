@@ -3,9 +3,9 @@
 set -euo pipefail
 
 ################################################################
-# This script deploys an ephemeral network and configures
+# This script deploys a temporary network and configures
 # tests.e2e.sh to execute the e2e suite against it. This
-# validates that ephnetctl is capable of starting a network and
+# validates that tmpnetctl is capable of starting a network and
 # that the e2e suite is capable of executing against a network
 # that it did not create.
 ################################################################
@@ -32,22 +32,22 @@ function print_separator {
 # Ensure network cleanup on teardown
 function cleanup {
   print_separator
-  echo "cleaning up ephemeral network"
-  if [[ -n "${EPHNET_NETWORK_DIR:-}" ]]; then
-    ./build/ephnetctl stop-network
+  echo "cleaning up temporary network"
+  if [[ -n "${TMPNET_NETWORK_DIR:-}" ]]; then
+    ./build/tmpnetctl stop-network
   fi
 }
 trap cleanup EXIT
 
-# Start an ephemeral network
-./scripts/build_ephnetctl.sh
+# Start a temporary network
+./scripts/build_tmpnetctl.sh
 print_separator
-./build/ephnetctl start-network
+./build/tmpnetctl start-network
 
 # Determine the network configuration path from the latest symlink
-LATEST_SYMLINK_PATH="${HOME}/.ephnet/networks/latest"
+LATEST_SYMLINK_PATH="${HOME}/.tmpnet/networks/latest"
 if [[ -h "${LATEST_SYMLINK_PATH}" ]]; then
-  export EPHNET_NETWORK_DIR="$(realpath ${LATEST_SYMLINK_PATH})"
+  export TMPNET_NETWORK_DIR="$(realpath ${LATEST_SYMLINK_PATH})"
 else
   echo "failed to find configuration path: ${LATEST_SYMLINK_PATH} symlink not found"
   exit 255
@@ -55,7 +55,7 @@ fi
 
 print_separator
 # - Setting E2E_USE_EXISTING_NETWORK configures tests.e2e.sh to use
-#   the ephemeral network identified by EPHNET_NETWORK_DIR.
+#   the temporary network identified by TMPNET_NETWORK_DIR.
 # - Only a single test (selected with --ginkgo.focus-file) is required
 #   to validate that an existing network can be used by an e2e test
 #   suite run. Executing more tests would be duplicative of the testing

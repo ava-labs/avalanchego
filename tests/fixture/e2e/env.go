@@ -16,8 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
-	"github.com/ava-labs/avalanchego/tests/fixture/ephnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/ephnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -40,7 +40,7 @@ type TestEnvironment struct {
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
-	URIs []ephnet.NodeURI
+	URIs []tmpnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
 
@@ -89,7 +89,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 
 // Retrieve a random URI to naively attempt to spread API load across
 // nodes.
-func (te *TestEnvironment) GetRandomNodeURI() ephnet.NodeURI {
+func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
 	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
@@ -97,7 +97,7 @@ func (te *TestEnvironment) GetRandomNodeURI() ephnet.NodeURI {
 }
 
 // Retrieve the network to target for testing.
-func (te *TestEnvironment) GetNetwork() ephnet.Network {
+func (te *TestEnvironment) GetNetwork() tmpnet.Network {
 	network, err := local.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
 	return network
@@ -123,7 +123,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork() ephnet.Network {
+func (te *TestEnvironment) NewPrivateNetwork() tmpnet.Network {
 	// Load the shared network to retrieve its path and exec path
 	sharedNetwork, err := local.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)

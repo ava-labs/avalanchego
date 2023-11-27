@@ -31,9 +31,9 @@ jobs:
       - name: Run e2e tests with existing network
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
-      - name: Upload ephnet network dir
+      - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: ephnet-data
-          path: ~/.ephnet/networks/1000
+          name: tmpnet-data
+          path: ~/.tmpnet/networks/1000

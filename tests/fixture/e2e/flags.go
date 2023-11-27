@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/ephnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
 )
 
 type FlagVars struct {
