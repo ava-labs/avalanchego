@@ -25,8 +25,8 @@ import (
 
 // If [ms] isn't initialized, initializes it with [genesis].
 // Then loads [ms] from disk.
-func (ms *merkleState) sync(genesis []byte) error {
-	shouldInit, err := ms.shouldInit()
+func (s *state) sync(genesis []byte) error {
+	shouldInit, err := s.shouldInit()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
@@ -37,7 +37,7 @@ func (ms *merkleState) sync(genesis []byte) error {
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := ms.init(genesis); err != nil {
+		if err := s.init(genesis); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
@@ -45,20 +45,20 @@ func (ms *merkleState) sync(genesis []byte) error {
 		}
 	}
 
-	return ms.load()
+	return s.load()
 }
 
-func (ms *merkleState) shouldInit() (bool, error) {
-	has, err := ms.singletonDB.Has(initializedKey)
+func (s *state) shouldInit() (bool, error) {
+	has, err := s.singletonDB.Has(initializedKey)
 	return !has, err
 }
 
-func (ms *merkleState) doneInit() error {
-	return ms.singletonDB.Put(initializedKey, nil)
+func (s *state) doneInit() error {
+	return s.singletonDB.Put(initializedKey, nil)
 }
 
 // Creates a genesis from [genesisBytes] and initializes [ms] with it.
-func (ms *merkleState) init(genesisBytes []byte) error {
+func (s *state) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
@@ -72,28 +72,28 @@ func (ms *merkleState) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := ms.syncGenesis(genesisBlock, genesisState); err != nil {
+	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
 		return err
 	}
 
-	if err := ms.doneInit(); err != nil {
+	if err := s.doneInit(); err != nil {
 		return err
 	}
 
-	return ms.Commit()
+	return s.Commit()
 }
 
 // Loads the state from [genesisBls] and [genesis] into [ms].
-func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
-	ms.SetLastAccepted(genesisBlk.ID())
-	ms.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
-	ms.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
-	ms.AddStatelessBlock(genesisBlk)
+func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
+	s.SetLastAccepted(genesisBlk.ID())
+	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
+	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
+	s.AddStatelessBlock(genesisBlk)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
 		avaxUTXO := utxo.UTXO
-		ms.AddUTXO(&avaxUTXO)
+		s.AddUTXO(&avaxUTXO)
 	}
 
 	// Persist primary network validator set at genesis
@@ -105,12 +105,12 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 
 		stakeAmount := tx.Validator.Wght
 		stakeDuration := tx.Validator.Duration()
-		currentSupply, err := ms.GetCurrentSupply(constants.PrimaryNetworkID)
+		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}
 
-		potentialReward := ms.rewards.Calculate(
+		potentialReward := s.rewards.Calculate(
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
@@ -125,9 +125,9 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 			return err
 		}
 
-		ms.PutCurrentValidator(staker)
-		ms.AddTx(vdrTx, status.Committed)
-		ms.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+		s.PutCurrentValidator(staker)
+		s.AddTx(vdrTx, status.Committed)
+		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}
 
 	for _, chain := range genesis.Chains {
@@ -138,37 +138,37 @@ func (ms *merkleState) syncGenesis(genesisBlk block.Block, genesis *genesis.Gene
 
 		// Ensure all chains that the genesis bytes say to create have the right
 		// network ID
-		if unsignedChain.NetworkID != ms.ctx.NetworkID {
+		if unsignedChain.NetworkID != s.ctx.NetworkID {
 			return avax.ErrWrongNetworkID
 		}
 
-		ms.AddChain(chain)
-		ms.AddTx(chain, status.Committed)
+		s.AddChain(chain)
+		s.AddTx(chain, status.Committed)
 	}
 
 	// updateValidators is set to false here to maintain the invariant that the
 	// primary network's validator set is empty before the validator sets are
 	// initialized.
-	return ms.write(false /*=updateValidators*/, 0)
+	return s.write(false /*=updateValidators*/, 0)
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
-func (ms *merkleState) load() error {
+func (s *state) load() error {
 	err := utils.Err(
-		ms.loadMerkleMetadata(),
-		ms.loadCurrentStakers(),
-		ms.loadPendingStakers(),
-		ms.initValidatorSets(),
+		s.loadMerkleMetadata(),
+		s.loadCurrentStakers(),
+		s.loadPendingStakers(),
+		s.initValidatorSets(),
 	)
-	ms.logMerkleRoot() // we already logged if sync has happened
+	s.logMerkleRoot() // we already logged if sync has happened
 	return err
 }
 
 // Loads the chain time and last accepted block ID from disk
 // and populates them in [ms].
-func (ms *merkleState) loadMerkleMetadata() error {
+func (s *state) loadMerkleMetadata() error {
 	// load chain time
-	chainTimeBytes, err := ms.merkleDB.Get(merkleChainTimeKey)
+	chainTimeBytes, err := s.merkleDB.Get(merkleChainTimeKey)
 	if err != nil {
 		return err
 	}
@@ -176,18 +176,18 @@ func (ms *merkleState) loadMerkleMetadata() error {
 	if err := chainTime.UnmarshalBinary(chainTimeBytes); err != nil {
 		return err
 	}
-	ms.latestComittedChainTime = chainTime
-	ms.SetTimestamp(chainTime)
+	s.latestComittedChainTime = chainTime
+	s.SetTimestamp(chainTime)
 
 	// load last accepted block
-	blkIDBytes, err := ms.merkleDB.Get(merkleLastAcceptedBlkIDKey)
+	blkIDBytes, err := s.merkleDB.Get(merkleLastAcceptedBlkIDKey)
 	if err != nil {
 		return err
 	}
 	lastAcceptedBlkID := ids.Empty
 	copy(lastAcceptedBlkID[:], blkIDBytes)
-	ms.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
-	ms.SetLastAccepted(lastAcceptedBlkID)
+	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
+	s.SetLastAccepted(lastAcceptedBlkID)
 
 	// We don't need to load supplies. Unlike chain time and last block ID,
 	// which have the persisted* attribute, we signify that a supply hasn't
@@ -196,14 +196,14 @@ func (ms *merkleState) loadMerkleMetadata() error {
 }
 
 // Loads current stakes from disk and populates them in [ms].
-func (ms *merkleState) loadCurrentStakers() error {
+func (s *state) loadCurrentStakers() error {
 	// TODO ABENEGIA: Check missing metadata
-	ms.currentStakers = newBaseStakers()
+	s.currentStakers = newBaseStakers()
 
 	prefix := make([]byte, len(currentStakersSectionPrefix))
 	copy(prefix, currentStakersSectionPrefix)
 
-	iter := ms.merkleDB.NewIteratorWithPrefix(prefix)
+	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer iter.Release()
 	for iter.Next() {
 		data := &stakersData{}
@@ -226,29 +226,29 @@ func (ms *merkleState) loadCurrentStakers() error {
 		}
 		if staker.Priority.IsValidator() {
 			// TODO: why not PutValidator/PutDelegator??
-			validator := ms.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			validator.validator = staker
-			ms.currentStakers.stakers.ReplaceOrInsert(staker)
+			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		} else {
-			validator := ms.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
 				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
 			validator.delegators.ReplaceOrInsert(staker)
-			ms.currentStakers.stakers.ReplaceOrInsert(staker)
+			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
 	}
 	return iter.Error()
 }
 
-func (ms *merkleState) loadPendingStakers() error {
+func (s *state) loadPendingStakers() error {
 	// TODO ABENEGIA: Check missing metadata
-	ms.pendingStakers = newBaseStakers()
+	s.pendingStakers = newBaseStakers()
 
 	prefix := make([]byte, len(pendingStakersSectionPrefix))
 	copy(prefix, pendingStakersSectionPrefix)
 
-	iter := ms.merkleDB.NewIteratorWithPrefix(prefix)
+	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer iter.Release()
 	for iter.Next() {
 		data := &stakersData{}
@@ -270,16 +270,16 @@ func (ms *merkleState) loadPendingStakers() error {
 			return err
 		}
 		if staker.Priority.IsValidator() {
-			validator := ms.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			validator.validator = staker
-			ms.pendingStakers.stakers.ReplaceOrInsert(staker)
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		} else {
-			validator := ms.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
 				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
 			validator.delegators.ReplaceOrInsert(staker)
-			ms.pendingStakers.stakers.ReplaceOrInsert(staker)
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
 	}
 	return iter.Error()
@@ -287,23 +287,23 @@ func (ms *merkleState) loadPendingStakers() error {
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
-func (ms *merkleState) initValidatorSets() error {
-	for subnetID, validators := range ms.currentStakers.validators {
-		if ms.validators.Count(subnetID) != 0 {
+func (s *state) initValidatorSets() error {
+	for subnetID, validators := range s.currentStakers.validators {
+		if s.validators.Count(subnetID) != 0 {
 			// Enforce the invariant that the validator set is empty here.
 			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
 		}
 
 		for nodeID, validator := range validators {
 			validatorStaker := validator.validator
-			if err := ms.validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
+			if err := s.validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
 				return err
 			}
 
 			delegatorIterator := NewTreeIterator(validator.delegators)
 			for delegatorIterator.Next() {
 				delegatorStaker := delegatorIterator.Value()
-				if err := ms.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
+				if err := s.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
 					delegatorIterator.Release()
 					return err
 				}
@@ -312,11 +312,11 @@ func (ms *merkleState) initValidatorSets() error {
 		}
 	}
 
-	ms.metrics.SetLocalStake(ms.validators.GetWeight(constants.PrimaryNetworkID, ms.ctx.NodeID))
-	totalWeight, err := ms.validators.TotalWeight(constants.PrimaryNetworkID)
+	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}
-	ms.metrics.SetTotalStake(totalWeight)
+	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }

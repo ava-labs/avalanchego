@@ -87,9 +87,6 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
-
-	// TODO: Remove after v1.11.x is activated
-	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -135,7 +132,7 @@ func (vm *VM) Initialize(
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
-	vm.state, err = state.NewMerkleState(
+	vm.state, err = state.New(
 		vm.db,
 		genesisBytes,
 		registerer,
@@ -218,35 +215,7 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("initializing last accepted",
 		zap.Stringer("blkID", lastAcceptedID),
 	)
-	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
-		return err
-	}
-
-	shouldPrune, err := vm.state.ShouldPrune()
-	if err != nil {
-		return fmt.Errorf(
-			"failed to check if the database should be pruned: %w",
-			err,
-		)
-	}
-	if !shouldPrune {
-		chainCtx.Log.Info("state already pruned and indexed")
-		vm.pruned.Set(true)
-		return nil
-	}
-
-	go func() {
-		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Error("state pruning and height indexing failed",
-				zap.Error(err),
-			)
-		}
-
-		vm.pruned.Set(true)
-	}()
-
-	return nil
+	return vm.SetPreference(ctx, lastAcceptedID)
 }
 
 // Create all chains that exist that this node validates.
@@ -472,12 +441,8 @@ func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
 }
 
-func (vm *VM) VerifyHeightIndex(_ context.Context) error {
-	if vm.pruned.Get() {
-		return nil
-	}
-
-	return snowmanblock.ErrIndexIncomplete
+func (*VM) VerifyHeightIndex(_ context.Context) error {
+	return nil
 }
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
