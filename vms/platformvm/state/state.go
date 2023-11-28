@@ -1029,6 +1029,49 @@ func applyWeightDiff(
 	return nil
 }
 
+func (s *state) ApplyValidatorPublicKeyDiffs(
+	ctx context.Context,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	startHeight uint64,
+	endHeight uint64,
+) error {
+	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
+		constants.PrimaryNetworkID[:],
+	)
+	defer diffIter.Release()
+
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		if err != nil {
+			return err
+		}
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
+		if parsedHeight < endHeight {
+			break
+		}
+
+		vdr, ok := validators[nodeID]
+		if !ok {
+			continue
+		}
+
+		pkBytes := diffIter.Value()
+		if len(pkBytes) == 0 {
+			vdr.PublicKey = nil
+			continue
+		}
+
+		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
+	}
+	return diffIter.Error()
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1265,49 +1308,6 @@ func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Dur
 // UTXOs section
 
 // VALIDATORS Section
-
-func (s *state) ApplyValidatorPublicKeyDiffs(
-	ctx context.Context,
-	validators map[ids.NodeID]*validators.GetValidatorOutput,
-	startHeight uint64,
-	endHeight uint64,
-) error {
-	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
-		constants.PrimaryNetworkID[:],
-	)
-	defer diffIter.Release()
-
-	for diffIter.Next() {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
-		if err != nil {
-			return err
-		}
-		// If the parsedHeight is less than our target endHeight, then we have
-		// fully processed the diffs from startHeight through endHeight.
-		if parsedHeight < endHeight {
-			break
-		}
-
-		vdr, ok := validators[nodeID]
-		if !ok {
-			continue
-		}
-
-		pkBytes := diffIter.Value()
-		if len(pkBytes) == 0 {
-			vdr.PublicKey = nil
-			continue
-		}
-
-		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
-	}
-	return diffIter.Error()
-}
 
 // DB Operations
 func (s *state) Abort() {
