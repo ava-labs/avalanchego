@@ -691,16 +691,3 @@ func (e *EngineTest) HealthCheck(ctx context.Context) (interface{}, error) {
 	}
 	return nil, errHealthCheck
 }
-
-func (e *EngineTest) GetVM() VM {
-	if e.GetVMF != nil {
-		return e.GetVMF()
-	}
-	if !e.CantGetVM {
-		return nil
-	}
-	if e.T != nil {
-		require.FailNow(e.T, "Unexpectedly called GetVM")
-	}
-	return nil
-}
