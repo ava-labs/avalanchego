@@ -133,6 +133,7 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 	return client, nil
 }
 
+// Peers contains metadata about the current set of connected peers
 type Peers struct {
 	lock sync.RWMutex
 	set  set.SampleableSet[ids.NodeID]
