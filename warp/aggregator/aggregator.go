@@ -39,8 +39,7 @@ type Aggregator struct {
 	client      SignatureGetter
 }
 
-// New returns a signature aggregator for the chain with the given [state] on the
-// given [subnetID], and where [client] can be used to fetch signatures from validators.
+// New returns a signature aggregator that will attempt to aggregate signatures from [validators].
 func New(client SignatureGetter, validators []*avalancheWarp.Validator, totalWeight uint64) *Aggregator {
 	return &Aggregator{
 		client:      client,

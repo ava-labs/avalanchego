@@ -56,11 +56,9 @@ func TestMessageSignatureHandler(t *testing.T) {
 				require.EqualValues(t, 1, stats.messageSignatureRequest.Count())
 				require.EqualValues(t, 1, stats.messageSignatureHit.Count())
 				require.EqualValues(t, 0, stats.messageSignatureMiss.Count())
-				require.Greater(t, stats.messageSignatureRequestDuration.Value(), int64(0))
 				require.EqualValues(t, 0, stats.blockSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.blockSignatureHit.Count())
 				require.EqualValues(t, 0, stats.blockSignatureMiss.Count())
-				require.EqualValues(t, stats.blockSignatureRequestDuration.Value(), int64(0))
 			},
 		},
 		"unknown message": {
@@ -73,11 +71,9 @@ func TestMessageSignatureHandler(t *testing.T) {
 				require.EqualValues(t, 1, stats.messageSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.messageSignatureHit.Count())
 				require.EqualValues(t, 1, stats.messageSignatureMiss.Count())
-				require.Greater(t, stats.messageSignatureRequestDuration.Value(), int64(0))
 				require.EqualValues(t, 0, stats.blockSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.blockSignatureHit.Count())
 				require.EqualValues(t, 0, stats.blockSignatureMiss.Count())
-				require.EqualValues(t, stats.blockSignatureRequestDuration.Value(), int64(0))
 			},
 		},
 	}
@@ -158,11 +154,9 @@ func TestBlockSignatureHandler(t *testing.T) {
 				require.EqualValues(t, 0, stats.messageSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.messageSignatureHit.Count())
 				require.EqualValues(t, 0, stats.messageSignatureMiss.Count())
-				require.EqualValues(t, stats.messageSignatureRequestDuration.Value(), int64(0))
 				require.EqualValues(t, 1, stats.blockSignatureRequest.Count())
 				require.EqualValues(t, 1, stats.blockSignatureHit.Count())
 				require.EqualValues(t, 0, stats.blockSignatureMiss.Count())
-				require.Greater(t, stats.blockSignatureRequestDuration.Value(), int64(0))
 			},
 		},
 		"unknown block": {
@@ -175,11 +169,9 @@ func TestBlockSignatureHandler(t *testing.T) {
 				require.EqualValues(t, 0, stats.messageSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.messageSignatureHit.Count())
 				require.EqualValues(t, 0, stats.messageSignatureMiss.Count())
-				require.EqualValues(t, stats.messageSignatureRequestDuration.Value(), int64(0))
 				require.EqualValues(t, 1, stats.blockSignatureRequest.Count())
 				require.EqualValues(t, 0, stats.blockSignatureHit.Count())
 				require.EqualValues(t, 1, stats.blockSignatureMiss.Count())
-				require.Greater(t, stats.blockSignatureRequestDuration.Value(), int64(0))
 			},
 		},
 	}

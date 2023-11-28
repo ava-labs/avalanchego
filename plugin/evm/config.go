@@ -17,7 +17,6 @@ import (
 const (
 	defaultAcceptorQueueLimit                         = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
 	defaultPruningEnabled                             = true
-	defaultPruneWarpDB                                = false
 	defaultCommitInterval                             = 4096
 	defaultTrieCleanCache                             = 512
 	defaultTrieDirtyCache                             = 512

@@ -1,13 +1,8 @@
 # Avalanche Warp Messaging
 
-> **Warning**
-> Avalanche Warp Messaging is currently in experimental mode to be used only on ephemeral test networks.
->
-> Breaking changes to Avalanche Warp Messaging integration into Subnet-EVM may still be made.
-
 Avalanche Warp Messaging offers a basic primitive to enable Cross-Subnet communication on the Avalanche Network.
 
-It is intended to allow communication between arbitrary Custom Virtual Machines (including, but not limited to Subnet-EVM).
+It is intended to allow communication between arbitrary Custom Virtual Machines (including, but not limited to Subnet-EVM and Coreth).
 
 ## How does Avalanche Warp Messaging Work
 
@@ -51,7 +46,7 @@ Additionally, the `SourceChainID` is excluded because anyone parsing the chain c
 - `sender`
 - The `messageID` of the unsigned message (sha256 of the unsigned message)
 
-The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including the Subnet-EVM [Addressed Payload](../../../warp/payload/payload.go). This is emitted as the unindexed data in the log.
+The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including an [AddressedCall](https://github.com/ava-labs/avalanchego/tree/v1.10.15/vms/platformvm/warp/payload). The unsigned message is emitted as the unindexed data in the log.
 
 #### getVerifiedMessage
 
@@ -70,7 +65,7 @@ This pre-verification is performed using the ProposerVM Block header during [blo
 
 #### getBlockchainID
 
-`getBlockchainID` returns the blockchainID of the blockchain that Subnet-EVM is running on.
+`getBlockchainID` returns the blockchainID of the blockchain that the VM is running on.
 
 This is different from the conventional Ethereum ChainID registered to [ChainList](https://chainlist.org/).
 
@@ -120,7 +115,7 @@ This means verifying the Warp Message and therefore the state transition on a bl
 
 The Avalanche P-Chain tracks only its current state and reverse diff layers (reversing the changes from past blocks) in order to re-calculate the validator set at a historical height. This means calculating a very old validator set that is used to verify a Warp Message in an old block may become prohibitively expensive.
 
-Therefore, we need a heuristic to ensure that the network can correctly re-process old blocks (note: re-processing old blocks is a requirement to perform bootstrapping and is used in some VMs including Subnet-EVM to serve or verify historical data).
+Therefore, we need a heuristic to ensure that the network can correctly re-process old blocks (note: re-processing old blocks is a requirement to perform bootstrapping and is used in some VMs to serve or verify historical data).
 
 As a result, we require that the block itself provides a deterministic hint which determines which Avalanche Warp Messages were considered valid/invalid during the block's execution. This ensures that we can always re-process blocks and use the hint to decide whether an Avalanche Warp Message should be treated as valid/invalid even after the P-Chain state that was used at the original execution time may no longer support fast lookups.
 
@@ -143,7 +138,7 @@ In contrast, Avalanche Warp Messages are validated within the context of an exac
 
 #### Guarantees Offered by Warp Precompile
 
-The Warp Precompile was designed with the intention of minimizing the trusted computing base for Subnet-EVM. Therefore, it makes several tradeoffs which encourage users to use protocols built ON TOP of the Warp Precompile itself as opposed to directly using the Warp Precompile.
+The Warp Precompile was designed with the intention of minimizing the trusted computing base for the VM as much as possible. Therefore, it makes several tradeoffs which encourage users to use protocols built ON TOP of the Warp Precompile itself as opposed to directly using the Warp Precompile.
 
 The Warp Precompile itself provides ONLY the following ability:
 
