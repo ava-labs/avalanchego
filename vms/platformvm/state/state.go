@@ -898,6 +898,22 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
+func (s *state) GetTimestamp() time.Time {
+	return s.chainTime
+}
+
+func (s *state) SetTimestamp(tm time.Time) {
+	s.chainTime = tm
+}
+
+func (s *state) GetLastAccepted() ids.ID {
+	return s.lastAcceptedBlkID
+}
+
+func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+	s.lastAcceptedBlkID = lastAccepted
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -997,21 +1013,6 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 }
 
 // METADATA Section
-func (s *state) GetTimestamp() time.Time {
-	return s.chainTime
-}
-
-func (s *state) SetTimestamp(tm time.Time) {
-	s.chainTime = tm
-}
-
-func (s *state) GetLastAccepted() ids.ID {
-	return s.lastAcceptedBlkID
-}
-
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
-	s.lastAcceptedBlkID = lastAccepted
-}
 
 func (s *state) SetHeight(height uint64) {
 	s.lastAcceptedHeight = height
