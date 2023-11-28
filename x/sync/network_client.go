@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -87,7 +88,7 @@ type networkClient struct {
 	// controls maximum number of active outbound requests
 	activeRequests *semaphore.Weighted
 	// tracking of peers & bandwidth usage
-	peers *peerTracker
+	peers *p2p.PeerTracker
 	// For sending messages to peers
 	appSender common.AppSender
 }
@@ -100,7 +101,7 @@ func NewNetworkClient(
 	metricsNamespace string,
 	registerer prometheus.Registerer,
 ) (NetworkClient, error) {
-	peerTracker, err := newPeerTracker(log, metricsNamespace, registerer)
+	peerTracker, err := p2p.NewPeerTracker(log, metricsNamespace, registerer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
 	}

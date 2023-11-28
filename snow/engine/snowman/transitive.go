@@ -480,10 +480,6 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, fmt.Errorf("vm: %w ; consensus: %w", vmErr, consensusErr)
 }
 
-func (t *Transitive) GetVM() common.VM {
-	return t.VM
-}
-
 func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
