@@ -1522,6 +1522,30 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
+func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
+	for stakerTxID, data := range currentData {
+		key := merkleCurrentStakersKey(stakerTxID)
+
+		if data.TxBytes == nil {
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+			continue
+		}
+
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		if err != nil {
+			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
+		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
+	}
+	return nil
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1985,30 +2009,6 @@ func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golin
 			})
 		}
 		delete(s.addedChains, subnetID)
-	}
-	return nil
-}
-
-func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
-	for stakerTxID, data := range currentData {
-		key := merkleCurrentStakersKey(stakerTxID)
-
-		if data.TxBytes == nil {
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:    key,
-				Delete: true,
-			})
-			continue
-		}
-
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
-		if err != nil {
-			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: dataBytes,
-		})
 	}
 	return nil
 }
