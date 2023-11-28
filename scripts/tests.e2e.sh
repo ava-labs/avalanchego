@@ -23,7 +23,7 @@ source ./scripts/constants.sh
 #################################
 echo "building e2e.test"
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
+go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
