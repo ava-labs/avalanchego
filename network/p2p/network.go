@@ -65,8 +65,8 @@ func NewNetwork(
 	}
 }
 
-// Network maintains state of the peer-to-peer network and any in-flight
-// requests
+// Network exposes networking state and supports building p2p application
+// protocols
 type Network struct {
 	Peers *Peers
 
