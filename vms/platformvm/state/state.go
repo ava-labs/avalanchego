@@ -1435,6 +1435,93 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.baseDB.CommitBatch()
 }
 
+func (s *state) writeBlocks() error {
+	for blkID, blk := range s.addedBlocks {
+		var (
+			blkID     = blkID
+			blkHeight = blk.Height()
+		)
+
+		delete(s.addedBlockIDs, blkHeight)
+		s.blockIDCache.Put(blkHeight, blkID)
+		if err := database.PutID(s.blockIDDB, database.PackUInt64(blkHeight), blkID); err != nil {
+			return fmt.Errorf("failed to write block height index: %w", err)
+		}
+
+		delete(s.addedBlocks, blkID)
+		// Note: Evict is used rather than Put here because blk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
+
+		if err := s.blockDB.Put(blkID[:], blk.Bytes()); err != nil {
+			return fmt.Errorf("failed to write block %s: %w", blkID, err)
+		}
+	}
+	return nil
+}
+
+func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk, nil
+	}
+
+	if blk, cached := s.blockCache.Get(blockID); cached {
+		if blk == nil {
+			return nil, database.ErrNotFound
+		}
+
+		return blk, nil
+	}
+
+	blkBytes, err := s.blockDB.Get(blockID[:])
+	switch err {
+	case nil:
+		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+		blk, err := block.Parse(block.GenesisCodec, blkBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.blockCache.Put(blockID, blk)
+		return blk, nil
+
+	case database.ErrNotFound:
+		s.blockCache.Put(blockID, nil)
+		return nil, database.ErrNotFound
+
+	default:
+		return nil, err
+	}
+}
+
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if blkID, exists := s.addedBlockIDs[height]; exists {
+		return blkID, nil
+	}
+	if blkID, cached := s.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		return blkID, nil
+	}
+
+	heightKey := database.PackUInt64(height)
+
+	blkID, err := database.GetID(s.blockIDDB, heightKey)
+	if err == database.ErrNotFound {
+		s.blockIDCache.Put(height, ids.Empty)
+		return ids.Empty, database.ErrNotFound
+	}
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	s.blockIDCache.Put(height, blkID)
+	return blkID, nil
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1544,66 +1631,6 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 // REWARD UTXOs SECTION
 
 // BLOCKs Section
-func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
-	if blk, exists := s.addedBlocks[blockID]; exists {
-		return blk, nil
-	}
-
-	if blk, cached := s.blockCache.Get(blockID); cached {
-		if blk == nil {
-			return nil, database.ErrNotFound
-		}
-
-		return blk, nil
-	}
-
-	blkBytes, err := s.blockDB.Get(blockID[:])
-	switch err {
-	case nil:
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-		blk, err := block.Parse(block.GenesisCodec, blkBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		s.blockCache.Put(blockID, blk)
-		return blk, nil
-
-	case database.ErrNotFound:
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
-
-	default:
-		return nil, err
-	}
-}
-
-func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	if blkID, exists := s.addedBlockIDs[height]; exists {
-		return blkID, nil
-	}
-	if blkID, cached := s.blockIDCache.Get(height); cached {
-		if blkID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-
-		return blkID, nil
-	}
-
-	heightKey := database.PackUInt64(height)
-
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, ids.Empty)
-		return ids.Empty, database.ErrNotFound
-	}
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	s.blockIDCache.Put(height, blkID)
-	return blkID, nil
-}
 
 // UPTIMES SECTION
 func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
@@ -2069,32 +2096,6 @@ func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //no
 			})
 		}
 		delete(s.modifiedDelegateeReward, nodeID)
-	}
-	return nil
-}
-
-func (s *state) writeBlocks() error {
-	for blkID, blk := range s.addedBlocks {
-		var (
-			blkID     = blkID
-			blkHeight = blk.Height()
-		)
-
-		delete(s.addedBlockIDs, blkHeight)
-		s.blockIDCache.Put(blkHeight, blkID)
-		if err := database.PutID(s.blockIDDB, database.PackUInt64(blkHeight), blkID); err != nil {
-			return fmt.Errorf("failed to write block height index: %w", err)
-		}
-
-		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because blk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
-
-		if err := s.blockDB.Put(blkID[:], blk.Bytes()); err != nil {
-			return fmt.Errorf("failed to write block %s: %w", blkID, err)
-		}
 	}
 	return nil
 }
