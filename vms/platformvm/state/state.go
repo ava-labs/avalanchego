@@ -422,19 +422,19 @@ func newState(
 		return nil, fmt.Errorf("failed creating merkleDB: %w", err)
 	}
 
-	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
-		"reward_utxos_cache",
+	txCache, err := metercacher.New(
+		"tx_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
+		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	suppliesCache, err := metercacher.New[ids.ID, *uint64](
-		"supply_cache",
+	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
+		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
+		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -455,6 +455,15 @@ func newState(
 		"transformed_subnet_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	supplyCache, err := metercacher.New[ids.ID, *uint64](
+		"supply_cache",
+		metricsReg,
+		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -487,15 +496,6 @@ func newState(
 		return nil, err
 	}
 
-	txCache, err := metercacher.New(
-		"tx_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state{
 		validators: validators,
 		ctx:        ctx,
@@ -517,7 +517,7 @@ func newState(
 		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
 
 		modifiedSupplies: make(map[ids.ID]uint64),
-		suppliesCache:    suppliesCache,
+		suppliesCache:    supplyCache,
 
 		subnetOwners:     make(map[ids.ID]fx.Owner),
 		subnetOwnerCache: subnetOwnerCache,
