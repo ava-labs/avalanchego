@@ -3,9 +3,8 @@
 
 package bimap
 
-import (
-	"github.com/ava-labs/avalanchego/utils"
-)
+import "github.com/ava-labs/avalanchego/utils"
+
 
 type Entry[K, V any] struct {
 	Key   K
