@@ -209,7 +209,7 @@ func TestAppRequestResponse(t *testing.T) {
 			handler := mocks.NewMockHandler(ctrl)
 			n := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			require.NoError(n.Connected(context.Background(), nodeID, nil))
-			client, err := n.RegisterAppProtocol(handlerID, handler)
+			client, err := n.NewAppProtocol(handlerID, handler)
 			require.NoError(err)
 
 			wg := &sync.WaitGroup{}
@@ -350,7 +350,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 		}).AnyTimes()
 
 	require.NoError(network.Connected(context.Background(), nodeID, nil))
-	client, err := network.RegisterAppProtocol(0x1, handler)
+	client, err := network.NewAppProtocol(0x1, handler)
 	require.NoError(err)
 
 	onResponse := func(ctx context.Context, nodeID ids.NodeID, got []byte, err error) {
@@ -493,7 +493,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
 			}
 
-			client, err := n.RegisterAppProtocol(1, nil)
+			client, err := n.NewAppProtocol(1, nil)
 			require.NoError(err)
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
@@ -525,12 +525,12 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator connected",
 			peers: []ids.NodeID{nodeID0, nodeID1},
 			option: func(t *testing.T, n *Network) ClientOption {
-				state := &snowvalidators.TestState{
+				state := &validators.TestState{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return map[ids.NodeID]*validators.GetValidatorOutput{
 							nodeID1: nil,
 						}, nil
 					},
@@ -545,12 +545,12 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator disconnected",
 			peers: []ids.NodeID{nodeID0},
 			option: func(t *testing.T, n *Network) ClientOption {
-				state := &snowvalidators.TestState{
+				state := &validators.TestState{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return map[ids.NodeID]*validators.GetValidatorOutput{
 							nodeID1: nil,
 						}, nil
 					},
@@ -581,7 +581,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
 
-			client, err := network.RegisterAppProtocol(0x0, nil, tt.option(t, network))
+			client, err := network.NewAppProtocol(0x0, nil, tt.option(t, network))
 			require.NoError(err)
 
 			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {

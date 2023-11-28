@@ -5,8 +5,6 @@ package p2p
 
 import (
 	"context"
-	"encoding/binary"
-	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -64,13 +61,18 @@ func NewNetwork(
 	metrics prometheus.Registerer,
 	namespace string,
 ) *Network {
+	peers := &peers{}
+	clientDefaults := &clientOptions{
+		nodeSampler: peers,
+	}
+
 	return &Network{
 		log:       log,
 		sender:    sender,
 		metrics:   metrics,
 		namespace: namespace,
-		router:    newRouter(log),
-		peers:     &peers{},
+		router:    newRouter(log, sender, metrics, namespace, clientDefaults),
+		peers:     peers,
 	}
 }
 
@@ -87,6 +89,7 @@ type Network struct {
 }
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
+	//TODO dont need this lock
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -102,121 +105,17 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
-// RegisterAppProtocol reserves an identifier for an application protocol and
-// returns a Client that can be used to send messages for the corresponding
-// protocol.
-func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options ...ClientOption) (*Client, error) {
-	// TODO refactor router
-	n.router.lock.Lock()
-	defer n.router.lock.Unlock()
-
-	if _, ok := n.router.handlers[handlerID]; ok {
-		return nil, fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
-	}
-
-	appRequestTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_app_request", handlerID),
-		"app request time (ns)",
-		n.metrics,
-	)
+func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...ClientOption) (*Client, error) {
+	client, err := n.router.registerAppProtocol(handlerID, handler)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
-	}
-
-	appRequestFailedTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_app_request_failed", handlerID),
-		"app request failed time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
-	}
-
-	appResponseTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_app_response", handlerID),
-		"app response time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register app response metric for handler_%d: %w", handlerID, err)
-	}
-
-	appGossipTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_app_gossip", handlerID),
-		"app gossip time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register app gossip metric for handler_%d: %w", handlerID, err)
-	}
-
-	crossChainAppRequestTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_request", handlerID),
-		"cross chain app request time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
-	}
-
-	crossChainAppRequestFailedTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_request_failed", handlerID),
-		"app request failed time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app request failed metric for handler_%d: %w", handlerID, err)
-	}
-
-	crossChainAppResponseTime, err := metric.NewAverager(
-		n.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_response", handlerID),
-		"cross chain app response time (ns)",
-		n.metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app response metric for handler_%d: %w", handlerID, err)
-	}
-
-	n.router.handlers[handlerID] = &meteredHandler{
-		responder: &responder{
-			Handler:   handler,
-			handlerID: handlerID,
-			log:       n.log,
-			sender:    n.sender,
-		},
-		metrics: &metrics{
-			appRequestTime:                 appRequestTime,
-			appRequestFailedTime:           appRequestFailedTime,
-			appResponseTime:                appResponseTime,
-			appGossipTime:                  appGossipTime,
-			crossChainAppRequestTime:       crossChainAppRequestTime,
-			crossChainAppRequestFailedTime: crossChainAppRequestFailedTime,
-			crossChainAppResponseTime:      crossChainAppResponseTime,
-		},
-	}
-
-	clientOptions := &clientOptions{
-		nodeSampler: n.peers,
+		return nil, err
 	}
 
 	for _, option := range options {
-		option.apply(clientOptions)
+		option.apply(client.options)
 	}
 
-	return &Client{
-		handlerID:     handlerID,
-		handlerPrefix: binary.AppendUvarint(nil, handlerID),
-		sender:        n.sender,
-		router:        n.router,
-		options:       clientOptions,
-	}, nil
+	return client, nil
 }
 
 // peers contains the set of nodes we are connected to
