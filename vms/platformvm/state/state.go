@@ -951,6 +951,84 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	s.modifiedSupplies[subnetID] = cs
 }
 
+func (s *state) ApplyValidatorWeightDiffs(
+	ctx context.Context,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	startHeight uint64,
+	endHeight uint64,
+	subnetID ids.ID,
+) error {
+	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKey(subnetID, startHeight),
+		subnetID[:],
+	)
+	defer diffIter.Release()
+
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		if err != nil {
+			return err
+		}
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
+		if parsedHeight < endHeight {
+			return diffIter.Error()
+		}
+
+		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
+		if err != nil {
+			return err
+		}
+
+		if err := applyWeightDiff(validators, nodeID, weightDiff); err != nil {
+			return err
+		}
+	}
+
+	return diffIter.Error()
+}
+
+func applyWeightDiff(
+	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
+	nodeID ids.NodeID,
+	weightDiff *ValidatorWeightDiff,
+) error {
+	vdr, ok := vdrs[nodeID]
+	if !ok {
+		// This node isn't in the current validator set.
+		vdr = &validators.GetValidatorOutput{
+			NodeID: nodeID,
+		}
+		vdrs[nodeID] = vdr
+	}
+
+	// The weight of this node changed at this block.
+	var err error
+	if weightDiff.Decrease {
+		// The validator's weight was decreased at this block, so in the
+		// prior block it was higher.
+		vdr.Weight, err = safemath.Add64(vdr.Weight, weightDiff.Amount)
+	} else {
+		// The validator's weight was increased at this block, so in the
+		// prior block it was lower.
+		vdr.Weight, err = safemath.Sub(vdr.Weight, weightDiff.Amount)
+	}
+	if err != nil {
+		return err
+	}
+
+	if vdr.Weight == 0 {
+		// The validator's weight was 0 before this block so they weren't in the
+		// validator set.
+		delete(vdrs, nodeID)
+	}
+	return nil
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1187,83 +1265,6 @@ func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Dur
 // UTXOs section
 
 // VALIDATORS Section
-func applyWeightDiff(
-	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
-	nodeID ids.NodeID,
-	weightDiff *ValidatorWeightDiff,
-) error {
-	vdr, ok := vdrs[nodeID]
-	if !ok {
-		// This node isn't in the current validator set.
-		vdr = &validators.GetValidatorOutput{
-			NodeID: nodeID,
-		}
-		vdrs[nodeID] = vdr
-	}
-
-	// The weight of this node changed at this block.
-	var err error
-	if weightDiff.Decrease {
-		// The validator's weight was decreased at this block, so in the
-		// prior block it was higher.
-		vdr.Weight, err = safemath.Add64(vdr.Weight, weightDiff.Amount)
-	} else {
-		// The validator's weight was increased at this block, so in the
-		// prior block it was lower.
-		vdr.Weight, err = safemath.Sub(vdr.Weight, weightDiff.Amount)
-	}
-	if err != nil {
-		return err
-	}
-
-	if vdr.Weight == 0 {
-		// The validator's weight was 0 before this block so they weren't in the
-		// validator set.
-		delete(vdrs, nodeID)
-	}
-	return nil
-}
-
-func (s *state) ApplyValidatorWeightDiffs(
-	ctx context.Context,
-	validators map[ids.NodeID]*validators.GetValidatorOutput,
-	startHeight uint64,
-	endHeight uint64,
-	subnetID ids.ID,
-) error {
-	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalStartDiffKey(subnetID, startHeight),
-		subnetID[:],
-	)
-	defer diffIter.Release()
-
-	for diffIter.Next() {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
-		if err != nil {
-			return err
-		}
-		// If the parsedHeight is less than our target endHeight, then we have
-		// fully processed the diffs from startHeight through endHeight.
-		if parsedHeight < endHeight {
-			return diffIter.Error()
-		}
-
-		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
-		if err != nil {
-			return err
-		}
-
-		if err := applyWeightDiff(validators, nodeID, weightDiff); err != nil {
-			return err
-		}
-	}
-
-	return diffIter.Error()
-}
 
 func (s *state) ApplyValidatorPublicKeyDiffs(
 	ctx context.Context,
