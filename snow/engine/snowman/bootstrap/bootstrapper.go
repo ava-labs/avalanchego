@@ -93,7 +93,7 @@ type Bootstrapper struct {
 	startTime time.Time
 
 	// tracks which validators were asked for which containers in which requests
-	outstandingRequests bimap.BiMap[common.Request, ids.ID]
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
 
 	// number of state transitions executed
 	executedStateTransitions int

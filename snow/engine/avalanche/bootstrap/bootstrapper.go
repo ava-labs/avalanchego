@@ -85,7 +85,7 @@ type bootstrapper struct {
 	metrics
 
 	// tracks which validators were asked for which containers in which requests
-	outstandingRequests bimap.BiMap[common.Request, ids.ID]
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests

@@ -4,7 +4,6 @@
 package bimap
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,11 +12,11 @@ import (
 func TestBiMapPut(t *testing.T) {
 	tests := []struct {
 		name            string
-		state           BiMap[int, int]
+		state           *BiMap[int, int]
 		key             int
 		value           int
 		expectedRemoved []Entry[int, int]
-		expectedState   BiMap[int, int]
+		expectedState   *BiMap[int, int]
 	}{
 		{
 			name:            "none removed",
@@ -25,8 +24,7 @@ func TestBiMapPut(t *testing.T) {
 			key:             1,
 			value:           2,
 			expectedRemoved: nil,
-			expectedState: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			expectedState: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 				},
@@ -37,8 +35,7 @@ func TestBiMapPut(t *testing.T) {
 		},
 		{
 			name: "key removed",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			state: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 				},
@@ -54,8 +51,7 @@ func TestBiMapPut(t *testing.T) {
 					Value: 2,
 				},
 			},
-			expectedState: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			expectedState: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 3,
 				},
@@ -66,8 +62,7 @@ func TestBiMapPut(t *testing.T) {
 		},
 		{
 			name: "value removed",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			state: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 				},
@@ -83,8 +78,7 @@ func TestBiMapPut(t *testing.T) {
 					Value: 2,
 				},
 			},
-			expectedState: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			expectedState: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					3: 2,
 				},
@@ -95,8 +89,7 @@ func TestBiMapPut(t *testing.T) {
 		},
 		{
 			name: "key and value removed",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			state: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 					3: 4,
@@ -118,8 +111,7 @@ func TestBiMapPut(t *testing.T) {
 					Value: 4,
 				},
 			},
-			expectedState: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			expectedState: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 4,
 				},
@@ -229,11 +221,11 @@ func TestBiMapHasKeyAndGetValue(t *testing.T) {
 func TestBiMapDeleteKey(t *testing.T) {
 	tests := []struct {
 		name            string
-		state           BiMap[int, int]
+		state           *BiMap[int, int]
 		key             int
 		expectedValue   int
 		expectedRemoved bool
-		expectedState   BiMap[int, int]
+		expectedState   *BiMap[int, int]
 	}{
 		{
 			name:            "none removed",
@@ -245,8 +237,7 @@ func TestBiMapDeleteKey(t *testing.T) {
 		},
 		{
 			name: "key removed",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			state: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 				},
@@ -275,11 +266,11 @@ func TestBiMapDeleteKey(t *testing.T) {
 func TestBiMapDeleteValue(t *testing.T) {
 	tests := []struct {
 		name            string
-		state           BiMap[int, int]
+		state           *BiMap[int, int]
 		value           int
 		expectedKey     int
 		expectedRemoved bool
-		expectedState   BiMap[int, int]
+		expectedState   *BiMap[int, int]
 	}{
 		{
 			name:            "none removed",
@@ -291,8 +282,7 @@ func TestBiMapDeleteValue(t *testing.T) {
 		},
 		{
 			name: "key removed",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
+			state: &BiMap[int, int]{
 				keyToValue: map[int]int{
 					1: 2,
 				},
@@ -314,49 +304,6 @@ func TestBiMapDeleteValue(t *testing.T) {
 			require.Equal(test.expectedKey, key)
 			require.Equal(test.expectedRemoved, removed)
 			require.Equal(test.expectedState, test.state)
-		})
-	}
-}
-
-func TestBiMapInverse(t *testing.T) {
-	tests := []struct {
-		name            string
-		state           BiMap[int, int]
-		expectedInverse BiMap[int, int]
-	}{
-		{
-			name:            "empty",
-			state:           New[int, int](),
-			expectedInverse: New[int, int](),
-		},
-		{
-			name: "keys and values swapped",
-			state: &biMap[int, int]{
-				lock: new(sync.RWMutex),
-				keyToValue: map[int]int{
-					1: 2,
-				},
-				valueToKey: map[int]int{
-					2: 1,
-				},
-			},
-			expectedInverse: &biMap[int, int]{
-				lock: new(sync.RWMutex),
-				keyToValue: map[int]int{
-					2: 1,
-				},
-				valueToKey: map[int]int{
-					1: 2,
-				},
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			inverse := test.state.Inverse()
-			require.Equal(test.expectedInverse, inverse)
 		})
 	}
 }

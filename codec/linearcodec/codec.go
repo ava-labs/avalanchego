@@ -39,7 +39,7 @@ type linearCodec struct {
 
 	lock            sync.RWMutex
 	nextTypeID      uint32
-	registeredTypes bimap.BiMap[uint32, reflect.Type]
+	registeredTypes *bimap.BiMap[uint32, reflect.Type]
 }
 
 // New returns a new, concurrency-safe codec; it allow to specify

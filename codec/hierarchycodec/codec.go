@@ -46,7 +46,7 @@ type hierarchyCodec struct {
 	lock            sync.RWMutex
 	currentGroupID  uint16
 	nextTypeID      uint16
-	registeredTypes bimap.BiMap[typeID, reflect.Type]
+	registeredTypes *bimap.BiMap[typeID, reflect.Type]
 }
 
 // New returns a new, concurrency-safe codec

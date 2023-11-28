@@ -65,7 +65,7 @@ type Transitive struct {
 	polls poll.Set
 
 	// blocks that have we have sent get requests for but haven't yet received
-	blkReqs bimap.BiMap[common.Request, ids.ID]
+	blkReqs *bimap.BiMap[common.Request, ids.ID]
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
 	// Block ID --> Block
