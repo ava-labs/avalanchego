@@ -17,6 +17,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
 - Storage: 1 TiB
+  - Nodes running for very long periods of time or nodes with custom configurations may observe higher storage requirements.
 - OS: Ubuntu 20.04/22.04 or macOS >= 12
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
