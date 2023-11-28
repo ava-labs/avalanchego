@@ -5,6 +5,7 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -135,7 +136,7 @@ func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, err
 
 	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
 	if err != nil {
-		return time.Time{}, false, err
+		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
 	}
 
 	// timeWasCapped means that [timestamp] was reduced to
