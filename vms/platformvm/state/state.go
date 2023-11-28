@@ -941,6 +941,40 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 	}
 }
 
+// REWARD UTXOs SECTION
+func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
+		return utxos, nil
+	}
+
+	rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
+	txDB := linkeddb.NewDefault(rawTxDB)
+	it := txDB.NewIterator()
+	defer it.Release()
+
+	utxos := []*avax.UTXO(nil)
+	for it.Next() {
+		utxo := &avax.UTXO{}
+		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	s.rewardUTXOsCache.Put(txID, utxos)
+	return utxos, nil
+}
+
+func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
+}
+
 // BLOCKs Section
 func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
@@ -1068,40 +1102,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 		return time.Time{}, err
 	}
 	return staker.StartTime, nil
-}
-
-// REWARD UTXOs SECTION
-func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
-		return utxos, nil
-	}
-	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
-		return utxos, nil
-	}
-
-	rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
-	txDB := linkeddb.NewDefault(rawTxDB)
-	it := txDB.NewIterator()
-	defer it.Release()
-
-	utxos := []*avax.UTXO(nil)
-	for it.Next() {
-		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
-			return nil, err
-		}
-		utxos = append(utxos, utxo)
-	}
-	if err := it.Error(); err != nil {
-		return nil, err
-	}
-
-	s.rewardUTXOsCache.Put(txID, utxos)
-	return utxos, nil
-}
-
-func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
-	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
 }
 
 // UTXOs section
