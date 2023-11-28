@@ -179,6 +179,7 @@ impl WalStore<WalFileImpl> for WalStoreImpl {
 
     fn enumerate_files(&self) -> Result<Self::FileNameIter, WalError> {
         let mut filenames = Vec::new();
+        #[allow(clippy::unwrap_used)]
         for path in fs::read_dir(&self.root_dir)?.filter_map(|entry| entry.ok()) {
             filenames.push(path.path());
         }
@@ -198,6 +199,7 @@ mod tests {
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
+        #[allow(clippy::unwrap_used)]
         let walfile = RawWalFile::open(walfile_path).await.unwrap();
 
         let walfile_impl = WalFileImpl::from(walfile);
@@ -211,9 +213,12 @@ mod tests {
             .chain(second_half.iter().copied())
             .collect();
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl.write(0, data).await.unwrap();
+        #[allow(clippy::unwrap_used)]
         walfile_impl.truncate(HALF_LENGTH).await.unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let result = walfile_impl.read(0, HALF_LENGTH).await.unwrap();
 
         assert_eq!(result, Some(first_half.into()))
@@ -227,17 +232,21 @@ mod tests {
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
+        #[allow(clippy::unwrap_used)]
         let walfile = RawWalFile::open(walfile_path).await.unwrap();
 
         let walfile_impl = WalFileImpl::from(walfile);
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl
             .write(0, vec![1u8; LENGTH].into())
             .await
             .unwrap();
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl.truncate(2 * LENGTH).await.unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let result = walfile_impl.read(LENGTH as u64, LENGTH).await.unwrap();
 
         assert_eq!(result, Some(vec![0u8; LENGTH].into()))
@@ -248,6 +257,7 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
+            #[allow(clippy::unwrap_used)]
             RawWalFile::open(walfile_path).await.unwrap()
         };
 
@@ -255,8 +265,10 @@ mod tests {
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl.write(0, data.clone().into()).await.unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let result = walfile_impl.read(0, data.len()).await.unwrap();
 
         assert_eq!(result, Some(data.into()));
@@ -267,17 +279,21 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
+            #[allow(clippy::unwrap_used)]
             RawWalFile::open(walfile_path).await.unwrap()
         };
 
         let walfile_impl = WalFileImpl::from(walfile);
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
+        #[allow(clippy::unwrap_used)]
         walfile_impl.write(0, data.clone().into()).await.unwrap();
 
         let mid = data.len() / 2;
         let (start, end) = data.split_at(mid);
+        #[allow(clippy::unwrap_used)]
         let read_start_result = walfile_impl.read(0, mid).await.unwrap();
+        #[allow(clippy::unwrap_used)]
         let read_end_result = walfile_impl.read(mid as u64, mid).await.unwrap();
 
         assert_eq!(read_start_result, Some(start.into()));
@@ -289,6 +305,7 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
+            #[allow(clippy::unwrap_used)]
             RawWalFile::open(walfile_path).await.unwrap()
         };
 
@@ -296,8 +313,10 @@ mod tests {
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl.write(0, data.clone().into()).await.unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let result = walfile_impl
             .read((data.len() / 2) as u64, data.len())
             .await
@@ -313,6 +332,7 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
+            #[allow(clippy::unwrap_used)]
             RawWalFile::open(walfile_path).await.unwrap()
         };
 
@@ -320,11 +340,13 @@ mod tests {
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
+        #[allow(clippy::unwrap_used)]
         walfile_impl
             .write(OFFSET, data.clone().into())
             .await
             .unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let result = walfile_impl
             .read(0, data.len() + OFFSET as usize)
             .await
@@ -338,6 +360,7 @@ mod tests {
         assert_eq!(result, Some(data.into()));
     }
 
+    #[allow(clippy::unwrap_used)]
     fn get_temp_walfile_path(file: &str, line: u32) -> PathBuf {
         let path = option_env!("CARGO_TARGET_TMPDIR")
             .map(PathBuf::from)

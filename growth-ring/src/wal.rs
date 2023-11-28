@@ -289,8 +289,10 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         })
     }
 
+    #[allow(clippy::unwrap_used)]
     async fn read_header(&self) -> Result<Header, WalError> {
         let bytes = self.header_file.read(0, HEADER_SIZE).await?.unwrap();
+        #[allow(clippy::unwrap_used)]
         let bytes: [u8; HEADER_SIZE] = (&*bytes).try_into().unwrap();
         let header: Header = cast_slice(&bytes)[0];
         Ok(header)
@@ -450,6 +452,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
 
         let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), WalError>>>>> = Vec::new();
 
+        #[allow(clippy::unwrap_used)]
         while state.pending_removal.len() > 1 {
             let (fid, counter) = state.pending_removal.front().unwrap();
 
@@ -707,6 +710,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 break;
             }
 
+            #[allow(clippy::unwrap_used)]
             let mut m = state.io_complete.pop().unwrap();
             let block_remain = block_size - (m.end & (block_size - 1));
 
@@ -741,6 +745,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
         self.file_pool.in_use_len()
     }
 
+    #[allow(clippy::unwrap_used)]
     pub async fn read_recent_records<'a>(
         &'a self,
         nrecords: usize,
@@ -774,6 +779,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             for ring in rings.into_iter().rev() {
                 let ring = ring.map_err(|_| WalError::Other("error mapping ring".to_string()))?;
                 let (header, payload) = ring;
+                #[allow(clippy::unwrap_used)]
                 let payload = payload.unwrap();
                 match header.rtype.try_into() {
                     Ok(WalRingType::Full) => {
@@ -853,6 +859,7 @@ pub struct WalLoader {
 }
 
 impl Default for WalLoader {
+    #[allow(clippy::unwrap_used)]
     fn default() -> Self {
         WalLoader {
             file_nbit: 22,  // 4MB
@@ -1316,6 +1323,7 @@ impl WalLoader {
 pub const CRC32: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_CKSUM);
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
     use test_case::test_case;

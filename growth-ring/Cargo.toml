@@ -34,4 +34,5 @@ path = "src/lib.rs"
 crate-type = ["dylib", "rlib", "staticlib"]
 
 [lints.clippy]
+unwrap_used = "warn"
 missing_const_for_fn = "warn"

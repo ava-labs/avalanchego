@@ -37,8 +37,8 @@ fn main() -> Result<(), WalError> {
     let mut loader = WalLoader::new();
     loader.file_nbit(9).block_nbit(8);
 
-    let store = WalStoreImpl::new(wal_dir, true).unwrap();
-    let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
+    let store = WalStoreImpl::new(wal_dir, true)?;
+    let mut wal = block_on(loader.load(store, recover, 0))?;
     for _ in 0..3 {
         let _ = test(
             ["hi", "hello", "lol"]
@@ -55,8 +55,8 @@ fn main() -> Result<(), WalError> {
         );
     }
 
-    let store = WalStoreImpl::new(wal_dir, false).unwrap();
-    let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
+    let store = WalStoreImpl::new(wal_dir, false)?;
+    let mut wal = block_on(loader.load(store, recover, 0))?;
     for _ in 0..3 {
         let _ = test(
             vec![
@@ -69,8 +69,8 @@ fn main() -> Result<(), WalError> {
         );
     }
 
-    let store = WalStoreImpl::new(wal_dir, false).unwrap();
-    let mut wal = block_on(loader.load(store, recover, 100)).unwrap();
+    let store = WalStoreImpl::new(wal_dir, false)?;
+    let mut wal = block_on(loader.load(store, recover, 100))?;
     let mut history = std::collections::VecDeque::new();
     for _ in 0..3 {
         let mut ids = Vec::new();
@@ -94,17 +94,16 @@ fn main() -> Result<(), WalError> {
         ids.shuffle(&mut rng);
         for e in ids.chunks(20) {
             println!("peel(20)");
-            futures::executor::block_on(wal.peel(e, 100)).unwrap();
+            futures::executor::block_on(wal.peel(e, 100))?;
         }
     }
     for (rec, ans) in
-        block_on(wal.read_recent_records(100, &growthring::wal::RecoverPolicy::Strict))
-            .unwrap()
+        block_on(wal.read_recent_records(100, &growthring::wal::RecoverPolicy::Strict))?
             .into_iter()
             .zip(history.into_iter().rev())
     {
-        assert_eq!(std::str::from_utf8(&rec).unwrap(), &ans);
-        println!("{}", std::str::from_utf8(&rec).unwrap());
+        assert_eq!(&String::from_utf8_lossy(&rec), &ans);
+        println!("{}", String::from_utf8_lossy(&rec));
     }
 
     Ok(())

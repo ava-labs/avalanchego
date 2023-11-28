@@ -261,15 +261,19 @@ impl PaintStrokes {
         assert!(raw.len() & 3 == 0);
         let is = std::mem::size_of::<u32>();
         let (len_raw, mut rest) = raw.split_at(is);
+        #[allow(clippy::unwrap_used)]
         let len = u32::from_le_bytes(len_raw.try_into().unwrap());
         let mut res = Vec::new();
         for _ in 0..len {
             let (s_raw, rest1) = rest.split_at(is);
             let (e_raw, rest2) = rest1.split_at(is);
             let (c_raw, rest3) = rest2.split_at(is);
+            #[allow(clippy::unwrap_used)]
             res.push((
                 u32::from_le_bytes(s_raw.try_into().unwrap()),
+                #[allow(clippy::unwrap_used)]
                 u32::from_le_bytes(e_raw.try_into().unwrap()),
+                #[allow(clippy::unwrap_used)]
                 u32::from_le_bytes(c_raw.try_into().unwrap()),
             ));
             rest = rest3
@@ -390,6 +394,7 @@ impl Canvas {
             return None;
         }
         let idx = rng.gen_range(0..self.queue.len());
+        #[allow(clippy::unwrap_used)]
         let (pos, _) = self.queue.get_index(idx).unwrap();
         let pos = *pos;
         Some((self.paint(pos), pos))
@@ -400,6 +405,7 @@ impl Canvas {
         self.waiting.clear();
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn paint_all(&mut self) {
         for (pos, q) in self.queue.iter() {
             self.canvas[*pos as usize] = q.back().unwrap().0;
@@ -411,8 +417,10 @@ impl Canvas {
         self.queue.is_empty()
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn paint(&mut self, pos: u32) -> Option<WalRingId> {
         let q = self.queue.get_mut(&pos).unwrap();
+        #[allow(clippy::unwrap_used)]
         let (c, rid) = q.pop_front().unwrap();
         if q.is_empty() {
             self.queue.remove(&pos);
@@ -574,6 +582,7 @@ impl PaintingSim {
 
     pub fn get_walloader(&self) -> WalLoader {
         let mut loader = WalLoader::new();
+        #[allow(clippy::unwrap_used)]
         loader
             .file_nbit(self.file_nbit)
             .block_nbit(self.block_nbit)
@@ -586,6 +595,7 @@ impl PaintingSim {
         let mut ops: Vec<PaintStrokes> = Vec::new();
         let mut ringid_map = HashMap::new();
         let fgen = Rc::new(CountFailGen::new());
+        #[allow(clippy::unwrap_used)]
         self.run(
             state,
             &mut canvas,
@@ -612,6 +622,7 @@ impl PaintingSim {
         let mut last_idx = 0;
         let mut napplied = 0;
         canvas.clear_queued();
+        #[allow(clippy::unwrap_used)]
         block_on(wal.load(
             WalStoreEmul::new(state, Rc::new(ZeroFailGen)),
             |payload, ringid| {
