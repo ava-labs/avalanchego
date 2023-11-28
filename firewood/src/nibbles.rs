@@ -120,7 +120,7 @@ impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_Z
 
 impl<'a, const LEADING_ZEROES: usize> NibblesIterator<'a, LEADING_ZEROES> {
     #[inline(always)]
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.head == self.tail
     }
 }
@@ -214,5 +214,40 @@ mod test {
         let expected = [0xf, 0xe, 0xe, 0xb, 0xd, 0xa, 0xe, 0xd, 0x0];
 
         assert!(nib_iter.eq(expected));
+    }
+
+    #[test]
+    fn empty() {
+        let nib = Nibbles::<0>(&[]);
+        assert!(nib.is_empty());
+        let it = nib.into_iter();
+        assert!(it.is_empty());
+        assert_eq!(it.size_hint().0, 0);
+    }
+
+    #[test]
+    fn not_empty_because_of_leading_nibble() {
+        let nib = Nibbles::<1>(&[]);
+        assert!(!nib.is_empty());
+        let mut it = nib.into_iter();
+        assert!(!it.is_empty());
+        assert_eq!(it.size_hint(), (1, Some(1)));
+        assert_eq!(it.next(), Some(0));
+        assert!(it.is_empty());
+        assert_eq!(it.size_hint(), (0, Some(0)));
+    }
+    #[test]
+    fn not_empty_because_of_data() {
+        let nib = Nibbles::<0>(&[1]);
+        assert!(!nib.is_empty());
+        let mut it = nib.into_iter();
+        assert!(!it.is_empty());
+        assert_eq!(it.size_hint(), (2, Some(2)));
+        assert_eq!(it.next(), Some(0));
+        assert!(!it.is_empty());
+        assert_eq!(it.size_hint(), (1, Some(1)));
+        assert_eq!(it.next(), Some(1));
+        assert!(it.is_empty());
+        assert_eq!(it.size_hint(), (0, Some(0)));
     }
 }

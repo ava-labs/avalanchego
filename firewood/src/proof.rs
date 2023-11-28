@@ -126,7 +126,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
             cur_hash = match sub_proof {
                 // Return when reaching the end of the key.
-                Some(p) if key_nibbles.size_hint().0 == 0 => break p.encoded,
+                Some(p) if key_nibbles.is_empty() => break p.encoded,
                 // The trie doesn't contain the key.
                 Some(SubProof {
                     hash: Some(hash), ..
@@ -542,7 +542,7 @@ fn locate_subproof(
 
             Ok((sub_proof.into(), key_nibbles))
         }
-        NodeType::Branch(_) if key_nibbles.size_hint().0 == 0 => Err(ProofError::NoSuchNode),
+        NodeType::Branch(_) if key_nibbles.is_empty() => Err(ProofError::NoSuchNode),
         NodeType::Branch(n) => {
             let index = key_nibbles.next().unwrap() as usize;
             // consume items returning the item at index
