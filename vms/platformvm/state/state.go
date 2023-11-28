@@ -193,9 +193,6 @@ type State interface {
 	Close() error
 }
 
-// Returns the block, status of the block, and whether it is a [stateBlk].
-// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
-//
 // TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    block.Block
