@@ -44,7 +44,7 @@ type Client struct {
 	handlerPrefix []byte
 	router        *router
 	sender        common.AppSender
-	options       *ClientOptions
+	options       *clientOptions
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -55,7 +55,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.options.NodeSampler.Sample(ctx, 1)
+	sampled := c.options.nodeSampler.Sample(ctx, 1)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}

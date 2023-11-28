@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,33 +27,33 @@ var (
 
 // ClientOption configures Client
 type ClientOption interface {
-	apply(options *ClientOptions)
+	apply(options *clientOptions)
 }
 
-type clientOptionFunc func(options *ClientOptions)
+type clientOptionFunc func(options *clientOptions)
 
-func (o clientOptionFunc) apply(options *ClientOptions) {
+func (o clientOptionFunc) apply(options *clientOptions) {
 	o(options)
 }
 
 // WithPeerSampling configures Client.AppRequestAny to sample peers
 func WithPeerSampling(network *Network) ClientOption {
-	return clientOptionFunc(func(options *ClientOptions) {
-		options.NodeSampler = network.peers
+	return clientOptionFunc(func(options *clientOptions) {
+		options.nodeSampler = network.peers
 	})
 }
 
 // WithValidatorSampling configures Client.AppRequestAny to sample validators
 func WithValidatorSampling(validators *Validators) ClientOption {
-	return clientOptionFunc(func(options *ClientOptions) {
-		options.NodeSampler = validators
+	return clientOptionFunc(func(options *clientOptions) {
+		options.nodeSampler = validators
 	})
 }
 
-// ClientOptions holds client-configurable values
-type ClientOptions struct {
-	// NodeSampler is used to select nodes to route Client.AppRequestAny to
-	NodeSampler NodeSampler
+// clientOptions holds client-configurable values
+type clientOptions struct {
+	// nodeSampler is used to select nodes to route Client.AppRequestAny to
+	nodeSampler NodeSampler
 }
 
 // NewNetwork returns an instance of Network
@@ -202,8 +201,8 @@ func (n *Network) RegisterAppProtocol(handlerID uint64, handler Handler, options
 		},
 	}
 
-	clientOptions := &ClientOptions{
-		NodeSampler: n.peers,
+	clientOptions := &clientOptions{
+		nodeSampler: n.peers,
 	}
 
 	for _, option := range options {
