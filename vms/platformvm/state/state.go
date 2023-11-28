@@ -1657,59 +1657,6 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 // BLOCKs Section
 
 // UPTIMES SECTION
-func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if exists {
-		uptime, exists := nodeUptimes[subnetID]
-		if exists {
-			return uptime.Duration, uptime.lastUpdated, nil
-		}
-	}
-
-	// try loading from DB
-	key := merkleLocalUptimesKey(vdrID, subnetID)
-	uptimeBytes, err := s.localUptimesDB.Get(key)
-	switch err {
-	case nil:
-		upTm := &uptimes{}
-		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, upTm); err != nil {
-			return 0, time.Time{}, err
-		}
-		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
-		s.localUptimesCache[vdrID] = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID][subnetID] = upTm
-		return upTm.Duration, upTm.lastUpdated, nil
-
-	case database.ErrNotFound:
-		// no local data for this staker uptime
-		return 0, time.Time{}, database.ErrNotFound
-	default:
-		return 0, time.Time{}, err
-	}
-}
-
-func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if !exists {
-		nodeUptimes = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID] = nodeUptimes
-	}
-
-	nodeUptimes[subnetID] = &uptimes{
-		Duration:    upDuration,
-		LastUpdated: uint64(lastUpdated.Unix()),
-		lastUpdated: lastUpdated,
-	}
-
-	// track diff
-	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
-	if !ok {
-		updatedNodeUptimes = set.Set[ids.ID]{}
-		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
-	}
-	updatedNodeUptimes.Add(subnetID)
-	return nil
-}
 
 // UTXOs section
 
@@ -2308,5 +2255,59 @@ func (s *state) logMerkleRoot(hasChanges bool) error {
 		zap.Stringer("blkID", blk.ID()),
 		zap.String("merkle root", root.String()),
 	)
+	return nil
+}
+
+func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+	nodeUptimes, exists := s.localUptimesCache[vdrID]
+	if exists {
+		uptime, exists := nodeUptimes[subnetID]
+		if exists {
+			return uptime.Duration, uptime.lastUpdated, nil
+		}
+	}
+
+	// try loading from DB
+	key := merkleLocalUptimesKey(vdrID, subnetID)
+	uptimeBytes, err := s.localUptimesDB.Get(key)
+	switch err {
+	case nil:
+		upTm := &uptimes{}
+		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, upTm); err != nil {
+			return 0, time.Time{}, err
+		}
+		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
+		s.localUptimesCache[vdrID] = make(map[ids.ID]*uptimes)
+		s.localUptimesCache[vdrID][subnetID] = upTm
+		return upTm.Duration, upTm.lastUpdated, nil
+
+	case database.ErrNotFound:
+		// no local data for this staker uptime
+		return 0, time.Time{}, database.ErrNotFound
+	default:
+		return 0, time.Time{}, err
+	}
+}
+
+func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
+	nodeUptimes, exists := s.localUptimesCache[vdrID]
+	if !exists {
+		nodeUptimes = make(map[ids.ID]*uptimes)
+		s.localUptimesCache[vdrID] = nodeUptimes
+	}
+
+	nodeUptimes[subnetID] = &uptimes{
+		Duration:    upDuration,
+		LastUpdated: uint64(lastUpdated.Unix()),
+		lastUpdated: lastUpdated,
+	}
+
+	// track diff
+	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
+	if !ok {
+		updatedNodeUptimes = set.Set[ids.ID]{}
+		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
+	}
+	updatedNodeUptimes.Add(subnetID)
 	return nil
 }
