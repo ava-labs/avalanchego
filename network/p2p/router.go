@@ -94,10 +94,10 @@ func newRouter(
 	}
 }
 
-// registerAppProtocol reserves an identifier for an application protocol and
+// newAppProtocol reserves an identifier for an application protocol and
 // returns a Client that can be used to send messages for the corresponding
 // protocol.
-func (r *router) registerAppProtocol(handlerID uint64, handler Handler) (*Client, error) {
+func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 

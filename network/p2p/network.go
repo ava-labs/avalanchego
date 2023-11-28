@@ -122,7 +122,7 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 }
 
 func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...ClientOption) (*Client, error) {
-	client, err := n.router.registerAppProtocol(handlerID, handler)
+	client, err := n.router.newAppProtocol(handlerID, handler)
 	if err != nil {
 		return nil, err
 	}
