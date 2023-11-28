@@ -486,7 +486,7 @@ type fullVM struct {
 }
 
 func setupBlockBackfillingTests(t *testing.T) (Config, *fullVM, *common.SenderTest, error) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 
 	var (
 		vm = &fullVM{
