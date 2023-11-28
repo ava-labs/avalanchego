@@ -757,7 +757,6 @@ func (t *Transitive) issue(ctx context.Context, nodeID ids.NodeID, blk snowman.B
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	t.metrics.providerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	return t.errs.Err
 }
 
@@ -986,6 +985,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, nodeID i
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	t.metrics.providerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
