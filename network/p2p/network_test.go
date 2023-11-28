@@ -451,7 +451,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
-			sampled := network.Peers.sample(tt.limit)
+			sampled := network.Peers.Sample(tt.limit)
 			require.Len(sampled, math.Min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})

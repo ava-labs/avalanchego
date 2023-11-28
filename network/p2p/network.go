@@ -163,7 +163,7 @@ func (p *Peers) has(nodeID ids.NodeID) bool {
 }
 
 // Sample returns a pseudo-random sample of up to limit Peers
-func (p *Peers) sample(limit int) []ids.NodeID {
+func (p *Peers) Sample(limit int) []ids.NodeID {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -175,5 +175,5 @@ type peerSampler struct {
 }
 
 func (p peerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
-	return p.peers.sample(limit)
+	return p.peers.Sample(limit)
 }
