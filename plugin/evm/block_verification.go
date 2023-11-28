@@ -118,11 +118,18 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	// Check that the size of the header's Extra data field is correct for [rules].
 	headerExtraDataSize := uint64(len(ethHeader.Extra))
 	switch {
+	case rules.IsDUpgrade:
+		if headerExtraDataSize < uint64(params.DynamicFeeExtraDataSize) {
+			return fmt.Errorf(
+				"expected header ExtraData to be len >= %d but got %d",
+				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
+			)
+		}
 	case rules.IsApricotPhase3:
-		if headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+		if headerExtraDataSize != params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be %d but got %d",
-				params.ApricotPhase3ExtraDataSize, headerExtraDataSize,
+				params.DynamicFeeExtraDataSize, headerExtraDataSize,
 			)
 		}
 	case rules.IsApricotPhase1:

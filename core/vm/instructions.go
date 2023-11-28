@@ -29,7 +29,6 @@ package vm
 import (
 	"errors"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -914,14 +913,14 @@ func makeLog(size int) executionFunc {
 		}
 
 		d := scope.Memory.GetCopy(int64(mStart.Uint64()), int64(mSize.Uint64()))
-		interpreter.evm.StateDB.AddLog(&types.Log{
-			Address: scope.Contract.Address(),
-			Topics:  topics,
-			Data:    d,
+		interpreter.evm.StateDB.AddLog(
+			scope.Contract.Address(),
+			topics,
+			d,
 			// This is a non-consensus field, but assigned here because
 			// core/state doesn't know the current block number.
-			BlockNumber: interpreter.evm.Context.BlockNumber.Uint64(),
-		})
+			interpreter.evm.Context.BlockNumber.Uint64(),
+		)
 
 		return nil, nil
 	}

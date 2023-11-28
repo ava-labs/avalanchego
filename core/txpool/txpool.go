@@ -269,10 +269,10 @@ type TxPool struct {
 	signer      types.Signer
 	mu          sync.RWMutex
 
-	istanbul atomic.Bool // Fork indicator whether we are in the istanbul stage.
-	eip2718  atomic.Bool // Fork indicator whether we are using EIP-2718 type transactions.
-	eip1559  atomic.Bool // Fork indicator whether we are using EIP-1559 type transactions.
-	eip3860  atomic.Bool // Fork indicator whether EIP-3860 is activated. (activated in Shanghai Upgrade in Ethereum)
+	rules   atomic.Pointer[params.Rules] // Rules for the currentHead
+	eip2718 atomic.Bool                  // Fork indicator whether we are using EIP-2718 type transactions.
+	eip1559 atomic.Bool                  // Fork indicator whether we are using EIP-1559 type transactions.
+	eip3860 atomic.Bool                  // Fork indicator whether EIP-3860 is activated. (activated in Shanghai Upgrade in Ethereum)
 
 	currentHead *types.Header
 	// [currentState] is the state of the blockchain head. It is reset whenever
@@ -764,7 +764,7 @@ func (pool *TxPool) validateTxBasics(tx *types.Transaction, local bool) error {
 		return fmt.Errorf("%w: address %s have gas tip cap (%d) < pool gas tip cap (%d)", ErrUnderpriced, from.Hex(), tx.GasTipCap(), pool.gasPrice)
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
-	intrGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul.Load(), pool.eip3860.Load())
+	intrGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, *pool.rules.Load())
 	if err != nil {
 		return err
 	}
@@ -1520,10 +1520,12 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	// Update all fork indicator by next pending block number.
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
-	pool.istanbul.Store(pool.chainconfig.IsIstanbul(next))
-	pool.eip2718.Store(pool.chainconfig.IsApricotPhase2(newHead.Time))
-	pool.eip1559.Store(pool.chainconfig.IsApricotPhase3(newHead.Time))
-	pool.eip3860.Store(pool.chainconfig.IsDUpgrade(newHead.Time))
+	rules := pool.chainconfig.AvalancheRules(next, newHead.Time)
+
+	pool.rules.Store(&rules)
+	pool.eip2718.Store(rules.IsApricotPhase2)
+	pool.eip1559.Store(rules.IsApricotPhase3)
+	pool.eip3860.Store(rules.IsDUpgrade)
 }
 
 // promoteExecutables moves transactions that have become processable from the

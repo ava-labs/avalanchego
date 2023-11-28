@@ -32,7 +32,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/precompile"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/coreth/precompile/modules"
+	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -132,7 +134,7 @@ var (
 	}
 
 	TestChainConfig = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -159,7 +161,7 @@ var (
 	}
 
 	TestLaunchConfig = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -186,7 +188,7 @@ var (
 	}
 
 	TestApricotPhase1Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -213,7 +215,7 @@ var (
 	}
 
 	TestApricotPhase2Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -240,7 +242,7 @@ var (
 	}
 
 	TestApricotPhase3Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -267,7 +269,7 @@ var (
 	}
 
 	TestApricotPhase4Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -294,7 +296,7 @@ var (
 	}
 
 	TestApricotPhase5Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -321,7 +323,7 @@ var (
 	}
 
 	TestApricotPhasePre6Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -348,7 +350,7 @@ var (
 	}
 
 	TestApricotPhase6Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -375,7 +377,7 @@ var (
 	}
 
 	TestApricotPhasePost6Config = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -402,7 +404,7 @@ var (
 	}
 
 	TestBanffChainConfig = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -429,7 +431,7 @@ var (
 	}
 
 	TestCortinaChainConfig = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -456,7 +458,7 @@ var (
 	}
 
 	TestDUpgradeChainConfig = &ChainConfig{
-		AvalancheContext:                AvalancheContext{common.Hash{1}},
+		AvalancheContext:                AvalancheContext{snow.DefaultContextTest()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
 		DAOForkBlock:                    nil,
@@ -483,6 +485,19 @@ var (
 
 	TestRules = TestChainConfig.AvalancheRules(new(big.Int), 0)
 )
+
+// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
+// - Timestamps that enable avalanche network upgrades,
+// - Enabling or disabling precompiles as network upgrades.
+type UpgradeConfig struct {
+	// Config for enabling and disabling precompiles as network upgrades.
+	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
+}
+
+// AvalancheContext provides Avalanche specific context directly into the EVM.
+type AvalancheContext struct {
+	SnowCtx *snow.Context
+}
 
 // ChainConfig is the core config which determines the blockchain settings.
 //
@@ -537,11 +552,8 @@ type ChainConfig struct {
 	DUpgradeBlockTimestamp *uint64 `json:"dUpgradeBlockTimestamp,omitempty"`
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
-}
 
-// AvalancheContext provides Avalanche specific context directly into the EVM.
-type AvalancheContext struct {
-	BlockchainID common.Hash
+	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Skip encoding/decoding directly into ChainConfig.
 }
 
 // Description returns a human-readable description of ChainConfig.
@@ -711,6 +723,21 @@ func (c *ChainConfig) IsCancun(time uint64) bool {
 	return utils.IsTimestampForked(c.CancunTime, time)
 }
 
+func (r *Rules) PredicatersExist() bool {
+	return len(r.Predicaters) > 0
+}
+
+func (r *Rules) PredicaterExists(addr common.Address) bool {
+	_, PredicaterExists := r.Predicaters[addr]
+	return PredicaterExists
+}
+
+// IsPrecompileEnabled returns whether precompile with [address] is enabled at [timestamp].
+func (c *ChainConfig) IsPrecompileEnabled(address common.Address, timestamp uint64) bool {
+	config := c.getActivePrecompileConfig(address, timestamp)
+	return config != nil && !config.IsDisabled()
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time uint64) *ConfigCompatError {
@@ -734,6 +761,16 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time u
 		}
 	}
 	return lasterr
+}
+
+// Verify verifies chain config and returns error
+func (c *ChainConfig) Verify() error {
+	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
+	if err := c.verifyPrecompileUpgrades(); err != nil {
+		return fmt.Errorf("invalid precompile upgrades: %w", err)
+	}
+
+	return nil
 }
 
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
@@ -1026,11 +1063,17 @@ type Rules struct {
 	IsCortina                                                                           bool
 	IsDUpgrade                                                                          bool
 
-	// Precompiles maps addresses to stateful precompiled contracts that are enabled
+	// ActivePrecompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
 	// Note: none of these addresses should conflict with the address space used by
 	// any existing precompiles.
-	Precompiles map[common.Address]precompile.StatefulPrecompiledContract
+	ActivePrecompiles map[common.Address]precompileconfig.Config
+	// Predicaters maps addresses to stateful precompile Predicaters
+	// that are enabled for this rule set.
+	Predicaters map[common.Address]precompileconfig.Predicater
+	// AccepterPrecompiles map addresses to stateful precompile accepter functions
+	// that are enabled for this rule set.
+	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1071,35 +1114,26 @@ func (c *ChainConfig) AvalancheRules(blockNum *big.Int, timestamp uint64) Rules 
 	rules.IsDUpgrade = c.IsDUpgrade(timestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
-	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
-	for _, config := range c.enabledStatefulPrecompiles() {
-		if utils.IsTimestampForked(config.Timestamp(), timestamp) {
-			rules.Precompiles[config.Address()] = config.Contract()
+	rules.ActivePrecompiles = make(map[common.Address]precompileconfig.Config)
+	rules.Predicaters = make(map[common.Address]precompileconfig.Predicater)
+	rules.AccepterPrecompiles = make(map[common.Address]precompileconfig.Accepter)
+	for _, module := range modules.RegisteredModules() {
+		if config := c.getActivePrecompileConfig(module.Address, timestamp); config != nil && !config.IsDisabled() {
+			rules.ActivePrecompiles[module.Address] = config
+			if predicater, ok := config.(precompileconfig.Predicater); ok {
+				rules.Predicaters[module.Address] = predicater
+			}
+			if precompileAccepter, ok := config.(precompileconfig.Accepter); ok {
+				rules.AccepterPrecompiles[module.Address] = precompileAccepter
+			}
 		}
 	}
 
 	return rules
 }
 
-// enabledStatefulPrecompiles returns a list of stateful precompile configs in the order that they are enabled
-// by block timestamp.
-// Note: the return value does not include the native precompiles [nativeAssetCall] and [nativeAssetBalance].
-// These are handled in [evm.precompile] directly.
-func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
-	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
-
-	return statefulPrecompileConfigs
-}
-
-// CheckConfigurePrecompiles checks if any of the precompiles specified in the chain config are enabled by the block
-// transition from [parentTimestamp] to the timestamp set in [blockContext]. If this is the case, it calls [Configure]
-// to apply the necessary state transitions for the upgrade.
-// This function is called:
-// - within genesis setup to configure the starting state for precompiles enabled at genesis,
-// - during block processing to update the state before processing the given block.
-func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *uint64, blockContext precompile.BlockContext, statedb precompile.StateDB) {
-	// Iterate the enabled stateful precompiles and configure them if needed
-	for _, config := range c.enabledStatefulPrecompiles() {
-		precompile.CheckConfigure(c, parentTimestamp, blockContext, config, statedb)
-	}
+// IsPrecompileEnabled returns true if the precompile at [addr] is enabled for this rule set.
+func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
+	_, ok := r.ActivePrecompiles[addr]
+	return ok
 }

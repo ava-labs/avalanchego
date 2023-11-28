@@ -79,6 +79,11 @@ func (b *BlockGen) SetExtra(data []byte) {
 	b.header.Extra = data
 }
 
+// AppendExtra appends data to the extra data field of the generated block.
+func (b *BlockGen) AppendExtra(data []byte) {
+	b.header.Extra = append(b.header.Extra, data...)
+}
+
 // SetNonce sets the nonce field of the generated block.
 func (b *BlockGen) SetNonce(nonce types.BlockNonce) {
 	b.header.Nonce = nonce
@@ -103,7 +108,8 @@ func (b *BlockGen) addTx(bc *BlockChain, vmConfig vm.Config, tx *types.Transacti
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.SetTxContext(tx.Hash(), len(b.txs))
-	receipt, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vmConfig)
+	blockContext := NewEVMBlockContext(b.header, bc, &b.header.Coinbase)
+	receipt, err := ApplyTransaction(b.config, bc, blockContext, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vmConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -245,6 +251,11 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts, error) {
 		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(chainreader, config, parent, gap, statedb, b.engine)
+
+		err := ApplyUpgrades(config, &parent.Header().Time, b, statedb)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to configure precompiles %v", err)
+		}
 
 		// Execute any user modifications to the block
 		if gen != nil {
