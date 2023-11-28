@@ -38,8 +38,6 @@ pub enum ProofError {
     InvalidProof,
     #[error("invalid edge keys")]
     InvalidEdgeKeys,
-    #[error("inconsisent edge keys")]
-    InconsistentEdgeKeys,
     #[error("node insertion error")]
     NodesInsertionError,
     #[error("node not in trie")]
@@ -221,11 +219,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // First check the validity of edge keys.
         if first_key.as_ref() >= last_key.as_ref() {
             return Err(ProofError::InvalidEdgeKeys);
-        }
-
-        // TODO(Hao): different length edge keys should be supported
-        if first_key.as_ref().len() != last_key.as_ref().len() {
-            return Err(ProofError::InconsistentEdgeKeys);
         }
 
         // Convert the edge proofs to edge trie paths. Then we can
