@@ -729,8 +729,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert preferences are correct
-	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(context.Background())
+	options, err := blk.(smcon.OracleBlock).Options(context.Background())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
@@ -739,13 +738,13 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.IsType(&block.BanffAbortBlock{}, abort.Block)
 
 	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
+	rewardTx := blk.(block.Block).Txs()[0].Unsigned
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
 	// Verify options and accept commmit block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
-	txID := oracleBlk.(block.Block).Txs()[0].ID()
+	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAbort, ok := vm.manager.GetState(abort.ID())
 		require.True(ok)
@@ -755,7 +754,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		require.Equal(status.Aborted, txStatus)
 	}
 
-	require.NoError(oracleBlk.Accept(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Accept(context.Background()))
 
 	// Verify that chain's timestamp has advanced
@@ -1483,23 +1482,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	commonCfg := common.Config{
+	bootstrapConfig := bootstrap.Config{
+		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	bootstrapConfig := bootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
+		Blocked:                        blocked,
+		VM:                             vm,
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine

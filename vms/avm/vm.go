@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/network"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
@@ -91,7 +91,7 @@ type VM struct {
 	appSender common.AppSender
 
 	// State management
-	state states.State
+	state state.State
 
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
@@ -220,7 +220,7 @@ func (vm *VM) Initialize(
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := states.New(
+	state, err := state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
