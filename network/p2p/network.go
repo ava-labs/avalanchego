@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -20,9 +21,9 @@ import (
 )
 
 var (
-	_ snowvalidators.Connector = (*Network)(nil)
-	_ common.AppHandler        = (*Network)(nil)
-	_ NodeSampler              = (*peers)(nil)
+	_ validators.Connector = (*Network)(nil)
+	_ common.AppHandler    = (*Network)(nil)
+	_ NodeSampler          = (*peers)(nil)
 )
 
 // ClientOption configures Client

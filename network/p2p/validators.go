@@ -28,7 +28,7 @@ type ValidatorSet interface {
 func NewValidators(
 	network *Network,
 	subnetID ids.ID,
-	validators snowvalidators.State,
+	validators validators.State,
 	maxValidatorSetStaleness time.Duration,
 ) *Validators {
 	return &Validators{
@@ -45,7 +45,7 @@ type Validators struct {
 	peers      *peers
 	log        logging.Logger
 	subnetID   ids.ID
-	validators snowvalidators.State
+	validators validators.State
 
 	lock                     sync.Mutex
 	validatorIDs             set.SampleableSet[ids.NodeID]
