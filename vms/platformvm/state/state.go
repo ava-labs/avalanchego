@@ -1319,13 +1319,13 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx)
+		validatorTx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
-		stakeAmount := tx.Weight()
-		stakeDuration := tx.EndTime().Sub(tx.StartTime()) // pre durango fork this duration is right
+		stakeAmount := validatorTx.Weight()
+		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime()) // pre durango fork this duration is right
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -1343,7 +1343,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 		// tx is a genesis transactions, hence it's guaranteed to be
 		// pre Durango. It's fine to use tx.StartTime
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, validatorTx.StartTime(), potentialReward)
 		if err != nil {
 			return err
 		}
