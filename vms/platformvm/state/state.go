@@ -360,7 +360,7 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 ) (State, error) {
-	res, err := newState(
+	s, err := newState(
 		rawDB,
 		metrics,
 		validators,
@@ -373,13 +373,13 @@ func New(
 		return nil, err
 	}
 
-	if err := res.sync(genesisBytes); err != nil {
+	if err := s.sync(genesisBytes); err != nil {
 		// Drop any errors on close to return the first error
-		_ = res.Close()
+		_ = s.Close()
 		return nil, err
 	}
 
-	return res, nil
+	return s, nil
 }
 
 func newState(
