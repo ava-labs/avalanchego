@@ -451,7 +451,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
-			sampled := network.Peers.Sample(context.Background(), tt.limit)
+			sampled := network.Peers.sample(tt.limit)
 			require.Len(sampled, math.Min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
@@ -505,6 +505,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 func TestNodeSamplerClientOption(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
 
 	tests := []struct {
 		name        string
@@ -515,11 +516,11 @@ func TestNodeSamplerClientOption(t *testing.T) {
 	}{
 		{
 			name:  "default",
-			peers: []ids.NodeID{nodeID0},
+			peers: []ids.NodeID{nodeID0, nodeID1, nodeID2},
 			option: func(_ *testing.T, n *Network) ClientOption {
 				return clientOptionFunc(func(*clientOptions) {})
 			},
-			expected: []ids.NodeID{nodeID0},
+			expected: []ids.NodeID{nodeID0, nodeID1, nodeID2},
 		},
 		{
 			name:  "validator connected",
@@ -570,7 +571,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			done := make(chan struct{})
 			sender := &common.SenderTest{
 				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-					require.Equal(tt.expected, nodeIDs.List())
+					require.Subset(tt.expected, nodeIDs.List())
 					close(done)
 					return nil
 				},

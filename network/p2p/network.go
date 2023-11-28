@@ -21,7 +21,7 @@ import (
 var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
-	_ NodeSampler          = (*Peers)(nil)
+	_ NodeSampler          = (*peerSampler)(nil)
 )
 
 // ClientOption configures Client
@@ -123,7 +123,9 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 	}
 
 	client.options = &clientOptions{
-		nodeSampler: n.Peers,
+		nodeSampler: &peerSampler{
+			peers: n.Peers,
+		},
 	}
 
 	for _, option := range options {
@@ -161,9 +163,17 @@ func (p *Peers) has(nodeID ids.NodeID) bool {
 }
 
 // Sample returns a pseudo-random sample of up to limit Peers
-func (p *Peers) Sample(_ context.Context, limit int) []ids.NodeID {
+func (p *Peers) sample(limit int) []ids.NodeID {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.set.Sample(limit)
+}
+
+type peerSampler struct {
+	peers *Peers
+}
+
+func (p peerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
+	return p.peers.sample(limit)
 }
