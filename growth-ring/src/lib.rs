@@ -52,7 +52,6 @@ pub mod wal;
 pub mod walerror;
 
 use async_trait::async_trait;
-use nix::fcntl::OFlag;
 use std::fs;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
@@ -159,16 +158,6 @@ impl WalStoreImpl {
             root_dir: wal_dir.as_ref().to_path_buf(),
         })
     }
-}
-
-/// Return OS specific open flags for opening files
-/// TODO: Switch to a rust idiomatic directory scanning approach
-/// TODO: This shouldn't need to escape growth-ring (no pub)
-pub fn oflags() -> OFlag {
-    #[cfg(target_os = "linux")]
-    return OFlag::O_DIRECTORY | OFlag::O_PATH;
-    #[cfg(not(target_os = "linux"))]
-    return OFlag::O_DIRECTORY;
 }
 
 #[async_trait(?Send)]
