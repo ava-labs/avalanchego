@@ -69,7 +69,6 @@ type router struct {
 	pendingAppRequests           map[uint32]pendingAppRequest
 	pendingCrossChainAppRequests map[uint32]pendingCrossChainAppRequest
 	requestID                    uint32
-	clientDefaults               *clientOptions
 }
 
 // newRouter returns a new instance of Router
@@ -78,14 +77,12 @@ func newRouter(
 	sender common.AppSender,
 	metrics prometheus.Registerer,
 	namespace string,
-	clientDefaults *clientOptions,
 ) *router {
 	return &router{
 		log:                          log,
 		sender:                       sender,
 		metrics:                      metrics,
 		namespace:                    namespace,
-		clientDefaults:               clientDefaults,
 		handlers:                     make(map[uint64]*meteredHandler),
 		pendingAppRequests:           make(map[uint32]pendingAppRequest),
 		pendingCrossChainAppRequests: make(map[uint32]pendingCrossChainAppRequest),
@@ -198,7 +195,6 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		handlerPrefix: binary.AppendUvarint(nil, handlerID),
 		sender:        r.sender,
 		router:        r,
-		options:       r.clientDefaults,
 	}, nil
 }
 

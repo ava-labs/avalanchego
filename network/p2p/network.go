@@ -55,18 +55,13 @@ func NewNetwork(
 	metrics prometheus.Registerer,
 	namespace string,
 ) *Network {
-	peers := &Peers{}
-	clientDefaults := &clientOptions{
-		nodeSampler: peers,
-	}
-
 	return &Network{
-		Peers:     peers,
+		Peers:     &Peers{},
 		log:       log,
 		sender:    sender,
 		metrics:   metrics,
 		namespace: namespace,
-		router:    newRouter(log, sender, metrics, namespace, clientDefaults),
+		router:    newRouter(log, sender, metrics, namespace),
 	}
 }
 
@@ -125,6 +120,10 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 	client, err := n.router.newAppProtocol(handlerID, handler)
 	if err != nil {
 		return nil, err
+	}
+
+	client.options = &clientOptions{
+		nodeSampler: n.Peers,
 	}
 
 	for _, option := range options {
