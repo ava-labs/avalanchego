@@ -582,6 +582,124 @@ func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
 
+func (s *state) GetSubnets() ([]*txs.Tx, error) {
+	// Note: we want all subnets, so we don't look at addedSubnets
+	// which are only part of them
+	if s.permissionedSubnetCache != nil {
+		return s.permissionedSubnetCache, nil
+	}
+
+	subnets := make([]*txs.Tx, 0)
+	subnetDBIt := s.merkleDB.NewIteratorWithPrefix(permissionedSubnetSectionPrefix)
+	defer subnetDBIt.Release()
+
+	for subnetDBIt.Next() {
+		subnetTxBytes := subnetDBIt.Value()
+		subnetTx, err := txs.Parse(txs.GenesisCodec, subnetTxBytes)
+		if err != nil {
+			return nil, err
+		}
+		subnets = append(subnets, subnetTx)
+	}
+	if err := subnetDBIt.Error(); err != nil {
+		return nil, err
+	}
+	subnets = append(subnets, s.addedPermissionedSubnets...)
+	s.permissionedSubnetCache = subnets
+	return subnets, nil
+}
+
+func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
+	s.addedPermissionedSubnets = append(s.addedPermissionedSubnets, createSubnetTx)
+}
+
+func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
+	if owner, exists := s.subnetOwners[subnetID]; exists {
+		return owner, nil
+	}
+
+	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
+		if ownerAndSize.owner == nil {
+			return nil, database.ErrNotFound
+		}
+		return ownerAndSize.owner, nil
+	}
+
+	subnetIDKey := merkleSubnetOwnersKey(subnetID)
+	ownerBytes, err := s.merkleDB.Get(subnetIDKey)
+	if err == nil {
+		var owner fx.Owner
+		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+			return nil, err
+		}
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+		return owner, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
+	subnetIntf, _, err := s.GetTx(subnetID)
+	if err != nil {
+		if err == database.ErrNotFound {
+			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
+		}
+		return nil, err
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+	}
+
+	s.SetSubnetOwner(subnetID, subnet.Owner)
+	return subnet.Owner, nil
+}
+
+func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	s.subnetOwners[subnetID] = owner
+}
+
+func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	if tx, exists := s.addedElasticSubnets[subnetID]; exists {
+		return tx, nil
+	}
+
+	if tx, cached := s.elasticSubnetCache.Get(subnetID); cached {
+		if tx == nil {
+			return nil, database.ErrNotFound
+		}
+		return tx, nil
+	}
+
+	key := merkleElasticSubnetKey(subnetID)
+	transformSubnetTxBytes, err := s.merkleDB.Get(key)
+	switch err {
+	case nil:
+		transformSubnetTx, err := txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
+		if err != nil {
+			return nil, err
+		}
+		s.elasticSubnetCache.Put(subnetID, transformSubnetTx)
+		return transformSubnetTx, nil
+
+	case database.ErrNotFound:
+		s.elasticSubnetCache.Put(subnetID, nil)
+		return nil, database.ErrNotFound
+
+	default:
+		return nil, err
+	}
+}
+
+func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	s.addedElasticSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -739,123 +857,6 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 }
 
 // SUBNETS Section
-func (s *state) GetSubnets() ([]*txs.Tx, error) {
-	// Note: we want all subnets, so we don't look at addedSubnets
-	// which are only part of them
-	if s.permissionedSubnetCache != nil {
-		return s.permissionedSubnetCache, nil
-	}
-
-	subnets := make([]*txs.Tx, 0)
-	subnetDBIt := s.merkleDB.NewIteratorWithPrefix(permissionedSubnetSectionPrefix)
-	defer subnetDBIt.Release()
-
-	for subnetDBIt.Next() {
-		subnetTxBytes := subnetDBIt.Value()
-		subnetTx, err := txs.Parse(txs.GenesisCodec, subnetTxBytes)
-		if err != nil {
-			return nil, err
-		}
-		subnets = append(subnets, subnetTx)
-	}
-	if err := subnetDBIt.Error(); err != nil {
-		return nil, err
-	}
-	subnets = append(subnets, s.addedPermissionedSubnets...)
-	s.permissionedSubnetCache = subnets
-	return subnets, nil
-}
-
-func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
-	s.addedPermissionedSubnets = append(s.addedPermissionedSubnets, createSubnetTx)
-}
-
-func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
-	if owner, exists := s.subnetOwners[subnetID]; exists {
-		return owner, nil
-	}
-
-	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if ownerAndSize.owner == nil {
-			return nil, database.ErrNotFound
-		}
-		return ownerAndSize.owner, nil
-	}
-
-	subnetIDKey := merkleSubnetOwnersKey(subnetID)
-	ownerBytes, err := s.merkleDB.Get(subnetIDKey)
-	if err == nil {
-		var owner fx.Owner
-		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
-			return nil, err
-		}
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
-		return owner, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-
-	subnetIntf, _, err := s.GetTx(subnetID)
-	if err != nil {
-		if err == database.ErrNotFound {
-			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
-		}
-		return nil, err
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
-	}
-
-	s.SetSubnetOwner(subnetID, subnet.Owner)
-	return subnet.Owner, nil
-}
-
-func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
-	s.subnetOwners[subnetID] = owner
-}
-
-func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
-	if tx, exists := s.addedElasticSubnets[subnetID]; exists {
-		return tx, nil
-	}
-
-	if tx, cached := s.elasticSubnetCache.Get(subnetID); cached {
-		if tx == nil {
-			return nil, database.ErrNotFound
-		}
-		return tx, nil
-	}
-
-	key := merkleElasticSubnetKey(subnetID)
-	transformSubnetTxBytes, err := s.merkleDB.Get(key)
-	switch err {
-	case nil:
-		transformSubnetTx, err := txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
-		if err != nil {
-			return nil, err
-		}
-		s.elasticSubnetCache.Put(subnetID, transformSubnetTx)
-		return transformSubnetTx, nil
-
-	case database.ErrNotFound:
-		s.elasticSubnetCache.Put(subnetID, nil)
-		return nil, database.ErrNotFound
-
-	default:
-		return nil, err
-	}
-}
-
-func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
-	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
-	s.addedElasticSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
-}
 
 // CHAINS Section
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
