@@ -5,7 +5,7 @@ set -euo pipefail
 print_usage() {
   printf "Usage: build [OPTIONS]
 
-  Build avalanchego
+  Build aoxc
 
   Options:
 
@@ -23,9 +23,9 @@ while getopts 'r' flag; do
 done
 
 # Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+AOXC_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AOXC_PATH"/scripts/constants.sh
 
 # Download dependencies
 echo "Downloading dependencies..."
@@ -33,11 +33,11 @@ go mod download
 
 build_args="$race"
 
-# Build avalanchego
-"$AVALANCHE_PATH"/scripts/build_avalanche.sh $build_args
+# Build aoxc
+"$AOXC_PATH"/scripts/build_avalanche.sh $build_args
 
 # Exit build successfully if the AvalancheGo binary is created successfully
-if [[ -f "$avalanchego_path" ]]; then
+if [[ -f "$aoxc_path" ]]; then
         echo "Build Successful"
         exit 0
 else

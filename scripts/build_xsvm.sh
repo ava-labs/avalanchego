@@ -12,8 +12,8 @@ source ./scripts/constants.sh
 echo "Building xsvm plugin..."
 go build -o ./build/xsvm ./vms/example/xsvm/cmd/xsvm/
 
-PLUGIN_DIR="$HOME/.avalanchego/plugins"
-PLUGIN_PATH="${PLUGIN_DIR}/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"
+PLUGIN_DIR="$HOME/.aoxc/plugins"
+PLUGIN_PATH="${PLUGIN_DIR}/2bGh8qfVHsWmYc4t7oXdXv3m4wPxaHpvGrK6PRW3idZrPHyurVH"
 echo "Symlinking ./build/xsvm to ${PLUGIN_PATH}"
 mkdir -p "${PLUGIN_DIR}"
 ln -sf "${PWD}/build/xsvm" "${PLUGIN_PATH}"

@@ -5,7 +5,7 @@ set -euo pipefail
 print_usage() {
   printf "Usage: build_avalanche [OPTIONS]
 
-  Build avalanchego
+  Build aoxc
 
   Options:
 
@@ -46,15 +46,15 @@ version_lt() {
 }
 
 if version_lt "$(go_version)" "$go_version_minimum"; then
-    echo "AvalancheGo requires Go >= $go_version_minimum, Go $(go_version) found." >&2
+    echo "aoxc requires Go >= $go_version_minimum, Go $(go_version) found." >&2
     exit 1
 fi
 
-# Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# aoxc root folder
+AOXC_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AOXC_PATH"/scripts/constants.sh
 
 build_args="$race"
-echo "Building AvalancheGo..."
-go build $build_args -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
+echo "Building aoxc..."
+go build $build_args -ldflags "-X github.com/aoxc/aoxc/version.GitCommit=$git_commit $static_ld_flags" -o "$aoxc_path" "$AOXC_PATH/main/"*.go

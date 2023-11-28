@@ -4,7 +4,7 @@ set -euo pipefail
 
 # e.g.,
 # ./scripts/tests.upgrade.sh 1.7.16
-# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.7.16 # Customization of avalanchego path
+# AOXCGO_PATH=./path/to/aoxc ./scripts/tests.upgrade.sh 1.7.16 # Customization of aoxc path
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -17,35 +17,35 @@ if [[ -z "${VERSION}" ]]; then
   exit 255
 fi
 
-AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
+AOXCGO_PATH="$(realpath ${AOXCGO_PATH:-./build/aoxc})"
 
 #################################
-# download avalanchego
-# https://github.com/ava-labs/avalanchego/releases
+# download aoxc
+# https://github.com/aoxcs/aoxc/releases
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-DOWNLOAD_URL=https://github.com/ava-labs/avalanchego/releases/download/v${VERSION}/avalanchego-linux-${GOARCH}-v${VERSION}.tar.gz
-DOWNLOAD_PATH=/tmp/avalanchego.tar.gz
+DOWNLOAD_URL=https://github.com/aoxcs/aoxc/releases/download/v${VERSION}/aoxc-linux-${GOARCH}-v${VERSION}.tar.gz
+DOWNLOAD_PATH=/tmp/aoxc.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
-  DOWNLOAD_URL=https://github.com/ava-labs/avalanchego/releases/download/v${VERSION}/avalanchego-macos-v${VERSION}.zip
-  DOWNLOAD_PATH=/tmp/avalanchego.zip
+  DOWNLOAD_URL=https://github.com/aoxcs/aoxc/releases/download/v${VERSION}/aoxc-macos-v${VERSION}.zip
+  DOWNLOAD_PATH=/tmp/aoxc.zip
 fi
 
 rm -f ${DOWNLOAD_PATH}
-rm -rf /tmp/avalanchego-v${VERSION}
-rm -rf /tmp/avalanchego-build
+rm -rf /tmp/aoxc-v${VERSION}
+rm -rf /tmp/aoxc-build
 
-echo "downloading avalanchego ${VERSION} at ${DOWNLOAD_URL}"
+echo "downloading aoxc ${VERSION} at ${DOWNLOAD_URL}"
 curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
 
-echo "extracting downloaded avalanchego"
+echo "extracting downloaded aoxc"
 if [[ ${GOOS} == "linux" ]]; then
   tar xzvf ${DOWNLOAD_PATH} -C /tmp
 elif [[ ${GOOS} == "darwin" ]]; then
-  unzip ${DOWNLOAD_PATH} -d /tmp/avalanchego-build
-  mv /tmp/avalanchego-build/build /tmp/avalanchego-v${VERSION}
+  unzip ${DOWNLOAD_PATH} -d /tmp/aoxc-build
+  mv /tmp/aoxc-build/build /tmp/aoxc-v${VERSION}
 fi
-find /tmp/avalanchego-v${VERSION}
+find /tmp/aoxc-v${VERSION}
 
 # Sourcing constants.sh ensures that the necessary CGO flags are set to
 # build the portable version of BLST. Without this, ginkgo may fail to
@@ -62,8 +62,8 @@ ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 
 #################################
 # By default, it runs all upgrade test cases!
-echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
+echo "running upgrade tests against the local cluster with ${AOXCGO_PATH}"
 ./tests/upgrade/upgrade.test \
   --ginkgo.v \
-  --avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
-  --avalanchego-path-to-upgrade-to=${AVALANCHEGO_PATH}
+  --aoxc-path=/tmp/aoxc-v${VERSION}/aoxc \
+  --aoxc-path-to-upgrade-to=${AOXCGO_PATH}
