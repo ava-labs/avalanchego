@@ -59,11 +59,10 @@ type builder struct {
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
-	// This timer goes off when it is time for the next validator to add/leave
-	// the validator set. When it goes off ResetTimer() is called, potentially
-	// triggering creation of a new block.
-	timer *timer.Timer
-
+	// This timer goes off when it is time for the next staker to add/leave
+	// the staking set. When it goes off, [setNextBlockBuildTime()] is called,
+	// potentially triggering creation of a new block.
+	timer                *timer.Timer
 	nextStakerChangeTime time.Time
 }
 
@@ -90,6 +89,11 @@ func New(
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
+	defer func() {
+		b.Mempool.RequestBuildBlock(false)
+		b.ResetBlockTimer()
+	}()
+
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
