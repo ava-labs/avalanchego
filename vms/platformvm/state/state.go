@@ -568,7 +568,6 @@ func newState(
 	}, nil
 }
 
-// STAKERS section
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
