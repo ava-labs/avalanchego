@@ -266,7 +266,10 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 	}
 
 	// Configure any stateful precompiles that should be enabled in the genesis.
-	g.Config.CheckConfigurePrecompiles(nil, types.NewBlockWithHeader(head), statedb)
+	err = ApplyPrecompileActivations(g.Config, nil, types.NewBlockWithHeader(head), statedb)
+	if err != nil {
+		panic(fmt.Sprintf("unable to configure precompiles in genesis block: %v", err))
+	}
 
 	for addr, account := range g.Alloc {
 		statedb.AddBalance(addr, account.Balance)

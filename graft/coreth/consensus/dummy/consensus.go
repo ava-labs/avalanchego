@@ -127,7 +127,7 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 		if err != nil {
 			return fmt.Errorf("failed to calculate base fee: %w", err)
 		}
-		if !bytes.Equal(expectedRollupWindowBytes, header.Extra) {
+		if len(header.Extra) < len(expectedRollupWindowBytes) || !bytes.Equal(expectedRollupWindowBytes, header.Extra[:len(expectedRollupWindowBytes)]) {
 			return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
 		}
 		if header.BaseFee == nil {
@@ -194,16 +194,21 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if uncle {
 		return errUnclesUnsupported
 	}
-	// Ensure that the header's extra-data section is of a reasonable size
-	if !config.IsApricotPhase3(header.Time) {
+	switch {
+	case config.IsDUpgrade(header.Time):
+		if len(header.Extra) < params.DynamicFeeExtraDataSize {
+			return fmt.Errorf("expected extra-data field length >= %d, found %d", params.DynamicFeeExtraDataSize, len(header.Extra))
+		}
+	case config.IsApricotPhase3(header.Time):
+		if len(header.Extra) != params.DynamicFeeExtraDataSize {
+			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.DynamicFeeExtraDataSize, len(header.Extra))
+		}
+	default:
 		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
-	} else {
-		if uint64(len(header.Extra)) != params.ApricotPhase3ExtraDataSize {
-			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.ApricotPhase3ExtraDataSize, len(header.Extra))
-		}
 	}
+
 	// Ensure gas-related header fields are correct
 	if err := self.verifyHeaderGasFields(config, header, parent); err != nil {
 		return err

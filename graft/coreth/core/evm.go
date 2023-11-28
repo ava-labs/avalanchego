@@ -32,7 +32,9 @@ import (
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/predicate"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	//"github.com/ethereum/go-ethereum/log"
 )
 
@@ -48,6 +50,33 @@ type ChainContext interface {
 
 // NewEVMBlockContext creates a new context for use in the EVM.
 func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address) vm.BlockContext {
+	predicateBytes, ok := predicate.GetPredicateResultBytes(header.Extra)
+	if !ok {
+		return newEVMBlockContext(header, chain, author, nil)
+	}
+	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or
+	// equal to this size. After the DUpgrade, the VM pre-verifies the extra
+	// data past the dynamic fee rollup window is valid.
+	predicateResults, err := predicate.ParseResults(predicateBytes)
+	if err != nil {
+		log.Error("failed to parse predicate results creating new block context", "err", err, "extra", header.Extra)
+		// As mentioned above, we pre-verify the extra data to ensure this never happens.
+		// If we hit an error, construct a new block context rather than use a potentially half initialized value
+		// as defense in depth.
+		return newEVMBlockContext(header, chain, author, nil)
+	}
+	return newEVMBlockContext(header, chain, author, predicateResults)
+}
+
+// NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
+// in header.Extra.
+// This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
+// directly rather than re-encode the latest results when executing each individaul transaction.
+func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateResults *predicate.Results) vm.BlockContext {
+	return newEVMBlockContext(header, chain, author, predicateResults)
+}
+
+func newEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address, predicateResults *predicate.Results) vm.BlockContext {
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
@@ -68,6 +97,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		Transfer:          Transfer,
 		TransferMultiCoin: TransferMultiCoin,
 		GetHash:           GetHashFn(header, chain),
+		PredicateResults:  predicateResults,
 		Coinbase:          beneficiary,
 		BlockNumber:       new(big.Int).Set(header.Number),
 		Time:              header.Time,

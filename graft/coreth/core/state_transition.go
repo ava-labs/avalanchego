@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -75,10 +76,10 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, rules params.Rules) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
-	if isContractCreation && isHomestead {
+	if isContractCreation && rules.IsHomestead {
 		gas = params.TxGasContractCreation
 	} else {
 		gas = params.TxGas
@@ -95,7 +96,7 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 		}
 		// Make sure we don't exceed uint64 for all data combinations
 		nonZeroGas := params.TxDataNonZeroGasFrontier
-		if isEIP2028 {
+		if rules.IsIstanbul {
 			nonZeroGas = params.TxDataNonZeroGasEIP2028
 		}
 		if (math.MaxUint64-gas)/nonZeroGas < nz {
@@ -109,7 +110,7 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 		}
 		gas += z * params.TxDataZeroGas
 
-		if isContractCreation && isEIP3860 {
+		if isContractCreation && rules.IsDUpgrade {
 			lenWords := toWordSize(dataLen)
 			if (math.MaxUint64-gas)/params.InitCodeWordGas < lenWords {
 				return 0, ErrGasUintOverflow
@@ -118,9 +119,55 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 		}
 	}
 	if accessList != nil {
+		accessListGas, err := accessListGas(rules, accessList)
+		if err != nil {
+			return 0, err
+		}
+		totalGas, overflow := cmath.SafeAdd(gas, accessListGas)
+		if overflow {
+			return 0, ErrGasUintOverflow
+		}
+		gas = totalGas
+	}
+
+	return gas, nil
+}
+
+func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, error) {
+	var gas uint64
+	if !rules.PredicatersExist() {
 		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
 		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
+		return gas, nil
 	}
+
+	for _, accessTuple := range accessList {
+		address := accessTuple.Address
+		predicaterContract, ok := rules.Predicaters[address]
+		if !ok {
+			// Previous access list gas calculation does not use safemath because an overflow would not be possible with
+			// the size of access lists that could be included in a block and standard access list gas costs.
+			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
+			// returned by a predicate.
+			accessTupleGas := params.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*params.TxAccessListStorageKeyGas
+			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
+			if overflow {
+				return 0, ErrGasUintOverflow
+			}
+			gas = totalGas
+		} else {
+			predicateGas, err := predicaterContract.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
+			if err != nil {
+				return 0, err
+			}
+			totalGas, overflow := cmath.SafeAdd(gas, predicateGas)
+			if overflow {
+				return 0, ErrGasUintOverflow
+			}
+			gas = totalGas
+		}
+	}
+
 	return gas, nil
 }
 
@@ -354,7 +401,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsDUpgrade)
+	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules)
 	if err != nil {
 		return nil, err
 	}
