@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -42,10 +41,12 @@ var (
 
 type Builder interface {
 	mempool.Mempool
-	mempool.BlockTimer
 
-	// BuildBlock is called on timer clock to attempt to create
-	// next block
+	// ResetBlockTimer schedules a timer to notify the consensus engine once a
+	// block needs to be built to process a staker change.
+	ResetBlockTimer()
+
+	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
 	// Shutdown cleanly shuts Builder down
@@ -60,13 +61,11 @@ type builder struct {
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
-	// channel to send messages to the consensus engine
-	toEngine chan<- common.Message
-
-	// This timer goes off when it is time for the next validator to add/leave
-	// the validator set. When it goes off ResetTimer() is called, potentially
-	// triggering creation of a new block.
-	timer *timer.Timer
+	// This timer goes off when it is time for the next staker to add/leave
+	// the staking set. When it goes off, [setNextBlockBuildTime()] is called,
+	// potentially triggering creation of a new block.
+	timer                *timer.Timer
+	nextStakerChangeTime time.Time
 }
 
 func New(
@@ -74,14 +73,12 @@ func New(
 	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
-	toEngine chan<- common.Message,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
-		toEngine:          toEngine,
 	}
 
 	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
@@ -94,25 +91,13 @@ func New(
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	b.Mempool.DisableAdding()
 	defer func() {
-		b.Mempool.EnableAdding()
+		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 		b.ResetBlockTimer()
 	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
-	statelessBlk, err := b.buildBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	return b.blkManager.NewBlock(statelessBlk), nil
-}
-
-// Returns the block we want to build and issue.
-// Only modifies state to remove expired proposal txs.
-func (b *builder) buildBlock() (block.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
 	preferred, err := b.blkManager.GetBlock(preferredID)
@@ -147,7 +132,7 @@ func (b *builder) buildBlock() (block.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	return buildBlock(
+	statelessBlk, err := buildBlock(
 		b,
 		preferredID,
 		nextHeight,
@@ -155,6 +140,11 @@ func (b *builder) buildBlock() (block.Block, error) {
 		timeWasCapped,
 		preferredState,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 func (b *builder) Shutdown() {
@@ -187,10 +177,10 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	if _, err := b.buildBlock(); err == nil {
-		// We can build a block now
-		b.notifyBlockReady()
-		return
+	now := b.txExecutorBackend.Clk.Time()
+	if !b.nextStakerChangeTime.After(now) {
+		// Block needs to be issued to advance time.
+		b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 	}
 
 	// Wake up when it's time to add/remove the next validator/delegator
@@ -215,7 +205,6 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	now := b.txExecutorBackend.Clk.Time()
 	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),
@@ -223,17 +212,8 @@ func (b *builder) setNextBuildBlockTime() {
 	)
 
 	// Wake up when it's time to add/remove the next validator
+	b.nextStakerChangeTime = nextStakerChangeTime
 	b.timer.SetTimeoutIn(waitTime)
-}
-
-// notifyBlockReady tells the consensus engine that a new block is ready to be
-// created
-func (b *builder) notifyBlockReady() {
-	select {
-	case b.toEngine <- common.PendingTxs:
-	default:
-		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
-	}
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)

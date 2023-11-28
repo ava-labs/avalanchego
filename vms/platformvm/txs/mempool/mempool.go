@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -42,19 +43,7 @@ var (
 	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
-type BlockTimer interface {
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
-	ResetBlockTimer()
-}
-
 type Mempool interface {
-	// we may want to be able to stop valid transactions
-	// from entering the mempool, e.g. during blocks creation
-	EnableAdding()
-	DisableAdding()
-
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
@@ -62,6 +51,13 @@ type Mempool interface {
 
 	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
 	Peek(maxTxSize int) *txs.Tx
+
+	// RequestBuildBlock notifies the consensus engine that a block should be
+	// built. If [emptyBlockPermitted] is true, the notification will be sent
+	// regardless of whether there are no transactions in the mempool. If not,
+	// a notification will only be sent if there is at least one transaction in
+	// the mempool.
+	RequestBuildBlock(emptyBlockPermitted bool)
 
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
 	// unissued decision/staker txs. This allows previously dropped txs to be
@@ -73,9 +69,6 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	// If true, drop transactions added to the mempool via Add.
-	dropIncoming bool
-
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
@@ -88,13 +81,13 @@ type mempool struct {
 
 	consumedUTXOs set.Set[ids.ID]
 
-	blkTimer BlockTimer
+	toEngine chan<- common.Message
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
+	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -124,24 +117,11 @@ func New(
 
 		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		dropIncoming:  false, // enable tx adding by default
-		blkTimer:      blkTimer,
+		toEngine:      toEngine,
 	}, nil
 }
 
-func (m *mempool) EnableAdding() {
-	m.dropIncoming = false
-}
-
-func (m *mempool) DisableAdding() {
-	m.dropIncoming = true
-}
-
 func (m *mempool) Add(tx *txs.Tx) error {
-	if m.dropIncoming {
-		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
-	}
-
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
@@ -190,7 +170,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
 
-	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 
@@ -238,4 +217,15 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	if !emptyBlockPermitted && m.unissuedTxs.Len() != 0 {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
 }
