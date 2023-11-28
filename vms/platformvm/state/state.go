@@ -637,6 +637,15 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
+func (s *state) shouldInit() (bool, error) {
+	has, err := s.singletonDB.Has(initializedKey)
+	return !has, err
+}
+
+func (s *state) doneInit() error {
+	return s.singletonDB.Put(initializedKey, nil)
+}
+
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
 	// Note: we want all subnets, so we don't look at addedSubnets
 	// which are only part of them
@@ -1588,15 +1597,6 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 		})
 	}
 	return nil
-}
-
-func (s *state) shouldInit() (bool, error) {
-	has, err := s.singletonDB.Has(initializedKey)
-	return !has, err
-}
-
-func (s *state) doneInit() error {
-	return s.singletonDB.Put(initializedKey, nil)
 }
 
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
