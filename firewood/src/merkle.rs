@@ -1220,39 +1220,43 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
         // transpose the Option<Result<T, E>> to Result<Option<T>, E>
         // If this is an error, the ? operator will return it
-        let Some((key, _)) = first_result.transpose()? else {
+        let Some((first_key, first_data)) = first_result.transpose()? else {
             // nothing returned, either the trie is empty or the key wasn't found
             return Ok(None);
         };
 
         let first_key_proof = self
-            .prove(key, root)
+            .prove(&first_key, root)
             .map_err(|e| api::Error::InternalError(Box::new(e)))?;
         let limit = limit.map(|old_limit| old_limit - 1);
 
+        let mut middle = vec![(first_key, first_data)];
+
         // we stop streaming if either we hit the limit or the key returned was larger
         // than the largest key requested
-        let mut middle = stream
-            .take(limit.unwrap_or(usize::MAX))
-            .take_while(|kv_result| {
-                // no last key asked for, so keep going
-                let Some(last_key) = last_key.as_ref() else {
-                    return ready(true);
-                };
+        middle.extend(
+            stream
+                .take(limit.unwrap_or(usize::MAX))
+                .take_while(|kv_result| {
+                    // no last key asked for, so keep going
+                    let Some(last_key) = last_key.as_ref() else {
+                        return ready(true);
+                    };
 
-                // return the error if there was one
-                let Ok(kv) = kv_result else {
-                    return ready(true);
-                };
+                    // return the error if there was one
+                    let Ok(kv) = kv_result else {
+                        return ready(true);
+                    };
 
-                // keep going if the key returned is less than the last key requested
-                ready(kv.0.as_slice() <= last_key.as_ref())
-            })
-            .try_collect::<Vec<(Vec<u8>, Vec<u8>)>>()
-            .await?;
+                    // keep going if the key returned is less than the last key requested
+                    ready(kv.0.as_slice() <= last_key.as_ref())
+                })
+                .try_collect::<Vec<(Vec<u8>, Vec<u8>)>>()
+                .await?,
+        );
 
         // remove the last key from middle and do a proof on it
-        let last_key_proof = match middle.pop() {
+        let last_key_proof = match middle.last() {
             None => {
                 return Ok(Some(api::RangeProof {
                     first_key_proof: first_key_proof.clone(),
@@ -1888,7 +1892,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(rangeproof.middle.len(), (u8::MAX - 1).into());
+        assert_eq!(rangeproof.middle.len(), u8::MAX as usize + 1);
         assert_ne!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
         let left_proof = merkle.prove([u8::MIN], root).unwrap();
         let right_proof = merkle.prove([u8::MAX], root).unwrap();
@@ -1917,7 +1921,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
-        assert_eq!(rangeproof.middle.len(), 0);
+        assert_eq!(rangeproof.middle.len(), 1);
     }
 
     #[test]
