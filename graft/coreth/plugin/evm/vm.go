@@ -40,10 +40,10 @@ import (
 	"github.com/ava-labs/coreth/rpc"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/client/stats"
-	"github.com/ava-labs/coreth/sync/handlers"
-	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/coreth/warp"
+	warpValidators "github.com/ava-labs/coreth/warp/validators"
 
 	"github.com/prometheus/client_golang/prometheus"
 	// Force-load tracer engine to trigger registration
@@ -122,11 +122,12 @@ const (
 	defaultMempoolSize = 4096
 	codecVersion       = uint16(0)
 
-	secpCacheSize       = 1024
-	decidedCacheSize    = 10 * units.MiB
-	missingCacheSize    = 50
-	unverifiedCacheSize = 5 * units.MiB
-	bytesToIDCacheSize  = 5 * units.MiB
+	secpCacheSize          = 1024
+	decidedCacheSize       = 10 * units.MiB
+	missingCacheSize       = 50
+	unverifiedCacheSize    = 5 * units.MiB
+	bytesToIDCacheSize     = 5 * units.MiB
+	warpSignatureCacheSize = 500
 
 	targetAtomicTxsSize = 40 * units.KiB
 
@@ -178,6 +179,7 @@ var (
 	lastAcceptedKey = []byte("last_accepted_key")
 	acceptedPrefix  = []byte("snowman_accepted")
 	metadataPrefix  = []byte("metadata")
+	warpPrefix      = []byte("warp")
 	ethDBPrefix     = []byte("ethdb")
 
 	// Prefixes for atomic trie
@@ -279,6 +281,10 @@ type VM struct {
 	// block.
 	acceptedBlockDB database.Database
 
+	// [warpDB] is used to store warp message signatures
+	// set to a prefixDB with the prefix [warpPrefix]
+	warpDB database.Database
+
 	toEngine chan<- commonEng.Message
 
 	syntacticBlockValidator BlockValidator
@@ -328,6 +334,10 @@ type VM struct {
 	// State sync server and client
 	StateSyncServer
 	StateSyncClient
+
+	// Avalanche Warp Messaging backend
+	// Used to serve BLS signatures of warp messages over RPC
+	warpBackend warp.Backend
 }
 
 // Codec implements the secp256k1fx interface
@@ -419,6 +429,10 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(db)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
+	// Note warpDB is not part of versiondb because it is not necessary
+	// that warp signatures are committed to the database atomically with
+	// the last accepted block.
+	vm.warpDB = prefixdb.New(warpPrefix, db)
 
 	if vm.config.InspectDatabase {
 		start := time.Now()
@@ -557,6 +571,16 @@ func (vm *VM) Initialize(
 	vm.networkCodec = message.Codec
 	vm.Network = peer.NewNetwork(vm.router, appSender, vm.networkCodec, message.CrossChainCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests, vm.config.MaxOutboundActiveCrossChainRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
+
+	// initialize warp backend
+	vm.warpBackend = warp.NewBackend(vm.ctx.NetworkID, vm.ctx.ChainID, vm.ctx.WarpSigner, vm, vm.warpDB, warpSignatureCacheSize)
+
+	// clear warpdb on initialization if config enabled
+	if vm.config.PruneWarpDB {
+		if err := vm.warpBackend.Clear(); err != nil {
+			return fmt.Errorf("failed to prune warpDB: %w", err)
+		}
+	}
 
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
 		return err
@@ -1128,15 +1152,15 @@ func (vm *VM) setAppRequestHandlers() {
 			Cache: vm.config.StateSyncServerTrieCache,
 		},
 	)
-	syncRequestHandler := handlers.NewSyncHandler(
+	networkHandler := newNetworkHandler(
 		vm.blockChain,
 		vm.chaindb,
 		evmTrieDB,
 		vm.atomicTrie.TrieDB(),
+		vm.warpBackend,
 		vm.networkCodec,
-		handlerstats.NewHandlerStats(metrics.Enabled),
 	)
-	vm.Network.SetRequestHandler(syncRequestHandler)
+	vm.Network.SetRequestHandler(networkHandler)
 }
 
 // setCrossChainAppRequestHandler sets the request handlers for the VM to serve cross chain
@@ -1332,6 +1356,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "snowman")
+	}
+	if vm.config.WarpAPIEnabled {
+		validatorsState := warpValidators.NewState(vm.ctx)
+		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx.NetworkID, vm.ctx.SubnetID, vm.ctx.ChainID, validatorsState, vm.warpBackend, vm.client)); err != nil {
+			return nil, err
+		}
+		enabledAPIs = append(enabledAPIs, "warp")
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))

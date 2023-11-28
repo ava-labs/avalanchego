@@ -34,6 +34,11 @@ const (
 
 	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.
 	AtomicTxBaseCost uint64 = 10_000
+
+	// Warp Parameters
+	WarpDefaultQuorumNumerator uint64 = 67
+	WarpQuorumNumeratorMinimum uint64 = 33
+	WarpQuorumDenominator      uint64 = 100
 )
 
 // Constants for message sizes
