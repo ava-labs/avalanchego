@@ -1,4 +1,3 @@
-
 github.com/ava-labs/avalanchego/api/server=Server=api/server/mock_server.go
 github.com/ava-labs/avalanchego/chains/atomic=SharedMemory=chains/atomic/mock_shared_memory.go
 github.com/ava-labs/avalanchego/codec=Manager=codec/mock_manager.go
