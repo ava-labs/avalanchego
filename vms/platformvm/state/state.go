@@ -1233,6 +1233,50 @@ func (s *state) loadCurrentStakers() error {
 	return iter.Error()
 }
 
+func (s *state) loadPendingStakers() error {
+	// TODO ABENEGIA: Check missing metadata
+	s.pendingStakers = newBaseStakers()
+
+	prefix := make([]byte, len(pendingStakersSectionPrefix))
+	copy(prefix, pendingStakersSectionPrefix)
+
+	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
+	defer iter.Release()
+	for iter.Next() {
+		data := &stakersData{}
+		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
+			return fmt.Errorf("failed to deserialize pending stakers data: %w", err)
+		}
+
+		tx, err := txs.Parse(txs.GenesisCodec, data.TxBytes)
+		if err != nil {
+			return fmt.Errorf("failed to parsing pending stakerTx: %w", err)
+		}
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		if !ok {
+			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+		}
+
+		staker, err := NewPendingStaker(tx.ID(), stakerTx)
+		if err != nil {
+			return err
+		}
+		if staker.Priority.IsValidator() {
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator.validator = staker
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
+		} else {
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			if validator.delegators == nil {
+				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			}
+			validator.delegators.ReplaceOrInsert(staker)
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
+		}
+	}
+	return iter.Error()
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
