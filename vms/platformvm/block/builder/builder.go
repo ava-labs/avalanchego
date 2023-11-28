@@ -193,11 +193,13 @@ func (b *builder) maybeAdvanceTime() {
 	}
 
 	now := b.txExecutorBackend.Clk.Time()
-	if !b.nextStakerChangeTime.After(now) {
-		// Block needs to be issued to advance time.
-		b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
+	if b.nextStakerChangeTime.After(now) {
+		// [nextStakerChangeTime] is in the future, no need to advance time.
 		return
 	}
+
+	// Block needs to be issued to advance time.
+	b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
