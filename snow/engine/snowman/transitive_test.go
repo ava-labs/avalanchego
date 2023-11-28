@@ -414,6 +414,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk0,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -529,6 +530,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk1,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -537,6 +539,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	blk0.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk0,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -575,6 +578,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -819,6 +823,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -885,6 +890,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -993,6 +999,7 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1053,6 +1060,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1141,6 +1149,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		parentBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1157,6 +1166,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		missingBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1215,6 +1225,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blockingBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1231,6 +1242,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		issuedBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1247,6 +1259,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		missingBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1348,6 +1361,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		validBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1355,6 +1369,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	sender.SendPushQueryF = nil
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		invalidBlk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -1743,6 +1758,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
 		te.metrics.providerSource.WithLabelValues(unknownSource),
@@ -2867,6 +2883,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
 		te.metrics.providerSource.WithLabelValues(unknownSource),

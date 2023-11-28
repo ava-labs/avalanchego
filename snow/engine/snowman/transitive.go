@@ -474,7 +474,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 			sourceMetric := t.metrics.providerSource.WithLabelValues(builtSource)
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, blk, false, sourceMetric); err != nil {
+				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, sourceMetric); err != nil {
 					return err
 				}
 			}
@@ -681,7 +681,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(ctx, blk, false, sourceMetric); err != nil {
+		if err := t.issue(ctx, nodeID, blk, false, sourceMetric); err != nil {
 			return false, err
 		}
 
@@ -727,7 +727,7 @@ func (t *Transitive) issueWithAncestors(
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		err := t.issue(ctx, blk, true, sourceMetric)
+		err := t.issue(ctx, t.Ctx.NodeID, blk, true, sourceMetric)
 		if err != nil {
 			return false, err
 		}
@@ -771,6 +771,7 @@ func (t *Transitive) wasIssued(blk snowman.Block) bool {
 // used.
 func (t *Transitive) issue(
 	ctx context.Context,
+	nodeID ids.NodeID,
 	blk snowman.Block,
 	push bool,
 	sourceMetric prometheus.Counter,
@@ -788,6 +789,7 @@ func (t *Transitive) issue(
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
 		t:            t,
+		nodeID:       nodeID,
 		blk:          blk,
 		sourceMetric: sourceMetric,
 		push:         push,
@@ -894,7 +896,13 @@ func (t *Transitive) sendQuery(
 // issue [blk] to consensus
 // If [push] is true, a push query will be used. Otherwise, a pull query will be
 // used.
-func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool, sourceMetric prometheus.Counter) error {
+func (t *Transitive) deliver(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blk snowman.Block,
+	push bool,
+	sourceMetric prometheus.Counter,
+) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -920,7 +928,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool, 
 	// By ensuring that the parent is either processing or accepted, it is
 	// guaranteed that the parent was successfully verified. This means that
 	// calling Verify on this block is allowed.
-	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blk, sourceMetric)
+	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, sourceMetric)
 	if err != nil {
 		return err
 	}
@@ -944,7 +952,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool, 
 			}
 
 			for _, blk := range options {
-				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blk, sourceMetric)
+				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, sourceMetric)
 				if err != nil {
 					return err
 				}
@@ -1030,6 +1038,7 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 // error if one occurred while adding it to consensus.
 func (t *Transitive) addUnverifiedBlockToConsensus(
 	ctx context.Context,
+	nodeID ids.NodeID,
 	blk snowman.Block,
 	sourceMetric prometheus.Counter,
 ) (bool, error) {
@@ -1038,6 +1047,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	// make sure this block is valid
 	if err := blk.Verify(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
+			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
@@ -1047,11 +1057,13 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		return false, nil
 	}
 
-	sourceMetric.Inc()
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	sourceMetric.Inc()
+	t.metrics.providerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	t.Ctx.Log.Verbo("adding block to consensus",
+		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
 	)
 	return true, t.Consensus.Add(ctx, &memoryBlock{

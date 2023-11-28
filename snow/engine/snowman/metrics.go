@@ -36,6 +36,7 @@ type metrics struct {
 	getAncestorsBlks                      metric.Averager
 	selectedVoteIndex                     metric.Averager
 	providerSource                        *prometheus.CounterVec
+	providerStake                         metric.Averager
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -129,6 +130,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blks_issued",
 		Help:      "number of blocks that have been issued into consensus broken down by how they were discovered",
 	}, []string{"source"})
+	m.providerStake = metric.NewAveragerWithErrs(
+		namespace,
+		"provider_stake",
+		"stake weight of the peer who provided a block that was issued into consensus",
+		reg,
+		&errs,
+	)
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
