@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -51,6 +53,41 @@ const (
 	valueNodeCacheSize        = 512 * units.MiB
 	intermediateNodeCacheSize = 512 * units.MiB
 	utxoCacheSize             = 8192 // from avax/utxo_state.go
+)
+
+var (
+	_ State = (*state)(nil)
+
+	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
+	errIsNotSubnet                  = errors.New("is not a subnet")
+
+	merkleStatePrefix       = []byte{0x00}
+	merkleSingletonPrefix   = []byte{0x01}
+	merkleBlockPrefix       = []byte{0x02}
+	merkleBlockIDsPrefix    = []byte{0x03}
+	merkleTxPrefix          = []byte{0x04}
+	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
+	merkleBlsKeyDiffPrefix  = []byte{0x08}
+	merkleRewardUtxosPrefix = []byte{0x09}
+
+	initializedKey = []byte("initialized")
+
+	// merkle db sections
+	metadataSectionPrefix      = byte(0x00)
+	merkleChainTimeKey         = []byte{metadataSectionPrefix, 0x00}
+	merkleLastAcceptedBlkIDKey = []byte{metadataSectionPrefix, 0x01}
+	merkleSuppliesPrefix       = []byte{metadataSectionPrefix, 0x02}
+
+	permissionedSubnetSectionPrefix = []byte{0x01}
+	elasticSubnetSectionPrefix      = []byte{0x02}
+	chainsSectionPrefix             = []byte{0x03}
+	utxosSectionPrefix              = []byte{0x04}
+	currentStakersSectionPrefix     = []byte{0x05}
+	pendingStakersSectionPrefix     = []byte{0x06}
+	delegateeRewardsPrefix          = []byte{0x07}
+	subnetOwnersPrefix              = []byte{0x08}
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -154,41 +191,6 @@ type State interface {
 
 	Close() error
 }
-
-var (
-	_ State = (*state)(nil)
-
-	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errIsNotSubnet                  = errors.New("is not a subnet")
-
-	merkleStatePrefix       = []byte{0x00}
-	merkleSingletonPrefix   = []byte{0x01}
-	merkleBlockPrefix       = []byte{0x02}
-	merkleBlockIDsPrefix    = []byte{0x03}
-	merkleTxPrefix          = []byte{0x04}
-	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
-	merkleBlsKeyDiffPrefix  = []byte{0x08}
-	merkleRewardUtxosPrefix = []byte{0x09}
-
-	initializedKey = []byte("initialized")
-
-	// merkle db sections
-	metadataSectionPrefix      = byte(0x00)
-	merkleChainTimeKey         = []byte{metadataSectionPrefix, 0x00}
-	merkleLastAcceptedBlkIDKey = []byte{metadataSectionPrefix, 0x01}
-	merkleSuppliesPrefix       = []byte{metadataSectionPrefix, 0x02}
-
-	permissionedSubnetSectionPrefix = []byte{0x01}
-	elasticSubnetSectionPrefix      = []byte{0x02}
-	chainsSectionPrefix             = []byte{0x03}
-	utxosSectionPrefix              = []byte{0x04}
-	currentStakersSectionPrefix     = []byte{0x05}
-	pendingStakersSectionPrefix     = []byte{0x06}
-	delegateeRewardsPrefix          = []byte{0x07}
-	subnetOwnersPrefix              = []byte{0x08}
-)
 
 func New(
 	rawDB database.Database,
