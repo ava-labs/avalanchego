@@ -24,6 +24,10 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// maxOutstandingBroadcastRequests is the maximum number of requests to have
+// outstanding when broadcasting.
+const maxOutstandingBroadcastRequests = 50
+
 var _ common.StateSyncer = (*stateSyncer)(nil)
 
 // summary content as received from network, along with accumulated weight.
@@ -544,7 +548,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
-	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < maxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
 		ss.pendingSeeders.Add(vdr)
@@ -560,7 +564,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
-	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < maxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
 		ss.pendingVoters.Add(vdr)
@@ -616,10 +620,6 @@ func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 		"vm":        vmIntf,
 	}
 	return intf, vmErr
-}
-
-func (ss *stateSyncer) GetVM() common.VM {
-	return ss.VM
 }
 
 func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
