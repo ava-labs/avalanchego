@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
