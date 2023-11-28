@@ -626,6 +626,15 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
+func (s *state) shouldInit() (bool, error) {
+	has, err := s.singletonDB.Has(initializedKey)
+	return !has, err
+}
+
+func (s *state) doneInit() error {
+	return s.singletonDB.Put(initializedKey, nil)
+}
+
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
 	if exists {

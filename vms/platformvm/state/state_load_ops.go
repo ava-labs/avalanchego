@@ -49,15 +49,6 @@ func (s *state) sync(genesis []byte) error {
 	return s.load(shouldInit)
 }
 
-func (s *state) shouldInit() (bool, error) {
-	has, err := s.singletonDB.Has(initializedKey)
-	return !has, err
-}
-
-func (s *state) doneInit() error {
-	return s.singletonDB.Put(initializedKey, nil)
-}
-
 // Creates a genesis from [genesisBytes] and initializes [ms] with it.
 func (s *state) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
