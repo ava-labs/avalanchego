@@ -140,7 +140,7 @@ func TestBiMapPut(t *testing.T) {
 	}
 }
 
-func TestBiMapGetKey(t *testing.T) {
+func TestBiMapHasValueAndGetKey(t *testing.T) {
 	m := New[int, int]()
 	require.Empty(t, m.Put(1, 2))
 
@@ -173,6 +173,9 @@ func TestBiMapGetKey(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
+			exists := m.HasValue(test.value)
+			require.Equal(test.expectedExists, exists)
+
 			key, exists := m.GetKey(test.value)
 			require.Equal(test.expectedKey, key)
 			require.Equal(test.expectedExists, exists)
@@ -180,7 +183,7 @@ func TestBiMapGetKey(t *testing.T) {
 	}
 }
 
-func TestBiMapGetValue(t *testing.T) {
+func TestBiMapHasKeyAndGetValue(t *testing.T) {
 	m := New[int, int]()
 	require.Empty(t, m.Put(1, 2))
 
@@ -212,6 +215,9 @@ func TestBiMapGetValue(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
+
+			exists := m.HasKey(test.key)
+			require.Equal(test.expectedExists, exists)
 
 			value, exists := m.GetValue(test.key)
 			require.Equal(test.expectedValue, value)
