@@ -109,7 +109,7 @@ func (b *backend) GetMessageSignature(messageID ids.ID) ([bls.SignatureLen]byte,
 
 	unsignedMessage, err := b.GetMessage(messageID)
 	if err != nil {
-		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
+		return [bls.SignatureLen]byte{}, err
 	}
 
 	var signature [bls.SignatureLen]byte

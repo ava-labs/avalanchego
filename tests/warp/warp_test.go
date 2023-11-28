@@ -329,7 +329,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		// Specify WarpQuorumDenominator to retrieve signatures from every validator
-		signedWarpMessageBytes, err := client.GetMessageAggregateSignature(ctx, unsignedWarpMessageID, params.WarpQuorumDenominator)
+		signedWarpMessageBytes, err := client.GetMessageAggregateSignature(ctx, unsignedWarpMessageID, params.WarpQuorumDenominator, "")
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(signedWarpMessageBytes).Should(gomega.Equal(signedWarpMsg.Bytes()))
 	})
@@ -344,7 +344,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		// Specify WarpQuorumDenominator to retrieve signatures from every validator
-		signedWarpBlockBytes, err := client.GetBlockAggregateSignature(ctx, warpBlockID, params.WarpQuorumDenominator)
+		signedWarpBlockBytes, err := client.GetBlockAggregateSignature(ctx, warpBlockID, params.WarpQuorumDenominator, "")
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(signedWarpBlockBytes).Should(gomega.Equal(warpBlockHashSignedMsg.Bytes()))
 	})
