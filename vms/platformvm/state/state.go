@@ -192,6 +192,164 @@ type State interface {
 	Close() error
 }
 
+// Stores global state in a merkle trie. This means that each state corresponds
+// to a unique merkle root. Specifically, the following state is merkleized.
+// - Delegatee Rewards
+// - UTXOs
+// - Current Supply
+// - Subnet Creation Transactions
+// - Subnet Owners
+// - Subnet Transformation Transactions
+// - Chain Creation Transactions
+// - Chain time
+// - Last Accepted Block ID
+// - Current Staker Set
+// - Pending Staker Set
+//
+// Changing any of the above state will cause the merkle root to change.
+//
+// The following state is not merkleized:
+// - Database Initialization Status
+// - Blocks
+// - Block IDs
+// - Transactions (note some transactions are also stored merkleized)
+// - Uptimes
+// - Weight Diffs
+// - BLS Key Diffs
+// - Reward UTXOs
+type state struct {
+	validators validators.Manager
+	ctx        *snow.Context
+	metrics    metrics.Metrics
+	rewards    reward.Calculator
+
+	baseDB       *versiondb.Database
+	singletonDB  database.Database
+	baseMerkleDB database.Database
+	merkleDB     merkledb.MerkleDB // Stores merkleized state
+
+	// stakers section (missing Delegatee piece)
+	// TODO: Consider moving delegatee to UTXOs section
+	currentStakers *baseStakers
+	pendingStakers *baseStakers
+
+	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
+	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
+
+	// UTXOs section
+	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
+	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
+
+	// Metadata section
+	chainTime, latestComittedChainTime                  time.Time
+	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
+	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
+	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
+	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+
+	// Subnets section
+	// Subnet ID --> Owner of the subnet
+	subnetOwners     map[ids.ID]fx.Owner
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+
+	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
+	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
+	addedElasticSubnets      map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
+	elasticSubnetCache       cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+
+	// Chains section
+	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
+	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
+
+	// Blocks section
+	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
+	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block.
+	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
+
+	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	blockIDDB     database.Database
+
+	// Txs section
+	// FIND a way to reduce use of these. No use in verification of addedTxs
+	// a limited windows to support APIs
+	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
+	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
+	txDB     database.Database
+
+	indexedUTXOsDB database.Database
+
+	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
+	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
+	localUptimesDB       database.Database
+
+	flatValidatorWeightDiffsDB    database.Database
+	flatValidatorPublicKeyDiffsDB database.Database
+
+	// Reward UTXOs section
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
+	rewardUTXOsDB    database.Database
+}
+
+type ValidatorWeightDiff struct {
+	Decrease bool   `serialize:"true"`
+	Amount   uint64 `serialize:"true"`
+}
+
+func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
+	if v.Decrease == negative {
+		var err error
+		v.Amount, err = safemath.Add64(v.Amount, amount)
+		return err
+	}
+
+	if v.Amount > amount {
+		v.Amount -= amount
+	} else {
+		v.Amount = safemath.AbsDiff(v.Amount, amount)
+		v.Decrease = negative
+	}
+	return nil
+}
+
+type txBytesAndStatus struct {
+	Tx     []byte        `serialize:"true"`
+	Status status.Status `serialize:"true"`
+}
+
+type txAndStatus struct {
+	tx     *txs.Tx
+	status status.Status
+}
+
+type fxOwnerAndSize struct {
+	owner fx.Owner
+	size  int
+}
+
+func txSize(_ ids.ID, tx *txs.Tx) int {
+	if tx == nil {
+		return ids.IDLen + constants.PointerOverhead
+	}
+	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
+}
+
+func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
+	if t == nil {
+		return ids.IDLen + constants.PointerOverhead
+	}
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
+}
+
+func blockSize(_ ids.ID, blk block.Block) int {
+	if blk == nil {
+		return ids.IDLen + constants.PointerOverhead
+	}
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
+}
+
 func New(
 	rawDB database.Database,
 	genesisBytes []byte,
@@ -397,107 +555,6 @@ func newState(
 		rewardUTXOsCache: rewardUTXOsCache,
 		rewardUTXOsDB:    rewardUTXOsDB,
 	}, nil
-}
-
-// Stores global state in a merkle trie. This means that each state corresponds
-// to a unique merkle root. Specifically, the following state is merkleized.
-// - Delegatee Rewards
-// - UTXOs
-// - Current Supply
-// - Subnet Creation Transactions
-// - Subnet Owners
-// - Subnet Transformation Transactions
-// - Chain Creation Transactions
-// - Chain time
-// - Last Accepted Block ID
-// - Current Staker Set
-// - Pending Staker Set
-//
-// Changing any of the above state will cause the merkle root to change.
-//
-// The following state is not merkleized:
-// - Database Initialization Status
-// - Blocks
-// - Block IDs
-// - Transactions (note some transactions are also stored merkleized)
-// - Uptimes
-// - Weight Diffs
-// - BLS Key Diffs
-// - Reward UTXOs
-type state struct {
-	validators validators.Manager
-	ctx        *snow.Context
-	metrics    metrics.Metrics
-	rewards    reward.Calculator
-
-	baseDB       *versiondb.Database
-	singletonDB  database.Database
-	baseMerkleDB database.Database
-	merkleDB     merkledb.MerkleDB // Stores merkleized state
-
-	// stakers section (missing Delegatee piece)
-	// TODO: Consider moving delegatee to UTXOs section
-	currentStakers *baseStakers
-	pendingStakers *baseStakers
-
-	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
-	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
-
-	// UTXOs section
-	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
-	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
-
-	// Metadata section
-	chainTime, latestComittedChainTime                  time.Time
-	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
-	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
-	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
-	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
-
-	// Subnets section
-	// Subnet ID --> Owner of the subnet
-	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
-
-	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
-	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
-	addedElasticSubnets      map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
-	elasticSubnetCache       cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
-
-	// Chains section
-	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
-	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
-
-	// Blocks section
-	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
-	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block.
-	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
-	blockDB     database.Database
-
-	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
-	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
-	blockIDDB     database.Database
-
-	// Txs section
-	// FIND a way to reduce use of these. No use in verification of addedTxs
-	// a limited windows to support APIs
-	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
-	txDB     database.Database
-
-	indexedUTXOsDB database.Database
-
-	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
-	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
-	localUptimesDB       database.Database
-
-	flatValidatorWeightDiffsDB    database.Database
-	flatValidatorPublicKeyDiffsDB database.Database
-
-	// Reward UTXOs section
-	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
-	rewardUTXOsDB    database.Database
 }
 
 // STAKERS section
@@ -741,11 +798,6 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 }
 
 // SUBNETS Section
-type fxOwnerAndSize struct {
-	owner fx.Owner
-	size  int
-}
-
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
 	// Note: we want all subnets, so we don't look at addedSubnets
 	// which are only part of them
@@ -899,30 +951,6 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 }
 
 // TXs Section
-type txBytesAndStatus struct {
-	Tx     []byte        `serialize:"true"`
-	Status status.Status `serialize:"true"`
-}
-
-type txAndStatus struct {
-	tx     *txs.Tx
-	status status.Status
-}
-
-func txSize(_ ids.ID, tx *txs.Tx) int {
-	if tx == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
-}
-
-func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
-	if t == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
-}
-
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
@@ -972,13 +1000,6 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 }
 
 // BLOCKs Section
-func blockSize(_ ids.ID, blk block.Block) int {
-	if blk == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
-}
-
 func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
@@ -1142,27 +1163,6 @@ func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 }
 
 // VALIDATORS Section
-type ValidatorWeightDiff struct {
-	Decrease bool   `serialize:"true"`
-	Amount   uint64 `serialize:"true"`
-}
-
-func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
-	if v.Decrease == negative {
-		var err error
-		v.Amount, err = safemath.Add64(v.Amount, amount)
-		return err
-	}
-
-	if v.Amount > amount {
-		v.Amount -= amount
-	} else {
-		v.Amount = safemath.AbsDiff(v.Amount, amount)
-		v.Decrease = negative
-	}
-	return nil
-}
-
 func applyWeightDiff(
 	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
 	nodeID ids.NodeID,
