@@ -420,18 +420,18 @@ func (mr *MockChainMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // NewView mocks base method.
-func (m *MockChain) NewView(arg0 []database.BatchOp) (merkledb.TrieView, error) {
+func (m *MockChain) NewView() (merkledb.TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView", arg0)
+	ret := m.ctrl.Call(m, "NewView")
 	ret0, _ := ret[0].(merkledb.TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockChainMockRecorder) NewView(arg0 interface{}) *gomock.Call {
+func (mr *MockChainMockRecorder) NewView() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockChain)(nil).NewView), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockChain)(nil).NewView))
 }
 
 // PutCurrentDelegator mocks base method.
@@ -942,18 +942,18 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // NewView mocks base method.
-func (m *MockDiff) NewView(arg0 []database.BatchOp) (merkledb.TrieView, error) {
+func (m *MockDiff) NewView() (merkledb.TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView", arg0)
+	ret := m.ctrl.Call(m, "NewView")
 	ret0, _ := ret[0].(merkledb.TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockDiffMockRecorder) NewView(arg0 interface{}) *gomock.Call {
+func (mr *MockDiffMockRecorder) NewView() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockDiff)(nil).NewView), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockDiff)(nil).NewView))
 }
 
 // PutCurrentDelegator mocks base method.
@@ -1634,18 +1634,18 @@ func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // NewView mocks base method.
-func (m *MockState) NewView(arg0 []database.BatchOp) (merkledb.TrieView, error) {
+func (m *MockState) NewView() (merkledb.TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView", arg0)
+	ret := m.ctrl.Call(m, "NewView")
 	ret0, _ := ret[0].(merkledb.TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockStateMockRecorder) NewView(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) NewView() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockState)(nil).NewView), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockState)(nil).NewView))
 }
 
 // PutCurrentDelegator mocks base method.

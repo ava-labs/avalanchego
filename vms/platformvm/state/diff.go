@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -80,20 +81,26 @@ func NewDiff(
 	}, nil
 }
 
-func (d *diff) NewView(ops []database.BatchOp) (merkledb.TrieView, error) {
+// Returns a view that contains the merkle state of this diff.
+func (d *diff) NewView() (merkledb.TrieView, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	diffOps, err := d.GetMerkleChanges()
+	ops, err := d.GetMerkleChanges()
 	if err != nil {
 		return nil, err
 	}
 
-	ops = append(diffOps, ops...)
+	parentView, err := parentState.NewView()
+	if err != nil {
+		return nil, err
+	}
 
-	return parentState.NewView(ops)
+	return parentView.NewView(context.Background(), merkledb.ViewChanges{
+		BatchOps: ops,
+	})
 }
 
 func (d *diff) GetTimestamp() time.Time {

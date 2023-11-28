@@ -98,7 +98,7 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	NewView(ops []database.BatchOp) (merkledb.TrieView, error)
+	NewView() (merkledb.TrieView, error)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -1507,10 +1507,8 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 	return output, nil
 }
 
-func (s *state) NewView(ops []database.BatchOp) (merkledb.TrieView, error) {
-	return s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{
-		BatchOps: ops,
-	})
+func (s *state) NewView() (merkledb.TrieView, error) {
+	return s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
 }
 
 func (s *state) getMerkleChanges(currentData, pendingData map[ids.ID]*stakersData) ([]database.BatchOp, error) {
@@ -1535,10 +1533,14 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 	if err != nil {
 		return err
 	}
-	view, err := s.NewView(changes)
+
+	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{
+		BatchOps: changes,
+	})
 	if err != nil {
 		return err
 	}
+
 	if err := view.CommitToDB(context.Background()); err != nil {
 		return err
 	}
