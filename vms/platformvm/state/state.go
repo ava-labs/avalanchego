@@ -742,6 +742,54 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
 }
 
+func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
+	if tx, exists := s.addedTxs[txID]; exists {
+		return tx.tx, tx.status, nil
+	}
+	if tx, cached := s.txCache.Get(txID); cached {
+		if tx == nil {
+			return nil, status.Unknown, database.ErrNotFound
+		}
+		return tx.tx, tx.status, nil
+	}
+
+	txBytes, err := s.txDB.Get(txID[:])
+	switch err {
+	case nil:
+		stx := txBytesAndStatus{}
+		if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
+			return nil, status.Unknown, err
+		}
+
+		tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
+		if err != nil {
+			return nil, status.Unknown, err
+		}
+
+		ptx := &txAndStatus{
+			tx:     tx,
+			status: stx.Status,
+		}
+
+		s.txCache.Put(txID, ptx)
+		return ptx.tx, ptx.status, nil
+
+	case database.ErrNotFound:
+		s.txCache.Put(txID, nil)
+		return nil, status.Unknown, database.ErrNotFound
+
+	default:
+		return nil, status.Unknown, err
+	}
+}
+
+func (s *state) AddTx(tx *txs.Tx, status status.Status) {
+	s.addedTxs[tx.ID()] = &txAndStatus{
+		tx:     tx,
+		status: status,
+	}
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -903,53 +951,6 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 // CHAINS Section
 
 // TXs Section
-func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
-	if tx, exists := s.addedTxs[txID]; exists {
-		return tx.tx, tx.status, nil
-	}
-	if tx, cached := s.txCache.Get(txID); cached {
-		if tx == nil {
-			return nil, status.Unknown, database.ErrNotFound
-		}
-		return tx.tx, tx.status, nil
-	}
-
-	txBytes, err := s.txDB.Get(txID[:])
-	switch err {
-	case nil:
-		stx := txBytesAndStatus{}
-		if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
-			return nil, status.Unknown, err
-		}
-
-		tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
-		if err != nil {
-			return nil, status.Unknown, err
-		}
-
-		ptx := &txAndStatus{
-			tx:     tx,
-			status: stx.Status,
-		}
-
-		s.txCache.Put(txID, ptx)
-		return ptx.tx, ptx.status, nil
-
-	case database.ErrNotFound:
-		s.txCache.Put(txID, nil)
-		return nil, status.Unknown, database.ErrNotFound
-
-	default:
-		return nil, status.Unknown, err
-	}
-}
-
-func (s *state) AddTx(tx *txs.Tx, status status.Status) {
-	s.addedTxs[tx.ID()] = &txAndStatus{
-		tx:     tx,
-		status: status,
-	}
-}
 
 // REWARD UTXOs SECTION
 func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
