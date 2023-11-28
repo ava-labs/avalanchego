@@ -412,7 +412,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blk0, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk0,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	blk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -522,10 +527,20 @@ func TestEngineBlockedIssue(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blk1, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk1,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	blk0.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), blk0, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk0,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	require.Equal(blk1.ID(), te.Consensus.Preference())
 }
@@ -558,7 +573,12 @@ func TestEngineAbandonResponse(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 	require.NoError(te.QueryFailed(context.Background(), vdr, 1))
 
 	require.Empty(te.blocked)
@@ -797,7 +817,12 @@ func TestVoteCanceling(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		true,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	require.Equal(1, te.polls.Len())
 
@@ -858,7 +883,12 @@ func TestEngineNoQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
@@ -961,7 +991,12 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1016,7 +1051,12 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		reqID = requestID
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		true,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1099,7 +1139,12 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		return blockingBlk, nil
 	}
 
-	require.NoError(te.issue(context.Background(), parentBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		parentBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	sender.CantSendChits = false
 
@@ -1110,7 +1155,12 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), missingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		missingBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	require.Empty(te.blocked)
 }
@@ -1163,7 +1213,12 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blockingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blockingBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
@@ -1174,7 +1229,12 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), issuedBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		issuedBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	sender.SendPushQueryF = nil
 	sender.CantSendPushQuery = false
@@ -1185,7 +1245,12 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), missingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		missingBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1281,9 +1346,19 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	require.NoError(te.issue(context.Background(), validBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		validBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 	sender.SendPushQueryF = nil
-	require.NoError(te.issue(context.Background(), invalidBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		invalidBlk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID))
 
 	require.Equal(choices.Accepted, validBlk.Status())
@@ -1666,7 +1741,12 @@ func TestEngineDoubleChit(t *testing.T) {
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
 	}
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		false,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
@@ -2785,7 +2865,12 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		blk,
+		true,
+		te.metrics.providerSource.WithLabelValues(unknownSource),
+	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
