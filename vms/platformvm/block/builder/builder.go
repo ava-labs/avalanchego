@@ -40,13 +40,11 @@ var (
 type Builder interface {
 	mempool.Mempool
 
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
+	// ResetBlockTimer schedules a timer to notify the consensus engine once a
+	// block needs to be built to process a staker change.
 	ResetBlockTimer()
 
-	// BuildBlock is called on timer clock to attempt to create
-	// next block
+	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
 	// Shutdown cleanly shuts Builder down
@@ -61,10 +59,11 @@ type builder struct {
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
-	// This timer goes off when it is time for the next validator to add/leave
-	// the validator set. When it goes off ResetTimer() is called, potentially
-	// triggering creation of a new block.
-	timer *timer.Timer
+	// This timer goes off when it is time for the next staker to add/leave
+	// the staking set. When it goes off, [setNextBlockBuildTime()] is called,
+	// potentially triggering creation of a new block.
+	timer                *timer.Timer
+	nextStakerChangeTime time.Time
 }
 
 func New(
@@ -92,6 +91,7 @@ func New(
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
+		b.Mempool.RequestBuildBlock(false)
 		b.Mempool.EnableAdding()
 		b.ResetBlockTimer()
 	}()
@@ -99,21 +99,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
-	statelessBlk, err := b.buildBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove selected txs from mempool now that we are returning the block to
-	// the consensus engine.
-	txs := statelessBlk.Txs()
-	b.Mempool.Remove(txs)
-	return b.blkManager.NewBlock(statelessBlk), nil
-}
-
-// Returns the block we want to build and issue.
-// Only modifies state to remove expired proposal txs.
-func (b *builder) buildBlock() (block.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
 	preferred, err := b.blkManager.GetBlock(preferredID)
@@ -148,7 +133,7 @@ func (b *builder) buildBlock() (block.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	return buildBlock(
+	statelessBlk, err := buildBlock(
 		b,
 		preferredID,
 		nextHeight,
@@ -156,6 +141,15 @@ func (b *builder) buildBlock() (block.Block, error) {
 		timeWasCapped,
 		preferredState,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove selected txs from mempool now that we are returning the block to
+	// the consensus engine.
+	txs := statelessBlk.Txs()
+	b.Mempool.Remove(txs)
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 func (b *builder) Shutdown() {
@@ -188,10 +182,10 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	if _, err := b.buildBlock(); err == nil {
-		// We can build a block now
+	now := b.txExecutorBackend.Clk.Time()
+	if !b.nextStakerChangeTime.After(now) {
+		// Block needs to be issued to advance time.
 		b.Mempool.RequestBuildBlock(true)
-		return
 	}
 
 	// Wake up when it's time to add/remove the next validator/delegator
@@ -216,7 +210,6 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	now := b.txExecutorBackend.Clk.Time()
 	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),
@@ -224,6 +217,7 @@ func (b *builder) setNextBuildBlockTime() {
 	)
 
 	// Wake up when it's time to add/remove the next validator
+	b.nextStakerChangeTime = nextStakerChangeTime
 	b.timer.SetTimeoutIn(waitTime)
 }
 
