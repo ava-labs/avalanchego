@@ -65,11 +65,8 @@ type Transitive struct {
 	validators.Connector
 
 	requestID uint32
-<<<<<<< HEAD
 
 	gossipCounter int
-=======
->>>>>>> gossip-source-metrics
 
 	// track outstanding preference requests
 	polls poll.Set
