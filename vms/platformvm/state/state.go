@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
@@ -190,6 +191,16 @@ type State interface {
 	Checksum() ids.ID
 
 	Close() error
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.11.x is activated
+type stateBlk struct {
+	Blk    block.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
 }
 
 // Stores global state in a merkle trie. This means that each state corresponds
