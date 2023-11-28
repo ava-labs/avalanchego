@@ -60,7 +60,7 @@ type builder struct {
 	blkManager        blockexecutor.Manager
 
 	// This timer goes off when it is time for the next staker to add/leave
-	// the staking set. When it goes off, [setNextBlockBuildTime()] is called,
+	// the staking set. When it goes off, [maybeAdvanceTime()] is called,
 	// potentially triggering creation of a new block.
 	timer                *timer.Timer
 	nextStakerChangeTime time.Time
@@ -92,7 +92,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
-		b.ResetBlockTimer()
+		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 	}()
 
 	ctx := b.txExecutorBackend.Ctx
