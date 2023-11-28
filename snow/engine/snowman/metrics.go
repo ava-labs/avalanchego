@@ -138,6 +138,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		&errs,
 	)
 
+	// Register the labels
+	m.providerSource.WithLabelValues(pullGossipSource)
+	m.providerSource.WithLabelValues(pushGossipSource)
+	m.providerSource.WithLabelValues(putGossipSource)
+	m.providerSource.WithLabelValues(builtSource)
+	m.providerSource.WithLabelValues(unknownSource)
+
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
 		reg.Register(m.numRequests),
