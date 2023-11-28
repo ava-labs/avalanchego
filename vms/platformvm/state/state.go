@@ -351,7 +351,7 @@ func blockSize(_ ids.ID, blk block.Block) int {
 }
 
 func New(
-	rawDB database.Database,
+	db database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
 	validators validators.Manager,
@@ -361,7 +361,7 @@ func New(
 	rewards reward.Calculator,
 ) (State, error) {
 	s, err := newState(
-		rawDB,
+		db,
 		metrics,
 		validators,
 		execCfg,
@@ -383,7 +383,7 @@ func New(
 }
 
 func newState(
-	rawDB database.Database,
+	db database.Database,
 	metrics metrics.Metrics,
 	validators validators.Manager,
 	execCfg *config.ExecutionConfig,
@@ -392,7 +392,7 @@ func newState(
 	rewards reward.Calculator,
 ) (*state, error) {
 	var (
-		baseDB                        = versiondb.New(rawDB)
+		baseDB                        = versiondb.New(db)
 		baseMerkleDB                  = prefixdb.New(merkleStatePrefix, baseDB)
 		singletonDB                   = prefixdb.New(merkleSingletonPrefix, baseDB)
 		blockDB                       = prefixdb.New(merkleBlockPrefix, baseDB)
