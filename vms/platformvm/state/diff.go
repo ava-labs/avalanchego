@@ -29,7 +29,7 @@ var (
 type Diff interface {
 	Chain
 
-	Apply(State) error
+	Apply(Chain) error
 }
 
 type diff struct {
@@ -726,7 +726,7 @@ func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
 	return batchOps, nil
 }
 
-func (d *diff) Apply(baseState State) error {
+func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)

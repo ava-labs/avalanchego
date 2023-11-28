@@ -622,9 +622,11 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	}
 
 	height := child.Height()
+	timestamp := child.Timestamp()
 	ts.ctx.Log.Trace("accepting block",
 		zap.Stringer("blkID", pref),
 		zap.Uint64("height", height),
+		zap.Time("timestamp", timestamp),
 	)
 	if err := child.Accept(ctx); err != nil {
 		return err
@@ -641,7 +643,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	ts.metrics.Accepted(
 		pref,
 		height,
-		child.Timestamp(),
+		timestamp,
 		ts.pollNumber,
 		len(bytes),
 	)

@@ -13,12 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // var errNotYetImplemented = errors.New("NOT YET IMPLEMENTED")
@@ -85,7 +86,8 @@ func (s *state) init(genesisBytes []byte) error {
 
 // Loads the state from [genesisBls] and [genesis] into [ms].
 func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
-	s.SetLastAccepted(genesisBlk.ID())
+	genesisBlkID := genesisBlk.ID()
+	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk)
@@ -98,13 +100,13 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx)
+		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
-		stakeAmount := tx.Validator.Wght
-		stakeDuration := tx.Validator.Duration()
+		stakeAmount := validatorTx.Weight()
+		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime())
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -115,12 +117,12 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			stakeAmount,
 			currentSupply,
 		)
-		newCurrentSupply, err := math.Add64(currentSupply, potentialReward)
+		newCurrentSupply, err := safemath.Add64(currentSupply, potentialReward)
 		if err != nil {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, potentialReward)
 		if err != nil {
 			return err
 		}
