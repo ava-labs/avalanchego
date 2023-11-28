@@ -177,7 +177,9 @@ type mockHandler struct {
 	handleStateTrieCalled,
 	handleAtomicTrieCalled,
 	handleBlockRequestCalled,
-	handleCodeRequestCalled bool
+	handleCodeRequestCalled,
+	handleMessageSignatureCalled,
+	handleBlockSignatureCalled bool
 }
 
 func (m *mockHandler) HandleStateTrieLeafsRequest(context.Context, ids.NodeID, uint32, LeafsRequest) ([]byte, error) {
@@ -197,6 +199,15 @@ func (m *mockHandler) HandleBlockRequest(context.Context, ids.NodeID, uint32, Bl
 
 func (m *mockHandler) HandleCodeRequest(context.Context, ids.NodeID, uint32, CodeRequest) ([]byte, error) {
 	m.handleCodeRequestCalled = true
+	return nil, nil
+}
+
+func (m *mockHandler) HandleMessageSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest MessageSignatureRequest) ([]byte, error) {
+	m.handleMessageSignatureCalled = true
+	return nil, nil
+}
+func (m *mockHandler) HandleBlockSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest BlockSignatureRequest) ([]byte, error) {
+	m.handleBlockSignatureCalled = true
 	return nil, nil
 }
 
