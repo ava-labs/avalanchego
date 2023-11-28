@@ -593,6 +593,50 @@ func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
 
+func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
+}
+
+func (s *state) PutCurrentDelegator(staker *Staker) {
+	s.currentStakers.PutDelegator(staker)
+}
+
+func (s *state) DeleteCurrentDelegator(staker *Staker) {
+	s.currentStakers.DeleteDelegator(staker)
+}
+
+func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
+	return s.currentStakers.GetStakerIterator(), nil
+}
+
+func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	return s.pendingStakers.GetValidator(subnetID, nodeID)
+}
+
+func (s *state) PutPendingValidator(staker *Staker) {
+	s.pendingStakers.PutValidator(staker)
+}
+
+func (s *state) DeletePendingValidator(staker *Staker) {
+	s.pendingStakers.DeleteValidator(staker)
+}
+
+func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
+}
+
+func (s *state) PutPendingDelegator(staker *Staker) {
+	s.pendingStakers.PutDelegator(staker)
+}
+
+func (s *state) DeletePendingDelegator(staker *Staker) {
+	s.pendingStakers.DeleteDelegator(staker)
+}
+
+func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
+	return s.pendingStakers.GetStakerIterator(), nil
+}
+
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
 	// Note: we want all subnets, so we don't look at addedSubnets
 	// which are only part of them
@@ -1544,50 +1588,6 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 		})
 	}
 	return nil
-}
-
-func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
-}
-
-func (s *state) PutCurrentDelegator(staker *Staker) {
-	s.currentStakers.PutDelegator(staker)
-}
-
-func (s *state) DeleteCurrentDelegator(staker *Staker) {
-	s.currentStakers.DeleteDelegator(staker)
-}
-
-func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
-	return s.currentStakers.GetStakerIterator(), nil
-}
-
-func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	return s.pendingStakers.GetValidator(subnetID, nodeID)
-}
-
-func (s *state) PutPendingValidator(staker *Staker) {
-	s.pendingStakers.PutValidator(staker)
-}
-
-func (s *state) DeletePendingValidator(staker *Staker) {
-	s.pendingStakers.DeleteValidator(staker)
-}
-
-func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
-}
-
-func (s *state) PutPendingDelegator(staker *Staker) {
-	s.pendingStakers.PutDelegator(staker)
-}
-
-func (s *state) DeletePendingDelegator(staker *Staker) {
-	s.pendingStakers.DeleteDelegator(staker)
-}
-
-func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
-	return s.pendingStakers.GetStakerIterator(), nil
 }
 
 func (s *state) shouldInit() (bool, error) {
