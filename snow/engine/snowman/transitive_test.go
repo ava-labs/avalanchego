@@ -33,18 +33,17 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.AddStaker(commonCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-	commonCfg.Sender = sender
 	sender.Default(true)
 
 	vm := &block.TestVM{}
@@ -54,10 +53,10 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	snowGetHandler, err := getter.New(
 		vm,
 		sender,
-		commonCfg.Ctx.Log,
+		engCfg.Ctx.Log,
 		time.Second,
 		2000,
-		commonCfg.Ctx.Registerer,
+		engCfg.Ctx.Registerer,
 	)
 	require.NoError(err)
 	engCfg.AllGetsServer = snowGetHandler
@@ -95,9 +94,8 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 }
 
 func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	commonCfg := common.DefaultConfigTest()
-	engCfg := DefaultConfigs()
-	return setup(t, commonCfg, engCfg)
+	engCfg := DefaultConfig()
+	return setup(t, engCfg)
 }
 
 func TestEngineShutdown(t *testing.T) {
@@ -326,7 +324,7 @@ func TestEngineQuery(t *testing.T) {
 func TestEngineMultipleQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -721,7 +719,7 @@ func TestEngineRepoll(t *testing.T) {
 func TestVoteCanceling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -819,7 +817,7 @@ func TestVoteCanceling(t *testing.T) {
 func TestEngineNoQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -866,7 +864,7 @@ func TestEngineNoQuery(t *testing.T) {
 func TestEngineNoRepollQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1504,7 +1502,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 func TestEngineAggressivePolling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewManager()
@@ -1592,7 +1590,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 func TestEngineDoubleChit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		AlphaPreference:       2,
@@ -1696,7 +1694,7 @@ func TestEngineDoubleChit(t *testing.T) {
 func TestEngineBuildBlockLimit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params.K = 1
 	engCfg.Params.AlphaPreference = 1
 	engCfg.Params.AlphaConfidence = 1
@@ -2718,7 +2716,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig()
 	engCfg.Params = snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,

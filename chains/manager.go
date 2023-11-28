@@ -878,21 +878,17 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Config: common.Config{
-			Ctx:                            ctx,
-			Beacons:                        vdrs,
-			SampleK:                        sampleK,
-			Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-			StartupTracker:                 startupTracker,
-			Sender:                         snowmanMessageSender,
-			BootstrapTracker:               sb,
-			Timer:                          h,
-			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			SharedCfg:                      &common.SharedConfig{},
-		},
-		AllGetsServer: snowGetHandler,
-		Blocked:       blockBlocker,
-		VM:            vmWrappingProposerVM,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        vdrs,
+		SampleK:                        sampleK,
+		StartupTracker:                 startupTracker,
+		Sender:                         snowmanMessageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		Blocked:                        blockBlocker,
+		VM:                             vmWrappingProposerVM,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
 	snowmanBootstrapper, err = smbootstrap.New(
@@ -1224,24 +1220,19 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// create bootstrap gear
-	alpha := bootstrapWeight/2 + 1 // must be > 50%
 	bootstrapCfg := smbootstrap.Config{
-		Config: common.Config{
-			Ctx:                            ctx,
-			Beacons:                        beacons,
-			SampleK:                        sampleK,
-			StartupTracker:                 startupTracker,
-			Alpha:                          alpha,
-			Sender:                         messageSender,
-			BootstrapTracker:               sb,
-			Timer:                          h,
-			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			SharedCfg:                      &common.SharedConfig{},
-		},
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		Bootstrapped:  bootstrapFunc,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupTracker:                 startupTracker,
+		Sender:                         messageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		Blocked:                        blocked,
+		VM:                             vm,
+		Bootstrapped:                   bootstrapFunc,
 	}
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
@@ -1264,7 +1255,7 @@ func (m *manager) createSnowmanChain(
 		messageSender,
 		beacons,
 		sampleK,
-		alpha,
+		bootstrapWeight/2+1, // must be > 50%
 		m.StateSyncBeacons,
 		vm,
 	)

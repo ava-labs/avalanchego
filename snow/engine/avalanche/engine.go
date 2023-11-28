@@ -66,10 +66,6 @@ func (e *engine) Context() *snow.ConsensusContext {
 	return e.ctx
 }
 
-func (e *engine) GetVM() common.VM {
-	return e.vm
-}
-
 func (*engine) HealthCheck(context.Context) (interface{}, error) {
 	return nil, nil
 }

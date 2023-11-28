@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -153,7 +153,7 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := states.NewMockState(ctrl)
+				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
 				return &Block{
 					Block: mockBlock,
@@ -186,7 +186,7 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := states.NewMockState(ctrl)
+				mockState := state.NewMockState(ctrl)
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight) // Should be blockHeight - 1
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
@@ -226,7 +226,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp.Add(1))
 
@@ -271,7 +271,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -321,7 +321,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -399,7 +399,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -461,7 +461,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -509,7 +509,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := states.NewMockDiff(ctrl)
+				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -616,11 +616,11 @@ func TestBlockAccept(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := states.NewMockState(ctrl)
+				mockManagerState := state.NewMockState(ctrl)
 				mockManagerState.EXPECT().CommitBatch().Return(nil, errTest)
 				mockManagerState.EXPECT().Abort()
 
-				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState := state.NewMockDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				return &Block{
@@ -654,7 +654,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := states.NewMockState(ctrl)
+				mockManagerState := state.NewMockState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
@@ -663,7 +663,7 @@ func TestBlockAccept(t *testing.T) {
 				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(errTest)
 
-				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState := state.NewMockDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				return &Block{
@@ -698,7 +698,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := states.NewMockState(ctrl)
+				mockManagerState := state.NewMockState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
@@ -707,7 +707,7 @@ func TestBlockAccept(t *testing.T) {
 				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
 
-				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState := state.NewMockDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				metrics := metrics.NewMockMetrics(ctrl)
@@ -748,7 +748,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := states.NewMockState(ctrl)
+				mockManagerState := state.NewMockState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
@@ -758,7 +758,7 @@ func TestBlockAccept(t *testing.T) {
 				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
 
-				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState := state.NewMockDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				metrics := metrics.NewMockMetrics(ctrl)
@@ -859,7 +859,7 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
 
 				preferredID := ids.GenerateTestID()
-				mockPreferredState := states.NewMockDiff(ctrl)
+				mockPreferredState := state.NewMockDiff(ctrl)
 				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
 				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
@@ -918,7 +918,7 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().Add(tx2).Return(nil)
 
 				preferredID := ids.GenerateTestID()
-				mockPreferredState := states.NewMockDiff(ctrl)
+				mockPreferredState := state.NewMockDiff(ctrl)
 				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
 				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
@@ -1014,7 +1014,7 @@ func TestBlockStatus(t *testing.T) {
 				mockBlock := block.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 
-				mockState := states.NewMockState(ctrl)
+				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(blockID).Return(nil, nil)
 
 				return &Block{
@@ -1034,7 +1034,7 @@ func TestBlockStatus(t *testing.T) {
 				mockBlock := block.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 
-				mockState := states.NewMockState(ctrl)
+				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(blockID).Return(nil, database.ErrNotFound)
 
 				return &Block{
