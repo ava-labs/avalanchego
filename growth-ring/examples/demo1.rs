@@ -9,26 +9,29 @@ use growthring::{
 };
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
-fn test(records: Vec<String>, wal: &mut WalWriter<WalFileImpl, WalStoreImpl>) -> Vec<WalRingId> {
+fn test(
+    records: Vec<String>,
+    wal: &mut WalWriter<WalFileImpl, WalStoreImpl>,
+) -> Result<Vec<WalRingId>, ()> {
     let mut res = Vec::new();
     for r in wal.grow(records).into_iter() {
-        let ring_id = futures::executor::block_on(r).unwrap().1;
+        let ring_id = futures::executor::block_on(r)?.1;
         println!("got ring id: {:?}", ring_id);
         res.push(ring_id);
     }
-    res
+    Ok(res)
 }
 
 fn recover(payload: WalBytes, ringid: WalRingId) -> Result<(), WalError> {
     println!(
         "recover(payload={}, ringid={:?}",
-        std::str::from_utf8(&payload).unwrap(),
+        std::str::from_utf8(&payload).map_err(|e| WalError::Other(e.to_string()))?,
         ringid
     );
     Ok(())
 }
 
-fn main() {
+fn main() -> Result<(), WalError> {
     let wal_dir = "./wal_demo1";
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let mut loader = WalLoader::new();
@@ -37,7 +40,7 @@ fn main() {
     let store = WalStoreImpl::new(wal_dir, true).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
-        test(
+        let _ = test(
             ["hi", "hello", "lol"]
                 .iter()
                 .map(|s| s.to_string())
@@ -46,7 +49,7 @@ fn main() {
         );
     }
     for _ in 0..3 {
-        test(
+        let _ = test(
             vec!["a".repeat(10), "b".repeat(100), "c".repeat(1000)],
             &mut wal,
         );
@@ -55,7 +58,7 @@ fn main() {
     let store = WalStoreImpl::new(wal_dir, false).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
-        test(
+        let _ = test(
             vec![
                 "a".repeat(10),
                 "b".repeat(100),
@@ -81,7 +84,10 @@ fn main() {
                 }
                 records.push(rec)
             }
-            for id in test(records, &mut wal).iter() {
+            for id in test(records, &mut wal)
+                .map_err(|_| WalError::Other("test failed".to_string()))?
+                .iter()
+            {
                 ids.push(*id)
             }
         }
@@ -100,4 +106,6 @@ fn main() {
         assert_eq!(std::str::from_utf8(&rec).unwrap(), &ans);
         println!("{}", std::str::from_utf8(&rec).unwrap());
     }
+
+    Ok(())
 }
