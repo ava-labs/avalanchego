@@ -82,9 +82,6 @@ func TestHealthCheckSubnet(t *testing.T) {
 			require.NoError(err)
 
 			bootstrapper := &common.BootstrapperTest{
-				BootstrapableTest: common.BootstrapableTest{
-					T: t,
-				},
 				EngineTest: common.EngineTest{
 					T: t,
 				},
