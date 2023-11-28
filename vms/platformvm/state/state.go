@@ -914,6 +914,43 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) {
 	s.lastAcceptedBlkID = lastAccepted
 }
 
+func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := s.modifiedSupplies[subnetID]
+	if ok {
+		return supply, nil
+	}
+	cachedSupply, ok := s.suppliesCache.Get(subnetID)
+	if ok {
+		if cachedSupply == nil {
+			return 0, database.ErrNotFound
+		}
+		return *cachedSupply, nil
+	}
+
+	key := merkleSuppliesKey(subnetID)
+
+	switch supplyBytes, err := s.merkleDB.Get(key); err {
+	case nil:
+		supply, err := database.ParseUInt64(supplyBytes)
+		if err != nil {
+			return 0, fmt.Errorf("failed parsing supply: %w", err)
+		}
+		s.suppliesCache.Put(subnetID, &supply)
+		return supply, nil
+
+	case database.ErrNotFound:
+		s.suppliesCache.Put(subnetID, nil)
+		return 0, database.ErrNotFound
+
+	default:
+		return 0, err
+	}
+}
+
+func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
+	s.modifiedSupplies[subnetID] = cs
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1016,43 +1053,6 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 
 func (s *state) SetHeight(height uint64) {
 	s.lastAcceptedHeight = height
-}
-
-func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
-	supply, ok := s.modifiedSupplies[subnetID]
-	if ok {
-		return supply, nil
-	}
-	cachedSupply, ok := s.suppliesCache.Get(subnetID)
-	if ok {
-		if cachedSupply == nil {
-			return 0, database.ErrNotFound
-		}
-		return *cachedSupply, nil
-	}
-
-	key := merkleSuppliesKey(subnetID)
-
-	switch supplyBytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		supply, err := database.ParseUInt64(supplyBytes)
-		if err != nil {
-			return 0, fmt.Errorf("failed parsing supply: %w", err)
-		}
-		s.suppliesCache.Put(subnetID, &supply)
-		return supply, nil
-
-	case database.ErrNotFound:
-		s.suppliesCache.Put(subnetID, nil)
-		return 0, database.ErrNotFound
-
-	default:
-		return 0, err
-	}
-}
-
-func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
-	s.modifiedSupplies[subnetID] = cs
 }
 
 // SUBNETS Section
