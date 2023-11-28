@@ -1958,30 +1958,6 @@ func (s *state) writePermissionedSubnets(batchOps *[]database.BatchOp) error { /
 	return nil
 }
 
-func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
-	for subnetID, owner := range s.subnetOwners {
-		owner := owner
-
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
-		if err != nil {
-			return fmt.Errorf("failed to marshal subnet owner: %w", err)
-		}
-
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
-
-		key := merkleSubnetOwnersKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: ownerBytes,
-		})
-	}
-	maps.Clear(s.subnetOwners)
-	return nil
-}
-
 func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for subnetID, transforkSubnetTx := range s.addedElasticSubnets {
 		key := merkleElasticSubnetKey(subnetID)
@@ -2037,6 +2013,72 @@ func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[
 	return nil
 }
 
+func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+	for nodeID, nodeDelegateeRewards := range s.modifiedDelegateeReward {
+		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
+		for _, subnetID := range nodeDelegateeRewardsList {
+			delegateeReward := s.delegateeRewardCache[nodeID][subnetID]
+
+			key := merkleDelegateeRewardsKey(nodeID, subnetID)
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: database.PackUInt64(delegateeReward),
+			})
+		}
+		delete(s.modifiedDelegateeReward, nodeID)
+	}
+	return nil
+}
+
+func (s *state) writeTxs() error {
+	for txID, txStatus := range s.addedTxs {
+		txID := txID
+
+		stx := txBytesAndStatus{
+			Tx:     txStatus.tx.Bytes(),
+			Status: txStatus.status,
+		}
+
+		// Note that we're serializing a [txBytesAndStatus] here, not a
+		// *txs.Tx, so we don't use [txs.Codec].
+		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
+		if err != nil {
+			return fmt.Errorf("failed to serialize tx: %w", err)
+		}
+
+		delete(s.addedTxs, txID)
+		// Note: Evict is used rather than Put here because stx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.txCache.Evict(txID)
+		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+			return fmt.Errorf("failed to add tx: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) writeRewardUTXOs() error {
+	for txID, utxos := range s.addedRewardUTXOs {
+		delete(s.addedRewardUTXOs, txID)
+		s.rewardUTXOsCache.Put(txID, utxos)
+		rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
+		txDB := linkeddb.NewDefault(rawTxDB)
+
+		for _, utxo := range utxos {
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			if err != nil {
+				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
+			}
+			utxoID := utxo.InputID()
+			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+				return fmt.Errorf("failed to add reward UTXO: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 	for utxoID, utxo := range s.modifiedUTXOs {
 		delete(s.modifiedUTXOs, utxoID)
@@ -2083,48 +2125,27 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 	return nil
 }
 
-func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for nodeID, nodeDelegateeRewards := range s.modifiedDelegateeReward {
-		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
-		for _, subnetID := range nodeDelegateeRewardsList {
-			delegateeReward := s.delegateeRewardCache[nodeID][subnetID]
+func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
+	for subnetID, owner := range s.subnetOwners {
+		owner := owner
 
-			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
-			})
-		}
-		delete(s.modifiedDelegateeReward, nodeID)
-	}
-	return nil
-}
-
-func (s *state) writeTxs() error {
-	for txID, txStatus := range s.addedTxs {
-		txID := txID
-
-		stx := txBytesAndStatus{
-			Tx:     txStatus.tx.Bytes(),
-			Status: txStatus.status,
-		}
-
-		// Note that we're serializing a [txBytesAndStatus] here, not a
-		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
-			return fmt.Errorf("failed to serialize tx: %w", err)
+			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
 
-		delete(s.addedTxs, txID)
-		// Note: Evict is used rather than Put here because stx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.txCache.Evict(txID)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
-			return fmt.Errorf("failed to add tx: %w", err)
-		}
+		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
+			owner: owner,
+			size:  len(ownerBytes),
+		})
+
+		key := merkleSubnetOwnersKey(subnetID)
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: ownerBytes,
+		})
 	}
+	maps.Clear(s.subnetOwners)
 	return nil
 }
 
@@ -2199,27 +2220,6 @@ func (s *state) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.
 		}
 		if err := s.flatValidatorPublicKeyDiffsDB.Put(key, blsKeyBytes); err != nil {
 			return fmt.Errorf("failed to add bls key diffs: %w", err)
-		}
-	}
-	return nil
-}
-
-func (s *state) writeRewardUTXOs() error {
-	for txID, utxos := range s.addedRewardUTXOs {
-		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
-		rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
-		txDB := linkeddb.NewDefault(rawTxDB)
-
-		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
-			if err != nil {
-				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
-			}
-			utxoID := utxo.InputID()
-			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
-				return fmt.Errorf("failed to add reward UTXO: %w", err)
-			}
 		}
 	}
 	return nil
