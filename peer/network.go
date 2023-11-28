@@ -179,7 +179,7 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 
-	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
+	log.Trace("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
 	n.peers.TrackPeer(nodeID)
 
 	requestID := n.nextRequestID()
@@ -196,7 +196,7 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 		return err
 	}
 
-	log.Debug("sent request message to peer", "nodeID", nodeID, "requestID", requestID)
+	log.Trace("sent request message to peer", "nodeID", nodeID, "requestID", requestID)
 	return nil
 }
 
@@ -228,7 +228,7 @@ func (n *network) SendCrossChainRequest(ctx context.Context, chainID ids.ID, req
 		return err
 	}
 
-	log.Debug("sent request message to chain", "chainID", chainID, "crossChainRequestID", requestID)
+	log.Trace("sent request message to chain", "chainID", chainID, "crossChainRequestID", requestID)
 	return nil
 }
 
@@ -240,21 +240,21 @@ func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID id
 		return nil
 	}
 
-	log.Debug("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
+	log.Trace("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.CrossChainRequest
 	if _, err := n.crossChainCodec.Unmarshal(request, &req); err != nil {
-		log.Debug("failed to unmarshal CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request), "err", err)
+		log.Trace("failed to unmarshal CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request), "err", err)
 		return nil
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.crossChainStats)
 	if err != nil {
-		log.Debug("deadline to process CrossChainAppRequest has expired, skipping", "requestingChainID", requestingChainID, "requestID", requestID, "err", err)
+		log.Trace("deadline to process CrossChainAppRequest has expired, skipping", "requestingChainID", requestingChainID, "requestID", requestID, "err", err)
 		return nil
 	}
 
-	log.Debug("processing incoming CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "req", req)
+	log.Trace("processing incoming CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "req", req)
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
@@ -277,12 +277,12 @@ func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID id
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
 func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChainID ids.ID, requestID uint32) error {
-	log.Debug("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
+	log.Trace("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Can happen after the network has been closed.
-		log.Debug("received CrossChainAppRequestFailed to unknown request", "respondingChainID", respondingChainID, "requestID", requestID)
+		log.Trace("received CrossChainAppRequestFailed to unknown request", "respondingChainID", respondingChainID, "requestID", requestID)
 		return nil
 	}
 
@@ -297,12 +297,12 @@ func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChai
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
 func (n *network) CrossChainAppResponse(ctx context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
-	log.Debug("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
+	log.Trace("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Can happen after the network has been closed.
-		log.Debug("received CrossChainAppResponse to unknown request", "respondingChainID", respondingChainID, "requestID", requestID, "responseLen", len(response))
+		log.Trace("received CrossChainAppResponse to unknown request", "respondingChainID", respondingChainID, "requestID", requestID, "responseLen", len(response))
 		return nil
 	}
 
@@ -322,21 +322,21 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 
-	log.Debug("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
+	log.Trace("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.Request
 	if _, err := n.codec.Unmarshal(request, &req); err != nil {
-		log.Debug("forwarding AppRequest to SDK router", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request), "err", err)
+		log.Trace("forwarding AppRequest to SDK router", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request), "err", err)
 		return n.router.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
 	if err != nil {
-		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
+		log.Trace("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
 
-	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
+	log.Trace("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
 	// We make a new context here because we don't want to cancel the context
 	// passed into n.AppSender.SendAppResponse below
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
@@ -358,11 +358,11 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
 func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	log.Debug("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
+	log.Trace("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
-		log.Debug("forwarding AppResponse to SDK router", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
+		log.Trace("forwarding AppResponse to SDK router", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
 		return n.router.AppResponse(ctx, nodeID, requestID, response)
 	}
 
@@ -379,11 +379,11 @@ func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error only when the response handler returns an error
 func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
+	log.Trace("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
-		log.Debug("forwarding AppRequestFailed to SDK router", "nodeID", nodeID, "requestID", requestID)
+		log.Trace("forwarding AppRequestFailed to SDK router", "nodeID", nodeID, "requestID", requestID)
 		return n.router.AppRequestFailed(ctx, nodeID, requestID)
 	}
 
@@ -447,18 +447,16 @@ func (n *network) Gossip(gossip []byte) error {
 func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
 	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
-		log.Debug("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
+		log.Trace("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
 		return nil
 	}
 
-	log.Debug("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
+	log.Trace("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
 	return gossipMsg.Handle(n.gossipHandler, nodeID)
 }
 
 // Connected adds the given nodeID to the peer list so that it can receive messages
 func (n *network) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	log.Debug("adding new peer", "nodeID", nodeID)
-
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -467,7 +465,6 @@ func (n *network) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *v
 	}
 
 	if nodeID == n.self {
-		log.Debug("skipping registering self as peer")
 		return nil
 	}
 
@@ -477,7 +474,6 @@ func (n *network) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *v
 
 // Disconnected removes given [nodeID] from the peer list
 func (n *network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	log.Debug("disconnecting peer", "nodeID", nodeID)
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
