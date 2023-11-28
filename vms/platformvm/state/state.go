@@ -597,10 +597,10 @@ func (s *state) GetSubnets() ([]*txs.Tx, error) {
 		return s.permissionedSubnetCache, nil
 	}
 
-	subnets := make([]*txs.Tx, 0)
 	subnetDBIt := s.merkleDB.NewIteratorWithPrefix(permissionedSubnetSectionPrefix)
 	defer subnetDBIt.Release()
 
+	subnets := make([]*txs.Tx, 0)
 	for subnetDBIt.Next() {
 		subnetTxBytes := subnetDBIt.Value()
 		subnetTx, err := txs.Parse(txs.GenesisCodec, subnetTxBytes)
@@ -706,6 +706,40 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
 	s.addedElasticSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
+}
+
+func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
+	if chains, cached := s.chainCache.Get(subnetID); cached {
+		return chains, nil
+	}
+
+	prefix := merkleChainPrefix(subnetID)
+	chainDBIt := s.merkleDB.NewIteratorWithPrefix(prefix)
+	defer chainDBIt.Release()
+
+	chains := make([]*txs.Tx, 0)
+
+	for chainDBIt.Next() {
+		chainTxBytes := chainDBIt.Value()
+		chainTx, err := txs.Parse(txs.GenesisCodec, chainTxBytes)
+		if err != nil {
+			return nil, err
+		}
+		chains = append(chains, chainTx)
+	}
+	if err := chainDBIt.Error(); err != nil {
+		return nil, err
+	}
+	chains = append(chains, s.addedChains[subnetID]...)
+	s.chainCache.Put(subnetID, chains)
+	return chains, nil
+}
+
+func (s *state) AddChain(createChainTxIntf *txs.Tx) {
+	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
+	subnetID := createChainTx.SubnetID
+
+	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -867,39 +901,6 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 // SUBNETS Section
 
 // CHAINS Section
-func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
-	if chains, cached := s.chainCache.Get(subnetID); cached {
-		return chains, nil
-	}
-
-	prefix := merkleChainPrefix(subnetID)
-	chainDBIt := s.merkleDB.NewIteratorWithPrefix(prefix)
-	defer chainDBIt.Release()
-
-	chains := make([]*txs.Tx, 0)
-
-	for chainDBIt.Next() {
-		chainTxBytes := chainDBIt.Value()
-		chainTx, err := txs.Parse(txs.GenesisCodec, chainTxBytes)
-		if err != nil {
-			return nil, err
-		}
-		chains = append(chains, chainTx)
-	}
-	if err := chainDBIt.Error(); err != nil {
-		return nil, err
-	}
-	chains = append(chains, s.addedChains[subnetID]...)
-	s.chainCache.Put(subnetID, chains)
-	return chains, nil
-}
-
-func (s *state) AddChain(createChainTxIntf *txs.Tx) {
-	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
-	subnetID := createChainTx.SubnetID
-
-	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
-}
 
 // TXs Section
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
