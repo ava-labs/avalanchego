@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +16,6 @@ import (
 	"go.uber.org/zap"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -822,6 +822,72 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
 }
+func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
+		if utxo == nil {
+			return nil, database.ErrNotFound
+		}
+		return utxo, nil
+	}
+	if utxo, found := s.utxoCache.Get(utxoID); found {
+		if utxo == nil {
+			return nil, database.ErrNotFound
+		}
+		return utxo, nil
+	}
+
+	key := merkleUtxoIDKey(utxoID)
+
+	switch bytes, err := s.merkleDB.Get(key); err {
+	case nil:
+		utxo := &avax.UTXO{}
+		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
+			return nil, err
+		}
+		s.utxoCache.Put(utxoID, utxo)
+		return utxo, nil
+
+	case database.ErrNotFound:
+		s.utxoCache.Put(utxoID, nil)
+		return nil, database.ErrNotFound
+
+	default:
+		return nil, err
+	}
+}
+
+func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	var (
+		prefix = slices.Clone(addr)
+		key    = merkleUtxoIndexKey(addr, start)
+	)
+
+	iter := s.indexedUTXOsDB.NewIteratorWithStartAndPrefix(key, prefix)
+	defer iter.Release()
+
+	utxoIDs := []ids.ID(nil)
+	for len(utxoIDs) < limit && iter.Next() {
+		itAddr, utxoID := splitUtxoIndexKey(iter.Key())
+		if !bytes.Equal(itAddr, addr) {
+			break
+		}
+		if utxoID == start {
+			continue
+		}
+
+		start = ids.Empty
+		utxoIDs = append(utxoIDs, utxoID)
+	}
+	return utxoIDs, iter.Error()
+}
+
+func (s *state) AddUTXO(utxo *avax.UTXO) {
+	s.modifiedUTXOs[utxo.InputID()] = utxo
+}
+
+func (s *state) DeleteUTXO(utxoID ids.ID) {
+	s.modifiedUTXOs[utxoID] = nil
+}
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
@@ -1117,72 +1183,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 }
 
 // UTXOs section
-func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
-	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
-		if utxo == nil {
-			return nil, database.ErrNotFound
-		}
-		return utxo, nil
-	}
-	if utxo, found := s.utxoCache.Get(utxoID); found {
-		if utxo == nil {
-			return nil, database.ErrNotFound
-		}
-		return utxo, nil
-	}
-
-	key := merkleUtxoIDKey(utxoID)
-
-	switch bytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		utxo := &avax.UTXO{}
-		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
-			return nil, err
-		}
-		s.utxoCache.Put(utxoID, utxo)
-		return utxo, nil
-
-	case database.ErrNotFound:
-		s.utxoCache.Put(utxoID, nil)
-		return nil, database.ErrNotFound
-
-	default:
-		return nil, err
-	}
-}
-
-func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	var (
-		prefix = slices.Clone(addr)
-		key    = merkleUtxoIndexKey(addr, start)
-	)
-
-	iter := s.indexedUTXOsDB.NewIteratorWithStartAndPrefix(key, prefix)
-	defer iter.Release()
-
-	utxoIDs := []ids.ID(nil)
-	for len(utxoIDs) < limit && iter.Next() {
-		itAddr, utxoID := splitUtxoIndexKey(iter.Key())
-		if !bytes.Equal(itAddr, addr) {
-			break
-		}
-		if utxoID == start {
-			continue
-		}
-
-		start = ids.Empty
-		utxoIDs = append(utxoIDs, utxoID)
-	}
-	return utxoIDs, iter.Error()
-}
-
-func (s *state) AddUTXO(utxo *avax.UTXO) {
-	s.modifiedUTXOs[utxo.InputID()] = utxo
-}
-
-func (s *state) DeleteUTXO(utxoID ids.ID) {
-	s.modifiedUTXOs[utxoID] = nil
-}
 
 // VALIDATORS Section
 func applyWeightDiff(
