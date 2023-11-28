@@ -127,7 +127,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 	m.providerSource = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "blks_issued",
-		Help:      "number of blocks that have been issued into consensus broken down by how they were discovered",
+		Help:      "number of blocks that have been issued into consensus by discovery mechanism",
 	}, []string{"source"})
 
 	// Register the labels
