@@ -90,7 +90,7 @@ func New(
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	defer func() {
-		b.Mempool.RequestBuildBlock(false)
+		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 		b.ResetBlockTimer()
 	}()
 
@@ -179,7 +179,7 @@ func (b *builder) setNextBuildBlockTime() {
 	now := b.txExecutorBackend.Clk.Time()
 	if !b.nextStakerChangeTime.After(now) {
 		// Block needs to be issued to advance time.
-		b.Mempool.RequestBuildBlock(true)
+		b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 	}
 
 	// Wake up when it's time to add/remove the next validator/delegator
