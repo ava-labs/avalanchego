@@ -71,8 +71,9 @@ type Mempool interface {
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built. If [emptyBlockPermitted] is true, the notification will be sent
-	// if there are no transactions in the mempool. Otherwise, a notification
-	// will only be sent if there is at least one transaction in the mempool.
+	// regardless of whether there are no transactions in the mempool. If not,
+	// a notification will only be sent if there is at least one transaction in
+	// the mempool.
 	RequestBuildBlock(emptyBlockPermitted bool)
 
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
