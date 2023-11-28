@@ -1946,35 +1946,6 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 	return nil
 }
 
-func (s *state) writePermissionedSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for _, subnetTx := range s.addedPermissionedSubnets {
-		key := merklePermissionedSubnetKey(subnetTx.ID())
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: subnetTx.Bytes(),
-		})
-	}
-	s.addedPermissionedSubnets = make([]*txs.Tx, 0)
-	return nil
-}
-
-func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for subnetID, transforkSubnetTx := range s.addedElasticSubnets {
-		key := merkleElasticSubnetKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: transforkSubnetTx.Bytes(),
-		})
-		delete(s.addedElasticSubnets, subnetID)
-
-		// Note: Evict is used rather than Put here because tx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.elasticSubnetCache.Evict(subnetID)
-	}
-	return nil
-}
-
 func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for subnetID, chains := range s.addedChains {
 		for _, chainTx := range chains {
@@ -2121,6 +2092,35 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 		if err := s.writeUTXOsIndex(utxo, true /*insertUtxo*/); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (s *state) writePermissionedSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+	for _, subnetTx := range s.addedPermissionedSubnets {
+		key := merklePermissionedSubnetKey(subnetTx.ID())
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnetTx.Bytes(),
+		})
+	}
+	s.addedPermissionedSubnets = make([]*txs.Tx, 0)
+	return nil
+}
+
+func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+	for subnetID, transforkSubnetTx := range s.addedElasticSubnets {
+		key := merkleElasticSubnetKey(subnetID)
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: transforkSubnetTx.Bytes(),
+		})
+		delete(s.addedElasticSubnets, subnetID)
+
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.elasticSubnetCache.Evict(subnetID)
 	}
 	return nil
 }
