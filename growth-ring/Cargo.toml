@@ -26,6 +26,7 @@ hex = "0.4.3"
 rand = "0.8.5"
 indexmap = "2.0.0"
 tokio = { version = "1.28.1", features = ["tokio-macros", "rt", "macros"] }
+test-case = "3.1.0"
 
 [lib]
 name = "growthring"

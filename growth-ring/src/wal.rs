@@ -9,19 +9,21 @@ use futures::{
     Future,
 };
 
-use std::cell::{RefCell, UnsafeCell};
 use std::convert::{TryFrom, TryInto};
 use std::mem::MaybeUninit;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
+use std::{
+    cell::{RefCell, UnsafeCell},
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 use std::{
     collections::{hash_map, BinaryHeap, HashMap, VecDeque},
     marker::PhantomData,
 };
 
 pub use crate::walerror::WalError;
-
-const FILENAME_FMT: &str = r"[0-9a-f]+\.log";
 
 enum WalRingType {
     #[allow(dead_code)]
@@ -59,8 +61,23 @@ type WalFileId = u64;
 pub type WalBytes = Box<[u8]>;
 pub type WalPos = u64;
 
-fn get_fid(fname: &str) -> WalFileId {
-    scan_fmt!(fname, "{x}.log", [hex WalFileId]).unwrap()
+// convert XXXXXX.log into number from the XXXXXX (in hex)
+fn get_fid(fname: &Path) -> Result<WalFileId, WalError> {
+    let wal_err: WalError = WalError::Other("not a log file".to_string());
+
+    if fname.extension() != Some(OsStr::new("log")) {
+        return Err(wal_err);
+    }
+
+    u64::from_str_radix(
+        fname
+            .file_stem()
+            .unwrap_or(OsStr::new(""))
+            .to_str()
+            .unwrap_or(""),
+        16,
+    )
+    .map_err(|_| wal_err)
 }
 
 fn get_fname(fid: WalFileId) -> String {
@@ -199,7 +216,7 @@ pub trait WalFile {
 
 #[async_trait(?Send)]
 pub trait WalStore<F: WalFile> {
-    type FileNameIter: Iterator<Item = String>;
+    type FileNameIter: Iterator<Item = PathBuf>;
 
     /// Open a file given the filename, create the file if not exists when `touch` is `true`.
     async fn open_file(&self, filename: &str, touch: bool) -> Result<F, WalError>;
@@ -729,7 +746,6 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
         nrecords: usize,
         recover_policy: &RecoverPolicy,
     ) -> Result<Vec<WalBytes>, WalError> {
-        let filename_fmt = regex::Regex::new(FILENAME_FMT).unwrap();
         let file_pool = &self.file_pool;
         let file_nbit = file_pool.file_nbit;
         let block_size = 1 << file_pool.block_nbit;
@@ -740,8 +756,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             file_pool
                 .store
                 .enumerate_files()?
-                .filter(|f| filename_fmt.is_match(f))
-                .map(|s| get_fid(&s))
+                .flat_map(|s| get_fid(&s))
                 .collect(),
         );
 
@@ -1179,7 +1194,6 @@ impl WalLoader {
         let msize = std::mem::size_of::<WalRingBlob>();
         assert!(self.file_nbit > self.block_nbit);
         assert!(msize < 1 << self.block_nbit);
-        let filename_fmt = regex::Regex::new(FILENAME_FMT).unwrap();
         let mut file_pool =
             WalFilePool::new(store, self.file_nbit, self.block_nbit, self.cache_size).await?;
         let logfiles = sort_fids(
@@ -1187,8 +1201,7 @@ impl WalLoader {
             file_pool
                 .store
                 .enumerate_files()?
-                .filter(|f| filename_fmt.is_match(f))
-                .map(|s| get_fid(&s))
+                .flat_map(|s| get_fid(&s))
                 .collect(),
         );
 
@@ -1301,3 +1314,25 @@ impl WalLoader {
 }
 
 pub const CRC32: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_CKSUM);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case("foo", Err("not a log file"); "no log extension")]
+    #[test_case("foo.log", Err("not a log file"); "invalid digit found in string")]
+    #[test_case("0000001.log", Ok(1); "happy path")]
+    #[test_case("1.log", Ok(1); "no leading zeroes")]
+
+    fn test_get_fid(input: &str, expected: Result<u64, &str>) {
+        let got = get_fid(Path::new(input));
+        match expected {
+            Err(has) => {
+                let err = got.err().unwrap().to_string();
+                assert!(err.contains(has), "{:?}", err)
+            }
+            Ok(val) => assert_eq!(got.unwrap(), val),
+        }
+    }
+}

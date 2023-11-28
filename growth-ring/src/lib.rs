@@ -48,8 +48,6 @@
 //! // After each recovery, the /tmp/walfiles is empty.
 //! ```
 
-#[macro_use]
-extern crate scan_fmt;
 pub mod wal;
 pub mod walerror;
 
@@ -175,7 +173,7 @@ pub fn oflags() -> OFlag {
 
 #[async_trait(?Send)]
 impl WalStore<WalFileImpl> for WalStoreImpl {
-    type FileNameIter = std::vec::IntoIter<String>;
+    type FileNameIter = std::vec::IntoIter<PathBuf>;
 
     async fn open_file(&self, filename: &str, _touch: bool) -> Result<WalFileImpl, WalError> {
         let path = self.root_dir.join(filename);
@@ -193,7 +191,7 @@ impl WalStore<WalFileImpl> for WalStoreImpl {
     fn enumerate_files(&self) -> Result<Self::FileNameIter, WalError> {
         let mut filenames = Vec::new();
         for path in fs::read_dir(&self.root_dir)?.filter_map(|entry| entry.ok()) {
-            filenames.push(path.file_name().into_string().unwrap());
+            filenames.push(path.path());
         }
         Ok(filenames.into_iter())
     }

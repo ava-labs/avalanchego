@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::collections::{hash_map, HashMap};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 pub trait FailGen {
@@ -126,7 +127,7 @@ impl<'a, G> WalStore<WalFileEmul<G>> for WalStoreEmul<'a, G>
 where
     G: 'static + FailGen,
 {
-    type FileNameIter = std::vec::IntoIter<String>;
+    type FileNameIter = std::vec::IntoIter<PathBuf>;
 
     async fn open_file(&self, filename: &str, touch: bool) -> Result<WalFileEmul<G>, WalError> {
         if self.fgen.next_fail() {
@@ -175,7 +176,7 @@ where
         }
         let mut logfiles = Vec::new();
         for (fname, _) in self.state.borrow().files.iter() {
-            logfiles.push(fname.clone())
+            logfiles.push(fname.into())
         }
         Ok(logfiles.into_iter())
     }
