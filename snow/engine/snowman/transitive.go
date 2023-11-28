@@ -59,7 +59,7 @@ type Transitive struct {
 	common.AppHandler
 	validators.Connector
 
-	RequestID uint32
+	requestID uint32
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -409,7 +409,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 }
 
 func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
-	t.RequestID = startReqID
+	t.requestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted(ctx)
 	if err != nil {
 		return err
@@ -774,20 +774,20 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 		return
 	}
 
-	t.RequestID++
+	t.requestID++
 	t.blkReqs.Put(
 		common.Request{
 			NodeID:    nodeID,
-			RequestID: t.RequestID,
+			RequestID: t.requestID,
 		},
 		blkID,
 	)
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", t.RequestID),
+		zap.Uint32("requestID", t.requestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(ctx, nodeID, t.RequestID, blkID)
+	t.Sender.SendGet(ctx, nodeID, t.requestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -828,21 +828,21 @@ func (t *Transitive) sendQuery(
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
-	t.RequestID++
-	if !t.polls.Add(t.RequestID, vdrBag) {
+	t.requestID++
+	if !t.polls.Add(t.requestID, vdrBag) {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "failed to add poll"),
 			zap.Stringer("blkID", blkID),
-			zap.Uint32("requestID", t.RequestID),
+			zap.Uint32("requestID", t.requestID),
 		)
 		return
 	}
 
 	vdrSet := set.Of(vdrIDs...)
 	if push {
-		t.Sender.SendPushQuery(ctx, vdrSet, t.RequestID, blkBytes, nextHeightToAccept)
+		t.Sender.SendPushQuery(ctx, vdrSet, t.requestID, blkBytes, nextHeightToAccept)
 	} else {
-		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID, nextHeightToAccept)
+		t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, blkID, nextHeightToAccept)
 	}
 }
 
