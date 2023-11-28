@@ -138,10 +138,11 @@ type PermissionlessValidator struct {
 // GenesisPermissionlessValidator should to be used for genesis validators only.
 type GenesisPermissionlessValidator struct {
 	GenesisValidator
-	RewardOwner        *Owner       `json:"rewardOwner,omitempty"`
-	DelegationFee      json.Float32 `json:"delegationFee"`
-	ExactDelegationFee *json.Uint32 `json:"exactDelegationFee,omitempty"`
-	Staked             []UTXO       `json:"staked,omitempty"`
+	RewardOwner        *Owner                    `json:"rewardOwner,omitempty"`
+	DelegationFee      json.Float32              `json:"delegationFee"`
+	ExactDelegationFee *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Staked             []UTXO                    `json:"staked,omitempty"`
+	Signer             *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.
@@ -315,21 +316,39 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			delegationFee = uint32(*vdr.ExactDelegationFee)
 		}
 
-		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		var (
+			baseTx = txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
-			}},
-			Validator: txs.Validator{
+			}}
+			validator = txs.Validator{
 				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
-			},
-			StakeOuts:        stake,
-			RewardsOwner:     owner,
-			DelegationShares: delegationFee,
-		}}
+			}
+			tx *txs.Tx
+		)
+		if vdr.Signer == nil {
+			tx = &txs.Tx{Unsigned: &txs.AddValidatorTx{
+				BaseTx:           baseTx,
+				Validator:        validator,
+				StakeOuts:        stake,
+				RewardsOwner:     owner,
+				DelegationShares: delegationFee,
+			}}
+		} else {
+			tx = &txs.Tx{Unsigned: &txs.AddPermissionlessValidatorTx{
+				BaseTx:                baseTx,
+				Validator:             validator,
+				Signer:                vdr.Signer,
+				StakeOuts:             stake,
+				ValidatorRewardsOwner: owner,
+				DelegatorRewardsOwner: owner,
+				DelegationShares:      delegationFee,
+			}}
+		}
+
 		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
