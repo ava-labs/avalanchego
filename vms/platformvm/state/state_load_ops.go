@@ -13,13 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // var errNotYetImplemented = errors.New("NOT YET IMPLEMENTED")
@@ -73,76 +69,6 @@ func (s *state) init(genesisBytes []byte) error {
 	}
 
 	return s.Commit()
-}
-
-// Loads the state from [genesisBls] and [genesis] into [ms].
-func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
-	genesisBlkID := genesisBlk.ID()
-	s.SetLastAccepted(genesisBlkID)
-	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
-	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
-	s.AddStatelessBlock(genesisBlk)
-
-	// Persist UTXOs that exist at genesis
-	for _, utxo := range genesis.UTXOs {
-		avaxUTXO := utxo.UTXO
-		s.AddUTXO(&avaxUTXO)
-	}
-
-	// Persist primary network validator set at genesis
-	for _, vdrTx := range genesis.Validators {
-		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
-		}
-
-		stakeAmount := validatorTx.Weight()
-		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime())
-		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
-
-		potentialReward := s.rewards.Calculate(
-			stakeDuration,
-			stakeAmount,
-			currentSupply,
-		)
-		newCurrentSupply, err := safemath.Add64(currentSupply, potentialReward)
-		if err != nil {
-			return err
-		}
-
-		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, potentialReward)
-		if err != nil {
-			return err
-		}
-
-		s.PutCurrentValidator(staker)
-		s.AddTx(vdrTx, status.Committed)
-		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
-	}
-
-	for _, chain := range genesis.Chains {
-		unsignedChain, ok := chain.Unsigned.(*txs.CreateChainTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
-		}
-
-		// Ensure all chains that the genesis bytes say to create have the right
-		// network ID
-		if unsignedChain.NetworkID != s.ctx.NetworkID {
-			return avax.ErrWrongNetworkID
-		}
-
-		s.AddChain(chain)
-		s.AddTx(chain, status.Committed)
-	}
-
-	// updateValidators is set to false here to maintain the invariant that the
-	// primary network's validator set is empty before the validator sets are
-	// initialized.
-	return s.write(false /*=updateValidators*/, 0)
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
