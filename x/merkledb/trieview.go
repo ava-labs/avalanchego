@@ -99,6 +99,7 @@ type trieView struct {
 	// The nil key node
 	// It is either the root of the trie or the root of the trie is its single child node
 	sentinelNode *node
+	rootPrefix   Key
 
 	tokenSize int
 }
@@ -110,6 +111,14 @@ type trieView struct {
 func (t *trieView) NewView(
 	ctx context.Context,
 	changes ViewChanges,
+) (TrieView, error) {
+	return t.NewViewWithRootPrefix(ctx, changes, Key{})
+}
+
+func (t *trieView) NewViewWithRootPrefix(
+	ctx context.Context,
+	changes ViewChanges,
+	rootPrefix Key,
 ) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
@@ -125,7 +134,7 @@ func (t *trieView) NewView(
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, changes)
+	newView, err := newTrieViewWithRootPrefix(t.db, t, changes, rootPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +157,36 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
+	return newTrieViewWithRootPrefix(db, parentTrie, changes, Key{})
+}
+
+// getRoot returns the node at [rootPrefix] from [t] by
+// checking for a node with and without a value.
+func (t *trieView) getHashRoot() (*node, error) {
+	if t.rootPrefix.Length() == 0 {
+		return t.sentinelNode, nil
+	}
+
+	for _, hasValue := range []bool{false, true} {
+		root, err := t.getNodeWithID(ids.Empty, t.rootPrefix, hasValue)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		return root, nil
+	}
+
+	return t.insert(t.rootPrefix, maybe.Nothing[[]byte]())
+}
+
+func newTrieViewWithRootPrefix(
+	db *merkleDB,
+	parentTrie TrieView,
+	changes ViewChanges,
+	rootPrefix Key,
+) (*trieView, error) {
 	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -158,6 +197,7 @@ func newTrieView(
 
 	newView := &trieView{
 		sentinelNode: sentinelNode,
+		rootPrefix:   rootPrefix,
 		db:           db,
 		parentTrie:   parentTrie,
 		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
@@ -250,10 +290,15 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
+		var root *node
+		root, err = t.getHashRoot()
+		if err != nil {
+			return
+		}
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.sentinelNode)
+		t.calculateNodeIDsHelper(root)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.getMerkleRoot()
+		t.changes.rootID = getMerkleRoot(root)
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -568,17 +613,21 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.getMerkleRoot(), nil
+	hashRoot, err := t.getHashRoot()
+	if err != nil {
+		return ids.Empty, err
+	}
+	return getMerkleRoot(hashRoot), nil
 }
 
-func (t *trieView) getMerkleRoot() ids.ID {
-	if !isSentinelNodeTheRoot(t.sentinelNode) {
-		for _, childEntry := range t.sentinelNode.children {
+func getMerkleRoot(hashRoot *node) ids.ID {
+	if !isSentinelNodeTheRoot(hashRoot) {
+		for _, childEntry := range hashRoot.children {
 			return childEntry.id
 		}
 	}
 
-	return t.sentinelNode.id
+	return hashRoot.id
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {

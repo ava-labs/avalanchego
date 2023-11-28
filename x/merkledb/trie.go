@@ -68,6 +68,12 @@ type Trie interface {
 		ctx context.Context,
 		changes ViewChanges,
 	) (TrieView, error)
+
+	NewViewWithRootPrefix(
+		ctx context.Context,
+		changes ViewChanges,
+		rootPrefix Key,
+	) (TrieView, error)
 }
 
 type TrieView interface {

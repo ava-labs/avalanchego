@@ -767,8 +767,16 @@ func (db *merkleDB) GetChangeProof(
 //
 // Assumes [db.commitLock] and [db.lock] aren't held.
 func (db *merkleDB) NewView(
-	_ context.Context,
+	ctx context.Context,
 	changes ViewChanges,
+) (TrieView, error) {
+	return db.NewViewWithRootPrefix(ctx, changes, Key{})
+}
+
+func (db *merkleDB) NewViewWithRootPrefix(
+	ctx context.Context,
+	changes ViewChanges,
+	rootPrefix Key,
 ) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
@@ -778,7 +786,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, changes)
+	newView, err := newTrieViewWithRootPrefix(db, db, changes, rootPrefix)
 	if err != nil {
 		return nil, err
 	}
