@@ -20,6 +20,8 @@ type BiMap[K, V any] interface {
 	Put(key K, val V) (removed []Entry[K, V])
 	GetKey(val V) (key K, exists bool)
 	GetValue(key K) (val V, exists bool)
+	HasKey(key K) (exists bool)
+	HasValue(val V) (exists bool)
 	DeleteKey(key K) (val V, deleted bool)
 	DeleteValue(val V) (key K, deleted bool)
 	Inverse() BiMap[V, K]
@@ -61,6 +63,22 @@ func (m *biMap[K, V]) GetValue(key K) (V, bool) {
 
 	val, ok := m.keyToValue[key]
 	return val, ok
+}
+
+func (m *biMap[K, _]) HasKey(key K) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	_, ok := m.keyToValue[key]
+	return ok
+}
+
+func (m *biMap[_, V]) HasValue(val V) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	_, ok := m.valueToKey[val]
+	return ok
 }
 
 func (m *biMap[K, V]) DeleteKey(key K) (V, bool) {
