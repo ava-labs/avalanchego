@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/event"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -64,7 +65,7 @@ type Transitive struct {
 	polls poll.Set
 
 	// blocks that have we have sent get requests for but haven't yet received
-	blkReqs common.Requests
+	blkReqs *bimap.BiMap[common.Request, ids.ID]
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
 	// Block ID --> Block
@@ -140,6 +141,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		nonVerifiedCache:            nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
 		polls:                       polls,
+		blkReqs:                     bimap.New[common.Request, ids.ID](),
 	}
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
@@ -169,7 +171,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 
 	actualBlkID := blk.ID()
-	expectedBlkID, ok := t.blkReqs.Get(nodeID, requestID)
+	expectedBlkID, ok := t.blkReqs.GetValue(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	// If the provided block is not the requested block, we need to explicitly
 	// mark the request as failed to avoid having a dangling dependency.
 	if ok && actualBlkID != expectedBlkID {
@@ -202,7 +207,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
-	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
+	blkID, ok := t.blkReqs.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -658,7 +666,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 	}
 
 	// Remove any outstanding requests for this block
-	t.blkReqs.RemoveAny(blkID)
+	t.blkReqs.DeleteValue(blkID)
 
 	issued := t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)
 	if issued {
@@ -702,7 +710,7 @@ func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) 
 
 	// There's an outstanding request for this block.
 	// We can just wait for that request to succeed or fail.
-	if t.blkReqs.Contains(blkID) {
+	if t.blkReqs.HasValue(blkID) {
 		return false, nil
 	}
 
@@ -731,7 +739,7 @@ func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) er
 	t.pending[blkID] = blk
 
 	// Remove any outstanding requests for this block
-	t.blkReqs.RemoveAny(blkID)
+	t.blkReqs.DeleteValue(blkID)
 
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
@@ -762,12 +770,18 @@ func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) er
 // Request that [vdr] send us block [blkID]
 func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) {
 	// There is already an outstanding request for this block
-	if t.blkReqs.Contains(blkID) {
+	if t.blkReqs.HasValue(blkID) {
 		return
 	}
 
 	t.RequestID++
-	t.blkReqs.Add(nodeID, t.RequestID, blkID)
+	t.blkReqs.Put(
+		common.Request{
+			NodeID:    nodeID,
+			RequestID: t.RequestID,
+		},
+		blkID,
+	)
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", t.RequestID),
@@ -917,13 +931,13 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 
 		t.removeFromPending(blk)
 		t.blocked.Fulfill(ctx, blkID)
-		t.blkReqs.RemoveAny(blkID)
+		t.blkReqs.DeleteValue(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
 		t.removeFromPending(blk)
 		t.blocked.Abandon(ctx, blkID)
-		t.blkReqs.RemoveAny(blkID)
+		t.blkReqs.DeleteValue(blkID)
 	}
 
 	// If we should issue multiple queries at the same time, we need to repoll
