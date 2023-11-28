@@ -1401,6 +1401,40 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
+func (s *state) AddStatelessBlock(block block.Block) {
+	s.addedBlocks[block.ID()] = block
+}
+
+func (s *state) SetHeight(height uint64) {
+	s.lastAcceptedHeight = height
+}
+
+func (s *state) Commit() error {
+	defer s.Abort()
+	batch, err := s.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return batch.Write()
+}
+
+func (s *state) Abort() {
+	s.baseDB.Abort()
+}
+
+func (*state) Checksum() ids.ID {
+	return ids.Empty
+}
+
+func (s *state) CommitBatch() (database.Batch, error) {
+	// updateValidators is set to true here so that the validator manager is
+	// kept up to date with the last accepted state.
+	if err := s.write(true /*updateValidators*/, s.lastAcceptedHeight); err != nil {
+		return nil, err
+	}
+	return s.baseDB.CommitBatch()
+}
+
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
@@ -1501,10 +1535,6 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 
 // METADATA Section
 
-func (s *state) SetHeight(height uint64) {
-	s.lastAcceptedHeight = height
-}
-
 // SUBNETS Section
 
 // CHAINS Section
@@ -1546,10 +1576,6 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	default:
 		return nil, err
 	}
-}
-
-func (s *state) AddStatelessBlock(block block.Block) {
-	s.addedBlocks[block.ID()] = block
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
@@ -1639,31 +1665,6 @@ func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Dur
 // VALIDATORS Section
 
 // DB Operations
-func (s *state) Abort() {
-	s.baseDB.Abort()
-}
-
-func (s *state) Commit() error {
-	defer s.Abort()
-	batch, err := s.CommitBatch()
-	if err != nil {
-		return err
-	}
-	return batch.Write()
-}
-
-func (s *state) CommitBatch() (database.Batch, error) {
-	// updateValidators is set to true here so that the validator manager is
-	// kept up to date with the last accepted state.
-	if err := s.write(true /*updateValidators*/, s.lastAcceptedHeight); err != nil {
-		return nil, err
-	}
-	return s.baseDB.CommitBatch()
-}
-
-func (*state) Checksum() ids.ID {
-	return ids.Empty
-}
 
 func (s *state) processCurrentStakers() (
 	map[ids.ID]*stakersData,
