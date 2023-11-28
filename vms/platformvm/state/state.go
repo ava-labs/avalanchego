@@ -98,6 +98,7 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
+	// Returns a view that contains the merkleized portion of the state.
 	NewView() (merkledb.TrieView, error)
 
 	GetTimestamp() time.Time

@@ -81,7 +81,6 @@ func NewDiff(
 	}, nil
 }
 
-// Returns a view that contains the merkle state of this diff.
 func (d *diff) NewView() (merkledb.TrieView, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -814,6 +813,5 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
-
 	return nil
 }
