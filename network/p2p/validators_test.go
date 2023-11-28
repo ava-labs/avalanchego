@@ -184,7 +184,7 @@ func TestValidatorsSample(t *testing.T) {
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network, subnetID, mockValidators, tt.maxStaleness)
+			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
 				sampled := v.Sample(context.Background(), call.limit)

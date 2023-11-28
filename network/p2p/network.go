@@ -6,6 +6,7 @@ package p2p
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -20,7 +21,7 @@ import (
 var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
-	_ NodeSampler          = (*peers)(nil)
+	_ NodeSampler          = (*Peers)(nil)
 )
 
 // ClientOption configures Client
@@ -32,13 +33,6 @@ type clientOptionFunc func(options *clientOptions)
 
 func (o clientOptionFunc) apply(options *clientOptions) {
 	o(options)
-}
-
-// WithPeerSampling configures Client.AppRequestAny to sample peers
-func WithPeerSampling(network *Network) ClientOption {
-	return clientOptionFunc(func(options *clientOptions) {
-		options.nodeSampler = network.peers
-	})
 }
 
 // WithValidatorSampling configures Client.AppRequestAny to sample validators
@@ -61,47 +55,69 @@ func NewNetwork(
 	metrics prometheus.Registerer,
 	namespace string,
 ) *Network {
-	peers := &peers{}
+	peers := &Peers{}
 	clientDefaults := &clientOptions{
 		nodeSampler: peers,
 	}
 
 	return &Network{
+		Peers:     peers,
 		log:       log,
 		sender:    sender,
 		metrics:   metrics,
 		namespace: namespace,
 		router:    newRouter(log, sender, metrics, namespace, clientDefaults),
-		peers:     peers,
 	}
 }
 
 // Network maintains state of the peer-to-peer network and any in-flight
 // requests
 type Network struct {
+	Peers *Peers
+
 	log       logging.Logger
 	sender    common.AppSender
 	metrics   prometheus.Registerer
 	namespace string
 
-	*router
-	peers *peers
+	router *router
+}
+
+func (n *Network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return n.router.AppRequest(ctx, nodeID, requestID, deadline, request)
+}
+
+func (n *Network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	return n.router.AppResponse(ctx, nodeID, requestID, response)
+}
+
+func (n *Network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return n.router.AppRequestFailed(ctx, nodeID, requestID)
+}
+
+func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+	return n.router.AppGossip(ctx, nodeID, msg)
+}
+
+func (n *Network) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return n.router.CrossChainAppRequest(ctx, chainID, requestID, deadline, request)
+}
+
+func (n *Network) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+	return n.router.CrossChainAppResponse(ctx, chainID, requestID, response)
+}
+
+func (n *Network) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+	return n.router.CrossChainAppRequestFailed(ctx, chainID, requestID)
 }
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	//TODO dont need this lock
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
-	n.peers.set.Add(nodeID)
+	n.Peers.add(nodeID)
 	return nil
 }
 
 func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
-	n.peers.set.Remove(nodeID)
+	n.Peers.remove(nodeID)
 	return nil
 }
 
@@ -118,21 +134,34 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 	return client, nil
 }
 
-// peers contains the set of nodes we are connected to
-type peers struct {
+type Peers struct {
 	lock sync.RWMutex
 	set  set.SampleableSet[ids.NodeID]
 }
 
-func (p *peers) has(nodeID ids.NodeID) bool {
+func (p *Peers) add(nodeID ids.NodeID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.set.Add(nodeID)
+}
+
+func (p *Peers) remove(nodeID ids.NodeID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.set.Remove(nodeID)
+}
+
+func (p *Peers) has(nodeID ids.NodeID) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.set.Contains(nodeID)
 }
 
-// Sample returns a pseudo-random sample of up to limit peers
-func (p *peers) Sample(_ context.Context, limit int) []ids.NodeID {
+// Sample returns a pseudo-random sample of up to limit Peers
+func (p *Peers) Sample(_ context.Context, limit int) []ids.NodeID {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 

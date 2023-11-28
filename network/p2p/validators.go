@@ -26,14 +26,15 @@ type ValidatorSet interface {
 }
 
 func NewValidators(
-	network *Network,
+	peers *Peers,
+	log logging.Logger,
 	subnetID ids.ID,
 	validators validators.State,
 	maxValidatorSetStaleness time.Duration,
 ) *Validators {
 	return &Validators{
-		peers:                    network.peers,
-		log:                      network.log, // TODO remove
+		peers:                    peers,
+		log:                      log,
 		subnetID:                 subnetID,
 		validators:               validators,
 		maxValidatorSetStaleness: maxValidatorSetStaleness,
@@ -42,7 +43,7 @@ func NewValidators(
 
 // Validators contains a set of nodes that are staking.
 type Validators struct {
-	peers      *peers
+	peers      *Peers
 	log        logging.Logger
 	subnetID   ids.ID
 	validators validators.State

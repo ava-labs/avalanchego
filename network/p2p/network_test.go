@@ -362,7 +362,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	requestSent.Wait()
 
 	// force the network to use the same requestID
-	network.requestID = 1
+	network.router.requestID = 1
 	timeout.Add(1)
 	err = client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil)
 	requestSent.Wait()
@@ -451,7 +451,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
-			sampled := network.peers.Sample(context.Background(), tt.limit)
+			sampled := network.Peers.Sample(context.Background(), tt.limit)
 			require.Len(sampled, math.Min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
@@ -514,10 +514,10 @@ func TestNodeSamplerClientOption(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:  "peers",
+			name:  "default",
 			peers: []ids.NodeID{nodeID0},
 			option: func(_ *testing.T, n *Network) ClientOption {
-				return WithPeerSampling(n)
+				return clientOptionFunc(func(*clientOptions) {})
 			},
 			expected: []ids.NodeID{nodeID0},
 		},
@@ -536,7 +536,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 				}
 
-				validators := NewValidators(n, ids.Empty, state, 0)
+				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
 				return WithValidatorSampling(validators)
 			},
 			expected: []ids.NodeID{nodeID1},
@@ -556,7 +556,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 				}
 
-				validators := NewValidators(n, ids.Empty, state, 0)
+				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
 				return WithValidatorSampling(validators)
 			},
 			expectedErr: ErrNoPeers,
