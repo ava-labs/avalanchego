@@ -822,6 +822,7 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
 }
+
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
@@ -887,6 +888,14 @@ func (s *state) AddUTXO(utxo *avax.UTXO) {
 
 func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
+}
+
+func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
+	staker, err := s.GetCurrentValidator(subnetID, nodeID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return staker.StartTime, nil
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -1172,14 +1181,6 @@ func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Dur
 	}
 	updatedNodeUptimes.Add(subnetID)
 	return nil
-}
-
-func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
-	staker, err := s.GetCurrentValidator(subnetID, nodeID)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return staker.StartTime, nil
 }
 
 // UTXOs section
