@@ -1644,26 +1644,7 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 	return nil
 }
 
-// METADATA Section
-
-// SUBNETS Section
-
-// CHAINS Section
-
-// TXs Section
-
-// REWARD UTXOs SECTION
-
-// BLOCKs Section
-
-// UPTIMES SECTION
-
-// UTXOs section
-
-// VALIDATORS Section
-
 // DB Operations
-
 func (s *state) processCurrentStakers() (
 	map[ids.ID]*stakersData,
 	map[weightDiffKey]*ValidatorWeightDiff,
@@ -1852,59 +1833,6 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		return fmt.Errorf("failed committing merkleDB view: %w", err)
 	}
 	return s.logMerkleRoot(len(batchOps) != 0)
-}
-
-func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
-	if !s.chainTime.Equal(s.latestComittedChainTime) {
-		encodedChainTime, err := s.chainTime.MarshalBinary()
-		if err != nil {
-			return fmt.Errorf("failed to encoding chainTime: %w", err)
-		}
-
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleChainTimeKey,
-			Value: encodedChainTime,
-		})
-		s.latestComittedChainTime = s.chainTime
-	}
-
-	if s.lastAcceptedBlkID != s.latestCommittedLastAcceptedBlkID {
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleLastAcceptedBlkIDKey,
-			Value: s.lastAcceptedBlkID[:],
-		})
-		s.latestCommittedLastAcceptedBlkID = s.lastAcceptedBlkID
-	}
-
-	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
-	// TODO: Consider if it should be
-
-	for subnetID, supply := range s.modifiedSupplies {
-		supply := supply
-		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
-		s.suppliesCache.Put(subnetID, &supply)
-
-		key := merkleSuppliesKey(subnetID)
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   key,
-			Value: database.PackUInt64(supply),
-		})
-	}
-	return nil
-}
-
-func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for subnetID, chains := range s.addedChains {
-		for _, chainTx := range chains {
-			key := merkleChainKey(subnetID, chainTx.ID())
-			*batchOps = append(*batchOps, database.BatchOp{
-				Key:   key,
-				Value: chainTx.Bytes(),
-			})
-		}
-		delete(s.addedChains, subnetID)
-	}
-	return nil
 }
 
 func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakersData) error {
@@ -2135,6 +2063,59 @@ func (s *state) writeLocalUptimes() error {
 			}
 		}
 		delete(s.modifiedLocalUptimes, vdrID)
+	}
+	return nil
+}
+
+func (s *state) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
+	for subnetID, chains := range s.addedChains {
+		for _, chainTx := range chains {
+			key := merkleChainKey(subnetID, chainTx.ID())
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: chainTx.Bytes(),
+			})
+		}
+		delete(s.addedChains, subnetID)
+	}
+	return nil
+}
+
+func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
+	if !s.chainTime.Equal(s.latestComittedChainTime) {
+		encodedChainTime, err := s.chainTime.MarshalBinary()
+		if err != nil {
+			return fmt.Errorf("failed to encoding chainTime: %w", err)
+		}
+
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   merkleChainTimeKey,
+			Value: encodedChainTime,
+		})
+		s.latestComittedChainTime = s.chainTime
+	}
+
+	if s.lastAcceptedBlkID != s.latestCommittedLastAcceptedBlkID {
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   merkleLastAcceptedBlkIDKey,
+			Value: s.lastAcceptedBlkID[:],
+		})
+		s.latestCommittedLastAcceptedBlkID = s.lastAcceptedBlkID
+	}
+
+	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
+	// TODO: Consider if it should be
+
+	for subnetID, supply := range s.modifiedSupplies {
+		supply := supply
+		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
+		s.suppliesCache.Put(subnetID, &supply)
+
+		key := merkleSuppliesKey(subnetID)
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: database.PackUInt64(supply),
+		})
 	}
 	return nil
 }
