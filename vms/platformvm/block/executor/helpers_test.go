@@ -61,8 +61,6 @@ const (
 )
 
 var (
-	_ mempool.BlockTimer = (*environment)(nil)
-
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -129,10 +127,6 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func (*environment) ResetBlockTimer() {
-	// dummy call, do nothing for now
-}
-
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
@@ -197,7 +191,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
