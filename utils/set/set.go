@@ -184,7 +184,7 @@ func (s Set[_]) MarshalJSON() ([]byte, error) {
 	return jsonBuf.Bytes(), errs.Err
 }
 
-// Returns an element. If the set is empty, returns false
+// Returns a random element. If the set is empty, returns false
 func (s *Set[T]) Peek() (T, bool) {
 	for elt := range *s {
 		return elt, true
