@@ -18,9 +18,12 @@ import (
 func TestWindowerNoValidators(t *testing.T) {
 	require := require.New(t)
 
-	subnetID := ids.GenerateTestID()
-	chainID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
+	var (
+		subnetID = ids.GenerateTestID()
+		chainID  = ids.GenerateTestID()
+		nodeID   = ids.GenerateTestNodeID()
+	)
+
 	vdrState := &validators.TestState{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -38,10 +41,13 @@ func TestWindowerNoValidators(t *testing.T) {
 func TestWindowerRepeatedValidator(t *testing.T) {
 	require := require.New(t)
 
-	subnetID := ids.GenerateTestID()
-	chainID := ids.GenerateTestID()
-	validatorID := ids.GenerateTestNodeID()
-	nonValidatorID := ids.GenerateTestNodeID()
+	var (
+		subnetID       = ids.GenerateTestID()
+		chainID        = ids.GenerateTestID()
+		validatorID    = ids.GenerateTestNodeID()
+		nonValidatorID = ids.GenerateTestNodeID()
+	)
+
 	vdrState := &validators.TestState{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -68,8 +74,11 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 func TestWindowerChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
-	subnetID := ids.ID{0, 1}
-	chainID := ids.ID{0, 2}
+	var (
+		subnetID = ids.ID{0, 1}
+		chainID  = ids.ID{0, 2}
+	)
+
 	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
@@ -126,11 +135,16 @@ func TestWindowerChangeByChain(t *testing.T) {
 
 	subnetID := ids.ID{0, 1}
 
-	rand.Seed(0)
+	source := rand.NewSource(int64(0))
+	rng := rand.New(source) // #nosec G404
+
 	chainID0 := ids.ID{}
-	_, _ = rand.Read(chainID0[:]) // #nosec G404
+	_, err := rng.Read(chainID0[:])
+	require.NoError(err)
+
 	chainID1 := ids.ID{}
-	_, _ = rand.Read(chainID1[:]) // #nosec G404
+	_, err = rng.Read(chainID1[:])
+	require.NoError(err)
 
 	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
 	for i := range validatorIDs {
