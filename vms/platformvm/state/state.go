@@ -590,20 +590,10 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 
 	key := merkleElasticSubnetKey(subnetID)
 	transformSubnetTxBytes, err := s.merkleDB.Get(key)
-	switch err {
-	case nil:
-		transformSubnetTx, err := txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
-		if err != nil {
-			return nil, err
-		}
-		return transformSubnetTx, nil
-
-	case database.ErrNotFound:
-		return nil, database.ErrNotFound
-
-	default:
+	if err != nil {
 		return nil, err
 	}
+	return txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
 }
 
 func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
