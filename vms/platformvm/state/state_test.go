@@ -722,14 +722,6 @@ func TestStateSubnetOwner(t *testing.T) {
 
 // Returns the block, status of the block, and whether it is a [stateBlk].
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
-//
-// TODO: Remove after v1.11.x is activated
-type stateBlk struct {
-	Blk    block.Block
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
-}
-
 func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	// Attempt to parse as blocks.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)
