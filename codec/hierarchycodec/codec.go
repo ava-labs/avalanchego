@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -42,20 +43,18 @@ type typeID struct {
 type hierarchyCodec struct {
 	codec.Codec
 
-	lock           sync.RWMutex
-	currentGroupID uint16
-	nextTypeID     uint16
-	typeIDToType   map[typeID]reflect.Type
-	typeToTypeID   map[reflect.Type]typeID
+	lock            sync.RWMutex
+	currentGroupID  uint16
+	nextTypeID      uint16
+	registeredTypes *bimap.BiMap[typeID, reflect.Type]
 }
 
 // New returns a new, concurrency-safe codec
 func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &hierarchyCodec{
-		currentGroupID: 0,
-		nextTypeID:     0,
-		typeIDToType:   map[typeID]reflect.Type{},
-		typeToTypeID:   map[reflect.Type]typeID{},
+		currentGroupID:  0,
+		nextTypeID:      0,
+		registeredTypes: bimap.New[typeID, reflect.Type](),
 	}
 	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
@@ -88,7 +87,7 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 	defer c.lock.Unlock()
 
 	valType := reflect.TypeOf(val)
-	if _, exists := c.typeToTypeID[valType]; exists {
+	if c.registeredTypes.HasValue(valType) {
 		return fmt.Errorf("%w: %v", codec.ErrDuplicateType, valType)
 	}
 
@@ -98,8 +97,7 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 	}
 	c.nextTypeID++
 
-	c.typeIDToType[valTypeID] = valType
-	c.typeToTypeID[valType] = valTypeID
+	c.registeredTypes.Put(valTypeID, valType)
 	return nil
 }
 
@@ -112,7 +110,7 @@ func (c *hierarchyCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) 
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	typeID, ok := c.typeToTypeID[valueType] // Get the type ID of the value being marshaled
+	typeID, ok := c.registeredTypes.GetKey(valueType) // Get the type ID of the value being marshaled
 	if !ok {
 		return fmt.Errorf("can't marshal unregistered type %q", valueType)
 	}
@@ -136,7 +134,7 @@ func (c *hierarchyCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type
 		typeID:  typeIDShort,
 	}
 	// Get a type that implements the interface
-	implementingType, ok := c.typeIDToType[t]
+	implementingType, ok := c.registeredTypes.GetValue(t)
 	if !ok {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: unknown type ID %+v", t)
 	}
