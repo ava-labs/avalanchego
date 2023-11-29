@@ -140,3 +140,13 @@ func TestDelegateeRewardsKey(t *testing.T) {
 	require.Equal(nodeID[:], key[len(prefix):len(prefix)+len(nodeID[:])])
 	require.Equal(subnetID[:], key[len(prefix)+len(nodeID[:]):])
 }
+
+func TestMerkleTxKey(t *testing.T) {
+	require := require.New(t)
+	txID := ids.GenerateTestID()
+
+	key := merkleTxKey(txID)
+	require.Len(key, len(txsSectionPrefix)+len(txID[:]))
+	require.Equal(txsSectionPrefix, key[:len(txsSectionPrefix)])
+	require.Equal(txID[:], key[len(txsSectionPrefix):])
+}

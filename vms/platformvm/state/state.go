@@ -69,12 +69,11 @@ var (
 	merkleSingletonPrefix   = []byte{0x01}
 	merkleBlockPrefix       = []byte{0x02}
 	merkleBlockIDsPrefix    = []byte{0x03}
-	merkleTxPrefix          = []byte{0x04}
-	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
-	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
-	merkleBlsKeyDiffPrefix  = []byte{0x08}
-	merkleRewardUtxosPrefix = []byte{0x09}
+	merkleIndexUTXOsPrefix  = []byte{0x04} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix     = []byte{0x05} // locally measured uptimes
+	merkleWeightDiffPrefix  = []byte{0x06} // non-merkleized validators weight diff. TODO: should we merkleize them?
+	merkleBlsKeyDiffPrefix  = []byte{0x07}
+	merkleRewardUtxosPrefix = []byte{0x08}
 
 	initializedKey = []byte("initialized")
 
@@ -92,6 +91,7 @@ var (
 	pendingStakersSectionPrefix     = []byte{0x06}
 	delegateeRewardsPrefix          = []byte{0x07}
 	subnetOwnersPrefix              = []byte{0x08}
+	txsSectionPrefix                = []byte{0x09}
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -287,7 +287,6 @@ type state struct {
 	// a limited windows to support APIs
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
-	txDB     database.Database
 
 	indexedUTXOsDB database.Database
 
@@ -408,7 +407,6 @@ func newState(
 		singletonDB                   = prefixdb.New(merkleSingletonPrefix, baseDB)
 		blockDB                       = prefixdb.New(merkleBlockPrefix, baseDB)
 		blockIDsDB                    = prefixdb.New(merkleBlockIDsPrefix, baseDB)
-		txDB                          = prefixdb.New(merkleTxPrefix, baseDB)
 		indexedUTXOsDB                = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
 		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
@@ -551,7 +549,6 @@ func newState(
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txCache:  txCache,
-		txDB:     txDB,
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
@@ -808,7 +805,8 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		return tx.tx, tx.status, nil
 	}
 
-	txBytes, err := s.txDB.Get(txID[:])
+	key := merkleTxKey(txID)
+	txBytes, err := s.merkleDB.Get(key)
 	switch err {
 	case nil:
 		stx := txBytesAndStatus{}
@@ -1394,7 +1392,6 @@ func (s *state) Close() error {
 		s.flatValidatorPublicKeyDiffsDB.Close(),
 		s.localUptimesDB.Close(),
 		s.indexedUTXOsDB.Close(),
-		s.txDB.Close(),
 		s.blockDB.Close(),
 		s.blockIDDB.Close(),
 		s.merkleDB.Close(),
@@ -1896,7 +1893,8 @@ func (s *state) writeTxs() error {
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.txCache.Evict(txID)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		key := merkleTxKey(txID)
+		if err := s.merkleDB.Put(key[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
