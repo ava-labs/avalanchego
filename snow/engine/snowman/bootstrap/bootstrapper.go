@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
@@ -91,7 +92,8 @@ type Bootstrapper struct {
 	// Time that startSyncing was last called
 	startTime time.Time
 
-	common.Fetcher
+	// tracks which validators were asked for which containers in which requests
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
 
 	// number of state transitions executed
 	executedStateTransitions int
@@ -112,6 +114,9 @@ type Bootstrapper struct {
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.
 	bootstrappedOnce sync.Once
+
+	// Called when bootstrapping is done on a specific chain
+	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
@@ -129,10 +134,10 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		minority: bootstrapper.Noop,
 		majority: bootstrapper.Noop,
 
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
+		outstandingRequests: bimap.New[common.Request, ids.ID](),
+
 		executedStateTransitions: math.MaxInt,
+		onFinished:               onFinished,
 	}, err
 }
 
@@ -425,7 +430,7 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 // Get block [blkID] and its ancestors from a validator
 func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	// Make sure we haven't already requested this block
-	if b.OutstandingRequests.Contains(blkID) {
+	if b.outstandingRequests.HasValue(blkID) {
 		return nil
 	}
 
@@ -444,7 +449,13 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 
 	b.requestID++
 
-	b.OutstandingRequests.Add(validatorID, b.requestID, blkID)
+	b.outstandingRequests.Put(
+		common.Request{
+			NodeID:    validatorID,
+			RequestID: b.requestID,
+		},
+		blkID,
+	)
 	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, blkID) // request block and ancestors
 	return nil
 }
@@ -453,7 +464,10 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
+	wantedBlkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok { // this message isn't in response to a request we made
 		b.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -522,7 +536,10 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
+	blkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -745,7 +762,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		return nil
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.requestID)
+	return b.onFinished(ctx, b.requestID)
 }
 
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
@@ -758,7 +775,7 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 		return b.restartBootstrapping(ctx)
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.requestID)
+	return b.onFinished(ctx, b.requestID)
 }
 
 func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
