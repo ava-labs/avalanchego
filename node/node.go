@@ -1084,7 +1084,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DTime:                         version.GetDTime(n.Config.NetworkID),
+				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
