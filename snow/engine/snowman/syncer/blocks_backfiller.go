@@ -12,10 +12,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/sync"
 )
@@ -42,14 +44,14 @@ type BlockBackfillerConfig struct {
 type BlockBackfiller struct {
 	BlockBackfillerConfig
 
-	peers               sync.PeerTracker
-	requestTimes        map[uint32]time.Time // requestID --> time of request issuance. Used to track bandwidth
-	outstandingRequests common.Requests      // tracks which validators were asked for which block in which requests
-	interrupted         bool                 // flag to allow backfilling restart after recovering from validators disconnections
+	peers               *p2p.PeerTracker
+	requestTimes        map[uint32]time.Time                 // requestID --> time of request issuance. Used to track bandwidth
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID] // tracks which validators were asked for which block in which requests
+	interrupted         bool                                 // flag to allow backfilling restart after recovering from validators disconnections
 }
 
 func NewBlockBackfiller(cfg BlockBackfillerConfig, vals validators.Manager) (*BlockBackfiller, error) {
-	pt, err := sync.NewPeerTracker(cfg.Ctx.Log, "", cfg.Ctx.Registerer)
+	pt, err := p2p.NewPeerTracker(cfg.Ctx.Log, "", cfg.Ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -63,9 +65,10 @@ func NewBlockBackfiller(cfg BlockBackfillerConfig, vals validators.Manager) (*Bl
 	return &BlockBackfiller{
 		BlockBackfillerConfig: cfg,
 
-		peers:        pt,
-		requestTimes: make(map[uint32]time.Time),
-		interrupted:  pt.Size() == 0,
+		peers:               pt,
+		requestTimes:        make(map[uint32]time.Time),
+		outstandingRequests: bimap.New[common.Request, ids.ID](),
+		interrupted:         pt.Size() == 0,
 	}, nil
 }
 
@@ -92,7 +95,10 @@ func (bb *BlockBackfiller) Start(ctx context.Context) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := bb.outstandingRequests.Remove(nodeID, requestID)
+	wantedBlkID, ok := bb.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok { // this message isn't in response to a request we made
 		bb.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -162,7 +168,10 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 }
 
 func (bb *BlockBackfiller) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := bb.outstandingRequests.Remove(nodeID, requestID)
+	blkID, ok := bb.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		bb.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -186,7 +195,13 @@ func (bb *BlockBackfiller) fetch(ctx context.Context, blkID ids.ID) error {
 	}
 
 	*bb.SharedRequestID++
-	bb.outstandingRequests.Add(peerID, *bb.SharedRequestID, blkID)
+	bb.outstandingRequests.Put(
+		common.Request{
+			NodeID:    peerID,
+			RequestID: *bb.SharedRequestID,
+		},
+		blkID,
+	)
 	bb.Sender.SendGetAncestors(ctx, peerID, *bb.SharedRequestID, blkID)
 	bb.requestTimes[*bb.SharedRequestID] = time.Now()
 	return nil

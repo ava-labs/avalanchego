@@ -4,20 +4,24 @@
 package snowman
 
 import (
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfigs() Config {
-	commonCfg := common.DefaultConfigTest()
+func DefaultConfig() Config {
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, 0)
+
 	return Config{
-		Ctx:        commonCfg.Ctx,
-		Sender:     commonCfg.Sender,
-		Validators: validators.NewManager(),
+		Ctx:        snow.DefaultConsensusContextTest(),
 		VM:         &block.TestVM{},
+		Sender:     &common.SenderTest{},
+		Validators: validators.NewManager(),
 		Params: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
@@ -31,7 +35,7 @@ func DefaultConfigs() Config {
 		},
 		Consensus: &snowman.Topological{},
 
-		Peers:                          commonCfg.StartupTracker,
+		Peers:                          startupTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 	}
