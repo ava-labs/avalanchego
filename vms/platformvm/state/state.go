@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -278,8 +277,8 @@ type state struct {
 
 	indexedUTXOsDB database.Database
 
-	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
-	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
+	// Node ID --> SubnetID --> Uptime of the node on the subnet
+	modifiedLocalUptimes map[ids.NodeID]map[ids.ID]*uptimes
 	localUptimesDB       database.Database
 
 	flatValidatorWeightDiffsDB    database.Database
@@ -426,8 +425,7 @@ func newState(
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
-		localUptimesCache:    make(map[ids.NodeID]map[ids.ID]*uptimes),
-		modifiedLocalUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
+		modifiedLocalUptimes: make(map[ids.NodeID]map[ids.ID]*uptimes),
 		localUptimesDB:       localUptimesDB,
 
 		flatValidatorWeightDiffsDB:    flatValidatorWeightDiffsDB,
@@ -1790,12 +1788,11 @@ func (s *state) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
 }
 
 func (s *state) writeLocalUptimes() error {
-	for vdrID, updatedSubnets := range s.modifiedLocalUptimes {
-		for subnetID := range updatedSubnets {
+	for vdrID, subnetIDToUptime := range s.modifiedLocalUptimes {
+		for subnetID, uptime := range subnetIDToUptime {
 			key := merkleLocalUptimesKey(vdrID, subnetID)
 
-			uptimes := s.localUptimesCache[vdrID][subnetID]
-			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptimes)
+			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptime)
 			if err != nil {
 				return err
 			}
@@ -1981,10 +1978,9 @@ func (s *state) logMerkleRoot(hasChanges bool) error {
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if exists {
-		uptime, exists := nodeUptimes[subnetID]
-		if exists {
+	// check if we have a modified value
+	if subnetIDToUptime, ok := s.modifiedLocalUptimes[vdrID]; ok {
+		if uptime, ok := subnetIDToUptime[subnetID]; ok {
 			return uptime.Duration, uptime.lastUpdated, nil
 		}
 	}
@@ -1999,8 +1995,6 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 			return 0, time.Time{}, err
 		}
 		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
-		s.localUptimesCache[vdrID] = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID][subnetID] = upTm
 		return upTm.Duration, upTm.lastUpdated, nil
 
 	case database.ErrNotFound:
@@ -2012,24 +2006,15 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 }
 
 func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if !exists {
-		nodeUptimes = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID] = nodeUptimes
+	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
+	if !ok {
+		updatedNodeUptimes = make(map[ids.ID]*uptimes, 0)
+		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
 	}
-
-	nodeUptimes[subnetID] = &uptimes{
+	updatedNodeUptimes[subnetID] = &uptimes{
 		Duration:    upDuration,
 		LastUpdated: uint64(lastUpdated.Unix()),
 		lastUpdated: lastUpdated,
 	}
-
-	// track diff
-	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
-	if !ok {
-		updatedNodeUptimes = set.Set[ids.ID]{}
-		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
-	}
-	updatedNodeUptimes.Add(subnetID)
 	return nil
 }
