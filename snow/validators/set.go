@@ -243,6 +243,13 @@ func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
 	return s.sample(size)
 }
 
+func (s *vdrSet) UniformSample(size int) ([]ids.NodeID, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.uniformSample(size)
+}
+
 func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	if !s.samplerInitialized {
 		if err := s.sampler.Initialize(s.weights); err != nil {
@@ -252,6 +259,22 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	}
 
 	indices, err := s.sampler.Sample(size)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]ids.NodeID, size)
+	for i, index := range indices {
+		list[i] = s.vdrSlice[index].NodeID
+	}
+	return list, nil
+}
+
+func (s *vdrSet) uniformSample(size int) ([]ids.NodeID, error) {
+	uniform := sampler.NewUniform()
+	uniform.Initialize(uint64(len(s.vdrSlice)))
+
+	indices, err := uniform.Sample(size)
 	if err != nil {
 		return nil, err
 	}
