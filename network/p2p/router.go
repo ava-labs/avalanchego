@@ -232,7 +232,7 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, err error) error {
+func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
@@ -240,7 +240,7 @@ func (r *Router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return ErrUnrequestedResponse
 	}
 
-	pending.AppResponseCallback(ctx, nodeID, nil, err)
+	pending.AppResponseCallback(ctx, nodeID, nil, appErr)
 	pending.appRequestFailedTime.Observe(float64(time.Since(start)))
 	return nil
 }
@@ -325,7 +325,7 @@ func (r *Router) CrossChainAppRequest(
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, err error) error {
+func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
@@ -333,7 +333,7 @@ func (r *Router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 		return ErrUnrequestedResponse
 	}
 
-	pending.CrossChainAppResponseCallback(ctx, chainID, nil, err)
+	pending.CrossChainAppResponseCallback(ctx, chainID, nil, appErr)
 	pending.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
 	return nil
 }

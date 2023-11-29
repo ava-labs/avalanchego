@@ -75,7 +75,7 @@ func (mr *MockLinearizableVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg
 }
 
 // AppRequestFailed mocks base method.
-func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 error) error {
+func (m *MockLinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 *common.AppError) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -176,7 +176,7 @@ func (mr *MockLinearizableVMMockRecorder) CrossChainAppRequest(arg0, arg1, arg2,
 }
 
 // CrossChainAppRequestFailed mocks base method.
-func (m *MockLinearizableVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 error) error {
+func (m *MockLinearizableVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 *common.AppError) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
