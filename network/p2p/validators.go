@@ -86,8 +86,8 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 	v.refresh(ctx)
 
-	sampled := make([]ids.NodeID, 0, limit)
 	validatorIDs := v.validatorIDs.Sample(limit)
+	sampled := validatorIDs[:0]
 
 	for _, validatorID := range validatorIDs {
 		if !v.peers.has(validatorID) {
