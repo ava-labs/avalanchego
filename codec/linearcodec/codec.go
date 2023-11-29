@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -36,19 +37,17 @@ type Codec interface {
 type linearCodec struct {
 	codec.Codec
 
-	lock         sync.RWMutex
-	nextTypeID   uint32
-	typeIDToType map[uint32]reflect.Type
-	typeToTypeID map[reflect.Type]uint32
+	lock            sync.RWMutex
+	nextTypeID      uint32
+	registeredTypes *bimap.BiMap[uint32, reflect.Type]
 }
 
 // New returns a new, concurrency-safe codec; it allow to specify
 // both tagNames and maxSlicelenght
 func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &linearCodec{
-		nextTypeID:   0,
-		typeIDToType: map[uint32]reflect.Type{},
-		typeToTypeID: map[reflect.Type]uint32{},
+		nextTypeID:      0,
+		registeredTypes: bimap.New[uint32, reflect.Type](),
 	}
 	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
@@ -78,12 +77,11 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 	defer c.lock.Unlock()
 
 	valType := reflect.TypeOf(val)
-	if _, exists := c.typeToTypeID[valType]; exists {
+	if c.registeredTypes.HasValue(valType) {
 		return fmt.Errorf("%w: %v", codec.ErrDuplicateType, valType)
 	}
 
-	c.typeIDToType[c.nextTypeID] = valType
-	c.typeToTypeID[valType] = c.nextTypeID
+	c.registeredTypes.Put(c.nextTypeID, valType)
 	c.nextTypeID++
 	return nil
 }
@@ -97,7 +95,7 @@ func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) err
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	typeID, ok := c.typeToTypeID[valueType] // Get the type ID of the value being marshaled
+	typeID, ok := c.registeredTypes.GetKey(valueType) // Get the type ID of the value being marshaled
 	if !ok {
 		return fmt.Errorf("can't marshal unregistered type %q", valueType)
 	}
@@ -114,7 +112,7 @@ func (c *linearCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type) (
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
 	}
 	// Get a type that implements the interface
-	implementingType, ok := c.typeIDToType[typeID]
+	implementingType, ok := c.registeredTypes.GetValue(typeID)
 	if !ok {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: unknown type ID %d", typeID)
 	}
