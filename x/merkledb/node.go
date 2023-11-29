@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,7 +16,7 @@ const HashLength = 32
 // Representation of a node stored in the database.
 type dbNode struct {
 	value    maybe.Maybe[[]byte]
-	children map[byte]child
+	children map[byte]*child
 }
 
 type child struct {
@@ -29,7 +28,6 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
-	id          ids.ID
 	key         Key
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
@@ -39,7 +37,7 @@ type node struct {
 func newNode(key Key) *node {
 	return &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, 2),
+			children: make(map[byte]*child, 2),
 		},
 		key: key,
 	}
@@ -78,19 +76,14 @@ func (n *node) bytes() []byte {
 // clear the cached values that will need to be recalculated whenever the node changes
 // for example, node ID and byte representation
 func (n *node) onNodeChanged() {
-	n.id = ids.Empty
 	n.nodeBytes = nil
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) {
-	if n.id != ids.Empty {
-		return
-	}
-
+func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
 	bytes := codec.encodeHashValues(n)
-	n.id = hashing.ComputeHash256Array(bytes)
+	return hashing.ComputeHash256Array(bytes)
 }
 
 // Set [n]'s value to [val].
@@ -114,16 +107,15 @@ func (n *node) setValueDigest() {
 func (n *node) addChild(childNode *node, tokenSize int) {
 	n.setChildEntry(
 		childNode.key.Token(n.key.length, tokenSize),
-		child{
+		&child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
-			id:            childNode.id,
 			hasValue:      childNode.hasValue(),
 		},
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) setChildEntry(index byte, childEntry child) {
+func (n *node) setChildEntry(index byte, childEntry *child) {
 	n.onNodeChanged()
 	n.children[index] = childEntry
 }
@@ -139,16 +131,23 @@ func (n *node) removeChild(child *node, tokenSize int) {
 // if this ever changes, value will need to be copied as well
 // it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
-	return &node{
-		id:  n.id,
+	result := &node{
 		key: n.key,
 		dbNode: dbNode{
 			value:    n.value,
-			children: maps.Clone(n.children),
+			children: make(map[byte]*child, len(n.children)),
 		},
 		valueDigest: n.valueDigest,
 		nodeBytes:   n.nodeBytes,
 	}
+	for key, existing := range n.children {
+		result.children[key] = &child{
+			compressedKey: existing.compressedKey,
+			id:            existing.id,
+			hasValue:      existing.hasValue,
+		}
+	}
+	return result
 }
 
 // Returns the ProofNode representation of this node.

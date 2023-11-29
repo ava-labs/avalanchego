@@ -200,10 +200,10 @@ func (vm *VM) Initialize(
 	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
-	innerBlkCache, err := metercacher.New[ids.ID, snowman.Block](
+	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
 		registerer,
-		cache.NewSizedLRU[ids.ID, snowman.Block](
+		cache.NewSizedLRU(
 			innerBlkCacheSize,
 			cachedBlockSize,
 		),
@@ -355,7 +355,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	// reset scheduler
-	minDelay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID)
+	minDelay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
 			zap.Error(err),

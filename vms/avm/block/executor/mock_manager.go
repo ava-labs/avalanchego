@@ -14,7 +14,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	block "github.com/ava-labs/avalanchego/vms/avm/block"
-	states "github.com/ava-labs/avalanchego/vms/avm/states"
+	state "github.com/ava-labs/avalanchego/vms/avm/state"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -58,10 +58,10 @@ func (mr *MockManagerMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
 }
 
 // GetState mocks base method.
-func (m *MockManager) GetState(arg0 ids.ID) (states.Chain, bool) {
+func (m *MockManager) GetState(arg0 ids.ID) (state.Chain, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetState", arg0)
-	ret0, _ := ret[0].(states.Chain)
+	ret0, _ := ret[0].(state.Chain)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }

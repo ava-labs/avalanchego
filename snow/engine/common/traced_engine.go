@@ -418,7 +418,3 @@ func (e *tracedEngine) HealthCheck(ctx context.Context) (interface{}, error) {
 
 	return e.engine.HealthCheck(ctx)
 }
-
-func (e *tracedEngine) GetVM() VM {
-	return e.engine.GetVM()
-}

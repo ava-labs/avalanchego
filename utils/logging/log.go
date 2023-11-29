@@ -5,6 +5,7 @@ package logging
 
 import (
 	"io"
+	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -67,7 +68,9 @@ func (l *log) Write(p []byte) (int, error) {
 // TODO: return errors here
 func (l *log) Stop() {
 	for _, wc := range l.wrappedCores {
-		_ = wc.Writer.Close()
+		if wc.Writer != os.Stdout && wc.Writer != os.Stderr {
+			_ = wc.Writer.Close()
+		}
 	}
 }
 

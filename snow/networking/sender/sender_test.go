@@ -134,9 +134,6 @@ func TestTimeout(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -401,9 +398,6 @@ func TestReliableMessages(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -549,9 +543,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
