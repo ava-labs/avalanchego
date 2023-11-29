@@ -60,7 +60,7 @@ type builder struct {
 	blkManager        blockexecutor.Manager
 
 	// This timer goes off when it is time for the next staker to add/leave
-	// the staking set. When it goes off, [setNextBlockBuildTime()] is called,
+	// the staking set. When it goes off, [maybeAdvanceTime()] is called,
 	// potentially triggering creation of a new block.
 	timer                *timer.Timer
 	nextStakerChangeTime time.Time
@@ -79,7 +79,7 @@ func New(
 		blkManager:        blkManager,
 	}
 
-	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
+	builder.timer = timer.NewTimer(builder.maybeAdvanceTime)
 
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
@@ -89,10 +89,7 @@ func New(
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	defer func() {
-		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
-		b.ResetBlockTimer()
-	}()
+	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
@@ -109,7 +106,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp := b.txExecutorBackend.Clk.Time()
+	now := b.txExecutorBackend.Clk.Time()
+	timestamp := now
 	if parentTime := preferred.Timestamp(); parentTime.After(timestamp) {
 		timestamp = parentTime
 	}
@@ -119,6 +117,16 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
+
+	waitTime := nextStakerChangeTime.Sub(now)
+	ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
+
+	// Wake up when it's time to add/remove the next validator
+	b.nextStakerChangeTime = nextStakerChangeTime
+	b.timer.SetTimeoutIn(waitTime)
 
 	// timeWasCapped means that [timestamp] was reduced to
 	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
@@ -161,7 +169,7 @@ func (b *builder) ResetBlockTimer() {
 	b.timer.SetTimeoutIn(0)
 }
 
-func (b *builder) setNextBuildBlockTime() {
+func (b *builder) maybeAdvanceTime() {
 	ctx := b.txExecutorBackend.Ctx
 
 	// Grabbing the lock here enforces that this function is not called mid-way
@@ -177,42 +185,13 @@ func (b *builder) setNextBuildBlockTime() {
 	}
 
 	now := b.txExecutorBackend.Clk.Time()
-	if !b.nextStakerChangeTime.After(now) {
-		// Block needs to be issued to advance time.
-		b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
-	}
-
-	// Wake up when it's time to add/remove the next validator/delegator
-	preferredID := b.blkManager.Preferred()
-	preferredState, ok := b.blkManager.GetState(preferredID)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("preferredID", preferredID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-		)
+	if b.nextStakerChangeTime.After(now) {
+		// [nextStakerChangeTime] is in the future, no need to advance time.
 		return
 	}
 
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("couldn't get next staker change time",
-			zap.Stringer("preferredID", preferredID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-			zap.Error(err),
-		)
-		return
-	}
-
-	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	// Wake up when it's time to add/remove the next validator
-	b.nextStakerChangeTime = nextStakerChangeTime
-	b.timer.SetTimeoutIn(waitTime)
+	// Block needs to be issued to advance time.
+	b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
