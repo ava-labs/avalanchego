@@ -96,7 +96,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		b.ResetBlockTimer()
 	}()
 
-	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
+	ctx := b.txExecutorBackend.Ctx
+	ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()

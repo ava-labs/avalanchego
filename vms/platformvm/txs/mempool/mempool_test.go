@@ -89,6 +89,9 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
+	// The proposal txs are ordered by decreasing start time. This means after
+	// each insertion, the last inserted transaction should be on the top of the
+	// heap.
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
