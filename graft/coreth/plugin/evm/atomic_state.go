@@ -25,7 +25,7 @@ type AtomicState interface {
 	Root() common.Hash
 	// Accept applies the state change to VM's persistent storage
 	// Changes are persisted atomically along with the provided [commitBatch].
-	Accept(commitBatch database.Batch) error
+	Accept(commitBatch database.Batch, requests map[ids.ID]*atomic.Requests) error
 	// Reject frees memory associated with the state change.
 	Reject() error
 }
@@ -46,7 +46,11 @@ func (a *atomicState) Root() common.Hash {
 }
 
 // Accept applies the state change to VM's persistent storage.
-func (a *atomicState) Accept(commitBatch database.Batch) error {
+func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*atomic.Requests) error {
+	// Add the new requests to the batch to be accepted
+	for chainID, requests := range requests {
+		mergeAtomicOpsToMap(a.atomicOps, chainID, requests)
+	}
 	// Update the atomic tx repository. Note it is necessary to invoke
 	// the correct method taking bonus blocks into consideration.
 	if a.backend.IsBonus(a.blockHeight, a.blockHash) {
