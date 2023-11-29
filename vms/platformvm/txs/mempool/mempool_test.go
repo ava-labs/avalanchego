@@ -20,15 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ BlockTimer = (*noopBlkTimer)(nil)
-
-	preFundedKeys = secp256k1.TestKeys()
-)
-
-type noopBlkTimer struct{}
-
-func (*noopBlkTimer) ResetBlockTimer() {}
+var preFundedKeys = secp256k1.TestKeys()
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
@@ -36,7 +28,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -60,7 +52,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
@@ -112,7 +104,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := New("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after
@@ -245,7 +237,7 @@ func TestDropExpiredStakerTxs(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer, &noopBlkTimer{})
+	mempool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	tx1, err := generateAddValidatorTx(10, 20)
