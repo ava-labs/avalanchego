@@ -52,6 +52,30 @@ func (mr *MockMempoolMockRecorder) Add(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0)
 }
 
+// DisableAdding mocks base method.
+func (m *MockMempool) DisableAdding() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DisableAdding")
+}
+
+// DisableAdding indicates an expected call of DisableAdding.
+func (mr *MockMempoolMockRecorder) DisableAdding() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableAdding", reflect.TypeOf((*MockMempool)(nil).DisableAdding))
+}
+
+// EnableAdding mocks base method.
+func (m *MockMempool) EnableAdding() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "EnableAdding")
+}
+
+// EnableAdding indicates an expected call of EnableAdding.
+func (mr *MockMempoolMockRecorder) EnableAdding() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableAdding", reflect.TypeOf((*MockMempool)(nil).EnableAdding))
+}
+
 // Get mocks base method.
 func (m *MockMempool) Get(arg0 ids.ID) *txs.Tx {
 	m.ctrl.T.Helper()

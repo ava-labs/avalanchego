@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -57,10 +58,10 @@ func New(
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
+		outstandingRequests: bimap.New[common.Request, ids.ID](),
+
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
+		onFinished:     onFinished,
 	}
 	return b, b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer)
 }
@@ -81,8 +82,10 @@ type bootstrapper struct {
 	common.ChitsHandler
 	common.AppHandler
 
-	common.Fetcher
 	metrics
+
+	// tracks which validators were asked for which containers in which requests
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
@@ -93,6 +96,9 @@ type bootstrapper struct {
 
 	// Tracks the last requestID that was used in a request
 	requestID uint32
+
+	// Called when bootstrapping is done on a specific chain
+	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
 func (b *bootstrapper) Context() *snow.ConsensusContext {
@@ -137,7 +143,10 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 	}
 
-	requestedVtxID, requested := b.OutstandingRequests.Remove(nodeID, requestID)
+	requestedVtxID, requested := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
@@ -177,7 +186,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return b.fetch(ctx, requestedVtxID)
 	}
-	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
+	if !requested && !b.outstandingRequests.HasValue(vtxID) && !b.needToFetch.Contains(vtxID) {
 		b.Ctx.Log.Debug("received un-needed vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -244,7 +253,10 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
+	vtxID, ok := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
 			zap.String("reason", "no matching outstanding request"),
@@ -388,12 +400,12 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
+	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
 		// Make sure we haven't already requested this vertex
-		if b.OutstandingRequests.Contains(vtxID) {
+		if b.outstandingRequests.HasValue(vtxID) {
 			continue
 		}
 
@@ -409,7 +421,13 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		validatorID := validatorIDs[0]
 		b.requestID++
 
-		b.OutstandingRequests.Add(validatorID, b.requestID, vtxID)
+		b.outstandingRequests.Put(
+			common.Request{
+				NodeID:    validatorID,
+				RequestID: b.requestID,
+			},
+			vtxID,
+		)
 		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
@@ -606,7 +624,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
-	return b.OnFinished(ctx, b.requestID)
+	return b.onFinished(ctx, b.requestID)
 }
 
 // A vertex is less than another vertex if it is unknown. Ties are broken by
