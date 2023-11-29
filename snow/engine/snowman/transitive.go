@@ -36,7 +36,11 @@ import (
 
 const (
 	nonVerifiedCacheSize = 64 * units.MiB
-	putGossipPeriod      = 10
+
+	// putGossipPeriod specifies the number of times Gossip will be called per
+	// Put gossip. This is done to avoid splitting Gossip into multiple
+	// functions and to allow more frequent pull gossip than push gossip.
+	putGossipPeriod = 10
 )
 
 var _ Engine = (*Transitive)(nil)
@@ -163,6 +167,8 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 			zap.Stringer("validators", t.Validators),
 		)
 
+		// Uniform sampling is used here to reduce bandwidth requirements of
+		// nodes with a large amount of stake weight.
 		vdrIDs, err := t.Validators.UniformSample(t.Ctx.SubnetID, 1)
 		if err != nil {
 			t.Ctx.Log.Error("skipping block gossip",
