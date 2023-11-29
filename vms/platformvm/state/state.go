@@ -776,26 +776,17 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) {
 }
 
 func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
-	supply, ok := s.modifiedSupplies[subnetID]
-	if ok {
+	if supply, ok := s.modifiedSupplies[subnetID]; ok {
 		return supply, nil
 	}
 
 	key := merkleSuppliesKey(subnetID)
-	switch supplyBytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		supply, err := database.ParseUInt64(supplyBytes)
-		if err != nil {
-			return 0, fmt.Errorf("failed parsing supply: %w", err)
-		}
-		return supply, nil
-
-	case database.ErrNotFound:
-		return 0, database.ErrNotFound
-
-	default:
+	supplyBytes, err := s.merkleDB.Get(key)
+	if err != nil {
 		return 0, err
 	}
+
+	return database.ParseUInt64(supplyBytes)
 }
 
 func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
@@ -1092,8 +1083,8 @@ func (s *state) loadPendingStakers() error {
 	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer iter.Release()
 	for iter.Next() {
-		data := &stakersData{}
-		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
+		var data stakersData
+		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), &data); err != nil {
 			return fmt.Errorf("failed to deserialize pending stakers data: %w", err)
 		}
 
@@ -1323,17 +1314,8 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 		return blkID, nil
 	}
 
-	heightKey := database.PackUInt64(height)
-
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
-		return ids.Empty, database.ErrNotFound
-	}
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	return blkID, nil
+	key := database.PackUInt64(height)
+	return database.GetID(s.blockIDDB, key)
 }
 
 func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
@@ -1362,28 +1344,28 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	// check if we have a modified value
-	if updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]; ok {
-		if amount, ok := updatedDelegateeRewards[subnetID]; ok {
-			return amount, nil
+	if subnetIDToReward, ok := s.modifiedDelegateeReward[vdrID]; ok {
+		if reward, ok := subnetIDToReward[subnetID]; ok {
+			return reward, nil
 		}
 	}
 
 	// try loading from the db
 	key := merkleDelegateeRewardsKey(vdrID, subnetID)
-	amountBytes, err := s.merkleDB.Get(key)
+	rewardBytes, err := s.merkleDB.Get(key)
 	if err != nil {
 		return 0, err
 	}
-	return database.ParseUInt64(amountBytes)
+	return database.ParseUInt64(rewardBytes)
 }
 
 func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
-	updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]
+	subnetIDToReward, ok := s.modifiedDelegateeReward[vdrID]
 	if !ok {
-		updatedDelegateeRewards = make(map[ids.ID]uint64)
-		s.modifiedDelegateeReward[vdrID] = updatedDelegateeRewards
+		subnetIDToReward = make(map[ids.ID]uint64)
+		s.modifiedDelegateeReward[vdrID] = subnetIDToReward
 	}
-	updatedDelegateeRewards[subnetID] = amount
+	subnetIDToReward[subnetID] = amount
 	return nil
 }
 
@@ -1603,12 +1585,12 @@ func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for nodeID, subnetIDToAmount := range s.modifiedDelegateeReward {
-		for subnetID, amount := range subnetIDToAmount {
+	for nodeID, subnetIDToReward := range s.modifiedDelegateeReward {
+		for subnetID, reward := range subnetIDToReward {
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
 			*batchOps = append(*batchOps, database.BatchOp{
 				Key:   key,
-				Value: database.PackUInt64(amount),
+				Value: database.PackUInt64(reward),
 			})
 		}
 		delete(s.modifiedDelegateeReward, nodeID)
