@@ -999,7 +999,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, nodeID i
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
-	t.metrics.providerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
+	t.metrics.issuerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
