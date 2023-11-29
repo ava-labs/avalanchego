@@ -18,9 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -674,4 +676,93 @@ func TestBuildBlock(t *testing.T) {
 			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
+}
+
+func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	env.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
+
+	now := env.backend.Clk.Time()
+
+	defaultValidatorStake := 100 * units.MilliAvax
+
+	validatorStartTime := now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+
+	tx1, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		preFundedKeys[0].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx1))
+	tx1ID := tx1.ID()
+	require.True(env.mempool.Has(tx1ID))
+
+	validator2StartTime := now.Add(-5 * time.Second)
+	validator2EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
+
+	tx2, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validator2StartTime.Unix()),
+		uint64(validator2EndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		preFundedKeys[1].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[1]},
+		preFundedKeys[1].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx2))
+	tx2ID := tx2.ID()
+	require.True(env.mempool.Has(tx2ID))
+
+	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
+	validator3EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
+
+	tx3, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validator3StartTime.Unix()),
+		uint64(validator3EndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		preFundedKeys[2].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[2]},
+		preFundedKeys[2].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx3))
+	tx3ID := tx3.ID()
+	require.True(env.mempool.Has(tx3ID))
+
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Len(blk.Txs(), 1)
+	require.Equal(tx1ID, blk.Txs()[0].ID())
+
+	require.False(env.mempool.Has(tx1ID))
+	require.False(env.mempool.Has(tx2ID))
+	require.False(env.mempool.Has(tx3ID))
+
+	require.NoError(env.mempool.GetDropReason(tx1ID))
+	require.ErrorIs(env.mempool.GetDropReason(tx2ID), txexecutor.ErrTimestampNotBeforeStartTime)
+	require.ErrorIs(env.mempool.GetDropReason(tx3ID), txexecutor.ErrFutureStakeTime)
+
 }
