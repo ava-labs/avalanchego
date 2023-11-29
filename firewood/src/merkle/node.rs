@@ -30,7 +30,7 @@ pub use partial_path::PartialPath;
 use crate::merkle::to_nibble_array;
 use crate::nibbles::Nibbles;
 
-use super::{from_nibbles, TrieHash, TRIE_HASH_LEN};
+use super::{TrieHash, TRIE_HASH_LEN};
 
 bitflags! {
     // should only ever be the size of a nibble
@@ -462,48 +462,8 @@ impl Storable for Node {
             }
 
             NodeTypeId::Leaf => {
-                let leaf_header_size = 1 + 4;
-                let node_raw = mem.get_view(addr + Meta::SIZE, leaf_header_size).ok_or(
-                    ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE,
-                        size: leaf_header_size,
-                    },
-                )?;
-
-                let mut cur = Cursor::new(node_raw.as_deref());
-                let mut buff = [0; 4];
-                cur.read_exact(&mut buff[..1])?;
-
-                let path_len = buff[0] as u64;
-
-                cur.read_exact(&mut buff)?;
-
-                let data_len = u32::from_le_bytes(buff) as u64;
-                let remainder = mem
-                    .get_view(
-                        addr + Meta::SIZE + leaf_header_size as usize,
-                        path_len + data_len,
-                    )
-                    .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE + leaf_header_size as usize,
-                        size: path_len + data_len,
-                    })?;
-
-                let nibbles: Vec<_> = remainder
-                    .as_deref()
-                    .into_iter()
-                    .take(path_len as usize)
-                    .flat_map(to_nibble_array)
-                    .collect();
-
-                let (path, _) = PartialPath::decode(&nibbles);
-                let data = Data(remainder.as_deref()[path_len as usize..].to_vec());
-
-                let node = Self::new_from_hash(
-                    root_hash,
-                    is_encoded_longer_than_hash_len,
-                    NodeType::Leaf(LeafNode { path, data }),
-                );
+                let inner = NodeType::Leaf(LeafNode::deserialize(offset, mem)?);
+                let node = Self::new_from_hash(root_hash, is_encoded_longer_than_hash_len, inner);
 
                 Ok(node)
             }
@@ -517,15 +477,8 @@ impl Storable for Node {
                     // TODO: add path
                     n.serialized_len()
                 }
-                NodeType::Extension(n) => {
-                    1 + 8
-                        + n.path.serialized_len()
-                        + match n.chd_encoded() {
-                            Some(v) => 1 + v.len() as u64,
-                            None => 1,
-                        }
-                }
-                NodeType::Leaf(n) => 1 + 4 + n.path.serialized_len() + n.data.len() as u64,
+                NodeType::Extension(n) => n.serialized_len(),
+                NodeType::Leaf(n) => n.serialized_len(),
             }
     }
 
@@ -556,7 +509,7 @@ impl Storable for Node {
         match &self.inner {
             NodeType::Branch(n) => {
                 // TODO: add path
-                cur.write_all(&[type_id::NodeTypeId::Branch as u8]).unwrap();
+                cur.write_all(&[type_id::NodeTypeId::Branch as u8])?;
 
                 let pos = cur.position() as usize;
 
@@ -566,29 +519,17 @@ impl Storable for Node {
             NodeType::Extension(n) => {
                 cur.write_all(&[type_id::NodeTypeId::Extension as u8])?;
 
-                let path: Vec<u8> = from_nibbles(&n.path.encode(false)).collect();
+                let pos = cur.position() as usize;
 
-                cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&n.child.to_le_bytes())?;
-                cur.write_all(&path)?;
-
-                if let Some(encoded) = n.chd_encoded() {
-                    cur.write_all(&[encoded.len() as u8])?;
-                    cur.write_all(encoded)?;
-                }
-
-                Ok(())
+                n.serialize(&mut cur.get_mut()[pos..])
             }
 
             NodeType::Leaf(n) => {
                 cur.write_all(&[type_id::NodeTypeId::Leaf as u8])?;
 
-                let path: Vec<u8> = from_nibbles(&n.path.encode(true)).collect();
+                let pos = cur.position() as usize;
 
-                cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&(n.data.len() as u32).to_le_bytes())?;
-                cur.write_all(&path)?;
-                cur.write_all(&n.data).map_err(ShaleError::Io)
+                n.serialize(&mut cur.get_mut()[pos..])
             }
         }
     }

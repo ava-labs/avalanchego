@@ -6,9 +6,15 @@ use bincode::Options;
 use super::{Encoded, Node};
 use crate::{
     merkle::{from_nibbles, PartialPath, TRIE_HASH_LEN},
-    shale::{DiskAddress, ShaleStore},
+    shale::{DiskAddress, ShaleStore, Storable},
 };
-use std::fmt::{Debug, Error as FmtError, Formatter};
+use std::{
+    fmt::{Debug, Error as FmtError, Formatter},
+    io::{Cursor, Write},
+    mem::size_of,
+};
+
+type DataLen = u8;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct ExtNode {
@@ -85,5 +91,48 @@ impl ExtNode {
 
     pub fn chd_encoded_mut(&mut self) -> &mut Option<Vec<u8>> {
         &mut self.child_encoded
+    }
+}
+
+impl Storable for ExtNode {
+    fn serialized_len(&self) -> u64 {
+        let path_len_size = size_of::<DataLen>() as u64;
+        let path_len = self.path.serialized_len();
+        let child_len = DiskAddress::MSIZE;
+        let encoded_len_size = size_of::<DataLen>() as u64;
+        let encoded_len = self
+            .child_encoded
+            .as_ref()
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+
+        path_len_size + path_len + child_len + encoded_len_size + encoded_len
+    }
+
+    fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
+        let mut cursor = Cursor::new(to);
+
+        let path: Vec<u8> = from_nibbles(&self.path.encode(false)).collect();
+
+        cursor.write_all(&[path.len() as DataLen])?;
+        cursor.write_all(&self.child.to_le_bytes())?;
+        cursor.write_all(&path)?;
+
+        if let Some(encoded) = self.chd_encoded() {
+            cursor.write_all(&[encoded.len() as DataLen])?;
+            cursor.write_all(encoded)?;
+        }
+
+        Ok(())
+    }
+
+    fn deserialize<T: crate::shale::CachedStore>(
+        _addr: usize,
+        _mem: &T,
+    ) -> Result<Self, crate::shale::ShaleError>
+    where
+        Self: Sized,
+    {
+        todo!()
     }
 }
