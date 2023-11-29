@@ -30,8 +30,6 @@ pub enum ProofError {
     InconsistentProofData,
     #[error("non-monotonic range increase")]
     NonMonotonicIncreaseRange,
-    #[error("range has deletion")]
-    RangeHasDeletion,
     #[error("invalid data")]
     InvalidData,
     #[error("invalid proof")]
@@ -161,10 +159,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // Ensure the received batch is monotonic increasing and contains no deletions
         if !keys.windows(2).all(|w| w[0].as_ref() < w[1].as_ref()) {
             return Err(ProofError::NonMonotonicIncreaseRange);
-        }
-
-        if !vals.iter().all(|v| !v.as_ref().is_empty()) {
-            return Err(ProofError::RangeHasDeletion);
         }
 
         // Use in-memory merkle
