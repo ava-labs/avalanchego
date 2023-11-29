@@ -331,9 +331,12 @@ func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 func (d *diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
 	if d.transformedSubnets == nil {
-		d.transformedSubnets = make(map[ids.ID]*txs.Tx)
+		d.transformedSubnets = map[ids.ID]*txs.Tx{
+			transformSubnetTx.Subnet: transformSubnetTxIntf,
+		}
+	} else {
+		d.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 	}
-	d.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 }
 
 func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {

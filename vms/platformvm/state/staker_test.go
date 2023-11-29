@@ -144,7 +144,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	weight := uint64(12345)
 	startTime := time.Now()
-	endTime := startTime.Add(time.Hour)
+	endTime := time.Now()
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 

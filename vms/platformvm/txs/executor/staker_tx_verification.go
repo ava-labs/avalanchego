@@ -479,7 +479,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return fmt.Errorf("failed retrieving validator rules: %w", err)
+		return err
 	}
 
 	duration := tx.Validator.Duration()
