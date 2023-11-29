@@ -444,7 +444,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		default:
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, blk, false); err != nil {
+				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false); err != nil {
 					return err
 				}
 			}
@@ -650,7 +650,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(ctx, blk, false); err != nil {
+		if err := t.issue(ctx, nodeID, blk, false); err != nil {
 			return false, err
 		}
 
@@ -690,7 +690,7 @@ func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) 
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		err := t.issue(ctx, blk, true)
+		err := t.issue(ctx, t.Ctx.NodeID, blk, true)
 		if err != nil {
 			return false, err
 		}
@@ -732,7 +732,7 @@ func (t *Transitive) wasIssued(blk snowman.Block) bool {
 // Issue [blk] to consensus once its ancestors have been issued.
 // If [push] is true, a push query will be used. Otherwise, a pull query will be
 // used.
-func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) error {
+func (t *Transitive) issue(ctx context.Context, nodeID ids.NodeID, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
@@ -743,9 +743,10 @@ func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) er
 
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
-		t:    t,
-		blk:  blk,
-		push: push,
+		t:      t,
+		nodeID: nodeID,
+		blk:    blk,
+		push:   push,
 	}
 
 	// block on the parent if needed
@@ -849,7 +850,7 @@ func (t *Transitive) sendQuery(
 // issue [blk] to consensus
 // If [push] is true, a push query will be used. Otherwise, a pull query will be
 // used.
-func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) error {
+func (t *Transitive) deliver(ctx context.Context, nodeID ids.NodeID, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -875,7 +876,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 	// By ensuring that the parent is either processing or accepted, it is
 	// guaranteed that the parent was successfully verified. This means that
 	// calling Verify on this block is allowed.
-	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blk)
+	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk)
 	if err != nil {
 		return err
 	}
@@ -899,7 +900,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) 
 			}
 
 			for _, blk := range options {
-				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blk)
+				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk)
 				if err != nil {
 					return err
 				}
@@ -979,12 +980,13 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 
 // addUnverifiedBlockToConsensus returns whether the block was added and an
 // error if one occurred while adding it to consensus.
-func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snowman.Block) (bool, error) {
+func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 
 	// make sure this block is valid
 	if err := blk.Verify(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
+			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
@@ -997,7 +999,9 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	t.metrics.issuerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	t.Ctx.Log.Verbo("adding block to consensus",
+		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
 	)
 	return true, t.Consensus.Add(ctx, &memoryBlock{

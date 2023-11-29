@@ -27,6 +27,7 @@ type metrics struct {
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
 	getAncestorsBlks                      metric.Averager
 	selectedVoteIndex                     metric.Averager
+	issuerStake                           metric.Averager
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -112,6 +113,13 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		namespace,
 		"selected_vote_index",
 		"index of the voteID that was passed into consensus",
+		reg,
+		&errs,
+	)
+	m.issuerStake = metric.NewAveragerWithErrs(
+		namespace,
+		"issuer_stake",
+		"stake weight of the peer who provided a block that was issued into consensus",
 		reg,
 		&errs,
 	)
