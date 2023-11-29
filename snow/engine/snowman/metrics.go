@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	pullGossipSource = "pullGossip"
-	pushGossipSource = "pushGossip"
-	putGossipSource  = "putGossip"
+	pullGossipSource = "pull_gossip"
+	pushGossipSource = "push_gossip"
+	putGossipSource  = "put_gossip"
 	builtSource      = "built"
 	unknownSource    = "unknown"
 )
