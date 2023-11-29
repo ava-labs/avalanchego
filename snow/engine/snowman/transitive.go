@@ -169,11 +169,10 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 
 		// Uniform sampling is used here to reduce bandwidth requirements of
 		// nodes with a large amount of stake weight.
-		vdrIDs, err := t.Validators.UniformSample(t.Ctx.SubnetID, 1)
-		if err != nil {
+		vdrID, ok := t.ConnectedValidators.SampleValidator()
+		if !ok {
 			t.Ctx.Log.Error("skipping block gossip",
-				zap.String("reason", "no validators"),
-				zap.Error(err),
+				zap.String("reason", "no connected validators"),
 			)
 			return nil
 		}
@@ -190,7 +189,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		}
 
 		t.requestID++
-		vdrSet := set.Of(vdrIDs...)
+		vdrSet := set.Of(vdrID)
 		preferredID := t.Consensus.Preference()
 		t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, preferredID, nextHeightToAccept)
 	} else {

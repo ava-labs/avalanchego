@@ -243,13 +243,6 @@ func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
 	return s.sample(size)
 }
 
-func (s *vdrSet) UniformSample(size int) ([]ids.NodeID, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.uniformSample(size)
-}
-
 func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	if !s.samplerInitialized {
 		if err := s.sampler.Initialize(s.weights); err != nil {
