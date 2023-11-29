@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -29,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -164,16 +161,13 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
-	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
 		metrics.Noop,
 		validators.NewManager(),
-		execCfg,
 		&snow.Context{
 			Log: logging.NoLog{},
 		},
-		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .1 * reward.PercentDenominator,

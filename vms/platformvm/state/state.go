@@ -18,8 +18,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -36,10 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -259,19 +255,16 @@ type state struct {
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
 
-	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
-	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
-	addedElasticSubnets      map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
-	elasticSubnetCache       cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+	addedPermissionedSubnets []*txs.Tx          // added SubnetTxs, waiting to be committed
+	permissionedSubnetCache  []*txs.Tx          // nil if the subnets haven't been loaded
+	addedElasticSubnets      map[ids.ID]*txs.Tx // map of subnetID -> transformSubnetTx
 
 	// Chains section
-	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
-	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	addedChains map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
 
 	// Blocks section
 	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
-	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block.
-	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]block.Block // map of blockID -> Block.
 	blockDB     database.Database
 
 	addedBlockIDs map[uint64]ids.ID // map of height -> blockID
@@ -280,8 +273,7 @@ type state struct {
 	// Txs section
 	// FIND a way to reduce use of these. No use in verification of addedTxs
 	// a limited windows to support APIs
-	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
+	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
 	txDB     database.Database
 
 	indexedUTXOsDB database.Database
@@ -329,33 +321,10 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func txSize(_ ids.ID, tx *txs.Tx) int {
-	if tx == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
-}
-
-func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
-	if t == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
-}
-
-func blockSize(_ ids.ID, blk block.Block) int {
-	if blk == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
-}
-
 func New(
 	db database.Database,
 	genesisBytes []byte,
-	metricsReg prometheus.Registerer,
 	validators validators.Manager,
-	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
@@ -364,9 +333,7 @@ func New(
 		db,
 		metrics,
 		validators,
-		execCfg,
 		ctx,
-		metricsReg,
 		rewards,
 	)
 	if err != nil {
@@ -386,9 +353,7 @@ func newState(
 	db database.Database,
 	metrics metrics.Metrics,
 	validators validators.Manager,
-	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
-	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
 	var (
@@ -422,42 +387,6 @@ func newState(
 		return nil, fmt.Errorf("failed creating merkleDB: %w", err)
 	}
 
-	txCache, err := metercacher.New(
-		"tx_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	transformedSubnetCache, err := metercacher.New(
-		"transformed_subnet_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
-		"chain_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state{
 		validators: validators,
 		ctx:        ctx,
@@ -484,20 +413,16 @@ func newState(
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
 		permissionedSubnetCache:  nil, // created first time GetSubnets is called
 		addedElasticSubnets:      make(map[ids.ID]*txs.Tx),
-		elasticSubnetCache:       transformedSubnetCache,
 
 		addedChains: make(map[ids.ID][]*txs.Tx),
-		chainCache:  chainCache,
 
 		addedBlocks: make(map[ids.ID]block.Block),
-		blockCache:  blockCache,
 		blockDB:     blockDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDDB:     blockIDsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
-		txCache:  txCache,
 		txDB:     txDB,
 
 		indexedUTXOsDB: indexedUTXOsDB,
@@ -663,13 +588,6 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	if tx, cached := s.elasticSubnetCache.Get(subnetID); cached {
-		if tx == nil {
-			return nil, database.ErrNotFound
-		}
-		return tx, nil
-	}
-
 	key := merkleElasticSubnetKey(subnetID)
 	transformSubnetTxBytes, err := s.merkleDB.Get(key)
 	switch err {
@@ -678,11 +596,9 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.elasticSubnetCache.Put(subnetID, transformSubnetTx)
 		return transformSubnetTx, nil
 
 	case database.ErrNotFound:
-		s.elasticSubnetCache.Put(subnetID, nil)
 		return nil, database.ErrNotFound
 
 	default:
@@ -696,10 +612,6 @@ func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 }
 
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
-	if chains, cached := s.chainCache.Get(subnetID); cached {
-		return chains, nil
-	}
-
 	prefix := merkleChainPrefix(subnetID)
 	chainDBIt := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer chainDBIt.Release()
@@ -718,7 +630,6 @@ func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 		return nil, err
 	}
 	chains = append(chains, s.addedChains[subnetID]...)
-	s.chainCache.Put(subnetID, chains)
 	return chains, nil
 }
 
@@ -731,12 +642,6 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
-		return tx.tx, tx.status, nil
-	}
-	if tx, cached := s.txCache.Get(txID); cached {
-		if tx == nil {
-			return nil, status.Unknown, database.ErrNotFound
-		}
 		return tx.tx, tx.status, nil
 	}
 
@@ -758,11 +663,9 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 			status: stx.Status,
 		}
 
-		s.txCache.Put(txID, ptx)
 		return ptx.tx, ptx.status, nil
 
 	case database.ErrNotFound:
-		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
 
 	default:
@@ -1409,10 +1312,6 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because blk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
 
 		if err := s.blockDB.Put(blkID[:], blk.Bytes()); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
@@ -1426,33 +1325,13 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return blk, nil
 	}
 
-	if blk, cached := s.blockCache.Get(blockID); cached {
-		if blk == nil {
-			return nil, database.ErrNotFound
-		}
-
-		return blk, nil
-	}
-
 	blkBytes, err := s.blockDB.Get(blockID[:])
-	switch err {
-	case nil:
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-		blk, err := block.Parse(block.GenesisCodec, blkBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		s.blockCache.Put(blockID, blk)
-		return blk, nil
-
-	case database.ErrNotFound:
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
-
-	default:
+	if err != nil {
 		return nil, err
 	}
+
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+	return block.Parse(block.GenesisCodec, blkBytes)
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
@@ -1794,7 +1673,6 @@ func (s *state) writeTxs() error {
 		// Note: Evict is used rather than Put here because stx may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
-		s.txCache.Evict(txID)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
@@ -1887,11 +1765,6 @@ func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //noli
 			Value: transforkSubnetTx.Bytes(),
 		})
 		delete(s.addedElasticSubnets, subnetID)
-
-		// Note: Evict is used rather than Put here because tx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.elasticSubnetCache.Evict(subnetID)
 	}
 	return nil
 }
