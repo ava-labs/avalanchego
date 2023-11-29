@@ -179,7 +179,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			NodeID:    nodeID,
 			RequestID: requestID,
 		}
-		sourceMetric prometheus.Counter
+		issuedMetric prometheus.Counter
 	)
 	switch expectedBlkID, ok := t.blkReqs.GetValue(req); {
 	case ok:
@@ -196,9 +196,9 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			return t.GetFailed(ctx, nodeID, requestID)
 		}
 
-		sourceMetric = t.blkReqSourceMetric[req]
+		issuedMetric = t.blkReqSourceMetric[req]
 	case requestID == constants.GossipMsgRequestID:
-		sourceMetric = t.metrics.issued.WithLabelValues(putGossipSource)
+		issuedMetric = t.metrics.issued.WithLabelValues(putGossipSource)
 	default:
 		// This can happen if this block was provided to this engine while a Get
 		// request was outstanding. For example, the block may have been locally
@@ -206,7 +206,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		//
 		// Note: It is still possible this block will be issued here, because
 		// the block may have previously failed verification.
-		sourceMetric = t.metrics.issued.WithLabelValues(unknownSource)
+		issuedMetric = t.metrics.issued.WithLabelValues(unknownSource)
 	}
 
 	if t.wasIssued(blk) {
@@ -218,7 +218,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(ctx, nodeID, blk, sourceMetric); err != nil {
+	if _, err := t.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
 		return err
 	}
 	return t.buildBlocks(ctx)
@@ -252,11 +252,11 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
 	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
-	sourceMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
-	if _, err := t.issueFromByID(ctx, nodeID, blkID, sourceMetric); err != nil {
+	if _, err := t.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
 		return err
 	}
 
@@ -290,14 +290,14 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
-	sourceMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, nodeID will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(ctx, nodeID, blk, sourceMetric); err != nil {
+	if _, err := t.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
 		return err
 	}
 
@@ -315,9 +315,9 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		zap.Stringer("acceptedID", acceptedID),
 	)
 
-	sourceMetric := t.metrics.issued.WithLabelValues(pullGossipSource)
+	issuedMetric := t.metrics.issued.WithLabelValues(pullGossipSource)
 
-	addedPreferred, err := t.issueFromByID(ctx, nodeID, preferredID, sourceMetric)
+	addedPreferred, err := t.issueFromByID(ctx, nodeID, preferredID, issuedMetric)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		responseOptions = []ids.ID{preferredID}
 	)
 	if preferredID != preferredIDAtHeight {
-		addedPreferredIDAtHeight, err = t.issueFromByID(ctx, nodeID, preferredIDAtHeight, sourceMetric)
+		addedPreferredIDAtHeight, err = t.issueFromByID(ctx, nodeID, preferredIDAtHeight, issuedMetric)
 		if err != nil {
 			return err
 		}
@@ -471,10 +471,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		case err != nil:
 			return err
 		default:
-			sourceMetric := t.metrics.issued.WithLabelValues(builtSource)
+			issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, sourceMetric); err != nil {
+				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, issuedMetric); err != nil {
 					return err
 				}
 			}
@@ -634,8 +634,8 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 			)
 		}
 
-		sourceMetric := t.metrics.issued.WithLabelValues(builtSource)
-		added, err := t.issueWithAncestors(ctx, blk, sourceMetric)
+		issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
+		added, err := t.issueWithAncestors(ctx, blk, issuedMetric)
 		if err != nil {
 			return err
 		}
@@ -665,23 +665,33 @@ func (t *Transitive) repoll(ctx context.Context) {
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID ids.ID, sourceMetric prometheus.Counter) (bool, error) {
+func (t *Transitive) issueFromByID(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blkID ids.ID,
+	issuedMetric prometheus.Counter,
+) (bool, error) {
 	blk, err := t.GetBlock(ctx, blkID)
 	if err != nil {
-		t.sendRequest(ctx, nodeID, blkID, sourceMetric)
+		t.sendRequest(ctx, nodeID, blkID, issuedMetric)
 		return false, nil
 	}
-	return t.issueFrom(ctx, nodeID, blk, sourceMetric)
+	return t.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block, sourceMetric prometheus.Counter) (bool, error) {
+func (t *Transitive) issueFrom(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blk snowman.Block,
+	issuedMetric prometheus.Counter,
+) (bool, error) {
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(ctx, nodeID, blk, false, sourceMetric); err != nil {
+		if err := t.issue(ctx, nodeID, blk, false, issuedMetric); err != nil {
 			return false, err
 		}
 
@@ -691,7 +701,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 
 		// If we don't have this ancestor, request it from [vdr]
 		if err != nil || !blk.Status().Fetched() {
-			t.sendRequest(ctx, nodeID, blkID, sourceMetric)
+			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
 			return false, nil
 		}
 	}
@@ -721,13 +731,13 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 func (t *Transitive) issueWithAncestors(
 	ctx context.Context,
 	blk snowman.Block,
-	sourceMetric prometheus.Counter,
+	issuedMetric prometheus.Counter,
 ) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		err := t.issue(ctx, t.Ctx.NodeID, blk, true, sourceMetric)
+		err := t.issue(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
 		if err != nil {
 			return false, err
 		}
@@ -774,7 +784,7 @@ func (t *Transitive) issue(
 	nodeID ids.NodeID,
 	blk snowman.Block,
 	push bool,
-	sourceMetric prometheus.Counter,
+	issuedMetric prometheus.Counter,
 ) error {
 	blkID := blk.ID()
 
@@ -791,7 +801,7 @@ func (t *Transitive) issue(
 		t:            t,
 		nodeID:       nodeID,
 		blk:          blk,
-		sourceMetric: sourceMetric,
+		issuedMetric: issuedMetric,
 		push:         push,
 	}
 
@@ -815,7 +825,12 @@ func (t *Transitive) issue(
 }
 
 // Request that [vdr] send us block [blkID]
-func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID, sourceMetric prometheus.Counter) {
+func (t *Transitive) sendRequest(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blkID ids.ID,
+	issuedMetric prometheus.Counter,
+) {
 	// There is already an outstanding request for this block
 	if t.blkReqs.HasValue(blkID) {
 		return
@@ -827,7 +842,7 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 		RequestID: t.requestID,
 	}
 	t.blkReqs.Put(req, blkID)
-	t.blkReqSourceMetric[req] = sourceMetric
+	t.blkReqSourceMetric[req] = issuedMetric
 
 	t.Ctx.Log.Verbo("sending Get request",
 		zap.Stringer("nodeID", nodeID),
@@ -901,7 +916,7 @@ func (t *Transitive) deliver(
 	nodeID ids.NodeID,
 	blk snowman.Block,
 	push bool,
-	sourceMetric prometheus.Counter,
+	issuedMetric prometheus.Counter,
 ) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
@@ -928,7 +943,7 @@ func (t *Transitive) deliver(
 	// By ensuring that the parent is either processing or accepted, it is
 	// guaranteed that the parent was successfully verified. This means that
 	// calling Verify on this block is allowed.
-	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, sourceMetric)
+	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, issuedMetric)
 	if err != nil {
 		return err
 	}
@@ -952,7 +967,7 @@ func (t *Transitive) deliver(
 			}
 
 			for _, blk := range options {
-				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, sourceMetric)
+				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, issuedMetric)
 				if err != nil {
 					return err
 				}
@@ -1040,7 +1055,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	blk snowman.Block,
-	sourceMetric prometheus.Counter,
+	issuedMetric prometheus.Counter,
 ) (bool, error) {
 	blkID := blk.ID()
 
@@ -1057,7 +1072,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		return false, nil
 	}
 
-	sourceMetric.Inc()
+	issuedMetric.Inc()
 	t.nonVerifieds.Remove(blkID)
 	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
