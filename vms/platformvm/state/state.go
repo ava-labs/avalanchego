@@ -619,6 +619,7 @@ func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if err := chainDBIt.Error(); err != nil {
 		return nil, err
 	}
+
 	chains = append(chains, s.addedChains[subnetID]...)
 	return chains, nil
 }
@@ -636,31 +637,26 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	}
 
 	txBytes, err := s.txDB.Get(txID[:])
-	switch err {
-	case nil:
-		stx := txBytesAndStatus{}
-		if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
-			return nil, status.Unknown, err
-		}
-
-		tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
-		if err != nil {
-			return nil, status.Unknown, err
-		}
-
-		ptx := &txAndStatus{
-			tx:     tx,
-			status: stx.Status,
-		}
-
-		return ptx.tx, ptx.status, nil
-
-	case database.ErrNotFound:
-		return nil, status.Unknown, database.ErrNotFound
-
-	default:
+	if err != nil {
 		return nil, status.Unknown, err
 	}
+
+	var txBytesAndStatus txBytesAndStatus
+	if _, err := txs.GenesisCodec.Unmarshal(txBytes, &txBytesAndStatus); err != nil {
+		return nil, status.Unknown, err
+	}
+
+	tx, err := txs.Parse(txs.GenesisCodec, txBytesAndStatus.Tx)
+	if err != nil {
+		return nil, status.Unknown, err
+	}
+
+	txAndStatus := &txAndStatus{
+		tx:     tx,
+		status: txBytesAndStatus.Status,
+	}
+
+	return txAndStatus.tx, txAndStatus.status, nil
 }
 
 func (s *state) AddTx(tx *txs.Tx, status status.Status) {
@@ -680,13 +676,13 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	it := txDB.NewIterator()
 	defer it.Release()
 
-	utxos := []*avax.UTXO(nil)
+	var utxos []*avax.UTXO
 	for it.Next() {
-		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		var utxo avax.UTXO
+		if _, err := txs.Codec.Unmarshal(it.Value(), &utxo); err != nil {
 			return nil, err
 		}
-		utxos = append(utxos, utxo)
+		utxos = append(utxos, &utxo)
 	}
 	if err := it.Error(); err != nil {
 		return nil, err
@@ -708,20 +704,16 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	}
 
 	key := merkleUtxoIDKey(utxoID)
-	switch bytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		utxo := &avax.UTXO{}
-		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
-			return nil, err
-		}
-		return utxo, nil
-
-	case database.ErrNotFound:
-		return nil, database.ErrNotFound
-
-	default:
+	bytes, err := s.merkleDB.Get(key)
+	if err != nil {
 		return nil, err
 	}
+
+	var utxo avax.UTXO
+	if _, err := txs.GenesisCodec.Unmarshal(bytes, &utxo); err != nil {
+		return nil, err
+	}
+	return &utxo, nil
 }
 
 func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
@@ -746,6 +738,8 @@ func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) 
 		start = ids.Empty
 		utxoIDs = append(utxoIDs, utxoID)
 	}
+
+	// TODO do we need to account for UTXOs in [s.modifiedUTXOs]?
 	return utxoIDs, iter.Error()
 }
 
