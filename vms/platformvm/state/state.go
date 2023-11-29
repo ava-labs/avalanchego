@@ -56,7 +56,6 @@ const (
 
 	valueNodeCacheSize        = 512 * units.MiB
 	intermediateNodeCacheSize = 512 * units.MiB
-	utxoCacheSize             = 8192 // from avax/utxo_state.go
 )
 
 var (
@@ -248,8 +247,7 @@ type state struct {
 	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
 
 	// UTXOs section
-	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
-	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
+	modifiedUTXOs map[ids.ID]*avax.UTXO // map of UTXO ID -> *UTXO
 
 	// Metadata section
 	chainTime, latestComittedChainTime                  time.Time
@@ -525,7 +523,6 @@ func newState(
 		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
 
 		modifiedSupplies: make(map[ids.ID]uint64),
 		suppliesCache:    supplyCache,
@@ -885,26 +882,17 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		}
 		return utxo, nil
 	}
-	if utxo, found := s.utxoCache.Get(utxoID); found {
-		if utxo == nil {
-			return nil, database.ErrNotFound
-		}
-		return utxo, nil
-	}
 
 	key := merkleUtxoIDKey(utxoID)
-
 	switch bytes, err := s.merkleDB.Get(key); err {
 	case nil:
 		utxo := &avax.UTXO{}
 		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
 			return nil, err
 		}
-		s.utxoCache.Put(utxoID, utxo)
 		return utxo, nil
 
 	case database.ErrNotFound:
-		s.utxoCache.Put(utxoID, nil)
 		return nil, database.ErrNotFound
 
 	default:
@@ -1931,7 +1919,6 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 		if utxo == nil { // delete the UTXO
 			switch utxo, err := s.GetUTXO(utxoID); err {
 			case nil:
-				s.utxoCache.Put(utxoID, nil)
 				*batchOps = append(*batchOps, database.BatchOp{
 					Key:    key,
 					Delete: true,
