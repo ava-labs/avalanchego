@@ -103,7 +103,7 @@ func DistributeFunds(ctx context.Context, client ethclient.Client, keys []*key.K
 	}
 
 	numTxs := uint64(len(needFundsAddrs))
-	txSequence, err := txs.GenerateTxSequence(ctx, txGenerator, client, maxFundsKey.PrivKey, numTxs)
+	txSequence, err := txs.GenerateTxSequence(ctx, txGenerator, client, maxFundsKey.PrivKey, numTxs, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate fund distribution sequence from %s of length %d", maxFundsKey.Address, len(needFundsAddrs))
 	}

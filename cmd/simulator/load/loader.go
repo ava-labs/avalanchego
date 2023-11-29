@@ -6,16 +6,13 @@ package load
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/cmd/simulator/config"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
@@ -27,14 +24,104 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
 	MetricsEndpoint = "/metrics" // Endpoint for the Prometheus Metrics Server
 )
+
+// Loader executes a series of worker/tx sequence pairs.
+// Each worker/txSequence pair issues [batchSize] transactions, confirms all
+// of them as accepted, and then moves to the next batch until the txSequence
+// is exhausted.
+type Loader[T txs.THash] struct {
+	clients     []txs.Worker[T]
+	txSequences []txs.TxSequence[T]
+	batchSize   uint64
+	metrics     *metrics.Metrics
+}
+
+func New[T txs.THash](
+	clients []txs.Worker[T],
+	txSequences []txs.TxSequence[T],
+	batchSize uint64,
+	metrics *metrics.Metrics,
+) *Loader[T] {
+	return &Loader[T]{
+		clients:     clients,
+		txSequences: txSequences,
+		batchSize:   batchSize,
+		metrics:     metrics,
+	}
+}
+
+func (l *Loader[T]) Execute(ctx context.Context) error {
+	log.Info("Constructing tx agents...", "numAgents", len(l.txSequences))
+	agents := make([]txs.Agent[T], 0, len(l.txSequences))
+	for i := 0; i < len(l.txSequences); i++ {
+		agents = append(agents, txs.NewIssueNAgent(l.txSequences[i], l.clients[i], l.batchSize, l.metrics))
+	}
+
+	log.Info("Starting tx agents...")
+	eg := errgroup.Group{}
+	for _, agent := range agents {
+		agent := agent
+		eg.Go(func() error {
+			return agent.Execute(ctx)
+		})
+	}
+
+	log.Info("Waiting for tx agents...")
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	log.Info("Tx agents completed successfully.")
+	return nil
+}
+
+// ConfirmReachedTip finds the max height any client has reached and then ensures every client
+// reaches at least that height.
+//
+// This allows the network to continue to roll forward and creates a synchronization point to ensure
+// that every client in the loader has reached at least the max height observed of any client at
+// the time this function was called.
+func (l *Loader[T]) ConfirmReachedTip(ctx context.Context) error {
+	maxHeight := uint64(0)
+	for i, client := range l.clients {
+		latestHeight, err := client.LatestHeight(ctx)
+		if err != nil {
+			return fmt.Errorf("client %d failed to get latest height: %w", i, err)
+		}
+		if latestHeight > maxHeight {
+			maxHeight = latestHeight
+		}
+	}
+
+	eg := errgroup.Group{}
+	for i, client := range l.clients {
+		i := i
+		client := client
+		eg.Go(func() error {
+			for {
+				latestHeight, err := client.LatestHeight(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get latest height from client %d: %w", i, err)
+				}
+				if latestHeight >= maxHeight {
+					return nil
+				}
+				select {
+				case <-ctx.Done():
+					return fmt.Errorf("failed to get latest height from client %d: %w", i, ctx.Err())
+				case <-time.After(time.Second):
+				}
+			}
+		})
+	}
+
+	return eg.Wait()
+}
 
 // ExecuteLoader creates txSequences from [config] and has txAgents execute the specified simulation.
 func ExecuteLoader(ctx context.Context, config config.Config) error {
@@ -61,6 +148,10 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 		// Cancel the child context and end all processes
 		cancel()
 	}()
+
+	m := metrics.NewDefaultMetrics()
+	ms := m.Serve(ctx, strconv.Itoa(int(config.MetricsPort)), MetricsEndpoint)
+	defer ms.Shutdown()
 
 	// Construct the arguments for the load simulator
 	clients := make([]ethclient.Client, 0, len(config.Endpoints))
@@ -96,11 +187,6 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	maxFeeCap := new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(config.MaxFeeCap))
 	minFundsPerAddr := new(big.Int).Mul(maxFeeCap, big.NewInt(int64(config.TxsPerWorker*params.TxGas)))
 
-	// Create metrics
-	reg := prometheus.NewRegistry()
-	m := metrics.NewMetrics(reg)
-	metricsPort := strconv.Itoa(int(config.MetricsPort))
-
 	log.Info("Distributing funds", "numTxsPerWorker", config.TxsPerWorker, "minFunds", minFundsPerAddr)
 	keys, err = DistributeFunds(ctx, clients[0], keys, config.Workers, minFundsPerAddr, m)
 	if err != nil {
@@ -128,7 +214,7 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	log.Info("Creating transaction sequences...")
 	txGenerator := func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error) {
 		addr := ethcrypto.PubkeyToAddress(key.PublicKey)
-		tx, err := types.SignNewTx(key, signer, &types.DynamicFeeTx{
+		return types.SignNewTx(key, signer, &types.DynamicFeeTx{
 			ChainID:   chainID,
 			Nonce:     nonce,
 			GasTipCap: gasTipCap,
@@ -138,84 +224,19 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 			Data:      nil,
 			Value:     common.Big0,
 		})
-		if err != nil {
-			return nil, err
-		}
-		return tx, nil
 	}
-	txSequences, err := txs.GenerateTxSequences(ctx, txGenerator, clients[0], pks, config.TxsPerWorker)
+
+	txSequences, err := txs.GenerateTxSequences(ctx, txGenerator, clients[0], pks, config.TxsPerWorker, false)
 	if err != nil {
 		return err
 	}
 
-	log.Info("Constructing tx agents...", "numAgents", config.Workers)
-	agents := make([]txs.Agent[*types.Transaction], 0, config.Workers)
-	for i := 0; i < config.Workers; i++ {
-		agents = append(agents, txs.NewIssueNAgent[*types.Transaction](txSequences[i], NewSingleAddressTxWorker(ctx, clients[i], senders[i]), config.BatchSize, m))
+	workers := make([]txs.Worker[*types.Transaction], 0, len(clients))
+	for i, client := range clients {
+		workers = append(workers, NewSingleAddressTxWorker(ctx, client, ethcrypto.PubkeyToAddress(pks[i].PublicKey)))
 	}
-
-	log.Info("Starting tx agents...")
-	eg := errgroup.Group{}
-	for _, agent := range agents {
-		agent := agent
-		eg.Go(func() error {
-			return agent.Execute(ctx)
-		})
-	}
-
-	go startMetricsServer(ctx, metricsPort, reg)
-
-	log.Info("Waiting for tx agents...")
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-	log.Info("Tx agents completed successfully.")
-
-	printOutputFromMetricsServer(metricsPort)
-	return nil
-}
-
-func startMetricsServer(ctx context.Context, metricsPort string, reg *prometheus.Registry) {
-	// Create a prometheus server to expose individual tx metrics
-	server := &http.Server{
-		Addr: fmt.Sprintf(":%s", metricsPort),
-	}
-
-	// Start up go routine to listen for SIGINT notifications to gracefully shut down server
-	go func() {
-		// Blocks until signal is received
-		<-ctx.Done()
-
-		if err := server.Shutdown(ctx); err != nil {
-			log.Error("Metrics server error: %v", err)
-		}
-		log.Info("Received a SIGINT signal: Gracefully shutting down metrics server")
-	}()
-
-	// Start metrics server
-	http.Handle(MetricsEndpoint, promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
-	log.Info(fmt.Sprintf("Metrics Server: localhost:%s%s", metricsPort, MetricsEndpoint))
-	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Error("Metrics server error: %v", err)
-	}
-}
-
-func printOutputFromMetricsServer(metricsPort string) {
-	// Get response from server
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%s%s", metricsPort, MetricsEndpoint))
-	if err != nil {
-		log.Error("cannot get response from metrics servers", "err", err)
-		return
-	}
-	// Read response body
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Error("cannot read response body", "err", err)
-		return
-	}
-	// Print out formatted individual metrics
-	parts := strings.Split(string(respBody), "\n")
-	for _, s := range parts {
-		fmt.Printf("       \t\t\t%s\n", s)
-	}
+	loader := New(workers, txSequences, config.BatchSize, m)
+	err = loader.Execute(ctx)
+	ms.Print() // Print regardless of execution error
+	return err
 }

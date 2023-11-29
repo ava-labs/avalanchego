@@ -17,34 +17,56 @@ var _ TxSequence[*types.Transaction] = (*txSequence)(nil)
 
 type CreateTx func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error)
 
-// GenerateTxSequence fetches the current nonce of key and calls [generator] [numTxs] times sequentially to generate a sequence of transactions.
-func GenerateTxSequence(ctx context.Context, generator CreateTx, client ethclient.Client, key *ecdsa.PrivateKey, numTxs uint64) (TxSequence[*types.Transaction], error) {
-	address := ethcrypto.PubkeyToAddress(key.PublicKey)
-	startingNonce, err := client.NonceAt(ctx, address, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch nonce for address %s: %w", address, err)
+func GenerateTxSequence(ctx context.Context, generator CreateTx, client ethclient.Client, key *ecdsa.PrivateKey, numTxs uint64, async bool) (TxSequence[*types.Transaction], error) {
+	sequence := &txSequence{
+		txChan: make(chan *types.Transaction, numTxs),
 	}
-	txs := make([]*types.Transaction, 0, numTxs)
-	for i := uint64(0); i < numTxs; i++ {
-		tx, err := generator(key, startingNonce+i)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign tx at index %d: %w", i, err)
+
+	if async {
+		go func() {
+			defer close(sequence.txChan)
+
+			if err := addTxs(ctx, sequence, generator, client, key, numTxs); err != nil {
+				panic(err)
+			}
+		}()
+	} else {
+		if err := addTxs(ctx, sequence, generator, client, key, numTxs); err != nil {
+			return nil, err
 		}
-		txs = append(txs, tx)
+		close(sequence.txChan)
 	}
-	return ConvertTxSliceToSequence(txs), nil
+
+	return sequence, nil
 }
 
-func GenerateTxSequences(ctx context.Context, generator CreateTx, client ethclient.Client, keys []*ecdsa.PrivateKey, txsPerKey uint64) ([]TxSequence[*types.Transaction], error) {
+func GenerateTxSequences(ctx context.Context, generator CreateTx, client ethclient.Client, keys []*ecdsa.PrivateKey, txsPerKey uint64, async bool) ([]TxSequence[*types.Transaction], error) {
 	txSequences := make([]TxSequence[*types.Transaction], len(keys))
 	for i, key := range keys {
-		txs, err := GenerateTxSequence(ctx, generator, client, key, txsPerKey)
+		txs, err := GenerateTxSequence(ctx, generator, client, key, txsPerKey, async)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate tx sequence at index %d: %w", i, err)
 		}
 		txSequences[i] = txs
 	}
 	return txSequences, nil
+}
+
+func addTxs(ctx context.Context, txSequence *txSequence, generator CreateTx, client ethclient.Client, key *ecdsa.PrivateKey, numTxs uint64) error {
+	address := ethcrypto.PubkeyToAddress(key.PublicKey)
+	startingNonce, err := client.NonceAt(ctx, address, nil)
+	if err != nil {
+		return err
+	}
+	for i := uint64(0); i < numTxs; i++ {
+		tx, err := generator(key, startingNonce+i)
+		if err != nil {
+			return err
+		}
+		txSequence.txChan <- tx
+	}
+
+	return nil
 }
 
 type txSequence struct {

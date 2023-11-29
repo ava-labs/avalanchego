@@ -19,7 +19,7 @@ type Key struct {
 	Address common.Address
 }
 
-func createKey(pk *ecdsa.PrivateKey) *Key {
+func CreateKey(pk *ecdsa.PrivateKey) *Key {
 	return &Key{pk, ethcrypto.PubkeyToAddress(pk.PublicKey)}
 }
 
@@ -29,7 +29,7 @@ func Load(file string) (*Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("problem loading private key from %s: %w", file, err)
 	}
-	return createKey(pk), nil
+	return CreateKey(pk), nil
 }
 
 // LoadAll loads all keys in [dir].
@@ -81,5 +81,5 @@ func Generate() (*Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: cannot generate key", err)
 	}
-	return createKey(pk), nil
+	return CreateKey(pk), nil
 }

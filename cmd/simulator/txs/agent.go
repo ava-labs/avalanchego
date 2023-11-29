@@ -31,7 +31,7 @@ type TxSequence[T THash] interface {
 type Worker[T THash] interface {
 	IssueTx(ctx context.Context, tx T) error
 	ConfirmTx(ctx context.Context, tx T) error
-	Close(ctx context.Context) error
+	LatestHeight(ctx context.Context) (uint64, error)
 }
 
 // Execute the work of the given agent.
@@ -74,12 +74,6 @@ func (a issueNAgent[T]) Execute(ctx context.Context) error {
 		totalIssuedTime    time.Duration
 		totalConfirmedTime time.Duration
 	)
-
-	defer func() {
-		if err := a.worker.Close(ctx); err != nil {
-			log.Error("error trying to close worker: %w", "err", err)
-		}
-	}()
 
 	// Start time for execution
 	start := time.Now()
