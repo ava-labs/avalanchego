@@ -53,3 +53,18 @@ func (mr *MockWindowerMockRecorder) Delay(arg0, arg1, arg2, arg3, arg4 interface
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*MockWindower)(nil).Delay), arg0, arg1, arg2, arg3, arg4)
 }
+
+// ExpectedProposer mocks base method.
+func (m *MockWindower) ExpectedProposer(arg0 context.Context, arg1, arg2 uint64, arg3, arg4 time.Time) (ids.NodeID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExpectedProposer", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(ids.NodeID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExpectedProposer indicates an expected call of ExpectedProposer.
+func (mr *MockWindowerMockRecorder) ExpectedProposer(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectedProposer", reflect.TypeOf((*MockWindower)(nil).ExpectedProposer), arg0, arg1, arg2, arg3, arg4)
+}
