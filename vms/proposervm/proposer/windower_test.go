@@ -33,9 +33,19 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	w := New(vdrState, subnetID, chainID)
 
-	delay, err := w.Delay(context.Background(), 1, 0, nodeID, MaxVerifyWindows)
+	var (
+		chainHeight     = uint64(1)
+		pChainHeight    = uint64(0)
+		blockTime       = time.Now().Truncate(time.Second)
+		parentBlockTime = time.Now().Truncate(time.Second).Add(time.Second)
+	)
+	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
 	require.NoError(err)
 	require.Zero(delay)
+
+	expectedProposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, blockTime, parentBlockTime)
+	require.ErrorIs(err, ErrNoProposersAvailable)
+	require.Equal(ids.EmptyNodeID, expectedProposer)
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {

@@ -5,6 +5,8 @@ package proposer
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,7 +28,11 @@ const (
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 )
 
-var _ Windower = (*windower)(nil)
+var (
+	_ Windower = (*windower)(nil)
+
+	ErrNoProposersAvailable = errors.New("no proposers available")
+)
 
 type Windower interface {
 	// Delay returns the amount of time that [validatorID] must wait before
@@ -116,7 +122,7 @@ func (w *windower) ExpectedProposer(
 
 	indices, err := w.sampler.Sample(numToSample)
 	if err != nil {
-		return ids.EmptyNodeID, err
+		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
 	}
 	return validators[indices[0]].id, nil
 }
