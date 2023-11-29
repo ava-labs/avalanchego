@@ -295,8 +295,7 @@ type state struct {
 	flatValidatorPublicKeyDiffsDB database.Database
 
 	// Reward UTXOs section
-	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
 	rewardUTXOsDB    database.Database
 }
 
@@ -433,15 +432,6 @@ func newState(
 		return nil, err
 	}
 
-	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
-		"reward_utxos_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -531,7 +521,6 @@ func newState(
 		flatValidatorPublicKeyDiffsDB: flatValidatorPublicKeyDiffsDB,
 
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
-		rewardUTXOsCache: rewardUTXOsCache,
 		rewardUTXOsDB:    rewardUTXOsDB,
 	}, nil
 }
@@ -803,9 +792,6 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
 	}
-	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
-		return utxos, nil
-	}
 
 	rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
 	txDB := linkeddb.NewDefault(rawTxDB)
@@ -824,7 +810,6 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 		return nil, err
 	}
 
-	s.rewardUTXOsCache.Put(txID, utxos)
 	return utxos, nil
 }
 
@@ -1841,7 +1826,6 @@ func (s *state) writeTxs() error {
 func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
 		rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
 		txDB := linkeddb.NewDefault(rawTxDB)
 
