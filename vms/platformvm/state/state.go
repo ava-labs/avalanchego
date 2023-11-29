@@ -252,9 +252,8 @@ type state struct {
 	// Metadata section
 	chainTime, latestComittedChainTime                  time.Time
 	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
-	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
-	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
-	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	lastAcceptedHeight                                  uint64            // TODO: Should this be written to state??
+	modifiedSupplies                                    map[ids.ID]uint64 // map of subnetID -> current supply
 
 	// Subnets section
 	// Subnet ID --> Owner of the subnet
@@ -525,7 +524,6 @@ func newState(
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 
 		modifiedSupplies: make(map[ids.ID]uint64),
-		suppliesCache:    supplyCache,
 
 		subnetOwners:     make(map[ids.ID]fx.Owner),
 		subnetOwnerCache: subnetOwnerCache,
@@ -962,27 +960,17 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	if ok {
 		return supply, nil
 	}
-	cachedSupply, ok := s.suppliesCache.Get(subnetID)
-	if ok {
-		if cachedSupply == nil {
-			return 0, database.ErrNotFound
-		}
-		return *cachedSupply, nil
-	}
 
 	key := merkleSuppliesKey(subnetID)
-
 	switch supplyBytes, err := s.merkleDB.Get(key); err {
 	case nil:
 		supply, err := database.ParseUInt64(supplyBytes)
 		if err != nil {
 			return 0, fmt.Errorf("failed parsing supply: %w", err)
 		}
-		s.suppliesCache.Put(subnetID, &supply)
 		return supply, nil
 
 	case database.ErrNotFound:
-		s.suppliesCache.Put(subnetID, nil)
 		return 0, database.ErrNotFound
 
 	default:
@@ -2095,7 +2083,6 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 	for subnetID, supply := range s.modifiedSupplies {
 		supply := supply
 		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
-		s.suppliesCache.Put(subnetID, &supply)
 
 		key := merkleSuppliesKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
